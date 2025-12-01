@@ -1,25 +1,19 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
-	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // completeJobRequest represents the request body for job completion.
@@ -240,50 +234,5 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-// maybeCompleteMultiStepRunForJob is a helper that publishes terminal events
-// when a run completes. It's used by the job-level completion endpoint.
-// This reuses the existing maybeCompleteMultiStepRun logic from nodes_complete.go.
-// Note: The actual implementation is in nodes_complete.go and is shared.
-
-// publishRunCompletionEvents publishes terminal ticket and done status events.
-// This is a helper extracted from maybeCompleteMultiStepRun for potential reuse.
-func publishRunCompletionEvents(ctx context.Context, eventsService *events.Service, run store.Run, runID pgtype.UUID, runStatus store.RunStatus) {
-	if eventsService == nil {
-		return
-	}
-
-	// Map store.RunStatus to modsapi.TicketState.
-	var ticketState modsapi.TicketState
-	switch runStatus {
-	case store.RunStatusSucceeded:
-		ticketState = modsapi.TicketStateSucceeded
-	case store.RunStatusFailed:
-		ticketState = modsapi.TicketStateFailed
-	case store.RunStatusCanceled:
-		ticketState = modsapi.TicketStateCancelled
-	default:
-		ticketState = modsapi.TicketStateFailed
-	}
-
-	runUUID := uuid.UUID(runID.Bytes)
-	ticketSummary := modsapi.TicketSummary{
-		TicketID:   domaintypes.TicketID(runUUID.String()),
-		State:      ticketState,
-		Repository: run.RepoUrl,
-		CreatedAt:  run.CreatedAt.Time,
-		UpdatedAt:  time.Now().UTC(),
-		Stages:     make(map[string]modsapi.StageStatus),
-	}
-	if err := eventsService.PublishTicket(ctx, runUUID.String(), ticketSummary); err != nil {
-		slog.Error("publish run completion: ticket event failed", "run_id", runID, "err", err)
-	}
-
-	// Publish done event to signal stream completion.
-	doneStatus := logstream.Status{Status: "done"}
-	if err := eventsService.Hub().PublishStatus(ctx, runUUID.String(), doneStatus); err != nil {
-		slog.Error("publish run completion: done status failed", "run_id", runID, "err", err)
 	}
 }

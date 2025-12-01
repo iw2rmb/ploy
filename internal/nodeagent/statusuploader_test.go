@@ -518,3 +518,85 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 		t.Error("stats not present or not a map in payload")
 	}
 }
+
+func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testing.T) {
+	t.Parallel()
+
+	var receivedPayload map[string]interface{}
+	jobID := types.JobID("test-job-id-uuid")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST request, got %s", r.Method)
+		}
+		expectedPath := "/v1/jobs/" + string(jobID) + "/complete"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %s", ct)
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
+			t.Errorf("failed to decode payload: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "ignored-node-id",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	uploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		t.Fatalf("failed to create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	exitCode := int32(0)
+	stats := types.RunStats{
+		"exit_code":   0,
+		"duration_ms": 1000,
+	}
+
+	err = uploader.UploadJobStatus(ctx, jobID, "succeeded", &exitCode, stats)
+	if err != nil {
+		t.Fatalf("unexpected error uploading job status: %v", err)
+	}
+
+	if receivedPayload["status"] != "succeeded" {
+		t.Errorf("expected status=succeeded, got %v", receivedPayload["status"])
+	}
+
+	if ec, ok := receivedPayload["exit_code"].(float64); !ok || ec != 0 {
+		t.Errorf("expected exit_code=0, got %v", receivedPayload["exit_code"])
+	}
+
+	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
+		if exitCodeVal, ok := statsPayload["exit_code"].(float64); !ok || exitCodeVal != 0 {
+			t.Errorf("expected stats.exit_code=0, got %v", statsPayload["exit_code"])
+		}
+	} else {
+		t.Error("stats not present or not a map in payload")
+	}
+
+	if _, ok := receivedPayload["run_id"]; ok {
+		t.Error("did not expect run_id in job-level payload")
+	}
+	if _, ok := receivedPayload["job_id"]; ok {
+		t.Error("did not expect job_id in payload; it is encoded in the URL")
+	}
+	if _, ok := receivedPayload["step_index"]; ok {
+		t.Error("did not expect step_index in job-level payload")
+	}
+}

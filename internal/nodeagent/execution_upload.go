@@ -198,8 +198,8 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := statusUploader.UploadStatus(statusCtx, runID, status, exitCode, stats, stepIndex, jobID); uploadErr != nil {
-		return fmt.Errorf("upload status: %w", uploadErr)
+	if uploadErr := statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats); uploadErr != nil {
+		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
 	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", exitCode, "step_index", stepIndex)
