@@ -170,10 +170,25 @@ NodeBuildGateClaimResponse:
   required: [job_id, request, status]
 
 # Response returned by POST /v1/nodes/{id}/claim
+# Schema aligned with claimJobHandler response — exposes job-centric fields.
 NodeClaimResponse:
   type: object
   properties:
-    id: { type: string, format: uuid }
+    id:
+      type: string
+      format: uuid
+      description: Run ID (parent run of the claimed job)
+    job_id:
+      type: string
+      format: uuid
+      description: Claimed job ID
+    job_name:
+      type: string
+      description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
+    job_meta:
+      type: object
+      additionalProperties: true
+      description: Job metadata (mod_type, mod_image, etc.)
     repo_url: { type: string }
     status: { type: string }
     node_id: { type: string, format: uuid }
@@ -181,23 +196,30 @@ NodeClaimResponse:
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
     step_index:
-      type: integer
-      format: int32
-      nullable: true
-      description: |
-        Present for multi-node execution when a specific step was claimed.
-        When null, the node should execute all steps sequentially (traditional single-node execution).
-        When present, the node should execute only the specified step (multi-node step-level execution).
+      type: number
+      format: double
+      description: Float index used for job ordering; always present for claimed jobs
     started_at: { type: string, format: date-time }
     created_at: { type: string, format: date-time }
     spec:
       description: |
         Opaque run specification JSON merged by the server at claim time.
-        May include fields like `job_id`, `gitlab_pat`, `gitlab_domain`,
-        `mr_on_success`, and `mr_on_fail`.
+        Includes `job_id` and any server defaults (e.g., `gitlab_pat`, `gitlab_domain`,
+        `mr_on_success`, `mr_on_fail`).
       type: object
       additionalProperties: true
-  required: [id, repo_url, status, node_id, base_ref, target_ref, started_at, created_at]
+  required:
+    - id
+    - job_id
+    - job_name
+    - repo_url
+    - status
+    - node_id
+    - base_ref
+    - target_ref
+    - step_index
+    - started_at
+    - created_at
 
 Event:
   type: object
