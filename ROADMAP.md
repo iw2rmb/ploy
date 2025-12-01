@@ -317,7 +317,7 @@ Legend: [ ] todo, [x] done.
 
 ## 5. Align `NodeClaimResponse` schema with job-centric claim response
 
-- [ ] Update `NodeClaimResponse` to expose `job_id`, `job_name`, `job_meta`, and the non-null float `step_index` — keep schema aligned with `claimJobHandler` response
+- [x] Update `NodeClaimResponse` to expose `job_id`, `job_name`, `job_meta`, and the non-null float `step_index` — keep schema aligned with `claimJobHandler` response
   - Component: OpenAPI components (`docs/api/components/schemas/controlplane.yaml`), server handler (`internal/server/handlers/nodes_claim.go`), CLI/nodeagent consumers.
   - Scope:
     - Edit `NodeClaimResponse` in `docs/api/components/schemas/controlplane.yaml`:
