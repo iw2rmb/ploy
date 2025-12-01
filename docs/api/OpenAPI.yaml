@@ -86,6 +86,9 @@ paths:
   # Node run completion endpoint
   /v1/nodes/{id}/complete:
     $ref: './paths/nodes_id_complete.yaml'
+  # Job-level completion endpoint (job-scoped, no node ID)
+  /v1/jobs/{job_id}/complete:
+    $ref: './paths/jobs_job_id_complete.yaml'
   # Node events endpoint
   /v1/nodes/{id}/events:
     $ref: './paths/nodes_id_events.yaml'
