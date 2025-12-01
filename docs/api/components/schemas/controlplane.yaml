@@ -18,13 +18,15 @@ CreateRepoRequest:
 
 Run:
   type: object
+  # Note: The `reason` field was removed to prevent schema drift from the DB model.
+  # Failure context is derived from `stats.exit_code` and `metadata`. The `stats`
+  # field contains job/run metrics including exit codes; use it for failure analysis.
   properties:
     id: { type: string, format: uuid }
     repo_url: { type: string }
     spec: {}
     created_by: { type: string, nullable: true }
     status: { type: string }
-    reason: { type: string, nullable: true }
     created_at: { type: string, format: date-time }
     started_at: { type: string, format: date-time, nullable: true }
     finished_at: { type: string, format: date-time, nullable: true }
@@ -32,7 +34,14 @@ Run:
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
-    stats: {}
+    stats:
+      description: |
+        Job/run metrics JSON object. Contains exit_code for failure context,
+        gate results, and other execution statistics. Replaces the deprecated
+        `reason` field for failure analysis.
+      type: object
+      additionalProperties: true
+      nullable: true
   required: [id, repo_url, status, created_at, base_ref, target_ref]
 
 CreateRunRequest:
@@ -74,12 +83,14 @@ TicketSummary:
   required: [ticket_id, status, repo_url, base_ref, target_ref]
 
 # Detailed status returned by GET /v1/mods/{id}
+# Note: The `reason` field was removed to prevent schema drift from the DB model.
+# Failure context is derived from job `stats.exit_code` and `metadata`. Cancellation
+# reasons are stored in `metadata.reason` by the cancel endpoint.
 TicketStatus:
   type: object
   properties:
     ticket_id: { type: string, format: uuid }
     status: { type: string }
-    reason: { type: string, nullable: true }
     repo_url: { type: string }
     base_ref: { type: string }
     target_ref: { type: string }
@@ -88,7 +99,12 @@ TicketStatus:
     started_at: { type: string, format: date-time, nullable: true }
     finished_at: { type: string, format: date-time, nullable: true }
     metadata:
-      description: Additional ticket metadata (e.g., mr_url)
+      description: |
+        Additional ticket metadata. Contains derived failure/cancellation context:
+        - `reason`: Human-readable cancellation reason (set by cancel endpoint)
+        - `mr_url`: Merge request URL when available
+        - `gate_summary`: Gate health summary from stats
+        - `node_id`: Claiming node identifier
       type: object
       additionalProperties:
         type: string
