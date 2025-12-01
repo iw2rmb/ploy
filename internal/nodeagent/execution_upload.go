@@ -186,7 +186,8 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 // It uses a short, detached context to ensure the status is reported even if the
 // run context is cancelled. Retry logic is handled by StatusUploader.
 // exitCode is the exit code from job execution (required for terminal status).
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex) error {
+// jobID is the authoritative job identifier (avoids float equality issues with step_index).
+func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex, jobID types.JobID) error {
 	statusUploader, err := NewStatusUploader(r.cfg)
 	if err != nil {
 		return fmt.Errorf("create status uploader: %w", err)
@@ -197,11 +198,11 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := statusUploader.UploadStatus(statusCtx, runID, status, exitCode, stats, stepIndex); uploadErr != nil {
+	if uploadErr := statusUploader.UploadStatus(statusCtx, runID, status, exitCode, stats, stepIndex, jobID); uploadErr != nil {
 		return fmt.Errorf("upload status: %w", uploadErr)
 	}
 
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "status", status, "exit_code", exitCode, "step_index", stepIndex)
+	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", exitCode, "step_index", stepIndex)
 	return nil
 }
 

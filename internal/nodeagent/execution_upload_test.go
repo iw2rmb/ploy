@@ -377,11 +377,11 @@ func TestRunController_uploadStatus(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			// Execute upload.
+			// Execute upload with job_id.
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := map[string]interface{}{"exit_code": 0}
-			err := controller.uploadStatus(ctx, "test-run", "succeeded", &exitCode, stats, 1000)
+			err := controller.uploadStatus(ctx, "test-run", "succeeded", &exitCode, stats, 1000, "test-job-id")
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
