@@ -527,16 +527,12 @@ func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 		}
 	}
 
-	// Verify mod jobs (index 1-3) have correct mod_image metadata.
+	// Verify mod jobs (index 1-3) have correct mod_image column.
 	for i := 1; i <= 3; i++ {
 		params := st.createJobParams[i]
-		var meta modsapi.StageMetadata
-		if err := json.Unmarshal(params.Meta, &meta); err != nil {
-			t.Fatalf("failed to unmarshal job %d metadata: %v", i, err)
-		}
 		expectedImage := fmt.Sprintf("img%d:latest", i)
-		if meta.ModImage != expectedImage {
-			t.Errorf("expected mod job %d mod_image %q, got %q", i, expectedImage, meta.ModImage)
+		if params.ModImage != expectedImage {
+			t.Errorf("expected mod job %d mod_image %q, got %q", i, expectedImage, params.ModImage)
 		}
 	}
 }

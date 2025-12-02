@@ -447,7 +447,8 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusFailed, // pre-gate failed initially
 			StepIndex: 1000,
-			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+			ModType:   "pre_gate",
+			Meta:      []byte(`{}`),
 		},
 		{
 			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
@@ -455,7 +456,8 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusSucceeded, // healing job succeeded
 			StepIndex: 1100,
-			Meta:      []byte(`{"mod_type":"heal"}`),
+			ModType:   "heal",
+			Meta:      []byte(`{}`),
 		},
 		{
 			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
@@ -463,7 +465,8 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusSucceeded, // re-gate succeeded (final gate)
 			StepIndex: 1200,
-			Meta:      []byte(`{"mod_type":"re_gate"}`),
+			ModType:   "re_gate",
+			Meta:      []byte(`{}`),
 		},
 		{
 			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
@@ -471,7 +474,8 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // mod running (to be completed)
 			StepIndex: 2000,
-			Meta:      []byte(`{"mod_type":"mod"}`),
+			ModType:   "mod",
+			Meta:      []byte(`{}`),
 		},
 	}
 
@@ -531,7 +535,8 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusSucceeded, // pre-gate succeeded
 			StepIndex: 1000,
-			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+			ModType:   "pre_gate",
+			Meta:      []byte(`{}`),
 		},
 		{
 			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
@@ -539,7 +544,8 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // mod running, about to fail
 			StepIndex: 2000,
-			Meta:      []byte(`{"mod_type":"mod"}`),
+			ModType:   "mod",
+			Meta:      []byte(`{}`),
 		},
 	}
 
@@ -599,7 +605,8 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusSucceeded, // pre-gate succeeded
 			StepIndex: 1000,
-			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+			ModType:   "pre_gate",
+			Meta:      []byte(`{}`),
 		},
 		{
 			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
@@ -842,7 +849,8 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // mod running, about to be canceled
 			StepIndex: 2000,
-			Meta:      []byte(`{"mod_type":"mod"}`),
+			ModType:   "mod",
+			Meta:      []byte(`{}`),
 		},
 	}
 

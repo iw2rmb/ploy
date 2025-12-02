@@ -26,7 +26,8 @@ type ClaimResponse struct {
 	ID        types.RunID     `json:"id"`         // Run ID
 	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
 	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-	JobMeta   json.RawMessage `json:"job_meta"`   // Job metadata (ModType, ModImage, etc.)
+	ModType   string          `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+	ModImage  string          `json:"mod_image"`  // Container image for mod/heal jobs
 	StepIndex types.StepIndex `json:"step_index"` // Job ordering index
 	RepoURL   string          `json:"repo_url"`
 	Status    string          `json:"status"`
@@ -37,15 +38,6 @@ type ClaimResponse struct {
 	StartedAt string          `json:"started_at"`
 	CreatedAt string          `json:"created_at"`
 	Spec      json.RawMessage `json:"spec,omitempty"`
-}
-
-// JobMetadata represents the metadata stored in job.meta JSONB.
-// Used to identify job type (pre_gate, mod, post_gate, heal, re_gate) for dispatch.
-type JobMetadata struct {
-	ModType   string `json:"mod_type,omitempty"`   // "pre_gate", "mod", "post_gate", "heal", "re_gate"
-	ModImage  string `json:"mod_image,omitempty"`  // Container image for mod/heal jobs
-	StepIndex int    `json:"step_index,omitempty"` // 0-based step index for multi-step runs
-	StepTotal int    `json:"step_total,omitempty"` // Total step count for multi-step runs
 }
 
 // NewClaimManager constructs a claim manager with HTTP client and buildgate executor.

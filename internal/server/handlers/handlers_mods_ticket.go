@@ -366,25 +366,15 @@ func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, 
 // modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
 // status should be JobStatusPending for the first job, JobStatusCreated for others.
 func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
-	// Build job metadata with type information.
-	jobMeta := modsapi.StageMetadata{
-		ModType:  modType,
-		ModImage: modImage,
-	}
-	metaBytes, err := json.Marshal(jobMeta)
-	if err != nil {
-		return fmt.Errorf("marshal job metadata: %w", err)
-	}
-
 	// Create the job with step_index and status.
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
+	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		RunID:     runID,
 		Name:      name,
 		Status:    status,
 		ModType:   modType,
 		ModImage:  modImage,
 		StepIndex: stepIndex,
-		Meta:      metaBytes,
+		Meta:      []byte(`{}`),
 	})
 	return err
 }

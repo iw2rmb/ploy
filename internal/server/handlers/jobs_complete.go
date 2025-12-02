@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -214,7 +213,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					"err", jobsErr,
 				)
 			} else {
-				if modsapi.IsGateJob(job.Meta) {
+				modType := strings.TrimSpace(job.ModType)
+				if modType == "pre_gate" || modType == "post_gate" || modType == "re_gate" {
 					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
 						slog.Error("complete job: failed to create healing jobs",
 							"job_id", jobIDStr,
