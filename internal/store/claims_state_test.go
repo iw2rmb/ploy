@@ -49,6 +49,8 @@ func TestClaimJob_Basic(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "test-job",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -126,6 +128,8 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-1",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -137,6 +141,8 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-2",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 2000,
 		Meta:      []byte(`{}`),
@@ -148,6 +154,8 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-3",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 3000,
 		Meta:      []byte(`{}`),
@@ -241,6 +249,8 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			RunID:     run.ID,
 			Name:      "job-" + strconv.Itoa(i),
+			ModType:   "",
+			ModImage:  "",
 			Status:    JobStatusPending,
 			StepIndex: float64(1000 + i*100),
 			Meta:      []byte(`{}`),
@@ -386,6 +396,8 @@ func TestAckRunStart_Basic(t *testing.T) {
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "test-job",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -506,6 +518,8 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "test-job",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -578,6 +592,8 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "test-job",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -659,6 +675,8 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-3",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 3000,
 		Meta:      []byte(`{}`),
@@ -670,6 +688,8 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-1",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
@@ -681,6 +701,8 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		RunID:     run.ID,
 		Name:      "job-2",
+		ModType:   "",
+		ModImage:  "",
 		Status:    JobStatusPending,
 		StepIndex: 2000,
 		Meta:      []byte(`{}`),
@@ -756,6 +778,8 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		RunID:     run.ID,
 		Name:      "running-job",
 		Status:    JobStatusRunning,
+		ModType:   "",
+		ModImage:  "",
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})

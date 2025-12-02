@@ -71,7 +71,7 @@ Ploy uses **shallow git clones** (via `internal/worker/hydration.GitFetcher`) to
 **Testing:** See `internal/worker/hydration/git_fetcher_test.go` for validation of shallow clone depth, commit pinning, and deterministic base snapshot behavior.
 
 ## Database (PostgreSQL) — pgx + sqlc
-- Use `pgx/v5` with `pgxpool` and typed `sqlc` queries as the default data layer (schema in `SCHEMA.sql`).
+- Use `pgx/v5` with `pgxpool` and typed `sqlc` queries as the default data layer (schema in `internal/store/schema.sql`).
 - Transactions: check errors on `Commit`; rollback on error with `defer tx.Rollback(ctx)`.
 - Contexts: every query accepts a `ctx` with deadlines where appropriate.
 - Migrations in `internal/store/migrations/`; queries in `internal/store/queries/`; generate code via `sqlc` and commit generated artifacts only if our CI does not run generators.

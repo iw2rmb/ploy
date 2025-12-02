@@ -7,7 +7,7 @@
 Scope: Refine the new server-driven job model and exit-code plumbing across the control plane, node agent, and documentation. Fix enum defaults, make job completion and run completion semantics consistent with Build Gate + healing, remove redundant job updates, and align OpenAPI/docs/mods lifecycle to the new job-centric model.
 
 Documentation:  
-- Schema and store: `SCHEMA.sql`, `internal/store/schema.sql`, `internal/store/models.go`, `internal/store/queries/*.sql`, `internal/store/status_conversion.go`  
+- Schema and store: `internal/store/schema.sql`, `internal/store/models.go`, `internal/store/queries/*.sql`, `internal/store/status_conversion.go`  
 - Control plane handlers: `internal/server/handlers/nodes_complete.go`, `nodes_claim.go`, `nodes_ack.go`, `handlers_mods_ticket.go`, `handlers_jobs_diff.go`, `handlers_jobs_artifact.go`  
 - Node agent: `internal/nodeagent/handlers.go`, `execution_orchestrator.go`, `execution_upload.go`, `statusuploader.go`, `claimer_loop.go`, `execution_healing.go`  
 - Mods domain + lifecycle: `internal/mods/api/types.go`, `internal/mods/api/status_conversion.go`, `docs/mods-lifecycle.md`  
@@ -18,16 +18,16 @@ Legend: [ ] todo, [x] done.
 ## 1. Fix `builds.status` enum default and remove `'pending'` from `job_status`
 
 - [x] Align `builds.status` with `job_status` and drop `'pending'` from the enum — prevent schema apply failures and keep status vocabulary consistent
-  - Component: server store schema (`SCHEMA.sql`, `internal/store/schema.sql`), generated models (`internal/store/models.go`), status helpers (`internal/store/status_conversion.go`), any tests referencing `JobStatusSkipped`/`JobStatusCreated`.
+  - Component: server store schema (`internal/store/schema.sql`), generated models (`internal/store/models.go`), status helpers (`internal/store/status_conversion.go`), any tests referencing `JobStatusSkipped`/`JobStatusCreated`.
   - Scope:
     - Change `job_status` enum definition in both schema files:
       - From:
-        - `CREATE TYPE job_status AS ENUM ('created', 'scheduled', 'running', 'succeeded', 'failed', 'skipped', 'canceled');`
+        - `CREATE TYPE job_status AS ENUM ('created', 'pending', 'running', 'succeeded', 'failed', 'skipped', 'canceled');`
       - To (drop `skipped`, keep only states actually used in code; if you want to keep `skipped`, see step 2.3):
         - ```sql
           CREATE TYPE job_status AS ENUM (
             'created',
-            'scheduled',
+            'pending',
             'running',
             'succeeded',
             'failed',
@@ -36,7 +36,7 @@ Legend: [ ] todo, [x] done.
           ```
         - If you decide to keep `skipped`, update later steps accordingly.
     - Fix `builds.status` default so it is valid for `job_status`:
-      - In `SCHEMA.sql` and `internal/store/schema.sql`, update the `builds` table:
+      - In `internal/store/schema.sql`, update the `builds` table:
         - From:
           - ```sql
             status       job_status NOT NULL DEFAULT 'pending',
@@ -57,11 +57,11 @@ Legend: [ ] todo, [x] done.
         func ValidateJobStatus(status string) (JobStatus, error) {
         	s := JobStatus(status)
         	switch s {
-        	case JobStatusCreated, JobStatusScheduled, JobStatusRunning,
+        	case JobStatusCreated, JobStatusPending, JobStatusRunning,
         		JobStatusSucceeded, JobStatusFailed, JobStatusCanceled:
         		return s, nil
         	default:
-        		return "", fmt.Errorf("invalid job status: %q (expected: created, scheduled, running, succeeded, failed, canceled)", status)
+        		return "", fmt.Errorf("invalid job status: %q (expected: created, pending, running, succeeded, failed, canceled)", status)
         	}
         }
         ```
@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
       - Remove or rewrite cases that mention `skipped` if the enum no longer supports it.
   - Test:
     - Schema + store:
-      - `go test ./internal/store/...` — `SCHEMA.sql` / `internal/store/schema.sql` should embed and generate cleanly; tests that rely on status conversion must still pass.
+      - `go test ./internal/store/...` — `internal/store/schema.sql` should embed and generate cleanly; tests that rely on status conversion must still pass.
     - Integration smoke:
       - `make test` — verify no enum-related runtime failures when creating or updating builds.
 
@@ -389,13 +389,13 @@ Legend: [ ] todo, [x] done.
         - `jobs` table (`jobs.status`, `jobs.step_index`, `jobs.meta.mod_type`, `jobs.meta.mod_image`).
       - Update the “Jobs and diffs” subsection to describe:
         - Jobs created at run submission:
-          - `pre-gate` (step_index=1000, `status=scheduled`).
+          - `pre-gate` (step_index=1000, `status=pending`).
           - `mod-k` (step_index=2000+k*1000, `status=created`).
           - `post-gate` (step_index after last mod, `status=created`).
         - Healing jobs inserted between existing jobs using float `step_index` midpoints (align with `maybeCreateHealingJobs`).
         - Server-driven scheduling:
-          - Only `status=scheduled` jobs are claimable (`ClaimJob` in `internal/store/queries/jobs.sql`).
-          - After a job succeeds, `ScheduleNextJob` transitions the first `created` job to `scheduled`.
+          - Only `status=pending` jobs are claimable (`ClaimJob` in `internal/store/queries/jobs.sql`).
+          - After a job succeeds, `ScheduleNextJob` transitions the first `created` job to `pending`.
       - Document that:
         - Diffs are job-scoped (`diffs.job_id`) and rehydration uses `jobs.step_index`.
         - Node claims jobs, not runs; `job_id` is used to correlate logs, diffs, and artifacts.
@@ -407,7 +407,7 @@ Legend: [ ] todo, [x] done.
         // and is used to order jobs in multi-step Mods runs.
         ```
     - Make sure the references at the end of `docs/mods-lifecycle.md` under “Database” point to:
-      - `SCHEMA.sql` for jobs.
+      - `internal/store/schema.sql` for jobs.
       - `internal/store/queries/jobs.sql` for `ClaimJob` and `ScheduleNextJob`.
   - Test:
     - Docs consistency:
@@ -503,4 +503,3 @@ Legend: [ ] todo, [x] done.
         - binary size guardrails.
   - Test:
     - `./scripts/validate-tdd-discipline.sh` — expect all phases to pass with updated code and docs.
-

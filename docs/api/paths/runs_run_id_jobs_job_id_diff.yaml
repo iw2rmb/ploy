@@ -9,6 +9,11 @@ parameters:
     required: true
     schema: { type: string, format: uuid }
     description: Job UUID
+  - in: header
+    name: PLOY_NODE_UUID
+    required: true
+    schema: { type: string, format: uuid }
+    description: Worker node UUID uploading the diff
 post:
   tags: [Artifacts]
   summary: Upload gzipped unified diff for a job (node → server)

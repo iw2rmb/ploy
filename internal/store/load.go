@@ -7,7 +7,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-// getSchemaSQL returns the embedded SCHEMA.sql content.
+// getSchemaSQL returns the embedded internal/store/schema.sql content.
 func getSchemaSQL() string {
 	return schemaSQL
 }

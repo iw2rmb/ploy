@@ -629,6 +629,8 @@ func maybeCreateHealingJobs(
 		_, err = st.CreateJob(ctx, store.CreateJobParams{
 			RunID:     runID,
 			Name:      jobName,
+			ModType:   "heal",
+			ModImage:  modImage,
 			Status:    jobStatus,
 			StepIndex: healStepIndex,
 			Meta:      metaBytes,
@@ -660,6 +662,8 @@ func maybeCreateHealingJobs(
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		RunID:     runID,
 		Name:      reGateName,
+		ModType:   "re_gate",
+		ModImage:  "",
 		Status:    store.JobStatusCreated,
 		StepIndex: reGateStepIndex,
 		Meta:      reGateMetaBytes,

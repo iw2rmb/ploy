@@ -23,7 +23,7 @@ WITH eligible AS (
 )
 UPDATE jobs SET status = 'running', node_id = $1, started_at = now()
 FROM eligible WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
+RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
 `
 
 // Atomically claim the next pending job for a node.
@@ -37,6 +37,8 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
 		&i.RunID,
 		&i.Name,
 		&i.Status,
+		&i.ModType,
+		&i.ModImage,
 		&i.StepIndex,
 		&i.NodeID,
 		&i.ExitCode,
@@ -80,15 +82,17 @@ func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRu
 }
 
 const createJob = `-- name: CreateJob :one
-INSERT INTO jobs (run_id, name, status, step_index, meta)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+INSERT INTO jobs (run_id, name, status, mod_type, mod_image, step_index, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
 `
 
 type CreateJobParams struct {
 	RunID     pgtype.UUID `json:"run_id"`
 	Name      string      `json:"name"`
 	Status    JobStatus   `json:"status"`
+	ModType   string      `json:"mod_type"`
+	ModImage  string      `json:"mod_image"`
 	StepIndex float64     `json:"step_index"`
 	Meta      []byte      `json:"meta"`
 }
@@ -98,6 +102,8 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		arg.RunID,
 		arg.Name,
 		arg.Status,
+		arg.ModType,
+		arg.ModImage,
 		arg.StepIndex,
 		arg.Meta,
 	)
@@ -107,6 +113,8 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.RunID,
 		&i.Name,
 		&i.Status,
+		&i.ModType,
+		&i.ModImage,
 		&i.StepIndex,
 		&i.NodeID,
 		&i.ExitCode,
@@ -150,7 +158,7 @@ func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (Ge
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
 WHERE id = $1
 `
 
@@ -162,6 +170,8 @@ func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
 		&i.RunID,
 		&i.Name,
 		&i.Status,
+		&i.ModType,
+		&i.ModImage,
 		&i.StepIndex,
 		&i.NodeID,
 		&i.ExitCode,
@@ -174,7 +184,7 @@ func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
 }
 
 const listCreatedJobsByRun = `-- name: ListCreatedJobsByRun :many
-SELECT id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
 WHERE run_id = $1 AND status = 'created'
 ORDER BY step_index ASC
 `
@@ -194,6 +204,8 @@ func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) (
 			&i.RunID,
 			&i.Name,
 			&i.Status,
+			&i.ModType,
+			&i.ModImage,
 			&i.StepIndex,
 			&i.NodeID,
 			&i.ExitCode,
@@ -213,7 +225,7 @@ func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) (
 }
 
 const listJobsByRun = `-- name: ListJobsByRun :many
-SELECT id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
 WHERE run_id = $1
 ORDER BY step_index ASC
 `
@@ -232,6 +244,8 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, 
 			&i.RunID,
 			&i.Name,
 			&i.Status,
+			&i.ModType,
+			&i.ModImage,
 			&i.StepIndex,
 			&i.NodeID,
 			&i.ExitCode,
@@ -258,7 +272,7 @@ WHERE id = (
   ORDER BY j.step_index ASC
   LIMIT 1
 )
-RETURNING id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
 `
 
 // Transitions the first 'created' job to 'pending' for a run.
@@ -272,6 +286,8 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, 
 		&i.RunID,
 		&i.Name,
 		&i.Status,
+		&i.ModType,
+		&i.ModImage,
 		&i.StepIndex,
 		&i.NodeID,
 		&i.ExitCode,
