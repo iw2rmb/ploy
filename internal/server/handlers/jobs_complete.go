@@ -60,16 +60,10 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Extract node identity from mTLS certificate.
-		// The CommonName contains the node UUID assigned during PKI bootstrap.
-		identity, ok := auth.IdentityFromContext(ctx)
+		// Extract caller identity from context (set by auth middleware).
+		_, ok := auth.IdentityFromContext(ctx)
 		if !ok {
 			http.Error(w, "unauthorized: no identity in context", http.StatusUnauthorized)
-			return
-		}
-		nodeID := domaintypes.ToPGUUID(identity.CommonName)
-		if !nodeID.Valid {
-			http.Error(w, "unauthorized: invalid node identity", http.StatusUnauthorized)
 			return
 		}
 
@@ -133,7 +127,21 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Derive run_id from the job for run completion checks.
 		runID := job.RunID
 
-		// Verify the job is assigned to the calling node (authorization check).
+		// Derive node UUID from required header. auth middleware already enforces
+		// presence and UUID shape for worker-role callers; this handler performs
+		// an additional check and uses the value for job ownership validation.
+		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+		if nodeIDHeader == "" {
+			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			return
+		}
+		nodeID := domaintypes.ToPGUUID(nodeIDHeader)
+		if !nodeID.Valid {
+			http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
+			return
+		}
+
+		// Verify the job is assigned to the calling node.
 		if !job.NodeID.Valid || job.NodeID != nodeID {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
@@ -170,7 +178,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			slog.Error("complete job: update failed",
 				"job_id", jobIDStr,
 				"step_index", job.StepIndex,
-				"node_id", identity.CommonName,
+				"node_id", nodeIDHeader,
 				"err", err,
 			)
 			return
@@ -179,7 +187,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		slog.Info("job completed",
 			"job_id", jobIDStr,
 			"step_index", job.StepIndex,
-			"node_id", identity.CommonName,
+			"node_id", nodeIDHeader,
 			"status", jobStatus,
 			"exit_code", req.ExitCode,
 			"stats_size", len(statsBytes),

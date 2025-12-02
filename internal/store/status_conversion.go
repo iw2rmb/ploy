@@ -11,9 +11,8 @@ import (
 //
 // Supported mappings:
 //   - "created" -> JobStatusCreated
-//   - "pending" -> JobStatusCreated (backward compatibility)
+//   - "pending" -> JobStatusPending
 //   - "queued" -> JobStatusCreated (mods API compatibility)
-//   - "scheduled" -> JobStatusScheduled
 //   - "running" -> JobStatusRunning
 //   - "succeeded" -> JobStatusSucceeded
 //   - "failed" -> JobStatusFailed
@@ -22,10 +21,10 @@ import (
 //   - "cancelling" -> JobStatusCanceled (mods API in-progress cancellation maps to final state)
 func ConvertToJobStatus(status string) (JobStatus, error) {
 	switch status {
-	case "created", "pending", "queued":
+	case "created", "queued":
 		return JobStatusCreated, nil
-	case "scheduled":
-		return JobStatusScheduled, nil
+	case "pending":
+		return JobStatusPending, nil
 	case "running":
 		return JobStatusRunning, nil
 	case "succeeded":
@@ -79,11 +78,11 @@ func ConvertToRunStatus(status string) (RunStatus, error) {
 func ValidateJobStatus(status string) (JobStatus, error) {
 	s := JobStatus(status)
 	switch s {
-	case JobStatusCreated, JobStatusScheduled, JobStatusRunning, JobStatusSucceeded,
+	case JobStatusCreated, JobStatusPending, JobStatusRunning, JobStatusSucceeded,
 		JobStatusFailed, JobStatusSkipped, JobStatusCanceled:
 		return s, nil
 	default:
-		return "", fmt.Errorf("invalid job status: %q (expected: created, scheduled, running, succeeded, failed, skipped, canceled)", status)
+		return "", fmt.Errorf("invalid job status: %q (expected: created, pending, running, succeeded, failed, skipped, canceled)", status)
 	}
 }
 

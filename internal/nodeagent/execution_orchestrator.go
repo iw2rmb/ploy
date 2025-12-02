@@ -407,6 +407,12 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
 	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
 
+	slog.Info("starting healing job execution",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"step_index", req.StepIndex,
+	)
+
 	// Run the healing container.
 	result, runErr := runner.Run(ctx, step.Request{
 		TicketID:  types.TicketID(req.RunID),
@@ -437,7 +443,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr, "duration", duration)
+		slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "error", runErr, "duration", duration)
 		return
 	}
 

@@ -332,7 +332,7 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
 	clusterID := "test-cluster"
-	nodeID := "node-123"
+	nodeID := "123e4567-e89b-12d3-a456-426614174000"
 	expiresAt := time.Now().Add(15 * time.Minute)
 
 	// Generate bootstrap token
@@ -351,6 +351,7 @@ func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 	// Bootstrap token should work for worker endpoints
 	req := httptest.NewRequest(http.MethodPost, "/v1/pki/bootstrap", nil)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
+	req.Header.Set("PLOY_NODE_UUID", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler := auth.Middleware(RoleWorker)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

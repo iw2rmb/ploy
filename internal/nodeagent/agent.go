@@ -224,6 +224,9 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
+		if a.cfg.NodeID != "" {
+			req.Header.Set("PLOY_NODE_UUID", a.cfg.NodeID)
+		}
 
 		resp, err := client.Do(req)
 		if err != nil {

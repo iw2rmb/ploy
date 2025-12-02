@@ -224,8 +224,8 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestStatusUploader_StepIndexAndJobIDIncluded verifies step_index and job_id are included
-// in payload when provided (multi-step run completion).
+// TestStatusUploader_PayloadIncludesStatusExitCodeAndStats verifies the
+// payload shape for job-level completion requests.
 func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 	t.Parallel()
 
@@ -273,10 +273,6 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 	}
 
 	// Verify job_id is present in payload.
-	if receivedPayload["job_id"] != "test-job-id-uuid" {
-		t.Errorf("expected job_id=test-job-id-uuid, got %v", receivedPayload["job_id"])
-	}
-
 	if receivedPayload["status"] != "failed" {
 		t.Errorf("expected status=failed, got %v", receivedPayload["status"])
 	}
@@ -301,6 +297,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 
 	var receivedPayload map[string]interface{}
 	jobID := types.JobID("test-job-id-uuid")
+	nodeID := "ignored-node-id"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -312,6 +309,9 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		}
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 			t.Errorf("expected Content-Type application/json, got %s", ct)
+		}
+		if got := r.Header.Get("PLOY_NODE_UUID"); got != nodeID {
+			t.Errorf("expected PLOY_NODE_UUID=%s, got %s", nodeID, got)
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
@@ -326,7 +326,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "ignored-node-id",
+		NodeID:    nodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,

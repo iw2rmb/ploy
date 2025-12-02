@@ -137,8 +137,9 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 
 	// Wrap transport with bearer token injector
 	authenticatedTransport := &bearerTokenTransport{
-		base:  transport,
-		token: string(bearerToken),
+		base:   transport,
+		token:  string(bearerToken),
+		nodeID: cfg.NodeID,
 	}
 
 	return &http.Client{
@@ -147,15 +148,18 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 	}, nil
 }
 
-// bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
+// bearerTokenTransport wraps an http.RoundTripper and adds Authorization and
+// PLOY_NODE_UUID headers to all requests.
 type bearerTokenTransport struct {
-	base  http.RoundTripper
-	token string
+	base   http.RoundTripper
+	token  string
+	nodeID string
 }
 
 func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone request to avoid modifying the original
 	req = req.Clone(req.Context())
 	req.Header.Set("Authorization", "Bearer "+t.token)
+	req.Header.Set("PLOY_NODE_UUID", t.nodeID)
 	return t.base.RoundTrip(req)
 }

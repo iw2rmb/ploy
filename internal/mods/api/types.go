@@ -105,16 +105,11 @@ type StageStatus struct {
 //
 // Each execution unit (pre_gate, mod, post_gate, heal, re_gate) has a jobs row
 // with mod_type identifying the phase type. Float step_index on the jobs table
-// provides ordering (not stored in meta; see jobs.step_index).
+// provides ordering for execution; metadata does not duplicate step index or
+// total step count.
 type StageMetadata struct {
 	// ModType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
 	ModType string `json:"mod_type,omitempty"`
-	// StepIndex is deprecated in meta; use jobs.step_index directly.
-	// Retained for backward compatibility with older responses.
-	StepIndex int `json:"step_index"`
-	// StepTotal is the total number of steps in this run.
-	// For single-step runs, this is 1. For multi-step runs, this is len(mods[]).
-	StepTotal int `json:"step_total"`
 	// ModImage is the container image for this job (optional, for diagnostics).
 	ModImage string `json:"mod_image,omitempty"`
 }

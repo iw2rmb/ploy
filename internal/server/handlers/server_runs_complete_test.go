@@ -139,7 +139,7 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-		Status:    store.JobStatusScheduled, // Not 'running'
+		Status:    store.JobStatusPending, // Not 'running'
 		StepIndex: 1000,
 	}
 

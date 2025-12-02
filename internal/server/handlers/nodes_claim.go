@@ -16,15 +16,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// claimJobHandler allows nodes to claim a scheduled job for execution.
+// claimJobHandler allows nodes to claim a pending job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
 //
-// Server-driven scheduling: only 'scheduled' jobs can be claimed. When a job completes,
-// the server schedules the next 'created' job by transitioning it to 'scheduled'.
+// Server-driven scheduling: only 'pending' jobs can be claimed. When a job completes,
+// the server schedules the next 'created' job by transitioning it to 'pending'.
 //
 // Jobs are the unified execution unit for all work types: pre-gate, mod, heal, re-gate, post-gate.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
-// Jobs transition directly from 'scheduled' to 'running' on claim (no 'assigned' intermediate state).
+// Jobs transition directly from 'pending' to 'running' on claim (no 'assigned' intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
@@ -54,10 +54,10 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Claim the next scheduled job.
+		// Claim the next pending job.
 		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
-			// No scheduled jobs available; return 204 No Content.
+			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {
 				w.WriteHeader(http.StatusNoContent)
 				slog.Debug("claim: no work available", "node_id", nodeIDStr)

@@ -17,7 +17,7 @@ func TestStageStatusFromStore(t *testing.T) {
 		want  StageState
 	}{
 		{name: "created->pending", input: store.JobStatusCreated, want: StageStatePending},
-		{name: "scheduled->pending", input: store.JobStatusScheduled, want: StageStatePending},
+		{name: "pending->pending", input: store.JobStatusPending, want: StageStatePending},
 		{name: "running", input: store.JobStatusRunning, want: StageStateRunning},
 		{name: "succeeded", input: store.JobStatusSucceeded, want: StageStateSucceeded},
 		{name: "failed", input: store.JobStatusFailed, want: StageStateFailed},
