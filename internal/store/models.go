@@ -61,7 +61,7 @@ type JobStatus string
 
 const (
 	JobStatusCreated   JobStatus = "created"
-	JobStatusScheduled JobStatus = "scheduled"
+	JobStatusPending   JobStatus = "pending"
 	JobStatusRunning   JobStatus = "running"
 	JobStatusSucceeded JobStatus = "succeeded"
 	JobStatusFailed    JobStatus = "failed"

@@ -80,10 +80,10 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Best-effort job updates to canceled — only for created|scheduled|running jobs
+		// Best-effort job updates to canceled — only for created|pending|running jobs
 		if jobs, err := st.ListJobsByRun(r.Context(), pgID); err == nil && len(jobs) > 0 {
 			for _, job := range jobs {
-				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusScheduled && job.Status != store.JobStatusRunning {
+				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusPending && job.Status != store.JobStatusRunning {
 					continue
 				}
 				// Compute duration if started

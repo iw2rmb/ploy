@@ -19,8 +19,8 @@ type Querier interface {
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
-	// Atomically claim the next scheduled job for a node.
-	// Server-driven scheduling: only 'scheduled' jobs are claimable.
+	// Atomically claim the next pending job for a node.
+	// Server-driven scheduling: only 'pending' jobs are claimable.
 	// Job transitions directly to 'running' (no intermediate 'assigned' state).
 	ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
 	// Counts total jobs for a run.
@@ -76,7 +76,7 @@ type Querier interface {
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
-	// List all created (not yet scheduled) jobs for a run, ordered by step_index.
+	// List all created (not yet pending) jobs for a run, ordered by step_index.
 	ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
 	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
@@ -106,9 +106,9 @@ type Querier interface {
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
-	// Transitions the first 'created' job to 'scheduled' for a run.
+	// Transitions the first 'created' job to 'pending' for a run.
 	// Called by server after a job completes successfully to enable server-driven scheduling.
-	// Returns the scheduled job, or null if no more jobs to schedule.
+	// Returns the pending job, or null if no more jobs to schedule.
 	ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, error)
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error

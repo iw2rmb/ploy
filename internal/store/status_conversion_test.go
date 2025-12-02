@@ -17,7 +17,7 @@ func TestConvertToJobStatus(t *testing.T) {
 	}{
 		// Direct matches
 		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
-		{name: "scheduled", input: "scheduled", want: JobStatusScheduled, wantErr: false},
+		{name: "pending", input: "pending", want: JobStatusPending, wantErr: false},
 		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
 		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
 		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},
@@ -108,7 +108,7 @@ func TestValidateJobStatus(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
-		{name: "scheduled", input: "scheduled", want: JobStatusScheduled, wantErr: false},
+		{name: "pending", input: "pending", want: JobStatusPending, wantErr: false},
 		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
 		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
 		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},

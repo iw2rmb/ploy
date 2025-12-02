@@ -304,9 +304,9 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 	// Check for mods[] array (multi-step run).
 	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
 		// Multi-step run: create pre-gate, one job per mod, and post-gate.
-		// Server-driven scheduling: first job (pre-gate) is 'scheduled', rest are 'created'.
-		// Pre-gate job - scheduled (ready to be claimed immediately)
-		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusScheduled); err != nil {
+		// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
+		// Pre-gate job - pending (ready to be claimed immediately)
+		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusPending); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
@@ -347,10 +347,10 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 }
 
 // createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
-// Server-driven scheduling: first job (pre-gate) is 'scheduled', rest are 'created'.
+// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
 func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, modImage string) error {
-	// Pre-gate is scheduled (ready to claim), others are created (wait for server to schedule).
-	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusScheduled); err != nil {
+	// Pre-gate is pending (ready to claim), others are created (wait for server to schedule).
+	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusPending); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
 	}
 	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", 2000, modImage, store.JobStatusCreated); err != nil {
@@ -364,7 +364,7 @@ func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, 
 
 // createJobWithIndex creates a job with the given step_index, status, and metadata.
 // modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
-// status should be JobStatusScheduled for the first job, JobStatusCreated for others.
+// status should be JobStatusPending for the first job, JobStatusCreated for others.
 func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
 	// Build job metadata with type information.
 	jobMeta := modsapi.StageMetadata{

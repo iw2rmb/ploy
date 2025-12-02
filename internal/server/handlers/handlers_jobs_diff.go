@@ -121,6 +121,23 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Verify the job is assigned to the calling node using the
+		// PLOY_NODE_UUID header, which is required for worker requests.
+		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+		if nodeIDHeader == "" {
+			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			return
+		}
+		nodeID := domaintypes.ToPGUUID(nodeIDHeader)
+		if !nodeID.Valid {
+			http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
+			return
+		}
+		if !job.NodeID.Valid || job.NodeID != nodeID {
+			http.Error(w, "job not assigned to this node", http.StatusForbidden)
+			return
+		}
+
 		// Create diff params.
 		summaryBytes, err := json.Marshal(req.Summary)
 		if err != nil {

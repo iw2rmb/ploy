@@ -240,7 +240,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
-		// This transitions the first 'created' job to 'scheduled' so it can be claimed.
+		// This transitions the first 'created' job to 'pending' so it can be claimed.
 		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {
 			if _, err := st.ScheduleNextJob(r.Context(), runID); err != nil {
 				// Log error but don't fail the job completion (job is already marked complete).
@@ -551,6 +551,18 @@ func maybeCreateHealingJobs(
 			"attempt", healingAttemptNumber,
 			"max_retries", retries,
 		)
+
+		// When healing retries are exhausted and the gate still fails, cancel
+		// all remaining non-terminal jobs for the run so the control plane
+		// can derive a terminal run state and avoid leaving mods/post-gate
+		// jobs stranded in created/pending state.
+		if err := cancelRemainingJobsAfterExhaustedHealing(ctx, st, runID, failedStepIndex, jobs); err != nil {
+			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs after exhausted healing",
+				"run_id", runID,
+				"failed_step_index", failedStepIndex,
+				"err", err,
+			)
+		}
 		return nil
 	}
 
@@ -579,7 +591,7 @@ func maybeCreateHealingJobs(
 	)
 
 	// Create healing jobs.
-	// Server-driven scheduling: first healing job is 'scheduled' (runs immediately),
+	// Server-driven scheduling: first healing job is 'pending' (runs immediately),
 	// subsequent jobs are 'created' (wait for server to schedule after prior completes).
 	for i, modInterface := range healingMods {
 		modMap, ok := modInterface.(map[string]any)
@@ -606,10 +618,10 @@ func maybeCreateHealingJobs(
 			return fmt.Errorf("marshal healing job metadata: %w", err)
 		}
 
-		// First healing job is scheduled (ready to claim), others are created.
+		// First healing job is pending (ready to claim), others are created.
 		jobStatus := store.JobStatusCreated
 		if i == 0 {
-			jobStatus = store.JobStatusScheduled
+			jobStatus = store.JobStatusPending
 		}
 
 		// Create the healing job.
@@ -661,6 +673,63 @@ func maybeCreateHealingJobs(
 		"job_name", reGateName,
 		"step_index", reGateStepIndex,
 	)
+
+	return nil
+}
+
+// cancelRemainingJobsAfterExhaustedHealing cancels all non-terminal jobs with
+// step_index greater than the failed gate's step_index. This ensures that once
+// healing retries are exhausted and the gate still fails, remaining mods and
+// post-gate jobs are not left stranded in created/pending state.
+func cancelRemainingJobsAfterExhaustedHealing(
+	ctx context.Context,
+	st store.Store,
+	runID pgtype.UUID,
+	failedStepIndex domaintypes.StepIndex,
+	jobs []store.Job,
+) error {
+	now := time.Now().UTC()
+
+	for _, job := range jobs {
+		if job.StepIndex <= float64(failedStepIndex) {
+			continue
+		}
+
+		switch job.Status {
+		case store.JobStatusSucceeded, store.JobStatusFailed, store.JobStatusCanceled, store.JobStatusSkipped:
+			continue
+		}
+
+		startedAt := job.StartedAt
+		var durationMs int64
+		if job.StartedAt.Valid {
+			durationMs = now.Sub(job.StartedAt.Time).Milliseconds()
+			if durationMs < 0 {
+				durationMs = 0
+			}
+		}
+
+		finishedAt := pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		}
+
+		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
+			ID:         job.ID,
+			Status:     store.JobStatusCanceled,
+			StartedAt:  startedAt,
+			FinishedAt: finishedAt,
+			DurationMs: durationMs,
+		}); err != nil {
+			return fmt.Errorf("cancel job %s: %w", uuid.UUID(job.ID.Bytes).String(), err)
+		}
+
+		slog.Info("canceled job after exhausted healing",
+			"run_id", runID,
+			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"step_index", job.StepIndex,
+		)
+	}
 
 	return nil
 }

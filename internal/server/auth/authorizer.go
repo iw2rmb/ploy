@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -130,6 +131,28 @@ func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler
 				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
+
+			// For worker-role callers using mutating methods, require explicit
+			// node UUID header so node identity is always available to downstream
+			// handlers regardless of auth mechanism (mTLS or bearer). Skip this
+			// enforcement in insecure mode to preserve local test behaviors.
+			if !a.allowInsecure &&
+				identity.Role == RoleWorker &&
+				(r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete) &&
+				(strings.HasPrefix(r.URL.Path, "/v1/nodes/") ||
+					strings.HasPrefix(r.URL.Path, "/v1/jobs/") ||
+					strings.HasPrefix(r.URL.Path, "/v1/runs/")) {
+				nodeHeader := strings.TrimSpace(r.Header.Get("PLOY_NODE_UUID"))
+				if nodeHeader == "" {
+					http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+					return
+				}
+				if _, err := uuid.Parse(nodeHeader); err != nil {
+					http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
+					return
+				}
+			}
+
 			if len(normalized) > 0 {
 				if _, ok := normalized[identity.Role]; !ok {
 					http.Error(w, "forbidden", http.StatusForbidden)

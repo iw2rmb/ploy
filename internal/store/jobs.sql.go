@@ -15,7 +15,7 @@ const claimJob = `-- name: ClaimJob :one
 WITH eligible AS (
   SELECT j.id FROM jobs j
   WHERE j.run_id IN (SELECT id FROM runs WHERE status IN ('queued', 'running'))
-    AND j.status = 'scheduled'
+    AND j.status = 'pending'
     AND j.node_id IS NULL
   ORDER BY j.step_index ASC
   FOR UPDATE SKIP LOCKED
@@ -26,8 +26,8 @@ FROM eligible WHERE jobs.id = eligible.id
 RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
 `
 
-// Atomically claim the next scheduled job for a node.
-// Server-driven scheduling: only 'scheduled' jobs are claimable.
+// Atomically claim the next pending job for a node.
+// Server-driven scheduling: only 'pending' jobs are claimable.
 // Job transitions directly to 'running' (no intermediate 'assigned' state).
 func (q *Queries) ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error) {
 	row := q.db.QueryRow(ctx, claimJob, nodeID)
@@ -179,7 +179,7 @@ WHERE run_id = $1 AND status = 'created'
 ORDER BY step_index ASC
 `
 
-// List all created (not yet scheduled) jobs for a run, ordered by step_index.
+// List all created (not yet pending) jobs for a run, ordered by step_index.
 func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listCreatedJobsByRun, runID)
 	if err != nil {
@@ -251,7 +251,7 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, 
 }
 
 const scheduleNextJob = `-- name: ScheduleNextJob :one
-UPDATE jobs SET status = 'scheduled'
+UPDATE jobs SET status = 'pending'
 WHERE id = (
   SELECT j.id FROM jobs j
   WHERE j.run_id = $1 AND j.status = 'created'
@@ -261,9 +261,9 @@ WHERE id = (
 RETURNING id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
 `
 
-// Transitions the first 'created' job to 'scheduled' for a run.
+// Transitions the first 'created' job to 'pending' for a run.
 // Called by server after a job completes successfully to enable server-driven scheduling.
-// Returns the scheduled job, or null if no more jobs to schedule.
+// Returns the pending job, or null if no more jobs to schedule.
 func (q *Queries) ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, error) {
 	row := q.db.QueryRow(ctx, scheduleNextJob, runID)
 	var i Job

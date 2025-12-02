@@ -57,6 +57,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	// Inject node identity into context (simulates mTLS authentication).
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
@@ -116,6 +117,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
 		CommonName: nodeID.String(),
@@ -148,6 +150,7 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", "") // Empty job_id
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -174,6 +177,7 @@ func TestCompleteJob_InvalidJobID(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/not-a-uuid/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", "not-a-uuid")
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -210,30 +214,101 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_InvalidNodeIdentity returns 401 when CommonName is not a valid UUID.
-func TestCompleteJob_InvalidNodeIdentity(t *testing.T) {
+// TestCompleteJob_InvalidNodeHeader returns 400 when PLOY_NODE_UUID header is not a valid UUID.
+func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 	t.Parallel()
 
+	nodeID := uuid.New()
+	runID := uuid.New()
 	jobID := uuid.New()
-	st := &mockStore{}
+
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, "not-a-uuid")
 
-	// Identity with invalid CommonName (not a UUID).
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: "not-a-uuid",
+		CommonName: "ignored",
 	})
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status 401, got %d", rr.Code)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called")
+	}
+}
+
+// TestCompleteJob_MissingNodeHeader returns 400 when PLOY_NODE_UUID header is missing.
+func TestCompleteJob_MissingNodeHeader(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	jobID := uuid.New()
+
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+
+	// Simulate bearer-token identity: CommonName is a non-UUID token id.
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: "tok_abcdef123456", // not a UUID, no "node:" prefix
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called")
 	}
 }
 
@@ -265,6 +340,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -291,12 +367,12 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
-	// Job is in 'scheduled' status (not 'running').
+	// Job is in 'pending' status (not 'running').
 	job := store.Job{
 		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-		Status:    store.JobStatusScheduled, // Not 'running'
+		Status:    store.JobStatusPending, // Not 'running'
 		StepIndex: 1000,
 	}
 
@@ -310,6 +386,7 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "failed"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -341,6 +418,7 @@ func TestCompleteJob_InvalidStatus(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "running"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -372,6 +450,7 @@ func TestCompleteJob_MissingStatus(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -417,6 +496,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -451,6 +531,7 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "failed"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -508,6 +589,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -590,6 +672,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -641,6 +724,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "failed"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -691,6 +775,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "canceled"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,

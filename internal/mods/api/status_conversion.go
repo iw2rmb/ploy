@@ -12,7 +12,7 @@ import (
 //
 // Mapping:
 //   - store.JobStatusCreated -> StageStatePending (created jobs are pending from API perspective)
-//   - store.JobStatusScheduled -> StageStatePending (scheduled jobs are pending from API perspective)
+//   - store.JobStatusPending -> StageStatePending (pending jobs are pending from API perspective)
 //   - store.JobStatusRunning -> StageStateRunning
 //   - store.JobStatusSucceeded -> StageStateSucceeded
 //   - store.JobStatusFailed -> StageStateFailed
@@ -20,7 +20,7 @@ import (
 //   - store.JobStatusCanceled -> StageStateCancelled (UK spelling for mods API)
 func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
-	case store.JobStatusCreated, store.JobStatusScheduled:
+	case store.JobStatusCreated, store.JobStatusPending:
 		return StageStatePending
 	case store.JobStatusRunning:
 		return StageStateRunning
