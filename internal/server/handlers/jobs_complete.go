@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -200,20 +201,36 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			slog.Error("complete job: get run failed", "job_id", jobIDStr, "run_id", runID, "err", err)
 		}
 
-		// If gate job failed, check if healing jobs should be created.
+		// When a job fails, either:
+		// - If it is a gate job, invoke maybeCreateHealingJobs (which may create healing/re-gate
+		//   jobs or cancel remaining jobs when healing is not configured or exhausted).
+		// - If it is a non-gate job (mod/heal), cancel remaining non-terminal jobs so the run
+		//   can reach a terminal state instead of leaving jobs stranded.
 		if jobStatus == store.JobStatusFailed && err == nil {
 			jobs, jobsErr := st.ListJobsByRun(ctx, runID)
 			if jobsErr != nil {
-				slog.Error("complete job: failed to list jobs for healing",
+				slog.Error("complete job: failed to list jobs for failure handling",
 					"job_id", jobIDStr,
 					"err", jobsErr,
 				)
-			} else if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
-				slog.Error("complete job: failed to create healing jobs",
-					"job_id", jobIDStr,
-					"step_index", job.StepIndex,
-					"err", healErr,
-				)
+			} else {
+				if modsapi.IsGateJob(job.Meta) {
+					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
+						slog.Error("complete job: failed to create healing jobs",
+							"job_id", jobIDStr,
+							"step_index", job.StepIndex,
+							"err", healErr,
+						)
+					}
+				} else {
+					if err := cancelRemainingJobsAfterFailure(ctx, st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
+						slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
+							"job_id", jobIDStr,
+							"step_index", job.StepIndex,
+							"err", err,
+						)
+					}
+				}
 			}
 		}
 

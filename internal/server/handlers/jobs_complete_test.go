@@ -745,6 +745,105 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_ModFailureCancelsRemainingJobs verifies that when a non-gate
+// mod job fails, remaining non-terminal jobs are canceled so the run can
+// transition to a terminal state instead of leaving jobs stranded.
+func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	modJobID := uuid.New()
+	postJobID := uuid.New()
+
+	// Jobs: pre-gate succeeded, mod failed, post-gate created.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded,
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning,
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: postJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.JobStatusCreated,
+			StepIndex: 3000,
+			Meta:      []byte(`{"mod_type":"post_gate"}`),
+		},
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        jobs[1], // mod job
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "failed",
+		"exit_code": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+modJobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", modJobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID.String(),
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify UpdateJobCompletion was called for the mod job.
+	if !st.updateJobCompletionCalled {
+		t.Fatal("expected UpdateJobCompletion to be called")
+	}
+	if st.updateJobCompletionParams.ID != jobs[1].ID {
+		t.Fatalf("expected UpdateJobCompletion for mod job, got %v", st.updateJobCompletionParams.ID)
+	}
+
+	// Verify UpdateJobStatus was called to cancel the post-gate job.
+	if !st.updateJobStatusCalled {
+		t.Fatal("expected UpdateJobStatus to be called to cancel remaining jobs")
+	}
+	if len(st.updateJobStatusCalls) == 0 {
+		t.Fatal("expected at least one UpdateJobStatus call")
+	}
+	foundPostCancel := false
+	for _, call := range st.updateJobStatusCalls {
+		if call.ID == jobs[2].ID {
+			foundPostCancel = true
+			if call.Status != store.JobStatusCanceled {
+				t.Fatalf("expected post-gate job to be canceled, got status %s", call.Status)
+			}
+		}
+	}
+	if !foundPostCancel {
+		t.Fatal("expected post-gate job to be canceled")
+	}
+}
+
 // TestCompleteJob_CanceledStatus verifies that canceled status is accepted.
 func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
