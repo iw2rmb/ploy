@@ -167,6 +167,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
 		StepIndex: claim.StepIndex, // Job step_index from server
 		ModType:   jobMeta.ModType, // Job type for dispatch (pre_gate, mod, post_gate, heal, re_gate)
+		ModImage:  jobMeta.ModImage,
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}

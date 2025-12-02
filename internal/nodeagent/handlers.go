@@ -34,15 +34,16 @@ import (
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
 	RunID     types.RunID       `json:"run_id,omitempty"`
-	JobID     types.JobID       `json:"job_id,omitempty"` // Job ID for artifact/diff uploads
-	RepoURL   types.RepoURL     `json:"repo_url,omitempty"`
+	JobID     types.JobID       `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
+	RepoURL   types.RepoURL     `json:"repo_url,omitempty"` // Repository URL for this run
 	BaseRef   types.GitRef      `json:"base_ref,omitempty"`
 	TargetRef types.GitRef      `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA   `json:"commit_sha,omitempty"`
-	StepIndex types.StepIndex   `json:"step_index"`         // Job step index for execution tracking
-	ModType   string            `json:"mod_type,omitempty"` // Job type: pre_gate, mod, post_gate, heal, re_gate
-	Options   map[string]any    `json:"options"`
-	Env       map[string]string `json:"env"`
+	StepIndex types.StepIndex   `json:"step_index"`          // Job step index for execution tracking
+	ModType   string            `json:"mod_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
+	ModImage  string            `json:"mod_image,omitempty"` // Container image for this job (for heal job dispatch)
+	Options   map[string]any    `json:"options"`             // Flattened options from spec (image, command, build_gate_healing, etc.)
+	Env       map[string]string `json:"env"`                 // Environment variables merged from spec
 }
 
 // StartRunResponse is returned when a run is accepted.

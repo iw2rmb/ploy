@@ -227,6 +227,80 @@ func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
 	}
 }
 
+// TestPersistFirstGateFailureLog_UsesTrimmedFinding verifies that the first failing
+// gate log persisted for healing prefers the trimmed LogFindings view over LogsText.
+func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
+	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-trimmed-log")
+
+	full := "[INFO] noise\n[ERROR] important failure\nstack\n"
+	trimmed := "[ERROR] important failure\nstack\n"
+
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "maven", Passed: false},
+		},
+		LogsText: full,
+		LogFindings: []contracts.BuildGateLogFinding{
+			{Severity: "error", Message: trimmed},
+		},
+	}
+
+	rc.persistFirstGateFailureLog(runID, meta)
+
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
+	logPath := filepath.Join(runDir, "build-gate-first.log")
+
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read persisted gate log: %v", err)
+	}
+
+	got := string(data)
+	if got != trimmed && got != trimmed+"\n" {
+		t.Fatalf("persisted gate log = %q, want trimmed log %q", got, trimmed)
+	}
+}
+
+// TestPopulateHealingInDirCopiesGateLog verifies that populateHealingInDir copies
+// the persisted gate log into the healing job's /in directory as build-gate.log.
+func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-copy-log")
+
+	// Seed the persisted gate log.
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	srcPath := filepath.Join(runDir, "build-gate-first.log")
+	const contents = "trimmed failure log\n"
+	if err := os.WriteFile(srcPath, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write src gate log: %v", err)
+	}
+
+	inDir := t.TempDir()
+
+	if err := rc.populateHealingInDir(runID, inDir); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+
+	destPath := filepath.Join(inDir, "build-gate.log")
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("failed to read /in/build-gate.log: %v", err)
+	}
+	if string(data) != contents {
+		t.Fatalf("healing /in/build-gate.log = %q, want %q", string(data), contents)
+	}
+}
+
 // TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator verifies that when
 // there is no pre-mod gate recorded yet, mergeExecutionResults falls back to
 // the next execution's PreGate.

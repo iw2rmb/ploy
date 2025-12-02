@@ -109,6 +109,13 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Run the build gate.
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
+
+	// Persist the first failing gate log for this run so discrete healing jobs
+	// can hydrate /in/build-gate.log with a trimmed failure view.
+	if gateErr != nil || (gateResult != nil && !gateResultPassed(gateResult)) {
+		r.persistFirstGateFailureLog(req.RunID, gateResult)
+	}
+
 	duration := time.Since(startTime)
 
 	// Build stats with gate metadata.
@@ -170,6 +177,66 @@ func (r *runController) runGate(ctx context.Context, runner step.Runner, manifes
 	}
 
 	return runner.Gate.Execute(ctx, gateSpec, workspace)
+}
+
+// gateResultPassed reports whether the gate result indicates a passing gate.
+func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
+	if gateResult == nil {
+		return false
+	}
+	if len(gateResult.StaticChecks) == 0 {
+		return false
+	}
+	return gateResult.StaticChecks[0].Passed
+}
+
+// persistFirstGateFailureLog writes the first failing gate log for a run to a
+// stable per-run path under the node's cache/temp home. Healing jobs later read
+// this file to hydrate /in/build-gate.log without re-running the gate.
+//
+// The function is idempotent: once a log has been written for a run, subsequent
+// calls are no-ops to preserve the original failure context.
+func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
+	if meta == nil {
+		return
+	}
+
+	// Prefer trimmed LogFindings view when available; fall back to full LogsText.
+	logPayload := meta.LogsText
+	if len(meta.LogFindings) > 0 {
+		if trimmed := strings.TrimSpace(meta.LogFindings[0].Message); trimmed != "" {
+			logPayload = trimmed
+			if !strings.HasSuffix(logPayload, "\n") {
+				logPayload += "\n"
+			}
+		}
+	}
+	if strings.TrimSpace(logPayload) == "" {
+		return
+	}
+
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		slog.Warn("failed to create run dir for gate log", "run_id", runID, "error", err)
+		return
+	}
+
+	logPath := filepath.Join(runDir, "build-gate-first.log")
+	if _, err := os.Stat(logPath); err == nil {
+		// Log already persisted for this run; keep the first failure view.
+		return
+	}
+
+	if err := os.WriteFile(logPath, []byte(logPayload), 0o644); err != nil {
+		slog.Warn("failed to persist first build gate failure log", "run_id", runID, "path", logPath, "error", err)
+		return
+	}
+
+	slog.Info("persisted first build gate failure log", "run_id", runID, "path", logPath)
 }
 
 // buildGateJobStats constructs stats payload for gate job completion.
@@ -342,7 +409,17 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// Parse options and build manifest.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
 	typedOpts := parseRunOptions(req.Options)
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+
+	var manifest contracts.StepManifest
+
+	// When build_gate_healing is configured, hydrate the healing manifest from the
+	// typed HealingConfig so that discrete healing jobs use the correct image/env.
+	if typedOpts.Healing != nil && len(typedOpts.Healing.Mods) > 0 {
+		healMod, healIndex := selectHealingModForJob(req, typedOpts.Healing)
+		manifest, err = buildHealingManifest(req, healMod, healIndex, "")
+	} else {
+		manifest, err = buildManifestFromRequest(req, typedOpts, 0)
+	}
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -382,8 +459,12 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 	defer func() { _ = os.RemoveAll(inDir) }()
 
-	// TODO: Fetch gate logs from parent job artifact and write to /in/build-gate.log
-	// For now, healing jobs receive gate logs via job metadata or artifact fetch.
+	// Hydrate /in/build-gate.log from the first failing gate log when available.
+	// This gives healing containers (e.g., Codex) a trimmed failure view without
+	// requiring them to re-run the gate themselves.
+	if err := r.populateHealingInDir(req.RunID, inDir); err != nil {
+		slog.Warn("failed to hydrate /in/build-gate.log for healing job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+	}
 
 	// Disable gate in manifest - healing jobs don't run gates.
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
@@ -406,6 +487,28 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
 	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+	manifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
+	manifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+	manifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+	if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+		manifest.Env["PLOY_API_TOKEN"] = token
+	} else if !r.cfg.HTTP.TLS.Enabled {
+		if data, err := os.ReadFile(bearerTokenPath()); err == nil {
+			if token := strings.TrimSpace(string(data)); token != "" {
+				manifest.Env["PLOY_API_TOKEN"] = token
+			}
+		} else {
+			slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
+		}
+	}
+
+	// Mount node TLS certificates into healing container for Build Gate API access.
+	if manifest.Options == nil {
+		manifest.Options = make(map[string]any)
+	}
+	manifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
+	manifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
+	manifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
 
 	slog.Info("starting healing job execution",
 		"run_id", req.RunID,
@@ -461,6 +564,61 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		slog.Error("failed to upload healing success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("healing job succeeded", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
+}
+
+// populateHealingInDir copies the first failing gate log (when present) into
+// the healing job's /in directory as build-gate.log. This mirrors the behavior
+// of executeWithHealing, which writes a trimmed failure view for Codex healers.
+func (r *runController) populateHealingInDir(runID types.RunID, inDir string) error {
+	if strings.TrimSpace(inDir) == "" {
+		return nil
+	}
+
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
+	srcPath := filepath.Join(runDir, "build-gate-first.log")
+
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read first gate log: %w", err)
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil
+	}
+
+	destPath := filepath.Join(inDir, "build-gate.log")
+	if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		return fmt.Errorf("write /in/build-gate.log: %w", err)
+	}
+
+	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+	return nil
+}
+
+// selectHealingModForJob selects the HealingMod that should back this healing job.
+// Preference order:
+//  1. Match StartRunRequest.ModImage against HealingConfig.Mods[i].Image (trimmed).
+//  2. Fall back to the first configured healing mod.
+func selectHealingModForJob(req StartRunRequest, healing *HealingConfig) (HealingMod, int) {
+	if healing == nil || len(healing.Mods) == 0 {
+		return HealingMod{}, 0
+	}
+
+	if img := strings.TrimSpace(req.ModImage); img != "" {
+		for i, mod := range healing.Mods {
+			if strings.TrimSpace(mod.Image) == img {
+				return mod, i
+			}
+		}
+	}
+
+	return healing.Mods[0], 0
 }
 
 // uploadFailureStatus uploads a failure status for early errors.
