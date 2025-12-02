@@ -407,6 +407,8 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 	result.RunID = params.RunID
 	result.Name = params.Name
 	result.Status = params.Status
+	result.ModType = params.ModType
+	result.ModImage = params.ModImage
 	result.Meta = params.Meta
 	return result, m.createJobErr
 }

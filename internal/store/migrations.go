@@ -17,10 +17,10 @@ type Migration struct {
 }
 
 // RunMigrations ensures the database schema is present.
-// Since there are no production deployments, this simply executes SCHEMA.sql
+// Since there are no production deployments, this simply executes internal/store/schema.sql
 // to create all tables from scratch. No incremental migrations needed.
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	slog.Info("applying schema from SCHEMA.sql")
+	slog.Info("applying schema from internal/store/schema.sql")
 
 	// Execute schema SQL (supports multi-statement files).
 	schemaSQL := getSchemaSQL()

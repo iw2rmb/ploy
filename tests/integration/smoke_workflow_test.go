@@ -66,10 +66,13 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Step 2: Create multiple jobs representing the workflow phases.
 	// Stage 1: Build Gate (pre-validation)
 	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:  run.ID,
-		Name:   "build-gate",
-		Status: store.JobStatusRunning,
-		Meta:   []byte(`{"type":"build-gate","profile":"java-maven"}`),
+		RunID:     run.ID,
+		Name:      "build-gate",
+		Status:    store.JobStatusRunning,
+		ModType:   "",
+		ModImage:  "",
+		StepIndex: 0,
+		Meta:      []byte(`{"type":"build-gate","profile":"java-maven"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(build-gate) failed: %v", err)
@@ -78,10 +81,13 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 2: Main mod execution
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:  run.ID,
-		Name:   "main",
-		Status: store.JobStatusCreated,
-		Meta:   []byte(`{"type":"mod","lane":"main"}`),
+		RunID:     run.ID,
+		Name:      "main",
+		Status:    store.JobStatusCreated,
+		ModType:   "",
+		ModImage:  "",
+		StepIndex: 0,
+		Meta:      []byte(`{"type":"mod","lane":"main"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(main) failed: %v", err)
@@ -90,10 +96,13 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 3: Post-processing (e.g., artifact upload)
 	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:  run.ID,
-		Name:   "post-process",
-		Status: store.JobStatusCreated,
-		Meta:   []byte(`{"type":"post-process","action":"upload-artifacts"}`),
+		RunID:     run.ID,
+		Name:      "post-process",
+		Status:    store.JobStatusCreated,
+		ModType:   "",
+		ModImage:  "",
+		StepIndex: 0,
+		Meta:      []byte(`{"type":"post-process","action":"upload-artifacts"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(post-process) failed: %v", err)
@@ -388,10 +397,13 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create a job.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:  run.ID,
-		Name:   "main",
-		Status: store.JobStatusRunning,
-		Meta:   []byte(`{"type":"mod"}`),
+		RunID:     run.ID,
+		Name:      "main",
+		Status:    store.JobStatusRunning,
+		ModType:   "",
+		ModImage:  "",
+		StepIndex: 0,
+		Meta:      []byte(`{"type":"mod"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)

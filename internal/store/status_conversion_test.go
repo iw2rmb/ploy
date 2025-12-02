@@ -25,7 +25,6 @@ func TestConvertToJobStatus(t *testing.T) {
 		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
 
 		// Mods API compatibility mappings
-		{name: "pending->created", input: "pending", want: JobStatusCreated, wantErr: false},
 		{name: "queued->created", input: "queued", want: JobStatusCreated, wantErr: false},
 		{name: "cancelled (UK)", input: "cancelled", want: JobStatusCanceled, wantErr: false},
 		{name: "cancelling", input: "cancelling", want: JobStatusCanceled, wantErr: false},
@@ -116,7 +115,6 @@ func TestValidateJobStatus(t *testing.T) {
 		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
 
 		// These should fail validation (non-canonical values)
-		{name: "pending invalid", input: "pending", want: "", wantErr: true},
 		{name: "queued invalid", input: "queued", want: "", wantErr: true},
 		{name: "cancelled invalid", input: "cancelled", want: "", wantErr: true},
 		{name: "cancelling invalid", input: "cancelling", want: "", wantErr: true},

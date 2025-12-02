@@ -381,6 +381,8 @@ func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, 
 		RunID:     runID,
 		Name:      name,
 		Status:    status,
+		ModType:   modType,
+		ModImage:  modImage,
 		StepIndex: stepIndex,
 		Meta:      metaBytes,
 	})

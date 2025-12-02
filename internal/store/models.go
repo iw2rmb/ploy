@@ -240,6 +240,8 @@ type Job struct {
 	RunID      pgtype.UUID        `json:"run_id"`
 	Name       string             `json:"name"`
 	Status     JobStatus          `json:"status"`
+	ModType    string             `json:"mod_type"`
+	ModImage   string             `json:"mod_image"`
 	StepIndex  float64            `json:"step_index"`
 	NodeID     pgtype.UUID        `json:"node_id"`
 	ExitCode   *int32             `json:"exit_code"`

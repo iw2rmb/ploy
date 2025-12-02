@@ -46,10 +46,13 @@ func TestLabSmoke(t *testing.T) {
 
 	// Step 4: Simulate node operations - Create a job for the run.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:  run.ID,
-		Name:   "build",
-		Status: store.JobStatusRunning,
-		Meta:   []byte(`{"type":"build","tool":"make"}`),
+		RunID:     run.ID,
+		Name:      "build",
+		Status:    store.JobStatusRunning,
+		ModType:   "",
+		ModImage:  "",
+		StepIndex: 0,
+		Meta:      []byte(`{"type":"build","tool":"make"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)

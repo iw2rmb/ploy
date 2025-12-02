@@ -1,4 +1,4 @@
--- SCHEMA.sql — Postgres schema outline for the simplified Ploy server
+-- internal/store/schema.sql — Postgres schema outline for the simplified Ploy server
 -- Notes
 -- - Uses pgcrypto for UUID generation via gen_random_uuid().
 -- - Stores only metadata and run artifacts (diffs/logs/events). No repository
@@ -15,7 +15,7 @@ CREATE TYPE run_status AS ENUM (
 );
 
 CREATE TYPE job_status AS ENUM (
-  'created', 'scheduled', 'running', 'succeeded', 'failed', 'skipped', 'canceled'
+  'created', 'pending', 'running', 'succeeded', 'failed', 'skipped', 'canceled'
 );
 
 CREATE TYPE buildgate_job_status AS ENUM (
@@ -79,13 +79,15 @@ CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
 -- Float step_index enables inserting healing jobs between existing jobs:
 --   pre-gate=1000, mod=2000, post-gate=3000
 --   heal-1 inserted at 1500, re-gate at 1750, etc.
--- Server-driven scheduling: first job is 'scheduled', rest are 'created'.
+-- Server-driven scheduling: first job is 'pending', rest are 'created'.
 -- When a job completes, server schedules the next 'created' job.
 CREATE TABLE IF NOT EXISTS jobs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id       UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   status       job_status NOT NULL DEFAULT 'created',
+  mod_type     TEXT NOT NULL DEFAULT '',
+  mod_image    TEXT NOT NULL DEFAULT '',
   step_index   FLOAT NOT NULL DEFAULT 0,  -- float for dynamic insertion between jobs
   node_id      UUID REFERENCES nodes(id) ON DELETE SET NULL,  -- which node claimed this job
   exit_code    INT,  -- exit code from job execution (null until completed)
@@ -96,7 +98,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   UNIQUE (run_id, name)
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
-CREATE INDEX IF NOT EXISTS jobs_scheduled_idx ON jobs(run_id, step_index) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
 
 -- Events (append-only)

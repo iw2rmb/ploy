@@ -1,16 +1,18 @@
 -- name: GetJob :one
-SELECT * FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE id = $1;
 
 -- name: ListJobsByRun :many
-SELECT * FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE run_id = $1
 ORDER BY step_index ASC;
 
 -- name: CreateJob :one
-INSERT INTO jobs (run_id, name, status, step_index, meta)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;
+INSERT INTO jobs (run_id, name, status, mod_type, mod_image, step_index, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta;
 
 -- name: UpdateJobStatus :exec
 UPDATE jobs
@@ -22,13 +24,13 @@ DELETE FROM jobs
 WHERE id = $1;
 
 -- name: ClaimJob :one
--- Atomically claim the next scheduled job for a node.
--- Server-driven scheduling: only 'scheduled' jobs are claimable.
+-- Atomically claim the next pending job for a node.
+-- Server-driven scheduling: only 'pending' jobs are claimable.
 -- Job transitions directly to 'running' (no intermediate 'assigned' state).
 WITH eligible AS (
   SELECT j.id FROM jobs j
   WHERE j.run_id IN (SELECT id FROM runs WHERE status IN ('queued', 'running'))
-    AND j.status = 'scheduled'
+    AND j.status = 'pending'
     AND j.node_id IS NULL
   ORDER BY j.step_index ASC
   FOR UPDATE SKIP LOCKED
@@ -47,28 +49,24 @@ SELECT
 FROM jobs j1 WHERE j1.id = $1;
 
 -- name: ListCreatedJobsByRun :many
--- List all created (not yet scheduled) jobs for a run, ordered by step_index.
-SELECT * FROM jobs
+-- List all created (not yet pending) jobs for a run, ordered by step_index.
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE run_id = $1 AND status = 'created'
 ORDER BY step_index ASC;
 
 -- name: ScheduleNextJob :one
--- Transitions the first 'created' job to 'scheduled' for a run.
+-- Transitions the first 'created' job to 'pending' for a run.
 -- Called by server after a job completes successfully to enable server-driven scheduling.
--- Returns the scheduled job, or null if no more jobs to schedule.
-UPDATE jobs SET status = 'scheduled'
+-- Returns the pending job, or null if no more jobs to schedule.
+UPDATE jobs SET status = 'pending'
 WHERE id = (
   SELECT j.id FROM jobs j
   WHERE j.run_id = $1 AND j.status = 'created'
   ORDER BY j.step_index ASC
   LIMIT 1
 )
-RETURNING *;
-
--- name: GetJobByRunAndStepIndex :one
--- Retrieves a specific job by run_id and step_index.
-SELECT * FROM jobs
-WHERE run_id = $1 AND step_index = $2;
+RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta;
 
 -- name: CountJobsByRun :one
 -- Counts total jobs for a run.

@@ -87,7 +87,7 @@ post:
     '409':
       description: |
         Conflict — job not in `running` state. This occurs when:
-        - The job is still in `created` or `scheduled` state (not yet started)
+        - The job is still in `created` or `pending` state (not yet started)
         - The job has already been completed (succeeded, failed, or canceled)
         - A duplicate completion request was received after the job transitioned
     '500':
