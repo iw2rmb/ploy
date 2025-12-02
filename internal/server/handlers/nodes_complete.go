@@ -232,7 +232,8 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 					"err", jobsErr,
 				)
 			} else {
-				if modsapi.IsGateJob(job.Meta) {
+				modType := strings.TrimSpace(job.ModType)
+				if modType == "pre_gate" || modType == "post_gate" || modType == "re_gate" {
 					if err := maybeCreateHealingJobs(r.Context(), st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
 						slog.Error("complete job: failed to create healing jobs",
 							"run_id", req.RunID,
@@ -343,8 +344,9 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 			hasCanceled = true
 		}
 
-		// Parse job metadata to determine if this is a gate job.
-		isGate := modsapi.IsGateJob(job.Meta)
+		// Determine if this is a gate job based on mod_type column.
+		modType := strings.TrimSpace(job.ModType)
+		isGate := modType == "pre_gate" || modType == "post_gate" || modType == "re_gate"
 
 		if isGate {
 			// Track the gate with the highest step_index (final gate result wins).
@@ -497,19 +499,18 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Parse job metadata to verify it's a gate job.
-	var jobMeta modsapi.StageMetadata
-	if len(failedJob.Meta) > 0 {
-		if err := json.Unmarshal(failedJob.Meta, &jobMeta); err != nil {
-			return fmt.Errorf("parse job metadata: %w", err)
+	// Only create healing for gate jobs.
+	modType := strings.TrimSpace(failedJob.ModType)
+	if modType == "" && len(failedJob.Meta) > 0 {
+		var jobMeta modsapi.StageMetadata
+		if err := json.Unmarshal(failedJob.Meta, &jobMeta); err == nil {
+			modType = strings.TrimSpace(jobMeta.ModType)
 		}
 	}
-
-	// Only create healing for gate jobs.
-	if jobMeta.ModType != "pre_gate" && jobMeta.ModType != "post_gate" && jobMeta.ModType != "re_gate" {
+	if modType != "pre_gate" && modType != "post_gate" && modType != "re_gate" {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
 			"run_id", runID,
-			"mod_type", jobMeta.ModType,
+			"mod_type", modType,
 		)
 		return nil
 	}
@@ -637,16 +638,6 @@ func maybeCreateHealingJobs(
 		// Calculate step_index for this healing job.
 		healStepIndex := float64(failedStepIndex) + stepIncrement*float64(i+1)
 
-		// Build job metadata.
-		jobMeta := modsapi.StageMetadata{
-			ModType:  "heal",
-			ModImage: modImage,
-		}
-		metaBytes, err := json.Marshal(jobMeta)
-		if err != nil {
-			return fmt.Errorf("marshal healing job metadata: %w", err)
-		}
-
 		// First healing job is pending (ready to claim), others are created.
 		jobStatus := store.JobStatusCreated
 		if i == 0 {
@@ -655,14 +646,14 @@ func maybeCreateHealingJobs(
 
 		// Create the healing job.
 		jobName := fmt.Sprintf("heal-%d-%d", healingAttemptNumber, i)
-		_, err = st.CreateJob(ctx, store.CreateJobParams{
+		_, err := st.CreateJob(ctx, store.CreateJobParams{
 			RunID:     runID,
 			Name:      jobName,
 			ModType:   "heal",
 			ModImage:  modImage,
 			Status:    jobStatus,
 			StepIndex: healStepIndex,
-			Meta:      metaBytes,
+			Meta:      []byte(`{}`),
 		})
 		if err != nil {
 			return fmt.Errorf("create healing job %s: %w", jobName, err)
@@ -679,23 +670,15 @@ func maybeCreateHealingJobs(
 
 	// Create re-gate job after healing jobs - starts as 'created'.
 	reGateStepIndex := float64(failedStepIndex) + stepIncrement*float64(healingCount+1)
-	reGateMeta := modsapi.StageMetadata{
-		ModType: "re_gate",
-	}
-	reGateMetaBytes, err := json.Marshal(reGateMeta)
-	if err != nil {
-		return fmt.Errorf("marshal re-gate metadata: %w", err)
-	}
-
 	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
+	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		RunID:     runID,
 		Name:      reGateName,
 		ModType:   "re_gate",
 		ModImage:  "",
 		Status:    store.JobStatusCreated,
 		StepIndex: reGateStepIndex,
-		Meta:      reGateMetaBytes,
+		Meta:      []byte(`{}`),
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job: %w", err)

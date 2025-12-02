@@ -152,12 +152,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Parse spec into options/env and typed RunOptions.
 	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
 
-	// Parse job metadata to extract ModType for job-type dispatch.
-	var jobMeta JobMetadata
-	if len(claim.JobMeta) > 0 {
-		_ = json.Unmarshal(claim.JobMeta, &jobMeta)
-	}
-
 	startReq := StartRunRequest{
 		RunID:     claim.ID,    // Already types.RunID from ClaimResponse
 		JobID:     claim.JobID, // Already types.JobID from ClaimResponse
@@ -166,8 +160,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		TargetRef: types.GitRef(claim.TargetRef),
 		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
 		StepIndex: claim.StepIndex, // Job step_index from server
-		ModType:   jobMeta.ModType, // Job type for dispatch (pre_gate, mod, post_gate, heal, re_gate)
-		ModImage:  jobMeta.ModImage,
+		ModType:   claim.ModType,
+		ModImage:  claim.ModImage,
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}

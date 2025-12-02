@@ -116,7 +116,8 @@ func buildAndSendJobClaimResponse(
 		ID        string                `json:"id"`         // Run ID
 		JobID     string                `json:"job_id"`     // Job ID
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-		JobMeta   json.RawMessage       `json:"job_meta"`   // Job metadata (ModType, ModImage, etc.)
+		ModType   string                `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+		ModImage  string                `json:"mod_image"`  // Container image for mod/heal jobs
 		StepIndex domaintypes.StepIndex `json:"step_index"` // Job ordering index
 		RepoURL   string                `json:"repo_url"`
 		Status    store.RunStatus       `json:"status"`
@@ -131,7 +132,8 @@ func buildAndSendJobClaimResponse(
 		ID:        uuid.UUID(run.ID.Bytes).String(),
 		JobID:     jobIDStr,
 		JobName:   job.Name,
-		JobMeta:   job.Meta,
+		ModType:   job.ModType,
+		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
