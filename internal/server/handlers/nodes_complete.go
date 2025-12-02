@@ -239,6 +239,33 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
+		// If a healing job itself fails, cancel remaining non-terminal jobs so the
+		// run can transition to a terminal state instead of leaving jobs stranded
+		// in created/pending status.
+		if jobStatus == store.JobStatusFailed {
+			var meta modsapi.StageMetadata
+			if len(job.Meta) > 0 {
+				_ = json.Unmarshal(job.Meta, &meta)
+			}
+			if meta.ModType == "heal" {
+				jobs, jobsErr := st.ListJobsByRun(r.Context(), runID)
+				if jobsErr != nil {
+					slog.Error("complete job: failed to list jobs for healing cancellation",
+						"run_id", req.RunID,
+						"job_id", req.JobID,
+						"err", jobsErr,
+					)
+				} else if err := cancelRemainingJobsAfterExhaustedHealing(r.Context(), st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
+					slog.Error("complete job: failed to cancel remaining jobs after healing failure",
+						"run_id", req.RunID,
+						"job_id", req.JobID,
+						"step_index", job.StepIndex,
+						"err", err,
+					)
+				}
+			}
+		}
+
 		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
 		// This transitions the first 'created' job to 'pending' so it can be claimed.
 		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {

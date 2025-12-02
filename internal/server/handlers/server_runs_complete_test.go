@@ -656,6 +656,108 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 	}
 }
 
+// TestHealingFailureCancelsRemainingJobs verifies that when a healing job fails,
+// remaining non-terminal jobs (re-gate, mods, post-gate) are cancelled so the run
+// can complete instead of leaving jobs stranded in created/pending state.
+func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	preGateJobID := uuid.New()
+	healJobID := uuid.New()
+	reGateJobID := uuid.New()
+	modJobID := uuid.New()
+
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: preGateJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusFailed, // pre-gate failed
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: healJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning, // healing job about to fail
+			StepIndex: 1333.3333,
+			Meta:      []byte(`{"mod_type":"heal"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: reGateJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusCreated, // re-gate not yet scheduled
+			StepIndex: 1500,
+			Meta:      []byte(`{"mod_type":"re_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusCreated, // mod not yet scheduled
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+	}
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        jobs[1], // healing job
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     healJobID.String(),
+		"status":     "failed",
+		"step_index": 1333.3333,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Healing failure should trigger cancellation of jobs after the healing step.
+	if !st.updateJobStatusCalled {
+		t.Fatal("expected UpdateJobStatus to be called to cancel remaining jobs")
+	}
+	if len(st.updateJobStatusCalls) == 0 {
+		t.Fatal("expected at least one UpdateJobStatus call")
+	}
+	// Verify that re-gate and mod jobs were targeted for cancellation.
+	var canceledReGate, canceledMod bool
+	for _, call := range st.updateJobStatusCalls {
+		id := uuid.UUID(call.ID.Bytes)
+		if id == reGateJobID && call.Status == store.JobStatusCanceled {
+			canceledReGate = true
+		}
+		if id == modJobID && call.Status == store.JobStatusCanceled {
+			canceledMod = true
+		}
+	}
+	if !canceledReGate {
+		t.Errorf("expected re-gate job %s to be canceled", reGateJobID)
+	}
+	if !canceledMod {
+		t.Errorf("expected mod job %s to be canceled", modJobID)
+	}
+}
+
 // TestGateAwareCompletion_NoRedundantJobMutation verifies that maybeCompleteMultiStepRun
 // does not call UpdateJobStatus after job completion (redundant mutation removed).
 func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
