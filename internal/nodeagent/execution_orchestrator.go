@@ -92,14 +92,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 
 	// Rehydrate workspace from base + diffs.
-	var baseClonePath string
-	defer func() {
-		if baseClonePath != "" {
-			_ = os.RemoveAll(baseClonePath)
-		}
-	}()
-
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -284,14 +277,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	}
 
 	// Rehydrate workspace from base + diffs.
-	var baseClonePath string
-	defer func() {
-		if baseClonePath != "" {
-			_ = os.RemoveAll(baseClonePath)
-		}
-	}()
-
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -427,14 +413,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 
 	// Rehydrate workspace from base + diffs.
-	var baseClonePath string
-	defer func() {
-		if baseClonePath != "" {
-			_ = os.RemoveAll(baseClonePath)
-		}
-	}()
-
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -874,9 +853,8 @@ func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, res
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - req: StartRunRequest containing repo URL, base_ref, and commit_sha.
-//   - manifest: StepManifest for this step (contains hydration config).
+//   - manifest: StepManifest for this step.
 //   - stepIndex: Job step index for execution tracking.
-//   - baseClonePathPtr: Pointer to cached base clone path (updated on first step).
 //
 // Returns:
 //   - workspacePath: Path to the rehydrated workspace ready for execution.
@@ -886,50 +864,62 @@ func (r *runController) rehydrateWorkspaceForStep(
 	req StartRunRequest,
 	manifest contracts.StepManifest,
 	stepIndex types.StepIndex,
-	baseClonePathPtr *string,
 ) (string, error) {
 	runID := req.RunID.String()
 
-	// Step 1: Ensure base clone exists (create on first step, reuse for subsequent steps).
-	if *baseClonePathPtr == "" {
-		// Create deterministic base clone path per run. Using a stable path rooted
-		// under the node's cache/temp location allows idempotent hydration for
-		// a given ticket: if the path already contains a valid clone for this
-		// repo, the git fetcher will detect it and skip re-cloning.
-		baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-		if baseRoot == "" {
-			baseRoot = os.TempDir()
-		}
-		baseClone := filepath.Join(baseRoot, "ploy", "run", runID, "base")
-		if err := os.MkdirAll(baseClone, 0o755); err != nil {
-			return "", fmt.Errorf("create base clone dir: %w", err)
-		}
-
-		slog.Info("creating base clone for run", "run_id", runID, "path", baseClone)
-
-		// Hydrate base clone using the runner's workspace hydrator.
-		// This performs a shallow git clone of the base_ref + optional commit_sha.
-		gitFetcher, err := r.createGitFetcher()
-		if err != nil {
-			return "", fmt.Errorf("create git fetcher: %w", err)
-		}
-
-		hydrator, err := r.createWorkspaceHydrator(gitFetcher)
-		if err != nil {
-			return "", fmt.Errorf("create workspace hydrator: %w", err)
-		}
-
-		// Hydrate the base clone using the manifest.
-		// The hydrator will use the first input from the manifest for repository cloning.
-		hydrateErr := hydrator.Hydrate(ctx, manifest, baseClone)
-		if hydrateErr != nil {
-			_ = os.RemoveAll(baseClone)
-			return "", fmt.Errorf("hydrate base clone: %w", hydrateErr)
-		}
-
-		*baseClonePathPtr = baseClone
-		slog.Info("base clone created", "run_id", runID, "path", baseClone)
+	// Step 1: Ensure base clone exists (create on first use, reuse on subsequent calls).
+	// Base clone path is deterministic per run and node.
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
 	}
+	baseClone := filepath.Join(baseRoot, "ploy", "run", runID, "base")
+	if err := os.MkdirAll(baseClone, 0o755); err != nil {
+		return "", fmt.Errorf("create base clone dir: %w", err)
+	}
+
+	slog.Info("creating base clone for run", "run_id", runID, "path", baseClone)
+
+	// Initialize git fetcher for repository hydration. The fetcher is responsible for
+	// reusing cached clones when PLOYD_CACHE_HOME is configured.
+	gitFetcher, err := r.createGitFetcher()
+	if err != nil {
+		return "", fmt.Errorf("create git fetcher: %w", err)
+	}
+
+	// Determine repo materialization:
+	// - Prefer manifest inputs that already carry hydration.Repo (gate/mod jobs).
+	// - Fallback to StartRunRequest repo fields (healing jobs and other callers).
+	var repo *contracts.RepoMaterialization
+	for _, input := range manifest.Inputs {
+		if input.Hydration != nil && input.Hydration.Repo != nil {
+			repo = input.Hydration.Repo
+			break
+		}
+	}
+
+	if repo == nil {
+		// Derive repo materialization from StartRunRequest, mirroring
+		// buildManifestFromRequest semantics.
+		targetRef := strings.TrimSpace(req.TargetRef.String())
+		if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
+			targetRef = strings.TrimSpace(req.BaseRef.String())
+		}
+
+		tmp := contracts.RepoMaterialization{
+			URL:       req.RepoURL,
+			BaseRef:   req.BaseRef,
+			TargetRef: types.GitRef(targetRef),
+			Commit:    req.CommitSHA,
+		}
+		repo = &tmp
+	}
+
+	if err := gitFetcher.Fetch(ctx, repo, baseClone); err != nil {
+		return "", fmt.Errorf("hydrate base clone: %w", err)
+	}
+
+	slog.Info("base clone created", "run_id", runID, "path", baseClone)
 
 	// Step 2: Rehydrate workspace from base clone + ordered diffs.
 	// C2: For ALL steps (including step 0), fetch diffs and apply them.
@@ -959,7 +949,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "diff_count", len(gzippedDiffs))
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
-	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, *baseClonePathPtr, workspacePath, gzippedDiffs); err != nil {
+	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("rehydrate from base and diffs: %w", err)
 	}

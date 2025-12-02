@@ -218,50 +218,38 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			"stats_size", len(statsBytes),
 		)
 
-		// If gate job failed, check if healing jobs should be created.
-		// This allows the server to dynamically insert healing jobs when gates fail.
-		// Fetch jobs for healing job creation since we no longer have the pre-check.
+		// When a job fails, either:
+		// - If it is a gate job, invoke maybeCreateHealingJobs (which may create healing/re-gate
+		//   jobs or cancel remaining jobs when healing is not configured or exhausted).
+		// - If it is a non-gate job (mod/heal), cancel remaining non-terminal jobs so the run
+		//   can reach a terminal state instead of leaving jobs stranded.
 		if jobStatus == store.JobStatusFailed {
 			jobs, jobsErr := st.ListJobsByRun(r.Context(), runID)
 			if jobsErr != nil {
-				slog.Error("complete job: failed to list jobs for healing",
+				slog.Error("complete job: failed to list jobs for failure handling",
 					"run_id", req.RunID,
 					"job_id", req.JobID,
 					"err", jobsErr,
 				)
-			} else if err := maybeCreateHealingJobs(r.Context(), st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
-				slog.Error("complete job: failed to create healing jobs",
-					"run_id", req.RunID,
-					"job_id", req.JobID,
-					"step_index", job.StepIndex,
-					"err", err,
-				)
-			}
-		}
-
-		// If a healing job itself fails, cancel remaining non-terminal jobs so the
-		// run can transition to a terminal state instead of leaving jobs stranded
-		// in created/pending status.
-		if jobStatus == store.JobStatusFailed {
-			var meta modsapi.StageMetadata
-			if len(job.Meta) > 0 {
-				_ = json.Unmarshal(job.Meta, &meta)
-			}
-			if meta.ModType == "heal" {
-				jobs, jobsErr := st.ListJobsByRun(r.Context(), runID)
-				if jobsErr != nil {
-					slog.Error("complete job: failed to list jobs for healing cancellation",
-						"run_id", req.RunID,
-						"job_id", req.JobID,
-						"err", jobsErr,
-					)
-				} else if err := cancelRemainingJobsAfterExhaustedHealing(r.Context(), st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
-					slog.Error("complete job: failed to cancel remaining jobs after healing failure",
-						"run_id", req.RunID,
-						"job_id", req.JobID,
-						"step_index", job.StepIndex,
-						"err", err,
-					)
+			} else {
+				if modsapi.IsGateJob(job.Meta) {
+					if err := maybeCreateHealingJobs(r.Context(), st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
+						slog.Error("complete job: failed to create healing jobs",
+							"run_id", req.RunID,
+							"job_id", req.JobID,
+							"step_index", job.StepIndex,
+							"err", err,
+						)
+					}
+				} else {
+					if err := cancelRemainingJobsAfterFailure(r.Context(), st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
+						slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
+							"run_id", req.RunID,
+							"job_id", req.JobID,
+							"step_index", job.StepIndex,
+							"err", err,
+						)
+					}
 				}
 			}
 		}
@@ -537,18 +525,32 @@ func maybeCreateHealingJobs(
 	// Check if healing is configured.
 	healingConfig, ok := specMap["build_gate_healing"].(map[string]any)
 	if !ok {
-		slog.Debug("maybeCreateHealingJobs: no healing config, skipping",
+		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
 			"run_id", runID,
 		)
+		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
+			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing configured",
+				"run_id", runID,
+				"failed_step_index", failedStepIndex,
+				"err", err,
+			)
+		}
 		return nil
 	}
 
 	// Get healing mods list.
 	healingMods, ok := healingConfig["mods"].([]any)
 	if !ok || len(healingMods) == 0 {
-		slog.Debug("maybeCreateHealingJobs: no healing mods configured",
+		slog.Debug("maybeCreateHealingJobs: no healing mods configured, canceling remaining jobs",
 			"run_id", runID,
 		)
+		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
+			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing mods configured",
+				"run_id", runID,
+				"failed_step_index", failedStepIndex,
+				"err", err,
+			)
+		}
 		return nil
 	}
 
@@ -583,7 +585,7 @@ func maybeCreateHealingJobs(
 		// all remaining non-terminal jobs for the run so the control plane
 		// can derive a terminal run state and avoid leaving mods/post-gate
 		// jobs stranded in created/pending state.
-		if err := cancelRemainingJobsAfterExhaustedHealing(ctx, st, runID, failedStepIndex, jobs); err != nil {
+		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
 			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs after exhausted healing",
 				"run_id", runID,
 				"failed_step_index", failedStepIndex,
@@ -708,11 +710,12 @@ func maybeCreateHealingJobs(
 	return nil
 }
 
-// cancelRemainingJobsAfterExhaustedHealing cancels all non-terminal jobs with
-// step_index greater than the failed gate's step_index. This ensures that once
-// healing retries are exhausted and the gate still fails, remaining mods and
-// post-gate jobs are not left stranded in created/pending state.
-func cancelRemainingJobsAfterExhaustedHealing(
+// cancelRemainingJobsAfterFailure cancels all non-terminal jobs with
+// step_index greater than the failed job's step_index. This is used after the
+// system determines that no further progression is possible (e.g., healing
+// retries exhausted, gate failure with no healing configured, or non-gate job
+// failure) to avoid leaving jobs stranded in created/pending state.
+func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
 	runID pgtype.UUID,
@@ -755,7 +758,7 @@ func cancelRemainingJobsAfterExhaustedHealing(
 			return fmt.Errorf("cancel job %s: %w", uuid.UUID(job.ID.Bytes).String(), err)
 		}
 
-		slog.Info("canceled job after exhausted healing",
+		slog.Info("canceled job after failure",
 			"run_id", runID,
 			"job_id", uuid.UUID(job.ID.Bytes).String(),
 			"step_index", job.StepIndex,
