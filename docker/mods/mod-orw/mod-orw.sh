@@ -54,6 +54,47 @@ fi
 
 mkdir -p "$outdir"
 
+# Optional TLS trust configuration for Maven/Gradle (e.g., corporate proxy).
+#
+# Two modes are supported:
+#   1) MOD_ORW_CA_CERT_CRT — PEM-encoded root CA certificate(s). The script imports
+#      this into the default Java cacerts keystore (-cacerts), matching common
+#      corporate guidance for adding a trusted root.
+#   2) MOD_ORW_CA_CERT_PEM / MOD_ORW_CA_CERT_PATH — PEM file contents or path.
+#      The script creates a temporary keystore and injects it via JAVA_TOOL_OPTIONS
+#      as javax.net.ssl.trustStore. This preserves the base truststore untouched.
+#
+# When MOD_ORW_CA_CERT_CRT is set, it takes precedence and the default cacerts
+# keystore is updated in-place. Otherwise, the temporary trustStore path is used.
+if [[ -n "${MOD_ORW_CA_CERT_CRT:-}" ]]; then
+  crt_file="$(mktemp)"
+  printf '%s\n' "${MOD_ORW_CA_CERT_CRT}" > "${crt_file}"
+  if ! keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias mod_orw_extra_root -file "${crt_file}" >/dev/null 2>&1; then
+    echo "error: failed to import MOD_ORW_CA_CERT_CRT into default cacerts" >&2
+    exit 6
+  fi
+else
+  extra_ca_file=""
+  if [[ -n "${MOD_ORW_CA_CERT_PEM:-}" ]]; then
+    extra_ca_file="$(mktemp)"
+    printf '%s\n' "${MOD_ORW_CA_CERT_PEM}" > "${extra_ca_file}"
+  fi
+  if [[ -n "${MOD_ORW_CA_CERT_PATH:-}" ]]; then
+    extra_ca_file="${MOD_ORW_CA_CERT_PATH}"
+  fi
+
+  if [[ -n "${extra_ca_file}" ]]; then
+    ts="$(mktemp)"
+    rm -f "${ts}"
+    ts_pass="${MOD_ORW_CA_TRUSTSTORE_PASSWORD:-changeit}"
+    if ! keytool -importcert -noprompt -keystore "${ts}" -storepass "${ts_pass}" -file "${extra_ca_file}" -alias mod_orw_extra_ca >/dev/null 2>&1; then
+      echo "error: failed to import extra CA certificate from ${extra_ca_file}" >&2
+      exit 6
+    fi
+    export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=${ts} -Djavax.net.ssl.trustStorePassword=${ts_pass}"
+  fi
+fi
+
 # Resolve recipe parameters strictly from env
 group=${RECIPE_GROUP:-}
 artifact=${RECIPE_ARTIFACT:-}
