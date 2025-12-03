@@ -56,15 +56,12 @@ mkdir -p "$outdir"
 
 # Optional TLS trust configuration for Maven/Gradle (e.g., corporate proxy).
 #
-# Modes:
-#   1) CA_CERTS_PEM_BUNDLE — PEM-encoded bundle containing one or more
-#      certificates (`-----BEGIN CERTIFICATE-----` blocks). The script splits
-#      the bundle and imports each cert into the default Java cacerts keystore
-#      (-cacerts).
-#   2) CA_CERTS_ZIP — Path to a ZIP file (inside the container) containing one
-#      or more *.crt files. Each certificate is imported into cacerts.
+# CA_CERTS_PEM_BUNDLE — PEM-encoded bundle containing one or more
+# certificates (`-----BEGIN CERTIFICATE-----` blocks). The script splits
+# the bundle and imports each cert into the default Java cacerts keystore
+# (-cacerts).
 
-# 1) Import CA certs from CA_CERTS_PEM_BUNDLE (if provided).
+# Import CA certs from CA_CERTS_PEM_BUNDLE (if provided).
 if [[ -n "${CA_CERTS_PEM_BUNDLE:-}" ]]; then
   pem_file="$(mktemp)"
   printf '%s\n' "${CA_CERTS_PEM_BUNDLE}" > "${pem_file}"
@@ -75,29 +72,6 @@ if [[ -n "${CA_CERTS_PEM_BUNDLE:-}" ]]; then
   for cert_path in "${pem_dir}"/*.crt; do
     base="$(basename "${cert_path}" .crt)"
     alias="mod_orw_pem_${base}"
-    if ! keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "${alias}" -file "${cert_path}" >/dev/null 2>&1; then
-      echo "error: failed to import certificate ${cert_path} into cacerts" >&2
-      exit 6
-    fi
-  done
-  shopt -u nullglob
-fi
-
-# 2) Import multiple CA certs from CA_CERTS_ZIP (if provided).
-if [[ -n "${CA_CERTS_ZIP:-}" ]]; then
-  if [[ ! -f "${CA_CERTS_ZIP}" ]]; then
-    echo "error: CA_CERTS_ZIP path does not exist: ${CA_CERTS_ZIP}" >&2
-    exit 6
-  fi
-  zip_tmp_dir="$(mktemp -d)"
-  if ! unzip -qq "${CA_CERTS_ZIP}" -d "${zip_tmp_dir}" >/dev/null 2>&1; then
-    echo "error: failed to extract CA_CERTS_ZIP from ${CA_CERTS_ZIP}" >&2
-    exit 6
-  fi
-  shopt -s nullglob
-  for cert_path in "${zip_tmp_dir}"/*.crt; do
-    base="$(basename "${cert_path}" .crt)"
-    alias="mod_orw_zip_${base}"
     if ! keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "${alias}" -file "${cert_path}" >/dev/null 2>&1; then
       echo "error: failed to import certificate ${cert_path} into cacerts" >&2
       exit 6
@@ -117,7 +91,8 @@ if [[ -z "$group" || -z "$artifact" || -z "$version" || -z "$classname" ]]; then
   exit 4
 fi
 
-plugin_ver=${MAVEN_PLUGIN_VERSION:-6.18.0}
+maven_plugin_ver=${MAVEN_PLUGIN_VERSION:-6.18.0}
+gradle_plugin_ver=${GRADLE_PLUGIN_VERSION:-8.5.0}
 
 cd "$workspace"
 is_maven=false
@@ -154,9 +129,9 @@ if [[ "$is_maven" == "true" ]]; then
   fi
 
   echo "[mod-orw] Running OpenRewrite recipe (Maven): $classname"
-  echo "[mod-orw] Coordinates: $group:$artifact:$version (plugin $plugin_ver)"
+  echo "[mod-orw] Coordinates: $group:$artifact:$version (maven plugin $maven_plugin_ver)"
 
-  mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run" \
+  mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${maven_plugin_ver}:run" \
     -Drewrite.configLocation="$cfg" \
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
@@ -191,7 +166,7 @@ initscript {
     mavenCentral()
   }
   dependencies {
-    classpath("org.openrewrite:rewrite-gradle-plugin:${plugin_ver}")
+    classpath("org.openrewrite:rewrite-gradle:${gradle_plugin_ver}")
   }
 }
 
