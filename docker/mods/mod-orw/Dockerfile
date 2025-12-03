@@ -8,7 +8,7 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash git tar gzip jq \
+      bash git tar gzip jq unzip \
  && rm -rf /var/lib/apt/lists/*
 
 # Workdir is where the step runner mounts the working tree
@@ -21,4 +21,3 @@ ENTRYPOINT ["mods-orw"]
 CMD ["--apply", "--dir", "/workspace", "--out", "/out"]
 
 # The runner invokes: mods-orw --apply --recipe-json /in/recipe.json --dir /workspace --out /out
-
