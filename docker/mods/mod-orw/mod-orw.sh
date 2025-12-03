@@ -56,16 +56,46 @@ mkdir -p "$outdir"
 
 # Optional TLS trust configuration for Maven/Gradle (e.g., corporate proxy).
 #
-# Two modes are supported:
-#   1) MOD_ORW_CA_CERT_CRT — PEM-encoded root CA certificate(s). The script imports
-#      this into the default Java cacerts keystore (-cacerts), matching common
-#      corporate guidance for adding a trusted root.
-#   2) MOD_ORW_CA_CERT_PEM / MOD_ORW_CA_CERT_PATH — PEM file contents or path.
-#      The script creates a temporary keystore and injects it via JAVA_TOOL_OPTIONS
-#      as javax.net.ssl.trustStore. This preserves the base truststore untouched.
+# Modes:
+#   1) CA_CERTS_ZIP — Path to a ZIP file (inside the container) containing one
+#      or more *.crt files. Each certificate is imported into the default Java
+#      cacerts keystore (-cacerts) as a trusted root/intermediate.
+#   2) MOD_ORW_CA_CERT_CRT — PEM-encoded root CA certificate(s). Imported into
+#      the default Java cacerts keystore (-cacerts), matching common corporate
+#      guidance for adding a trusted root.
+#   3) MOD_ORW_CA_CERT_PEM / MOD_ORW_CA_CERT_PATH — PEM file contents or path.
+#      The script creates a temporary keystore and injects it via
+#      JAVA_TOOL_OPTIONS as javax.net.ssl.trustStore. This preserves the base
+#      truststore untouched.
 #
-# When MOD_ORW_CA_CERT_CRT is set, it takes precedence and the default cacerts
-# keystore is updated in-place. Otherwise, the temporary trustStore path is used.
+# CA_CERTS_ZIP and MOD_ORW_CA_CERT_CRT are additive and both update the default
+# cacerts keystore when provided. The temporary trustStore path is only used
+# when MOD_ORW_CA_CERT_PEM / MOD_ORW_CA_CERT_PATH are set.
+
+# 1) Import multiple CA certs from CA_CERTS_ZIP (if provided).
+if [[ -n "${CA_CERTS_ZIP:-}" ]]; then
+  if [[ ! -f "${CA_CERTS_ZIP}" ]]; then
+    echo "error: CA_CERTS_ZIP path does not exist: ${CA_CERTS_ZIP}" >&2
+    exit 6
+  fi
+  zip_tmp_dir="$(mktemp -d)"
+  if ! unzip -qq "${CA_CERTS_ZIP}" -d "${zip_tmp_dir}" >/dev/null 2>&1; then
+    echo "error: failed to extract CA_CERTS_ZIP from ${CA_CERTS_ZIP}" >&2
+    exit 6
+  fi
+  shopt -s nullglob
+  for cert_path in "${zip_tmp_dir}"/*.crt; do
+    base="$(basename "${cert_path}" .crt)"
+    alias="mod_orw_zip_${base}"
+    if ! keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "${alias}" -file "${cert_path}" >/dev/null 2>&1; then
+      echo "error: failed to import certificate ${cert_path} into cacerts" >&2
+      exit 6
+    fi
+  done
+  shopt -u nullglob
+fi
+
+# 2) Import single-root CA from MOD_ORW_CA_CERT_CRT (if provided).
 if [[ -n "${MOD_ORW_CA_CERT_CRT:-}" ]]; then
   crt_file="$(mktemp)"
   printf '%s\n' "${MOD_ORW_CA_CERT_CRT}" > "${crt_file}"
@@ -73,26 +103,27 @@ if [[ -n "${MOD_ORW_CA_CERT_CRT:-}" ]]; then
     echo "error: failed to import MOD_ORW_CA_CERT_CRT into default cacerts" >&2
     exit 6
   fi
-else
-  extra_ca_file=""
-  if [[ -n "${MOD_ORW_CA_CERT_PEM:-}" ]]; then
-    extra_ca_file="$(mktemp)"
-    printf '%s\n' "${MOD_ORW_CA_CERT_PEM}" > "${extra_ca_file}"
-  fi
-  if [[ -n "${MOD_ORW_CA_CERT_PATH:-}" ]]; then
-    extra_ca_file="${MOD_ORW_CA_CERT_PATH}"
-  fi
+fi
 
-  if [[ -n "${extra_ca_file}" ]]; then
-    ts="$(mktemp)"
-    rm -f "${ts}"
-    ts_pass="${MOD_ORW_CA_TRUSTSTORE_PASSWORD:-changeit}"
-    if ! keytool -importcert -noprompt -keystore "${ts}" -storepass "${ts_pass}" -file "${extra_ca_file}" -alias mod_orw_extra_ca >/dev/null 2>&1; then
-      echo "error: failed to import extra CA certificate from ${extra_ca_file}" >&2
-      exit 6
-    fi
-    export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=${ts} -Djavax.net.ssl.trustStorePassword=${ts_pass}"
+# 3) Optional temporary trustStore from PEM/path.
+extra_ca_file=""
+if [[ -n "${MOD_ORW_CA_CERT_PEM:-}" ]]; then
+  extra_ca_file="$(mktemp)"
+  printf '%s\n' "${MOD_ORW_CA_CERT_PEM}" > "${extra_ca_file}"
+fi
+if [[ -n "${MOD_ORW_CA_CERT_PATH:-}" ]]; then
+  extra_ca_file="${MOD_ORW_CA_CERT_PATH}"
+fi
+
+if [[ -n "${extra_ca_file}" ]]; then
+  ts="$(mktemp)"
+  rm -f "${ts}"
+  ts_pass="${MOD_ORW_CA_TRUSTSTORE_PASSWORD:-changeit}"
+  if ! keytool -importcert -noprompt -keystore "${ts}" -storepass "${ts_pass}" -file "${extra_ca_file}" -alias mod_orw_extra_ca >/dev/null 2>&1; then
+    echo "error: failed to import extra CA certificate from ${extra_ca_file}" >&2
+    exit 6
   fi
+  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=${ts} -Djavax.net.ssl.trustStorePassword=${ts_pass}"
 fi
 
 # Resolve recipe parameters strictly from env
