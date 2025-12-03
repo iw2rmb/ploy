@@ -170,7 +170,31 @@ else
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
   echo "[mod-orw] Coordinates: $group:$artifact:$version"
 
-  "$gradle_cmd" --no-daemon --stacktrace rewriteRun \
+  # Use a Gradle init script so we don't require the project to preconfigure
+  # the OpenRewrite plugin or tasks. This keeps the mod image universal and
+  # avoids committing rewrite configuration into the target repo.
+  init_script="$(mktemp)"
+  cat >"$init_script" <<GRADLE
+initscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath("org.openrewrite:rewrite-gradle-plugin:${plugin_ver}")
+  }
+}
+
+allprojects {
+  apply plugin: "org.openrewrite.rewrite"
+
+  rewrite {
+    activeRecipe("${classname}")
+    recipeArtifact("${group}:${artifact}:${version}")
+  }
+}
+GRADLE
+
+  "$gradle_cmd" --no-daemon --stacktrace -I "$init_script" rewriteRun \
     -Drewrite.configLocation="$cfg" \
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
