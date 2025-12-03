@@ -22,6 +22,27 @@ type Migration struct {
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	slog.Info("applying schema from internal/store/schema.sql")
 
+	// First check if the core schema already exists. When the runs table is
+	// present in the ploy schema, we treat migrations as already applied and
+	// skip executing the embedded schema.sql. This makes RunMigrations safe
+	// to call on every server startup without failing on CREATE TYPE/CREATE
+	// TABLE statements that are not idempotent.
+	const existsSQL = `
+SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.tables
+  WHERE table_schema = 'ploy' AND table_name = 'runs'
+)`
+
+	var exists bool
+	if err := pool.QueryRow(ctx, existsSQL).Scan(&exists); err != nil {
+		return fmt.Errorf("check existing schema: %w", err)
+	}
+	if exists {
+		slog.Info("schema already present, skipping schema.sql execution")
+		return nil
+	}
+
 	// Execute schema SQL (supports multi-statement files).
 	schemaSQL := getSchemaSQL()
 	if _, err := pool.Exec(ctx, schemaSQL); err != nil {

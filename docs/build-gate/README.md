@@ -211,7 +211,7 @@ Inputs
 
 Behavior
 - For `java-maven`: run `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install`.
-- For `java-gradle`: run `gradle -q --stacktrace --fail-fast test -p /workspace`.
+- For `java-gradle`: run `gradle -q --stacktrace test -p /workspace`.
 - For `java`: compile all `*.java` under `/workspace` with `javac --release 17` (succeeds when no Java sources are present).
 - The gate does not modify the repo; it validates the current working tree.
 

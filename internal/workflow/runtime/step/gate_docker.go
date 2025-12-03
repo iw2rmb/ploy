@@ -125,8 +125,8 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 		tool = "gradle"
 		// Include --stacktrace for error stack traces (similar to Maven -e). Keep -q to reduce noise.
-		// Use --fail-fast so Gradle test failures stop execution early.
-		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace --fail-fast test -p /workspace"}
+		// Run Gradle tests for the workspace project and let Gradle's default failure semantics apply.
+		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace test -p /workspace"}
 	}
 	chooseJava := func() {
 		if image == "" {
