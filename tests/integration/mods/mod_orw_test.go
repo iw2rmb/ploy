@@ -72,6 +72,78 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(out)
 }
 
+// Test that mod-orw can operate on a Gradle project by preferring a Gradle
+// wrapper when build.gradle is present and pom.xml is absent. The test stubs
+// ./gradlew to avoid requiring a real Gradle installation.
+func TestModORW_GradleWorkspace_UsesGradleWrapper(t *testing.T) {
+	workspace := t.TempDir()
+
+	// Create a minimal Gradle build file to signal a Gradle project.
+	buildGradlePath := filepath.Join(workspace, "build.gradle")
+	if err := os.WriteFile(buildGradlePath, []byte(`// dummy gradle build for tests
+`), 0o644); err != nil {
+		t.Fatalf("write build.gradle: %v", err)
+	}
+
+	// Stub ./gradlew so the script can invoke it without requiring real Gradle.
+	gradlewPath := filepath.Join(workspace, "gradlew")
+	gradlewScript := `#!/usr/bin/env bash
+echo "[gradle-stub] rewriteRun invoked with args: $@"
+`
+	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
+		t.Fatalf("write gradlew stub: %v", err)
+	}
+	if err := os.Chmod(gradlewPath, 0o755); err != nil {
+		t.Fatalf("chmod gradlew stub: %v", err)
+	}
+
+	outdir := t.TempDir()
+
+	// Use the scenario script defaults for recipe coordinates.
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioBytes, err := os.ReadFile(scenarioPath)
+	if err != nil {
+		t.Fatalf("read scenario script: %v", err)
+	}
+	_, _, _, group, artifact, version, classname, plugin := parseScenarioORWPass(string(scenarioBytes))
+
+	modScript := filepath.Join(repoRoot(t), "docker", "mods", "mod-orw", "mod-orw.sh")
+	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP="+group,
+		"RECIPE_ARTIFACT="+artifact,
+		"RECIPE_VERSION="+version,
+		"RECIPE_CLASSNAME="+classname,
+		"MAVEN_PLUGIN_VERSION="+plugin,
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mod-orw (gradle) failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	// Verify that transform.log contains the gradle stub marker, proving that
+	// the Gradle path ran.
+	logPath := filepath.Join(outdir, "transform.log")
+	logBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	if !strings.Contains(string(logBytes), "[gradle-stub] rewriteRun invoked") {
+		t.Fatalf("transform.log does not contain gradle stub marker:\n%s", string(logBytes))
+	}
+
+	// Also verify the report.json exists and indicates success.
+	reportPath := filepath.Join(outdir, "report.json")
+	reportBytes, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	if !strings.Contains(string(reportBytes), "\"success\": true") {
+		t.Fatalf("report.json does not indicate success: %s", string(reportBytes))
+	}
+}
+
 // Test that running docker/mods/mod-orw/mod-orw.sh with real recipe coordinates from
 // the scenario script produces a git diff in the workspace. We stub mvn so the
 // test is hermetic and fast, but we preserve the real recipe args.

@@ -54,11 +54,6 @@ fi
 
 mkdir -p "$outdir"
 
-if ! command -v mvn >/dev/null 2>&1; then
-  echo "error: mvn not found in PATH" >&2
-  exit 127
-fi
-
 # Resolve recipe parameters strictly from env
 group=${RECIPE_GROUP:-}
 artifact=${RECIPE_ARTIFACT:-}
@@ -73,13 +68,20 @@ fi
 plugin_ver=${MAVEN_PLUGIN_VERSION:-6.18.0}
 
 cd "$workspace"
-if [[ ! -f pom.xml ]]; then
-  echo "error: pom.xml not found in $workspace (Maven project required)" >&2
-  exit 5
+is_maven=false
+is_gradle=false
+
+if [[ -f pom.xml ]]; then
+  is_maven=true
+fi
+if [[ -f build.gradle || -f build.gradle.kts ]]; then
+  is_gradle=true
 fi
 
-echo "[mod-orw] Running OpenRewrite recipe: $classname"
-echo "[mod-orw] Coordinates: $group:$artifact:$version (plugin $plugin_ver)"
+if [[ "$is_maven" == "false" && "$is_gradle" == "false" ]]; then
+  echo "error: no build file found in $workspace (expected pom.xml or build.gradle(.kts))" >&2
+  exit 5
+fi
 
 # Prepare a temporary rewrite.yml to ensure activeRecipes are picked up reliably.
 cfg=$(mktemp)
@@ -90,19 +92,56 @@ recipeList:
   - $classname
 YAML
 
-# Run OpenRewrite; skip tests, be verbose for diagnostics
-mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run" \
-  -Drewrite.configLocation="$cfg" \
-  -Drewrite.activeRecipes="$classname" \
-  -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
-  -DskipTests \
-  -X | tee "$outdir/transform.log"
+status=0
+if [[ "$is_maven" == "true" ]]; then
+  # Maven project: invoke rewrite-maven-plugin directly so the recipe coordinates
+  # can be supplied without requiring the plugin to be configured in pom.xml.
+  if ! command -v mvn >/dev/null 2>&1; then
+    echo "error: mvn not found in PATH" >&2
+    exit 127
+  fi
 
-status=${PIPESTATUS[0]}
+  echo "[mod-orw] Running OpenRewrite recipe (Maven): $classname"
+  echo "[mod-orw] Coordinates: $group:$artifact:$version (plugin $plugin_ver)"
+
+  mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run" \
+    -Drewrite.configLocation="$cfg" \
+    -Drewrite.activeRecipes="$classname" \
+    -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
+    -DskipTests \
+    -X | tee "$outdir/transform.log"
+
+  status=${PIPESTATUS[0]}
+else
+  # Gradle project: prefer ./gradlew when present, otherwise fall back to
+  # system gradle. The repository must apply the OpenRewrite Gradle plugin;
+  # recipe coordinates are passed via standard rewrite.* system properties.
+  gradle_cmd=""
+  if [[ -x "./gradlew" ]]; then
+    gradle_cmd="./gradlew"
+  elif command -v gradle >/dev/null 2>&1; then
+    gradle_cmd="gradle"
+  else
+    echo "error: gradle not found in PATH and ./gradlew is missing (Gradle project required)" >&2
+    exit 127
+  fi
+
+  echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
+  echo "[mod-orw] Coordinates: $group:$artifact:$version"
+
+  "$gradle_cmd" --no-daemon --stacktrace rewriteRun \
+    -Drewrite.configLocation="$cfg" \
+    -Drewrite.activeRecipes="$classname" \
+    -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
+    -q | tee "$outdir/transform.log"
+
+  status=${PIPESTATUS[0]}
+fi
+
 if [[ $status -ne 0 ]]; then
   echo "[mod-orw] OpenRewrite failed (exit $status)" >&2
   echo '{"success":false}' > "$outdir/report.json"
-exit "$status"
+  exit "$status"
 fi
 
 # Minimal report for downstream inspection
@@ -115,7 +154,6 @@ cat > "$outdir/report.json" <<JSON
 JSON
 
 # Cleanup: remove build output directories to keep workspace clean
-find "$workspace" -type d -name target -prune -exec rm -rf {} + || true
+find "$workspace" -type d \( -name target -o -name build \) -prune -exec rm -rf {} + || true
 
 echo "[mod-orw] Completed successfully"
-

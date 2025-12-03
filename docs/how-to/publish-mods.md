@@ -2,9 +2,12 @@ Publish Mods Images to Docker Hub
 
 Overview
 - Mods images live under `docker/mods/`:
-  - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
+  - `mod-orw` — OpenRewrite apply (Maven/Gradle) → `mods-openrewrite`
     - Coordinates are passed via environment only (no JSON spec for coords):
       set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
+    - Build tool detection:
+      - If `pom.xml` exists, the mod runs the Rewrite Maven plugin directly (no plugin declaration required in `pom.xml`).
+      - If `build.gradle` or `build.gradle.kts` exists (and `pom.xml` does not), the mod prefers `./gradlew` and falls back to `gradle` in `PATH`. The repository must apply the OpenRewrite Gradle plugin; the same `RECIPE_*` coordinates are passed via `rewrite.*` system properties.
   - `mod-codex` — Codex CLI wrapper (sentinel protocol) → `mods-codex`
     - Uses the sentinel protocol: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]`; Ploy re-runs the Build Gate externally.
     - Build requires no special context; uses a standard Node base image; Codex never runs the Build Gate or build tools directly.

@@ -501,12 +501,6 @@ func maybeCreateHealingJobs(
 
 	// Only create healing for gate jobs.
 	modType := strings.TrimSpace(failedJob.ModType)
-	if modType == "" && len(failedJob.Meta) > 0 {
-		var jobMeta modsapi.StageMetadata
-		if err := json.Unmarshal(failedJob.Meta, &jobMeta); err == nil {
-			modType = strings.TrimSpace(jobMeta.ModType)
-		}
-	}
 	if modType != "pre_gate" && modType != "post_gate" && modType != "re_gate" {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
 			"run_id", runID,
@@ -561,16 +555,80 @@ func maybeCreateHealingJobs(
 		retries = int(r)
 	}
 
-	// Count existing healing attempts by counting "heal" jobs for this run.
+	// Determine the base gate index used to count healing attempts.
+	// Healing attempts are counted per build gate (pre/post) independently.
+	// For re-gate failures, associate the failure with the nearest preceding
+	// pre_gate/post_gate so that all healing jobs between that gate and the
+	// next non-gate/non-heal job share the same attempt counter.
+	baseGateIndex := failedStepIndex
+	if modType == "re_gate" {
+		var (
+			baseFound     bool
+			baseStepIndex float64
+		)
+		for _, job := range jobs {
+			mt := strings.TrimSpace(job.ModType)
+			if mt != "pre_gate" && mt != "post_gate" {
+				continue
+			}
+			if job.StepIndex > float64(failedStepIndex) {
+				continue
+			}
+			if !baseFound || job.StepIndex > baseStepIndex {
+				baseFound = true
+				baseStepIndex = job.StepIndex
+			}
+		}
+		if baseFound {
+			baseGateIndex = domaintypes.StepIndex(baseStepIndex)
+		}
+	}
+
+	windowStart := float64(baseGateIndex)
+
+	// Find the earliest non-healing, non-gate job after the base gate.
+	// This bounds the healing window for this gate so that retries are
+	// counted independently for each build gate.
+	var (
+		windowEnd     float64
+		hasWindowEnd  bool
+		isGateJobType = func(t string) bool {
+			return t == "pre_gate" || t == "post_gate" || t == "re_gate"
+		}
+	)
+	for _, job := range jobs {
+		if job.StepIndex <= windowStart {
+			continue
+		}
+		jt := strings.TrimSpace(job.ModType)
+		if jt == "heal" {
+			continue
+		}
+		if isGateJobType(jt) {
+			// Gate jobs (pre/post/re) live inside the healing window and
+			// must not terminate it.
+			continue
+		}
+		if !hasWindowEnd || job.StepIndex < windowEnd {
+			hasWindowEnd = true
+			windowEnd = job.StepIndex
+		}
+	}
+
+	// Count existing healing attempts for this gate by counting "heal" jobs
+	// whose step_index lies within (baseGateIndex, windowEnd).
 	healingAttempts := 0
 	for _, job := range jobs {
-		var meta modsapi.StageMetadata
-		if len(job.Meta) > 0 {
-			_ = json.Unmarshal(job.Meta, &meta)
+		if strings.TrimSpace(job.ModType) != "heal" {
+			continue
 		}
-		if meta.ModType == "heal" {
-			healingAttempts++
+		if job.StepIndex <= windowStart {
+			continue
 		}
+		if hasWindowEnd && job.StepIndex >= windowEnd {
+			continue
+		}
+		healingAttempts++
 	}
 
 	// Check if retries exhausted.
