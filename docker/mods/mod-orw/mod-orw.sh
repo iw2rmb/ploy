@@ -92,7 +92,7 @@ if [[ -z "$group" || -z "$artifact" || -z "$version" || -z "$classname" ]]; then
 fi
 
 maven_plugin_ver=${MAVEN_PLUGIN_VERSION:-6.18.0}
-gradle_plugin_ver=${GRADLE_PLUGIN_VERSION:-8.5.0}
+gradle_plugin_ver=${GRADLE_PLUGIN_VERSION:-7.21.0}
 
 cd "$workspace"
 is_maven=false
@@ -156,23 +156,54 @@ else
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
   echo "[mod-orw] Coordinates: $group:$artifact:$version (gradle plugin $gradle_plugin_ver)"
 
-  # Use a Gradle init script so we don't require the project to preconfigure
-  # the OpenRewrite plugin or tasks. This keeps the mod image universal and
-  # avoids committing rewrite configuration into the target repo.
-  #
-  # The OpenRewrite Gradle plugin is published on the Gradle Plugin Portal
-  # with id "org.openrewrite.rewrite". We resolve the plugin marker directly
-  # from plugins.gradle.org and then apply it by id for all projects.
+  # Use a two-phase approach for Gradle:
+  #  1. Bootstrap a tiny project that applies the OpenRewrite Gradle plugin
+  #     via the standard Gradle plugins DSL. This lets Gradle resolve the
+  #     actual plugin implementation (org.openrewrite:plugin:${gradle_plugin_ver})
+  #     into GRADLE_USER_HOME without touching the target repo.
+  #  2. Locate the resolved plugin JAR in the Gradle cache and construct an
+  #     init script that adds it to the classpath and applies the plugin by id
+  #     for all projects in the target build.
+
+  gradle_home="$(mktemp -d)"
+  export GRADLE_USER_HOME="$gradle_home"
+
+  bootstrap_dir="$(mktemp -d)"
+
+  cat > "${bootstrap_dir}/settings.gradle" <<'BOOTSTRAP_SETTINGS'
+rootProject.name = "rewriteBootstrap"
+BOOTSTRAP_SETTINGS
+
+  cat > "${bootstrap_dir}/build.gradle" <<BOOTSTRAP_BUILD
+plugins {
+  id "org.openrewrite.rewrite" version "${gradle_plugin_ver}"
+}
+
+repositories {
+  // Standard repositories; Gradle plugin portal is used implicitly for the plugin DSL.
+  mavenCentral()
+}
+
+tasks.register("rewriteBootstrap") {}
+BOOTSTRAP_BUILD
+
+  echo "[mod-orw] Bootstrapping OpenRewrite Gradle plugin (version $gradle_plugin_ver)"
+  if ! "$gradle_cmd" --no-daemon --stacktrace -g "$GRADLE_USER_HOME" -p "$bootstrap_dir" rewriteBootstrap -q; then
+    echo "error: failed to bootstrap OpenRewrite Gradle plugin (version $gradle_plugin_ver)" >&2
+    exit 128
+  fi
+
+  plugin_jar="$(find "$GRADLE_USER_HOME" -type f -name "plugin-${gradle_plugin_ver}.jar" | head -n 1 || true)"
+  if [[ -z "$plugin_jar" ]]; then
+    echo "error: could not locate org.openrewrite:plugin:${gradle_plugin_ver} in Gradle cache under $GRADLE_USER_HOME" >&2
+    exit 129
+  fi
+
   init_script="$(mktemp)"
   cat >"$init_script" <<GRADLE
 initscript {
-  repositories {
-    maven {
-      url = uri("https://plugins.gradle.org/m2")
-    }
-  }
   dependencies {
-    classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:${gradle_plugin_ver}")
+    classpath(files("$plugin_jar"))
   }
 }
 
@@ -186,7 +217,7 @@ allprojects {
 }
 GRADLE
 
-  "$gradle_cmd" --no-daemon --stacktrace -I "$init_script" rewriteRun \
+  "$gradle_cmd" --no-daemon --stacktrace -g "$GRADLE_USER_HOME" -I "$init_script" rewriteRun \
     -Drewrite.configLocation="$cfg" \
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
