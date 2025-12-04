@@ -154,19 +154,25 @@ else
   fi
 
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
-  echo "[mod-orw] Coordinates: $group:$artifact:$version"
+  echo "[mod-orw] Coordinates: $group:$artifact:$version (gradle plugin $gradle_plugin_ver)"
 
   # Use a Gradle init script so we don't require the project to preconfigure
   # the OpenRewrite plugin or tasks. This keeps the mod image universal and
   # avoids committing rewrite configuration into the target repo.
+  #
+  # The OpenRewrite Gradle plugin is published on the Gradle Plugin Portal
+  # with id "org.openrewrite.rewrite". We resolve the plugin marker directly
+  # from plugins.gradle.org and then apply it by id for all projects.
   init_script="$(mktemp)"
   cat >"$init_script" <<GRADLE
 initscript {
   repositories {
-    mavenCentral()
+    maven {
+      url = uri("https://plugins.gradle.org/m2")
+    }
   }
   dependencies {
-    classpath("org.openrewrite:rewrite-gradle:${gradle_plugin_ver}")
+    classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:${gradle_plugin_ver}")
   }
 }
 
