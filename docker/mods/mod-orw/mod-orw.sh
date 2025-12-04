@@ -172,59 +172,22 @@ else
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
   echo "[mod-orw] Coordinates: $group:$artifact:$version (gradle plugin $gradle_plugin_ver)"
 
-  # Use a two-phase approach for Gradle:
-  #  1. Bootstrap a tiny project that applies the OpenRewrite Gradle plugin
-  #     via the standard Gradle plugins DSL. This lets Gradle resolve the
-  #     actual plugin implementation (org.openrewrite:plugin:${gradle_plugin_ver})
-  #     into GRADLE_USER_HOME without touching the target repo.
-  #  2. Locate the resolved plugin JAR in the Gradle cache and construct an
-  #     init script that adds it to the classpath and applies the plugin by id
-  #     for all projects in the target build.
-
-  gradle_home="$(mktemp -d)"
-  export GRADLE_USER_HOME="$gradle_home"
-
-  bootstrap_dir="$(mktemp -d)"
-
-  cat > "${bootstrap_dir}/settings.gradle" <<'BOOTSTRAP_SETTINGS'
-rootProject.name = "rewriteBootstrap"
-BOOTSTRAP_SETTINGS
-
-  cat > "${bootstrap_dir}/build.gradle" <<BOOTSTRAP_BUILD
-plugins {
-  id "org.openrewrite.rewrite" version "${gradle_plugin_ver}"
-}
-
-repositories {
-  // Standard repositories; Gradle plugin portal is used implicitly for the plugin DSL.
-  mavenCentral()
-}
-
-tasks.register("rewriteBootstrap") {}
-BOOTSTRAP_BUILD
-
-  echo "[mod-orw] Bootstrapping OpenRewrite Gradle plugin (version $gradle_plugin_ver)"
-  if ! "$gradle_cmd" --no-daemon --stacktrace -g "$GRADLE_USER_HOME" -p "$bootstrap_dir" rewriteBootstrap -q; then
-    echo "error: failed to bootstrap OpenRewrite Gradle plugin (version $gradle_plugin_ver)" >&2
-    exit 128
-  fi
-
-  plugin_jar="$(find "$GRADLE_USER_HOME" -type f -name "plugin-${gradle_plugin_ver}.jar" | head -n 1 || true)"
-  if [[ -z "$plugin_jar" ]]; then
-    echo "error: could not locate org.openrewrite:plugin:${gradle_plugin_ver} in Gradle cache under $GRADLE_USER_HOME" >&2
-    exit 129
-  fi
-
+  # Use a Gradle init script that resolves the OpenRewrite Gradle integration
+  # directly from Maven Central and applies the plugin class for all projects.
+  # This avoids reliance on plugin markers and keeps the target repo unchanged.
   init_script="$(mktemp)"
   cat >"$init_script" <<GRADLE
 initscript {
+  repositories {
+    mavenCentral()
+  }
   dependencies {
-    classpath(files("$plugin_jar"))
+    classpath("org.openrewrite:rewrite-gradle:${gradle_plugin_ver}")
   }
 }
 
 allprojects {
-  apply plugin: "org.openrewrite.rewrite"
+  apply plugin: org.openrewrite.gradle.RewritePlugin
 
   rewrite {
     activeRecipe("${classname}")
