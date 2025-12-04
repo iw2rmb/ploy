@@ -7,9 +7,9 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.created="$BUILD_TS"
 
 RUN apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash git tar gzip jq unzip \
- && rm -rf /var/lib/apt/lists/*
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    bash git tar gzip jq unzip gradle \
+    && rm -rf /var/lib/apt/lists/*
 
 # Workdir is where the step runner mounts the working tree
 WORKDIR /workspace
