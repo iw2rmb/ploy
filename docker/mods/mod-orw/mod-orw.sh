@@ -158,7 +158,9 @@ if [[ "$is_maven" == "true" ]]; then
 else
   # Gradle project: prefer system Gradle when present to avoid wrapper-managed
   # distribution downloads from services.gradle.org; fall back to ./gradlew
-  # only when a system gradle binary is unavailable.
+  # only when a system gradle binary is unavailable. The target project is
+  # expected to apply and configure the OpenRewrite Gradle plugin itself;
+  # this mod simply triggers the rewriteRun task.
   gradle_cmd=""
   if command -v gradle >/dev/null 2>&1; then
     gradle_cmd="gradle"
@@ -170,33 +172,17 @@ else
   fi
 
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
-  echo "[mod-orw] Coordinates: $group:$artifact:$version (gradle plugin $gradle_plugin_ver)"
+  echo "[mod-orw] Coordinates: $group:$artifact:$version (gradle plugin configured in project)"
 
-  # Use a Gradle init script that resolves the OpenRewrite Gradle integration
-  # directly from Maven Central and applies the plugin class for all projects.
-  # This avoids reliance on plugin markers and keeps the target repo unchanged.
-  init_script="$(mktemp)"
-  cat >"$init_script" <<GRADLE
-initscript {
-  repositories {
-    mavenCentral()
-  }
-  dependencies {
-    classpath("org.openrewrite:rewrite-gradle:${gradle_plugin_ver}")
-  }
-}
+  # Use isolated Gradle caches so we do not contend with any host Gradle
+  # processes or IDEs that may be using the workspace-mounted .gradle directory.
+  gradle_home="$(mktemp -d)"
+  project_cache_dir="$(mktemp -d)"
+  export GRADLE_USER_HOME="$gradle_home"
 
-allprojects {
-  apply plugin: org.openrewrite.gradle.RewritePlugin
-
-  rewrite {
-    activeRecipe("${classname}")
-    recipeArtifact("${group}:${artifact}:${version}")
-  }
-}
-GRADLE
-
-  "$gradle_cmd" --no-daemon --stacktrace -I "$init_script" rewriteRun \
+  "$gradle_cmd" --no-daemon --stacktrace \
+    --project-cache-dir "$project_cache_dir" \
+    rewriteRun \
     -Drewrite.configLocation="$cfg" \
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
