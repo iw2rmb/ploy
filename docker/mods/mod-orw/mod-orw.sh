@@ -140,14 +140,14 @@ if [[ "$is_maven" == "true" ]]; then
 
   status=${PIPESTATUS[0]}
 else
-  # Gradle project: prefer ./gradlew when present, otherwise fall back to
-  # system gradle. The repository must apply the OpenRewrite Gradle plugin;
-  # recipe coordinates are passed via standard rewrite.* system properties.
+  # Gradle project: prefer system Gradle when present to avoid wrapper-managed
+  # distribution downloads from services.gradle.org; fall back to ./gradlew
+  # only when a system gradle binary is unavailable.
   gradle_cmd=""
-  if [[ -x "./gradlew" ]]; then
-    gradle_cmd="./gradlew"
-  elif command -v gradle >/dev/null 2>&1; then
+  if command -v gradle >/dev/null 2>&1; then
     gradle_cmd="gradle"
+  elif [[ -x "./gradlew" ]]; then
+    gradle_cmd="./gradlew"
   else
     echo "error: gradle not found in PATH and ./gradlew is missing (Gradle project required)" >&2
     exit 127
