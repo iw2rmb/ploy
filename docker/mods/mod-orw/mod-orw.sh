@@ -196,7 +196,7 @@ allprojects {
 }
 GRADLE
 
-  "$gradle_cmd" --no-daemon --stacktrace -g "$GRADLE_USER_HOME" -I "$init_script" rewriteRun \
+  "$gradle_cmd" --no-daemon --stacktrace -I "$init_script" rewriteRun \
     -Drewrite.configLocation="$cfg" \
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
