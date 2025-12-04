@@ -68,6 +68,13 @@ if [[ -n "${CA_CERTS_PEM_BUNDLE:-}" ]]; then
   pem_dir="$(mktemp -d)"
   # Split bundle into individual cert files cert1.crt, cert2.crt, ...
   awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="${pem_dir}" "${pem_file}"
+
+  sys_ca_dir=""
+  if command -v update-ca-certificates >/dev/null 2>&1; then
+    sys_ca_dir="/usr/local/share/ca-certificates/mod-orw"
+    mkdir -p "$sys_ca_dir"
+  fi
+
   shopt -s nullglob
   for cert_path in "${pem_dir}"/*.crt; do
     base="$(basename "${cert_path}" .crt)"
@@ -76,8 +83,17 @@ if [[ -n "${CA_CERTS_PEM_BUNDLE:-}" ]]; then
       echo "error: failed to import certificate ${cert_path} into cacerts" >&2
       exit 6
     fi
+    if [[ -n "$sys_ca_dir" ]]; then
+      cp "${cert_path}" "${sys_ca_dir}/" || true
+    fi
   done
   shopt -u nullglob
+
+  if [[ -n "$sys_ca_dir" ]]; then
+    if ! update-ca-certificates >/dev/null 2>&1; then
+      echo "warning: update-ca-certificates failed; system CA bundle may not include injected CAs" >&2
+    fi
+  fi
 fi
 
 # Resolve recipe parameters strictly from env
