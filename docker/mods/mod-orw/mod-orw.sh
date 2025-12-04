@@ -158,9 +158,7 @@ if [[ "$is_maven" == "true" ]]; then
 else
   # Gradle project: prefer system Gradle when present to avoid wrapper-managed
   # distribution downloads from services.gradle.org; fall back to ./gradlew
-  # only when a system gradle binary is unavailable. The target project is
-  # expected to apply and configure the OpenRewrite Gradle plugin itself;
-  # this mod simply triggers the rewriteRun task.
+  # only when a system gradle binary is unavailable.
   gradle_cmd=""
   if command -v gradle >/dev/null 2>&1; then
     gradle_cmd="gradle"
@@ -169,6 +167,81 @@ else
   else
     echo "error: gradle not found in PATH and ./gradlew is missing (Gradle project required)" >&2
     exit 127
+  fi
+
+  # Determine build file (Kotlin DSL preferred). We currently support
+  # automatic OpenRewrite Gradle plugin injection only for Kotlin DSL
+  # builds (build.gradle.kts).
+  build_file=""
+  build_style=""
+  if [[ -f "build.gradle.kts" ]]; then
+    build_file="build.gradle.kts"
+    build_style="kts"
+  elif [[ -f "build.gradle" ]]; then
+    build_file="build.gradle"
+    build_style="groovy"
+  fi
+
+  if [[ -z "$build_file" ]]; then
+    echo "error: Gradle project detected but no build.gradle(.kts) found" >&2
+    exit 5
+  fi
+  if [[ "$build_style" != "kts" ]]; then
+    echo "error: OpenRewrite Gradle injection currently supports only Kotlin DSL (build.gradle.kts)" >&2
+    exit 5
+  fi
+
+  # Inject OpenRewrite Gradle plugin and recipe module into build.gradle.kts
+  # if absent. These additions are removed after rewriteRun completes, so the
+  # build file is left in its original shape aside from changes made by
+  # the recipes themselves.
+  plugin_line='id("org.openrewrite.rewrite") version "'"${gradle_plugin_ver}"'"'
+  recipe_coord="${group}:${artifact}:${version}"
+  rewrite_dep_line='rewrite("'"${recipe_coord}"'")'
+
+  plugin_was_present=false
+  rewrite_was_present=false
+  if grep -q 'org.openrewrite.rewrite' "$build_file"; then
+    plugin_was_present=true
+  fi
+  if grep -q "$recipe_coord" "$build_file"; then
+    rewrite_was_present=true
+  fi
+
+  if [[ "$plugin_was_present" == false ]]; then
+    tmpf="$(mktemp)"
+    awk -v line="$plugin_line" '
+      $0 ~ /^plugins[[:space:]]*\{/ && !inserted {
+        print $0
+        print "    " line
+        inserted=1
+        next
+      }
+      { print $0 }
+    ' "$build_file" > "$tmpf"
+    mv "$tmpf" "$build_file"
+  fi
+
+  if [[ "$rewrite_was_present" == false ]]; then
+    tmpf="$(mktemp)"
+    awk -v line="$rewrite_dep_line" '
+      $0 ~ /^dependencies[[:space:]]*\{/ && !inserted {
+        print $0
+        print "    " line
+        inserted=1
+        next
+      }
+      { print $0 }
+      END {
+        if (!inserted) {
+          print ""
+          print "dependencies {"
+          print "    " line
+          print "}"
+        }
+      }
+    ' "$build_file" > "$tmpf"
+    mv "$tmpf" "$build_file"
   fi
 
   echo "[mod-orw] Running OpenRewrite recipe (Gradle): $classname"
@@ -187,6 +260,16 @@ else
     -Drewrite.activeRecipes="$classname" \
     -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
     -q | tee "$outdir/transform.log"
+
+  # Remove injected plugin/dependency lines if we added them, leaving any
+  # other build file changes (including those made by recipes) intact.
+  if [[ "$plugin_was_present" == false ]]; then
+    # Best-effort removal; ignore errors to avoid masking rewrite failures.
+    sed -i '/org.openrewrite.rewrite/d' "$build_file" || true
+  fi
+  if [[ "$rewrite_was_present" == false ]]; then
+    sed -i "/rewrite(\"$recipe_coord\")/d" "$build_file" || true
+  fi
 
   status=${PIPESTATUS[0]}
 fi
