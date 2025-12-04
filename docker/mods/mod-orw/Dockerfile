@@ -8,8 +8,19 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    bash git tar gzip jq unzip gradle \
+    bash git tar gzip jq unzip curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install a modern Gradle distribution explicitly so the system
+# gradle binary is compatible with the OpenRewrite Gradle plugin.
+# Align with the Gradle wrapper version used by typical target projects (8.5).
+ARG GRADLE_VERSION=8.5
+RUN curl -sSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip \
+    && mkdir -p /opt/gradle \
+    && unzip -d /opt/gradle /tmp/gradle.zip \
+    && rm /tmp/gradle.zip
+ENV GRADLE_HOME=/opt/gradle/gradle-${GRADLE_VERSION}
+ENV PATH="${GRADLE_HOME}/bin:${PATH}"
 
 # Workdir is where the step runner mounts the working tree
 WORKDIR /workspace
