@@ -98,7 +98,7 @@ Legend: [ ] todo, [x] done.
       - The run fails with a clear error when the stack is `java-gradle` and only `java-maven` is specified without `default`.
 
 ## Split OpenRewrite ORW image by stack
-- [ ] Introduce `docker/mods/orw-maven` and `docker/mods/orw-gradle` images — Create dedicated, minimal images for Maven and Gradle OpenRewrite application, derived from the current `mod-orw` behavior.
+- [x] Introduce `docker/mods/orw-maven` and `docker/mods/orw-gradle` images — Create dedicated, minimal images for Maven and Gradle OpenRewrite application, derived from the current `mod-orw` behavior.
   - Repository: ploy
   - Component: `docker/mods`, `tests/integration/mods`, `scripts/docker`
   - Scope:
