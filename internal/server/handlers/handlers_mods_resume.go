@@ -20,6 +20,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// Resumability invariants:
+// 1. Only terminal states (failed, canceled) are resumable.
+// 2. Succeeded runs cannot be resumed — there is nothing to fix.
+// 3. In-progress runs (queued, assigned, running) return 200 OK for idempotency.
+// 4. Already-succeeded jobs within a run are preserved; only failed/canceled jobs are reset.
+// 5. A job that is already pending/running triggers idempotent 200 OK (no double-scheduling).
+
 // resumeTicketHandler resumes a failed or canceled Mods ticket (run) by requeueing eligible jobs.
 // POST /v1/mods/{id}/resume
 // Responses:
@@ -27,7 +34,7 @@ import (
 //   - 200 OK if already running/queued (idempotent) or if all jobs already succeeded
 //   - 404 Not Found if ticket does not exist
 //   - 400 Bad Request for invalid id
-//   - 409 Conflict if the run cannot be resumed (e.g., already succeeded)
+//   - 409 Conflict if the run cannot be resumed (e.g., state=succeeded is not resumable)
 func resumeTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract and validate the ticket ID from the path.
@@ -56,23 +63,18 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Handle idempotency: if run is already in progress, return 200 OK.
-		// This allows clients to safely retry resume requests.
-		if run.Status == store.RunStatusQueued || run.Status == store.RunStatusAssigned || run.Status == store.RunStatusRunning {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// Succeeded runs cannot be resumed - there's nothing to requeue.
-		if run.Status == store.RunStatusSucceeded {
-			http.Error(w, "cannot resume succeeded ticket", http.StatusConflict)
-			return
-		}
-
-		// Only failed and canceled runs are resumable.
-		// At this point we know the run is in a terminal state (failed or canceled).
-		if run.Status != store.RunStatusFailed && run.Status != store.RunStatusCanceled {
-			http.Error(w, fmt.Sprintf("cannot resume ticket in state: %s", run.Status), http.StatusConflict)
+		// Check resumability invariants using a centralized helper.
+		// This ensures consistent error messages and logging across resume paths.
+		resumable, httpStatus, errMsg := checkResumability(run)
+		if !resumable {
+			// Log rejected resume attempts for observability.
+			slog.Info("resume rejected", "ticket_id", ticketIDStr, "state", run.Status, "reason", errMsg)
+			if httpStatus == http.StatusOK {
+				// Idempotent case: run is already in progress.
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			http.Error(w, errMsg, httpStatus)
 			return
 		}
 
@@ -202,6 +204,35 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		w.WriteHeader(http.StatusAccepted)
 		slog.Info("ticket resumed", "ticket_id", ticketIDStr, "jobs_reset", len(jobsToReset))
+	}
+}
+
+// checkResumability evaluates whether a run can be resumed based on its current state.
+// It returns (resumable, httpStatus, errorMessage):
+//   - resumable=true: the run can proceed with resume logic
+//   - resumable=false with httpStatus=200: idempotent case (already in progress)
+//   - resumable=false with httpStatus=409: conflict (state not resumable)
+//
+// Error messages follow the format: "ticket state=<state> is not resumable[: reason]"
+// to provide clear, consistent feedback to API clients.
+func checkResumability(run store.Run) (resumable bool, httpStatus int, errMsg string) {
+	switch run.Status {
+	case store.RunStatusQueued, store.RunStatusAssigned, store.RunStatusRunning:
+		// Invariant 3: In-progress runs return 200 OK for idempotency.
+		// The run is already active; no action needed.
+		return false, http.StatusOK, fmt.Sprintf("ticket state=%s is already in progress", run.Status)
+
+	case store.RunStatusSucceeded:
+		// Invariant 2: Succeeded runs cannot be resumed — nothing to fix.
+		return false, http.StatusConflict, fmt.Sprintf("ticket state=%s is not resumable: nothing to fix", run.Status)
+
+	case store.RunStatusFailed, store.RunStatusCanceled:
+		// Invariant 1: Terminal failure states are resumable.
+		return true, 0, ""
+
+	default:
+		// Unknown state: reject with 409 to be safe.
+		return false, http.StatusConflict, fmt.Sprintf("ticket state=%s is not resumable", run.Status)
 	}
 }
 

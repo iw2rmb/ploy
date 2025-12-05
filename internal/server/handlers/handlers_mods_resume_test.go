@@ -141,6 +141,7 @@ func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
 }
 
 // TestResumeTicket_SucceededConflict verifies 409 when trying to resume a succeeded run.
+// This tests resumability invariant 2: succeeded runs cannot be resumed.
 func TestResumeTicket_SucceededConflict(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
@@ -152,6 +153,11 @@ func TestResumeTicket_SucceededConflict(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+	// Verify error message follows the invariant format.
+	body := rr.Body.String()
+	if !contains(body, "ticket state=succeeded is not resumable") {
+		t.Fatalf("expected error message with invariant format, got: %s", body)
 	}
 }
 
@@ -519,6 +525,242 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 	if !foundTicket {
 		t.Fatal("expected ticket event in snapshot")
 	}
+}
+
+// TestResumeTicket_ResumabilityInvariants is a table-driven test verifying all resumability
+// invariants with their expected HTTP status codes and error message formats.
+// This directly tests the requirements from D4: guard against unsafe or confusing resumes.
+func TestResumeTicket_ResumabilityInvariants(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		runStatus      store.RunStatus
+		wantStatus     int
+		wantBodySubstr string // Substring expected in response body (for 409 cases).
+	}{
+		// Invariant 1: Terminal failure states (failed, canceled) are resumable.
+		{
+			name:       "failed run is resumable",
+			runStatus:  store.RunStatusFailed,
+			wantStatus: http.StatusAccepted, // 202 - resume proceeds.
+		},
+		{
+			name:       "canceled run is resumable",
+			runStatus:  store.RunStatusCanceled,
+			wantStatus: http.StatusAccepted, // 202 - resume proceeds.
+		},
+		// Invariant 2: Succeeded runs cannot be resumed.
+		{
+			name:           "succeeded run returns 409 conflict",
+			runStatus:      store.RunStatusSucceeded,
+			wantStatus:     http.StatusConflict,
+			wantBodySubstr: "ticket state=succeeded is not resumable",
+		},
+		// Invariant 3: In-progress runs return 200 OK for idempotency.
+		{
+			name:       "queued run returns 200 idempotent",
+			runStatus:  store.RunStatusQueued,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "assigned run returns 200 idempotent",
+			runStatus:  store.RunStatusAssigned,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "running run returns 200 idempotent",
+			runStatus:  store.RunStatusRunning,
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			id := uuid.New()
+			// For resumable states, provide a job to reset.
+			jobs := []store.Job{}
+			if tt.runStatus == store.RunStatusFailed || tt.runStatus == store.RunStatusCanceled {
+				jobs = []store.Job{
+					{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+				}
+			}
+			st := &mockStore{
+				getRunResult: store.Run{
+					ID:        pgtype.UUID{Bytes: id, Valid: true},
+					Status:    tt.runStatus,
+					RepoUrl:   "https://example/repo.git",
+					CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+				},
+				listJobsByRunResult: jobs,
+			}
+
+			handler := resumeTicketHandler(st, nil)
+			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+			req.SetPathValue("id", id.String())
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d: %s", tt.wantStatus, rr.Code, rr.Body.String())
+			}
+			// For conflict cases, verify the error message format.
+			if tt.wantBodySubstr != "" && !contains(rr.Body.String(), tt.wantBodySubstr) {
+				t.Fatalf("expected body to contain %q, got: %s", tt.wantBodySubstr, rr.Body.String())
+			}
+		})
+	}
+}
+
+// TestCheckResumability_Unit tests the checkResumability helper function directly.
+func TestCheckResumability_Unit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		status        store.RunStatus
+		wantResumable bool
+		wantHTTP      int
+		wantMsgSubstr string
+	}{
+		{"queued", store.RunStatusQueued, false, http.StatusOK, "already in progress"},
+		{"assigned", store.RunStatusAssigned, false, http.StatusOK, "already in progress"},
+		{"running", store.RunStatusRunning, false, http.StatusOK, "already in progress"},
+		{"succeeded", store.RunStatusSucceeded, false, http.StatusConflict, "nothing to fix"},
+		{"failed", store.RunStatusFailed, true, 0, ""},
+		{"canceled", store.RunStatusCanceled, true, 0, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			run := store.Run{Status: tt.status}
+			resumable, httpStatus, errMsg := checkResumability(run)
+
+			if resumable != tt.wantResumable {
+				t.Errorf("resumable: got %v, want %v", resumable, tt.wantResumable)
+			}
+			if httpStatus != tt.wantHTTP {
+				t.Errorf("httpStatus: got %d, want %d", httpStatus, tt.wantHTTP)
+			}
+			if tt.wantMsgSubstr != "" && !contains(errMsg, tt.wantMsgSubstr) {
+				t.Errorf("errMsg should contain %q, got: %s", tt.wantMsgSubstr, errMsg)
+			}
+		})
+	}
+}
+
+// TestResumeTicket_JobLevelInvariants verifies that already-succeeded jobs are preserved
+// during resume (invariant 4) and pending/running jobs trigger idempotent behavior (invariant 5).
+func TestResumeTicket_JobLevelInvariants(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invariant 4: succeeded jobs preserved", func(t *testing.T) {
+		t.Parallel()
+		id := uuid.New()
+		succeededJobID := uuid.New()
+		failedJobID := uuid.New()
+
+		st := &mockStore{
+			getRunResult: store.Run{
+				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				Status:    store.RunStatusFailed,
+				RepoUrl:   "https://example/repo.git",
+				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+			},
+			listJobsByRunResult: []store.Job{
+				{ID: pgtype.UUID{Bytes: succeededJobID, Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 1000},
+				{ID: pgtype.UUID{Bytes: failedJobID, Valid: true}, Status: store.JobStatusFailed, StepIndex: 2000},
+			},
+		}
+
+		handler := resumeTicketHandler(st, nil)
+		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+		req.SetPathValue("id", id.String())
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusAccepted {
+			t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
+		}
+		// Verify only the failed job was updated, not the succeeded one.
+		if len(st.updateJobStatusCalls) != 1 {
+			t.Fatalf("expected 1 job update, got %d", len(st.updateJobStatusCalls))
+		}
+		if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) == succeededJobID {
+			t.Fatal("succeeded job should NOT be updated")
+		}
+		if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) != failedJobID {
+			t.Fatal("failed job should be updated")
+		}
+	})
+
+	t.Run("invariant 5: pending job triggers idempotent response", func(t *testing.T) {
+		t.Parallel()
+		id := uuid.New()
+
+		st := &mockStore{
+			getRunResult: store.Run{
+				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				Status:    store.RunStatusFailed, // Terminal but has a pending job (edge case).
+				RepoUrl:   "https://example/repo.git",
+				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+			},
+			listJobsByRunResult: []store.Job{
+				{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusPending, StepIndex: 1000},
+			},
+		}
+
+		handler := resumeTicketHandler(st, nil)
+		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+		req.SetPathValue("id", id.String())
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		// Should return 200 OK because there's already a pending job — no double-scheduling.
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 for idempotent case, got %d: %s", rr.Code, rr.Body.String())
+		}
+		if st.updateRunStatusCalled {
+			t.Fatal("should not update run status when pending job exists")
+		}
+	})
+
+	t.Run("invariant 5: running job triggers idempotent response", func(t *testing.T) {
+		t.Parallel()
+		id := uuid.New()
+
+		st := &mockStore{
+			getRunResult: store.Run{
+				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				Status:    store.RunStatusFailed, // Terminal but has a running job (edge case).
+				RepoUrl:   "https://example/repo.git",
+				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+			},
+			listJobsByRunResult: []store.Job{
+				{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StepIndex: 1000},
+			},
+		}
+
+		handler := resumeTicketHandler(st, nil)
+		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+		req.SetPathValue("id", id.String())
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		// Should return 200 OK because there's already a running job.
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 for idempotent case, got %d: %s", rr.Code, rr.Body.String())
+		}
+		if st.updateRunStatusCalled {
+			t.Fatal("should not update run status when running job exists")
+		}
+	})
 }
 
 // contains is a simple helper to check if a string contains a substring.
