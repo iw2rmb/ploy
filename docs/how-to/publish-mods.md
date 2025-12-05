@@ -2,12 +2,12 @@ Publish Mods Images to Docker Hub
 
 Overview
 - Mods images live under `docker/mods/`:
-  - `mod-orw` — OpenRewrite apply (Maven/Gradle) → `mods-openrewrite`
-    - Coordinates are passed via environment only (no JSON spec for coords):
-      set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
-    - Build tool detection:
-      - If `pom.xml` exists, the mod runs the Rewrite Maven plugin directly (no plugin declaration required in `pom.xml`).
-      - If `build.gradle` or `build.gradle.kts` exists (and `pom.xml` does not), the mod prefers `./gradlew` and falls back to `gradle` in `PATH`. The repository must apply the OpenRewrite Gradle plugin; the same `RECIPE_*` coordinates are passed via `rewrite.*` system properties.
+  - `orw-maven` — OpenRewrite apply for Maven-only workspaces → `mods-orw-maven`
+    - Requires `pom.xml` in the workspace; runs the Rewrite Maven plugin.
+    - Coordinates are passed via environment: `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
+  - `orw-gradle` — OpenRewrite apply for Gradle-only workspaces (Kotlin DSL) → `mods-orw-gradle`
+    - Requires `build.gradle.kts` in the workspace; prefers `./gradlew`, falls back to `gradle` in `PATH`.
+    - Same `RECIPE_*` environment variables as Maven; plugin injected via Kotlin DSL.
   - `mod-codex` — Codex CLI wrapper (sentinel protocol) → `mods-codex`
     - Uses the sentinel protocol: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]`; Ploy re-runs the Build Gate externally.
     - Build requires no special context; uses a standard Node base image; Codex never runs the Build Gate or build tools directly.
@@ -15,6 +15,17 @@ Overview
   - `mod-plan` — Planner stub → `mods-plan`
   - (Human gate image removed for now.)
 - The runner pulls images from Docker Hub by default: `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+
+Stack-aware images
+- Use the stack-aware `image` map in `mod.yaml` to select `orw-maven` or `orw-gradle` based on the Build Gate detected stack:
+  ```yaml
+  mod:
+    image:
+      default: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
+      java-maven: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
+      java-gradle: docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
+  ```
+- The Build Gate detects `java-maven` when `pom.xml` is present, `java-gradle` when only Gradle files exist.
 
 Prerequisites
 - Set the following environment variables in your shell (e.g., in `~/.zshenv`):
@@ -29,11 +40,11 @@ scripts/docker/build-and-push-mods.sh
 # Special-cases mod-codex to use repo-root context automatically.
 ```
 
-Publish a single Mods image
+Publish a single Mods image (example: orw-maven)
 ```bash
-name=mod-orw
+name=orw-maven
 IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}" \
-  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-openrewrite:latest" --push docker/mods/${name}
+  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-orw-maven:latest" --push docker/mods/${name}
 ```
 
 Publish mods-codex (manual one-off)
@@ -54,7 +65,7 @@ echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 ```
 
 Notes
-- Directory name to repo mapping: `mod-foo` → `mods-foo`; special‑case `mod-orw` → `mods-openrewrite`.
+- Directory name to repo mapping: `mod-foo` → `mods-foo`; `orw-maven` → `mods-orw-maven`; `orw-gradle` → `mods-orw-gradle`.
 - To use a different registry/namespace, set `MODS_IMAGE_PREFIX` (for example, `docker.io/acme`).
 
 Multi‑arch (Mac + Linux) push
@@ -82,6 +93,7 @@ Multi‑arch (Mac + Linux) push
 
 Verification for required images
 ```bash
-docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-openrewrite:latest
+docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
+docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
 docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-codex:latest
 ```

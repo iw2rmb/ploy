@@ -13,7 +13,8 @@
 **Build + Publish Mods Images (Docker Hub)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite: `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-orw`
+  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t mods-orw-maven:e2e docker/mods/orw-maven`
+  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t mods-orw-gradle:e2e docker/mods/orw-gradle`
   - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f docker/mods/mod-codex/Dockerfile -t mods-codex:e2e .`
   - Optional: `mods-llm`, `mods-plan` as needed.
 - Push to Docker Hub using the helper script:
@@ -22,8 +23,8 @@
   - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 
 Notes:
-- Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match examples.
-- Coordinates are passed via environment only (no JSON manifest support in mod-orw): set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
+- Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`; `orw-maven` → `mods-orw-maven`; `orw-gradle` → `mods-orw-gradle`.
+- OpenRewrite coordinates are passed via environment: set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 - The Codex healer now uses the **sentinel protocol**: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]` when ready. The node agent then re-runs the Build Gate externally. Codex no longer invokes Build Gate tooling directly from inside the container.
 
