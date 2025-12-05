@@ -108,8 +108,10 @@ func buildAndSendJobClaimResponse(
 	jobIDStr := uuid.UUID(job.ID.Bytes).String()
 	mergedSpec := mergeJobIDIntoSpec(run.Spec, jobIDStr)
 
-	// For mod jobs, inject a numeric mod_index derived from job name (mod-N).
-	if strings.TrimSpace(job.ModType) == "mod" {
+	// For mod jobs (names following "mod-N" pattern), inject a numeric
+	// mod_index derived from job name so the node agent can map this job
+	// to mods[N] in multi-step specs.
+	if strings.HasPrefix(job.Name, "mod-") {
 		if idx, err := parseModIndex(job.Name); err == nil {
 			mergedSpec = mergeModIndexIntoSpec(mergedSpec, idx)
 		}
