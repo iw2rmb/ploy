@@ -149,7 +149,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
   - Snippets: Updated YAML examples in `docs/schemas/mod.example.yaml` showing multiple healing strategies.
   - Tests: Add spec parsing tests in `internal/nodeagent/claimer_spec.go` to validate the new shape and backward compatibility.
 
-- [ ] E2 — Control-plane branch planner — Create branch-aware healing jobs from spec.
+- [x] E2 — Control-plane branch planner — Create branch-aware healing jobs from spec.
   - Repository: `ploy`
   - Component: `internal/server/handlers/nodes_complete.go`, `internal/store`.
   - Scope:
