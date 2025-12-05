@@ -28,7 +28,7 @@ Legend: [ ] todo, [x] done.
   - Component: internal/worker/lifecycle
   - Scope: replace github.com/docker/docker/api/types and client usage in DockerChecker and related health code with github.com/moby/moby/api equivalents; align Ping and Info field usage.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover — worker lifecycle tests pass and cover moby-based health checks.
-- [ ] Remove deprecated github.com/docker/docker module — enforce use of supported Engine v29 SDK modules only.
+- [x] Remove deprecated github.com/docker/docker module — enforce use of supported Engine v29 SDK modules only.
   - Repository: github.com/iw2rmb/ploy
   - Component: go.mod, internal/workflow/runtime, internal/worker/lifecycle
   - Scope: drop github.com/docker/docker from go.mod and remaining imports; ensure all call-sites use moby client/API modules; clean up unused indirect dependencies introduced by docker.
