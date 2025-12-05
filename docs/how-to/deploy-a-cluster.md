@@ -51,7 +51,7 @@ docker version
 **Upgrading from Docker v28 or earlier**: See `docs/how-to/update-a-cluster.md` § "Docker Engine Upgrade"
 for step-by-step instructions on upgrading existing nodes.
 
-**Why v29?** Ploy uses the moby client SDK (`github.com/docker/docker/client`) which requires API v1.44
+**Why v29?** Ploy uses the moby client SDK (`github.com/moby/moby/client`) which requires API v1.44
 for container lifecycle operations. Older daemon versions lack required API endpoints and will cause
 container execution failures.
 
