@@ -79,10 +79,12 @@ func TestModORW_GradleWorkspace_UsesGradleWrapper(t *testing.T) {
 	workspace := t.TempDir()
 
 	// Create a minimal Gradle build file to signal a Gradle project.
-	buildGradlePath := filepath.Join(workspace, "build.gradle")
-	if err := os.WriteFile(buildGradlePath, []byte(`// dummy gradle build for tests
+	buildGradlePath := filepath.Join(workspace, "build.gradle.kts")
+	if err := os.WriteFile(buildGradlePath, []byte(`// dummy Kotlin DSL gradle build for tests
+plugins {
+}
 `), 0o644); err != nil {
-		t.Fatalf("write build.gradle: %v", err)
+		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
 	// Stub ./gradlew so the script can invoke it without requiring real Gradle.
@@ -109,12 +111,14 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 
 	modScript := filepath.Join(repoRoot(t), "docker", "mods", "mod-orw", "mod-orw.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	filteredPath := filterPath("gradle")
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,
 		"RECIPE_ARTIFACT="+artifact,
 		"RECIPE_VERSION="+version,
 		"RECIPE_CLASSNAME="+classname,
 		"MAVEN_PLUGIN_VERSION="+plugin,
+		"PATH="+filteredPath,
 	)
 
 	out, err := cmd.CombinedOutput()

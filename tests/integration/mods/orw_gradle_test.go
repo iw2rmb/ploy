@@ -190,17 +190,3 @@ func TestOrwGradle_SelfTest(t *testing.T) {
 		t.Fatalf("report.json does not indicate self_test: %s", string(reportBytes))
 	}
 }
-
-// filterPath returns PATH with any entry containing the given substring removed.
-// This helps isolate tests from system-installed binaries.
-func filterPath(exclude string) string {
-	original := os.Getenv("PATH")
-	parts := strings.Split(original, string(os.PathListSeparator))
-	var filtered []string
-	for _, p := range parts {
-		if !strings.Contains(p, exclude) {
-			filtered = append(filtered, p)
-		}
-	}
-	return strings.Join(filtered, string(os.PathListSeparator))
-}
