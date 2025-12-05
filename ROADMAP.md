@@ -103,7 +103,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `POST /v1/mods/{id}/resume`
   - Tests: Add handler tests verifying resume behavior for failed, canceled, and invalid-state tickets and ensuring idempotent behavior when resume is called twice.
 
-- [ ] D2 — CLI resume wiring — Make `ploy mod resume` use the server resume endpoint.
+- [x] D2 — CLI resume wiring — Make `ploy mod resume` use the server resume endpoint.
   - Repository: `ploy`
   - Component: `cmd/ploy/mod_controlplane_commands.go`, `internal/cli/mods/resume.go`, `cmd/ploy/README.md`.
   - Scope: Wire the existing `ResumeCommand` to `POST /v1/mods/{ticket}/resume`:
