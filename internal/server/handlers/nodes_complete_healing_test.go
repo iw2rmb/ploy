@@ -132,4 +132,3 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		t.Fatalf("expected re-gate job ModType=re_gate, got %q", reGateJob.ModType)
 	}
 }
-
