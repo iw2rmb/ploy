@@ -289,6 +289,59 @@ build_gate_healing:
 See `docs/schemas/mod.example.yaml` for a complete example and `tests/e2e/mods/README.md`
 for end-to-end usage with `mods-codex`.
 
+## Job Graph and DAG State
+
+Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
+surfaces via `GET /v1/mods/{id}` in `TicketSummary.Stages` and through the
+`ploy mod inspect` command. Each job has a `step_index` for execution ordering
+and optional metadata identifying the job phase.
+
+**Job phases (mod_type):**
+- `pre_gate` — Build Gate validation before mods run
+- `mod` — Main mod execution (code transformation)
+- `post_gate` — Build Gate validation after mods succeed
+- `heal` — Healing mod execution (when pre/post gate fails)
+- `re_gate` — Build Gate re-validation after healing
+
+**DAG structure:**
+
+```
+pre-gate → mod-0 → post-gate
+          │
+          └─(fail)→ heal → re-gate → mod-0
+```
+
+When a gate fails with a retryable outcome, the runner branches into the healing
+flow. The heal job attempts to fix the build issue, then re-gate validates the
+fix. If re-gate passes, the DAG continues to the next mod.
+
+**CLI inspection:**
+
+Use `ploy mod inspect <ticket-id>` to view job-level state:
+
+```bash
+$ ploy mod inspect mods-abc123
+Ticket mods-abc123: running
+MR: https://gitlab.com/org/repo/-/merge_requests/1
+Gate: failed pre-gate duration=567ms
+Jobs:
+  [1000] a1b2c3d4: succeeded
+  [2000] e5f6g7h8: running
+  [2500] i9j0k1l2: pending
+```
+
+The `[step_index]` ordering reflects execution sequence. Healing jobs inserted
+dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
+
+**API response:**
+
+The `GET /v1/mods/{id}` endpoint returns `TicketSummary` with:
+- `stages` — Map of job UUID to `StageStatus` (state, step_index, attempts)
+- `metadata["gate_summary"]` — Human-readable gate result
+- `metadata["mr_url"]` — Merge request URL if created
+
+See `internal/mods/api/types.go` for the full schema.
+
 ## Exit Codes
 
 - `0` — success (ticket claimed, stages completed, workspace cleaned).

@@ -187,6 +187,7 @@ The smoke test suite validates these critical paths:
    - Version and help commands
    - Subcommand help (mod, server, etc.)
    - Flag parsing and validation
+   - `mod inspect` command: ticket state, MR URL, gate summary, job graph display
 
 7. **Container execution (e2e):**
    - Mod container lifecycle
