@@ -87,7 +87,6 @@ func TestClaimJob_Success(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-
 	if resp["id"] != runID.String() {
 		t.Errorf("expected id (run_id) %s, got %v", runID.String(), resp["id"])
 	}
@@ -106,6 +105,19 @@ func TestClaimJob_Success(t *testing.T) {
 	}
 	if resp["repo_url"] != "https://github.com/user/repo.git" {
 		t.Errorf("expected repo_url from parent run, got %v", resp["repo_url"])
+	}
+
+	// Verify that spec was enriched with job_id and mod_index for the mod job.
+	spec, ok := resp["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec to be an object, got %T", resp["spec"])
+	}
+	if spec["job_id"] != jobID.String() {
+		t.Errorf("expected spec.job_id %s, got %v", jobID.String(), spec["job_id"])
+	}
+	// Numbers decode as float64 in generic maps.
+	if mi, ok := spec["mod_index"].(float64); !ok || mi != 0 {
+		t.Errorf("expected spec.mod_index 0, got %v", spec["mod_index"])
 	}
 }
 

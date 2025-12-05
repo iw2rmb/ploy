@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,13 @@ func buildAndSendJobClaimResponse(
 	jobIDStr := uuid.UUID(job.ID.Bytes).String()
 	mergedSpec := mergeJobIDIntoSpec(run.Spec, jobIDStr)
 
+	// For mod jobs, inject a numeric mod_index derived from job name (mod-N).
+	if strings.TrimSpace(job.ModType) == "mod" {
+		if idx, err := parseModIndex(job.Name); err == nil {
+			mergedSpec = mergeModIndexIntoSpec(mergedSpec, idx)
+		}
+	}
+
 	// Merge server default GitLab config (token/domain) into spec if configured.
 	// Per-run overrides (already in spec) take precedence over server defaults.
 	gitlabCfg := configHolder.GetGitLab()
@@ -162,4 +170,33 @@ func mergeJobIDIntoSpec(spec []byte, jobID string) json.RawMessage {
 	m["job_id"] = jobID
 	merged, _ := json.Marshal(m)
 	return merged
+}
+
+// mergeModIndexIntoSpec injects mod_index into the spec JSONB for downstream execution.
+// mod_index maps a mod job (mod-N) to mods[N] in multi-step specs.
+func mergeModIndexIntoSpec(spec []byte, modIndex int) json.RawMessage {
+	var m map[string]interface{}
+	if err := json.Unmarshal(spec, &m); err != nil {
+		m = make(map[string]interface{})
+	}
+	m["mod_index"] = modIndex
+	merged, _ := json.Marshal(m)
+	return merged
+}
+
+// parseModIndex extracts the numeric index from a mod job name ("mod-N").
+func parseModIndex(name string) (int, error) {
+	const prefix = "mod-"
+	if !strings.HasPrefix(name, prefix) {
+		return 0, fmt.Errorf("job name %q does not use mod-N pattern", name)
+	}
+	suffix := strings.TrimPrefix(name, prefix)
+	if strings.TrimSpace(suffix) == "" {
+		return 0, fmt.Errorf("empty mod index in job name %q", name)
+	}
+	idx, err := strconv.Atoi(suffix)
+	if err != nil {
+		return 0, fmt.Errorf("parse mod index from %q: %w", name, err)
+	}
+	return idx, nil
 }

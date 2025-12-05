@@ -279,6 +279,75 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}
 }
 
+// TestParseSpec_ModIndexPropagatesToOptions verifies that server-injected
+// mod_index is preserved in the flattened options map.
+func TestParseSpec_ModIndexPropagatesToOptions(t *testing.T) {
+	t.Parallel()
+
+	specJSON := `{
+		"mod_index": 1,
+		"mods": [
+			{"image":"docker.io/test/step-a:v1"},
+			{"image":"docker.io/test/step-b:v1"}
+		]
+	}`
+
+	var raw json.RawMessage = []byte(specJSON)
+	opts, _, _ := parseSpec(raw)
+
+	v, ok := opts["mod_index"].(int)
+	if !ok {
+		t.Fatalf("expected mod_index to be int in opts, got %T (%v)", opts["mod_index"], opts["mod_index"])
+	}
+	if v != 1 {
+		t.Errorf("expected mod_index=1 in opts, got %d", v)
+	}
+}
+
+// TestParseSpec_ModImageMap_PopulatesExecutionImage verifies that a single-step
+// spec using mod.image as a stack-aware map is parsed into Execution.Image.
+func TestParseSpec_ModImageMap_PopulatesExecutionImage(t *testing.T) {
+	t.Parallel()
+
+	specJSON := `{
+		"mod": {
+			"image": {
+				"default": "docker.io/user/mods-orw:latest",
+				"java-maven": "docker.io/user/mods-orw-maven:latest",
+				"java-gradle": "docker.io/user/mods-orw-gradle:latest"
+			}
+		}
+	}`
+
+	var raw json.RawMessage = []byte(specJSON)
+	_, _, typedOpts := parseSpec(raw)
+
+	// Verify that Execution.Image is a stack-specific map and resolves correctly.
+	mavenImg, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackJavaMaven)
+	if err != nil {
+		t.Fatalf("unexpected error resolving maven image: %v", err)
+	}
+	if mavenImg != "docker.io/user/mods-orw-maven:latest" {
+		t.Errorf("expected maven image, got %q", mavenImg)
+	}
+
+	gradleImg, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackJavaGradle)
+	if err != nil {
+		t.Fatalf("unexpected error resolving gradle image: %v", err)
+	}
+	if gradleImg != "docker.io/user/mods-orw-gradle:latest" {
+		t.Errorf("expected gradle image, got %q", gradleImg)
+	}
+
+	defaultImg, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackJava)
+	if err != nil {
+		t.Fatalf("unexpected error resolving default image: %v", err)
+	}
+	if defaultImg != "docker.io/user/mods-orw:latest" {
+		t.Errorf("expected default image for generic java stack, got %q", defaultImg)
+	}
+}
+
 // TestHealingCommand_ToSlice verifies command conversion to slice.
 func TestHealingCommand_ToSlice(t *testing.T) {
 	t.Parallel()
