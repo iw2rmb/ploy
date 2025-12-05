@@ -76,6 +76,25 @@ lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
 and the local `path`. Filenames are sanitized and deterministic; when a content
 digest is available it prefixes the name, otherwise the artifact CID is used.
 
+`mod resume` requests resumption of a failed or canceled Mods ticket via the
+control plane `POST /v1/mods/{id}/resume` endpoint. This enables continuation
+of previously interrupted workflows without resubmitting the entire spec.
+
+```bash
+ploy mod resume <ticket-id>
+# Output: Resume requested
+```
+
+The command handles the following server responses:
+- **202 Accepted**: Resume successfully initiated; eligible jobs are requeued.
+- **200 OK**: Ticket is already running (idempotent) or all jobs succeeded.
+- **404 Not Found**: Ticket does not exist.
+- **409 Conflict**: Ticket state is not resumable (e.g., already succeeded).
+- **400 Bad Request**: Invalid ticket ID format.
+
+Only tickets in `failed` or `canceled` state can be resumed. Succeeded tickets
+cannot be resumed since there are no jobs to requeue.
+
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
