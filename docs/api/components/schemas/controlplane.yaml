@@ -417,3 +417,92 @@ Node:
     - disk_free_bytes
     - drained
     - created_at
+
+WorkflowGraphNode:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+      description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
+    type:
+      type: string
+      description: Job phase type derived from jobs.mod_type
+      enum: [pre_gate, mod, heal, re_gate, post_gate]
+    step_index:
+      type: number
+      format: double
+      description: Float index used for job ordering (matches jobs.step_index)
+    status:
+      type: string
+      description: Job execution status (matches jobs.status)
+      enum: [created, pending, running, succeeded, failed, skipped, canceled]
+    attempt:
+      type: integer
+      format: int32
+      description: Retry attempt number (1 for current implementation)
+    parent_ids:
+      type: array
+      description: IDs of predecessor jobs derived from step_index ordering
+      items:
+        type: string
+        format: uuid
+    child_ids:
+      type: array
+      description: IDs of successor jobs derived from step_index ordering
+      items:
+        type: string
+        format: uuid
+    image:
+      type: string
+      nullable: true
+      description: Container image used for this job, when available
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+    duration_ms:
+      type: integer
+      format: int64
+      description: Job duration in milliseconds
+    exit_code:
+      type: integer
+      format: int32
+      nullable: true
+      description: Exit code for the job, when available
+  required: [id, name, type, step_index, status, attempt]
+
+WorkflowGraph:
+  type: object
+  properties:
+    run_id:
+      type: string
+      format: uuid
+      description: Ticket/run identifier
+    nodes:
+      type: object
+      description: Map of job IDs to graph nodes
+      additionalProperties:
+        $ref: '#/WorkflowGraphNode'
+    root_ids:
+      type: array
+      description: IDs of entry-point nodes (jobs with no parents)
+      items:
+        type: string
+        format: uuid
+    leaf_ids:
+      type: array
+      description: IDs of terminal nodes (jobs with no children)
+      items:
+        type: string
+        format: uuid
+    linear:
+      type: boolean
+      description: True when graph is a simple linear chain
+  required: [run_id, nodes, root_ids, leaf_ids, linear]
