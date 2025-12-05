@@ -217,6 +217,22 @@ func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompleti
 	return err
 }
 
+const updateRunResume = `-- name: UpdateRunResume :exec
+UPDATE runs
+SET stats = stats || jsonb_build_object(
+    'resume_count', COALESCE((stats->>'resume_count')::int, 0) + 1,
+    'last_resumed_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+)
+WHERE id = $1
+`
+
+// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
+// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
+func (q *Queries) UpdateRunResume(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateRunResume, id)
+	return err
+}
+
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2, finished_at = $3

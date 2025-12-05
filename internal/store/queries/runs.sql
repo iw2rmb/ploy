@@ -34,6 +34,16 @@ WHERE id = $1;
 DELETE FROM runs
 WHERE id = $1;
 
+-- name: UpdateRunResume :exec
+-- Increments resume_count and updates last_resumed_at timestamp in runs.stats.
+-- Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
+UPDATE runs
+SET stats = stats || jsonb_build_object(
+    'resume_count', COALESCE((stats->>'resume_count')::int, 0) + 1,
+    'last_resumed_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+)
+WHERE id = $1;
+
 -- name: GetRunTiming :one
 SELECT id,
        COALESCE(queue_ms, 0) AS queue_ms,

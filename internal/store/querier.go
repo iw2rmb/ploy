@@ -120,6 +120,9 @@ type Querier interface {
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
+	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
+	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
+	UpdateRunResume(ctx context.Context, id pgtype.UUID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 }
 

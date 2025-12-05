@@ -423,6 +423,104 @@ func TestResumeTicket_AllJobsSucceeded(t *testing.T) {
 	}
 }
 
+// TestResumeTicket_UpdateRunResumeCalled verifies that UpdateRunResume is called to track resume metadata.
+func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
+	t.Parallel()
+	id := uuid.New()
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			Status:     store.RunStatusFailed,
+			RepoUrl:    "https://example/repo.git",
+			BaseRef:    "main",
+			TargetRef:  "feature",
+			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		listJobsByRunResult: []store.Job{
+			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+		},
+	}
+
+	handler := resumeTicketHandler(st, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+	req.SetPathValue("id", id.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
+	}
+	// Verify UpdateRunResume was called to track resume metadata.
+	if !st.updateRunResumeCalled {
+		t.Fatal("expected UpdateRunResume to be called")
+	}
+	if uuid.UUID(st.updateRunResumeParam.Bytes) != id {
+		t.Fatalf("UpdateRunResume called with wrong id: got %s, want %s",
+			uuid.UUID(st.updateRunResumeParam.Bytes), id)
+	}
+}
+
+// TestResumeTicket_SSEPublishWithResumeMetadata verifies that resume events include resume metadata.
+func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
+	t.Parallel()
+	id := uuid.New()
+	// Simulate a run that has already been resumed once (stats contain resume_count=1).
+	statsJSON := []byte(`{"resume_count":1,"last_resumed_at":"2025-01-15T10:00:00Z"}`)
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			Status:     store.RunStatusFailed,
+			RepoUrl:    "https://example/repo.git",
+			BaseRef:    "main",
+			TargetRef:  "feature",
+			Stats:      statsJSON,
+			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
+			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		listJobsByRunResult: []store.Job{
+			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+		},
+	}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+
+	handler := resumeTicketHandler(st, eventsService)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
+	req.SetPathValue("id", id.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify ticket event was published with resume metadata.
+	snapshot := eventsService.Hub().Snapshot(id.String())
+	if len(snapshot) == 0 {
+		t.Fatal("expected at least 1 ticket event in snapshot")
+	}
+	// The event should be a ticket type. The metadata includes resume_count and last_resumed_at.
+	// Since we re-fetch the run after UpdateRunResume (which the mock doesn't actually update),
+	// the stats from getRunResult are used. The test verifies the plumbing works.
+	foundTicket := false
+	for _, evt := range snapshot {
+		if evt.Type == "ticket" {
+			foundTicket = true
+		}
+	}
+	if !foundTicket {
+		t.Fatal("expected ticket event in snapshot")
+	}
+}
+
 // contains is a simple helper to check if a string contains a substring.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||

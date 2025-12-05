@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -168,16 +170,30 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
+		// Track resume metadata (resume_count, last_resumed_at) in runs.stats.
+		// This allows clients to see resume history via ticket status and SSE events.
+		if err := st.UpdateRunResume(r.Context(), pgID); err != nil {
+			// Log but don't fail the operation; the resume itself succeeded.
+			slog.Error("resume ticket: update resume stats failed", "ticket_id", ticketIDStr, "err", err)
+		}
+
 		// Publish ticket event for SSE clients to indicate the run has resumed.
+		// Include resume metadata so watchers can see the resume transition in the stream.
 		if eventsService != nil {
 			now := time.Now().UTC()
 			ticketSummary := modsapi.TicketSummary{
 				TicketID:   domaintypes.TicketID(uuid.UUID(pgID.Bytes).String()),
 				State:      modsapi.TicketStatePending, // 'pending' maps to 'queued' in mods API.
 				Repository: run.RepoUrl,
+				Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
 				CreatedAt:  timeOrZero(run.CreatedAt),
 				UpdatedAt:  now,
 				Stages:     make(map[string]modsapi.StageStatus),
+			}
+			// Re-fetch run to get updated stats with resume_count and last_resumed_at.
+			// Use fresh stats to ensure event reflects the latest resume metadata.
+			if updatedRun, err := st.GetRun(r.Context(), pgID); err == nil {
+				ticketSummary.Metadata = buildResumeMetadata(updatedRun)
 			}
 			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), ticketSummary); err != nil {
 				slog.Error("resume ticket: publish ticket event failed", "ticket_id", ticketIDStr, "err", err)
@@ -187,4 +203,33 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		w.WriteHeader(http.StatusAccepted)
 		slog.Info("ticket resumed", "ticket_id", ticketIDStr, "jobs_reset", len(jobsToReset))
 	}
+}
+
+// buildResumeMetadata extracts standard ticket metadata from a run, including
+// resume-related fields (resume_count, last_resumed_at) when present in runs.stats.
+// Used by resume handler to populate TicketSummary.Metadata for SSE events.
+func buildResumeMetadata(run store.Run) map[string]string {
+	meta := map[string]string{
+		"repo_base_ref":   run.BaseRef,
+		"repo_target_ref": run.TargetRef,
+	}
+	// Include claiming node id when available for diagnostics.
+	if run.NodeID.Valid {
+		meta["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
+	}
+	// Parse stats to extract resume metadata.
+	if len(run.Stats) > 0 && json.Valid(run.Stats) {
+		var stats domaintypes.RunStats
+		if err := json.Unmarshal(run.Stats, &stats); err == nil {
+			// Add resume_count if run has been resumed at least once.
+			if rc := stats.ResumeCount(); rc > 0 {
+				meta["resume_count"] = strconv.Itoa(rc)
+			}
+			// Add last_resumed_at timestamp when available.
+			if lra := stats.LastResumedAt(); lra != "" {
+				meta["last_resumed_at"] = lra
+			}
+		}
+	}
+	return meta
 }
