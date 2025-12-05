@@ -39,7 +39,7 @@ kind: ModRunSpec
 # or after healing). In remote-http mode, the gate is executed by a dedicated
 # Build Gate worker, not the node running this mod.
 mod:
-  image: docker.io/iwtormb/mods-openrewrite:latest
+  image: docker.io/iwtormb/mods-orw-maven:latest
   env:
     RECIPE_GROUP: org.openrewrite.recipe
     RECIPE_ARTIFACT: rewrite-migrate-java
