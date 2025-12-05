@@ -134,7 +134,7 @@ Legend: [ ] todo, [x] done.
       - `orw-maven` against a sample Maven workspace (e.g., using the existing ORW scenario repo) with a real `mvn` invocation.
       - `orw-gradle` against a minimal Gradle workspace using a stubbed `gradle`/`gradlew` that confirms the expected command line (similar to `TestModORW_GradleWorkspace_UsesGradleWrapper`).
 
-- [ ] Remove `docker/mods/mod-orw` in favor of split images — Eliminate `mod-orw` usage entirely and rely solely on `orw-maven` / `orw-gradle`.
+- [x] Remove `docker/mods/mod-orw` in favor of split images — Eliminate `mod-orw` usage entirely and rely solely on `orw-maven` / `orw-gradle`.
   - Repository: ploy
   - Component: `docker/mods/mod-orw`, `scripts/docker/build-and-push-mods.sh`, `docs/how-to/publish-mods.md`, `tests/integration/mods`
   - Scope:

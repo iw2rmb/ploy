@@ -70,7 +70,13 @@ if [[ ${#images[@]} -eq 0 ]]; then
 fi
 
 for name in "${images[@]}"; do
-  # Map directory name to repo image name
+  # Skip deprecated mod-orw; use orw-maven/orw-gradle instead.
+  if [[ "$name" == "mod-orw" ]]; then
+    echo "==> Skipping deprecated mod-orw (use orw-maven/orw-gradle)"
+    continue
+  fi
+
+  # Map directory name to repo image name.
   image_name="$name"
   case "$name" in
     orw-maven)
@@ -78,9 +84,6 @@ for name in "${images[@]}"; do
       ;;
     orw-gradle)
       image_name="mods-orw-gradle"
-      ;;
-    mod-orw)
-      image_name="mods-openrewrite"
       ;;
     mod-*)
       image_name="mods-${name#mod-}"
