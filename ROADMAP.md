@@ -236,5 +236,5 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
     - Keep it clearly marked as debug-only and avoid coupling clients to it as a stable public API.
   - Snippets:
     - Example JSON:
-      - `{"nodes":[{"id":"pre-gate","children":["mod-0"]},{"id":"mod-0","children":["post-gate"]}]}`
+      - `{"run_id":"mods-123","nodes":{"job-1":{"id":"job-1","name":"pre-gate","type":"pre_gate","child_ids":["job-2"]},"job-2":{"id":"job-2","name":"mod-0","type":"mod","child_ids":["job-3"]},"job-3":{"id":"job-3","name":"post-gate","type":"post_gate"}},"root_ids":["job-1"],"leaf_ids":["job-3"],"linear":true}`
   - Tests: Add a basic handler test to ensure the debug view returns consistent, well-formed output for a test run.
