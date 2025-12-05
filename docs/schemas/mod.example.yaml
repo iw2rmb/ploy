@@ -110,9 +110,28 @@ build_gate:
   enabled: true
   profile: auto # auto | java | java-maven | java-gradle
 
-# Healing sequence executed when the Build Gate fails (applies globally to all mods).
-# Each item is a container step that can modify /workspace and emit artifacts to
-# /out. After running all steps, the gate is re-run; on pass, the next mod proceeds.
+# Healing configuration executed when the Build Gate fails (applies globally to all mods).
+#
+# The healing block supports two forms for backward compatibility:
+#
+# 1. **Single-strategy (legacy form)** — A single `mods` list executed sequentially:
+#    build_gate_healing:
+#      retries: 1
+#      mods: [...]
+#
+# 2. **Multi-strategy (branches form)** — Multiple independent healing strategies
+#    that can be executed in parallel by the control plane:
+#    build_gate_healing:
+#      retries: 1
+#      strategies:
+#        - name: codex-ai
+#          mods: [...]
+#        - name: fallback-patch
+#          mods: [...]
+#
+# When using the legacy `mods` form, it is internally mapped to a single unnamed
+# strategy, preserving existing behavior. Do not mix `mods` and `strategies` in
+# the same block; if both are present, `strategies` takes precedence.
 #
 # For multi-step runs, the healing policy is shared across all mod steps. When a
 # step's gate fails, healing runs once per the retry count, then the gate is
@@ -132,6 +151,7 @@ build_gate:
 # - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
 build_gate_healing:
   retries: 1
+  # Legacy single-strategy form (mods executed sequentially as a single branch).
   mods:
     - image: docker.io/your-dh-user/mods-codex:latest
       # Codex prompt can be provided via env (CODEX_PROMPT) or a prompt file.
@@ -155,6 +175,43 @@ build_gate_healing:
         # Inline Codex auth as env from file content (resolved by CLI)
         # CODEX_AUTH_JSON: ~/.codex/auth.json
       retain_container: false
+
+################################################################################
+# MULTI-STRATEGY HEALING (optional, for parallel healing branches)
+################################################################################
+# When you need multiple independent healing strategies executed in parallel,
+# use the `strategies` field instead of `mods`. Each strategy is a named branch
+# with its own sequence of healing mods. The control plane can execute these
+# branches in parallel, and the first branch to pass the re-gate wins.
+#
+# Strategy Semantics:
+# - Each strategy is an independent healing attempt with its own workspace clone.
+# - Strategies execute in parallel (subject to available nodes).
+# - Each strategy runs its mods[] sequentially, then re-gates.
+# - The first strategy whose re-gate passes wins; other branches are canceled.
+# - If all strategies exhaust retries without passing, the run fails.
+#
+# Example multi-strategy healing:
+# build_gate_healing:
+#   retries: 2
+#   strategies:
+#     - name: codex-ai
+#       mods:
+#         - image: docker.io/your-dh-user/mods-codex:latest
+#           command: mod-codex --input /workspace --out /out
+#           env:
+#             CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
+#     - name: static-patch
+#       mods:
+#         - image: docker.io/your-dh-user/mods-patcher:latest
+#           command: apply-known-fixes.sh
+#           env:
+#             FIX_CATALOG: "/patches/java-migration-fixes.yaml"
+#
+# In this example:
+# - "codex-ai" attempts AI-powered healing via Codex.
+# - "static-patch" applies known patches from a fix catalog.
+# - Both run in parallel; whichever passes re-gate first wins.
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided

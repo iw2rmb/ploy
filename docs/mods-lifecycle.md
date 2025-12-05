@@ -137,6 +137,62 @@ post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
 - `ploy mod inspect <ticket-id>` output as `Gate: passed|failed ...`.
 
+### Multi-strategy healing
+
+The healing configuration supports two forms for backward compatibility:
+
+**Single-strategy (legacy form)** — A flat `mods` list executed sequentially:
+```yaml
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/user/mods-codex:latest
+      command: mod-codex --input /workspace --out /out
+```
+
+**Multi-strategy (branching form)** — Multiple named strategies that can be
+executed in parallel by the control plane:
+```yaml
+build_gate_healing:
+  retries: 2
+  strategies:
+    - name: codex-ai
+      mods:
+        - image: docker.io/user/mods-codex:latest
+          command: mod-codex --input /workspace --out /out
+    - name: static-patch
+      mods:
+        - image: docker.io/user/mods-patcher:latest
+          command: apply-known-fixes.sh
+```
+
+When using the legacy `mods` form, it is internally normalized to a single
+unnamed strategy, preserving existing behavior. If both `mods` and `strategies`
+are present, `strategies` takes precedence.
+
+#### Multi-strategy semantics
+
+- **Independent workspaces**: Each strategy operates on its own workspace clone.
+- **Parallel execution**: Strategies execute in parallel (subject to node availability).
+- **Sequential mods within strategy**: Each strategy runs its mods[] sequentially,
+  then triggers a re-gate.
+- **First-wins racing**: The first strategy whose re-gate passes wins; other
+  branches are canceled.
+- **Exhaustion handling**: If all strategies exhaust retries without passing,
+  the run fails.
+
+This design enables racing different healing approaches (e.g., AI-powered vs.
+deterministic patches) to reduce total healing time while ensuring the first
+valid fix is applied.
+
+#### Implementation references
+
+- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`,
+  `HealingStrategy`, `NormalizedStrategies()`).
+- Spec parsing: `internal/nodeagent/run_options.go` (`parseRunOptions`,
+  `parseHealingStrategy`).
+- Schema example: `docs/schemas/mod.example.yaml`.
+
 ### Workspace and rehydration semantics
 
 This subsection clarifies which code version each Build Gate sees during execution.
