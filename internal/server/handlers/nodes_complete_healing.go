@@ -15,6 +15,70 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// healingStrategy represents a named healing strategy (branch) parsed from the spec.
+// A strategy contains a name and a list of healing mods to execute sequentially.
+type healingStrategy struct {
+	Name string           // Strategy name (e.g., "codex-ai", "static-patch"); empty for legacy single-strategy.
+	Mods []map[string]any // Ordered list of healing mod definitions (image, command, env, etc.).
+}
+
+// parseHealingStrategies extracts healing strategies from the build_gate_healing config.
+// Returns a slice of strategies that supports both legacy single-strategy (mods[]) and
+// multi-strategy (strategies[]) forms.
+//
+// The function handles three cases:
+//  1. Legacy form: build_gate_healing.mods[] — maps to a single unnamed strategy.
+//  2. Multi-strategy form: build_gate_healing.strategies[] — each entry becomes a strategy.
+//  3. Both present: strategies[] takes precedence (as documented in mod.example.yaml).
+func parseHealingStrategies(healingConfig map[string]any) []healingStrategy {
+	// Check for multi-strategy form first (takes precedence per docs).
+	if strategiesRaw, ok := healingConfig["strategies"].([]any); ok && len(strategiesRaw) > 0 {
+		var strategies []healingStrategy
+		for _, sRaw := range strategiesRaw {
+			sMap, ok := sRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			// Extract strategy name (optional, defaults to empty).
+			name := ""
+			if n, ok := sMap["name"].(string); ok {
+				name = strings.TrimSpace(n)
+			}
+			// Extract mods list for this strategy.
+			modsRaw, ok := sMap["mods"].([]any)
+			if !ok || len(modsRaw) == 0 {
+				continue // Skip strategies without mods.
+			}
+			var mods []map[string]any
+			for _, mRaw := range modsRaw {
+				if m, ok := mRaw.(map[string]any); ok {
+					mods = append(mods, m)
+				}
+			}
+			if len(mods) > 0 {
+				strategies = append(strategies, healingStrategy{Name: name, Mods: mods})
+			}
+		}
+		return strategies
+	}
+
+	// Fallback to legacy single-strategy form (mods[] at top level).
+	if modsRaw, ok := healingConfig["mods"].([]any); ok && len(modsRaw) > 0 {
+		var mods []map[string]any
+		for _, mRaw := range modsRaw {
+			if m, ok := mRaw.(map[string]any); ok {
+				mods = append(mods, m)
+			}
+		}
+		if len(mods) > 0 {
+			// Return a single unnamed strategy for backward compatibility.
+			return []healingStrategy{{Name: "", Mods: mods}}
+		}
+	}
+
+	return nil
+}
+
 // maybeCreateHealingJobs creates healing jobs and a re-gate job when a gate job fails.
 // This is called when a gate job (pre_gate, post_gate, re_gate) completes with reason="build-gate".
 //
@@ -25,7 +89,13 @@ import (
 // 4. Counts existing healing attempts to enforce retry limits
 // 5. Creates healing jobs and a re-gate job at intermediate step_index values
 //
-// Float step_index enables dynamic job insertion:
+// For multi-strategy specs, creates parallel branches with distinct step_index windows:
+//
+//	pre-gate (1000) → FAIL → branch-a: heal-a-0 (1500), re-gate-a (1600)
+//	                       → branch-b: heal-b-0 (1700), re-gate-b (1800)
+//	→ mod-0 (2000)
+//
+// For legacy single-strategy specs, maintains existing behavior:
 //
 //	pre-gate (1000) → FAIL → healing-0 (1100) → healing-1 (1200) → re-gate (1300) → mod-0 (2000)
 func maybeCreateHealingJobs(
@@ -86,20 +156,27 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Get healing mods list.
-	healingMods, ok := healingConfig["mods"].([]any)
-	if !ok || len(healingMods) == 0 {
-		slog.Debug("maybeCreateHealingJobs: no healing mods configured, canceling remaining jobs",
+	// Parse healing strategies (supports both legacy mods[] and multi-strategy forms).
+	strategies := parseHealingStrategies(healingConfig)
+	if len(strategies) == 0 {
+		slog.Debug("maybeCreateHealingJobs: no healing strategies configured, canceling remaining jobs",
 			"run_id", runID,
 		)
 		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
-			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing mods configured",
+			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing configured",
 				"run_id", runID,
 				"failed_step_index", failedStepIndex,
 				"err", err,
 			)
 		}
 		return nil
+	}
+
+	// Count total mods across all strategies for attempt calculation.
+	// For multi-strategy, we count all mods from all branches.
+	totalModsAcrossStrategies := 0
+	for _, s := range strategies {
+		totalModsAcrossStrategies += len(s.Mods)
 	}
 
 	// Get retry limit (default to 1 if not specified).
@@ -185,7 +262,9 @@ func maybeCreateHealingJobs(
 	}
 
 	// Check if retries exhausted.
-	healingAttemptNumber := healingAttempts/len(healingMods) + 1 // 1-based attempt number
+	// For multi-strategy, each attempt creates jobs for all strategies in parallel,
+	// so we divide by totalModsAcrossStrategies to get the attempt number.
+	healingAttemptNumber := healingAttempts/totalModsAcrossStrategies + 1 // 1-based attempt number
 	if healingAttemptNumber > retries {
 		slog.Info("maybeCreateHealingJobs: healing retries exhausted",
 			"run_id", runID,
@@ -217,9 +296,119 @@ func maybeCreateHealingJobs(
 		}
 	}
 
-	// Calculate step_index range for healing jobs.
-	// Divide the gap between failed job and next job evenly.
+	// Calculate step_index allocation based on strategy count.
+	// Total gap is divided into windows per strategy, plus a buffer before nextStepIndex.
+	// Each branch gets its own contiguous step_index window for its heal jobs + re-gate.
 	gapSize := nextStepIndex - float64(failedStepIndex)
+	numStrategies := len(strategies)
+
+	// For multi-strategy, allocate distinct windows per branch (e.g., 1500-1600, 1700-1800).
+	// For single-strategy (legacy), use the existing behavior with evenly distributed indices.
+	if numStrategies > 1 {
+		// Multi-strategy branch planner: allocate non-overlapping step_index windows.
+		// Window size = gap / (numStrategies + 1) to leave buffer before nextStepIndex.
+		windowSize := gapSize / float64(numStrategies+1)
+
+		slog.Info("maybeCreateHealingJobs: creating multi-branch healing jobs",
+			"run_id", runID,
+			"failed_step_index", failedStepIndex,
+			"next_step_index", nextStepIndex,
+			"num_strategies", numStrategies,
+			"window_size", windowSize,
+			"attempt", healingAttemptNumber,
+		)
+
+		// Create jobs for each strategy branch in parallel (all first jobs are pending).
+		// Each branch gets a distinct step_index window.
+		for branchIdx, strategy := range strategies {
+			// Branch window starts at: failedStepIndex + windowSize * (branchIdx + 1)
+			// This places branch 0 at (failedStepIndex + windowSize), branch 1 at (failedStepIndex + 2*windowSize), etc.
+			branchWindowStart := float64(failedStepIndex) + windowSize*float64(branchIdx+1)
+
+			// Within the branch, distribute mods + re-gate evenly.
+			// branchIncrement = windowSize / (len(mods) + 2) to fit mods and re-gate with buffer.
+			modsCount := len(strategy.Mods)
+			branchIncrement := windowSize / float64(modsCount+2)
+
+			// Derive branch name suffix for job naming.
+			branchSuffix := strategy.Name
+			if branchSuffix == "" {
+				branchSuffix = fmt.Sprintf("branch-%d", branchIdx)
+			}
+
+			// Create healing jobs for this branch.
+			// First job of each branch is 'pending' (parallel execution across branches).
+			for modIdx, modMap := range strategy.Mods {
+				modImage := ""
+				if img, ok := modMap["image"].(string); ok {
+					modImage = strings.TrimSpace(img)
+				}
+
+				// step_index for this mod within the branch window.
+				healStepIndex := branchWindowStart + branchIncrement*float64(modIdx+1)
+
+				// First job of each branch is pending (parallel branches execute concurrently).
+				jobStatus := store.JobStatusCreated
+				if modIdx == 0 {
+					jobStatus = store.JobStatusPending
+				}
+
+				// Job name includes attempt, branch name, and mod index.
+				jobName := fmt.Sprintf("heal-%s-%d-%d", branchSuffix, healingAttemptNumber, modIdx)
+				_, err := st.CreateJob(ctx, store.CreateJobParams{
+					RunID:     runID,
+					Name:      jobName,
+					ModType:   "heal",
+					ModImage:  modImage,
+					Status:    jobStatus,
+					StepIndex: healStepIndex,
+					Meta:      []byte(`{}`),
+				})
+				if err != nil {
+					return fmt.Errorf("create healing job %s: %w", jobName, err)
+				}
+
+				slog.Info("created healing job",
+					"run_id", runID,
+					"job_name", jobName,
+					"step_index", healStepIndex,
+					"status", jobStatus,
+					"image", modImage,
+					"branch", branchSuffix,
+				)
+			}
+
+			// Create re-gate job for this branch (after its healing mods).
+			reGateStepIndex := branchWindowStart + branchIncrement*float64(modsCount+1)
+			reGateName := fmt.Sprintf("re-gate-%s-%d", branchSuffix, healingAttemptNumber)
+			_, err := st.CreateJob(ctx, store.CreateJobParams{
+				RunID:     runID,
+				Name:      reGateName,
+				ModType:   "re_gate",
+				ModImage:  "",
+				Status:    store.JobStatusCreated,
+				StepIndex: reGateStepIndex,
+				Meta:      []byte(`{}`),
+			})
+			if err != nil {
+				return fmt.Errorf("create re-gate job %s: %w", reGateName, err)
+			}
+
+			slog.Info("created re-gate job",
+				"run_id", runID,
+				"job_name", reGateName,
+				"step_index", reGateStepIndex,
+				"branch", branchSuffix,
+			)
+		}
+
+		return nil
+	}
+
+	// Single-strategy (legacy) behavior: create healing jobs sequentially with one re-gate.
+	// This preserves backward compatibility for specs with only mods[] and no strategies[].
+	strategy := strategies[0]
+	healingMods := strategy.Mods
 	healingCount := len(healingMods)
 	stepIncrement := gapSize / float64(healingCount+2) // +2 for re-gate and buffer
 
@@ -234,12 +423,7 @@ func maybeCreateHealingJobs(
 	// Create healing jobs.
 	// Server-driven scheduling: first healing job is 'pending' (runs immediately),
 	// subsequent jobs are 'created' (wait for server to schedule after prior completes).
-	for i, modInterface := range healingMods {
-		modMap, ok := modInterface.(map[string]any)
-		if !ok {
-			continue
-		}
-
+	for i, modMap := range healingMods {
 		// Extract healing mod image.
 		modImage := ""
 		if img, ok := modMap["image"].(string); ok {

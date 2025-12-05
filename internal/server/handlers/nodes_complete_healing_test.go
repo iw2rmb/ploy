@@ -132,3 +132,484 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		t.Fatalf("expected re-gate job ModType=re_gate, got %q", reGateJob.ModType)
 	}
 }
+
+// TestMaybeCreateHealingJobs_MultiBranchStrategies verifies that the branch planner
+// creates parallel healing branches from multi-strategy specs with distinct step_index windows.
+func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Multi-strategy spec with two named branches, each with one healing mod.
+	spec := map[string]any{
+		"build_gate_healing": map[string]any{
+			"retries": float64(2),
+			"strategies": []any{
+				map[string]any{
+					"name": "codex-ai",
+					"mods": []any{
+						map[string]any{"image": "mods-codex:latest"},
+					},
+				},
+				map[string]any{
+					"name": "static-patch",
+					"mods": []any{
+						map[string]any{"image": "mods-patcher:latest"},
+					},
+				},
+			},
+		},
+	}
+	specBytes, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("failed to marshal spec: %v", err)
+	}
+
+	// Jobs for a fresh run where pre-gate just failed.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+			Meta:      []byte(`{}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+			Meta:      []byte(`{}`),
+		},
+	}
+
+	run := store.Run{
+		ID:   runID,
+		Spec: specBytes,
+	}
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	// With 2 strategies, each with 1 mod, we expect:
+	// - Branch "codex-ai": heal-codex-ai-1-0 (pending), re-gate-codex-ai-1 (created)
+	// - Branch "static-patch": heal-static-patch-1-0 (pending), re-gate-static-patch-1 (created)
+	// Total: 4 jobs created.
+	if st.createJobCallCount != 4 {
+		t.Fatalf("expected 4 CreateJob calls (2 branches × (1 heal + 1 re-gate)), got %d", st.createJobCallCount)
+	}
+
+	// Verify job names and step_index windows are distinct.
+	jobsByName := make(map[string]store.CreateJobParams)
+	for _, p := range st.createJobParams {
+		jobsByName[p.Name] = p
+	}
+
+	// Branch "codex-ai" jobs.
+	codexHeal, ok := jobsByName["heal-codex-ai-1-0"]
+	if !ok {
+		t.Fatalf("expected heal-codex-ai-1-0 job to be created")
+	}
+	if codexHeal.Status != store.JobStatusPending {
+		t.Fatalf("expected heal-codex-ai-1-0 to be pending (first job of branch), got %s", codexHeal.Status)
+	}
+	if codexHeal.ModImage != "mods-codex:latest" {
+		t.Fatalf("expected heal-codex-ai-1-0 image=mods-codex:latest, got %q", codexHeal.ModImage)
+	}
+
+	codexReGate, ok := jobsByName["re-gate-codex-ai-1"]
+	if !ok {
+		t.Fatalf("expected re-gate-codex-ai-1 job to be created")
+	}
+	if codexReGate.Status != store.JobStatusCreated {
+		t.Fatalf("expected re-gate-codex-ai-1 to be created, got %s", codexReGate.Status)
+	}
+
+	// Branch "static-patch" jobs.
+	patchHeal, ok := jobsByName["heal-static-patch-1-0"]
+	if !ok {
+		t.Fatalf("expected heal-static-patch-1-0 job to be created")
+	}
+	if patchHeal.Status != store.JobStatusPending {
+		t.Fatalf("expected heal-static-patch-1-0 to be pending (first job of branch), got %s", patchHeal.Status)
+	}
+	if patchHeal.ModImage != "mods-patcher:latest" {
+		t.Fatalf("expected heal-static-patch-1-0 image=mods-patcher:latest, got %q", patchHeal.ModImage)
+	}
+
+	patchReGate, ok := jobsByName["re-gate-static-patch-1"]
+	if !ok {
+		t.Fatalf("expected re-gate-static-patch-1 job to be created")
+	}
+	if patchReGate.Status != store.JobStatusCreated {
+		t.Fatalf("expected re-gate-static-patch-1 to be created, got %s", patchReGate.Status)
+	}
+
+	// Verify distinct step_index windows (branches must not overlap).
+	// Window 1 (codex-ai): step_index values in (1000, 1333.33...)
+	// Window 2 (static-patch): step_index values in (1333.33..., 1666.66...)
+	if codexHeal.StepIndex >= patchHeal.StepIndex {
+		t.Fatalf("codex-ai branch should have lower step_index than static-patch branch: codex=%f, patch=%f",
+			codexHeal.StepIndex, patchHeal.StepIndex)
+	}
+	if codexReGate.StepIndex >= patchHeal.StepIndex {
+		t.Fatalf("codex-ai re-gate should have lower step_index than static-patch heal: re-gate=%f, patch-heal=%f",
+			codexReGate.StepIndex, patchHeal.StepIndex)
+	}
+
+	// Verify all jobs are between failedStepIndex (1000) and nextStepIndex (2000).
+	for name, p := range jobsByName {
+		if p.StepIndex <= 1000 || p.StepIndex >= 2000 {
+			t.Fatalf("job %s step_index=%f should be between 1000 and 2000", name, p.StepIndex)
+		}
+	}
+}
+
+// TestMaybeCreateHealingJobs_LegacySingleStrategy verifies backward compatibility
+// with legacy specs that use build_gate_healing.mods[] instead of strategies[].
+func TestMaybeCreateHealingJobs_LegacySingleStrategy(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Legacy single-strategy spec (mods at top level, no strategies array).
+	spec := map[string]any{
+		"build_gate_healing": map[string]any{
+			"retries": float64(2),
+			"mods": []any{
+				map[string]any{"image": "heal-a:latest"},
+				map[string]any{"image": "heal-b:latest"},
+			},
+		},
+	}
+	specBytes, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("failed to marshal spec: %v", err)
+	}
+
+	// Jobs for a fresh run where pre-gate just failed.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+			Meta:      []byte(`{}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+			Meta:      []byte(`{}`),
+		},
+	}
+
+	run := store.Run{
+		ID:   runID,
+		Spec: specBytes,
+	}
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	// Legacy behavior: 2 healing mods + 1 re-gate = 3 jobs.
+	if st.createJobCallCount != 3 {
+		t.Fatalf("expected 3 CreateJob calls (2 heal + 1 re-gate), got %d", st.createJobCallCount)
+	}
+
+	// Verify legacy job naming (heal-1-0, heal-1-1, re-gate-1).
+	expectedNames := []string{"heal-1-0", "heal-1-1", "re-gate-1"}
+	for i, expected := range expectedNames {
+		if st.createJobParams[i].Name != expected {
+			t.Fatalf("expected job[%d] name=%q, got %q", i, expected, st.createJobParams[i].Name)
+		}
+	}
+
+	// First healing job is pending, others are created.
+	if st.createJobParams[0].Status != store.JobStatusPending {
+		t.Fatalf("expected heal-1-0 to be pending, got %s", st.createJobParams[0].Status)
+	}
+	if st.createJobParams[1].Status != store.JobStatusCreated {
+		t.Fatalf("expected heal-1-1 to be created, got %s", st.createJobParams[1].Status)
+	}
+	if st.createJobParams[2].Status != store.JobStatusCreated {
+		t.Fatalf("expected re-gate-1 to be created, got %s", st.createJobParams[2].Status)
+	}
+
+	// Verify step_index order (sequential, not branched).
+	for i := 1; i < len(st.createJobParams); i++ {
+		if st.createJobParams[i].StepIndex <= st.createJobParams[i-1].StepIndex {
+			t.Fatalf("step_index should increase: job[%d]=%f, job[%d]=%f",
+				i-1, st.createJobParams[i-1].StepIndex,
+				i, st.createJobParams[i].StepIndex)
+		}
+	}
+}
+
+// TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods verifies multi-branch creation
+// when each strategy has multiple healing mods.
+func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Multi-strategy spec: branch A has 2 mods, branch B has 1 mod.
+	spec := map[string]any{
+		"build_gate_healing": map[string]any{
+			"retries": float64(1),
+			"strategies": []any{
+				map[string]any{
+					"name": "branch-a",
+					"mods": []any{
+						map[string]any{"image": "heal-a-0:latest"},
+						map[string]any{"image": "heal-a-1:latest"},
+					},
+				},
+				map[string]any{
+					"name": "branch-b",
+					"mods": []any{
+						map[string]any{"image": "heal-b-0:latest"},
+					},
+				},
+			},
+		},
+	}
+	specBytes, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("failed to marshal spec: %v", err)
+	}
+
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+			Meta:      []byte(`{}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+			Meta:      []byte(`{}`),
+		},
+	}
+
+	run := store.Run{
+		ID:   runID,
+		Spec: specBytes,
+	}
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	// Branch A: 2 heal + 1 re-gate = 3 jobs
+	// Branch B: 1 heal + 1 re-gate = 2 jobs
+	// Total: 5 jobs.
+	if st.createJobCallCount != 5 {
+		t.Fatalf("expected 5 CreateJob calls, got %d", st.createJobCallCount)
+	}
+
+	jobsByName := make(map[string]store.CreateJobParams)
+	for _, p := range st.createJobParams {
+		jobsByName[p.Name] = p
+	}
+
+	// Verify branch A jobs.
+	healA0, ok := jobsByName["heal-branch-a-1-0"]
+	if !ok {
+		t.Fatalf("expected heal-branch-a-1-0 job")
+	}
+	if healA0.Status != store.JobStatusPending {
+		t.Fatalf("expected heal-branch-a-1-0 to be pending, got %s", healA0.Status)
+	}
+
+	healA1, ok := jobsByName["heal-branch-a-1-1"]
+	if !ok {
+		t.Fatalf("expected heal-branch-a-1-1 job")
+	}
+	if healA1.Status != store.JobStatusCreated {
+		t.Fatalf("expected heal-branch-a-1-1 to be created, got %s", healA1.Status)
+	}
+
+	reGateA, ok := jobsByName["re-gate-branch-a-1"]
+	if !ok {
+		t.Fatalf("expected re-gate-branch-a-1 job")
+	}
+
+	// Verify branch B jobs.
+	healB0, ok := jobsByName["heal-branch-b-1-0"]
+	if !ok {
+		t.Fatalf("expected heal-branch-b-1-0 job")
+	}
+	if healB0.Status != store.JobStatusPending {
+		t.Fatalf("expected heal-branch-b-1-0 to be pending, got %s", healB0.Status)
+	}
+
+	reGateB, ok := jobsByName["re-gate-branch-b-1"]
+	if !ok {
+		t.Fatalf("expected re-gate-branch-b-1 job")
+	}
+
+	// Verify branch A step_index < branch B step_index (windows don't overlap).
+	if reGateA.StepIndex >= healB0.StepIndex {
+		t.Fatalf("branch-a re-gate (%f) should be before branch-b heal (%f)",
+			reGateA.StepIndex, healB0.StepIndex)
+	}
+
+	// Verify step order within branch A.
+	if healA0.StepIndex >= healA1.StepIndex {
+		t.Fatalf("heal-branch-a-1-0 (%f) should be before heal-branch-a-1-1 (%f)",
+			healA0.StepIndex, healA1.StepIndex)
+	}
+	if healA1.StepIndex >= reGateA.StepIndex {
+		t.Fatalf("heal-branch-a-1-1 (%f) should be before re-gate-branch-a-1 (%f)",
+			healA1.StepIndex, reGateA.StepIndex)
+	}
+
+	// Verify step order within branch B.
+	if healB0.StepIndex >= reGateB.StepIndex {
+		t.Fatalf("heal-branch-b-1-0 (%f) should be before re-gate-branch-b-1 (%f)",
+			healB0.StepIndex, reGateB.StepIndex)
+	}
+}
+
+// TestParseHealingStrategies verifies strategy parsing for both legacy and multi-strategy forms.
+func TestParseHealingStrategies(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		config           map[string]any
+		wantStrategies   int
+		wantFirstName    string
+		wantFirstModsLen int
+	}{
+		{
+			name: "legacy mods form",
+			config: map[string]any{
+				"mods": []any{
+					map[string]any{"image": "heal:latest"},
+					map[string]any{"image": "heal2:latest"},
+				},
+			},
+			wantStrategies:   1,
+			wantFirstName:    "", // Unnamed strategy for legacy form.
+			wantFirstModsLen: 2,
+		},
+		{
+			name: "multi-strategy form",
+			config: map[string]any{
+				"strategies": []any{
+					map[string]any{
+						"name": "codex",
+						"mods": []any{map[string]any{"image": "codex:latest"}},
+					},
+					map[string]any{
+						"name": "patch",
+						"mods": []any{map[string]any{"image": "patch:latest"}},
+					},
+				},
+			},
+			wantStrategies:   2,
+			wantFirstName:    "codex",
+			wantFirstModsLen: 1,
+		},
+		{
+			name: "strategies takes precedence over mods",
+			config: map[string]any{
+				"mods": []any{map[string]any{"image": "legacy:latest"}},
+				"strategies": []any{
+					map[string]any{
+						"name": "winner",
+						"mods": []any{map[string]any{"image": "winner:latest"}},
+					},
+				},
+			},
+			wantStrategies:   1,
+			wantFirstName:    "winner",
+			wantFirstModsLen: 1,
+		},
+		{
+			name:           "empty strategies",
+			config:         map[string]any{"strategies": []any{}},
+			wantStrategies: 0,
+		},
+		{
+			name:           "empty mods",
+			config:         map[string]any{"mods": []any{}},
+			wantStrategies: 0,
+		},
+		{
+			name: "strategy without name uses empty string",
+			config: map[string]any{
+				"strategies": []any{
+					map[string]any{
+						"mods": []any{map[string]any{"image": "anon:latest"}},
+					},
+				},
+			},
+			wantStrategies:   1,
+			wantFirstName:    "",
+			wantFirstModsLen: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			strategies := parseHealingStrategies(tc.config)
+			if len(strategies) != tc.wantStrategies {
+				t.Fatalf("expected %d strategies, got %d", tc.wantStrategies, len(strategies))
+			}
+
+			if tc.wantStrategies > 0 {
+				if strategies[0].Name != tc.wantFirstName {
+					t.Fatalf("expected first strategy name=%q, got %q", tc.wantFirstName, strategies[0].Name)
+				}
+				if len(strategies[0].Mods) != tc.wantFirstModsLen {
+					t.Fatalf("expected first strategy mods len=%d, got %d", tc.wantFirstModsLen, len(strategies[0].Mods))
+				}
+			}
+		})
+	}
+}
