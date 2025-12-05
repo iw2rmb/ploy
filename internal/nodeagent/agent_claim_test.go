@@ -72,11 +72,8 @@ func TestClaimLoop(t *testing.T) {
 		},
 	}
 
-	// Create controller.
-	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
-	}
+	// Create controller (mocked to avoid external HTTP interactions).
+	controller := &mockRunController{}
 
 	// Create claim manager.
 	claimer, err := NewClaimManager(cfg, controller)
