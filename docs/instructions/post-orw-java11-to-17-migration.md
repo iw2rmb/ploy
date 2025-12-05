@@ -42,6 +42,107 @@ That recipe already:
 **Do not** re‑implement or undo any of the above. Treat them as **completed**.  
 The remaining steps focus on gaps that OpenRewrite does **not** cover.
 
+### 0.1 Centralized Java/Kotlin target configuration (build descriptors only)
+
+OpenRewrite upgrades *typical* build settings, but projects often centralize Java/Kotlin
+targets in shared constants (for example Gradle version catalogs).
+
+Actions:
+
+- Search build descriptors and version catalogs for shared JVM target values:
+  - `gradle/libs.versions.toml`
+  - `gradle.properties`
+  - `buildSrc` or convention plugins
+  - Any `jvmTarget`, `javaVersion`, `javaLanguageVersion`, or similar keys.
+- For each constant that is wired into **both**:
+  - `JavaPluginExtension` (`sourceCompatibility`, `targetCompatibility`), and
+  - Kotlin compile tasks (`kotlinOptions.jvmTarget` or `jvmToolchain`),
+  ensure the value represents Java 17.
+
+**Example (Gradle version catalog)**
+
+Before (`gradle/libs.versions.toml`):
+
+```toml
+[versions]
+jvmTarget = "11"
+```
+
+After:
+
+```toml
+[versions]
+jvmTarget = "17"
+```
+
+Do not change numbers that are clearly *not* Java versions (for example detekt thresholds,
+business constants, or test data).
+
+### 0.2 Stale Java‑version markers in build/config files
+
+Without running any builds, you can still clean up obviously stale Java‑version references.
+
+Actions:
+
+- Text‑search build and configuration files for:
+  - `Java 11`
+  - `JDK 11`
+  - `1.8`
+  - `jdk8`
+- For each hit:
+  - If it documents the project’s required Java version, update to `Java 17` / `JDK 17`.
+  - If it is test data or an unrelated constant, leave it unchanged.
+  - If you are unsure, add a brief comment:
+
+    ```text
+    # TODO: Verify whether this Java version reference should be updated for Java 17.
+    ```
+
+### 0.3 Kotlin plugin version awareness (no automatic upgrade)
+
+Kotlin Gradle/Maven plugins older than the Java 17 toolchain can work but may be poorly tested
+for `jvmTarget = "17"`. This guide does **not** mandate upgrading them automatically, but the
+agent should surface obvious mismatches for humans.
+
+Actions:
+
+- Search build descriptors for Kotlin plugin declarations:
+  - Gradle Kotlin DSL:
+
+    ```kotlin
+    plugins {
+        kotlin("jvm") version "1.6.10"
+    }
+    ```
+
+  - Gradle Groovy DSL:
+
+    ```groovy
+    plugins {
+        id "org.jetbrains.kotlin.jvm" version "1.6.10"
+    }
+    ```
+
+  - Maven:
+
+    ```xml
+    <plugin>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-maven-plugin</artifactId>
+      <version>1.6.10</version>
+    </plugin>
+    ```
+
+- If the project’s Java/Kotlin target is 17 (toolchain, `sourceCompatibility`, `kotlinOptions.jvmTarget`)
+  and the Kotlin plugin version is clearly old (for example `1.6.x` or earlier), add a nearby comment:
+
+  ```kotlin
+  // TODO: Kotlin plugin version is older than the Java 17 target; 
+  // consider upgrading per Kotlin's official compatibility matrix.
+  ```
+
+Do **not** bump the Kotlin plugin version automatically in this guide; only annotate the mismatch.
+
 ---
 
 ## 1. Clean Up Remaining JDK‑Internal API Usage
@@ -726,22 +827,22 @@ Use these links for precise semantics and migration details. Prefer them over bl
 
 - **Java 11**
   - JDK 11 documentation home (Oracle):  
-    `https://docs.oracle.com/javase/11/` citeturn2search0turn2search1  
+    `https://docs.oracle.com/javase/11/`
   - JDK 11 Migration Guide index (Oracle “Books” page, includes Migration Guide):  
-    `https://docs.oracle.com/en/java/javase/11/books.html` citeturn2search9
+    `https://docs.oracle.com/en/java/javase/11/books.html`
 - **Java 17**
   - JDK 17 documentation home (Oracle):  
-    `https://docs.oracle.com/en/java/javase/17/` citeturn0search3  
+    `https://docs.oracle.com/en/java/javase/17/`
   - JDK 17 API “New since JDK 11” overview (helps understand APIs newly available when moving 11 → 17):  
-    `https://docs.oracle.com/en/java/javase/17/docs/api/new-list.html` citeturn0search7
+    `https://docs.oracle.com/en/java/javase/17/docs/api/new-list.html`
 - **Java Version History and LTS Context**
   - Java SE 11 and 17 overview, including LTS status and JEP references:  
-    `https://en.wikipedia.org/wiki/Java_version_history` citeturn2search12
+    `https://en.wikipedia.org/wiki/Java_version_history`
 - **Kotlin**
   - Kotlin FAQ (includes supported JVM versions and general language info):  
-    `https://kotlinlang.org/docs/faq.html` citeturn1search2
+    `https://kotlinlang.org/docs/faq.html`
   - Java ↔ Kotlin interoperability details (nullability, mapped types, generics):  
-    `https://kotlinlang.org/docs/java-interop.html` citeturn1search3
+    `https://kotlinlang.org/docs/java-interop.html`
 
 When library‑ or framework‑specific questions arise (for example, Spring 6 + Java 17, Jakarta EE 10),
 always prefer:
@@ -752,4 +853,3 @@ always prefer:
 This guide deliberately avoids duplicating what the OpenRewrite `UpgradeToJava17` recipe
 and official migration guides already do, and focuses instead on manual code changes that
 automated tools cannot safely complete.
-
