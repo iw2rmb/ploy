@@ -318,6 +318,57 @@ Skip artifact collection for faster runs (e.g., in CI):
 SKIP_ARTIFACTS=1 PLOY_BUILDGATE_MODE=remote-http bash tests/e2e/mods/scenario-remote-buildgate/run.sh
 ```
 
+**Stack-Aware Image Selection Scenario**
+
+E2E validation for stack-aware image resolution where different container images
+are selected based on Build Gate stack detection:
+  - `bash tests/e2e/mods/scenario-stack-aware-images/run.sh`
+
+This scenario validates:
+- Stack-aware image map parsing from the spec
+- Build Gate stack detection (java-maven for Maven repositories)
+- Image resolution using the exact stack key match
+- Fallback to "default" key when exact match is not present
+- Clear error messages when neither stack key nor default exists
+
+Configuration:
+- Uses the public test repository: `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
+- Spec uses stack-aware image map with `default`, `java-maven`, and `java-gradle` keys
+- Build Gate detects "java-maven" stack (pom.xml present) and selects corresponding image
+
+Stack resolution rules (from `internal/workflow/contracts/mod_image.go`):
+1. **Universal image**: If `image` is a string, use it for all stacks.
+2. **Exact match**: If `image` is a map and contains the detected stack key, use that.
+3. **Default fallback**: If no exact match, use the `default` key when present.
+4. **Error**: If neither stack key nor `default` exists, fail with actionable error.
+
+Example stack-aware spec:
+```yaml
+mod:
+  image:
+    default: docker.io/user/mods-openrewrite:latest
+    java-maven: docker.io/user/mods-orw-maven:latest
+    java-gradle: docker.io/user/mods-orw-gradle:latest
+  env:
+    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+```
+
+To test the error path (missing stack key without default):
+```bash
+dist/ploy mod run \
+  --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
+  --repo-base-ref main \
+  --repo-target-ref e2e/stack-aware-error \
+  --spec tests/e2e/mods/scenario-stack-aware-images/mod-no-default.yaml \
+  --follow
+```
+Expected error: `no image specified for stack "java-maven" and no default provided`
+
+Skip artifact collection for faster runs (e.g., in CI):
+```bash
+SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-stack-aware-images/run.sh
+```
+
 **References**
 
 - Historic E2E assets (legacy Nomad-based) found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
