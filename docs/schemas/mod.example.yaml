@@ -11,7 +11,34 @@ kind: ModRunSpec
 # This is the traditional single-mod format. For multi-step workflows, use the
 # mods[] array instead (see MULTI-STEP section below).
 mod:
-  # Required: image that performs the transformation (e.g., OpenRewrite)
+  # Required: image that performs the transformation (e.g., OpenRewrite).
+  #
+  # The `image` field accepts two forms:
+  #
+  # 1. **Universal image (string)** — A single image used for all stacks:
+  #    image: docker.io/your-dh-user/mods-openrewrite:latest
+  #
+  # 2. **Stack-specific images (map)** — Different images per Build Gate stack:
+  #    image:
+  #      default: docker.io/your-dh-user/mods-openrewrite:latest
+  #      java-maven: docker.io/your-dh-user/mods-orw-maven:latest
+  #      java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
+  #
+  # Stack Resolution Rules (for map form):
+  #   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
+  #      that image is selected.
+  #   2. Default fallback: If no exact match exists, the "default" key is used.
+  #   3. Error: If neither the stack key nor "default" is present, the run fails
+  #      with a clear error message.
+  #
+  # Recognized Stack Names (from Build Gate detection):
+  #   - "java-maven"  — Maven-based Java projects (pom.xml detected)
+  #   - "java-gradle" — Gradle-based Java projects (build.gradle detected)
+  #   - "java"        — Generic Java projects (no build tool detected)
+  #   - "unknown"     — No recognized stack markers found
+  #   - "default"     — Fallback key for unrecognized stacks
+  #
+  # The universal string form is backward compatible and ignores stack detection.
   image: docker.io/your-dh-user/mods-openrewrite:latest
   # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
   # command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
@@ -44,6 +71,10 @@ mod:
 # - Each mod step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
 #
+# Each entry in mods[] supports the same `image` field as the single mod section:
+# - String form: `image: docker.io/user/mod:latest` (universal, any stack)
+# - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
+#
 # Example (disabled by default; remove comments to activate):
 # mods:
 #   - image: docker.io/your-dh-user/mods-migrate-java8:latest
@@ -56,6 +87,15 @@ mod:
 #     env:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"
+#
+# Example with stack-specific images (for dedicated Maven/Gradle containers):
+# mods:
+#   - image:
+#       default: docker.io/your-dh-user/mods-openrewrite:latest
+#       java-maven: docker.io/your-dh-user/mods-orw-maven:latest
+#       java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
+#     env:
+#       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 
 ################################################################################
 # GLOBAL BUILD GATE AND HEALING POLICY
@@ -135,6 +175,14 @@ mr_on_fail: true
 #   * Single-mod: Use the `mod` section for one transformation.
 #   * Multi-step: Use the `mods[]` array for sequential transformations.
 #   * Both formats share the same global build_gate and build_gate_healing policy.
+#
+# - Stack-aware image selection:
+#   * The `image` field (in mod, mods[], and build_gate_healing.mods[]) accepts
+#     either a string (universal image) or a map (stack-specific images).
+#   * When using the map form, the Build Gate detects the workspace stack
+#     (java-maven, java-gradle, etc.) and resolves the image accordingly.
+#   * Resolution order: exact stack match → "default" key → error.
+#   * See the SINGLE-STEP MOD section above for full resolution rules.
 #
 # - Multi-step semantics:
 #   * Mods execute in array order (sequential steps within one run).

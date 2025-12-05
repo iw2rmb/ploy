@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
     - Add planner/runtime tests asserting that a run with a Maven workspace yields `Stack == "java-maven"` on Mods steps, and a Gradle-only workspace yields `Stack == "java-gradle"`.
     - Add tests that verify the same stack value is visible both before and after healing-induced re-gates for a given ticket.
 
-- [ ] Document stack-aware Mods images in schemas and lifecycle docs — Make the new `image` map form discoverable and describe stack resolution rules.
+- [x] Document stack-aware Mods images in schemas and lifecycle docs — Make the new `image` map form discoverable and describe stack resolution rules.
   - Repository: ploy
   - Component: `docs/schemas`, `docs/mods-lifecycle.md`, `tests/e2e/mods`
   - Scope:

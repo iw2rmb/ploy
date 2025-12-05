@@ -210,6 +210,133 @@ Key invariants:
 - **Build Gate remote execution**: See `docs/build-gate/README.md` for the repo+diff
   validation model, HTTP API endpoints, and Build Gate worker configuration.
 
+## 1.2 Stack-Aware Image Selection
+
+Mods supports stack-aware image selection, allowing different container images to be
+used based on the detected build stack. This enables optimized images for specific
+build tools (e.g., dedicated Maven or Gradle images) while maintaining backward
+compatibility with universal images.
+
+### Image specification forms
+
+The `image` field in `mod`, `mods[]`, and `build_gate_healing.mods[]` accepts two forms:
+
+**Universal image (string)** — A single image used regardless of stack:
+```yaml
+mod:
+  image: docker.io/user/mods-openrewrite:latest
+```
+
+**Stack-specific images (map)** — Different images per detected stack:
+```yaml
+mod:
+  image:
+    default: docker.io/user/mods-openrewrite:latest
+    java-maven: docker.io/user/mods-orw-maven:latest
+    java-gradle: docker.io/user/mods-orw-gradle:latest
+```
+
+### Stack detection via Build Gate
+
+The Build Gate detects the workspace stack during validation based on file markers:
+
+| Stack Name     | Detection Criteria                           | Build Tool |
+|----------------|----------------------------------------------|------------|
+| `java-maven`   | `pom.xml` present in workspace root          | Maven      |
+| `java-gradle`  | `build.gradle` or `build.gradle.kts` present | Gradle     |
+| `java`         | JDK markers but no build tool detected       | Generic    |
+| `unknown`      | No recognized stack markers found            | None       |
+
+The detected stack is propagated from the Build Gate to Mods steps via
+`BuildGateStageMetadata.Tool`, which is converted to a `ModStack` using
+`ToolToModStack()` in `internal/workflow/contracts/mod_image.go`.
+
+### Image resolution rules
+
+When resolving an image for a given stack:
+
+1. **Universal image**: If `image` is a string, return it (ignores stack).
+2. **Exact match**: If `image` is a map and contains the detected stack key
+   (e.g., `java-maven`), use that image.
+3. **Default fallback**: If no exact match, use the `default` key when present.
+4. **Error**: If neither the stack key nor `default` exists, fail with an
+   actionable error message.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Image Resolution Flow                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   image: "docker.io/user/img:latest"                                        │
+│       │                                                                     │
+│       └──▶ Return "docker.io/user/img:latest" (universal, any stack)        │
+│                                                                             │
+│   image:                                                                    │
+│     default: img:default                                                    │
+│     java-maven: img:maven                                                   │
+│     java-gradle: img:gradle                                                 │
+│       │                                                                     │
+│       ├─ stack="java-maven"  ──▶ Return "img:maven"     (exact match)       │
+│       ├─ stack="java-gradle" ──▶ Return "img:gradle"    (exact match)       │
+│       ├─ stack="java"        ──▶ Return "img:default"   (fallback)          │
+│       ├─ stack="unknown"     ──▶ Return "img:default"   (fallback)          │
+│       └─ stack="python-pip"  ──▶ Return "img:default"   (fallback)          │
+│                                                                             │
+│   image:                                                                    │
+│     java-maven: img:maven   (NO default key)                                │
+│       │                                                                     │
+│       ├─ stack="java-maven"  ──▶ Return "img:maven"     (exact match)       │
+│       └─ stack="java-gradle" ──▶ ERROR: no image for stack, no default      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Consistency across run lifecycle
+
+Stack detection occurs during the pre-mod Build Gate execution. The detected stack
+is then used consistently for all subsequent Mods steps within the same run:
+
+1. **Pre-mod gate**: Build Gate detects workspace stack (e.g., `java-maven`).
+2. **Stack propagation**: The stack is stored in run context/metadata.
+3. **Image resolution**: Each mod step resolves its image using the same stack.
+4. **Healing steps**: Stack remains consistent across heal → re-gate cycles.
+
+This ensures deterministic image selection: a Maven workspace always uses the
+Maven-specific image throughout the entire run, including healing retries.
+
+### Example: Stack-aware OpenRewrite
+
+A common use case is dedicated OpenRewrite images for Maven and Gradle:
+
+```yaml
+mod:
+  image:
+    default: docker.io/user/mods-openrewrite:latest
+    java-maven: docker.io/user/mods-orw-maven:latest
+    java-gradle: docker.io/user/mods-orw-gradle:latest
+  env:
+    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+```
+
+When this spec runs against a Maven project (`pom.xml` present):
+- Build Gate detects `java-maven` stack.
+- Image resolves to `mods-orw-maven:latest`.
+- The Maven-specific entrypoint executes OpenRewrite via `mvn rewrite:run`.
+
+When the same spec runs against a Gradle project (`build.gradle` present):
+- Build Gate detects `java-gradle` stack.
+- Image resolves to `mods-orw-gradle:latest`.
+- The Gradle-specific entrypoint executes OpenRewrite via `gradle rewriteRun`.
+
+### Implementation references
+
+- Image type and resolution: `internal/workflow/contracts/mod_image.go`
+  (`ModImage`, `ResolveImage`, `ParseModImage`, `ToolToModStack`).
+- Stack propagation: `internal/workflow/contracts/build_gate_metadata.go`
+  (`BuildGateStageMetadata.Tool`).
+- Image resolution in executor: `internal/nodeagent/run_options.go`.
+- Unit tests: `internal/workflow/contracts/mod_image_test.go`.
+
 ## 2. Data Model
 
 ### 2.1 Ticket summary (`internal/mods/api`)
