@@ -190,3 +190,28 @@ func (m ModImage) String() string {
 	}
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
+
+// ToolToModStack converts a Build Gate tool name to a ModStack constant.
+// Tool names come from BuildGateStaticCheckReport.Tool after gate execution.
+//
+// Conversion rules:
+//   - "maven" → ModStackJavaMaven
+//   - "gradle" → ModStackJavaGradle
+//   - "java" → ModStackJava
+//   - "" or unknown → ModStackUnknown
+//
+// This function enables deterministic stack-aware image selection after
+// Build Gate detection, ensuring Mods steps use the correct stack-specific
+// images based on the workspace's detected build system.
+func ToolToModStack(tool string) ModStack {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
+	case "maven":
+		return ModStackJavaMaven
+	case "gradle":
+		return ModStackJavaGradle
+	case "java":
+		return ModStackJava
+	default:
+		return ModStackUnknown
+	}
+}

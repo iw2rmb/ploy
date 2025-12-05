@@ -18,6 +18,25 @@ type BuildGateStageMetadata struct {
 	Resources *BuildGateResourceUsage `json:"-"`
 }
 
+// DetectedStack returns the ModStack derived from the first static check's tool.
+// This provides deterministic stack identification for stack-aware image selection
+// in Mods steps and healing jobs.
+//
+// The detected stack is derived from the Build Gate's tool detection:
+//   - "maven" tool → ModStackJavaMaven
+//   - "gradle" tool → ModStackJavaGradle
+//   - "java" tool → ModStackJava
+//   - unknown/empty → ModStackUnknown
+//
+// This method ensures the same stack value is visible to both mod and healing
+// executions, enabling consistent image resolution across re-gates.
+func (m BuildGateStageMetadata) DetectedStack() ModStack {
+	if len(m.StaticChecks) == 0 {
+		return ModStackUnknown
+	}
+	return ToolToModStack(m.StaticChecks[0].Tool)
+}
+
 // Validate ensures build gate metadata entries are well formed.
 func (m BuildGateStageMetadata) Validate() error {
 	for i, check := range m.StaticChecks {

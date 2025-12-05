@@ -464,3 +464,80 @@ func TestModImage_String(t *testing.T) {
 		}
 	})
 }
+
+// TestToolToModStack verifies conversion from Build Gate tool names to ModStack.
+func TestToolToModStack(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		tool string
+		want ModStack
+	}{
+		{
+			name: "maven lowercase",
+			tool: "maven",
+			want: ModStackJavaMaven,
+		},
+		{
+			name: "maven mixed case",
+			tool: "Maven",
+			want: ModStackJavaMaven,
+		},
+		{
+			name: "maven with whitespace",
+			tool: "  maven  ",
+			want: ModStackJavaMaven,
+		},
+		{
+			name: "gradle lowercase",
+			tool: "gradle",
+			want: ModStackJavaGradle,
+		},
+		{
+			name: "gradle mixed case",
+			tool: "GRADLE",
+			want: ModStackJavaGradle,
+		},
+		{
+			name: "java lowercase",
+			tool: "java",
+			want: ModStackJava,
+		},
+		{
+			name: "java mixed case",
+			tool: "Java",
+			want: ModStackJava,
+		},
+		{
+			name: "empty string",
+			tool: "",
+			want: ModStackUnknown,
+		},
+		{
+			name: "whitespace only",
+			tool: "   ",
+			want: ModStackUnknown,
+		},
+		{
+			name: "unknown tool",
+			tool: "bazel",
+			want: ModStackUnknown,
+		},
+		{
+			name: "none tool (gate skipped)",
+			tool: "none",
+			want: ModStackUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ToolToModStack(tt.tool)
+			if got != tt.want {
+				t.Errorf("ToolToModStack(%q) = %q, want %q", tt.tool, got, tt.want)
+			}
+		})
+	}
+}

@@ -103,6 +103,13 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Run the build gate.
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
+	// Persist the detected stack for this run so mod and healing jobs can
+	// resolve stack-specific images consistently. This is done for all gate
+	// results (pass or fail) to ensure deterministic image selection.
+	if gateResult != nil {
+		r.persistGateStack(req.RunID, gateResult)
+	}
+
 	// Persist the first failing gate log for this run so discrete healing jobs
 	// can hydrate /in/build-gate.log with a trimmed failure view.
 	if gateErr != nil || (gateResult != nil && !gateResultPassed(gateResult)) {
@@ -183,6 +190,77 @@ func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
 	return gateResult.StaticChecks[0].Passed
 }
 
+// persistGateStack writes the detected stack from a gate result to a stable
+// per-run path under the node's cache/temp home. This allows mod and healing
+// jobs to resolve stack-specific images consistently, even when executed as
+// separate jobs on the same or different nodes.
+//
+// The function is idempotent: once a stack has been written for a run,
+// subsequent calls are no-ops to preserve the original detection result.
+// This ensures stability across re-gates and healing retries.
+func (r *runController) persistGateStack(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
+	if meta == nil {
+		return
+	}
+
+	stack := meta.DetectedStack()
+	if stack == "" {
+		stack = contracts.ModStackUnknown
+	}
+
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		slog.Warn("failed to create run dir for gate stack", "run_id", runID, "error", err)
+		return
+	}
+
+	stackPath := filepath.Join(runDir, "build-gate-stack.txt")
+	if _, err := os.Stat(stackPath); err == nil {
+		// Stack already persisted for this run; keep the first detection.
+		return
+	}
+
+	if err := os.WriteFile(stackPath, []byte(string(stack)), 0o644); err != nil {
+		slog.Warn("failed to persist build gate stack", "run_id", runID, "path", stackPath, "error", err)
+		return
+	}
+
+	slog.Info("persisted build gate stack", "run_id", runID, "stack", stack, "path", stackPath)
+}
+
+// loadPersistedStack reads the persisted stack for a run from the node's
+// cache/temp home. Returns ModStackUnknown if no stack file exists or on error.
+//
+// This allows mod and healing jobs to use the same stack detected during the
+// initial gate execution, ensuring deterministic image selection across jobs.
+func (r *runController) loadPersistedStack(runID types.RunID) contracts.ModStack {
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	stackPath := filepath.Join(baseRoot, "ploy", "run", runID.String(), "build-gate-stack.txt")
+
+	data, err := os.ReadFile(stackPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("failed to read persisted stack", "run_id", runID, "error", err)
+		}
+		return contracts.ModStackUnknown
+	}
+
+	stack := contracts.ModStack(strings.TrimSpace(string(data)))
+	if stack == "" {
+		return contracts.ModStackUnknown
+	}
+
+	slog.Debug("loaded persisted stack for run", "run_id", runID, "stack", stack)
+	return stack
+}
+
 // persistFirstGateFailureLog writes the first failing gate log for a run to a
 // stable per-run path under the node's cache/temp home. Healing jobs later read
 // this file to hydrate /in/build-gate.log without re-running the gate.
@@ -254,6 +332,10 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 
 // executeModJob runs a mod container job.
 // Executes the container, uploads diff, and reports status.
+//
+// Stack-aware image selection: The job loads the persisted stack from the
+// pre-gate phase and uses it for manifest building. This ensures mod steps
+// use stack-specific images (e.g., java-maven, java-gradle) when configured.
 func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -266,15 +348,28 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	}
 	defer func() { _ = logStreamer.Close() }()
 
-	// Parse options and build manifest.
+	// Load the persisted stack from the pre-gate phase for stack-aware image
+	// selection. If no stack was persisted (e.g., gate skipped), defaults to
+	// ModStackUnknown which falls back to "default" in stack maps.
+	stack := r.loadPersistedStack(req.RunID)
+
+	// Parse options and build manifest with stack-aware image resolution.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
 	typedOpts := parseRunOptions(req.Options)
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	manifest, err := buildManifestFromRequestWithStack(req, typedOpts, 0, stack)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
+
+	// Log the stack-aware image selection for observability.
+	slog.Info("mod job using stack-aware image",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"detected_stack", stack,
+		"resolved_image", manifest.Image,
+	)
 
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
@@ -380,6 +475,10 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 // executeHealingJob runs a healing container job.
 // Fetches gate logs from parent job, runs healing container, uploads diff.
+//
+// Stack-aware image selection: The job loads the persisted stack from the
+// pre-gate phase and uses it for manifest building. This ensures healing
+// mods use stack-specific images (e.g., java-maven, java-gradle) when configured.
 func (r *runController) executeHealingJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -392,7 +491,12 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 	defer func() { _ = logStreamer.Close() }()
 
-	// Parse options and build manifest.
+	// Load the persisted stack from the pre-gate phase for stack-aware image
+	// selection. If no stack was persisted (e.g., gate skipped), defaults to
+	// ModStackUnknown which falls back to "default" in stack maps.
+	stack := r.loadPersistedStack(req.RunID)
+
+	// Parse options and build manifest with stack-aware image resolution.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
 	typedOpts := parseRunOptions(req.Options)
 
@@ -402,15 +506,23 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// typed HealingConfig so that discrete healing jobs use the correct image/env.
 	if typedOpts.Healing != nil && len(typedOpts.Healing.Mods) > 0 {
 		healMod, healIndex := selectHealingModForJob(req, typedOpts.Healing)
-		manifest, err = buildHealingManifest(req, healMod, healIndex, "")
+		manifest, err = buildHealingManifestWithStack(req, healMod, healIndex, "", stack)
 	} else {
-		manifest, err = buildManifestFromRequest(req, typedOpts, 0)
+		manifest, err = buildManifestFromRequestWithStack(req, typedOpts, 0, stack)
 	}
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
+
+	// Log the stack-aware image selection for observability.
+	slog.Info("healing job using stack-aware image",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"detected_stack", stack,
+		"resolved_image", manifest.Image,
+	)
 
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
