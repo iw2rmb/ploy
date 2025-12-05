@@ -46,11 +46,12 @@ Legend: [ ] todo, [x] done.
   - Scope: confirm HostConfig options (AutoRemove, Mounts, resource limits, network mode, storage options) and wait semantics still match Engine v29 responses; adjust code if response or option structures changed.
   - Tests: go test ./internal/workflow/runtime/step -run 'Docker|Container' -cover; manual smoke tests against a Docker Engine v29 daemon — containers start, complete, and clean up as before.
   - **Completed**: Added comprehensive lifecycle validation tests (TestDockerContainerLifecycleV29*) covering full create→start→wait→remove sequence with HostConfig options, mount types, wait conditions, and error propagation; enhanced method comments with Engine v29 semantics documentation.
-- [ ] Confirm log streaming and demuxing works with moby client — avoid deprecated stdcopy usage while preserving output format.
+- [x] Confirm log streaming and demuxing works with moby client — avoid deprecated stdcopy usage while preserving output format.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step/container_docker.go, internal/workflow/runtime/step/container_docker_test.go
   - Scope: ensure ContainerLogs calls and options still produce multiplexed output; update stdcopy import path if required by moby; keep combined stdout+stderr behaviour identical for callers.
   - Tests: go test ./internal/workflow/runtime/step -run 'DockerLog' -cover — tests pass and confirm demuxed log content under Engine v29.
+  - **Completed**: Added comprehensive log streaming tests (TestDockerLogStreamingV29*) validating: multiplexed stream demuxing, interleaved frame handling, large payloads (64KB), binary content preservation, edge cases (empty/single-byte), and runtime integration; enhanced Logs method with detailed Engine v29 semantics documentation including stdcopy import path (github.com/moby/moby/api/pkg/stdcopy), multiplexed format description, and fallback behaviour.
 
 ## Worker health check adaptation
 - [ ] Switch DockerChecker to moby client and types — maintain the existing health checker interface.
