@@ -38,6 +38,11 @@ import (
 
 	units "github.com/docker/go-units"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+
+	// Import moby client for ContainerStats/Inspect option types used in
+	// resource usage gathering below. The actual client calls go through
+	// DockerContainerRuntime.client which is a *client.Client.
+	"github.com/moby/moby/client"
 )
 
 // dockerGateExecutor runs build validation inside language images using the
@@ -249,8 +254,12 @@ fi`
 	meta.LogDigest = sha256Hex(logs)
 
 	// Gather resource usage via Docker stats when available.
+	// Moby Engine v29 SDK uses client.ContainerStatsOptions{Stream: false} instead
+	// of a boolean stream parameter. ContainerInspect requires ContainerInspectOptions
+	// with Size: true to populate SizeRw, and returns ContainerInspectResult with
+	// Container field containing the InspectResponse.
 	if d, ok := e.rt.(*DockerContainerRuntime); ok && d != nil && d.client != nil {
-		if stats, err := d.client.ContainerStats(ctx, h.ID, false); err == nil && stats.Body != nil {
+		if stats, err := d.client.ContainerStats(ctx, h.ID, dockerStatsOptions()); err == nil && stats.Body != nil {
 			var sj struct {
 				MemoryStats struct{ Usage, MaxUsage uint64 } `json:"memory_stats"`
 				CPUStats    struct {
@@ -275,11 +284,12 @@ fi`
 					writeBytes += rec.Value
 				}
 			}
-			// Inspect for SizeRw if available
+			// Inspect for SizeRw if available. Moby v29 SDK requires Size: true in
+			// options and returns ContainerInspectResult with Container.SizeRw.
 			var sizeRw *int64
-			if inspect, ierr := d.client.ContainerInspect(ctx, h.ID); ierr == nil {
-				if inspect.SizeRw != nil {
-					size := *inspect.SizeRw
+			if inspect, ierr := d.client.ContainerInspect(ctx, h.ID, dockerInspectOptionsWithSize()); ierr == nil {
+				if inspect.Container.SizeRw != nil {
+					size := *inspect.Container.SizeRw
 					sizeRw = &size
 				}
 			}
@@ -323,4 +333,17 @@ func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimS
 func sha256Hex(b []byte) string {
 	h := sha256.Sum256(b)
 	return fmt.Sprintf("%x", h[:])
+}
+
+// dockerStatsOptions returns the moby client.ContainerStatsOptions for a
+// one-shot (non-streaming) stats call. Stream: false tells the daemon to
+// return a single stats sample and close the connection.
+func dockerStatsOptions() client.ContainerStatsOptions {
+	return client.ContainerStatsOptions{Stream: false}
+}
+
+// dockerInspectOptionsWithSize returns the moby client.ContainerInspectOptions
+// with Size: true to populate SizeRw and SizeRootFs in the response.
+func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
+	return client.ContainerInspectOptions{Size: true}
 }
