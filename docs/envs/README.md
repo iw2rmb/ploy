@@ -133,6 +133,35 @@ See `docs/build-gate/README.md` for the complete HTTP Build Gate API contract.
 
 ## Worker Nodes
 
+### Docker Engine v29 Environment Variables
+
+The node agent uses the moby Engine v29 SDK (`github.com/moby/moby/client`) for all
+container operations. The SDK's `client.FromEnv` function reads the following standard
+Docker environment variables when constructing the client. These rarely need explicit
+setting on typical deployments where Docker runs on the default Unix socket.
+
+| Variable             | Default                          | Description                                                  |
+|----------------------|----------------------------------|--------------------------------------------------------------|
+| `DOCKER_HOST`        | `unix:///var/run/docker.sock`    | Docker daemon address (Unix socket or TCP endpoint)          |
+| `DOCKER_TLS_VERIFY`  | (unset)                          | Set to `"1"` to enable TLS verification for TCP connections  |
+| `DOCKER_CERT_PATH`   | (unset)                          | Directory containing `ca.pem`, `cert.pem`, `key.pem` for TLS |
+| `DOCKER_API_VERSION` | (auto-negotiated)                | Override API version; normally unnecessary with v29+         |
+
+**Implementation**: `internal/workflow/runtime/step/container_docker.go:59-66` constructs the
+Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
+
+**When to set these variables:**
+- **Remote Docker daemon**: Set `DOCKER_HOST=tcp://<host>:2376` and TLS variables when the
+  daemon runs on a different host or requires TLS authentication.
+- **Custom socket path**: Set `DOCKER_HOST=unix:///custom/path/docker.sock` if the daemon
+  uses a non-standard socket location.
+- **API version pinning**: Set `DOCKER_API_VERSION=1.44` only if auto-negotiation causes
+  issues (rare; Engine v29+ handles this automatically).
+
+**Cross-references:**
+- Engine version requirements: `GOLANG.md` § "Docker Engine Requirements"
+- Migration status: `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration"
+
 - `PLOY_CA_CERT_PEM` — Cluster CA certificate presented to the node for mTLS trust (PEM-encoded).
   Required for node→server and server→node mTLS connections.
 - `PLOY_CA_KEY_PEM` — Cluster CA private key (PEM-encoded). Set during bootstrap on the
@@ -386,6 +415,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 ## Related Docs
 
 - [README.md](../../README.md) — Server/node pivot architecture
+- [GOLANG.md](../../GOLANG.md) — Docker Engine v29 requirements and Go SDK modules
 - See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
 
