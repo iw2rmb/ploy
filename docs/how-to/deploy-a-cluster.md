@@ -18,7 +18,9 @@ assumes a 1x server + 2x node layout.
 
 - SSH access to all hosts with sudo privileges (default user `root`, port `22`).
 - Go 1.25+ installed locally for building binaries.
-- Docker Engine 28.0+ on worker nodes for job execution (installed automatically during `ploy node add`).
+- **Docker Engine v29.0+** on worker nodes for container execution (installed automatically during `ploy node add`).
+  - Minimum API version: v1.44 (required by Engine v29).
+  - See `GOLANG.md` § "Docker Engine Requirements" for SDK module details.
 - PostgreSQL 14+ (installed automatically on the server host when `--postgresql-dsn` is omitted).
 - Build the CLI and binaries locally: `make build` (CLI placed at `dist/ploy`).
 

@@ -256,6 +256,8 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
 - PostgreSQL remains untouched during a binary update. If your server uses a local Postgres installed by
   the bootstrap, ensure the service is healthy before restarting `ployd`.
 - Prefer rolling nodes one at a time to keep capacity available during updates.
+- **Docker Engine v29.0+** is required on worker nodes. Nodes running older Docker versions may fail
+  API negotiation (minimum API v1.44). See `GOLANG.md` § "Docker Engine Requirements" for details.
 - **GitLab MR integration**: Node agents use `gitlab.com/gitlab-org/api/client-go` for GitLab API interactions with automatic retry on transient failures (rate limits, 5xx errors, network issues). The client integrates with the shared backoff policy (`GitLabMRPolicy`: 4 max attempts, 1s/2s/4s backoff schedule with jitter) and automatically redacts Personal Access Tokens from all logs and error messages. See `cmd/ploy/README.md#gitlab-mr-integration` for retry behavior details and `docs/how-to/create-mr.md` for configuration examples.
 
 ---
