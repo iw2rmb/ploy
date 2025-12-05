@@ -603,28 +603,28 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 		t.Fatalf("expected 2 UpdateJobStatus calls for loser jobs, got %d", len(st.updateJobStatusCalls))
 	}
 
-	// Collect canceled job IDs.
-	canceledIDs := make(map[uuid.UUID]bool)
+	// Collect skipped job IDs.
+	skippedIDs := make(map[uuid.UUID]bool)
 	for _, call := range st.updateJobStatusCalls {
-		if call.Status != store.JobStatusCanceled {
-			t.Fatalf("expected canceled status, got %s", call.Status)
+		if call.Status != store.JobStatusSkipped {
+			t.Fatalf("expected skipped status, got %s", call.Status)
 		}
-		canceledIDs[uuid.UUID(call.ID.Bytes)] = true
+		skippedIDs[uuid.UUID(call.ID.Bytes)] = true
 	}
 
-	// Verify the loser heal job was canceled.
-	if !canceledIDs[loserHealID] {
-		t.Fatalf("expected heal-static-patch-1-0 to be canceled")
+	// Verify the loser heal job was skipped.
+	if !skippedIDs[loserHealID] {
+		t.Fatalf("expected heal-static-patch-1-0 to be skipped")
 	}
 
-	// Verify the loser re-gate job was canceled.
-	if !canceledIDs[loserReGateID] {
-		t.Fatalf("expected re-gate-static-patch-1 to be canceled")
+	// Verify the loser re-gate job was skipped.
+	if !skippedIDs[loserReGateID] {
+		t.Fatalf("expected re-gate-static-patch-1 to be skipped")
 	}
 
-	// Verify the mainline mod-0 was NOT canceled.
-	if canceledIDs[mainlineModID] {
-		t.Fatalf("mainline mod-0 should NOT be canceled")
+	// Verify the mainline mod-0 was NOT skipped.
+	if skippedIDs[mainlineModID] {
+		t.Fatalf("mainline mod-0 should NOT be skipped")
 	}
 }
 
@@ -760,15 +760,98 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
-	// Only the pending loser (heal-branch-c-1-0) should be canceled.
-	// The already-failed re-gate-branch-b-1 should be skipped.
+	// Only the pending loser (heal-branch-c-1-0) should be marked skipped.
+	// The already-failed re-gate-branch-b-1 should be left unchanged.
 	if len(st.updateJobStatusCalls) != 1 {
 		t.Fatalf("expected 1 UpdateJobStatus call, got %d", len(st.updateJobStatusCalls))
 	}
 
 	if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) != pendingLoserID {
-		t.Fatalf("expected heal-branch-c-1-0 to be canceled, got job %v",
+		t.Fatalf("expected heal-branch-c-1-0 to be skipped, got job %v",
 			uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes))
+	}
+}
+
+// TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds verifies that when
+// one healing branch wins (re-gate succeeds) and other branches are skipped,
+// the run completes with succeeded status (not canceled).
+func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-branch-a-1-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "heal",
+			StepIndex: 1333,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-a-1",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "re_gate",
+			StepIndex: 1444,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-branch-b-1-0",
+			Status:    store.JobStatusSkipped, // Loser branch heal skipped after winner selected.
+			ModType:   "heal",
+			StepIndex: 1555,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-b-1",
+			Status:    store.JobStatusSkipped, // Loser branch re-gate skipped after winner selected.
+			ModType:   "re_gate",
+			StepIndex: 1666,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "mod",
+			StepIndex: 2000,
+		},
+	}
+
+	run := store.Run{
+		ID:   runID,
+		Spec: []byte(`{}`),
+	}
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
+	}
+
+	if !st.updateRunCompletionCalled {
+		t.Fatalf("expected UpdateRunCompletion to be called")
+	}
+	if st.updateRunCompletionParams.Status != store.RunStatusSucceeded {
+		t.Fatalf("expected run status=succeeded, got %s", st.updateRunCompletionParams.Status)
 	}
 }
 

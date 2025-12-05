@@ -67,7 +67,8 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		// Check if job is in terminal state.
 		isTerminal := job.Status == store.JobStatusSucceeded ||
 			job.Status == store.JobStatusFailed ||
-			job.Status == store.JobStatusCanceled
+			job.Status == store.JobStatusCanceled ||
+			job.Status == store.JobStatusSkipped
 		if isTerminal {
 			terminalJobs++
 		}
