@@ -1183,6 +1183,134 @@ func setupGitRepoWithChange(workspace string) error {
 	return nil
 }
 
+// TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails verifies that
+// when healing mods do not produce any workspace changes (as measured by
+// `git status --porcelain`), the node agent does not re-run the gate and
+// returns a terminal ErrBuildGateFailed error.
+func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T) {
+	// Mock gate executor that always fails to force healing.
+	gateCallCount := 0
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: false},
+				},
+				LogsText: "[ERROR] Build failure\n",
+			}, nil
+		},
+	}
+
+	// Healing container runs but does not modify the workspace.
+	healingContainerCount := 0
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			healingContainerCount++
+			return step.ContainerHandle{ID: "healer"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("healer logs"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	// Create workspace with a clean git repo so git status --porcelain is empty
+	// both before and after healing.
+	workspace, err := os.MkdirTemp("", "ploy-no-diff-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	// Reuse helper that initializes a git repo and then reset changes to ensure
+	// a clean working tree.
+	if err := setupGitRepoWithChange(workspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := runCommand(workspace, "git", "checkout", "--", "."); err != nil {
+		t.Fatal(err)
+	}
+
+	outDir, err := os.MkdirTemp("", "ploy-no-diff-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("test-no-diff-healing"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods": []any{
+					map[string]any{"image": "healer:latest"},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	initialGate, reGates, err := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
+	)
+
+	// No net workspace changes should cause a terminal build gate failure.
+	if !errors.Is(err, step.ErrBuildGateFailed) {
+		t.Fatalf("runGateWithHealing() error = %v, want ErrBuildGateFailed", err)
+	}
+
+	// Initial gate must still be captured.
+	if initialGate == nil || initialGate.Metadata == nil {
+		t.Fatal("initialGate should be captured even when healing produces no changes")
+	}
+
+	// No re-gates should be executed when there are no workspace changes.
+	if len(reGates) != 0 {
+		t.Fatalf("len(reGates) = %d, want 0 (no re-gates when workspace unchanged)", len(reGates))
+	}
+
+	// Gate should have been called exactly once (initial gate only).
+	if gateCallCount != 1 {
+		t.Fatalf("gateCallCount = %d, want 1 (initial gate only)", gateCallCount)
+	}
+
+	// Healing containers should still run once for the configured retry.
+	if healingContainerCount != 1 {
+		t.Fatalf("healingContainerCount = %d, want 1", healingContainerCount)
+	}
+}
+
 // runCommand executes a shell command in the specified directory.
 func runCommand(dir, name string, args ...string) error {
 	cmd := exec.Command(name, args...)

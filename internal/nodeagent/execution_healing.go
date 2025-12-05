@@ -249,6 +249,25 @@ func computeGzippedDiff(ctx context.Context, workspace string) []byte {
 	return gzBuf.Bytes()
 }
 
+// workspaceStatus returns the output of `git status --porcelain` for the given
+// workspace. An empty string indicates a clean working tree relative to the
+// current HEAD. When git status fails (e.g., workspace is not a git repo),
+// the error is returned so callers can decide how to proceed.
+func workspaceStatus(ctx context.Context, workspace string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	cmd.Dir = workspace
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("git status --porcelain failed: %w (stderr=%s)", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return stdout.String(), nil
+}
+
 // runGateWithHealing executes the build gate with optional healing loop when validation fails.
 // This helper centralizes gate+healing orchestration logic for reuse by both pre-mod and
 // post-mod gate phases.
@@ -403,7 +422,6 @@ func (r *runController) runGateWithHealing(
 	// When a Codex-based healing mod writes codex-session.txt to /out, the agent
 	// reads and persists this session ID to /in for subsequent attempts.
 	var codexSession string
-	var codexRequestedValidation bool
 
 	// Attempt healing loop.
 	// Note: This is a domain-specific healing retry loop (not a transient error retry).
@@ -414,6 +432,18 @@ func (r *runController) runGateWithHealing(
 	//  3. No exponential backoff is needed; each healing attempt runs immediately after healing mods complete.
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries, "phase", gatePhase)
+
+		// Capture workspace status before running healing mods so we can detect
+		// whether this healing attempt produced any net changes.
+		preStatus, preStatusErr := workspaceStatus(ctx, workspace)
+		if preStatusErr != nil {
+			slog.Warn("healing: failed to compute workspace status before healing; assuming changes may occur",
+				"run_id", req.RunID,
+				"attempt", attempt,
+				"phase", gatePhase,
+				"error", preStatusErr,
+			)
+		}
 
 		// Execute each healing mod in sequence using typed HealingMod structs.
 		for idx, mod := range healingConfig.Mods {
@@ -490,12 +520,6 @@ func (r *runController) runGateWithHealing(
 					slog.Info("healing: captured codex session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", codexSession)
 				}
 			}
-
-			// Check for sentinel file indicating Codex requested build validation.
-			if _, statErr := os.Stat(filepath.Join(outDir, "request_build_validation")); statErr == nil {
-				codexRequestedValidation = true
-				slog.Info("healing: codex requested build validation", "run_id", req.RunID, "mod_index", idx)
-			}
 		}
 
 		// Persist codex-session.txt to /in for subsequent healing attempts.
@@ -508,8 +532,29 @@ func (r *runController) runGateWithHealing(
 			}
 		}
 
-		// Log sentinel state for observability (gate semantics unchanged).
-		_ = codexRequestedValidation
+		// Capture workspace status after healing mods complete and compare with
+		// the pre-healing status. If both are available and identical, then this
+		// healing attempt produced no net workspace changes and there is no point
+		// in re-running the gate. Treat this as a terminal build gate failure.
+		postStatus, postStatusErr := workspaceStatus(ctx, workspace)
+		if postStatusErr != nil {
+			slog.Warn("healing: failed to compute workspace status after healing; proceeding with re-gate",
+				"run_id", req.RunID,
+				"attempt", attempt,
+				"phase", gatePhase,
+				"error", postStatusErr,
+			)
+		}
+
+		if preStatusErr == nil && postStatusErr == nil && preStatus == postStatus {
+			slog.Warn("healing: no workspace changes detected after healing attempt; skipping re-gate",
+				"run_id", req.RunID,
+				"attempt", attempt,
+				"phase", gatePhase,
+			)
+			// Retries are effectively exhausted because healing cannot make further progress.
+			return initialGate, reGates, fmt.Errorf("%w: healing produced no workspace changes", step.ErrBuildGateFailed)
+		}
 
 		// Re-run the gate after healing mods complete.
 		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
