@@ -11,6 +11,33 @@ This document codifies Go engineering rules for this repository. It complements 
 - Modules: single-module unless otherwise justified. Keep public APIs stable; prefer `internal/...` for non‑exported packages.
 - Package boundaries: keep CLI thin; orchestration logic lives under `internal/...` packages per `AGENTS.md`.
 
+## Docker Engine Requirements
+
+Worker nodes require Docker Engine v29.0 or later for container execution.
+
+### Supported Daemon Versions
+- **Minimum**: Docker Engine **v29.0** (API v1.44+)
+- **Recommended**: Latest v29.x patch release
+- **API floor**: v1.44 (enforced by Engine v29; clients negotiating <v1.44 are rejected)
+
+### Go SDK Modules
+The Docker Go SDK migrated from `github.com/docker/docker` (deprecated) to the
+`github.com/moby/moby` module with explicit sub-packages:
+
+| Module path                      | Purpose                                |
+|----------------------------------|----------------------------------------|
+| `github.com/moby/moby/client`    | Docker client (connect, container ops) |
+| `github.com/moby/moby/api/types` | Container, image, mount, network types |
+
+Version tag format: `docker-v29.x.y` (e.g., `docker-v29.0.0`).
+
+**Note**: The root `github.com/moby/moby` module is an internal implementation
+detail; only `client` and `api/...` sub-packages are public API.
+
+### Migration Status
+See `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration" for the
+incremental migration plan from `github.com/docker/docker` to moby modules.
+
 ## Formatting & Linting
 - Formatting is enforced automatically by a pre‑commit hook in `.githooks/pre-commit` (run `git config core.hooksPath .githooks` once; `IMPLEMENT.sh` sets this automatically when present).
 - The hook runs `goimports -w` (if available) and `gofmt -s -w` on all tracked `*.go` files and re‑stages the changes. No manual formatting needed.
