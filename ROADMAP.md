@@ -54,11 +54,12 @@ Legend: [ ] todo, [x] done.
   - **Completed**: Added comprehensive log streaming tests (TestDockerLogStreamingV29*) validating: multiplexed stream demuxing, interleaved frame handling, large payloads (64KB), binary content preservation, edge cases (empty/single-byte), and runtime integration; enhanced Logs method with detailed Engine v29 semantics documentation including stdcopy import path (github.com/moby/moby/api/pkg/stdcopy), multiplexed format description, and fallback behaviour.
 
 ## Worker health check adaptation
-- [ ] Switch DockerChecker to moby client and types — maintain the existing health checker interface.
+- [x] Switch DockerChecker to moby client and types — maintain the existing health checker interface.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle/health.go
   - Scope: replace github.com/docker/docker/api/types, github.com/docker/docker/api/types/system, and github.com/docker/docker/client imports with github.com/moby/moby equivalents; keep the dockerAPI interface and DockerCheckerOptions shape stable for callers.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover — construction and Close behaviour pass with moby client.
+  - **Completed**: DockerChecker uses github.com/moby/moby/client with client.PingOptions, client.PingResult, client.InfoOptions, and client.SystemInfoResult; tests cover OK, error, degraded states, nil guards, context cancellation, default options, and Details field population.
 - [ ] Reconcile Ping and Info field usage with Engine v29 — keep ComponentStatus fields and details keys stable.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle/health.go, internal/worker/lifecycle/health_docker_test.go
