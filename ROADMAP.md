@@ -18,7 +18,7 @@ Legend: [ ] todo, [x] done.
   - Component: go.mod
   - Scope: add github.com/moby/moby/client and github.com/moby/moby/api/... dependencies alongside github.com/docker/docker; run go mod tidy and ensure all packages still compile.
   - Tests: go test ./... — repository builds and tests pass with both docker and moby client modules present.
-- [ ] Migrate workflow runtime packages to moby client and types — keep container execution logic equivalent.
+- [x] Migrate workflow runtime packages to moby client and types — keep container execution logic equivalent.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step
   - Scope: replace github.com/docker/docker imports and client usage in workflow runtime packages with github.com/moby/moby/client and github.com/moby/moby/api/... equivalents; adjust for any type or option differences.
