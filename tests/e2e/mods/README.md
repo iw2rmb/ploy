@@ -347,7 +347,7 @@ Example stack-aware spec:
 ```yaml
 mod:
   image:
-    default: docker.io/user/mods-openrewrite:latest
+    default: docker.io/user/mods-orw-maven:latest
     java-maven: docker.io/user/mods-orw-maven:latest
     java-gradle: docker.io/user/mods-orw-gradle:latest
   env:

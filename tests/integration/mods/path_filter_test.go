@@ -50,8 +50,8 @@ func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, a
 	baseRef = "main"
 	targetRef = "e2e/success"
 	group = "org.openrewrite.recipe"
-	artifact = "rewrite-java-17"
-	version = "2.6.0"
+	artifact = "rewrite-migrate-java"
+	version = "3.20.0"
 	classname = "org.openrewrite.java.migrate.UpgradeToJava17"
 	plugin = "6.18.0"
 
