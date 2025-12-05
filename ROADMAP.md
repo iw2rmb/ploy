@@ -98,11 +98,12 @@ Legend: [ ] todo, [x] done.
   - Tests: make build && ./scripts/check-binary-size.sh — build succeeds and binary size stays under the defined limit.
 
 ## Documentation and rollout
-- [ ] Update engineering docs for Docker Engine v29 requirements — set clear expectations for contributors.
+- [x] Update engineering docs for Docker Engine v29 requirements — set clear expectations for contributors.
   - Repository: github.com/iw2rmb/ploy
   - Component: ROADMAP.md, GOLANG.md
   - Scope: document the new minimum supported Docker Engine version, the chosen moby client/API modules, and the migration status; ensure ROADMAP.md is linked from GOLANG.md or README.md where appropriate.
   - Tests: docs review — engineering docs consistently describe Docker Engine v29 and moby usage.
+  - **Completed**: Enhanced GOLANG.md § "Docker Engine Requirements" with: supported daemon versions (v29.0+ minimum, v28.x unsupported), complete SDK module table (client, types/container, types/mount, pkg/stdcopy), client construction pattern with code example, environment variables table (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH, DOCKER_API_VERSION), verification commands, and cross-references to implementation files and ROADMAP.md migration section.
 - [ ] Update operator how-to docs for v29 — make runtime prerequisites explicit for deployments.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md

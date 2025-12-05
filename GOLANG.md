@@ -13,30 +13,74 @@ This document codifies Go engineering rules for this repository. It complements 
 
 ## Docker Engine Requirements
 
-Worker nodes require Docker Engine v29.0 or later for container execution.
+Worker nodes (`ployd-node`) require Docker Engine v29.0+ for container execution.
+The SDK migration from `github.com/docker/docker` to moby Engine v29 modules is
+complete—see `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration".
 
 ### Supported Daemon Versions
 - **Minimum**: Docker Engine **v29.0** (API v1.44+)
 - **Recommended**: Latest v29.x patch release
 - **API floor**: v1.44 (enforced by Engine v29; clients negotiating <v1.44 are rejected)
+- **Unsupported**: Engine v28.x and earlier—API negotiation may succeed but
+  behaviour is untested and may exhibit drift.
 
-### Go SDK Modules
-The Docker Go SDK migrated from `github.com/docker/docker` (deprecated) to the
-`github.com/moby/moby` module with explicit sub-packages:
+### Go SDK Modules (Contributors)
 
-| Module path                      | Purpose                                |
-|----------------------------------|----------------------------------------|
-| `github.com/moby/moby/client`    | Docker client (connect, container ops) |
-| `github.com/moby/moby/api/types` | Container, image, mount, network types |
+The Docker Go SDK migrated from `github.com/docker/docker` (now **removed** from
+`go.mod`) to the moby Engine v29 modules:
 
-Version tag format: `docker-v29.x.y` (e.g., `docker-v29.0.0`).
+| Module path                              | Purpose                                    |
+|------------------------------------------|--------------------------------------------|
+| `github.com/moby/moby/client`            | Client construction and Docker API calls   |
+| `github.com/moby/moby/api/types/container` | ContainerConfig, HostConfig, WaitResponse |
+| `github.com/moby/moby/api/types/mount`   | Bind and volume mount specifications       |
+| `github.com/moby/moby/api/pkg/stdcopy`   | Log stream demuxing (stdout/stderr frames) |
 
-**Note**: The root `github.com/moby/moby` module is an internal implementation
-detail; only `client` and `api/...` sub-packages are public API.
+Do **not** import `github.com/docker/docker`; the module has been removed.
 
-### Migration Status
-See `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration" for the
-incremental migration plan from `github.com/docker/docker` to moby modules.
+### Client Construction Pattern
+
+All Docker client construction uses `client.FromEnv` (reads environment) and
+`client.WithAPIVersionNegotiation` (auto-negotiates API version with daemon):
+
+```go
+// Standard pattern: read DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH from
+// environment and auto-negotiate API version with the daemon.
+cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+if err != nil {
+    return fmt.Errorf("configure docker client: %w", err)
+}
+```
+
+Implementation: `internal/workflow/runtime/step/container_docker.go:59-66`.
+
+### Environment Variables (Optional)
+
+These variables are read by `client.FromEnv` and rarely need explicit setting:
+
+| Variable             | Default                          | Description                              |
+|----------------------|----------------------------------|------------------------------------------|
+| `DOCKER_HOST`        | `unix:///var/run/docker.sock`    | Docker daemon address                    |
+| `DOCKER_TLS_VERIFY`  | (unset)                          | Set to `"1"` to enable TLS verification  |
+| `DOCKER_CERT_PATH`   | (unset)                          | Path to TLS certificates when TLS enabled |
+| `DOCKER_API_VERSION` | (auto-negotiated)                | Override API version; normally unnecessary |
+
+### Verification
+
+```bash
+# Check Docker Engine version on a node (must report v29.0+).
+docker version --format '{{.Server.Version}}'
+
+# Run the Docker health check test (uses moby client interface).
+go test ./internal/worker/lifecycle -run 'DockerChecker' -v
+```
+
+### Cross-References
+
+- Migration roadmap: `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration"
+- Container runtime: `internal/workflow/runtime/step/container_docker.go`
+- Health checker: `internal/worker/lifecycle/health.go`
+- Gate executor: `internal/workflow/runtime/step/gate_docker.go`
 
 ## Formatting & Linting
 - Formatting is enforced automatically by a pre‑commit hook in `.githooks/pre-commit` (run `git config core.hooksPath .githooks` once; `IMPLEMENT.sh` sets this automatically when present).
