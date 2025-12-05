@@ -26,7 +26,7 @@ Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`; `orw-maven` → `mods-orw-maven`; `orw-gradle` → `mods-orw-gradle`.
 - OpenRewrite coordinates are passed via environment: set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
-- The Codex healer now uses the **sentinel protocol**: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]` when ready. The node agent then re-runs the Build Gate externally. Codex no longer invokes Build Gate tooling directly from inside the container.
+- The Codex healer now uses a **workspace diff handshake**: Codex edits the workspace and exits when done. The node agent then inspects the workspace via `git status --porcelain` and only re-runs the Build Gate externally when changes are present. Codex no longer invokes Build Gate tooling directly from inside the container.
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
@@ -87,9 +87,9 @@ Healing verification aligns with the HTTP Build Gate API's repo+diff model:
   The in-process re-gate avoids network overhead since the workspace already contains the modified state.
 - **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
 
-**Sentinel Protocol (Codex healing):**
+**Codex Healing Handshake (workspace diff):**
 
-The recommended approach for Codex-based healing is the sentinel protocol. Codex edits the workspace and, when ready for validation, emits `[[REQUEST_BUILD_VALIDATION]]` as its final message. The node agent re-runs the Build Gate externally after healing completes; the sentinel keeps Codex focused on fixing code while the control plane handles validation.
+The recommended approach for Codex-based healing is the workspace diff handshake. Codex edits the workspace and, when ready for validation, simply exits. The node agent re-runs the Build Gate externally after healing completes only when workspace diffs exist; a clean workspace (no diff) means no re-gate and the run remains failed.
 
 **Codex Healing Handshake Checklist (TDD Validation):**
 
@@ -97,17 +97,15 @@ Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifa
 
 | Artifact | Location | Description | Required |
 |----------|----------|-------------|----------|
-| Sentinel message | `codex.log` or `codex-last.txt` | `[[REQUEST_BUILD_VALIDATION]]` signals Build Gate re-run | Recommended |
-| Sentinel flag | `request_build_validation` | Boolean flag file for sentinel detection | Optional |
 | Session ID | `codex-session.txt` | Thread ID for resume mode across healing retries | Recommended |
-| Run manifest | `codex-run.json` | JSON with `requested_build_validation`, `session_id`, `resumed` fields | Required |
+| Run manifest | `codex-run.json` | JSON with `session_id`, `resumed` fields | Required |
 
 **Validation steps:**
 
-1. **Sentinel visibility**: After each healing attempt, verify that:
-   - `codex.log` or `codex-last.txt` contains `[[REQUEST_BUILD_VALIDATION]]`
-   - OR `request_build_validation` flag file exists with value `true`
-   - The node agent logs "codex requested build validation" upon sentinel detection
+1. **Workspace diff driven re-gate**: After each healing attempt, verify that:
+   - Healing mods edit files under `/workspace` as needed to fix the failure.
+   - The node agent re-runs the Build Gate only when workspace diffs are present (`git status --porcelain` non-empty).
+   - When healing performs no net changes (clean `git status`), the gate is not re-run and the run terminates as failed.
 
 2. **Session resume across healing retries**: When `retries > 1` in healing config:
    - After first healing attempt: `codex-session.txt` is written to `/out` with thread ID
@@ -117,7 +115,6 @@ Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifa
    - `codex-run.json` contains `"resumed":true` for resumed runs
 
 3. **Run manifest fields** (`codex-run.json`):
-   - `requested_build_validation`: `true` when sentinel was emitted
    - `session_id`: Thread ID for conversation continuity (may be empty)
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
@@ -136,10 +133,6 @@ Cross-reference: `ROADMAP.md` Phase D, `GOLANG.md` Codex Healing Pipeline sectio
 
 **Generating diff patches for Build Gate verification (legacy healers only):**
 
-> NOTE: For Codex-based healing, use the **sentinel protocol** instead (see above).
-> Codex should NOT invoke Build Gate tooling directly—it edits the workspace and
-> emits `[[REQUEST_BUILD_VALIDATION]]`; the node agent handles gate execution.
-
 Legacy (non-Codex) healing mods may optionally generate unified diff patches and
 use the repo+diff Build Gate API for mid-healing verification. This avoids
 shipping full workspace archives over HTTP:
@@ -151,7 +144,7 @@ shipping full workspace archives over HTTP:
 
 2. Optionally call the Build Gate HTTP API directly (for non-Codex healers) using the injected `PLOY_*` env vars if you need mid-healing verification.
 
-Example healing spec block (sentinel protocol):
+Example healing spec block (Codex workspace diff handshake):
 ```yaml
 build_gate_healing:
   retries: 1
@@ -162,9 +155,7 @@ build_gate_healing:
           Rules:
           - Use /workspace and /in/build-gate.log to understand the compile error.
           - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, reply with exactly:
-            [[REQUEST_BUILD_VALIDATION]]
-            as your final message and then stop.
+          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
@@ -184,11 +175,11 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with the sentinel protocol—Codex emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent re-runs the Build Gate, then ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the sentinel protocol, Codex simply emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent handles the actual gate execution.
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
@@ -281,7 +272,7 @@ This scenario validates:
 - Multi-VPS gate execution: gate jobs can run on different nodes than mods steps.
 - Job lifecycle: jobs transition through pending → claimed → running → passed/failed in `buildgate_jobs` table.
 - Repo+diff semantics: re-gates after healing include `diff_patch` for remote workspace reconstruction.
-- Healing flow compatibility: Codex sentinel protocol works identically in remote-http mode.
+- Healing flow compatibility: Codex workspace diff handshake works identically in remote-http mode.
 
 Configuration for remote-http mode:
 - Workers must have `PLOY_BUILDGATE_MODE=remote-http` in their environment.

@@ -97,7 +97,7 @@ func TestEndToEndFlow(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("test-run-e2e"),
 			JobID:   types.JobID("test-job-e2e"),
-			RepoURL: types.RepoURL("https://github.com/example/test-repo.git"),
+			RepoURL: types.RepoURL("https://github.com/iw2rmb/ploy-nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
 			Options: map[string]any{
 				"image":   "alpine:latest",
@@ -120,8 +120,9 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 		rc.mu.Unlock()
 
-		// Wait a bit for the run to execute (it will fail due to git clone, but that's expected).
-		// The important part is that it attempts to stream logs, upload diff, and emit status.
+		// Wait a bit for the run to execute. The run may fail (for example due to
+		// git clone or container execution), but the important part is that it
+		// attempts to stream logs, upload diff, and emit status.
 		time.Sleep(2 * time.Second)
 
 		// Cancel the context to stop execution if still running.

@@ -513,7 +513,7 @@ func (r *runController) runGateWithHealing(
 			// Per-step diff capture: Generate and upload diff after each healing mod step.
 			r.uploadHealingModDiff(ctx, req.RunID, req.JobID, workspace, healResult, idx, attempt, stepIndex)
 
-			// Read Codex session and sentinel artifacts from /out for session propagation.
+			// Read Codex session artifacts from /out for session propagation.
 			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
 				if session := strings.TrimSpace(string(sessionBytes)); session != "" {
 					codexSession = session

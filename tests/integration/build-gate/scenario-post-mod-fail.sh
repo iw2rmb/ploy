@@ -131,7 +131,8 @@ echo "$POST_LOGS" >"$INDIR/build-gate.log"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 5: Healing stub creates the missing class (simulates LLM/Codex healing).
-# In production, this would be mods-codex emitting [[REQUEST_BUILD_VALIDATION]].
+# In production, this would be mods-codex editing the workspace and exiting;
+# the node agent would then detect workspace diffs and re-run the gate.
 # Here we directly create the fix to test the gate-heal-regate flow.
 # ─────────────────────────────────────────────────────────────────────────────
 echo "[scenario] Running healing (creating UndefinedModSymbol.java)..."

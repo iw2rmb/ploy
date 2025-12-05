@@ -221,8 +221,9 @@ check_code_quality() {
     log_info "Code quality checks passed"
 }
 
-# Phase 4: Codex healing pipeline discipline (sentinel + session handshake)
-# Validates that the Codex healing pipeline tests cover the new handshake protocol.
+# Phase 4: Codex healing pipeline discipline (session + workspace diff handshake)
+# Validates that the Codex healing pipeline tests cover the handshake protocol where
+# Codex edits the workspace, exits, and the node agent re-gates only when diffs exist.
 # Per ROADMAP.md Phase D: RED→GREEN→REFACTOR for the Codex healing pipeline.
 check_codex_healing_discipline() {
     log_info "Validating Codex healing pipeline TDD discipline..."
@@ -251,11 +252,11 @@ check_codex_healing_discipline() {
             failed=1
         fi
 
-        # Check for sentinel detection test (via observability tracking).
-        if grep -q "request_build_validation" "$healing_tests"; then
-            log_info "✓ Sentinel detection test coverage present"
+        # Check for workspace diff handshake test coverage (no-diff → no re-gate).
+        if grep -q "TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails" "$healing_tests"; then
+            log_info "✓ Workspace diff handshake test coverage present"
         else
-            log_warn "✗ Sentinel detection test coverage missing"
+            log_warn "✗ Workspace diff handshake test coverage missing"
             failed=1
         fi
 
@@ -274,11 +275,11 @@ check_codex_healing_discipline() {
     # 3. Verify integration test for mod-codex exists.
     local integration_test="$repo_root/tests/integration/mods/mod-codex/mod_codex_test.go"
     if [[ -f "$integration_test" ]]; then
-        # Check for sentinel and session assertions.
-        if grep -q "buildgate-ready\|request_build_validation" "$integration_test"; then
-            log_info "✓ Integration test includes sentinel assertions"
+        # Check for Codex run manifest and session assertions.
+        if grep -q "codex-run.json" "$integration_test"; then
+            log_info "✓ Integration test includes Codex run manifest assertions"
         else
-            log_warn "✗ Integration test missing sentinel assertions"
+            log_warn "✗ Integration test missing Codex manifest assertions"
             failed=1
         fi
     else
@@ -362,7 +363,7 @@ main() {
     # Code quality
     run_check "Code quality (vet + staticcheck)" check_code_quality
 
-    # Codex healing pipeline discipline (sentinel + session handshake)
+    # Codex healing pipeline discipline (session + workspace diff handshake)
     run_check "Codex healing pipeline (Phase D discipline)" check_codex_healing_discipline
 
     echo ""

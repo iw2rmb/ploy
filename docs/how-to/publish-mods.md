@@ -8,8 +8,8 @@ Overview
   - `orw-gradle` — OpenRewrite apply for Gradle-only workspaces (Kotlin DSL) → `mods-orw-gradle`
     - Requires `build.gradle.kts` in the workspace; prefers `./gradlew`, falls back to `gradle` in `PATH`.
     - Same `RECIPE_*` environment variables as Maven; plugin injected via Kotlin DSL.
-  - `mod-codex` — Codex CLI wrapper (sentinel protocol) → `mods-codex`
-    - Uses the sentinel protocol: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]`; Ploy re-runs the Build Gate externally.
+  - `mod-codex` — Codex CLI wrapper (workspace diff handshake) → `mods-codex`
+    - Codex edits the workspace and exits; the node agent inspects the workspace via `git status --porcelain` and only re-runs the Build Gate when changes are present.
     - Build requires no special context; uses a standard Node base image; Codex never runs the Build Gate or build tools directly.
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`

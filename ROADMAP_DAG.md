@@ -72,7 +72,7 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Replace `executeWithHealing` monolith with node-type executors:
       - `executeGateNode` — runs Build Gate (local docker or HTTP, depending on `PLOY_BUILDGATE_MODE`).
-      - `executeHealingNode` — runs the healing mod (e.g., `mods-codex` with sentinel + session resume).
+      - `executeHealingNode` — runs the healing mod (e.g., `mods-codex` with session resume and workspace diff handshake).
       - `executeModNode` — runs the main Mods container as today.
     - Node agent selects executor based on node type from the graph.
     - Healing loop becomes:
@@ -128,4 +128,3 @@ Legend: [ ] todo, [x] done.
   - Test:
     - Run `make test` to ensure CLI and docs tests remain green.
     - Manually run a simple Mods ticket in a dev environment and confirm the CLI surface matches documentation.
-

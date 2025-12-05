@@ -166,26 +166,20 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   VALIDATION_FAILED=0
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Verify sentinel behavior: Codex should emit [[REQUEST_BUILD_VALIDATION]].
-  #    The sentinel signals that Codex has fixed the code and wants a re-gate.
+  # 1. Verify Codex logs are present. Codex now signals completion by exiting;
+  #    the node agent decides whether to re-run the gate based on workspace diffs.
   # ─────────────────────────────────────────────────────────────────────────────
   CODEX_LOG="${ARTIFACT_DIR}/codex.log"
   CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
-  SENTINEL_FLAG="${ARTIFACT_DIR}/request_build_validation"
 
-  echo "  1. Sentinel detection (healing completion signal):"
-  if [[ -f "$SENTINEL_FLAG" ]]; then
-    echo "     ✓ Sentinel flag file present (request_build_validation)"
-  elif [[ -f "$CODEX_LAST" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LAST"; then
-    echo "     ✓ Sentinel detected in codex-last.txt"
-  elif [[ -f "$CODEX_LOG" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
-    echo "     ✓ Sentinel detected in codex.log"
+  echo "  1. Codex log artifacts:"
+  if [[ -f "$CODEX_LOG" ]]; then
+    echo "     ✓ codex.log present"
   else
-    echo "     ⚠ Sentinel [[REQUEST_BUILD_VALIDATION]] not found"
-    echo "       This may indicate healing did not trigger (no post-gate failure)"
-    echo "       or Codex completed without emitting the sentinel."
-    # Not a hard failure; the scenario may pass without needing healing
-    # depending on branch state.
+    echo "     - codex.log not found (Codex healing may not have run)"
+  fi
+  if [[ -f "$CODEX_LAST" ]]; then
+    echo "     ✓ codex-last.txt present (last assistant message captured)"
   fi
   echo ""
 
@@ -216,11 +210,6 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   echo "  3. Codex run manifest (healing metadata):"
   if [[ -f "$CODEX_MANIFEST" ]]; then
     echo "     ✓ codex-run.json present"
-    if grep -q '"requested_build_validation"' "$CODEX_MANIFEST"; then
-      echo "     ✓ Manifest contains requested_build_validation field"
-    else
-      echo "     ⚠ Manifest missing requested_build_validation field"
-    fi
     if grep -q '"session_id"' "$CODEX_MANIFEST"; then
       echo "     ✓ Manifest contains session_id field"
     else
@@ -285,7 +274,7 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   echo ""
   echo "2. Healing execution:"
   echo "   - Review codex.log for healing activity"
-  echo "   - Check for [[REQUEST_BUILD_VALIDATION]] sentinel"
+  echo "   - Confirm Codex edited files under /workspace and exited (no in-container gate runs)"
   echo "   - Verify healing created/modified files to fix the error"
   echo ""
   echo "3. Re-gate success:"

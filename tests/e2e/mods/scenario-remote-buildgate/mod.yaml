@@ -11,7 +11,7 @@
 #
 # The scenario uses a failing branch to trigger healing, demonstrating:
 # - Initial gate failure (routed to remote worker)
-# - Codex healing with sentinel protocol
+# - Codex healing with workspace diff handshake
 # - Re-gate after healing (accumulated diffs passed via diff_patch)
 # - Final ORW transformation
 #
@@ -66,13 +66,13 @@ build_gate:
   profile: auto  # Auto-detect Maven or Gradle
 
 ################################################################################
-# HEALING: Codex with sentinel protocol
+# HEALING: Codex with workspace diff handshake
 ################################################################################
 # Healing configuration for when the initial Build Gate fails.
 # The healing flow works identically in both local-docker and remote-http modes:
 # 1. Codex modifies workspace to fix compilation errors.
-# 2. Codex emits [[REQUEST_BUILD_VALIDATION]] sentinel.
-# 3. Node agent triggers re-gate.
+# 2. Codex exits when done; node agent inspects workspace diffs.
+# 3. Node agent triggers re-gate only when diffs are present.
 #
 # In remote-http mode:
 # - Re-gate request includes diff_patch with accumulated healing changes.
@@ -81,7 +81,7 @@ build_gate:
 build_gate_healing:
   retries: 1
   mods:
-    # Codex healing container using the sentinel protocol.
+    # Codex healing container using the workspace diff handshake.
     # Identical to scenario-orw-fail; execution mode doesn't change healing behavior.
     - image: docker.io/iwtormb/mods-codex:latest
       env:
@@ -89,9 +89,7 @@ build_gate_healing:
           Rules:
           - Use /workspace and /in/build-gate.log to understand the compile error.
           - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, reply with exactly:
-            [[REQUEST_BUILD_VALIDATION]]
-            as your final message and then stop.
+          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
@@ -140,7 +138,7 @@ mr_on_success: true
 #
 # Success criteria:
 # - Initial gate fails (expected for e2e/fail-missing-symbol branch)
-# - Codex healing runs and emits sentinel
+# - Codex healing runs and edits the workspace
 # - Re-gate passes after healing (diff_patch applied correctly)
 # - ORW transformation completes successfully
 # - MR created (if --gitlab-pat provided)

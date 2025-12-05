@@ -179,7 +179,7 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   # ─────────────────────────────────────────────────────────────────────────────
   if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     echo "6. Codex healing handshake (if healing was triggered):"
-    echo "   - Sentinel visibility: Look for [[REQUEST_BUILD_VALIDATION]] in codex.log or codex-last.txt"
+    echo "   - Codex completion: Codex exits after editing; node agent re-gates when workspace diffs exist"
     echo "   - Session resume: Check for codex-session.txt artifact for retry continuity"
     echo ""
 
@@ -190,11 +190,7 @@ if [[ $EXIT_CODE -eq 0 ]]; then
 
     echo "   Automated artifact checks:"
     if [[ -f "$CODEX_LOG" ]]; then
-      if grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
-        echo "   ✓ Sentinel detected in codex.log"
-      else
-        echo "   - Sentinel not found (healing may not have used Codex)"
-      fi
+      echo "   ✓ codex.log present"
     else
       echo "   - codex.log not present (no Codex healing in this run)"
     fi
