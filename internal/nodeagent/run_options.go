@@ -63,14 +63,74 @@ type BuildGateOptions struct {
 // When the build gate fails, the agent can execute one or more healing mods
 // to fix the workspace, then re-run the gate. This struct specifies the
 // retry limit and the healing mods to execute.
+//
+// HealingConfig supports two schema forms for backward compatibility:
+//
+//  1. Single-strategy (legacy): A flat `mods` list that is internally converted
+//     to a single unnamed strategy. This preserves existing behavior.
+//
+//  2. Multi-strategy (branching): A `strategies` array where each strategy is
+//     a named branch with its own mods[] list. Strategies can be executed in
+//     parallel by the control plane, with the first passing re-gate winning.
+//
+// When `strategies` is present, it takes precedence over `mods`. If only `mods`
+// is present, it is normalized into a single-element Strategies slice.
 type HealingConfig struct {
 	// Retries is the maximum number of healing attempts (default: 1).
 	// Each retry executes all healing mods in sequence, then re-runs the gate.
+	// For multi-strategy configs, retries apply per-strategy.
 	Retries int
 
 	// Mods is the list of healing mod specifications to execute on gate failure.
 	// Each mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
+	// DEPRECATED: Prefer Strategies for new specs. Mods is retained for backward
+	// compatibility and is internally normalized to a single unnamed strategy.
 	Mods []HealingMod
+
+	// Strategies is the list of healing strategies (branches) to attempt.
+	// Each strategy has a name and its own mods[] list. Strategies can be
+	// executed in parallel by the control plane; the first to pass re-gate wins.
+	// When Strategies is populated, Mods is ignored.
+	Strategies []HealingStrategy
+}
+
+// HealingStrategy represents a named healing branch with its own sequence of mods.
+// Multiple strategies can be executed in parallel by the control plane to race
+// different healing approaches (e.g., AI-powered vs. static patches).
+//
+// Strategy Semantics:
+//   - Each strategy operates on an independent workspace clone.
+//   - Strategies execute in parallel (subject to available nodes).
+//   - Each strategy runs its Mods sequentially, then re-gates.
+//   - The first strategy whose re-gate passes wins; others are canceled.
+//   - If all strategies exhaust retries without passing, the run fails.
+type HealingStrategy struct {
+	// Name is an optional identifier for this strategy (e.g., "codex-ai", "static-patch").
+	// Used for logging, metrics, and debugging. If empty, defaults to "strategy-<index>".
+	Name string
+
+	// Mods is the list of healing mod specifications for this strategy.
+	// Executed sequentially; after all mods complete, re-gate is triggered.
+	Mods []HealingMod
+}
+
+// NormalizedStrategies returns the healing strategies to use for execution.
+// If Strategies is populated, returns it directly. Otherwise, converts the
+// legacy Mods list into a single unnamed strategy for backward compatibility.
+// Returns nil if no healing configuration is present.
+func (h *HealingConfig) NormalizedStrategies() []HealingStrategy {
+	if h == nil {
+		return nil
+	}
+	// Multi-strategy form takes precedence.
+	if len(h.Strategies) > 0 {
+		return h.Strategies
+	}
+	// Normalize legacy single-strategy form to a single unnamed strategy.
+	if len(h.Mods) > 0 {
+		return []HealingStrategy{{Name: "", Mods: h.Mods}}
+	}
+	return nil
 }
 
 // HealingMod describes a single healing mod container specification.
@@ -242,7 +302,7 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.BuildGate.Profile = profile
 	}
 
-	// Parse healing configuration.
+	// Parse healing configuration (supports both legacy mods[] and multi-strategy forms).
 	if healingMap, ok := opts["build_gate_healing"].(map[string]any); ok {
 		healing := &HealingConfig{
 			Retries: 1, // Default to 1 retry.
@@ -255,8 +315,18 @@ func parseRunOptions(opts map[string]any) RunOptions {
 			healing.Retries = int(rf)
 		}
 
-		// Extract healing mods.
-		if modsSlice, ok := healingMap["mods"].([]any); ok {
+		// Check for multi-strategy form first (strategies takes precedence over mods).
+		// This supports the new parallel healing branches schema while maintaining
+		// backward compatibility with the legacy single-strategy mods[] form.
+		if strategiesSlice, ok := healingMap["strategies"].([]any); ok && len(strategiesSlice) > 0 {
+			for _, stratEntry := range strategiesSlice {
+				if stratMap, ok := stratEntry.(map[string]any); ok {
+					strategy := parseHealingStrategy(stratMap)
+					healing.Strategies = append(healing.Strategies, strategy)
+				}
+			}
+		} else if modsSlice, ok := healingMap["mods"].([]any); ok {
+			// Legacy single-strategy form: extract healing mods directly.
 			for _, modEntry := range modsSlice {
 				if modMap, ok := modEntry.(map[string]any); ok {
 					mod := parseHealingMod(modMap)
@@ -421,4 +491,28 @@ func parseHealingMod(modMap map[string]any) HealingMod {
 	}
 
 	return mod
+}
+
+// parseHealingStrategy extracts a HealingStrategy from an untyped map[string]any.
+// This function handles the multi-strategy healing schema where each strategy
+// has a name and its own mods[] list for parallel healing branches.
+func parseHealingStrategy(stratMap map[string]any) HealingStrategy {
+	strategy := HealingStrategy{}
+
+	// Extract strategy name (optional; used for logging and metrics).
+	if name, ok := stratMap["name"].(string); ok {
+		strategy.Name = name
+	}
+
+	// Extract mods[] for this strategy.
+	if modsSlice, ok := stratMap["mods"].([]any); ok {
+		for _, modEntry := range modsSlice {
+			if modMap, ok := modEntry.(map[string]any); ok {
+				mod := parseHealingMod(modMap)
+				strategy.Mods = append(strategy.Mods, mod)
+			}
+		}
+	}
+
+	return strategy
 }

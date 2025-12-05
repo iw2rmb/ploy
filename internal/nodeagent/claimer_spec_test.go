@@ -3,6 +3,8 @@ package nodeagent
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // TestParseSpec_PassesThroughBuildGateHealing verifies that the node agent
@@ -179,5 +181,320 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 		t.Errorf("expected build_gate_healing to be preserved")
 	} else if retries, _ := healing["retries"].(float64); int(retries) != 1 {
 		t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+	}
+}
+
+// TestParseRunOptions_MultiStrategyHealing verifies that parseRunOptions correctly
+// parses the multi-strategy healing schema where strategies[] takes precedence over mods[].
+// This test ensures backward compatibility with the legacy single-strategy form.
+func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		specJSON         string
+		wantRetries      int
+		wantStrategies   int
+		wantLegacyMods   int
+		wantStratNames   []string
+		wantModsPerStrat []int
+	}{
+		{
+			name: "legacy_single_strategy_form",
+			specJSON: `{
+				"build_gate_healing": {
+					"retries": 2,
+					"mods": [
+						{"image": "docker.io/test/heal1:latest"},
+						{"image": "docker.io/test/heal2:latest"}
+					]
+				}
+			}`,
+			wantRetries:      2,
+			wantStrategies:   0, // No strategies array.
+			wantLegacyMods:   2, // Legacy mods populated.
+			wantStratNames:   nil,
+			wantModsPerStrat: nil,
+		},
+		{
+			name: "multi_strategy_form_two_branches",
+			specJSON: `{
+				"build_gate_healing": {
+					"retries": 3,
+					"strategies": [
+						{
+							"name": "codex-ai",
+							"mods": [
+								{"image": "docker.io/test/codex:latest", "command": "fix-with-ai"}
+							]
+						},
+						{
+							"name": "static-patch",
+							"mods": [
+								{"image": "docker.io/test/patcher:latest"},
+								{"image": "docker.io/test/validator:latest"}
+							]
+						}
+					]
+				}
+			}`,
+			wantRetries:      3,
+			wantStrategies:   2,
+			wantLegacyMods:   0, // Legacy mods empty when strategies present.
+			wantStratNames:   []string{"codex-ai", "static-patch"},
+			wantModsPerStrat: []int{1, 2},
+		},
+		{
+			name: "strategies_takes_precedence_over_mods",
+			specJSON: `{
+				"build_gate_healing": {
+					"retries": 1,
+					"mods": [
+						{"image": "docker.io/test/legacy:latest"}
+					],
+					"strategies": [
+						{
+							"name": "preferred",
+							"mods": [{"image": "docker.io/test/new:latest"}]
+						}
+					]
+				}
+			}`,
+			wantRetries:      1,
+			wantStrategies:   1, // Strategies populated.
+			wantLegacyMods:   0, // Legacy mods ignored when strategies present.
+			wantStratNames:   []string{"preferred"},
+			wantModsPerStrat: []int{1},
+		},
+		{
+			name: "empty_strategy_name_allowed",
+			specJSON: `{
+				"build_gate_healing": {
+					"retries": 1,
+					"strategies": [
+						{
+							"mods": [{"image": "docker.io/test/unnamed:latest"}]
+						}
+					]
+				}
+			}`,
+			wantRetries:      1,
+			wantStrategies:   1,
+			wantLegacyMods:   0,
+			wantStratNames:   []string{""}, // Empty name allowed.
+			wantModsPerStrat: []int{1},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var raw json.RawMessage = []byte(tc.specJSON)
+			opts, _, typedOpts := parseSpec(raw)
+
+			// Verify raw opts contains the healing block.
+			if _, ok := opts["build_gate_healing"]; !ok {
+				t.Fatal("expected build_gate_healing in raw opts")
+			}
+
+			// Verify typed options.
+			if typedOpts.Healing == nil {
+				t.Fatal("expected Healing config to be parsed")
+			}
+
+			if typedOpts.Healing.Retries != tc.wantRetries {
+				t.Errorf("Retries: got %d, want %d", typedOpts.Healing.Retries, tc.wantRetries)
+			}
+
+			if len(typedOpts.Healing.Strategies) != tc.wantStrategies {
+				t.Errorf("Strategies count: got %d, want %d", len(typedOpts.Healing.Strategies), tc.wantStrategies)
+			}
+
+			if len(typedOpts.Healing.Mods) != tc.wantLegacyMods {
+				t.Errorf("Legacy Mods count: got %d, want %d", len(typedOpts.Healing.Mods), tc.wantLegacyMods)
+			}
+
+			// Verify strategy names.
+			for i, wantName := range tc.wantStratNames {
+				if i >= len(typedOpts.Healing.Strategies) {
+					t.Errorf("missing strategy at index %d", i)
+					continue
+				}
+				if typedOpts.Healing.Strategies[i].Name != wantName {
+					t.Errorf("Strategy[%d].Name: got %q, want %q", i, typedOpts.Healing.Strategies[i].Name, wantName)
+				}
+			}
+
+			// Verify mods per strategy.
+			for i, wantMods := range tc.wantModsPerStrat {
+				if i >= len(typedOpts.Healing.Strategies) {
+					continue
+				}
+				if len(typedOpts.Healing.Strategies[i].Mods) != wantMods {
+					t.Errorf("Strategy[%d].Mods count: got %d, want %d", i, len(typedOpts.Healing.Strategies[i].Mods), wantMods)
+				}
+			}
+		})
+	}
+}
+
+// TestHealingConfig_NormalizedStrategies verifies that NormalizedStrategies()
+// correctly converts both legacy and multi-strategy forms into a unified slice.
+func TestHealingConfig_NormalizedStrategies(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         *HealingConfig
+		wantStrategies int
+		wantFirstName  string
+		wantFirstMods  int
+	}{
+		{
+			name:           "nil_config_returns_nil",
+			config:         nil,
+			wantStrategies: 0,
+		},
+		{
+			name: "legacy_mods_normalized_to_single_unnamed_strategy",
+			config: &HealingConfig{
+				Retries: 2,
+				Mods: []HealingMod{
+					{Image: contracts.ModImage{Universal: "img1:latest"}},
+					{Image: contracts.ModImage{Universal: "img2:latest"}},
+				},
+			},
+			wantStrategies: 1,
+			wantFirstName:  "", // Unnamed.
+			wantFirstMods:  2,
+		},
+		{
+			name: "multi_strategy_returned_directly",
+			config: &HealingConfig{
+				Retries: 1,
+				Strategies: []HealingStrategy{
+					{Name: "alpha", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "a:latest"}}}},
+					{Name: "beta", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "b:latest"}}}},
+				},
+			},
+			wantStrategies: 2,
+			wantFirstName:  "alpha",
+			wantFirstMods:  1,
+		},
+		{
+			name: "strategies_takes_precedence_over_mods",
+			config: &HealingConfig{
+				Retries: 1,
+				Mods:    []HealingMod{{Image: contracts.ModImage{Universal: "legacy:latest"}}},
+				Strategies: []HealingStrategy{
+					{Name: "preferred", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "new:latest"}}}},
+				},
+			},
+			wantStrategies: 1,
+			wantFirstName:  "preferred",
+			wantFirstMods:  1,
+		},
+		{
+			name: "empty_config_returns_nil",
+			config: &HealingConfig{
+				Retries: 1,
+				// No Mods, no Strategies.
+			},
+			wantStrategies: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			strategies := tc.config.NormalizedStrategies()
+
+			if len(strategies) != tc.wantStrategies {
+				t.Fatalf("NormalizedStrategies count: got %d, want %d", len(strategies), tc.wantStrategies)
+			}
+
+			if tc.wantStrategies == 0 {
+				return
+			}
+
+			if strategies[0].Name != tc.wantFirstName {
+				t.Errorf("First strategy name: got %q, want %q", strategies[0].Name, tc.wantFirstName)
+			}
+
+			if len(strategies[0].Mods) != tc.wantFirstMods {
+				t.Errorf("First strategy mods count: got %d, want %d", len(strategies[0].Mods), tc.wantFirstMods)
+			}
+		})
+	}
+}
+
+// TestParseHealingStrategy_ModFields verifies that parseHealingStrategy correctly
+// extracts mod fields including image, command, env, and retain_container.
+func TestParseHealingStrategy_ModFields(t *testing.T) {
+	t.Parallel()
+
+	specJSON := `{
+		"build_gate_healing": {
+			"retries": 1,
+			"strategies": [
+				{
+					"name": "test-strategy",
+					"mods": [
+						{
+							"image": "docker.io/test/healer:v1",
+							"command": "heal.sh --fix",
+							"env": {
+								"MODE": "aggressive",
+								"DEBUG": "true"
+							},
+							"retain_container": true
+						}
+					]
+				}
+			]
+		}
+	}`
+
+	var raw json.RawMessage = []byte(specJSON)
+	_, _, typedOpts := parseSpec(raw)
+
+	if typedOpts.Healing == nil || len(typedOpts.Healing.Strategies) == 0 {
+		t.Fatal("expected healing strategies to be parsed")
+	}
+
+	strat := typedOpts.Healing.Strategies[0]
+	if strat.Name != "test-strategy" {
+		t.Errorf("Strategy name: got %q, want %q", strat.Name, "test-strategy")
+	}
+
+	if len(strat.Mods) != 1 {
+		t.Fatalf("Strategy mods count: got %d, want 1", len(strat.Mods))
+	}
+
+	mod := strat.Mods[0]
+
+	// Verify image.
+	if mod.Image.Universal != "docker.io/test/healer:v1" {
+		t.Errorf("Mod image: got %q, want %q", mod.Image.Universal, "docker.io/test/healer:v1")
+	}
+
+	// Verify command (shell form).
+	if mod.Command.Shell != "heal.sh --fix" {
+		t.Errorf("Mod command: got %q, want %q", mod.Command.Shell, "heal.sh --fix")
+	}
+
+	// Verify env.
+	if mod.Env["MODE"] != "aggressive" {
+		t.Errorf("Mod env MODE: got %q, want %q", mod.Env["MODE"], "aggressive")
+	}
+	if mod.Env["DEBUG"] != "true" {
+		t.Errorf("Mod env DEBUG: got %q, want %q", mod.Env["DEBUG"], "true")
+	}
+
+	// Verify retain_container.
+	if !mod.RetainContainer {
+		t.Error("Mod retain_container: got false, want true")
 	}
 }
