@@ -71,9 +71,8 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		if gateSummary, ok := payload.Ticket.Metadata["gate_summary"]; ok && gateSummary != "" {
 			_, _ = fmt.Fprintf(c.Output, "Gate: %s\n", gateSummary)
 		}
-		// Display job-level DAG state for visibility into gate/heal/re-gate workflow phases.
-		// Jobs are sorted by StepIndex to reflect execution order. Each job's ModType
-		// (pre_gate, mod, post_gate, heal, re_gate) shows the phase in the healing DAG:
+		// Display job-level DAG state for visibility into gate/heal/re-gate workflow steps.
+		// Jobs are sorted by StepIndex to reflect execution order in the healing DAG:
 		//   pre-gate → mod-0 → post-gate
 		//             │
 		//             └─(fail)→ heal → re-gate → mod-0
@@ -82,7 +81,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 	return nil
 }
 
-// printJobGraph outputs a summary of jobs sorted by step_index, showing phase and state.
+// printJobGraph outputs a summary of jobs sorted by step_index, showing job state.
 // This surfaces the DAG structure visible via GET /v1/mods/{id} in human-readable form.
 func (c InspectCommand) printJobGraph(stages map[string]modsapi.StageStatus) {
 	if len(stages) == 0 {
