@@ -34,21 +34,21 @@ func TestServer_HandleFunc(t *testing.T) {
 		// Register a test handler without role restrictions.
 		srv.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
+			_, _ = w.Write([]byte("ok"))
 		})
 
 		ctx := context.Background()
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		// Make a request to verify handler is registered.
 		resp, err := http.Get("http://" + srv.Addr() + "/test")
 		if err != nil {
 			t.Fatalf("GET /test error = %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -75,21 +75,21 @@ func TestServer_HandleFunc(t *testing.T) {
 		// Register handler requiring CLIAdmin role (higher than default).
 		srv.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("admin"))
+			_, _ = w.Write([]byte("admin"))
 		}, auth.RoleCLIAdmin)
 
 		ctx := context.Background()
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		// Request should be forbidden (ControlPlane < CLIAdmin).
 		resp, err := http.Get("http://" + srv.Addr() + "/admin")
 		if err != nil {
 			t.Fatalf("GET /admin error = %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusForbidden {
 			t.Errorf("expected status 403, got %d", resp.StatusCode)
@@ -118,20 +118,20 @@ func TestServer_Handle(t *testing.T) {
 	// Register a handler using Handle (http.Handler interface).
 	srv.Handle("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		_, _ = w.Write([]byte("test"))
 	}))
 
 	ctx := context.Background()
 	if err := srv.Start(ctx); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
-	defer srv.Stop(ctx)
+	defer func() { _ = srv.Stop(ctx) }()
 
 	resp, err := http.Get("http://" + srv.Addr() + "/test")
 	if err != nil {
 		t.Fatalf("GET /test error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)

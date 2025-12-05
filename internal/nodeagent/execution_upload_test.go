@@ -73,7 +73,7 @@ func TestRunController_uploadDiff(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create workspace: %v", err)
 			}
-			defer os.RemoveAll(workspace)
+			defer func() { _ = os.RemoveAll(workspace) }()
 
 			// Initialize test infrastructure.
 			cfg := Config{
@@ -184,7 +184,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create workspace: %v", err)
 			}
-			defer os.RemoveAll(workspace)
+			defer func() { _ = os.RemoveAll(workspace) }()
 
 			for _, f := range tt.createFiles {
 				fullPath := filepath.Join(workspace, f)
@@ -291,7 +291,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to create out dir: %v", err)
 				}
-				defer os.RemoveAll(outDir)
+				defer func() { _ = os.RemoveAll(outDir) }()
 
 				for _, f := range tt.createFiles {
 					fullPath := filepath.Join(outDir, f)
@@ -521,7 +521,7 @@ func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create workspace: %v", err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	// Initialize test infrastructure.
 	cfg := Config{

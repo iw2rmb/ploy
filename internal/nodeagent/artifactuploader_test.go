@@ -156,7 +156,9 @@ func TestCreateTarGzBundle_SingleFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create gzip reader: %v", err)
 	}
-	defer gzReader.Close()
+	defer func() {
+		_ = gzReader.Close()
+	}()
 
 	tarReader := tar.NewReader(gzReader)
 	header, err := tarReader.Next()
@@ -201,7 +203,9 @@ func TestCreateTarGzBundle_MultipleFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create gzip reader: %v", err)
 	}
-	defer gzReader.Close()
+	defer func() {
+		_ = gzReader.Close()
+	}()
 
 	tarReader := tar.NewReader(gzReader)
 
@@ -251,7 +255,9 @@ func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("gzip reader: %v", err)
 	}
-	defer gzReader.Close()
+	defer func() {
+		_ = gzReader.Close()
+	}()
 	tr := tar.NewReader(gzReader)
 
 	got := map[string][]byte{}

@@ -314,7 +314,9 @@ func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (
 	if err != nil {
 		return "", "", fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
@@ -356,7 +358,9 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("POST %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))

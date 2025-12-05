@@ -86,6 +86,6 @@ func ValidateToken(tokenString, secret string) (*TokenClaims, error) {
 
 func generateTokenID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }

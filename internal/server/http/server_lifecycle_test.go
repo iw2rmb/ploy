@@ -120,7 +120,7 @@ func TestServer_StartStop(t *testing.T) {
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		// Attempt to start again should fail.
 		if err := srv.Start(ctx); err == nil {
@@ -190,7 +190,9 @@ func TestServer_GracefulShutdown(t *testing.T) {
 			errChan <- err
 			return
 		}
-		resp.Body.Close()
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
 		errChan <- nil
 	}()
 

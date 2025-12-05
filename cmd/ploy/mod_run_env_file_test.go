@@ -38,7 +38,9 @@ func TestResolveEnvFromFile(t *testing.T) {
 		if err := os.MkdirAll(testSubdir, 0o755); err != nil {
 			t.Skipf("skip tilde test: cannot create test dir in home: %v", err)
 		}
-		defer os.RemoveAll(testSubdir)
+		defer func() {
+			_ = os.RemoveAll(testSubdir)
+		}()
 
 		testFile := filepath.Join(testSubdir, "auth.json")
 		testContent := `{"token":"xyz"}`
@@ -515,7 +517,9 @@ env_from_file:
 		if err := os.MkdirAll(testSubdir, 0o755); err != nil {
 			t.Skipf("skip tilde test: cannot create test dir in home: %v", err)
 		}
-		defer os.RemoveAll(testSubdir)
+		defer func() {
+			_ = os.RemoveAll(testSubdir)
+		}()
 
 		testFile := filepath.Join(testSubdir, "tilde-auth.json")
 		testContent := `{"tilde":"token"}`

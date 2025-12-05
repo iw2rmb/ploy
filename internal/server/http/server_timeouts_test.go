@@ -37,7 +37,7 @@ func TestServer_Timeouts(t *testing.T) {
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		// Verify default timeouts were applied.
 		srv.mu.Lock()
@@ -83,7 +83,7 @@ func TestServer_Timeouts(t *testing.T) {
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		// Verify custom timeouts were applied.
 		srv.mu.Lock()

@@ -206,8 +206,8 @@ func TestDropPartitionsForTable_PartitionNameParsing(t *testing.T) {
 				}
 
 				year, month := 0, 0
-				fmt.Sscanf(matches[2], "%d", &year)
-				fmt.Sscanf(matches[3], "%d", &month)
+				_, _ = fmt.Sscanf(matches[2], "%d", &year)
+				_, _ = fmt.Sscanf(matches[3], "%d", &month)
 
 				if year == 0 || month == 0 {
 					continue

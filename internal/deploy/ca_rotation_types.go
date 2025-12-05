@@ -6,14 +6,15 @@ import (
 )
 
 const (
-	defaultCAValidity   = 365 * 24 * time.Hour
-	defaultLeafValidity = 90 * 24 * time.Hour
-	certSerialBitSize   = 160
-	clusterSecurityRoot = "/ploy/clusters"
+	//nolint:unused // reserved for future CA rotation configuration defaults
+	defaultCAValidity   = 365 * 24 * time.Hour //nolint:unused // reserved for future CA rotation defaults
+	defaultLeafValidity = 90 * 24 * time.Hour  //nolint:unused // reserved for future CA rotation defaults
+	certSerialBitSize   = 160                  //nolint:unused // reserved for future CA rotation defaults
+	clusterSecurityRoot = "/ploy/clusters"     //nolint:unused // reserved for future CA rotation defaults
 
-	certificateRoleControlPlane = "control-plane"
-	certificateRoleWorker       = "worker"
-	certificateRoleCLIAdmin     = "cli-admin"
+	certificateRoleControlPlane = "control-plane" //nolint:unused // reserved for future CA rotation ACLs
+	certificateRoleWorker       = "worker"        //nolint:unused // reserved for future CA rotation ACLs
+	certificateRoleCLIAdmin     = "cli-admin"     //nolint:unused // reserved for future CA rotation ACLs
 )
 
 var (

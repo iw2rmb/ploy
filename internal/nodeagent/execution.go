@@ -165,7 +165,9 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gzip reader initialization failed: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		_ = reader.Close()
+	}()
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, reader); err != nil {

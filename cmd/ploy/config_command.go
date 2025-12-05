@@ -104,7 +104,9 @@ func handleConfigGitLabShow(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
@@ -195,7 +197,9 @@ func handleConfigGitLabSet(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("PUT %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
@@ -283,6 +287,8 @@ func validateGitLabConfig(cfg *gitLabConfigPayload) error {
 }
 
 // min returns the minimum of two integers.
+//
+//nolint:unused // kept for future CLI range helpers
 func min(a, b int) int {
 	if a < b {
 		return a

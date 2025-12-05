@@ -34,7 +34,7 @@ func TestRequestCertificate_Success(t *testing.T) {
 		// Return valid certificate response.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"certificate": "cert-pem-data",
 			"ca_bundle":   "ca-pem-data",
 		})
@@ -80,7 +80,7 @@ func TestRequestCertificate_RetryOnNetworkError(t *testing.T) {
 		// Succeed on third attempt.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"certificate": "cert-pem-data",
 			"ca_bundle":   "ca-pem-data",
 		})
@@ -166,7 +166,7 @@ func TestRequestCertificate_BackoffProgression(t *testing.T) {
 		// Succeed on fourth attempt.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"certificate": "cert-pem-data",
 			"ca_bundle":   "ca-pem-data",
 		})
@@ -268,7 +268,7 @@ func TestRequestCertificate_BearerToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"certificate":  "cert-pem-data",
 			"ca_bundle":    "ca-pem-data",
 			"bearer_token": "secret-bearer-token",
@@ -354,7 +354,7 @@ func TestRequestCertificate_Non200Status(t *testing.T) {
 					if statusCode == http.StatusOK {
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(statusCode)
-						json.NewEncoder(w).Encode(map[string]string{
+						_ = json.NewEncoder(w).Encode(map[string]string{
 							"certificate": "cert-pem-data",
 							"ca_bundle":   "ca-pem-data",
 						})

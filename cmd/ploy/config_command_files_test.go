@@ -44,7 +44,7 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	err := handleConfigGitLabShow(nil, buf)
 
 	// Close write end and read captured output.
-	w.Close()
+	_ = w.Close()
 	var capturedOutput bytes.Buffer
 	_, _ = io.Copy(&capturedOutput, r)
 
@@ -91,7 +91,7 @@ func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 
 	err := handleConfigGitLabShow(nil, buf)
 
-	w.Close()
+	_ = w.Close()
 	var capturedOutput bytes.Buffer
 	_, _ = io.Copy(&capturedOutput, r)
 
@@ -148,7 +148,7 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)
 
 	// Close write end and read captured output.
-	w.Close()
+	_ = w.Close()
 	var capturedOutput bytes.Buffer
 	_, _ = io.Copy(&capturedOutput, r)
 
@@ -246,7 +246,7 @@ func TestHandleConfigGitLabValidateSuccess(t *testing.T) {
 	err := handleConfigGitLabValidate([]string{"--file", configPath}, buf)
 
 	// Close write end and read captured output.
-	w.Close()
+	_ = w.Close()
 	var capturedOutput bytes.Buffer
 	_, _ = io.Copy(&capturedOutput, r)
 

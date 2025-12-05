@@ -110,7 +110,9 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET %s failed: %v", healthURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -131,7 +133,9 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET %s failed: %v", runsURL, err)
 	}
-	defer resp2.Body.Close()
+	defer func() {
+		_ = resp2.Body.Close()
+	}()
 
 	if resp2.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp2.Body)
@@ -157,8 +161,9 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	// Step 8: Verify the server is no longer responding.
 	// We expect a connection error since the server is stopped.
 	time.Sleep(100 * time.Millisecond)
-	_, err = http.Get(healthURL)
-	if err == nil {
+	resp3, err := http.Get(healthURL)
+	if err == nil && resp3 != nil {
+		_ = resp3.Body.Close()
 		t.Fatalf("Expected connection error after server stop, but request succeeded")
 	}
 	t.Logf("Verified server stopped (connection error as expected): %v", err)

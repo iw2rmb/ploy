@@ -9,6 +9,8 @@ import (
 )
 
 // writeLocalAdminBundle writes CA and admin cert/key under the config home.
+//
+//nolint:unused // planned for future server deploy flow
 func writeLocalAdminBundle(clusterID, caPEM, certPEM, keyPEM string) (caPath, certPath, keyPath string, err error) {
 	base, err := resolveConfigBaseDir()
 	if err != nil {
@@ -34,6 +36,7 @@ func writeLocalAdminBundle(clusterID, caPEM, certPEM, keyPEM string) (caPath, ce
 	return caPath, certPath, keyPath, nil
 }
 
+//nolint:unused // used by planned local admin bundle writer
 func writeFile0600(path string, data []byte) error {
 	// Atomic write with proper mode
 	tmp := path + ".tmp"
@@ -50,6 +53,8 @@ func writeFile0600(path string, data []byte) error {
 }
 
 // resolveConfigBaseDir mirrors internal/cli/config clusters dir resolution to find the base.
+//
+//nolint:unused // kept for CLI/server deploy parity helpers
 func resolveConfigBaseDir() (string, error) {
 	base := strings.TrimSpace(os.Getenv("PLOY_CONFIG_HOME"))
 	if base == "" {
