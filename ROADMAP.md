@@ -174,7 +174,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `workspace_branch_a = base + diffs[<=gate] + diffs_branch_a`
   - Tests: Add targeted tests to confirm that each branch sees only its own diffs during rehydration.
 
-- [ ] E4 — Winner selection and loser teardown — Choose a winning branch and clean up others.
+- [x] E4 — Winner selection and loser teardown — Choose a winning branch and clean up others.
   - Repository: `ploy`
   - Component: `internal/server/handlers/nodes_complete.go`, `internal/store`.
   - Scope:
