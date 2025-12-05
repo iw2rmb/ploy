@@ -568,6 +568,140 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	t.Log("Gate contract verified: Runner.Run was called (gate execution handled separately)")
 }
 
+// TestPersistGateStack_WritesStack verifies that persistGateStack writes the
+// detected stack to a file under the run directory for later retrieval.
+func TestPersistGateStack_WritesStack(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-stack-persist")
+
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Language: "java", Tool: "maven", Passed: true},
+		},
+	}
+
+	rc.persistGateStack(runID, meta)
+
+	// Verify the stack file was created with the correct content.
+	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
+	data, err := os.ReadFile(stackPath)
+	if err != nil {
+		t.Fatalf("failed to read persisted stack file: %v", err)
+	}
+
+	got := string(data)
+	if got != "java-maven" {
+		t.Errorf("persisted stack = %q, want %q", got, "java-maven")
+	}
+}
+
+// TestPersistGateStack_Idempotent verifies that persistGateStack only writes
+// the first detection and ignores subsequent calls.
+func TestPersistGateStack_Idempotent(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-stack-idempotent")
+
+	// First persist: Maven.
+	metaMaven := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Language: "java", Tool: "maven", Passed: true},
+		},
+	}
+	rc.persistGateStack(runID, metaMaven)
+
+	// Second persist: Gradle (should be ignored).
+	metaGradle := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Language: "java", Tool: "gradle", Passed: true},
+		},
+	}
+	rc.persistGateStack(runID, metaGradle)
+
+	// Verify the first stack is preserved.
+	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
+	data, err := os.ReadFile(stackPath)
+	if err != nil {
+		t.Fatalf("failed to read persisted stack file: %v", err)
+	}
+
+	got := string(data)
+	if got != "java-maven" {
+		t.Errorf("persisted stack = %q, want first stack %q", got, "java-maven")
+	}
+}
+
+// TestLoadPersistedStack_ReturnsStack verifies that loadPersistedStack reads
+// the persisted stack from the run directory.
+func TestLoadPersistedStack_ReturnsStack(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-stack-load")
+
+	// Seed the stack file manually.
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	stackPath := filepath.Join(runDir, "build-gate-stack.txt")
+	if err := os.WriteFile(stackPath, []byte("java-gradle"), 0o644); err != nil {
+		t.Fatalf("write stack file: %v", err)
+	}
+
+	got := rc.loadPersistedStack(runID)
+	if got != contracts.ModStackJavaGradle {
+		t.Errorf("loadPersistedStack() = %q, want %q", got, contracts.ModStackJavaGradle)
+	}
+}
+
+// TestLoadPersistedStack_DefaultsToUnknown verifies that loadPersistedStack
+// returns ModStackUnknown when no stack file exists.
+func TestLoadPersistedStack_DefaultsToUnknown(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-stack-missing")
+
+	got := rc.loadPersistedStack(runID)
+	if got != contracts.ModStackUnknown {
+		t.Errorf("loadPersistedStack() = %q, want %q", got, contracts.ModStackUnknown)
+	}
+}
+
+// TestPersistAndLoadGateStack_RoundTrip verifies the complete flow of persisting
+// a stack during gate execution and loading it for mod/healing execution.
+func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-stack-roundtrip")
+
+	// Simulate gate execution result.
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Language: "java", Tool: "gradle", Passed: false},
+		},
+	}
+
+	// Persist during gate job.
+	rc.persistGateStack(runID, meta)
+
+	// Load during mod/healing job.
+	got := rc.loadPersistedStack(runID)
+	if got != contracts.ModStackJavaGradle {
+		t.Errorf("round-trip stack = %q, want %q", got, contracts.ModStackJavaGradle)
+	}
+}
+
 // TestUploadDiffForStep_TagsStepIndex verifies that uploadDiffForStep includes
 // step_index both at the top level and inside the summary for proper ordering in multi-step runs.
 func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
