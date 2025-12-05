@@ -84,7 +84,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Parse options and build manifest.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
 	typedOpts := parseRunOptions(req.Options)
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

@@ -596,3 +596,55 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 	})
 }
+
+// TestBuildGateManifestFromRequest_IgnoresStackAwareModImages verifies that the
+// gate manifest builder does not attempt stack-aware image resolution using
+// mods[].image. Gate jobs should always use the default execution image and
+// rely on Build Gate stack detection for subsequent Mods steps.
+func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
+	t.Parallel()
+
+	req := StartRunRequest{
+		RunID:   types.RunID("run-gate-stack-aware"),
+		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+		BaseRef: types.GitRef("main"),
+		Options: map[string]any{
+			"build_gate_enabled": true,
+			"mods": []any{
+				map[string]any{
+					// Stack-aware image map without default key. If the gate
+					// manifest builder tried to resolve this with stack=unknown,
+					// it would fail with "no image specified for stack".
+					"image": map[string]any{
+						"java-maven":  "docker.io/example/mods-orw-maven:latest",
+						"java-gradle": "docker.io/example/mods-orw-gradle:latest",
+					},
+				},
+			},
+		},
+	}
+
+	typedOpts := parseRunOptions(req.Options)
+
+	manifest, err := buildGateManifestFromRequest(req, typedOpts)
+	if err != nil {
+		t.Fatalf("buildGateManifestFromRequest() error: %v", err)
+	}
+
+	// Gate manifest should use the default execution image, not the stack-aware
+	// mods[].image map.
+	if manifest.Image != "ubuntu:latest" {
+		t.Errorf("gate manifest image=%q, want ubuntu:latest", manifest.Image)
+	}
+
+	// Gate spec should be populated and enabled based on build_gate_* options.
+	if manifest.Gate == nil {
+		t.Fatal("expected Gate spec to be set")
+	}
+	if !manifest.Gate.Enabled {
+		t.Error("expected Gate.Enabled=true for build_gate_enabled option")
+	}
+	if manifest.Gate.RepoURL != req.RepoURL.String() {
+		t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
+	}
+}

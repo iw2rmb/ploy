@@ -31,6 +31,39 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	return buildManifestFromRequestWithStack(req, typedOpts, stepIndex, contracts.ModStackUnknown)
 }
 
+// buildGateManifestFromRequest builds a StepManifest for gate jobs (pre_gate,
+// post_gate, re_gate) using only the gate configuration and repo metadata.
+//
+// Gate jobs must not depend on stack-aware mod images from Execution.Image or
+// mods[].image. Stack detection happens inside the Build Gate itself, and the
+// resulting stack is persisted for later Mods/healing jobs. To avoid resolving
+// stack-specific image maps with an "unknown" stack (which would fail when no
+// default key is present), this helper:
+//
+//   - Clears Steps so multi-step mods[] configuration is ignored.
+//   - Clears Execution.Image and Execution.Command so the default ubuntu image
+//     and placeholder command are used.
+//
+// This keeps gate manifest image resolution independent of mods[] image maps
+// while preserving Gate profile, repo metadata, and MR wiring options.
+func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
+	// Shallow copy to avoid mutating caller's RunOptions.
+	sanitized := typedOpts
+
+	// Ignore per-step mods configuration for gate jobs; gate execution does not
+	// run the Mods containers and should not depend on mods[].image.
+	sanitized.Steps = nil
+
+	// Ignore stack-aware Execution.Image and custom commands for gate jobs.
+	// Gate containers are selected by the Gate executor based on profile and
+	// workspace detection, not by the Mods execution image.
+	sanitized.Execution.Image = contracts.ModImage{}
+	sanitized.Execution.Command = ExecutionCommand{}
+
+	// Delegate to the standard manifest builder with sanitized options.
+	return buildManifestFromRequest(req, sanitized, 0)
+}
+
 // buildManifestFromRequestWithStack converts a StartRunRequest into a StepManifest
 // with explicit stack-aware image resolution. The stack parameter is used to
 // resolve stack-specific images when the image field is a map.
