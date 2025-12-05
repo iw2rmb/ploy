@@ -188,7 +188,9 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
 	zr, err := gzip.NewReader(bytes.NewReader(log.Data))
 	if err == nil {
-		defer zr.Close()
+		defer func() {
+			_ = zr.Close()
+		}()
 		scanner := bufio.NewScanner(zr)
 		// Set a reasonable max token size (256 KiB per line) to avoid memory blowups.
 		const maxLine = 256 * 1024

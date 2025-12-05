@@ -270,14 +270,16 @@ func writeTempFile(t *testing.T, content []byte) string {
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	if _, err := f.Write(content); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
 
 	t.Cleanup(func() {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 	})
 
 	return f.Name()
@@ -376,9 +378,9 @@ func TestNewHeartbeatManagerParsesNetIgnoreEnv(t *testing.T) {
 			}
 			t.Cleanup(func() {
 				if oldValue != "" {
-					os.Setenv("PLOY_LIFECYCLE_NET_IGNORE", oldValue)
+					_ = os.Setenv("PLOY_LIFECYCLE_NET_IGNORE", oldValue)
 				} else {
-					os.Unsetenv("PLOY_LIFECYCLE_NET_IGNORE")
+					_ = os.Unsetenv("PLOY_LIFECYCLE_NET_IGNORE")
 				}
 			})
 

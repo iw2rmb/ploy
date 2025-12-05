@@ -58,7 +58,7 @@ func TestServer_Addr(t *testing.T) {
 		if err := srv.Start(ctx); err != nil {
 			t.Fatalf("Start() error = %v", err)
 		}
-		defer srv.Stop(ctx)
+		defer func() { _ = srv.Stop(ctx) }()
 
 		addr := srv.Addr()
 		if addr == "" || addr == "127.0.0.1:0" {

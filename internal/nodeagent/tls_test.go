@@ -173,13 +173,14 @@ func TestServerTLSWiring(t *testing.T) {
 			},
 		}
 
-		_, err := client.Get("https://" + addr + "/health")
-		if err == nil {
+		resp, err := client.Get("https://" + addr + "/health")
+		if err == nil && resp != nil {
+			_ = resp.Body.Close()
 			t.Fatal("expected error for missing client cert, got nil")
 		}
 
 		// TLS handshake should fail due to missing client certificate.
-		if !containsError(err, "certificate") && !containsError(err, "handshake") {
+		if err != nil && !containsError(err, "certificate") && !containsError(err, "handshake") {
 			t.Logf("warning: unexpected error message: %v", err)
 		}
 	})
@@ -208,8 +209,9 @@ func TestServerTLSWiring(t *testing.T) {
 			},
 		}
 
-		_, err = client.Get("https://" + addr + "/health")
-		if err == nil {
+		resp, err := client.Get("https://" + addr + "/health")
+		if err == nil && resp != nil {
+			_ = resp.Body.Close()
 			t.Fatal("expected error when using TLS 1.2, got nil")
 		}
 	})

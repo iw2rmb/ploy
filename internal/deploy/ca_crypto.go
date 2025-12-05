@@ -16,11 +16,15 @@ import (
 	"time"
 )
 
+// leafProfile describes SANs for leaf certificates.
+//
+//nolint:unused // used by planned CA rotation flow
 type leafProfile struct {
 	DNSNames    []string
 	IPAddresses []net.IP
 }
 
+//nolint:unused // helper reserved for CA rotation rollout
 func decodeCABundleMaterials(bundle CABundle) (*ecdsa.PrivateKey, *x509.Certificate, error) {
 	keyBlock, _ := pem.Decode([]byte(bundle.KeyPEM))
 	if keyBlock == nil {
@@ -45,6 +49,7 @@ func decodeCABundleMaterials(bundle CABundle) (*ecdsa.PrivateKey, *x509.Certific
 	return privateKey, caCert, nil
 }
 
+//nolint:unused // retained for future CA rotation tooling
 func generateCABundle(clusterID string, now time.Time, validity time.Duration) (CABundle, *ecdsa.PrivateKey, *x509.Certificate, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -91,6 +96,7 @@ func generateCABundle(clusterID string, now time.Time, validity time.Duration) (
 	}, priv, template, nil
 }
 
+//nolint:unused // reserved for CA rotation issuance helpers
 func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string, profile *leafProfile) (LeafCertificate, error) {
 	role = strings.TrimSpace(role)
 	if role == "" {
@@ -147,6 +153,7 @@ func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certifi
 	}, nil
 }
 
+//nolint:unused // used by generateCABundle/issueLeafCertificate during rotation work
 func randomSerial() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), certSerialBitSize)
 	serial, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -159,6 +166,7 @@ func randomSerial() (*big.Int, error) {
 	return serial, nil
 }
 
+//nolint:unused // kept for versioned CA/leaf metadata helpers
 func buildVersion(now time.Time) string {
 	ts := now.UTC().Format("20060102T150405Z")
 	randomBytes := make([]byte, 4)

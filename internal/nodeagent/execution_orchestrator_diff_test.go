@@ -52,7 +52,9 @@ func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read body: %v", err)
 		}
-		defer r.Body.Close()
+		defer func() {
+			_ = r.Body.Close()
+		}()
 
 		if err := json.Unmarshal(body, &gotPayload); err != nil {
 			t.Fatalf("unmarshal payload: %v", err)

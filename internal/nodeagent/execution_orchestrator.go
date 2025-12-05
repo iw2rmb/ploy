@@ -544,6 +544,8 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 }
 
 // finalizeRun handles terminal status determination, merge request creation, and status upload.
+//
+//nolint:unused // invoked by future orchestration entrypoints; kept for roadmap parity
 func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, execResult executionResult, execErr error, workspace string, duration time.Duration) {
 	result := execResult.Result
 
@@ -592,6 +594,8 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 
 // buildExecutionStats constructs the stats payload for terminal status upload.
 // Includes execution timings, exit code, gate history (pre-gate, re-gates), and MR URL.
+//
+//nolint:unused // used by finalizeRun for roadmap-aligned metrics, kept for future wiring
 func (r *runController) buildExecutionStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult, duration time.Duration, mrURL string) types.RunStats {
 	stats := types.RunStats{
 		"exit_code":   result.ExitCode,

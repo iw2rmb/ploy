@@ -85,6 +85,8 @@ func generateAdminCSR(clusterID string) (csrPEM, keyPEM []byte, err error) {
 }
 
 // refreshAdminCertFromServer generates a CSR and calls the server PKI endpoint to sign it.
+//
+//nolint:unused // reserved for future server PKI rotation flow
 func refreshAdminCertFromServer(ctx context.Context, clusterID string, stderr io.Writer) (caPEM, certPEM, keyPEM string, err error) {
 	if stderr == nil {
 		stderr = io.Discard

@@ -7,11 +7,14 @@ import (
 )
 
 // mockPoolExecer is a minimal interface for testing SQL execution.
+//
+//nolint:unused // retained for future partition dropper tests that exercise Exec paths
 type mockPoolExecer struct {
 	execCalls []string
 	execErr   error
 }
 
+//nolint:unused // used by future Exec-path tests for partition dropper
 func (m *mockPoolExecer) Exec(ctx context.Context, sql string, args ...any) (any, error) {
 	m.execCalls = append(m.execCalls, sql)
 	return nil, m.execErr

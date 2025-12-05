@@ -58,7 +58,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	// Reuse helper that initializes a git repo and then reset changes to ensure
 	// a clean working tree.
@@ -73,7 +73,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -146,13 +146,13 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -221,13 +221,13 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -316,13 +316,13 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -422,9 +422,9 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -516,13 +516,13 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-premod-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -641,9 +641,9 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-premod-exhausted-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-premod-exhausted-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -748,9 +748,9 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-premod-pass-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-premod-pass-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{

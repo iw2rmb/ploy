@@ -234,7 +234,9 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 			slog.Warn("certificate request failed", "error", err, "attempt", attemptNum)
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			// Non-200 status - retry with backoff.

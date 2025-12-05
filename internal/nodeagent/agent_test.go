@@ -71,7 +71,7 @@ func TestAgentLifecycle(t *testing.T) {
 			// Return no work available.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
 
@@ -123,7 +123,11 @@ func TestAgentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("health check failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("health check status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -157,7 +161,7 @@ func TestAgentGracefulShutdown(t *testing.T) {
 		if r.URL.Path == "/v1/nodes/shutdown-test/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
 
@@ -216,8 +220,9 @@ func TestAgentGracefulShutdown(t *testing.T) {
 	}
 
 	// Verify the server is no longer accepting connections.
-	_, err = http.Get(fmt.Sprintf("http://%s/health", agent.server.Address()))
-	if err == nil {
+	resp, err := http.Get(fmt.Sprintf("http://%s/health", agent.server.Address()))
+	if err == nil && resp != nil {
+		_ = resp.Body.Close()
 		t.Error("expected connection error after shutdown, got nil")
 	}
 }
@@ -236,7 +241,7 @@ func TestAgentComponentIntegration(t *testing.T) {
 		if r.URL.Path == "/v1/nodes/integration-test/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
 		if r.URL.Path == "/v1/nodes/integration-test/claim-buildgate" {
@@ -295,7 +300,11 @@ func TestAgentComponentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send run start request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 
 	// Verify the server accepted the request.
 	if resp.StatusCode != http.StatusAccepted {
@@ -331,7 +340,7 @@ func TestAgentWithTLS(t *testing.T) {
 		if r.URL.Path == "/v1/nodes/tls-test/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
 		if r.URL.Path == "/v1/nodes/tls-test/claim-buildgate" {
@@ -415,7 +424,7 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 		if r.URL.Path == "/v1/nodes/heartbeat-fail/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
 		if r.URL.Path == "/v1/nodes/heartbeat-fail/claim-buildgate" {
@@ -477,6 +486,8 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 
 // extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
 // extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
+//
+//nolint:unused // helper retained for potential future assertions
 func extractPort(addr string) string {
 	// Handle IPv6 format [::]:port
 	if idx := strings.LastIndex(addr, ":"); idx != -1 {

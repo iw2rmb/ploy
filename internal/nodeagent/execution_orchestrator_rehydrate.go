@@ -238,6 +238,8 @@ func (r *runController) uploadDiffForStep(
 //   - modType: the mod_type to tag the diff with (e.g., "pre_gate", "post_gate")
 //
 // Returns error if diff generation fails or diff is empty (healing claimed success but made no changes).
+//
+//nolint:unused // used by future rehydration phases to upload baseline diffs
 func (r *runController) uploadBaselineDiff(
 	ctx context.Context,
 	runID types.RunID,

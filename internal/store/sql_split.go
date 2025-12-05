@@ -12,6 +12,8 @@ import (
 // statements and accounts for comments and common quoting modes (single quotes,
 // double quotes, and dollar-quoted strings) so that semicolons inside those
 // constructs do not split statements.
+//
+//nolint:unused // exported for future migration helpers; currently unused
 func execMigrationSQL(ctx context.Context, tx pgx.Tx, sql string) error {
 	stmts := splitSQLStatements(sql)
 	for _, s := range stmts {

@@ -48,9 +48,9 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	}
 
 	ws, _ := os.MkdirTemp("", "ploy-ws-*")
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 	outDir, _ := os.MkdirTemp("", "ploy-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -100,9 +100,9 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	}
 
 	ws, _ := os.MkdirTemp("", "ploy-ws-*")
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 	outDir, _ := os.MkdirTemp("", "ploy-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -141,9 +141,9 @@ func TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing(t *testing.T) {
 	}}
 
 	ws, _ := os.MkdirTemp("", "ploy-ws-*")
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 	outDir, _ := os.MkdirTemp("", "ploy-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -189,9 +189,9 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	}
 
 	ws, _ := os.MkdirTemp("", "ploy-ws-*")
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 	outDir, _ := os.MkdirTemp("", "ploy-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -256,10 +256,10 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -372,10 +372,10 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -447,10 +447,10 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-env-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -511,7 +511,7 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 	if _, err := tmpFile.WriteString("file-token-abc\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -549,10 +549,10 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-file-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
@@ -633,13 +633,13 @@ func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-codex-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	// Write codex-session.txt to /out before healing mod runs (simulating
 	// what a Codex-based healer would produce).
@@ -743,13 +743,13 @@ func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-noncodex-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	// Write a session file (simulating a previous Codex run or external source).
 	sessionFile := filepath.Join(outDir, "codex-session.txt")
@@ -809,7 +809,7 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 	if _, err := tmpFile.WriteString("tls-file-token\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -847,10 +847,10 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(ws)
+	defer func() { _ = os.RemoveAll(ws) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-tls-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}

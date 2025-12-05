@@ -108,7 +108,9 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("POST %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)
@@ -187,7 +189,9 @@ func handleTokenList(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)
@@ -215,7 +219,7 @@ func handleTokenList(args []string, stderr io.Writer) error {
 
 	// Display as table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "TOKEN ID\tROLE\tDESCRIPTION\tEXPIRES\tLAST USED\tSTATUS")
+	_, _ = fmt.Fprintln(w, "TOKEN ID\tROLE\tDESCRIPTION\tEXPIRES\tLAST USED\tSTATUS")
 	for _, t := range result.Tokens {
 		desc := "-"
 		if t.Description != nil {
@@ -244,10 +248,10 @@ func handleTokenList(args []string, stderr io.Writer) error {
 			tokenIDDisplay = tokenIDDisplay[:12] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			tokenIDDisplay, t.Role, desc, expires, lastUsed, status)
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	return nil
 }
@@ -297,7 +301,9 @@ func handleTokenRevoke(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("DELETE %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)

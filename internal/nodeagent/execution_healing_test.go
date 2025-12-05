@@ -79,13 +79,13 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -276,13 +276,13 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-final-gate-healing-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -439,13 +439,13 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -596,13 +596,13 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -697,10 +697,10 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -818,13 +818,13 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -981,13 +981,13 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1105,7 +1105,7 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	// Initialize git repo and create a change.
 	if err := setupGitRepoWithChange(workspace); err != nil {
@@ -1189,6 +1189,8 @@ func setupGitRepoWithChange(workspace string) error {
 // when healing mods do not produce any workspace changes (as measured by
 // `git status --porcelain`), the node agent does not re-run the gate and
 // returns a terminal ErrBuildGateFailed error.
+//
+//nolint:unused // kept as legacy scenario documentation for gate healing behavior
 func legacyRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T) {
 	// Mock gate executor that always fails to force healing.
 	gateCallCount := 0
@@ -1229,7 +1231,7 @@ func legacyRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	// Reuse helper that initializes a git repo and then reset changes to ensure
 	// a clean working tree.
@@ -1244,7 +1246,7 @@ func legacyRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1395,13 +1397,13 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-gate-history-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1545,6 +1547,8 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 // TestRunGateWithHealing_GatePassesImmediately verifies that runGateWithHealing returns
 // immediately with the gate metadata when the initial gate passes without healing.
 // This test validates the reusable helper for future pre-mod and post-mod gate phases.
+//
+//nolint:unused // kept as legacy scenario for passing gate
 func legacyRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 	// Mock gate executor that passes immediately.
 	mockGate := &mockGateExecutor{
@@ -1562,13 +1566,13 @@ func legacyRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1634,6 +1638,8 @@ func legacyRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 
 // TestRunGateWithHealing_GateFailsNoHealing verifies that runGateWithHealing returns
 // ErrBuildGateFailed when the gate fails and no healing is configured.
+//
+//nolint:unused // kept as legacy scenario for failing gate without healing
 func legacyRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	// Mock gate executor that fails.
 	mockGate := &mockGateExecutor{
@@ -1651,13 +1657,13 @@ func legacyRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1715,6 +1721,8 @@ func legacyRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 
 // TestRunGateWithHealing_GateFailsHealingSucceeds verifies the gate+healing orchestration
 // when the initial gate fails but healing succeeds on the first attempt.
+//
+//nolint:unused // kept as legacy scenario for successful healing
 func legacyRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	// Track call sequence.
 	var callSequence []string
@@ -1763,13 +1771,13 @@ func legacyRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -1853,6 +1861,8 @@ func legacyRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 
 // TestRunGateWithHealing_HealingRetriesExhausted verifies that runGateWithHealing returns
 // ErrBuildGateFailed when healing retries are exhausted without the gate passing.
+//
+//nolint:unused // kept as legacy scenario for exhausted healing retries
 func legacyRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	gateCallCount := 0
 
@@ -1880,9 +1890,9 @@ func legacyRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -1947,6 +1957,8 @@ func legacyRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 //  3. Healing mod executes and fixes the issue
 //  4. Re-gate passes
 //  5. Run proceeds to execute mods
+//
+//nolint:unused // kept as legacy pre-mod healing scenario
 func legacyPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	// Track call sequence to verify pre-mod gate runs BEFORE mod execution.
 	var callSequence []string
@@ -1995,13 +2007,13 @@ func legacyPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 
 	outDir, err := os.MkdirTemp("", "ploy-premod-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 
 	inDir := ""
 
@@ -2105,6 +2117,8 @@ func legacyPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 //  3. Healing retries are exhausted
 //  4. Run terminates with ErrBuildGateFailed
 //  5. NO mod containers are ever executed
+//
+//nolint:unused // kept as legacy pre-mod exhausted healing scenario
 func legacyPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	gateCallCount := 0
 	healingContainerCount := 0
@@ -2143,9 +2157,9 @@ func legacyPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-premod-exhausted-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-premod-exhausted-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -2229,6 +2243,8 @@ func legacyPreModGate_HealingExhaustedNoMods(t *testing.T) {
 
 // TestPreModGate_GatePassesNoHealing verifies that when the pre-mod gate passes
 // immediately (baseline compiles), no healing is triggered and the run proceeds.
+//
+//nolint:unused // kept as legacy pre-mod passing scenario
 func legacyPreModGate_GatePassesNoHealing(t *testing.T) {
 	gateCallCount := 0
 	healingContainerCount := 0
@@ -2264,9 +2280,9 @@ func legacyPreModGate_GatePassesNoHealing(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-premod-pass-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-premod-pass-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -2376,9 +2392,9 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-postgate-pass-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-postgate-pass-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -2522,9 +2538,9 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	}
 
 	workspace, _ := os.MkdirTemp("", "ploy-postgate-heal-*")
-	defer os.RemoveAll(workspace)
+	defer func() { _ = os.RemoveAll(workspace) }()
 	outDir, _ := os.MkdirTemp("", "ploy-postgate-heal-out-*")
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }()
 	inDir := ""
 
 	runner := step.Runner{
@@ -2637,6 +2653,8 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 // TestRunGateWithHealing_GateDisabled verifies that runGateWithHealing returns immediately
 // without error when the gate is disabled.
+//
+//nolint:unused // kept as legacy scenario for disabled gate
 func legacyRunGateWithHealing_GateDisabled(t *testing.T) {
 	// Gate should not be called.
 	mockGate := &mockGateExecutor{
@@ -2677,6 +2695,8 @@ func legacyRunGateWithHealing_GateDisabled(t *testing.T) {
 // healing modifications without requiring direct workspace access.
 //
 // ROADMAP: Route re‑gates after healing through the HTTP adapter — Decouple healing node from gate node.
+//
+//nolint:unused // kept as legacy HTTP-mode diff patch scenario
 func legacyRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
 	// Skip if git is not available (needed for workspace setup and diff computation).
 	if _, err := exec.LookPath("git"); err != nil {
@@ -2891,7 +2911,7 @@ func legacyRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
 			if _, err := diffContent.ReadFrom(gzReader); err != nil {
 				t.Errorf("failed to decompress DiffPatch: %v", err)
 			}
-			gzReader.Close()
+			_ = gzReader.Close()
 
 			// Verify diff contains the healing change.
 			diffStr := diffContent.String()
