@@ -214,7 +214,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `          └─(fail)→ heal → re-gate → mod-0`
   - Tests: Manual doc review; ensure references in tests/docs still pass `make test`.
 
-- [ ] F2 — CLI surface for graph/state — Make DAG state visible in CLI help and examples.
+- [x] F2 — CLI surface for graph/state — Make DAG state visible in CLI help and examples.
   - Repository: `ploy`
   - Component: `cmd/ploy/README.md`, `internal/cli/mods/inspect.go`, `tests/README.md`.
   - Scope:
