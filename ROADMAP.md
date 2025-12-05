@@ -7,7 +7,7 @@ Documentation: `docs/schemas/mod.example.yaml`, `docs/mods-lifecycle.md`, `docs/
 Legend: [ ] todo, [x] done.
 
 ## Stack-aware Mods images
-- [ ] Extend Mods spec to support stack-aware images — Teach `mod.image` / `mods[].image` to accept either a string (universal image) or a map keyed by stack, with `default` as the fallback, and preserve existing single-string behavior.
+- [x] Extend Mods spec to support stack-aware images — Teach `mod.image` / `mods[].image` to accept either a string (universal image) or a map keyed by stack, with `default` as the fallback, and preserve existing single-string behavior.
   - Repository: ploy
   - Component: `internal/workflow/contracts`, `internal/workflow/runtime/step`, `cmd/ploy`, `internal/cli/mods`, `tests/e2e/mods`
   - Scope: 
