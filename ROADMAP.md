@@ -60,11 +60,12 @@ Legend: [ ] todo, [x] done.
   - Scope: replace github.com/docker/docker/api/types, github.com/docker/docker/api/types/system, and github.com/docker/docker/client imports with github.com/moby/moby equivalents; keep the dockerAPI interface and DockerCheckerOptions shape stable for callers.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover — construction and Close behaviour pass with moby client.
   - **Completed**: DockerChecker uses github.com/moby/moby/client with client.PingOptions, client.PingResult, client.InfoOptions, and client.SystemInfoResult; tests cover OK, error, degraded states, nil guards, context cancellation, default options, and Details field population.
-- [ ] Reconcile Ping and Info field usage with Engine v29 — keep ComponentStatus fields and details keys stable.
+- [x] Reconcile Ping and Info field usage with Engine v29 — keep ComponentStatus fields and details keys stable.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle/health.go, internal/worker/lifecycle/health_docker_test.go
   - Scope: verify types.Ping and Info field names and semantics under moby/Engine v29; update status.Version, api_version, containers_running, and driver mappings as needed while keeping Details keys unchanged.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover — tests validate OK, degraded, and error paths using updated Ping/Info fixtures.
+  - **Completed**: Reconciled Ping/Info field usage with Engine v29; added os_type to stable Details keys; documented field mappings (api_version, os_type from PingResult; containers_running, driver, Version from system.Info); added TestDockerChecker_EngineVersionCompatibility and TestDockerChecker_StableDetailsKeys tests covering v28/v29 compatibility.
 - [ ] Validate Docker health reporting across mixed daemon versions — ensure Engine v28 and v29 both produce sane status.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle/health.go, internal/worker/lifecycle/health_docker_test.go

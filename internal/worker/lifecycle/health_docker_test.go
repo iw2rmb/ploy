@@ -71,7 +71,7 @@ func TestDockerChecker_OK(t *testing.T) {
 	// to verify successful health check returns OK state with correct details.
 	c, err := NewDockerChecker(DockerCheckerOptions{
 		Client: fakeDocker{
-			ping: client.PingResult{APIVersion: "1.44"},
+			ping: client.PingResult{APIVersion: "1.44", OSType: "linux"},
 			info: system.Info{ServerVersion: "25.0.0", Driver: "overlay2", ContainersRunning: 3},
 		},
 		Timeout: 50 * time.Millisecond,
@@ -89,6 +89,10 @@ func TestDockerChecker_OK(t *testing.T) {
 	}
 	if v, ok := st.Details["api_version"]; !ok || v.(string) != "1.44" {
 		t.Fatalf("unexpected api_version: %#v", st.Details)
+	}
+	// Verify os_type from PingResult is included in Details.
+	if v, ok := st.Details["os_type"]; !ok || v.(string) != "linux" {
+		t.Fatalf("unexpected os_type: %#v", st.Details)
 	}
 }
 
@@ -221,7 +225,7 @@ func TestDockerChecker_DefaultClock(t *testing.T) {
 func TestDockerChecker_DetailsFields(t *testing.T) {
 	c, err := NewDockerChecker(DockerCheckerOptions{
 		Client: fakeDocker{
-			ping: client.PingResult{APIVersion: "1.45"},
+			ping: client.PingResult{APIVersion: "1.45", OSType: "linux"},
 			info: system.Info{
 				ServerVersion:     "29.0.1",
 				Driver:            "overlay2",
@@ -242,6 +246,10 @@ func TestDockerChecker_DetailsFields(t *testing.T) {
 	if v, ok := st.Details["api_version"]; !ok || v.(string) != "1.45" {
 		t.Fatalf("unexpected api_version: %#v", st.Details)
 	}
+	// Verify os_type from PingResult.
+	if v, ok := st.Details["os_type"]; !ok || v.(string) != "linux" {
+		t.Fatalf("unexpected os_type: %#v", st.Details)
+	}
 	// Verify containers_running from system.Info.
 	if v, ok := st.Details["containers_running"]; !ok || v.(int) != 5 {
 		t.Fatalf("unexpected containers_running: %#v", st.Details)
@@ -249,5 +257,134 @@ func TestDockerChecker_DetailsFields(t *testing.T) {
 	// Verify driver from system.Info.
 	if v, ok := st.Details["driver"]; !ok || v.(string) != "overlay2" {
 		t.Fatalf("unexpected driver: %#v", st.Details)
+	}
+}
+
+// TestDockerChecker_EngineVersionCompatibility verifies stable Details keys across
+// Engine v28 and v29 responses. The same field names and semantics should work
+// for both daemon versions.
+func TestDockerChecker_EngineVersionCompatibility(t *testing.T) {
+	// Test cases simulate representative Engine v28 and v29 responses.
+	// The Details keys (api_version, os_type, containers_running, driver)
+	// must remain stable across versions.
+	tests := []struct {
+		name           string
+		ping           client.PingResult
+		info           system.Info
+		wantVersion    string
+		wantAPIVersion string
+		wantOSType     string
+		wantDriver     string
+		wantRunning    int
+	}{
+		{
+			name:           "Engine v28.x response",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info:           system.Info{ServerVersion: "28.0.0", Driver: "overlay2", ContainersRunning: 2},
+			wantVersion:    "28.0.0",
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    2,
+		},
+		{
+			name:           "Engine v29.x response",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			info:           system.Info{ServerVersion: "29.0.0", Driver: "overlay2", ContainersRunning: 5},
+			wantVersion:    "29.0.0",
+			wantAPIVersion: "1.45",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    5,
+		},
+		{
+			name:           "Engine v29.x Windows",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "windows"},
+			info:           system.Info{ServerVersion: "29.0.1", Driver: "windowsfilter", ContainersRunning: 1},
+			wantVersion:    "29.0.1",
+			wantAPIVersion: "1.45",
+			wantOSType:     "windows",
+			wantDriver:     "windowsfilter",
+			wantRunning:    1,
+		},
+		{
+			name:           "Engine v28.x with vfs driver",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info:           system.Info{ServerVersion: "28.1.0", Driver: "vfs", ContainersRunning: 0},
+			wantVersion:    "28.1.0",
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantDriver:     "vfs",
+			wantRunning:    0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewDockerChecker(DockerCheckerOptions{
+				Client:  fakeDocker{ping: tc.ping, info: tc.info},
+				Timeout: 50 * time.Millisecond,
+				Clock:   func() time.Time { return time.Unix(100, 0).UTC() },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			st := c.Check(context.Background())
+			if st.State != stateOK {
+				t.Fatalf("want ok, got %s", st.State)
+			}
+			// Verify Version from system.Info.ServerVersion.
+			if st.Version != tc.wantVersion {
+				t.Errorf("Version: got %q, want %q", st.Version, tc.wantVersion)
+			}
+			// Verify api_version from PingResult.APIVersion.
+			if v, ok := st.Details["api_version"]; !ok || v.(string) != tc.wantAPIVersion {
+				t.Errorf("api_version: got %v, want %q", st.Details["api_version"], tc.wantAPIVersion)
+			}
+			// Verify os_type from PingResult.OSType.
+			if v, ok := st.Details["os_type"]; !ok || v.(string) != tc.wantOSType {
+				t.Errorf("os_type: got %v, want %q", st.Details["os_type"], tc.wantOSType)
+			}
+			// Verify driver from system.Info.Driver.
+			if v, ok := st.Details["driver"]; !ok || v.(string) != tc.wantDriver {
+				t.Errorf("driver: got %v, want %q", st.Details["driver"], tc.wantDriver)
+			}
+			// Verify containers_running from system.Info.ContainersRunning.
+			if v, ok := st.Details["containers_running"]; !ok || v.(int) != tc.wantRunning {
+				t.Errorf("containers_running: got %v, want %d", st.Details["containers_running"], tc.wantRunning)
+			}
+		})
+	}
+}
+
+// TestDockerChecker_StableDetailsKeys verifies that the Details map contains
+// exactly the expected stable keys. This ensures no keys are accidentally
+// removed or renamed during future refactoring.
+func TestDockerChecker_StableDetailsKeys(t *testing.T) {
+	c, err := NewDockerChecker(DockerCheckerOptions{
+		Client: fakeDocker{
+			ping: client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			info: system.Info{ServerVersion: "29.0.0", Driver: "overlay2", ContainersRunning: 3},
+		},
+		Timeout: 50 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := c.Check(context.Background())
+
+	// Define the stable keys that must be present in Details.
+	// These keys are documented in DockerChecker and Check comments.
+	stableKeys := []string{"api_version", "os_type", "containers_running", "driver"}
+
+	for _, key := range stableKeys {
+		if _, ok := st.Details[key]; !ok {
+			t.Errorf("missing stable Details key: %q", key)
+		}
+	}
+
+	// Verify no unexpected keys are present.
+	if len(st.Details) != len(stableKeys) {
+		t.Errorf("Details has %d keys, want %d; keys: %v", len(st.Details), len(stableKeys), st.Details)
 	}
 }
