@@ -163,7 +163,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `heal-branch-b-0 (1700), re-gate-b (1800)`
   - Tests: Add tests verifying correct job creation for multi-branch specs and that legacy single-branch behavior is unchanged.
 
-- [ ] E3 — Branch-local rehydration — Keep branch workspaces isolated.
+- [x] E3 — Branch-local rehydration — Keep branch workspaces isolated.
   - Repository: `ploy`
   - Component: `internal/nodeagent/execution_orchestrator.go`, rehydration helpers.
   - Scope:
