@@ -185,7 +185,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `re-gate-a: passed → mark branch-a winner, cancel branch-b jobs`
   - Tests: Add tests covering winner selection, loser cancellation, and final run status when multiple branches exist.
 
-- [ ] E5 — Parallel healing tests and guardrails — Validate end-to-end behavior.
+- [x] E5 — Parallel healing tests and guardrails — Validate end-to-end behavior.
   - Repository: `ploy`
   - Component: Healing-related tests under `internal/server/handlers` and `internal/nodeagent`.
   - Scope: Add integration-style tests (or focused multi-branch unit tests) that exercise:
