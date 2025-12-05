@@ -354,9 +354,24 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	stack := r.loadPersistedStack(req.RunID)
 
 	// Parse options and build manifest with stack-aware image resolution.
-	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
+	// stepIndex is derived from server-injected mod_index for multi-step runs;
+	// when absent, defaults to 0 (single-step or legacy behavior).
 	typedOpts := parseRunOptions(req.Options)
-	manifest, err := buildManifestFromRequestWithStack(req, typedOpts, 0, stack)
+	stepIdx := 0
+	if len(typedOpts.Steps) > 0 {
+		if mi, ok := req.Options["mod_index"].(int); ok && mi >= 0 && mi < len(typedOpts.Steps) {
+			stepIdx = mi
+		} else if mf, ok := req.Options["mod_index"].(float64); ok {
+			mi := int(mf)
+			if mi >= 0 && mi < len(typedOpts.Steps) {
+				stepIdx = mi
+			} else {
+				slog.Warn("mod_index out of range for steps",
+					"run_id", req.RunID, "mod_index", mi, "steps_len", len(typedOpts.Steps))
+			}
+		}
+	}
+	manifest, err := buildManifestFromRequestWithStack(req, typedOpts, stepIdx, stack)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

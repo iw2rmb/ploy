@@ -57,8 +57,22 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 		return map[string]any{"spec": root}, env, typedOpts
 	}
 	// Extract known fields at top level.
-	if v, ok := m["image"].(string); ok && v != "" {
-		opts["image"] = v
+	// Image may be a string (universal) or a map (stack-aware).
+	if v, ok := m["image"]; ok && v != nil {
+		switch img := v.(type) {
+		case string:
+			if img != "" {
+				opts["image"] = img
+			}
+		case map[string]any:
+			if len(img) > 0 {
+				opts["image"] = img
+			}
+		case map[string]string:
+			if len(img) > 0 {
+				opts["image"] = img
+			}
+		}
 	}
 	if v, ok := m["command"].(string); ok && v != "" {
 		opts["command"] = v
@@ -131,8 +145,21 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	if mod, ok := m["mod"].(map[string]any); ok {
 		// image
 		if _, present := opts["image"]; !present {
-			if v, ok := mod["image"].(string); ok && v != "" {
-				opts["image"] = v
+			if v, ok := mod["image"]; ok && v != nil {
+				switch img := v.(type) {
+				case string:
+					if img != "" {
+						opts["image"] = img
+					}
+				case map[string]any:
+					if len(img) > 0 {
+						opts["image"] = img
+					}
+				case map[string]string:
+					if len(img) > 0 {
+						opts["image"] = img
+					}
+				}
 			}
 		}
 		// command (string or array)
@@ -187,6 +214,17 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	// Each entry in mods[] defines a gate+mod step with its own image, command, and env.
 	if modsSlice, ok := m["mods"].([]any); ok && len(modsSlice) > 0 {
 		opts["mods"] = modsSlice
+	}
+
+	// Pass through mod_index when present. This is a server-injected per-job
+	// index that maps mod jobs to mods[mod_index] in multi-step specs.
+	if mi, ok := m["mod_index"]; ok {
+		switch v := mi.(type) {
+		case float64:
+			opts["mod_index"] = int(v)
+		case int:
+			opts["mod_index"] = v
+		}
 	}
 
 	// Parse typed options from the flattened opts map.
