@@ -11,7 +11,6 @@ func TestIDs_Basics(t *testing.T) {
 		var (
 			a TicketID
 			b RunID
-			c StageID
 			d StepID
 			e ClusterID
 		)
@@ -20,9 +19,6 @@ func TestIDs_Basics(t *testing.T) {
 		}
 		if !b.IsZero() || b.String() != "" {
 			t.Fatalf("RunID zero failed")
-		}
-		if !c.IsZero() || c.String() != "" {
-			t.Fatalf("StageID zero failed")
 		}
 		if !d.IsZero() || d.String() != "" {
 			t.Fatalf("StepID zero failed")
@@ -41,10 +37,6 @@ func TestIDs_Basics(t *testing.T) {
 		if r1 != r2 || r1.String() != "r1" {
 			t.Fatalf("RunID compare/string failed")
 		}
-		s1, s2 := StageID("s1"), StageID("s1")
-		if s1 != s2 || s1.String() != "s1" {
-			t.Fatalf("StageID compare/string failed")
-		}
 		st1, st2 := StepID("st1"), StepID("st1")
 		if st1 != st2 || st1.String() != "st1" {
 			t.Fatalf("StepID compare/string failed")
@@ -61,7 +53,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	var (
 		tid  TicketID
 		rid  RunID
-		sid  StageID
 		step StepID
 		cid  ClusterID
 	)
@@ -90,9 +81,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	if err := rid.UnmarshalText([]byte(" r-1 ")); err != nil {
 		t.Fatalf("run UnmarshalText: %v", err)
 	}
-	if err := sid.UnmarshalText([]byte(" s-1 ")); err != nil {
-		t.Fatalf("stage UnmarshalText: %v", err)
-	}
 	if err := step.UnmarshalText([]byte(" step-1 ")); err != nil {
 		t.Fatalf("step UnmarshalText: %v", err)
 	}
@@ -100,7 +88,7 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		t.Fatalf("cluster UnmarshalText: %v", err)
 	}
 
-	for name, v := range map[string]any{"run": rid, "stage": sid, "step": step, "cluster": cid} {
+	for name, v := range map[string]any{"run": rid, "step": step, "cluster": cid} {
 		bb, err := json.Marshal(v)
 		if err != nil {
 			t.Fatalf("%s marshal: %v", name, err)
@@ -118,7 +106,6 @@ func TestIDs_RejectEmpty(t *testing.T) {
 	}{
 		{"ticket", func(b []byte) error { var v TicketID; return v.UnmarshalText(b) }},
 		{"run", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }},
-		{"stage", func(b []byte) error { var v StageID; return v.UnmarshalText(b) }},
 		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
 		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},
 	}

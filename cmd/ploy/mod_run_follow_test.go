@@ -61,7 +61,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				TicketID: domaintypes.TicketID(ticketID),
 				State:    modsapi.TicketStateSucceeded,
 				Stages: map[string]modsapi.StageStatus{
-					"plan": {StageID: domaintypes.StageID("plan"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
+					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
 				},
 			}})
 

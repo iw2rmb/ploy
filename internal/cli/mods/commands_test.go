@@ -20,8 +20,8 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 		TicketID: domaintypes.TicketID("t1"),
 		State:    modsapi.TicketStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
-			"build": {StageID: domaintypes.StageID("build"), Artifacts: map[string]string{"bin": "cid1"}},
-			"test":  {StageID: domaintypes.StageID("test")},
+			"build": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
+			"test":  {State: modsapi.StageStateSucceeded},
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -254,7 +254,7 @@ func TestSimplePrinterFormats(t *testing.T) {
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
 	p.Ticket(modsapi.TicketSummary{TicketID: domaintypes.TicketID("t1"), State: modsapi.TicketStateRunning})
-	p.Stage(modsapi.StageStatus{StageID: domaintypes.StageID("build"), State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
+	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
 	}

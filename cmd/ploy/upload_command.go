@@ -26,7 +26,7 @@ func handleUpload(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	// New flags
 	runID := fs.String("run-id", "", "Run identifier to attach the artifact bundle to (UUID)")
-	stageID := fs.String("stage-id", "", "Optional stage identifier (UUID)")
+	stageID := fs.String("stage-id", "", "DEPRECATED (ignored)")
 	buildID := fs.String("build-id", "", "Optional build identifier (UUID)")
 	name := fs.String("name", "", "Optional artifact name override (defaults to filename)")
 	// Backward-compat: accept --job-id as an alias for --run-id
@@ -37,6 +37,8 @@ func handleUpload(args []string, stderr io.Writer) error {
 		printUploadUsage(stderr)
 		return err
 	}
+	// stageID flag is accepted for backward compatibility but ignored.
+	_ = stageID
 	remaining := fs.Args()
 	if len(remaining) == 0 {
 		printUploadUsage(stderr)
@@ -75,13 +77,9 @@ func handleUpload(args []string, stderr io.Writer) error {
 	}
 
 	var reqBody struct {
-		StageID *string `json:"stage_id,omitempty"`
 		BuildID *string `json:"build_id,omitempty"`
 		Name    *string `json:"name,omitempty"`
 		Bundle  []byte  `json:"bundle"`
-	}
-	if v := strings.TrimSpace(*stageID); v != "" {
-		reqBody.StageID = &v
 	}
 	if v := strings.TrimSpace(*buildID); v != "" {
 		reqBody.BuildID = &v

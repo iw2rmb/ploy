@@ -21,15 +21,6 @@ func TestUUIDBridge_Roundtrip(t *testing.T) {
 		}
 	})
 
-	t.Run("StageID", func(t *testing.T) {
-		u := uuid.New()
-		in := StageID(u.String())
-		out := FromPGUUID[StageID](ToPGUUID(in))
-		if out != in {
-			t.Fatalf("roundtrip mismatch: got %q want %q", out, in)
-		}
-	})
-
 	t.Run("StepID", func(t *testing.T) {
 		u := uuid.New()
 		in := StepID(u.String())

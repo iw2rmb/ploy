@@ -10,7 +10,7 @@ import (
 // FuzzMergeGitLabConfigIntoSpec_NoPanic ensures the merge helper never panics
 // and always returns valid JSON for arbitrary inputs.
 func FuzzMergeGitLabConfigIntoSpec_NoPanic(f *testing.F) {
-	f.Add([]byte(`{"stage_id":"s"}`), "https://gitlab.example.com", "glpat-xxx")
+	f.Add([]byte(`{"job_id":"j"}`), "https://gitlab.example.com", "glpat-xxx")
 	f.Add([]byte(`{"gitlab_pat":"per","gitlab_domain":"d"}`), "", "token")
 	f.Add([]byte(`not json`), "d", "t")
 

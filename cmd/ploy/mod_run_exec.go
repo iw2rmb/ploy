@@ -24,7 +24,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
@@ -39,11 +38,11 @@ import (
 // names and lane roles.
 func defaultStageDefinitions() []modsapi.StageDefinition {
 	return []modsapi.StageDefinition{
-		{ID: domaintypes.StageID(modplan.StageNamePlan), Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
-		{ID: domaintypes.StageID(modplan.StageNameORWApply), Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
-		{ID: domaintypes.StageID(modplan.StageNameORWGenerate), Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
-		{ID: domaintypes.StageID(modplan.StageNameLLMPlan), Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
-		{ID: domaintypes.StageID(modplan.StageNameLLMExec), Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNameORWApply), domaintypes.StageID(modplan.StageNameORWGenerate), domaintypes.StageID(modplan.StageNameLLMPlan)}},
+		{ID: modplan.StageNamePlan, Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
+		{ID: modplan.StageNameORWApply, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameORWGenerate, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameLLMPlan, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameLLMExec, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNameORWApply, modplan.StageNameORWGenerate, modplan.StageNameLLMPlan}},
 	}
 }
 

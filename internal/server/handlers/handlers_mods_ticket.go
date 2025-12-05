@@ -262,9 +262,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.
-			// Note: Using job.ID as StageID for API backward compatibility.
 			summary.Stages[uuid.UUID(job.ID.Bytes).String()] = modsapi.StageStatus{
-				StageID:     domaintypes.StageID(uuid.UUID(job.ID.Bytes).String()),
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
