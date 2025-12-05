@@ -104,11 +104,12 @@ Legend: [ ] todo, [x] done.
   - Scope: document the new minimum supported Docker Engine version, the chosen moby client/API modules, and the migration status; ensure ROADMAP.md is linked from GOLANG.md or README.md where appropriate.
   - Tests: docs review — engineering docs consistently describe Docker Engine v29 and moby usage.
   - **Completed**: Enhanced GOLANG.md § "Docker Engine Requirements" with: supported daemon versions (v29.0+ minimum, v28.x unsupported), complete SDK module table (client, types/container, types/mount, pkg/stdcopy), client construction pattern with code example, environment variables table (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH, DOCKER_API_VERSION), verification commands, and cross-references to implementation files and ROADMAP.md migration section.
-- [ ] Update operator how-to docs for v29 — make runtime prerequisites explicit for deployments.
+- [x] Update operator how-to docs for v29 — make runtime prerequisites explicit for deployments.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md
   - Scope: add or update sections that call out required Docker Engine v29 versions on VPS nodes, any flags or configuration changes needed, and upgrade steps from earlier Engine versions.
   - Tests: docs review — how-to docs walk an operator through deploying/updating a v29-based cluster without ambiguity.
+  - **Completed**: Enhanced deploy-a-cluster.md with: dedicated "Docker Engine v29 Requirements (Worker Nodes)" section containing version table (Engine v29.0+, API v1.44+, v28.x unsupported), automatic installation notes, verification commands, upgrade cross-reference, and rationale. Enhanced update-a-cluster.md with: comprehensive "Docker Engine Upgrade" section containing prerequisites (drain, version check), step-by-step upgrade instructions for Debian/Ubuntu and RHEL/CentOS/Rocky, post-upgrade verification commands, emergency rollback procedure, and upgrade checklist table.
 - [ ] Align environment variable documentation with Docker v29 migration — ensure envs are complete and accurate.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/envs/README.md
