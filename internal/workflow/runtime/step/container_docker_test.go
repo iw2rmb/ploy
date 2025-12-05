@@ -111,6 +111,7 @@ type fakeDockerClient struct {
 	waitStatusCode int64
 	waitErr        error
 	waitCalled     bool
+	waitOptions    client.ContainerWaitOptions
 
 	// ContainerInspect behavior
 	inspectResult client.ContainerInspectResult
@@ -152,6 +153,7 @@ func (f *fakeDockerClient) ContainerStart(ctx context.Context, containerID strin
 // ContainerWait simulates waiting for container exit.
 func (f *fakeDockerClient) ContainerWait(ctx context.Context, containerID string, options client.ContainerWaitOptions) client.ContainerWaitResult {
 	f.waitCalled = true
+	f.waitOptions = options
 	result := make(chan container.WaitResponse, 1)
 	errCh := make(chan error, 1)
 	if f.waitErr != nil {
@@ -996,6 +998,9 @@ func TestDockerContainerLifecycleV29_WaitCondition(t *testing.T) {
 	}
 	if !fake.waitCalled {
 		t.Error("ContainerWait should have been called")
+	}
+	if fake.waitOptions.Condition != container.WaitConditionNotRunning {
+		t.Errorf("WaitCondition = %q, want %q", fake.waitOptions.Condition, container.WaitConditionNotRunning)
 	}
 	// Verify result contains expected data from moby SDK response.
 	if result.ExitCode != 0 {
