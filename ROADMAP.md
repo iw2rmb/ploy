@@ -228,7 +228,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `Gate: failed pre-gate duration=567ms`
   - Tests: Run `make test` and validate CLI help text tests (if any) still pass.
 
-- [ ] F3 — Optional graph/debug view — Provide a simple way to inspect the job graph.
+- [x] F3 — Optional graph/debug view — Provide a simple way to inspect the job graph.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, optional tooling.
   - Scope:
