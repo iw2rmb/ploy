@@ -488,6 +488,141 @@ func maybeCreateHealingJobs(
 	return nil
 }
 
+// cancelLoserBranches cancels all parallel branch jobs when a re-gate job succeeds.
+// This implements E4 "winner selection" — the winning branch is the one whose re-gate
+// passed first, and all other branches (losers) are canceled.
+//
+// Branch identification:
+//   - Branch jobs are heal/re_gate jobs created by multi-branch healing (E2).
+//   - Each branch occupies a distinct step_index window between the original gate and
+//     the next mainline job.
+//   - Jobs from the same branch share a common step_index range and naming pattern.
+//
+// Winner selection rules:
+//   - The winning re-gate's step_index defines the winner's window.
+//   - All other heal/re_gate jobs in the same healing window (between the original
+//     gate and the next mainline job) that are not in terminal state are canceled.
+//   - Mainline jobs (outside the healing window) are not affected.
+func cancelLoserBranches(
+	ctx context.Context,
+	st store.Store,
+	runID pgtype.UUID,
+	winnerJob store.Job,
+	jobs []store.Job,
+) error {
+	now := time.Now().UTC()
+
+	// Find the base gate (pre_gate/post_gate) that triggered healing.
+	// This is the highest-index gate job with step_index < winner's step_index.
+	var baseGateIndex float64
+	for _, job := range jobs {
+		mt := strings.TrimSpace(job.ModType)
+		if mt != "pre_gate" && mt != "post_gate" {
+			continue
+		}
+		if job.StepIndex >= winnerJob.StepIndex {
+			continue
+		}
+		if job.StepIndex > baseGateIndex {
+			baseGateIndex = job.StepIndex
+		}
+	}
+
+	// Find the next mainline job (non-heal, non-gate) after the healing window.
+	// This bounds the healing window so we only cancel branch jobs, not mainline jobs.
+	var nextMainlineIndex float64
+	hasNextMainline := false
+	for _, job := range jobs {
+		if job.StepIndex <= winnerJob.StepIndex {
+			continue
+		}
+		mt := strings.TrimSpace(job.ModType)
+		// Skip heal and gate jobs; they are part of healing branches.
+		if mt == "heal" || mt == "pre_gate" || mt == "post_gate" || mt == "re_gate" {
+			continue
+		}
+		if !hasNextMainline || job.StepIndex < nextMainlineIndex {
+			nextMainlineIndex = job.StepIndex
+			hasNextMainline = true
+		}
+	}
+
+	// Cancel all non-terminal heal/re_gate jobs in the healing window (baseGateIndex, nextMainlineIndex)
+	// except the winner job itself.
+	var canceledCount int
+	for _, job := range jobs {
+		// Skip the winner job.
+		if job.ID == winnerJob.ID {
+			continue
+		}
+
+		// Only cancel jobs within the healing window.
+		if job.StepIndex <= baseGateIndex {
+			continue
+		}
+		if hasNextMainline && job.StepIndex >= nextMainlineIndex {
+			continue
+		}
+
+		// Only cancel heal and re_gate jobs (branch jobs).
+		mt := strings.TrimSpace(job.ModType)
+		if mt != "heal" && mt != "re_gate" {
+			continue
+		}
+
+		// Skip jobs already in terminal state.
+		switch job.Status {
+		case store.JobStatusSucceeded, store.JobStatusFailed, store.JobStatusCanceled, store.JobStatusSkipped:
+			continue
+		}
+
+		// Cancel the loser job.
+		startedAt := job.StartedAt
+		var durationMs int64
+		if job.StartedAt.Valid {
+			durationMs = now.Sub(job.StartedAt.Time).Milliseconds()
+			if durationMs < 0 {
+				durationMs = 0
+			}
+		}
+
+		finishedAt := pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		}
+
+		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
+			ID:         job.ID,
+			Status:     store.JobStatusCanceled,
+			StartedAt:  startedAt,
+			FinishedAt: finishedAt,
+			DurationMs: durationMs,
+		}); err != nil {
+			return fmt.Errorf("cancel loser job %s: %w", uuid.UUID(job.ID.Bytes).String(), err)
+		}
+
+		canceledCount++
+		slog.Info("canceled loser branch job",
+			"run_id", runID,
+			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"job_name", job.Name,
+			"step_index", job.StepIndex,
+			"winner_job", winnerJob.Name,
+		)
+	}
+
+	if canceledCount > 0 {
+		slog.Info("winner selection complete",
+			"run_id", runID,
+			"winner_job", winnerJob.Name,
+			"winner_step_index", winnerJob.StepIndex,
+			"canceled_loser_jobs", canceledCount,
+		)
+	}
+
+	return nil
+}
+
 // cancelRemainingJobsAfterFailure cancels all non-terminal jobs with
 // step_index greater than the failed job's step_index. This is used after the
 // system determines that no further progression is possible (e.g., healing
