@@ -91,7 +91,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
   - Tests: Covered by `internal/nodeagent/execution_orchestrator_test.go`, `internal/nodeagent/execution_healing_test.go`, and `internal/nodeagent/execution_healing_retry_test.go` (executor selection, gate/healing behavior, and env wiring).
 
 ## Phase D — Resumability and failure recovery
-- [ ] D1 — Server resume endpoint — Allow resuming failed/canceled Mods tickets using existing runs/jobs.
+- [x] D1 — Server resume endpoint — Allow resuming failed/canceled Mods tickets using existing runs/jobs.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, `internal/store`.
   - Scope: Implement `POST /v1/mods/{id}/resume` on the control plane:
