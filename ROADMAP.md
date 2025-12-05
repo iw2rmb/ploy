@@ -85,7 +85,7 @@ Legend: [ ] todo, [x] done.
   - Component: repository-wide tests
   - Scope: execute go test -cover ./... after the migration to moby client/types; ensure there are no regressions in unrelated packages.
   - Tests: go test -cover ./... — full test suite passes with coverage recorded.
-  - **Completed**: Full test suite (52 packages) passes under moby Engine v29 SDK. Notable coverage: cmd/ploy 64.1%, internal/nodeagent 70.9%, internal/workflow/runtime/step 72.8%, internal/server/scheduler 97.9%. No regressions detected.
+  - **Completed**: Full test suite (54 packages) passes under moby Engine v29 SDK. Notable coverage: cmd/ploy 64.1%, internal/nodeagent 70.9%, internal/workflow/runtime/step 72.8%, internal/server/scheduler 97.9%. No regressions detected.
 - [ ] Enforce RED→GREEN→REFACTOR discipline and coverage thresholds — protect workflow runner and worker paths.
   - Repository: github.com/iw2rmb/ploy
   - Component: scripts/validate-tdd-discipline.sh, internal/workflow/..., internal/worker/...
