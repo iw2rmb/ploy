@@ -140,7 +140,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
   - Tests: Add negative-path tests where resume is rejected for non-resumable states and verify error codes/messages.
 
 ## Phase E — Parallel healing and branching
-- [ ] E1 — Spec shape for multi-strategy healing — Allow multiple healing strategies while preserving current behavior.
+- [x] E1 — Spec shape for multi-strategy healing — Allow multiple healing strategies while preserving current behavior.
   - Repository: `ploy`
   - Component: `docs/schemas/mod.example.yaml`, `docs/mods-lifecycle.md`, spec parsing in `internal/nodeagent/claimer_spec.go`.
   - Scope:
