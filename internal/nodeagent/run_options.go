@@ -5,7 +5,16 @@
 // lookups throughout the package while preserving raw JSON where needed for
 // wire-level compatibility. The typed options align with the roadmap goal of
 // reducing map[string]any casts and improving internal type safety.
+//
+// ## Stack-Aware Image Selection
+//
+// The Image field in StepMod, HealingMod, and ExecutionOptions uses the
+// contracts.ModImage type to support both universal images (string) and
+// stack-specific images (map keyed by stack). Resolution happens at manifest
+// build time using the detected stack from Build Gate.
 package nodeagent
+
+import "github.com/iw2rmb/ploy/internal/workflow/contracts"
 
 // RunOptions holds all typed configuration options for a run execution.
 // It aggregates build gate configuration, healing policy, MR creation wiring,
@@ -68,7 +77,10 @@ type HealingConfig struct {
 // Healing mods run after gate failure to attempt workspace fixes before re-gate.
 type HealingMod struct {
 	// Image is the container image for the healing mod (required).
-	Image string
+	// Supports both universal images (string) and stack-specific images (map).
+	// Resolution to a concrete image happens at manifest build time using the
+	// detected stack from Build Gate.
+	Image contracts.ModImage
 
 	// Command is the container command override (optional).
 	// Can be a single shell string or an array of command + args.
@@ -131,7 +143,10 @@ type MRWiringOptions struct {
 // These options shape how the main mod container is configured and retained.
 type ExecutionOptions struct {
 	// Image is the container image to run (default: "ubuntu:latest").
-	Image string
+	// Supports both universal images (string) and stack-specific images (map).
+	// Resolution to a concrete image happens at manifest build time using the
+	// detected stack from Build Gate.
+	Image contracts.ModImage
 
 	// Command is the container command override (optional).
 	// Can be a shell string or an array of command + args.
@@ -195,7 +210,10 @@ type ServerMetadataOptions struct {
 // Steps execute sequentially with shared workspace, each running gate+mod.
 type StepMod struct {
 	// Image is the container image for this step (required).
-	Image string
+	// Supports both universal images (string) and stack-specific images (map).
+	// Resolution to a concrete image happens at manifest build time using the
+	// detected stack from Build Gate.
+	Image contracts.ModImage
 
 	// Command is the container command override for this step (optional).
 	Command ExecutionCommand
@@ -265,8 +283,13 @@ func parseRunOptions(opts map[string]any) RunOptions {
 	}
 
 	// Parse execution options.
-	if image, ok := opts["image"].(string); ok {
-		runOpts.Execution.Image = image
+	// Image supports both string (universal) and map (stack-specific) forms.
+	// ParseModImage handles the polymorphic conversion.
+	if imgVal, hasImage := opts["image"]; hasImage {
+		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
+			runOpts.Execution.Image = modImage
+		}
+		// On parse error, leave Image empty; validation happens at manifest build.
 	}
 	if retain, ok := opts["retain_container"].(bool); ok {
 		runOpts.Execution.RetainContainer = retain
@@ -316,8 +339,12 @@ func parseStepMod(modMap map[string]any) StepMod {
 	}
 
 	// Extract image (required for multi-step mods).
-	if image, ok := modMap["image"].(string); ok {
-		stepMod.Image = image
+	// Image supports both string (universal) and map (stack-specific) forms.
+	if imgVal, hasImage := modMap["image"]; hasImage {
+		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
+			stepMod.Image = modImage
+		}
+		// On parse error, leave Image empty; validation happens at manifest build.
 	}
 
 	// Extract command (polymorphic: string or []any).
@@ -359,8 +386,12 @@ func parseHealingMod(modMap map[string]any) HealingMod {
 
 	// Extract image (required, but we don't validate here; validation happens
 	// in buildHealingManifest where context allows better error messages).
-	if image, ok := modMap["image"].(string); ok {
-		mod.Image = image
+	// Image supports both string (universal) and map (stack-specific) forms.
+	if imgVal, hasImage := modMap["image"]; hasImage {
+		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
+			mod.Image = modImage
+		}
+		// On parse error, leave Image empty; validation happens at manifest build.
 	}
 
 	// Extract command (polymorphic: string or []any).

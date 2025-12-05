@@ -582,8 +582,13 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 
 // selectHealingModForJob selects the HealingMod that should back this healing job.
 // Preference order:
-//  1. Match StartRunRequest.ModImage against HealingConfig.Mods[i].Image (trimmed).
+//  1. Match StartRunRequest.ModImage against HealingConfig.Mods[i].Image (resolved).
 //  2. Fall back to the first configured healing mod.
+//
+// When matching, the mod image is resolved using ModStackUnknown since we don't
+// have stack information at job selection time. For universal images, this returns
+// the exact image string. For stack-specific images, this compares against the
+// default fallback (if any).
 func selectHealingModForJob(req StartRunRequest, healing *HealingConfig) (HealingMod, int) {
 	if healing == nil || len(healing.Mods) == 0 {
 		return HealingMod{}, 0
@@ -591,7 +596,13 @@ func selectHealingModForJob(req StartRunRequest, healing *HealingConfig) (Healin
 
 	if img := strings.TrimSpace(req.ModImage); img != "" {
 		for i, mod := range healing.Mods {
-			if strings.TrimSpace(mod.Image) == img {
+			// Resolve the mod image using unknown stack (fallback to default).
+			// This matches universal images directly and stack maps via default.
+			resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)
+			if err != nil {
+				continue // Skip mods that can't be resolved without stack context.
+			}
+			if strings.TrimSpace(resolved) == img {
 				return mod, i
 			}
 		}

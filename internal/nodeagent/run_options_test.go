@@ -3,6 +3,8 @@ package nodeagent
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // TestParseRunOptions_BuildGate verifies that build gate options are correctly parsed.
@@ -57,8 +59,13 @@ func TestParseRunOptions_HealingConfig(t *testing.T) {
 	}
 
 	mod := runOpts.Healing.Mods[0]
-	if mod.Image != "docker.io/test/heal:v1" {
-		t.Errorf("expected image=docker.io/test/heal:v1, got %q", mod.Image)
+	// Image is now a ModImage type; verify universal image was parsed.
+	resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving image: %v", err)
+	}
+	if resolved != "docker.io/test/heal:v1" {
+		t.Errorf("expected image=docker.io/test/heal:v1, got %q", resolved)
 	}
 	if mod.Command.Shell != "heal.sh" {
 		t.Errorf("expected command.shell=heal.sh, got %q", mod.Command.Shell)
@@ -149,8 +156,13 @@ func TestParseRunOptions_Execution(t *testing.T) {
 
 		runOpts := parseRunOptions(opts)
 
-		if runOpts.Execution.Image != "ubuntu:22.04" {
-			t.Errorf("expected image=ubuntu:22.04, got %q", runOpts.Execution.Image)
+		// Image is now a ModImage type; verify universal image was parsed.
+		resolved, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected error resolving image: %v", err)
+		}
+		if resolved != "ubuntu:22.04" {
+			t.Errorf("expected image=ubuntu:22.04, got %q", resolved)
 		}
 		if runOpts.Execution.Command.Shell != "echo hello" {
 			t.Errorf("expected command.shell='echo hello', got %q", runOpts.Execution.Command.Shell)
@@ -236,8 +248,13 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}
 
 	// Verify typed options are populated.
-	if typedOpts.Execution.Image != "docker.io/test/mod:latest" {
-		t.Errorf("expected typed image=docker.io/test/mod:latest, got %q", typedOpts.Execution.Image)
+	// Image is now a ModImage type; verify universal image was parsed.
+	resolved, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving image: %v", err)
+	}
+	if resolved != "docker.io/test/mod:latest" {
+		t.Errorf("expected typed image=docker.io/test/mod:latest, got %q", resolved)
 	}
 	if typedOpts.Execution.Command.Shell != "run-test.sh" {
 		t.Errorf("expected typed command.shell=run-test.sh, got %q", typedOpts.Execution.Command.Shell)
@@ -401,8 +418,13 @@ func TestParseRunOptions_MultiStepMods(t *testing.T) {
 
 	// Verify first step.
 	step0 := runOpts.Steps[0]
-	if step0.Image != "docker.io/test/step1:v1" {
-		t.Errorf("expected steps[0].image=docker.io/test/step1:v1, got %q", step0.Image)
+	// Image is now a ModImage type; verify universal image was parsed.
+	step0Img, err := step0.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving step0 image: %v", err)
+	}
+	if step0Img != "docker.io/test/step1:v1" {
+		t.Errorf("expected steps[0].image=docker.io/test/step1:v1, got %q", step0Img)
 	}
 	if step0.Command.Shell != "migrate-java8.sh" {
 		t.Errorf("expected steps[0].command.shell=migrate-java8.sh, got %q", step0.Command.Shell)
@@ -419,8 +441,12 @@ func TestParseRunOptions_MultiStepMods(t *testing.T) {
 
 	// Verify second step (command as exec array).
 	step1 := runOpts.Steps[1]
-	if step1.Image != "docker.io/test/step2:v1" {
-		t.Errorf("expected steps[1].image=docker.io/test/step2:v1, got %q", step1.Image)
+	step1Img, err := step1.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving step1 image: %v", err)
+	}
+	if step1Img != "docker.io/test/step2:v1" {
+		t.Errorf("expected steps[1].image=docker.io/test/step2:v1, got %q", step1Img)
 	}
 	want := []string{"/bin/sh", "-c", "migrate-java11.sh"}
 	if len(step1.Command.Exec) != len(want) {
@@ -440,8 +466,12 @@ func TestParseRunOptions_MultiStepMods(t *testing.T) {
 
 	// Verify third step (no command specified).
 	step2 := runOpts.Steps[2]
-	if step2.Image != "docker.io/test/step3:v1" {
-		t.Errorf("expected steps[2].image=docker.io/test/step3:v1, got %q", step2.Image)
+	step2Img, err := step2.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving step2 image: %v", err)
+	}
+	if step2Img != "docker.io/test/step3:v1" {
+		t.Errorf("expected steps[2].image=docker.io/test/step3:v1, got %q", step2Img)
 	}
 	if !step2.Command.IsEmpty() {
 		t.Errorf("expected steps[2].command to be empty, got shell=%q exec=%v", step2.Command.Shell, step2.Command.Exec)
@@ -488,8 +518,12 @@ func TestParseRunOptions_SingleStepHasNoSteps(t *testing.T) {
 	}
 
 	// Verify Execution options are populated.
-	if runOpts.Execution.Image != "docker.io/test/single:v1" {
-		t.Errorf("expected execution.image=docker.io/test/single:v1, got %q", runOpts.Execution.Image)
+	execImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving execution image: %v", err)
+	}
+	if execImg != "docker.io/test/single:v1" {
+		t.Errorf("expected execution.image=docker.io/test/single:v1, got %q", execImg)
 	}
 	if runOpts.Execution.Command.Shell != "run-single.sh" {
 		t.Errorf("expected execution.command.shell=run-single.sh, got %q", runOpts.Execution.Command.Shell)
@@ -527,8 +561,12 @@ func TestParseSpec_MultiStepProducesTypedSteps(t *testing.T) {
 	}
 
 	// Verify first step.
-	if typedOpts.Steps[0].Image != "docker.io/test/step-a:v1" {
-		t.Errorf("expected steps[0].image=docker.io/test/step-a:v1, got %q", typedOpts.Steps[0].Image)
+	stepAImg, err := typedOpts.Steps[0].Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving step-a image: %v", err)
+	}
+	if stepAImg != "docker.io/test/step-a:v1" {
+		t.Errorf("expected steps[0].image=docker.io/test/step-a:v1, got %q", stepAImg)
 	}
 	if typedOpts.Steps[0].Command.Shell != "step-a.sh" {
 		t.Errorf("expected steps[0].command.shell=step-a.sh, got %q", typedOpts.Steps[0].Command.Shell)
@@ -538,8 +576,12 @@ func TestParseSpec_MultiStepProducesTypedSteps(t *testing.T) {
 	}
 
 	// Verify second step.
-	if typedOpts.Steps[1].Image != "docker.io/test/step-b:v1" {
-		t.Errorf("expected steps[1].image=docker.io/test/step-b:v1, got %q", typedOpts.Steps[1].Image)
+	stepBImg, err := typedOpts.Steps[1].Image.ResolveImage(contracts.ModStackUnknown)
+	if err != nil {
+		t.Fatalf("unexpected error resolving step-b image: %v", err)
+	}
+	if stepBImg != "docker.io/test/step-b:v1" {
+		t.Errorf("expected steps[1].image=docker.io/test/step-b:v1, got %q", stepBImg)
 	}
 	want := []string{"step-b.sh", "--flag"}
 	if len(typedOpts.Steps[1].Command.Exec) != len(want) {
@@ -560,5 +602,136 @@ func TestParseSpec_MultiStepProducesTypedSteps(t *testing.T) {
 	}
 	if typedOpts.BuildGate.Profile != "auto" {
 		t.Errorf("expected build_gate.profile=auto, got %q", typedOpts.BuildGate.Profile)
+	}
+}
+
+// TestParseRunOptions_StackAwareImage verifies that stack-aware image maps
+// are correctly parsed and resolved to the appropriate image for each stack.
+func TestParseRunOptions_StackAwareImage(t *testing.T) {
+	t.Parallel()
+
+	// Execution options with stack-specific images.
+	opts := map[string]any{
+		"image": map[string]any{
+			"default":     "docker.io/user/mods-orw:latest",
+			"java-maven":  "docker.io/user/mods-orw-maven:latest",
+			"java-gradle": "docker.io/user/mods-orw-gradle:latest",
+		},
+		"command": "run.sh",
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	// Verify stack-specific resolution works.
+	tests := []struct {
+		stack contracts.ModStack
+		want  string
+	}{
+		{contracts.ModStackJavaMaven, "docker.io/user/mods-orw-maven:latest"},
+		{contracts.ModStackJavaGradle, "docker.io/user/mods-orw-gradle:latest"},
+		{contracts.ModStackJava, "docker.io/user/mods-orw:latest"},       // Falls back to default.
+		{contracts.ModStackUnknown, "docker.io/user/mods-orw:latest"},    // Falls back to default.
+		{contracts.ModStack("python"), "docker.io/user/mods-orw:latest"}, // Falls back to default.
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.stack), func(t *testing.T) {
+			resolved, err := runOpts.Execution.Image.ResolveImage(tt.stack)
+			if err != nil {
+				t.Fatalf("unexpected error resolving image for stack %q: %v", tt.stack, err)
+			}
+			if resolved != tt.want {
+				t.Errorf("ResolveImage(%q) = %q, want %q", tt.stack, resolved, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseRunOptions_HealingStackAwareImage verifies that healing mods
+// with stack-aware image maps are correctly parsed.
+func TestParseRunOptions_HealingStackAwareImage(t *testing.T) {
+	t.Parallel()
+
+	opts := map[string]any{
+		"build_gate_healing": map[string]any{
+			"retries": 1,
+			"mods": []any{
+				map[string]any{
+					"image": map[string]any{
+						"default":    "docker.io/user/heal:latest",
+						"java-maven": "docker.io/user/heal-maven:latest",
+					},
+					"command": "heal.sh",
+				},
+			},
+		},
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	if runOpts.Healing == nil || len(runOpts.Healing.Mods) != 1 {
+		t.Fatal("expected 1 healing mod")
+	}
+
+	mod := runOpts.Healing.Mods[0]
+
+	// Verify stack-specific resolution.
+	mavenImg, err := mod.Image.ResolveImage(contracts.ModStackJavaMaven)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mavenImg != "docker.io/user/heal-maven:latest" {
+		t.Errorf("expected java-maven image, got %q", mavenImg)
+	}
+
+	// Verify default fallback.
+	gradleImg, err := mod.Image.ResolveImage(contracts.ModStackJavaGradle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gradleImg != "docker.io/user/heal:latest" {
+		t.Errorf("expected default image for gradle stack, got %q", gradleImg)
+	}
+}
+
+// TestParseRunOptions_MultiStepStackAwareImage verifies that multi-step mods
+// with stack-aware image maps are correctly parsed.
+func TestParseRunOptions_MultiStepStackAwareImage(t *testing.T) {
+	t.Parallel()
+
+	opts := map[string]any{
+		"mods": []any{
+			map[string]any{
+				"image": map[string]any{
+					"default":     "docker.io/user/step1:latest",
+					"java-gradle": "docker.io/user/step1-gradle:latest",
+				},
+				"command": "step1.sh",
+			},
+		},
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	if len(runOpts.Steps) != 1 {
+		t.Fatalf("expected 1 step, got %d", len(runOpts.Steps))
+	}
+
+	// Verify gradle stack gets specific image.
+	gradleImg, err := runOpts.Steps[0].Image.ResolveImage(contracts.ModStackJavaGradle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gradleImg != "docker.io/user/step1-gradle:latest" {
+		t.Errorf("expected gradle-specific image, got %q", gradleImg)
+	}
+
+	// Verify maven stack falls back to default.
+	mavenImg, err := runOpts.Steps[0].Image.ResolveImage(contracts.ModStackJavaMaven)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mavenImg != "docker.io/user/step1:latest" {
+		t.Errorf("expected default image for maven stack, got %q", mavenImg)
 	}
 }

@@ -18,7 +18,31 @@ import (
 // mod step to build a manifest for. For single-step runs, stepIndex is ignored and
 // Execution options are used. This enables step-by-step execution where each step
 // runs gate+mod with its own image/command/env configuration.
+//
+// ## Stack-Aware Image Resolution
+//
+// The Image field in StepMod and ExecutionOptions supports both universal images
+// (string) and stack-specific images (map keyed by stack). This function resolves
+// the image using contracts.ModStackUnknown as the default stack. For full stack
+// detection, use buildManifestFromRequestWithStack which accepts an explicit stack.
 func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int) (contracts.StepManifest, error) {
+	// Delegate to the stack-aware version with "unknown" as the default stack.
+	// This preserves backward compatibility for callers that don't have stack info.
+	return buildManifestFromRequestWithStack(req, typedOpts, stepIndex, contracts.ModStackUnknown)
+}
+
+// buildManifestFromRequestWithStack converts a StartRunRequest into a StepManifest
+// with explicit stack-aware image resolution. The stack parameter is used to
+// resolve stack-specific images when the image field is a map.
+//
+// Stack values typically come from Build Gate detection:
+//   - "java-maven": Maven project detected (pom.xml present)
+//   - "java-gradle": Gradle project detected (build.gradle present)
+//   - "java": Generic Java (no specific build tool)
+//   - "unknown": No recognized stack markers
+//
+// For universal images (string form), the stack is ignored.
+func buildManifestFromRequestWithStack(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.ModStack) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -44,9 +68,14 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		}
 		stepMod := typedOpts.Steps[stepIndex]
 
-		// Use step-specific image and command.
-		if stepMod.Image != "" {
-			image = strings.TrimSpace(stepMod.Image)
+		// Resolve image using stack-aware selection. If the image spec is empty,
+		// fall back to the default image. Resolution errors fail the manifest build.
+		if !stepMod.Image.IsEmpty() {
+			resolved, err := stepMod.Image.ResolveImage(stack)
+			if err != nil {
+				return contracts.StepManifest{}, fmt.Errorf("step[%d] image resolution: %w", stepIndex, err)
+			}
+			image = strings.TrimSpace(resolved)
 		}
 		command = stepMod.Command.ToSlice()
 
@@ -61,8 +90,14 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		retain = stepMod.RetainContainer
 	} else {
 		// Single-step run: use Execution options.
-		if typedOpts.Execution.Image != "" {
-			image = strings.TrimSpace(typedOpts.Execution.Image)
+		// Resolve image using stack-aware selection. If the image spec is empty,
+		// fall back to the default image. Resolution errors fail the manifest build.
+		if !typedOpts.Execution.Image.IsEmpty() {
+			resolved, err := typedOpts.Execution.Image.ResolveImage(stack)
+			if err != nil {
+				return contracts.StepManifest{}, fmt.Errorf("image resolution: %w", err)
+			}
+			image = strings.TrimSpace(resolved)
 		}
 		command = typedOpts.Execution.Command.ToSlice()
 
@@ -221,9 +256,33 @@ func isCodexHealingImage(image string) bool {
 //
 // These env vars enable healing mods to call the Build Gate HTTP API with the same
 // repo+ref baseline used by the initial Build Gate check.
+//
+// ## Stack-Aware Image Resolution
+//
+// This function uses contracts.ModStackUnknown as the default stack for image
+// resolution. For explicit stack support, use buildHealingManifestWithStack.
 func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string) (contracts.StepManifest, error) {
-	// Validate required image field.
-	image := strings.TrimSpace(mod.Image)
+	return buildHealingManifestWithStack(req, mod, index, codexSession, contracts.ModStackUnknown)
+}
+
+// buildHealingManifestWithStack constructs a StepManifest from a typed HealingMod
+// with explicit stack-aware image resolution.
+//
+// The stack parameter is used to resolve stack-specific images when the image
+// field is a map. For universal images (string form), the stack is ignored.
+func buildHealingManifestWithStack(req StartRunRequest, mod HealingMod, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+	// Validate and resolve the image field. ModImage can be:
+	//   - Universal string: returned directly
+	//   - Stack map: resolved using the provided stack with default fallback
+	if mod.Image.IsEmpty() {
+		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: image required", index)
+	}
+	image, err := mod.Image.ResolveImage(stack)
+	if err != nil {
+		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d] image resolution: %w", index, err)
+	}
+	image = strings.TrimSpace(image)
+	// Handle whitespace-only universal images (resolved but empty after trim).
 	if image == "" {
 		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: image required", index)
 	}
