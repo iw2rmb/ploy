@@ -128,7 +128,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - `"metadata":{"resume_count":"1","repo_base_ref":"main"}`
   - Tests: Add tests to assert metadata presence after a resume and to verify that events include at least one resume-related update.
 
-- [ ] D4 — Resumability invariants — Guard against unsafe or confusing resumes.
+- [x] D4 — Resumability invariants — Guard against unsafe or confusing resumes.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, `internal/store`.
   - Scope:
