@@ -51,6 +51,8 @@ paths:
     $ref: './paths/mods.yaml'
   /v1/mods/{id}:
     $ref: './paths/mods_id.yaml'
+  /v1/mods/{id}/graph:
+    $ref: './paths/mods_id_graph.yaml'
   /v1/mods/{id}/cancel:
     $ref: './paths/mods_id_cancel.yaml'
   /v1/mods/{id}/events:
@@ -155,6 +157,10 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Event'
     Stage:
       $ref: './components/schemas/controlplane.yaml#/Stage'
+    WorkflowGraphNode:
+      $ref: './components/schemas/controlplane.yaml#/WorkflowGraphNode'
+    WorkflowGraph:
+      $ref: './components/schemas/controlplane.yaml#/WorkflowGraph'
     Node:
       $ref: './components/schemas/controlplane.yaml#/Node'
     NodeCreateLogResponse:
