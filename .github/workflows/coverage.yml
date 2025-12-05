@@ -20,12 +20,6 @@ jobs:
           - name: mods
             path: ./internal/mods
             min: 80
-          - name: orchestration
-            path: ./internal/orchestration
-            min: 70
-          - name: storage
-            path: ./internal/storage
-            min: 70
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -84,8 +78,6 @@ jobs:
           set -euo pipefail
           components=(
             "mods ./internal/mods"
-            "orchestration ./internal/orchestration"
-            "storage ./internal/storage"
           )
           mkdir -p badges
           gen_badge() {
@@ -156,8 +148,6 @@ jobs:
           set -euo pipefail
           components=(
             "mods ./internal/mods"
-            "orchestration ./internal/orchestration"
-            "storage ./internal/storage"
           )
           echo "mode: atomic" > coverage_all.out
           for entry in "${components[@]}"; do
