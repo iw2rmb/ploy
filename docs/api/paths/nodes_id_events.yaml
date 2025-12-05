@@ -34,11 +34,11 @@ post:
                   - level
                   - message
                 properties:
-                  stage_id:
+                  job_id:
                     type: string
                     format: uuid
                     nullable: true
-                    description: Optional stage UUID
+                    description: Optional job UUID associated with this event
                   time:
                     type: string
                     format: date-time
