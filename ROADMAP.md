@@ -198,7 +198,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
   - Tests: Extend test suites to cover the full multi-branch flow once design is stable.
 
 ## Phase F — Docs, CLI UX, and observability
-- [ ] F1 — DAG and job-flow docs — Document the job graph clearly.
+- [x] F1 — DAG and job-flow docs — Document the job graph clearly.
   - Repository: `ploy`
   - Component: `docs/mods-lifecycle.md`, `ROADMAP_DAG.md`.
   - Scope:

@@ -393,6 +393,72 @@ When the same spec runs against a Gradle project (`build.gradle` present):
 - Image resolution in executor: `internal/nodeagent/run_options.go`.
 - Unit tests: `internal/workflow/contracts/mod_image_test.go`.
 
+## 1.3 Job Graph (DAG) Visualization
+
+Mods runs form a directed acyclic graph (DAG) of jobs. The graph package
+(`internal/workflow/graph`) materializes jobs into an explicit graph structure
+for visualization and debugging. Jobs are ordered by `step_index` (float values
+like 1000, 2000, 3000), which determines execution order and edge relationships.
+
+### Node types
+
+| Type        | Description                                  | Example        |
+|-------------|----------------------------------------------|----------------|
+| `pre_gate`  | Pre-mod Build Gate validation                | `pre-gate`     |
+| `mod`       | Modification container execution             | `mod-0`        |
+| `post_gate` | Post-mod Build Gate validation               | `post-gate`    |
+| `heal`      | Healing job after gate failure               | `heal-0`       |
+| `re_gate`   | Re-validation after healing                  | `re-gate`      |
+
+### Simple run graph
+
+A successful single-mod run creates a linear three-node chain:
+
+```
+┌───────────┐       ┌───────────┐       ┌───────────┐
+│ pre-gate  │──────▶│   mod-0   │──────▶│ post-gate │
+│  (1000)   │       │  (2000)   │       │  (3000)   │
+└───────────┘       └───────────┘       └───────────┘
+```
+
+### Healing run graph
+
+When a gate fails with healing configured, heal and re-gate jobs are inserted
+at midpoint `step_index` values:
+
+```
+┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
+│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│   mod-0   │────▶│ post-gate │
+│  (1000)   │     │  (1250)   │     │  (1500)   │     │  (2000)   │     │  (3000)   │
+│  FAILED   │     │           │     │  PASSED   │     │           │     │           │
+└───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
+```
+
+### Parallel healing branches (Phase E)
+
+Multi-strategy healing creates concurrent branches with distinct `step_index`
+windows. The first branch whose re-gate passes wins; losing branches are canceled:
+
+```
+                           ┌─────────────────────────────────────┐
+                           │         Parallel Branches           │
+                     ┌─────┴─────┐                         ┌─────┴─────┐
+                     │ Branch A  │                         │ Branch B  │
+                     └─────┬─────┘                         └─────┬─────┘
+                           │                                     │
+post-gate  ───────────────▶├─▶ heal-a (1500) → re-gate-a (1600) ─┤
+ FAILED                    │                                     │
+                           └─▶ heal-b (1700) → re-gate-b (1800) ─┘
+                                                                 │
+                                              (first pass wins) ─┘
+```
+
+### Implementation references
+
+- Graph types: `internal/workflow/graph/types.go`
+- Graph builder: `internal/workflow/graph/builder.go`
+- Detailed DAG documentation: `ROADMAP_DAG.md`
+
 ## 2. Data Model
 
 ### 2.1 Ticket summary (`internal/mods/api`)
@@ -701,6 +767,10 @@ Code paths most relevant for Mods:
   - `internal/nodeagent/execution_orchestrator.go`
   - `internal/nodeagent/execution_healing.go`
   - `internal/workflow/runtime/step/*`
+- Graph:
+  - `internal/workflow/graph/types.go` — graph node/edge types
+  - `internal/workflow/graph/builder.go` — DAG materialization from jobs
+  - `ROADMAP_DAG.md` — detailed job graph documentation
 
 For concrete end-to-end scenarios and sample specs see:
 
