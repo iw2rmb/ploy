@@ -18,11 +18,44 @@ assumes a 1x server + 2x node layout.
 
 - SSH access to all hosts with sudo privileges (default user `root`, port `22`).
 - Go 1.25+ installed locally for building binaries.
-- **Docker Engine v29.0+** on worker nodes for container execution (installed automatically during `ploy node add`).
-  - Minimum API version: v1.44 (required by Engine v29).
-  - See `GOLANG.md` § "Docker Engine Requirements" for SDK module details.
 - PostgreSQL 14+ (installed automatically on the server host when `--postgresql-dsn` is omitted).
 - Build the CLI and binaries locally: `make build` (CLI placed at `dist/ploy`).
+
+### Docker Engine v29 Requirements (Worker Nodes)
+
+Worker nodes require **Docker Engine v29.0 or later** for container execution.
+
+| Requirement          | Value              | Notes                                           |
+|----------------------|--------------------|-------------------------------------------------|
+| Docker Engine        | v29.0+             | `docker version --format '{{.Server.Version}}'` |
+| Docker API           | v1.44+             | `docker version --format '{{.Server.APIVersion}}'` |
+| Unsupported versions | v28.x and earlier  | API negotiation fails; nodes will not claim jobs |
+
+**Automatic installation**: When `ploy node add` provisions a worker node that lacks Docker, it installs
+Docker Engine v29 via the official convenience script (`get.docker.com`). Nodes with pre-existing Docker
+installations are **not upgraded** — operators must verify the version before deployment.
+
+**Verification commands** (run on each worker node):
+
+```bash
+# Check Docker Engine version (must be 29.0 or higher).
+docker version --format '{{.Server.Version}}'
+
+# Check Docker API version (must be 1.44 or higher).
+docker version --format '{{.Server.APIVersion}}'
+
+# Full version output for troubleshooting.
+docker version
+```
+
+**Upgrading from Docker v28 or earlier**: See `docs/how-to/update-a-cluster.md` § "Docker Engine Upgrade"
+for step-by-step instructions on upgrading existing nodes.
+
+**Why v29?** Ploy uses the moby client SDK (`github.com/docker/docker/client`) which requires API v1.44
+for container lifecycle operations. Older daemon versions lack required API endpoints and will cause
+container execution failures.
+
+Cross-reference: `GOLANG.md` § "Docker Engine Requirements" for SDK module details.
 
 Related env vars are documented in `docs/envs/README.md` (PostgreSQL DSN, PKI, optional DockerHub/OpenAI keys).
 

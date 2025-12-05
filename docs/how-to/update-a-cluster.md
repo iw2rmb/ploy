@@ -257,8 +257,129 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
   the bootstrap, ensure the service is healthy before restarting `ployd`.
 - Prefer rolling nodes one at a time to keep capacity available during updates.
 - **Docker Engine v29.0+** is required on worker nodes. Nodes running older Docker versions may fail
-  API negotiation (minimum API v1.44). See `GOLANG.md` § "Docker Engine Requirements" for details.
+  API negotiation (minimum API v1.44). See the "Docker Engine Upgrade" section below for upgrade steps.
 - **GitLab MR integration**: Node agents use `gitlab.com/gitlab-org/api/client-go` for GitLab API interactions with automatic retry on transient failures (rate limits, 5xx errors, network issues). The client integrates with the shared backoff policy (`GitLabMRPolicy`: 4 max attempts, 1s/2s/4s backoff schedule with jitter) and automatically redacts Personal Access Tokens from all logs and error messages. See `cmd/ploy/README.md#gitlab-mr-integration` for retry behavior details and `docs/how-to/create-mr.md` for configuration examples.
+
+---
+
+## Docker Engine Upgrade
+
+Worker nodes require **Docker Engine v29.0 or later** (API v1.44+). This section describes how to
+upgrade nodes running older Docker versions.
+
+### Prerequisites
+
+Before upgrading Docker:
+
+1. **Drain the node** to prevent new job claims during the upgrade:
+   ```bash
+   # Drain via rollout (node stops claiming new jobs).
+   dist/ploy rollout nodes --selector '<node-pattern>' --drain-only
+   ```
+   Alternatively, wait for active runs to complete naturally if the cluster has low activity.
+
+2. **Verify current Docker version** on the target node:
+   ```bash
+   ssh root@<node-ip> 'docker version --format "Engine: {{.Server.Version}}, API: {{.Server.APIVersion}}"'
+   ```
+   If the output shows Engine v29.0+ and API v1.44+, no upgrade is needed.
+
+### Upgrade Steps (Debian/Ubuntu)
+
+Run these commands on each worker node via SSH:
+
+```bash
+# 1. Stop the node agent to prevent container operations during upgrade.
+ssh root@<node-ip> 'systemctl stop ployd-node'
+
+# 2. Remove old Docker packages (keeps configuration and images).
+ssh root@<node-ip> 'apt-get remove -y docker docker-engine docker.io containerd runc || true'
+
+# 3. Install Docker Engine v29 using the official convenience script.
+#    The script auto-detects the OS and installs the latest stable release.
+ssh root@<node-ip> 'curl -fsSL https://get.docker.com | sh'
+
+# 4. Verify the new Docker version (should show 29.x or higher).
+ssh root@<node-ip> 'docker version'
+
+# 5. Restart the Docker daemon (usually automatic after install).
+ssh root@<node-ip> 'systemctl enable docker && systemctl start docker'
+
+# 6. Start the node agent.
+ssh root@<node-ip> 'systemctl start ployd-node'
+```
+
+### Upgrade Steps (RHEL/CentOS/Rocky)
+
+```bash
+# 1. Stop the node agent.
+ssh root@<node-ip> 'systemctl stop ployd-node'
+
+# 2. Remove old Docker packages.
+ssh root@<node-ip> 'yum remove -y docker docker-common docker-engine || true'
+
+# 3. Install Docker Engine v29 using the convenience script.
+ssh root@<node-ip> 'curl -fsSL https://get.docker.com | sh'
+
+# 4. Verify the new version.
+ssh root@<node-ip> 'docker version'
+
+# 5. Start Docker and the node agent.
+ssh root@<node-ip> 'systemctl enable docker && systemctl start docker'
+ssh root@<node-ip> 'systemctl start ployd-node'
+```
+
+### Post-Upgrade Verification
+
+After upgrading Docker on each node:
+
+```bash
+# 1. Verify Docker Engine version is 29.0 or higher.
+ssh root@<node-ip> 'docker version --format "{{.Server.Version}}"'
+# Expected: 29.0.0 or higher
+
+# 2. Verify Docker API version is 1.44 or higher.
+ssh root@<node-ip> 'docker version --format "{{.Server.APIVersion}}"'
+# Expected: 1.44 or higher
+
+# 3. Verify ployd-node is running and healthy.
+ssh root@<node-ip> 'systemctl status ployd-node --no-pager'
+
+# 4. Check node agent logs for errors.
+ssh root@<node-ip> 'journalctl -u ployd-node -n 20 --no-pager'
+
+# 5. Verify the node is sending heartbeats (future: via API).
+#    For now, check logs for "heartbeat sent" or similar messages.
+```
+
+### Rollback (Emergency)
+
+If Docker v29 causes issues, you can rollback to a specific version:
+
+```bash
+# Debian/Ubuntu: Install a specific older version (NOT recommended long-term).
+ssh root@<node-ip> 'apt-cache madison docker-ce | head -5'  # List available versions
+ssh root@<node-ip> 'apt-get install -y docker-ce=<version> docker-ce-cli=<version>'
+
+# Note: Ploy requires v29.0+. Downgrading will cause API negotiation failures.
+# Only use rollback as a temporary measure while investigating the root cause.
+```
+
+### Upgrade Checklist
+
+| Step | Action | Verification |
+|------|--------|--------------|
+| 1 | Drain node | Node stops claiming new jobs |
+| 2 | Wait for active runs | `ploy runs list --node <id>` shows no running jobs |
+| 3 | Stop ployd-node | `systemctl status ployd-node` shows inactive |
+| 4 | Upgrade Docker | `docker version` shows v29.0+ |
+| 5 | Start ployd-node | `systemctl status ployd-node` shows active |
+| 6 | Verify heartbeat | Logs show successful heartbeat to control plane |
+| 7 | Undrain node | Node resumes claiming jobs |
+
+Cross-references:
+- `docs/how-to/deploy-a-cluster.md` § "Docker Engine v29 Requirements" for new deployments.
+- `GOLANG.md` § "Docker Engine Requirements" for SDK module and API version details.
 
 ---
 
