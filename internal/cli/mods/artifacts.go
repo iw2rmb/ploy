@@ -62,15 +62,15 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.Output == nil {
 		return nil
 	}
-	// Stable iteration order by stage id.
-	var stages []string
+	// Stable iteration order by stage id (map key = job UUID).
+	var stageIDs []string
 	for id := range payload.Ticket.Stages {
-		stages = append(stages, id)
+		stageIDs = append(stageIDs, id)
 	}
-	sort.Strings(stages)
-	for _, id := range stages {
+	sort.Strings(stageIDs)
+	for _, id := range stageIDs {
 		st := payload.Ticket.Stages[id]
-		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(string(st.StageID)))
+		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(id))
 		if len(st.Artifacts) == 0 {
 			continue
 		}

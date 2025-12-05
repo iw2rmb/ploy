@@ -20,8 +20,8 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 				TicketID: domaintypes.TicketID(ticket),
 				State:    modsapi.TicketStateSucceeded,
 				Stages: map[string]modsapi.StageStatus{
-					"plan": {StageID: domaintypes.StageID("plan"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
-					"exec": {StageID: domaintypes.StageID("exec"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
+					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
+					"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
 				},
 			}})
 			return

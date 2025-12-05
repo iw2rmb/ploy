@@ -32,8 +32,7 @@ func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
 					State:    modsapi.TicketStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"stage1": {
-							StageID: domaintypes.StageID("stage1"),
-							State:   modsapi.StageStateSucceeded,
+							State: modsapi.StageStateSucceeded,
 							Artifacts: map[string]string{
 								"artifact1": "cid-abc123",
 							},
@@ -148,15 +147,13 @@ func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
 					State:    modsapi.TicketStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {
-							StageID: domaintypes.StageID("plan"),
-							State:   modsapi.StageStateSucceeded,
+							State: modsapi.StageStateSucceeded,
 							Artifacts: map[string]string{
 								"plan.json": "cid-plan",
 							},
 						},
 						"exec": {
-							StageID: domaintypes.StageID("exec"),
-							State:   modsapi.StageStateSucceeded,
+							State: modsapi.StageStateSucceeded,
 							Artifacts: map[string]string{
 								"output.log": "cid-exec",
 							},
@@ -269,7 +266,7 @@ func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
 						Ticket: modsapi.TicketSummary{
 							TicketID: domaintypes.TicketID("test"),
 							Stages: map[string]modsapi.StageStatus{
-								"stage1": {StageID: domaintypes.StageID("stage1"), Artifacts: map[string]string{"art": "missing-cid"}},
+								"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
 							},
 						},
 					}

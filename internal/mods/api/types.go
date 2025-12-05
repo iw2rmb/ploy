@@ -36,12 +36,12 @@ const (
 
 // StageDefinition defines a stage within the Mods ticket graph.
 type StageDefinition struct {
-	ID           domaintypes.StageID   `json:"id"`
-	Dependencies []domaintypes.StageID `json:"dependencies,omitempty"`
-	Lane         string                `json:"lane,omitempty"`
-	Priority     string                `json:"priority,omitempty"`
-	MaxAttempts  int                   `json:"max_attempts,omitempty"`
-	Metadata     map[string]string     `json:"metadata,omitempty"`
+	ID           string            `json:"id"`
+	Dependencies []string          `json:"dependencies,omitempty"`
+	Lane         string            `json:"lane,omitempty"`
+	Priority     string            `json:"priority,omitempty"`
+	MaxAttempts  int               `json:"max_attempts,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
 // TicketSubmitRequest represents a ticket submission payload.
@@ -81,11 +81,9 @@ type TicketSummary struct {
 // StageStatus summarises the execution state for a job (called "stage" for API
 // backward compatibility). Each StageStatus maps to a row in the `jobs` table.
 type StageStatus struct {
-	// StageID is the job UUID (jobs.id). Named "stage_id" for API backward compatibility.
-	StageID     domaintypes.StageID `json:"stage_id"`
-	State       StageState          `json:"state"`
-	Attempts    int                 `json:"attempts"`
-	MaxAttempts int                 `json:"max_attempts"`
+	State       StageState `json:"state"`
+	Attempts    int        `json:"attempts"`
+	MaxAttempts int        `json:"max_attempts"`
 	// CurrentJobID is the job identifier for execution jobs.
 	CurrentJobID domaintypes.JobID `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`

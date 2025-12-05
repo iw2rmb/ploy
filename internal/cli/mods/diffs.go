@@ -68,7 +68,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	var listing struct {
 		Diffs []struct {
 			ID        string `json:"id"`
-			StageID   string `json:"stage_id"`
+			JobID     string `json:"job_id"`
 			CreatedAt string `json:"created_at"`
 			Size      int    `json:"gzipped_size"`
 		} `json:"diffs"`
@@ -79,7 +79,11 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 
 	if !c.Download {
 		for _, d := range listing.Diffs {
-			_, _ = fmt.Fprintf(out, "%s stage=%s size=%d created=%s\n", strings.TrimSpace(d.ID), strings.TrimSpace(d.StageID), d.Size, strings.TrimSpace(d.CreatedAt))
+			job := strings.TrimSpace(d.JobID)
+			if job == "" {
+				job = "-"
+			}
+			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", strings.TrimSpace(d.ID), job, d.Size, strings.TrimSpace(d.CreatedAt))
 		}
 		return nil
 	}

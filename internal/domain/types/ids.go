@@ -12,9 +12,6 @@ type TicketID string
 // RunID identifies a run instance.
 type RunID string
 
-// StageID identifies a stage within a run.
-type StageID string
-
 // StepID identifies a step within a stage.
 type StepID string
 
@@ -43,12 +40,6 @@ func (v RunID) String() string { return string(v) }
 
 // IsZero reports whether the value is empty (after trimming spaces).
 func (v RunID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v StageID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v StageID) IsZero() bool { return IsEmpty(string(v)) }
 
 // String returns the underlying string value.
 func (v StepID) String() string { return string(v) }
@@ -120,16 +111,6 @@ func (v RunID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
 func (v *RunID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
 func (v RunID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *RunID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*StageID)(nil)
-
-func (v StageID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *StageID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
-func (v StageID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *StageID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
 var _ interface {
 	encoding.TextMarshaler

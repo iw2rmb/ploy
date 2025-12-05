@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createRunDiffHandler stores a gzipped diff for a run using body-provided stage_id.
+// createRunDiffHandler stores a gzipped diff for a run using an optional job-scoped association.
 func createRunDiffHandler(st store.Store) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded patch bytes.

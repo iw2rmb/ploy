@@ -163,7 +163,6 @@ func TestStream_PublishTicket(t *testing.T) {
 				UpdatedAt: now,
 				Stages: map[string]modsapi.StageStatus{
 					"stage-1": {
-						StageID:     domaintypes.StageID("stage-1"),
 						State:       modsapi.StageStateQueued,
 						Attempts:    0,
 						MaxAttempts: 3,
