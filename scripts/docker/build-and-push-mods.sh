@@ -72,12 +72,20 @@ fi
 for name in "${images[@]}"; do
   # Map directory name to repo image name
   image_name="$name"
-  if [[ "$image_name" == mod-* ]]; then
-    image_name="mods-${image_name#mod-}"
-  fi
-  if [[ "$name" == "mod-orw" ]]; then
-    image_name="mods-openrewrite"
-  fi
+  case "$name" in
+    orw-maven)
+      image_name="mods-orw-maven"
+      ;;
+    orw-gradle)
+      image_name="mods-orw-gradle"
+      ;;
+    mod-orw)
+      image_name="mods-openrewrite"
+      ;;
+    mod-*)
+      image_name="mods-${name#mod-}"
+      ;;
+  esac
 
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
@@ -112,4 +120,3 @@ for name in "${images[@]}"; do
 done
 
 echo "All Mods images pushed to ${IMAGE_PREFIX}"
-
