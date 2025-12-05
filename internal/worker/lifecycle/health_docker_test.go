@@ -6,20 +6,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	typesystem "github.com/docker/docker/api/types/system"
+	// Docker Engine v29 SDK modules (moby). These replace the deprecated
+	// github.com/docker/docker imports with supported Engine v29 equivalents.
+	// See ROADMAP.md "Migrate worker lifecycle packages to moby client and types".
+	"github.com/moby/moby/api/types/system"
+	"github.com/moby/moby/client"
 )
 
+// fakeDocker implements the dockerAPI interface for testing DockerChecker.
+// It uses moby Engine v29 SDK types (client.PingResult, client.SystemInfoResult)
+// to match the production dockerAPI interface.
 type fakeDocker struct {
-	ping    types.Ping
+	ping    client.PingResult
 	pingErr error
-	info    typesystem.Info
+	info    system.Info
 	infoErr error
 }
 
-func (f fakeDocker) Ping(ctx context.Context) (types.Ping, error)      { return f.ping, f.pingErr }
-func (f fakeDocker) Info(ctx context.Context) (typesystem.Info, error) { return f.info, f.infoErr }
-func (f fakeDocker) Close() error                                      { return nil }
+// Ping returns the configured PingResult or error. Matches moby client.Ping signature.
+func (f fakeDocker) Ping(ctx context.Context, opts client.PingOptions) (client.PingResult, error) {
+	return f.ping, f.pingErr
+}
+
+// Info returns SystemInfoResult wrapping system.Info or error. Matches moby client.Info signature.
+func (f fakeDocker) Info(ctx context.Context, opts client.InfoOptions) (client.SystemInfoResult, error) {
+	return client.SystemInfoResult{Info: f.info}, f.infoErr
+}
+
+// Close is a no-op for the fake client.
+func (f fakeDocker) Close() error { return nil }
 
 func TestDockerChecker_PingError(t *testing.T) {
 	c, err := NewDockerChecker(DockerCheckerOptions{
@@ -52,10 +67,12 @@ func TestDockerChecker_InfoError(t *testing.T) {
 }
 
 func TestDockerChecker_OK(t *testing.T) {
+	// Test uses moby Engine v29 SDK types (client.PingResult, system.Info)
+	// to verify successful health check returns OK state with correct details.
 	c, err := NewDockerChecker(DockerCheckerOptions{
 		Client: fakeDocker{
-			ping: types.Ping{APIVersion: "1.44"},
-			info: typesystem.Info{ServerVersion: "25.0.0", Driver: "overlay2", ContainersRunning: 3},
+			ping: client.PingResult{APIVersion: "1.44"},
+			info: system.Info{ServerVersion: "25.0.0", Driver: "overlay2", ContainersRunning: 3},
 		},
 		Timeout: 50 * time.Millisecond,
 		Clock:   func() time.Time { return time.Unix(12, 0).UTC() },
