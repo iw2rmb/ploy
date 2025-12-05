@@ -116,7 +116,7 @@ Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows
       - Output: `Resume requested`
   - Tests: Extend `cmd/ploy/mod_resume_test.go` to cover success and error paths (e.g. missing ticket, server error).
 
-- [ ] D3 — Resume-aware status and events — Make resumed runs clearly visible in status and SSE.
+- [x] D3 — Resume-aware status and events — Make resumed runs clearly visible in status and SSE.
   - Repository: `ploy`
   - Component: `internal/server/handlers/handlers_mods_ticket.go`, `internal/server/events`.
   - Scope:
