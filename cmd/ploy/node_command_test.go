@@ -129,11 +129,9 @@ func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
 				if !strings.Contains(err.Error(), "invalid SSH port") {
 					t.Fatalf("expected SSH port validation error, got: %v", err)
 				}
-			} else {
+			} else if err != nil {
 				// For valid ports in dry-run mode, we expect success.
-				if err != nil {
-					t.Fatalf("unexpected error for valid port %d: %v", tt.sshPort, err)
-				}
+				t.Fatalf("unexpected error for valid port %d: %v", tt.sshPort, err)
 			}
 		})
 	}

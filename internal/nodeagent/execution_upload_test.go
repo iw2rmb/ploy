@@ -48,10 +48,11 @@ func TestRunController_uploadDiff(t *testing.T) {
 
 			// Mock server that handles both diff and artifact endpoints (job-scoped).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/diff" {
+				switch r.URL.Path {
+				case "/v1/runs/test-run/jobs/test-stage/diff":
 					diffUploadCalled = true
 					w.WriteHeader(http.StatusCreated)
-				} else if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
+				case "/v1/runs/test-run/jobs/test-stage/artifact":
 					artUploadCalled = true
 					w.WriteHeader(http.StatusCreated)
 					// Verify artifact name is "diff" for diff bundle.
@@ -61,7 +62,7 @@ func TestRunController_uploadDiff(t *testing.T) {
 						t.Errorf("artifact name = %v, want diff", payload["name"])
 					}
 					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
-				} else {
+				default:
 					t.Errorf("unexpected endpoint: %s", r.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
 				}
@@ -497,7 +498,8 @@ func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 
 	// Mock server that captures the diff summary for validation (job-scoped endpoints).
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/diff" {
+		switch r.URL.Path {
+		case "/v1/runs/test-run/jobs/test-stage/diff":
 			var payload struct {
 				Patch   string            `json:"patch"`
 				Summary types.DiffSummary `json:"summary"`
@@ -508,10 +510,13 @@ func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 			capturedSummary = payload.Summary
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
-		} else if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
+		case "/v1/runs/test-run/jobs/test-stage/artifact":
 			// Artifact endpoint (diff artifact bundle)
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
+		default:
+			t.Errorf("unexpected endpoint: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer server.Close()

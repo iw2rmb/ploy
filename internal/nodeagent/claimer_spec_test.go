@@ -464,16 +464,16 @@ func TestParseHealingStrategy_ModFields(t *testing.T) {
 		t.Fatal("expected healing strategies to be parsed")
 	}
 
-	strat := typedOpts.Healing.Strategies[0]
-	if strat.Name != "test-strategy" {
-		t.Errorf("Strategy name: got %q, want %q", strat.Name, "test-strategy")
+	strategy := typedOpts.Healing.Strategies[0]
+	if strategy.Name != "test-strategy" {
+		t.Errorf("Strategy name: got %q, want %q", strategy.Name, "test-strategy")
 	}
 
-	if len(strat.Mods) != 1 {
-		t.Fatalf("Strategy mods count: got %d, want 1", len(strat.Mods))
+	if len(strategy.Mods) != 1 {
+		t.Fatalf("Strategy mods count: got %d, want 1", len(strategy.Mods))
 	}
 
-	mod := strat.Mods[0]
+	mod := strategy.Mods[0]
 
 	// Verify image.
 	if mod.Image.Universal != "docker.io/test/healer:v1" {

@@ -183,7 +183,7 @@ func TestGenerateBootstrapToken_ShortLived(t *testing.T) {
 
 	// Verify expiration is within expected range (15 minutes ± 1 minute tolerance)
 	expectedDuration := 15 * time.Minute
-	actualDuration := claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time)
+	actualDuration := claims.ExpiresAt.Sub(claims.IssuedAt.Time)
 	diff := actualDuration - expectedDuration
 	if diff.Abs() > time.Minute {
 		t.Errorf("token duration=%v want approximately %v", actualDuration, expectedDuration)

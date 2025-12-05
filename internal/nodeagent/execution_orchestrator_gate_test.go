@@ -104,8 +104,8 @@ func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
 	}
 
 	// Result should come from the next execution result.
-	if merged.Result.ExitCode != 0 {
-		t.Errorf("merged.Result.ExitCode = %d, want 0", merged.Result.ExitCode)
+	if merged.ExitCode != 0 {
+		t.Errorf("merged.ExitCode = %d, want 0", merged.ExitCode)
 	}
 }
 
@@ -273,8 +273,8 @@ func TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator(t *testing.T) {
 	if merged.PreGate != nextPreGate {
 		t.Fatalf("merged.PreGate = %#v, want nextPreGate %#v", merged.PreGate, nextPreGate)
 	}
-	if merged.Result.ExitCode != 0 {
-		t.Errorf("merged.Result.ExitCode = %d, want 0", merged.Result.ExitCode)
+	if merged.ExitCode != 0 {
+		t.Errorf("merged.ExitCode = %d, want 0", merged.ExitCode)
 	}
 }
 

@@ -83,7 +83,8 @@ type HealingConfig struct {
 
 	// Mods is the list of healing mod specifications to execute on gate failure.
 	// Each mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
-	// DEPRECATED: Prefer Strategies for new specs. Mods is retained for backward
+	//
+	// Deprecated: Prefer Strategies for new specs. Mods is retained for backward
 	// compatibility and is internally normalized to a single unnamed strategy.
 	Mods []HealingMod
 

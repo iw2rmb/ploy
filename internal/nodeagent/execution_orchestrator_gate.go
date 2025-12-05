@@ -108,12 +108,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string) (*contracts.BuildGateStageMetadata, error) {
 	// Resolve gate spec from manifest.
 	gateSpec := manifest.Gate
-	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
-	if gateSpec == nil && manifest.Shift != nil {
+	if gateSpec == nil && manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
 		gateSpec = &contracts.StepGateSpec{
-			Enabled: manifest.Shift.Enabled,
-			Profile: manifest.Shift.Profile,
-			Env:     manifest.Shift.Env,
+			Enabled: manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
+			Profile: manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
+			Env:     manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
 		}
 	}
 

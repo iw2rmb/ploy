@@ -63,11 +63,11 @@ type DockerCheckerOptions struct {
 func NewDockerChecker(opts DockerCheckerOptions) (*DockerChecker, error) {
 	clientAPI := opts.Client
 	if clientAPI == nil {
-		cliOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
+		cliOpts := []client.Opt{client.FromEnv}
 		if trimmed := strings.TrimSpace(opts.Host); trimmed != "" {
 			cliOpts = append(cliOpts, client.WithHost(trimmed))
 		}
-		cli, err := client.NewClientWithOpts(cliOpts...)
+		cli, err := client.New(cliOpts...)
 		if err != nil {
 			return nil, err
 		}

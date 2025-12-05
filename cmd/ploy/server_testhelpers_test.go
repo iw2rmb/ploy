@@ -24,11 +24,12 @@ func (m *mockProvisionRunner) Run(ctx context.Context, name string, args []strin
 		m.copiedBinary = true
 	case "ssh":
 		argsStr := strings.Join(args, " ")
-		if strings.Contains(argsStr, "install -m0755") {
+		switch {
+		case strings.Contains(argsStr, "install -m0755"):
 			m.installedBinary = true
-		} else if strings.Contains(argsStr, "systemctl is-active") {
+		case strings.Contains(argsStr, "systemctl is-active"):
 			m.checkedService = true
-		} else if strings.Contains(argsStr, "bash") && strings.Contains(argsStr, "-s") {
+		case strings.Contains(argsStr, "bash") && strings.Contains(argsStr, "-s"):
 			m.ranBootstrapScript = true
 		}
 	default:

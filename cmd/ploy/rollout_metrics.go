@@ -36,9 +36,10 @@ func (m *RolloutMetrics) RecordStep(step, status string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.stepsTotal[step]++
-	if status == "completed" || status == "success" {
+	switch status {
+	case "completed", "success":
 		m.stepsSuccess[step]++
-	} else if status == "failed" {
+	case "failed":
 		m.stepsFailed[step]++
 	}
 }

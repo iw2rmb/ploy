@@ -29,7 +29,7 @@ func TestGenerateClusterID(t *testing.T) {
 		}
 
 		for _, c := range hexPart {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				t.Errorf("invalid hex character %q in cluster ID %q", c, id)
 			}
 		}
@@ -76,7 +76,7 @@ func TestGenerateNodeID(t *testing.T) {
 		}
 
 		for _, c := range hexPart {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				t.Errorf("invalid hex character %q in node ID %q", c, id)
 			}
 		}
@@ -149,7 +149,7 @@ func TestRandomHexString(t *testing.T) {
 
 			// Validate all characters are hex
 			for _, c := range got {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 					t.Errorf("invalid hex character %q in result %q", c, got)
 				}
 			}

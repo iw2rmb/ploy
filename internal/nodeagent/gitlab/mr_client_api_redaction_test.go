@@ -26,7 +26,7 @@ func TestCreateMR_PATRedaction(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 				// Echo the auth header in the error (simulating a real API that might leak tokens).
 				auth := r.Header.Get("Authorization")
-				_, _ = w.Write([]byte(fmt.Sprintf(`{"message":"Invalid token: %s"}`, auth)))
+				_, _ = fmt.Fprintf(w, `{"message":"Invalid token: %s"}`, auth)
 			},
 		},
 		{
@@ -35,7 +35,7 @@ func TestCreateMR_PATRedaction(t *testing.T) {
 			serverFunc: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 				auth := r.Header.Get("Authorization")
-				_, _ = w.Write([]byte(fmt.Sprintf(`{"message":"Auth failed: %s"}`, auth)))
+				_, _ = fmt.Fprintf(w, `{"message":"Auth failed: %s"}`, auth)
 			},
 		},
 		{
@@ -147,7 +147,7 @@ func TestCreateMR_ClientGoErrorRedaction(t *testing.T) {
 				// include auth details are properly redacted.
 				w.WriteHeader(http.StatusUnauthorized)
 				auth := r.Header.Get("Authorization")
-				_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"unauthorized","details":"%s"}`, auth)))
+				_, _ = fmt.Fprintf(w, `{"error":"unauthorized","details":"%s"}`, auth)
 			},
 			wantError: true,
 		},

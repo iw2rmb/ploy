@@ -210,10 +210,8 @@ func TestValidateGitLabConfig(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Fatalf("expected error containing %q, got: %v", tt.errMsg, err)
 				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
