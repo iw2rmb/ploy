@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Component: internal/workflow/runtime/step
   - Scope: replace github.com/docker/docker imports and client usage in workflow runtime packages with github.com/moby/moby/client and github.com/moby/moby/api/... equivalents; adjust for any type or option differences.
   - Tests: go test ./internal/workflow/runtime/step -run 'Docker|Container' -cover — workflow runtime tests pass and cover new moby-based code paths.
-- [ ] Migrate worker lifecycle packages to moby client and types — keep worker health semantics stable.
+- [x] Migrate worker lifecycle packages to moby client and types — keep worker health semantics stable.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle
   - Scope: replace github.com/docker/docker/api/types and client usage in DockerChecker and related health code with github.com/moby/moby/api equivalents; align Ping and Info field usage.
