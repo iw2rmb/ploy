@@ -252,6 +252,29 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
 		// This transitions the first 'created' job to 'pending' so it can be claimed.
 		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {
+			// E4: Winner selection — When a re-gate succeeds, it's a "winner" branch.
+			// Cancel all other parallel branch jobs (loser teardown) so only the winner proceeds.
+			modType := strings.TrimSpace(job.ModType)
+			if modType == "re_gate" {
+				jobs, jobsErr := st.ListJobsByRun(r.Context(), runID)
+				if jobsErr != nil {
+					slog.Error("complete job: failed to list jobs for winner selection",
+						"run_id", req.RunID,
+						"job_id", req.JobID,
+						"err", jobsErr,
+					)
+				} else {
+					if err := cancelLoserBranches(r.Context(), st, runID, job, jobs); err != nil {
+						slog.Error("complete job: failed to cancel loser branches",
+							"run_id", req.RunID,
+							"job_id", req.JobID,
+							"step_index", job.StepIndex,
+							"err", err,
+						)
+					}
+				}
+			}
+
 			if _, err := st.ScheduleNextJob(r.Context(), runID); err != nil {
 				// Log error but don't fail the job completion (job is already marked complete).
 				// pgx.ErrNoRows means no more jobs to schedule, which is expected for the last job.

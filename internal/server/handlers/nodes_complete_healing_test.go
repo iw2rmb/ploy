@@ -512,6 +512,353 @@ func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
 	}
 }
 
+// TestCancelLoserBranches_WinnerSelectsAndCancelsLosers verifies that when a re-gate
+// succeeds, all other parallel branch jobs (heal, re_gate) in the healing window are canceled.
+func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Scenario: Two-branch healing where branch "codex-ai" re-gate succeeds first.
+	// Branch "static-patch" jobs should be canceled.
+	//
+	// Jobs layout:
+	//   pre-gate (1000) → FAILED
+	//   heal-codex-ai-1-0 (1333) → SUCCEEDED
+	//   re-gate-codex-ai-1 (1444) → SUCCEEDED (winner)
+	//   heal-static-patch-1-0 (1555) → RUNNING (should be canceled)
+	//   re-gate-static-patch-1 (1666) → CREATED (should be canceled)
+	//   mod-0 (2000) → CREATED (mainline, should NOT be canceled)
+	winnerJobID := uuid.New()
+	loserHealID := uuid.New()
+	loserReGateID := uuid.New()
+	mainlineModID := uuid.New()
+
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-codex-ai-1-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "heal",
+			StepIndex: 1333,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-codex-ai-1",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "re_gate",
+			StepIndex: 1444,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: loserHealID, Valid: true},
+			RunID:     runID,
+			Name:      "heal-static-patch-1-0",
+			Status:    store.JobStatusRunning,
+			ModType:   "heal",
+			StepIndex: 1555,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: loserReGateID, Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-static-patch-1",
+			Status:    store.JobStatusCreated,
+			ModType:   "re_gate",
+			StepIndex: 1666,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: mainlineModID, Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+		},
+	}
+
+	winnerJob := jobs[2] // re-gate-codex-ai-1
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+		t.Fatalf("cancelLoserBranches returned error: %v", err)
+	}
+
+	// Verify UpdateJobStatus was called for the loser jobs (heal and re-gate of static-patch).
+	if len(st.updateJobStatusCalls) != 2 {
+		t.Fatalf("expected 2 UpdateJobStatus calls for loser jobs, got %d", len(st.updateJobStatusCalls))
+	}
+
+	// Collect canceled job IDs.
+	canceledIDs := make(map[uuid.UUID]bool)
+	for _, call := range st.updateJobStatusCalls {
+		if call.Status != store.JobStatusCanceled {
+			t.Fatalf("expected canceled status, got %s", call.Status)
+		}
+		canceledIDs[uuid.UUID(call.ID.Bytes)] = true
+	}
+
+	// Verify the loser heal job was canceled.
+	if !canceledIDs[loserHealID] {
+		t.Fatalf("expected heal-static-patch-1-0 to be canceled")
+	}
+
+	// Verify the loser re-gate job was canceled.
+	if !canceledIDs[loserReGateID] {
+		t.Fatalf("expected re-gate-static-patch-1 to be canceled")
+	}
+
+	// Verify the mainline mod-0 was NOT canceled.
+	if canceledIDs[mainlineModID] {
+		t.Fatalf("mainline mod-0 should NOT be canceled")
+	}
+}
+
+// TestCancelLoserBranches_NoLosersWhenSingleBranch verifies that winner selection
+// with a single branch (legacy behavior) doesn't cancel anything extra.
+func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Single-branch legacy healing: only one re-gate, so no losers to cancel.
+	winnerJobID := uuid.New()
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-1-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "heal",
+			StepIndex: 1333,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-1",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "re_gate",
+			StepIndex: 1666,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+		},
+	}
+
+	winnerJob := jobs[2] // re-gate-1
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+		t.Fatalf("cancelLoserBranches returned error: %v", err)
+	}
+
+	// No jobs should be canceled (heal-1-0 is already succeeded, winner is the only re-gate).
+	if len(st.updateJobStatusCalls) != 0 {
+		t.Fatalf("expected 0 UpdateJobStatus calls (no losers), got %d", len(st.updateJobStatusCalls))
+	}
+}
+
+// TestCancelLoserBranches_SkipsTerminalJobs verifies that jobs already in terminal
+// state (succeeded, failed, canceled, skipped) are not re-canceled.
+func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	winnerJobID := uuid.New()
+	alreadyFailedID := uuid.New()
+	pendingLoserID := uuid.New()
+
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-a-1",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "re_gate",
+			StepIndex: 1400,
+		},
+		{
+			// This loser re-gate already failed (maybe timeout); should not be re-canceled.
+			ID:        pgtype.UUID{Bytes: alreadyFailedID, Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-b-1",
+			Status:    store.JobStatusFailed,
+			ModType:   "re_gate",
+			StepIndex: 1600,
+		},
+		{
+			// This loser heal is still pending; should be canceled.
+			ID:        pgtype.UUID{Bytes: pendingLoserID, Valid: true},
+			RunID:     runID,
+			Name:      "heal-branch-c-1-0",
+			Status:    store.JobStatusPending,
+			ModType:   "heal",
+			StepIndex: 1700,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCreated,
+			ModType:   "mod",
+			StepIndex: 2000,
+		},
+	}
+
+	winnerJob := jobs[1]
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+		t.Fatalf("cancelLoserBranches returned error: %v", err)
+	}
+
+	// Only the pending loser (heal-branch-c-1-0) should be canceled.
+	// The already-failed re-gate-branch-b-1 should be skipped.
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected 1 UpdateJobStatus call, got %d", len(st.updateJobStatusCalls))
+	}
+
+	if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) != pendingLoserID {
+		t.Fatalf("expected heal-branch-c-1-0 to be canceled, got job %v",
+			uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes))
+	}
+}
+
+// TestCancelLoserBranches_AllBranchesFail verifies that when all branches fail
+// (no winner), the run eventually fails via maybeCompleteMultiStepRun.
+// This test ensures cancelLoserBranches is NOT called on failure (only on success).
+func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	runUUID := uuid.New()
+	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+
+	// Both branches failed; no winner selection happens.
+	// The run should eventually fail via maybeCompleteMultiStepRun.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "pre-gate",
+			Status:    store.JobStatusFailed,
+			ModType:   "pre_gate",
+			StepIndex: 1000,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-branch-a-1-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "heal",
+			StepIndex: 1333,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-a-1",
+			Status:    store.JobStatusFailed, // Branch A re-gate failed
+			ModType:   "re_gate",
+			StepIndex: 1444,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "heal-branch-b-1-0",
+			Status:    store.JobStatusSucceeded,
+			ModType:   "heal",
+			StepIndex: 1555,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "re-gate-branch-b-1",
+			Status:    store.JobStatusFailed, // Branch B re-gate also failed
+			ModType:   "re_gate",
+			StepIndex: 1666,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     runID,
+			Name:      "mod-0",
+			Status:    store.JobStatusCanceled, // Canceled after healing exhausted
+			ModType:   "mod",
+			StepIndex: 2000,
+		},
+	}
+
+	run := store.Run{
+		ID:   runID,
+		Spec: []byte(`{}`),
+	}
+
+	st := &mockStore{
+		listJobsByRunResult: jobs,
+	}
+
+	// Call maybeCompleteMultiStepRun to verify run completes as failed.
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
+	}
+
+	// Run should be completed with failed status (last gate failed).
+	if !st.updateRunCompletionCalled {
+		t.Fatalf("expected UpdateRunCompletion to be called")
+	}
+	if st.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Fatalf("expected run status=failed, got %s", st.updateRunCompletionParams.Status)
+	}
+}
+
 // TestParseHealingStrategies verifies strategy parsing for both legacy and multi-strategy forms.
 func TestParseHealingStrategies(t *testing.T) {
 	t.Parallel()
