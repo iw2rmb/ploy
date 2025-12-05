@@ -74,11 +74,12 @@ Legend: [ ] todo, [x] done.
   - **Completed**: Added comprehensive mixed daemon version validation tests covering: full v28.x/v29.x healthy scenarios with various drivers (overlay2, vfs, windowsfilter), degraded states when Info fails (v28/v29), error states when Ping fails (v28/v29), version string edge cases (whitespace, build metadata, git hashes), CheckedAt timestamp verification, and API version negotiation range (1.43–1.46). Tests validate State, Version, and Details stability across both Engine versions.
 
 ## Test and validation cycle
-- [ ] Run focused tests for workflow and worker packages on moby — validate the new Docker integration path first.
+- [x] Run focused tests for workflow and worker packages on moby — validate the new Docker integration path first.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step, internal/worker/lifecycle
   - Scope: run go test ./internal/workflow/runtime/step ./internal/worker/lifecycle with moby client in place; fix any immediate failures before wider sweeps.
   - Tests: go test ./internal/workflow/runtime/step ./internal/worker/lifecycle -cover — targeted packages are green with adequate coverage.
+  - **Completed**: Both packages pass with moby Engine v29 SDK. workflow/runtime/step: 72.8% coverage; worker/lifecycle: 23.0% coverage (Docker health paths well-covered). Docker-specific tests (TestDockerContainerRuntimeCreate, TestDockerContainerLifecycleV29*, TestDockerChecker_MixedDaemonVersionHealth, etc.) all green.
 - [ ] Run repo-wide tests with coverage under Engine v29 — confirm overall GREEN.
   - Repository: github.com/iw2rmb/ploy
   - Component: repository-wide tests
