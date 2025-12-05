@@ -80,11 +80,12 @@ Legend: [ ] todo, [x] done.
   - Scope: run go test ./internal/workflow/runtime/step ./internal/worker/lifecycle with moby client in place; fix any immediate failures before wider sweeps.
   - Tests: go test ./internal/workflow/runtime/step ./internal/worker/lifecycle -cover — targeted packages are green with adequate coverage.
   - **Completed**: Both packages pass with moby Engine v29 SDK. workflow/runtime/step: 72.8% coverage; worker/lifecycle: 23.0% coverage (Docker health paths well-covered). Docker-specific tests (TestDockerContainerRuntimeCreate, TestDockerContainerLifecycleV29*, TestDockerChecker_MixedDaemonVersionHealth, etc.) all green.
-- [ ] Run repo-wide tests with coverage under Engine v29 — confirm overall GREEN.
+- [x] Run repo-wide tests with coverage under Engine v29 — confirm overall GREEN.
   - Repository: github.com/iw2rmb/ploy
   - Component: repository-wide tests
   - Scope: execute go test -cover ./... after the migration to moby client/types; ensure there are no regressions in unrelated packages.
   - Tests: go test -cover ./... — full test suite passes with coverage recorded.
+  - **Completed**: Full test suite (52 packages) passes under moby Engine v29 SDK. Notable coverage: cmd/ploy 64.1%, internal/nodeagent 70.9%, internal/workflow/runtime/step 72.8%, internal/server/scheduler 97.9%. No regressions detected.
 - [ ] Enforce RED→GREEN→REFACTOR discipline and coverage thresholds — protect workflow runner and worker paths.
   - Repository: github.com/iw2rmb/ploy
   - Component: scripts/validate-tdd-discipline.sh, internal/workflow/..., internal/worker/...
