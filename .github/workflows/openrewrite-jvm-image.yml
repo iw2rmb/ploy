@@ -1,16 +1,7 @@
 name: OpenRewrite JVM Image
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'services/openrewrite-jvm/**'
-      - '.github/workflows/openrewrite-jvm-image.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'services/openrewrite-jvm/**'
-      - '.github/workflows/openrewrite-jvm-image.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
