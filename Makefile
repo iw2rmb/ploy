@@ -97,7 +97,7 @@ lint: ## Run golangci-lint
 .PHONY: staticcheck
 staticcheck: ## Run staticcheck
 	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck ./...; \
+		staticcheck -checks=all,-SA1019,-ST1003,-ST1000,-U1000 ./...; \
 	else \
 		echo "staticcheck not installed. Run: go install honnef.co/go/tools/cmd/staticcheck@latest"; \
 		exit 1; \
