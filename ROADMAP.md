@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./...; scripts/validate-tdd-discipline.sh ./internal/workflow/... ./internal/worker/... — all packages compile, tests pass, and coverage targets remain met without github.com/docker/docker.
 
 ## Container runtime adaptation
-- [ ] Switch DockerContainerRuntime imports and client construction to moby — keep configuration and environment semantics identical.
+- [x] Switch DockerContainerRuntime imports and client construction to moby — keep configuration and environment semantics identical.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step/container_docker.go
   - Scope: update imports to github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/image, github.com/moby/moby/api/types/mount, and github.com/moby/moby/client; ensure client.NewClientWithOpts usage maps cleanly to the moby client and still honours FromEnv and WithAPIVersionNegotiation.

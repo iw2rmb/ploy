@@ -18,23 +18,58 @@ import (
 	"github.com/moby/moby/client"
 )
 
+// dockerClientAPI abstracts the moby client methods used by DockerContainerRuntime.
+// This interface enables dependency injection for testing without requiring a live
+// Docker daemon. It mirrors the moby Engine v29 SDK method signatures exactly.
+type dockerClientAPI interface {
+	// ContainerCreate creates a container and returns its ID.
+	ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error)
+	// ContainerStart starts a previously created container.
+	ContainerStart(ctx context.Context, containerID string, options client.ContainerStartOptions) (client.ContainerStartResult, error)
+	// ContainerWait blocks until the container stops and returns the wait result.
+	ContainerWait(ctx context.Context, containerID string, options client.ContainerWaitOptions) client.ContainerWaitResult
+	// ContainerInspect returns detailed container information.
+	ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error)
+	// ContainerLogs returns a reader for container stdout/stderr (moby returns ContainerLogsResult).
+	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
+	// ContainerRemove deletes a container.
+	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+	// ContainerStats returns live resource usage statistics for a container.
+	// Used by gate executor for resource telemetry.
+	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
+	// ImagePull fetches an image from a registry (moby returns ImagePullResponse).
+	ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error)
+}
+
 // DockerContainerRuntime executes containers using the local Docker daemon.
 // It uses the moby Engine v29 SDK (github.com/moby/moby/client) for all
 // Docker operations (create, start, wait, logs, remove, image pull).
 type DockerContainerRuntime struct {
-	client *client.Client
+	// client abstracts Docker API calls via dockerClientAPI interface.
+	// In production, this is *client.Client from moby; in tests, a fake.
+	client dockerClientAPI
 	opts   DockerContainerRuntimeOptions
 }
 
 // NewDockerContainerRuntime constructs a Docker-backed container runtime.
 // It uses client.FromEnv to read DOCKER_HOST and related environment variables,
 // and WithAPIVersionNegotiation to auto-negotiate API version with the daemon.
+// These two options ensure environment semantics are honoured identically to
+// the prior github.com/docker/docker client construction.
 func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRuntime, error) {
+	// Use moby client with FromEnv for DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH,
+	// and WithAPIVersionNegotiation to auto-negotiate API version with the daemon.
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
 	return &DockerContainerRuntime{client: cli, opts: opts}, nil
+}
+
+// newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
+// an injected dockerClientAPI. Used for testing with fake Docker clients.
+func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContainerRuntimeOptions) *DockerContainerRuntime {
+	return &DockerContainerRuntime{client: cli, opts: opts}
 }
 
 // Create prepares a container using the moby client ContainerCreate API.
