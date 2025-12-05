@@ -1,16 +1,7 @@
 name: LangGraph Runner Image
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'services/langgraph-runner/**'
-      - '.github/workflows/langgraph-runner-image.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'services/langgraph-runner/**'
-      - '.github/workflows/langgraph-runner-image.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
