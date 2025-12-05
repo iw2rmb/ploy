@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Unit tests for mod-codex.sh
 # Tests CLI flag detection, JSONL event capture, session ID extraction,
-# and build validation sentinel detection.
+# and run manifest/session metadata.
 #
 # Usage: bash tests/unit/mod_codex_sh_test.sh
 #
@@ -194,71 +194,7 @@ MOCKCODEX
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: Script detects [[REQUEST_BUILD_VALIDATION]] sentinel
-# ─────────────────────────────────────────────────────────────────────────────
-test_build_validation_sentinel_detection() {
-  run_test
-
-  # Create temp directories for test
-  local tmp_bin tmp_out tmp_ws
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  tmp_ws=$(mktemp -d)
-
-  # Mock codex CLI that supports --output-last-message
-  cat > "$tmp_bin/codex" <<'MOCKCODEX'
-#!/bin/bash
-if [[ "$1" == "exec" && "$2" == "--help" ]]; then
-  echo "Usage: codex exec [OPTIONS]"
-  echo "  --yolo                Skip confirmations"
-  echo "  --output-last-message Write last message to file"
-  exit 0
-fi
-# Find and write to --output-last-message file
-args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-  if [[ "${args[i]}" == "--output-last-message" ]]; then
-    outfile="${args[i+1]}"
-    echo "[[REQUEST_BUILD_VALIDATION]]" > "$outfile"
-    break
-  fi
-done
-exit 0
-MOCKCODEX
-  chmod +x "$tmp_bin/codex"
-
-  # Use temp dir as HOME to avoid /root permission issues
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  local exit_code
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
-  ) >/dev/null 2>&1
-  exit_code=$?
-
-  # Check that request_build_validation flag file was created
-  if [[ -f "$tmp_out/request_build_validation" ]]; then
-    local flag_value
-    flag_value=$(cat "$tmp_out/request_build_validation")
-    if [[ "$flag_value" == "true" ]]; then
-      pass "build validation sentinel detected"
-    else
-      fail "sentinel detection" "flag file has wrong value: $flag_value"
-    fi
-  else
-    fail "sentinel detection" "request_build_validation file not created"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Manifest includes requested_build_validation and session_id fields
+# Test: Manifest includes session_id and resumed fields
 # ─────────────────────────────────────────────────────────────────────────────
 test_manifest_contains_new_fields() {
   run_test
@@ -281,15 +217,6 @@ if [[ "$1" == "exec" && "$2" == "--help" ]]; then
 fi
 # Output thread.started event for session extraction
 echo '{"type":"thread.started","thread_id":"thread_manifest_test"}'
-# Find and write sentinel to --output-last-message file
-args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-  if [[ "${args[i]}" == "--output-last-message" ]]; then
-    outfile="${args[i+1]}"
-    echo "[[REQUEST_BUILD_VALIDATION]]" > "$outfile"
-    break
-  fi
-done
 exit 0
 MOCKCODEX
   chmod +x "$tmp_bin/codex"
@@ -313,16 +240,16 @@ MOCKCODEX
     local manifest
     manifest=$(cat "$tmp_out/codex-run.json")
 
-    if echo "$manifest" | grep -q '"requested_build_validation":true'; then
-      pass "manifest contains requested_build_validation:true"
-    else
-      fail "manifest requested_build_validation" "field missing or wrong: $manifest"
-    fi
-
     if echo "$manifest" | grep -q '"session_id":"thread_manifest_test"'; then
       pass "manifest contains session_id"
     else
       fail "manifest session_id" "field missing or wrong: $manifest"
+    fi
+
+    if echo "$manifest" | grep -q '"resumed":false'; then
+      pass "manifest contains resumed field"
+    else
+      fail "manifest resumed" "field missing or wrong: $manifest"
     fi
   else
     fail "manifest new fields" "codex-run.json not created"
@@ -378,14 +305,19 @@ MOCKCODEX
     fail "no JSON support fallback" "script failed or basic files missing"
   fi
 
-  # Manifest should have empty session_id and false requested_build_validation
+  # Manifest should have empty session_id and resumed:false
   if [[ -f "$tmp_out/codex-run.json" ]]; then
     local manifest
     manifest=$(cat "$tmp_out/codex-run.json")
-    if echo "$manifest" | grep -q '"requested_build_validation":false'; then
-      pass "manifest has false requested_build_validation when no sentinel"
+    if echo "$manifest" | grep -q '"session_id":""'; then
+      pass "manifest has empty session_id when no JSON support"
     else
-      fail "manifest fallback" "expected false, got: $manifest"
+      fail "manifest fallback" "expected empty session_id, got: $manifest"
+    fi
+    if echo "$manifest" | grep -q '"resumed":false'; then
+      pass "manifest has resumed:false when not resuming"
+    else
+      fail "manifest resumed fallback" "expected resumed:false, got: $manifest"
     fi
   fi
 
@@ -714,10 +646,6 @@ test_json_flag_detection
 echo ""
 echo "Test: Session ID extraction"
 test_session_id_extraction
-
-echo ""
-echo "Test: Build validation sentinel detection"
-test_build_validation_sentinel_detection
 
 echo ""
 echo "Test: Manifest contains new fields"

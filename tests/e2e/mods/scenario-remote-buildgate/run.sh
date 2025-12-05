@@ -217,15 +217,13 @@ if [[ "$SKIP_ARTIFACTS" == "0" && -d "$ARTIFACT_DIR" ]]; then
     echo "   [ ] No Build Gate logs found (check artifact collection)."
   fi
 
-  # Check for Codex healing artifacts (sentinel protocol validation).
+  # Check for Codex healing artifacts (session + workspace diff handshake).
   CODEX_LOG="${ARTIFACT_DIR}/codex.log"
   CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
   if [[ -f "$CODEX_LOG" ]] || [[ -f "$CODEX_LAST" ]]; then
     echo "   [x] Codex healing artifacts present."
-    if [[ -f "$CODEX_LAST" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LAST"; then
-      echo "       -> Sentinel detected: [[REQUEST_BUILD_VALIDATION]]"
-    elif [[ -f "$CODEX_LOG" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
-      echo "       -> Sentinel detected in codex.log"
+    if [[ -f "$CODEX_LAST" ]]; then
+      echo "       -> codex-last.txt present (last assistant message captured)"
     fi
   fi
 

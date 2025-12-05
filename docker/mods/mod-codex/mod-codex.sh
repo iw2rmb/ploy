@@ -76,9 +76,10 @@ fi
 
 # For resume runs, prepend a short instruction to the prompt so Codex knows
 # that the previous Build Gate still failed and it should continue healing
-# from the existing context and emit [[REQUEST_BUILD_VALIDATION]] again.
+# from the existing context. Codex never runs the gate itself; the node agent
+# handles validation externally based on workspace diffs.
 if [[ -n "$resume_session" ]]; then
-  resume_prefix="The previous Build Gate still failed (see /in/build-gate.log for the latest failure). Continue healing from the existing context and emit [[REQUEST_BUILD_VALIDATION]] again when ready for another gate run."
+  resume_prefix="The previous Build Gate still failed (see /in/build-gate.log for the latest failure). Continue healing from the existing context by editing files under /workspace as needed to fix the error, then stop when you are done. Do not run build tools or tests inside this container; validation runs externally."
   prompt="$resume_prefix"$'\n\n'"$prompt"
 fi
 
@@ -120,7 +121,7 @@ if grep -q -- "--json" <<<"$help_out"; then
   cmd+=(--json)
 fi
 
-# --output-last-message: Write the final assistant message to a file (for sentinel detection).
+# --output-last-message: Write the final assistant message to a file (for debugging).
 if grep -q -- "--output-last-message" <<<"$help_out"; then
   cmd+=(--output-last-message "$out_dir/codex-last.txt")
 fi
@@ -175,27 +176,12 @@ if [[ -n "$session_id" ]]; then
   printf "%s\n" "$session_id" > "$out_dir/codex-session.txt"
 fi
 
-# Detect whether Codex requested Build Gate validation via the sentinel message.
-# The sentinel [[REQUEST_BUILD_VALIDATION]] in codex-last.txt signals that Codex
-# wants the node agent to run the build gate and provide feedback.
-requested_build=false
-if [[ -f "$out_dir/codex-last.txt" ]]; then
-  # Normalize whitespace and check for exact sentinel match.
-  last_msg="$(tr -d '\r\n' < "$out_dir/codex-last.txt")"
-  if [[ "$last_msg" == "[[REQUEST_BUILD_VALIDATION]]" ]]; then
-    requested_build=true
-    # Write a simple flag file for easy downstream detection by node agent.
-    printf "true\n" > "$out_dir/request_build_validation"
-  fi
-fi
-
 # Write run manifest with all captured metadata for nodeagent consumption.
 # Fields:
 #   ts                       - ISO timestamp of completion
 #   exit_code                - Codex CLI exit status
 #   model                    - Model used (may be empty if default)
 #   input                    - Input directory path
-#   requested_build_validation - Whether sentinel was detected
 #   session_id               - Thread/session ID for resume (may be empty)
 #   resumed                  - Boolean indicating if this was a resume run
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -206,8 +192,8 @@ if [[ -n "$resume_session" ]]; then
   was_resumed=true
 fi
 
-printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","requested_build_validation":%s,"session_id":"%s","resumed":%s}\n' \
+printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","session_id":"%s","resumed":%s}\n' \
   "$ts" "${status:-0}" "${model}" "$input_dir" \
-  "${requested_build}" "${session_id}" "${was_resumed}" > "$manifest"
+  "${session_id}" "${was_resumed}" > "$manifest"
 
 exit "${status:-0}"

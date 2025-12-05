@@ -96,13 +96,13 @@ build_gate:
 # sequence runs to fix the error. The healing mod:
 # 1. Reads /in/build-gate.log to understand the failure
 # 2. Edits the workspace to fix the issue
-# 3. Emits [[REQUEST_BUILD_VALIDATION]] to signal readiness for re-gate
-#
-# This tests the critical gate-heal-regate flow for post-mod failures.
+# 3. Edits the workspace and exits; node agent re-gates only when workspace
+#    diffs are present. This tests the critical gate-heal-regate flow for
+#    post-mod failures using the workspace diff handshake.
 build_gate_healing:
   retries: 2  # Allow multiple healing attempts for complex errors
   mods:
-    # Codex healing container using the sentinel protocol.
+    # Codex healing container using the workspace diff handshake.
     # For this E2E, Codex will analyze the compile error (missing class) and
     # create the necessary stub class to fix the build.
     - image: docker.io/iwtormb/mods-codex:latest
@@ -114,9 +114,7 @@ build_gate_healing:
           - Create the missing class in the appropriate package under /workspace.
           - The class should have a minimal implementation (empty constructor, toString).
           - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, reply with exactly:
-            [[REQUEST_BUILD_VALIDATION]]
-            as your final message and then stop.
+          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
@@ -151,8 +149,7 @@ mr_on_success: true
 #
 # 2. Healing execution:
 #    - Healing mod should run after post-gate failure
-#    - Codex should emit [[REQUEST_BUILD_VALIDATION]] in artifacts
-#    - Healing should create the missing class file
+#    - Codex should edit the workspace to create the missing class file
 #
 # 3. Re-gate success:
 #    - Re-gate after healing should pass
@@ -166,7 +163,7 @@ mr_on_success: true
 #
 # 5. Artifact validation:
 #    - codex.log should contain healing output
-#    - codex-run.json should have requested_build_validation=true
+#    - codex-run.json should include session_id/resumed fields
 #    - Final workspace should include healing fix
 #
 # Success criteria:

@@ -38,7 +38,7 @@ if [[ -n "${TICKET:-}" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Validate Codex healing pipeline artifacts (sentinel + session handshake)
+# Validate Codex healing pipeline artifacts (session + workspace diff handshake)
 # Per ROADMAP.md Phase D: RED→GREEN→REFACTOR discipline for Codex healing.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
@@ -46,21 +46,17 @@ echo "Validating Codex healing pipeline artifacts..."
 
 VALIDATION_FAILED=0
 
-# 1. Verify sentinel behavior: Codex should emit [[REQUEST_BUILD_VALIDATION]].
-#    The sentinel is detected from codex.log or codex-last.txt in artifacts.
+# 1. Verify Codex logs are present. Codex now signals completion by exiting;
+#    the node agent decides whether to re-run the gate based on workspace diffs.
 CODEX_LOG="${ARTIFACT_DIR}/codex.log"
 CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
-SENTINEL_FLAG="${ARTIFACT_DIR}/request_build_validation"
-
-if [[ -f "$SENTINEL_FLAG" ]]; then
-  echo "  ✓ Sentinel flag file present (request_build_validation)"
-elif [[ -f "$CODEX_LAST" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LAST"; then
-  echo "  ✓ Sentinel detected in codex-last.txt"
-elif [[ -f "$CODEX_LOG" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
-  echo "  ✓ Sentinel detected in codex.log"
+if [[ -f "$CODEX_LOG" ]]; then
+  echo "  ✓ codex.log present"
 else
-  echo "  ⚠ Sentinel [[REQUEST_BUILD_VALIDATION]] not found in artifacts (optional)"
-  # Not a hard failure; older Codex versions may not emit sentinel.
+  echo "  ⚠ codex.log not found (Codex healing may not have run)"
+fi
+if [[ -f "$CODEX_LAST" ]]; then
+  echo "  ✓ codex-last.txt present (last assistant message captured)"
 fi
 
 # 2. Verify session resume support: Check for codex-session.txt in artifacts.
@@ -82,11 +78,6 @@ fi
 CODEX_MANIFEST="${ARTIFACT_DIR}/codex-run.json"
 
 if [[ -f "$CODEX_MANIFEST" ]]; then
-  if grep -q '"requested_build_validation"' "$CODEX_MANIFEST"; then
-    echo "  ✓ Manifest contains requested_build_validation field"
-  else
-    echo "  ⚠ Manifest missing requested_build_validation field"
-  fi
   if grep -q '"session_id"' "$CODEX_MANIFEST"; then
     echo "  ✓ Manifest contains session_id field"
   else
@@ -109,4 +100,3 @@ else
   exit 1
 fi
 echo "Artifacts saved to: ${ARTIFACT_DIR}"
-

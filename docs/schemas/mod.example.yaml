@@ -118,11 +118,12 @@ build_gate:
 # step's gate fails, healing runs once per the retry count, then the gate is
 # re-evaluated before proceeding to the next step.
 #
-# Sentinel Protocol (recommended for Codex healing):
-# - Codex edits the workspace and emits [[REQUEST_BUILD_VALIDATION]] when ready.
-# - The node agent (not Codex) re-runs the Build Gate externally after healing.
+# Workspace Diff Handshake (recommended for Codex healing):
+# - Codex edits the workspace and exits when done.
+# - The node agent (not Codex) computes `git status --porcelain` on the workspace
+#   and re-runs the Build Gate externally only when changes are present.
 # - This separation keeps Codex focused on code fixes while the control plane
-#   handles validation orchestration.
+#   handles validation orchestration and build verification.
 #
 # Environment variables injected by the node agent for healing mods:
 # - PLOY_REPO_URL: Git repository URL (same as the Mods run)
@@ -138,16 +139,15 @@ build_gate_healing:
       command: >-
         mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
-        # Sentinel protocol: Codex edits code then signals readiness for validation.
-        # The node agent re-runs the Build Gate externally; Codex does NOT invoke
-        # the Build Gate binary or run any build commands directly.
+        # Workspace diff handshake: Codex edits code then exits when done.
+        # The node agent re-runs the Build Gate externally only when workspace
+        # diffs are detected; Codex does NOT invoke the Build Gate binary or run
+        # any build commands directly.
         CODEX_PROMPT: |-
           Rules:
           - Use /workspace and /in/build-gate.log to understand the compile error.
           - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, reply with exactly:
-            [[REQUEST_BUILD_VALIDATION]]
-            as your final message and then stop.
+          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
