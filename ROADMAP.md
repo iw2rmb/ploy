@@ -110,8 +110,9 @@ Legend: [ ] todo, [x] done.
   - Scope: add or update sections that call out required Docker Engine v29 versions on VPS nodes, any flags or configuration changes needed, and upgrade steps from earlier Engine versions.
   - Tests: docs review — how-to docs walk an operator through deploying/updating a v29-based cluster without ambiguity.
   - **Completed**: Enhanced deploy-a-cluster.md with: dedicated "Docker Engine v29 Requirements (Worker Nodes)" section containing version table (Engine v29.0+, API v1.44+, v28.x unsupported), automatic installation notes, verification commands, upgrade cross-reference, and rationale. Enhanced update-a-cluster.md with: comprehensive "Docker Engine Upgrade" section containing prerequisites (drain, version check), step-by-step upgrade instructions for Debian/Ubuntu and RHEL/CentOS/Rocky, post-upgrade verification commands, emergency rollback procedure, and upgrade checklist table.
-- [ ] Align environment variable documentation with Docker v29 migration — ensure envs are complete and accurate.
+- [x] Align environment variable documentation with Docker v29 migration — ensure envs are complete and accurate.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/envs/README.md
   - Scope: document any new environment variables or configuration flags introduced for Docker or moby client configuration (e.g., DOCKER_HOST, API negotiation controls); remove references that assume pre-v29 behaviour only.
   - Tests: docs review — env docs match the configuration knobs actually read by the code after migration.
+  - **Completed**: Added "Docker Engine v29 Environment Variables" subsection under "Worker Nodes" with: complete environment variable table (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH, DOCKER_API_VERSION), defaults, descriptions, implementation cross-reference to container_docker.go:59-66, usage guidance for remote daemons and custom sockets, and cross-references to GOLANG.md and ROADMAP.md. Added GOLANG.md link to Related Docs section for discoverability.
