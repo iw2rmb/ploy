@@ -41,7 +41,7 @@ Legend: [ ] todo, [x] done.
       - Map `image` with no exact key but `default` present → `default` image selected.
       - Map `image` with neither stack key nor `default` → run fails with a clear, actionable error.
 
-- [ ] Wire Build Gate stack into Mods planner/runtime — Make the Build Gate stack available to each Mods step so stack-aware image selection is deterministic and observable.
+- [x] Wire Build Gate stack into Mods planner/runtime — Make the Build Gate stack available to each Mods step so stack-aware image selection is deterministic and observable.
   - Repository: ploy
   - Component: `internal/workflow/contracts`, `internal/workflow/planner`, `internal/workflow/runtime/step`, `internal/nodeagent`
   - Scope:
