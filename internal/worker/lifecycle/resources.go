@@ -181,7 +181,7 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 		if len(netIO.Interfaces) > 0 {
 			snapshot.NetworkInterfaces = netIO.Interfaces
 		}
-	} else if err != nil {
+	} else if !errors.Is(err, context.Canceled) {
 		errs = append(errs, err.Error())
 	}
 
