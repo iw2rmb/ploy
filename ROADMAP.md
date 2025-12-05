@@ -100,14 +100,14 @@ Legend: [ ] todo, [x] done.
   - Repository: github.com/iw2rmb/ploy
   - Component: ROADMAP.md, GOLANG.md
   - Scope: document the new minimum supported Docker Engine version, the chosen moby client/API modules, and the migration status; ensure ROADMAP.md is linked from GOLANG.md or README.md where appropriate.
-  - Tests: docs manual review — engineering docs consistently describe Docker Engine v29 and moby usage.
+  - Tests: docs review — engineering docs consistently describe Docker Engine v29 and moby usage.
 - [ ] Update operator how-to docs for v29 — make runtime prerequisites explicit for deployments.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md
   - Scope: add or update sections that call out required Docker Engine v29 versions on VPS nodes, any flags or configuration changes needed, and upgrade steps from earlier Engine versions.
-  - Tests: docs manual review — how-to docs walk an operator through deploying/updating a v29-based cluster without ambiguity.
+  - Tests: docs review — how-to docs walk an operator through deploying/updating a v29-based cluster without ambiguity.
 - [ ] Align environment variable documentation with Docker v29 migration — ensure envs are complete and accurate.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/envs/README.md
   - Scope: document any new environment variables or configuration flags introduced for Docker or moby client configuration (e.g., DOCKER_HOST, API negotiation controls); remove references that assume pre-v29 behaviour only.
-  - Tests: docs manual review — env docs match the configuration knobs actually read by the code after migration.
+  - Tests: docs review — env docs match the configuration knobs actually read by the code after migration.
