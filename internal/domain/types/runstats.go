@@ -72,6 +72,38 @@ func (s RunStats) MRURL() string {
 	return strings.TrimSpace(meta["mr_url"])
 }
 
+// ResumeCount returns the number of times this run has been resumed.
+// Returns 0 if never resumed. Accepts int, int64, float64 representations.
+func (s RunStats) ResumeCount() int {
+	v, ok := s["resume_count"]
+	if !ok || v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
+// LastResumedAt returns the RFC3339 timestamp of the last resume, or empty string if never resumed.
+func (s RunStats) LastResumedAt() string {
+	v, ok := s["last_resumed_at"]
+	if !ok || v == nil {
+		return ""
+	}
+	str, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(str)
+}
+
 // GateSummary extracts build gate execution summary from the gate field.
 // Returns a human-readable summary string suitable for CLI/API display.
 // Format: "passed duration=123ms" or "failed pre-gate duration=45ms" or empty if no gate data.

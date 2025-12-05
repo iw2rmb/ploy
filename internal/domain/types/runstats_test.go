@@ -54,6 +54,131 @@ func TestRunStats_ExitCode(t *testing.T) {
 	}
 }
 
+func TestRunStats_ResumeCount(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		stats RunStats
+		want  int
+	}{
+		{
+			name:  "int resume count",
+			stats: RunStats{"resume_count": 3},
+			want:  3,
+		},
+		{
+			name:  "int64 resume count",
+			stats: RunStats{"resume_count": int64(5)},
+			want:  5,
+		},
+		{
+			name:  "float64 resume count from JSON",
+			stats: RunStats{"resume_count": float64(2)},
+			want:  2,
+		},
+		{
+			name:  "missing resume count",
+			stats: RunStats{},
+			want:  0,
+		},
+		{
+			name:  "nil resume count",
+			stats: RunStats{"resume_count": nil},
+			want:  0,
+		},
+		{
+			name:  "invalid type (string)",
+			stats: RunStats{"resume_count": "not a number"},
+			want:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.stats.ResumeCount()
+			if got != tt.want {
+				t.Errorf("ResumeCount() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunStats_LastResumedAt(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		stats RunStats
+		want  string
+	}{
+		{
+			name:  "timestamp present",
+			stats: RunStats{"last_resumed_at": "2025-01-15T10:30:00Z"},
+			want:  "2025-01-15T10:30:00Z",
+		},
+		{
+			name:  "timestamp with whitespace",
+			stats: RunStats{"last_resumed_at": "  2025-01-15T10:30:00Z  "},
+			want:  "2025-01-15T10:30:00Z",
+		},
+		{
+			name:  "missing timestamp",
+			stats: RunStats{},
+			want:  "",
+		},
+		{
+			name:  "nil timestamp",
+			stats: RunStats{"last_resumed_at": nil},
+			want:  "",
+		},
+		{
+			name:  "invalid type (int)",
+			stats: RunStats{"last_resumed_at": 12345},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.stats.LastResumedAt()
+			if got != tt.want {
+				t.Errorf("LastResumedAt() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunStats_ResumeMetadata_FromJSON(t *testing.T) {
+	// Test that resume metadata works with real JSON-decoded data.
+	t.Parallel()
+	jsonData := `{
+		"resume_count": 2,
+		"last_resumed_at": "2025-01-15T10:30:00Z",
+		"metadata": {
+			"repo_base_ref": "main"
+		}
+	}`
+
+	var stats RunStats
+	if err := json.Unmarshal([]byte(jsonData), &stats); err != nil {
+		t.Fatalf("json.Unmarshal() failed: %v", err)
+	}
+
+	// Test resume count extraction.
+	gotCount := stats.ResumeCount()
+	if gotCount != 2 {
+		t.Errorf("ResumeCount() = %d, want 2", gotCount)
+	}
+
+	// Test last_resumed_at extraction.
+	gotTimestamp := stats.LastResumedAt()
+	wantTimestamp := "2025-01-15T10:30:00Z"
+	if gotTimestamp != wantTimestamp {
+		t.Errorf("LastResumedAt() = %q, want %q", gotTimestamp, wantTimestamp)
+	}
+}
+
 func TestRunStats_MRURL(t *testing.T) {
 	tests := []struct {
 		name  string

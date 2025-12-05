@@ -158,7 +158,8 @@ func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (Ge
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE id = $1
 `
 
@@ -184,7 +185,8 @@ func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
 }
 
 const listCreatedJobsByRun = `-- name: ListCreatedJobsByRun :many
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE run_id = $1 AND status = 'created'
 ORDER BY step_index ASC
 `
@@ -225,7 +227,8 @@ func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) (
 }
 
 const listJobsByRun = `-- name: ListJobsByRun :many
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
+SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+FROM jobs
 WHERE run_id = $1
 ORDER BY step_index ASC
 `

@@ -95,6 +95,11 @@ type mockStore struct {
 	updateRunStatusParams store.UpdateRunStatusParams
 	updateRunStatusErr    error
 
+	// UpdateRunResume tracking (resume_count, last_resumed_at)
+	updateRunResumeCalled bool
+	updateRunResumeParam  pgtype.UUID
+	updateRunResumeErr    error
+
 	// Node drain/undrain tracking
 	updateNodeDrainedCalled bool
 	updateNodeDrainedParams store.UpdateNodeDrainedParams
@@ -361,6 +366,12 @@ func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunS
 	m.updateRunStatusCalled = true
 	m.updateRunStatusParams = params
 	return m.updateRunStatusErr
+}
+
+func (m *mockStore) UpdateRunResume(ctx context.Context, id pgtype.UUID) error {
+	m.updateRunResumeCalled = true
+	m.updateRunResumeParam = id
+	return m.updateRunResumeErr
 }
 
 func (m *mockStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) error {
