@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
 Current engine: Mods tickets are stored as `runs` rows with per-step `jobs` rows (mod_type `pre_gate`, `mod`, `heal`, `re_gate`, `post_gate`) ordered by float `step_index`. Healing inserts additional `heal` and `re_gate` jobs between existing jobs, and workspace rehydration applies diffs ordered by `step_index`.
 
 ## Phase A — Graph model and persistence
-- [ ] Define a control-plane workflow graph view for Mods — Treat jobs as explicit nodes and expose dependencies on top of existing persistence.
+- [x] Define a control-plane workflow graph view for Mods — Treat jobs as explicit nodes and expose dependencies on top of existing persistence.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/workflow/mods/plan`, `internal/mods/api`, `internal/store`.
   - Scope: Introduce a `WorkflowGraph` / `StepGraph` abstraction that can be materialized from `jobs` rows and, when needed, Mods planner stages:
