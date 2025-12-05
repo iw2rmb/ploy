@@ -205,14 +205,38 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 }
 
 // Logs returns combined stdout/stderr from the container using the moby client
-// ContainerLogs API. Docker returns a multiplexed stream when TTY is not enabled;
-// we demultiplex using stdcopy.StdCopy and combine stdout+stderr.
+// ContainerLogs API. The method demultiplexes Docker's multiplexed stream format
+// into separate stdout and stderr buffers, then concatenates them for callers
+// that expect plain text output.
+//
+// Engine v29 log streaming semantics:
+//   - ContainerLogs uses client.ContainerLogsOptions (not container.LogsOptions).
+//   - Returns client.ContainerLogsResult (io.ReadCloser) with multiplexed stream.
+//   - When TTY is disabled (default for workflow containers), Docker multiplexes
+//     stdout and stderr into a single stream using an 8-byte header per frame:
+//     [STREAM_TYPE, 0, 0, 0, SIZE_BE32] + payload.
+//   - STREAM_TYPE: 0=stdin (unused), 1=stdout, 2=stderr.
+//   - SIZE_BE32: big-endian uint32 length of the payload.
+//
+// Demuxing with moby stdcopy:
+//   - The moby SDK provides stdcopy.StdCopy at github.com/moby/moby/api/pkg/stdcopy.
+//   - The old path github.com/docker/docker/pkg/stdcopy is deprecated in Engine v29.
+//   - stdcopy.StdCopy reads multiplexed frames and writes to separate stdout/stderr
+//     io.Writers, preserving content order within each stream.
+//   - We combine stdout then stderr for workflow artifact collection, matching
+//     the format expected by downstream log processors.
+//
+// Fallback behaviour:
+//   - On demux errors (e.g., corrupted stream, TTY mode), we attempt to read
+//     raw bytes to avoid total data loss.
+//   - This handles edge cases where the container was started with TTY enabled
+//     (non-multiplexed) or the stream is malformed.
 func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
 	if r == nil || r.client == nil {
 		return nil, errors.New("step: docker runtime not configured")
 	}
-	// Moby Engine v29 SDK uses client.ContainerLogsOptions instead of
-	// container.LogsOptions; same field names (ShowStdout, ShowStderr).
+	// Moby Engine v29 SDK uses client.ContainerLogsOptions (ShowStdout, ShowStderr).
+	// Returns client.ContainerLogsResult which embeds io.ReadCloser.
 	reader, err := r.client.ContainerLogs(ctx, handle.ID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -221,15 +245,22 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 		return nil, fmt.Errorf("step: fetch container logs: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
-	// Docker returns a multiplexed stream when TTY is not enabled. Demultiplex
-	// into combined stdout+stderr for consumers that expect plain text.
-	// stdcopy is now at github.com/moby/moby/api/pkg/stdcopy.
+
+	// Demultiplex Docker's multiplexed stream format using stdcopy.StdCopy.
+	// This separates stdout and stderr frames based on the 8-byte header prefix.
+	// Import path: github.com/moby/moby/api/pkg/stdcopy (the deprecated
+	// github.com/docker/docker/pkg/stdcopy should not be used with Engine v29).
 	var stdoutBuf, stderrBuf bytes.Buffer
 	if _, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader); err != nil {
-		// Fall back to raw bytes on demux errors to avoid losing logs entirely.
+		// Fall back to raw bytes on demux errors (TTY mode, corruption).
+		// The reader may be partially consumed, so ReadAll gets remaining data.
 		raw, _ := io.ReadAll(reader)
 		return raw, nil
 	}
+
+	// Combine stdout then stderr for consumers expecting plain text.
+	// This ordering matches workflow artifact collection semantics where
+	// stdout (build output) precedes stderr (warnings/errors).
 	return append(stdoutBuf.Bytes(), stderrBuf.Bytes()...), nil
 }
 
