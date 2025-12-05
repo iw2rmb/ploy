@@ -66,11 +66,12 @@ Legend: [ ] todo, [x] done.
   - Scope: verify types.Ping and Info field names and semantics under moby/Engine v29; update status.Version, api_version, containers_running, and driver mappings as needed while keeping Details keys unchanged.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover — tests validate OK, degraded, and error paths using updated Ping/Info fixtures.
   - **Completed**: Reconciled Ping/Info field usage with Engine v29; added os_type to stable Details keys; documented field mappings (api_version, os_type from PingResult; containers_running, driver, Version from system.Info); added TestDockerChecker_EngineVersionCompatibility and TestDockerChecker_StableDetailsKeys tests covering v28/v29 compatibility.
-- [ ] Validate Docker health reporting across mixed daemon versions — ensure Engine v28 and v29 both produce sane status.
+- [x] Validate Docker health reporting across mixed daemon versions — ensure Engine v28 and v29 both produce sane status.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/worker/lifecycle/health.go, internal/worker/lifecycle/health_docker_test.go
   - Scope: add or adjust tests to cover representative Engine v28 and v29 responses; ensure ComponentStatus.State, Version, and Details remain meaningful across both.
   - Tests: go test ./internal/worker/lifecycle -run 'DockerChecker' -cover; optional manual runs against lab nodes — health output remains stable across daemon versions.
+  - **Completed**: Added comprehensive mixed daemon version validation tests covering: full v28.x/v29.x healthy scenarios with various drivers (overlay2, vfs, windowsfilter), degraded states when Info fails (v28/v29), error states when Ping fails (v28/v29), version string edge cases (whitespace, build metadata, git hashes), CheckedAt timestamp verification, and API version negotiation range (1.43–1.46). Tests validate State, Version, and Details stability across both Engine versions.
 
 ## Test and validation cycle
 - [ ] Run focused tests for workflow and worker packages on moby — validate the new Docker integration path first.
