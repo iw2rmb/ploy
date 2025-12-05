@@ -166,7 +166,8 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	duration := time.Since(startTime)
 
 	// Upload diff for this mod.
-	r.uploadDiffForStep(ctx, req.RunID, req.JobID, diffGenerator, workspace, result, req.StepIndex)
+	// E3: Pass job name for branch-local diff tagging (mainline mod jobs have empty branch).
+	r.uploadDiffForStep(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, workspace, result, req.StepIndex)
 
 	// Upload /out artifacts.
 	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
@@ -369,7 +370,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	duration := time.Since(startTime)
 
 	// Upload diff for this healing step.
-	r.uploadDiffForStep(ctx, req.RunID, req.JobID, diffGenerator, workspace, result, req.StepIndex)
+	// E3: Pass job name for branch-local diff tagging in multi-strategy healing.
+	r.uploadDiffForStep(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, workspace, result, req.StepIndex)
 
 	// Upload /out artifacts.
 	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
