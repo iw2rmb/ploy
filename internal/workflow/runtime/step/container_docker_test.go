@@ -319,6 +319,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{
@@ -381,6 +382,7 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{startErr: tc.startErr}
@@ -453,6 +455,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{
@@ -533,6 +536,7 @@ func TestDockerContainerRuntimeLogs(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{
@@ -584,6 +588,7 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{removeErr: tc.removeErr}
@@ -690,6 +695,7 @@ func TestParseDockerTime(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			result := parseDockerTime(tc.input)
