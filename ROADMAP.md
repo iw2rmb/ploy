@@ -40,11 +40,12 @@ Legend: [ ] todo, [x] done.
   - Component: internal/workflow/runtime/step/container_docker.go
   - Scope: update imports to github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/image, github.com/moby/moby/api/types/mount, and github.com/moby/moby/client; ensure client.NewClientWithOpts usage maps cleanly to the moby client and still honours FromEnv and WithAPIVersionNegotiation.
   - Tests: go test ./internal/workflow/runtime/step -run 'DockerContainerRuntime' -cover — construction and basic lifecycle tests pass using moby client.
-- [ ] Re-validate container lifecycle semantics under Engine v29 — ensure create/start/wait/remove behaviour remains correct.
+- [x] Re-validate container lifecycle semantics under Engine v29 — ensure create/start/wait/remove behaviour remains correct.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step/container_docker.go
   - Scope: confirm HostConfig options (AutoRemove, Mounts, resource limits, network mode, storage options) and wait semantics still match Engine v29 responses; adjust code if response or option structures changed.
   - Tests: go test ./internal/workflow/runtime/step -run 'Docker|Container' -cover; manual smoke tests against a Docker Engine v29 daemon — containers start, complete, and clean up as before.
+  - **Completed**: Added comprehensive lifecycle validation tests (TestDockerContainerLifecycleV29*) covering full create→start→wait→remove sequence with HostConfig options, mount types, wait conditions, and error propagation; enhanced method comments with Engine v29 semantics documentation.
 - [ ] Confirm log streaming and demuxing works with moby client — avoid deprecated stdcopy usage while preserving output format.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step/container_docker.go, internal/workflow/runtime/step/container_docker_test.go

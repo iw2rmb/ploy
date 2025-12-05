@@ -75,6 +75,15 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 // Create prepares a container using the moby client ContainerCreate API.
 // It configures the container image, command, environment, mounts, resource
 // limits, network mode, and storage options based on the provided ContainerSpec.
+//
+// Engine v29 lifecycle semantics:
+//   - ContainerCreate uses client.ContainerCreateOptions struct (not positional args).
+//   - HostConfig.AutoRemove is explicitly set to false to ensure logs can be
+//     retrieved after container exit — critical for workflow artifact collection.
+//   - Mounts use mount.TypeBind for host path mounts; volume mounts not used.
+//   - Resource limits (NanoCPUs, Memory) are set via HostConfig.Resources.
+//   - NetworkMode is set via HostConfig.NetworkMode when configured.
+//   - StorageOpt["size"] sets disk quota when supported by the storage driver.
 func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
 	if r == nil || r.client == nil {
 		return ContainerHandle{}, errors.New("step: docker runtime not configured")
@@ -137,6 +146,12 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 // Start launches the container using the moby client ContainerStart API.
 // The moby v29 SDK returns (ContainerStartResult, error) but ContainerStartResult
 // is currently empty; we discard it and return only the error status.
+//
+// Engine v29 lifecycle semantics:
+//   - ContainerStart is async: returns immediately after the container process starts.
+//   - Uses client.ContainerStartOptions (empty struct for default behavior).
+//   - The container may still be initializing when Start returns successfully.
+//   - Use Wait to block until the container actually exits.
 func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
@@ -150,6 +165,16 @@ func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHand
 // Wait waits for container termination using the moby client ContainerWait API.
 // The moby v29 SDK returns a ContainerWaitResult struct with Result and Error
 // channels instead of returning two separate channels.
+//
+// Engine v29 lifecycle semantics:
+//   - ContainerWait blocks until the container reaches the specified condition.
+//   - Uses WaitConditionNotRunning to wait until container has completely stopped
+//     (not just exited), ensuring all cleanup has occurred before proceeding.
+//   - Returns ContainerWaitResult with Result and Error channels (not two channels).
+//   - Exit code is obtained from container.WaitResponse.StatusCode.
+//   - Timestamps (StartedAt, FinishedAt) are extracted via ContainerInspect
+//     from ContainerInspectResult.Container.State fields.
+//   - Context cancellation propagates to abort waiting if ctx is done.
 func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
 	if r == nil || r.client == nil {
 		return ContainerResult{}, errors.New("step: docker runtime not configured")
@@ -210,6 +235,14 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 
 // Remove deletes the container using the moby client ContainerRemove API.
 // Force remove is used to ensure cleanup even if some resources linger.
+//
+// Engine v29 lifecycle semantics:
+//   - ContainerRemove uses client.ContainerRemoveOptions (not container.RemoveOptions).
+//   - Force=true ensures removal even if container is still running or has
+//     lingering resources, preventing orphaned containers from accumulating.
+//   - Returns (ContainerRemoveResult, error); result is empty, we discard it.
+//   - Removal is idempotent: removing an already-removed container may return
+//     an error (404) but does not leave the system in an inconsistent state.
 func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
 	if r == nil || r.client == nil {
 		return errors.New("step: docker runtime not configured")
