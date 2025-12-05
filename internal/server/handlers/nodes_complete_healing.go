@@ -548,7 +548,9 @@ func cancelLoserBranches(
 	}
 
 	// Cancel all non-terminal heal/re_gate jobs in the healing window (baseGateIndex, nextMainlineIndex)
-	// except the winner job itself.
+	// except the winner job itself. Loser jobs are marked as "skipped" so that:
+	//   - maybeCompleteMultiStepRun treats them as terminal without failing the run.
+	//   - resume logic does not requeue loser branches.
 	var canceledCount int
 	for _, job := range jobs {
 		// Skip the winner job.
@@ -576,7 +578,9 @@ func cancelLoserBranches(
 			continue
 		}
 
-		// Cancel the loser job.
+		// Cancel/skip the loser job. We mark losers as "skipped" rather than "canceled"
+		// so that a successful winning branch does not cause the overall run to be
+		// marked as canceled.
 		startedAt := job.StartedAt
 		var durationMs int64
 		if job.StartedAt.Valid {
@@ -593,7 +597,7 @@ func cancelLoserBranches(
 
 		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
 			ID:         job.ID,
-			Status:     store.JobStatusCanceled,
+			Status:     store.JobStatusSkipped,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 			DurationMs: durationMs,
@@ -602,7 +606,7 @@ func cancelLoserBranches(
 		}
 
 		canceledCount++
-		slog.Info("canceled loser branch job",
+		slog.Info("skipped loser branch job",
 			"run_id", runID,
 			"job_id", uuid.UUID(job.ID.Bytes).String(),
 			"job_name", job.Name,
