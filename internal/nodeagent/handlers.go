@@ -42,6 +42,7 @@ type StartRunRequest struct {
 	StepIndex types.StepIndex   `json:"step_index"`          // Job step index for execution tracking
 	ModType   string            `json:"mod_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
 	ModImage  string            `json:"mod_image,omitempty"` // Container image for this job (for heal job dispatch)
+	JobName   string            `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
 	Options   map[string]any    `json:"options"`             // Flattened options from spec (image, command, build_gate_healing, etc.)
 	Env       map[string]string `json:"env"`                 // Environment variables merged from spec
 }

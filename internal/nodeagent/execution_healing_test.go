@@ -1137,7 +1137,8 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 	// Call uploadHealingModDiff (will fail at upload but we can verify the setup logic).
 	// In a real scenario, this would need a mock HTTP server to validate the uploaded metadata.
 	// C2: Pass stepIndex=3 to tag the healing diff with the parent step.
-	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", workspace, healResult, 2, 1, 3)
+	// E3: Pass job name for branch identification (empty string for legacy single-branch healing).
+	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", "heal-1-0", workspace, healResult, 2, 1, 3)
 
 	// Verify that the function completes without panics (basic smoke test).
 	// More comprehensive validation would require capturing the HTTP request in an integration test.
@@ -1147,6 +1148,7 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 	//   - "healing_attempt": 1
 	//   - "exit_code": 0
 	//   - "timings": {...}
+	//   - E3: "branch_id" (only present for multi-branch jobs like "heal-branch-a-1-0")
 	// This is validated by code inspection and integration tests.
 }
 

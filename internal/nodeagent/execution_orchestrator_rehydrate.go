@@ -22,9 +22,13 @@ import (
 // This function implements the core rehydration strategy that enables multi-node execution:
 // each step can run on any node by reconstructing workspace state from base + diff chain.
 //
+// E3: Branch-local isolation — For multi-branch healing strategies, each branch's workspace
+// is isolated by filtering diffs during rehydration. Branch jobs only see mainline diffs
+// plus their own branch's diffs, preventing cross-branch contamination.
+//
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
-//   - req: StartRunRequest containing repo URL, base_ref, and commit_sha.
+//   - req: StartRunRequest containing repo URL, base_ref, commit_sha, and job_name.
 //   - manifest: StepManifest for this step.
 //   - stepIndex: Job step index for execution tracking.
 //
@@ -109,16 +113,22 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
+	// E3: Extract branch name from job name for branch-local isolation.
+	// For multi-branch healing (e.g., "heal-branch-a-1-0"), this returns "branch-a".
+	// For mainline jobs (e.g., "mod-0", "pre-gate") or legacy healing, this returns "".
+	branchID := ExtractBranchFromJobName(req.JobName)
+
 	// C2: Uniform rehydration query for ALL steps.
 	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).
 	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
-	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, stepIndex-1)
+	// E3: Filter by branch_id to maintain branch workspace isolation.
+	gzippedDiffs, err := diffFetcher.FetchDiffsForBranch(ctx, runID, stepIndex-1, branchID)
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("fetch diffs for step: %w", err)
 	}
 
-	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "diff_count", len(gzippedDiffs))
+	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "branch_id", branchID, "diff_count", len(gzippedDiffs))
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
 	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
@@ -146,10 +156,15 @@ func (r *runController) rehydrateWorkspaceForStep(
 // uploadDiffForStep generates and uploads a diff for the given step with step_index metadata.
 // This replaces the older uploadDiff method and tags each diff with its step index for
 // ordered rehydration in multi-step/multi-node scenarios.
+//
+// E3: For branch jobs (e.g., heal-branch-a-1-0, re-gate-branch-a-1), the job name is used to
+// extract branch_id and tag the diff. This enables branch-local workspace isolation during
+// rehydration — each branch only sees mainline diffs plus its own branch's diffs.
 func (r *runController) uploadDiffForStep(
 	ctx context.Context,
 	runID types.RunID,
 	jobID types.JobID,
+	jobName string,
 	diffGenerator step.DiffGenerator,
 	workspace string,
 	result step.Result,
@@ -176,6 +191,7 @@ func (r *runController) uploadDiffForStep(
 	// C2: Every diff is tagged with step_index + mod_type for unified rehydration.
 	// - step_index: Job step index for ordering and rehydration queries.
 	// - mod_type: "mod" for main mod diffs (healing diffs use "healing" in execution_healing.go).
+	// E3: branch_id enables branch-local workspace isolation for multi-strategy healing.
 	summary := types.DiffSummary{
 		"step_index": stepIndex,
 		"mod_type":   "mod", // Identifies this diff as a main mod step diff.
@@ -187,6 +203,13 @@ func (r *runController) uploadDiffForStep(
 			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
 			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 		},
+	}
+
+	// E3: Add branch_id for multi-branch healing isolation.
+	// For branch jobs (e.g., "heal-branch-a-1-0", "re-gate-branch-a-1"), this enables
+	// rehydration to filter diffs by branch, ensuring each branch workspace is isolated.
+	if branchID := ExtractBranchFromJobName(jobName); branchID != "" {
+		summary["branch_id"] = branchID
 	}
 
 	// Upload diff with step metadata to control plane.

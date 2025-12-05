@@ -162,6 +162,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		StepIndex: claim.StepIndex, // Job step_index from server
 		ModType:   claim.ModType,
 		ModImage:  claim.ModImage,
+		JobName:   claim.JobName, // Job name for branch identification
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}

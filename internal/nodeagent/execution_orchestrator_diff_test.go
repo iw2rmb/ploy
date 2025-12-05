@@ -84,6 +84,7 @@ func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 		ctx,
 		"run-123",
 		"stage-abc",
+		"mod-0", // Job name (mainline mod job).
 		stubDiffGen{},
 		"/unused/workspace",
 		step.Result{},
