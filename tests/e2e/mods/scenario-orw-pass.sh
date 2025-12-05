@@ -14,10 +14,10 @@ RECIPE_VERSION=3.20.0
 RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17
 MAVEN_PLUGIN_VERSION=6.18.0
 
-# Artifacts directory: default to ./tmp/mods/mod-orw/<YYMMDDHHmmss>/
+# Artifacts directory: default to ./tmp/mods/orw-maven/<YYMMDDHHmmss>/
 # override with PLOY_E2E_ARTIFACT_DIR or PLOY_E2E_ARTIFACT_BASE.
 TS=$(date +%y%m%d%H%M%S)
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/mod-orw}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/orw-maven}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -35,7 +35,7 @@ TICKET=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
-  --mod-image "docker.io/${DOCKERHUB_USERNAME:-}/mods-openrewrite:latest" \
+  --mod-image "docker.io/${DOCKERHUB_USERNAME:-}/mods-orw-maven:latest" \
   --mod-env RECIPE_GROUP="$RECIPE_GROUP" \
   --mod-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
   --mod-env RECIPE_VERSION="$RECIPE_VERSION" \

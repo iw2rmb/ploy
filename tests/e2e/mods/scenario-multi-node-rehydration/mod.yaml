@@ -33,7 +33,7 @@ kind: ModRunSpec
 mods:
   # Step 0: Migrate to Java 8
   # This step establishes the base transformation. Any node can claim this step.
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -49,7 +49,7 @@ mods:
   # 1. Copy base clone
   # 2. Fetch and apply diff from step 0
   # 3. Run this transformation on the rehydrated workspace
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -64,7 +64,7 @@ mods:
   # 1. Copy base clone
   # 2. Fetch and apply diffs from steps 0 and 1 in order
   # 3. Run this transformation on the rehydrated workspace
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

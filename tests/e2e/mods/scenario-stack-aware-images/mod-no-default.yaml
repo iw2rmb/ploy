@@ -26,7 +26,7 @@ mod:
   # Stack-aware image map WITHOUT default key.
   # This will fail for Maven workspaces because only java-gradle is specified.
   image:
-    java-gradle: docker.io/iwtormb/mods-openrewrite:latest
+    java-gradle: docker.io/iwtormb/mods-orw-gradle:latest
   env:
     RECIPE_GROUP: org.openrewrite.recipe
     RECIPE_ARTIFACT: rewrite-migrate-java

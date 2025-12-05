@@ -44,7 +44,7 @@ kind: ModRunSpec
 mods:
   # Step 0: Apply code formatting as warmup (should pass)
   # This step uses a lightweight recipe that formats code without introducing errors.
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
@@ -58,7 +58,7 @@ mods:
   # Step 1: Migrate to Java 17 (may trigger post-gate failure on fail-missing-symbol branch)
   # This transformation may expose or interact with the UndefinedClass reference.
   # If post-gate fails, healing will create the missing UndefinedModSymbol class.
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -70,7 +70,7 @@ mods:
 
   # Step 2: Apply cleanup recipe (should pass after step 1 healing)
   # This step runs after healing has fixed any post-gate failures from step 1.
-  - image: docker.io/iwtormb/mods-openrewrite:latest
+  - image: docker.io/iwtormb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
