@@ -355,10 +355,9 @@ When the same spec runs against a Gradle project (`build.gradle` present):
     - `reason` (terminal error reason when available).
   - `stages` — map keyed by **job UUID** (`jobs.id`), value is `StageStatus`.
     Note: The `stages` field name is retained for API backward compatibility,
-    but each entry represents a `jobs` table row. The key is the job's UUID.
+    but each entry represents a `jobs` table row. The map key is the job's UUID.
 
 - `StageStatus`:
-  - `stage_id` — job UUID (`jobs.id`).
   - `state` — job lifecycle state (mirrors `jobs.status`).
   - `artifacts` — map of artifact logical names to bundle CIDs.
   - `step_index` — float index for job ordering (mirrors `jobs.step_index`).

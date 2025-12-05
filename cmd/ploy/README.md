@@ -31,7 +31,7 @@ ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
-ploy upload --run-id <uuid> [--stage-id <uuid>] [--build-id <uuid>] [--name <string>] <path>
+ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>
 ```
 
 Note on `--json` output:
