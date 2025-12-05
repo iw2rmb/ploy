@@ -91,7 +91,7 @@ Legend: [ ] todo, [x] done.
   - Component: scripts/validate-tdd-discipline.sh, internal/workflow/..., internal/worker/...
   - Scope: run scripts/validate-tdd-discipline.sh ./internal/workflow/... ./internal/worker/...; verify coverage ≥60% overall and ≥90% on critical workflow runner packages.
   - Tests: scripts/validate-tdd-discipline.sh ./internal/workflow/... ./internal/worker/... — passes without lowering existing coverage.
-- [ ] Check binary size and build health after dependency changes — avoid dependency bloat from the moby client.
+- [x] Check binary size and build health after dependency changes — avoid dependency bloat from the moby client.
   - Repository: github.com/iw2rmb/ploy
   - Component: Makefile, dist/ploy, scripts/check-binary-size.sh
   - Scope: run make build and scripts/check-binary-size.sh; ensure dist/ploy remains under the configured size threshold after docker→moby migration.
