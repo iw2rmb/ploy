@@ -388,3 +388,365 @@ func TestDockerChecker_StableDetailsKeys(t *testing.T) {
 		t.Errorf("Details has %d keys, want %d; keys: %v", len(st.Details), len(stableKeys), st.Details)
 	}
 }
+
+// TestDockerChecker_MixedDaemonVersionHealth validates that DockerChecker produces
+// sane ComponentStatus across mixed Engine v28 and v29 daemon versions. This test
+// exercises the full matrix of version-specific responses to ensure:
+//   - State (OK, Degraded, Error) is meaningful for both daemon versions.
+//   - Version field correctly reflects the ServerVersion from Info.
+//   - Details keys remain stable and correctly typed across versions.
+//
+// See ROADMAP.md line 69: "Validate Docker health reporting across mixed daemon
+// versions — ensure Engine v28 and v29 both produce sane status."
+func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
+	// Define test cases covering representative Engine v28 and v29 responses.
+	// Each case validates State, Version, and Details correctness.
+	tests := []struct {
+		name string
+		// fake input
+		ping    client.PingResult
+		pingErr error
+		info    system.Info
+		infoErr error
+		// expected output
+		wantState      string
+		wantVersion    string
+		wantAPIVersion string
+		wantOSType     string
+		wantDriver     string
+		wantRunning    int
+		wantHasMessage bool
+	}{
+		// Engine v28.x healthy scenarios.
+		{
+			name:           "v28.0.0 healthy linux overlay2",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info:           system.Info{ServerVersion: "28.0.0", Driver: "overlay2", ContainersRunning: 0},
+			wantState:      stateOK,
+			wantVersion:    "28.0.0",
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    0,
+		},
+		{
+			name:           "v28.1.3 healthy linux with running containers",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info:           system.Info{ServerVersion: "28.1.3", Driver: "overlay2", ContainersRunning: 42},
+			wantState:      stateOK,
+			wantVersion:    "28.1.3",
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    42,
+		},
+		{
+			name:           "v28.0.5 healthy linux vfs driver",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info:           system.Info{ServerVersion: "28.0.5", Driver: "vfs", ContainersRunning: 1},
+			wantState:      stateOK,
+			wantVersion:    "28.0.5",
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantDriver:     "vfs",
+			wantRunning:    1,
+		},
+		// Engine v29.x healthy scenarios.
+		{
+			name:           "v29.0.0 healthy linux overlay2",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			info:           system.Info{ServerVersion: "29.0.0", Driver: "overlay2", ContainersRunning: 0},
+			wantState:      stateOK,
+			wantVersion:    "29.0.0",
+			wantAPIVersion: "1.45",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    0,
+		},
+		{
+			name:           "v29.0.3 healthy linux with many containers",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			info:           system.Info{ServerVersion: "29.0.3", Driver: "overlay2", ContainersRunning: 100},
+			wantState:      stateOK,
+			wantVersion:    "29.0.3",
+			wantAPIVersion: "1.45",
+			wantOSType:     "linux",
+			wantDriver:     "overlay2",
+			wantRunning:    100,
+		},
+		{
+			name:           "v29.1.0 healthy windows windowsfilter",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "windows"},
+			info:           system.Info{ServerVersion: "29.1.0", Driver: "windowsfilter", ContainersRunning: 5},
+			wantState:      stateOK,
+			wantVersion:    "29.1.0",
+			wantAPIVersion: "1.45",
+			wantOSType:     "windows",
+			wantDriver:     "windowsfilter",
+			wantRunning:    5,
+		},
+		// Degraded scenarios: Ping OK but Info fails.
+		// Both v28 and v29 should produce Degraded state when Info fails.
+		{
+			name:           "v28 degraded info error",
+			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			infoErr:        errors.New("daemon busy"),
+			wantState:      stateDegraded,
+			wantAPIVersion: "1.44",
+			wantOSType:     "linux",
+			wantHasMessage: true,
+		},
+		{
+			name:           "v29 degraded info error",
+			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			infoErr:        errors.New("info unavailable"),
+			wantState:      stateDegraded,
+			wantAPIVersion: "1.45",
+			wantOSType:     "linux",
+			wantHasMessage: true,
+		},
+		// Error scenarios: Ping fails.
+		// Both v28 and v29 should produce Error state when Ping fails.
+		{
+			name:           "v28 error ping fails",
+			pingErr:        errors.New("cannot connect to docker daemon"),
+			wantState:      stateError,
+			wantHasMessage: true,
+		},
+		{
+			name:           "v29 error ping fails",
+			pingErr:        errors.New("connection refused"),
+			wantState:      stateError,
+			wantHasMessage: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewDockerChecker(DockerCheckerOptions{
+				Client: fakeDocker{
+					ping:    tc.ping,
+					pingErr: tc.pingErr,
+					info:    tc.info,
+					infoErr: tc.infoErr,
+				},
+				Timeout: 50 * time.Millisecond,
+				Clock:   func() time.Time { return time.Unix(200, 0).UTC() },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			st := c.Check(context.Background())
+
+			// Verify State is as expected.
+			if st.State != tc.wantState {
+				t.Errorf("State: got %q, want %q", st.State, tc.wantState)
+			}
+
+			// Verify Message is present when expected.
+			if tc.wantHasMessage && st.Message == "" {
+				t.Error("expected Message to be set, got empty")
+			}
+
+			// For non-error states, verify Version and Details.
+			if tc.wantState == stateOK {
+				if st.Version != tc.wantVersion {
+					t.Errorf("Version: got %q, want %q", st.Version, tc.wantVersion)
+				}
+				if v, ok := st.Details["api_version"]; !ok || v.(string) != tc.wantAPIVersion {
+					t.Errorf("api_version: got %v, want %q", st.Details["api_version"], tc.wantAPIVersion)
+				}
+				if v, ok := st.Details["os_type"]; !ok || v.(string) != tc.wantOSType {
+					t.Errorf("os_type: got %v, want %q", st.Details["os_type"], tc.wantOSType)
+				}
+				if v, ok := st.Details["driver"]; !ok || v.(string) != tc.wantDriver {
+					t.Errorf("driver: got %v, want %q", st.Details["driver"], tc.wantDriver)
+				}
+				if v, ok := st.Details["containers_running"]; !ok || v.(int) != tc.wantRunning {
+					t.Errorf("containers_running: got %v, want %d", st.Details["containers_running"], tc.wantRunning)
+				}
+			}
+
+			// For degraded states, verify partial Details (api_version, os_type from Ping).
+			if tc.wantState == stateDegraded {
+				if v, ok := st.Details["api_version"]; !ok || v.(string) != tc.wantAPIVersion {
+					t.Errorf("degraded api_version: got %v, want %q", st.Details["api_version"], tc.wantAPIVersion)
+				}
+				if v, ok := st.Details["os_type"]; !ok || v.(string) != tc.wantOSType {
+					t.Errorf("degraded os_type: got %v, want %q", st.Details["os_type"], tc.wantOSType)
+				}
+			}
+		})
+	}
+}
+
+// TestDockerChecker_VersionStringEdgeCases verifies that version strings with
+// whitespace or unusual formatting are handled correctly. ServerVersion from
+// Docker Engine may have trailing whitespace in some edge cases.
+func TestDockerChecker_VersionStringEdgeCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		serverVersion string
+		driver        string
+		wantVersion   string
+		wantDriver    string
+	}{
+		{
+			name:          "clean version",
+			serverVersion: "28.0.0",
+			driver:        "overlay2",
+			wantVersion:   "28.0.0",
+			wantDriver:    "overlay2",
+		},
+		{
+			name:          "version with trailing space",
+			serverVersion: "29.0.0 ",
+			driver:        "overlay2",
+			wantVersion:   "29.0.0",
+			wantDriver:    "overlay2",
+		},
+		{
+			name:          "version with leading space",
+			serverVersion: " 28.1.0",
+			driver:        "overlay2",
+			wantVersion:   "28.1.0",
+			wantDriver:    "overlay2",
+		},
+		{
+			name:          "driver with trailing space",
+			serverVersion: "29.0.0",
+			driver:        "overlay2 ",
+			wantVersion:   "29.0.0",
+			wantDriver:    "overlay2",
+		},
+		{
+			name:          "version with build metadata",
+			serverVersion: "28.0.0-ce",
+			driver:        "overlay2",
+			wantVersion:   "28.0.0-ce",
+			wantDriver:    "overlay2",
+		},
+		{
+			name:          "version with git hash suffix",
+			serverVersion: "29.0.0-dev+abc123",
+			driver:        "overlay2",
+			wantVersion:   "29.0.0-dev+abc123",
+			wantDriver:    "overlay2",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewDockerChecker(DockerCheckerOptions{
+				Client: fakeDocker{
+					ping: client.PingResult{APIVersion: "1.45", OSType: "linux"},
+					info: system.Info{
+						ServerVersion:     tc.serverVersion,
+						Driver:            tc.driver,
+						ContainersRunning: 1,
+					},
+				},
+				Timeout: 50 * time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			st := c.Check(context.Background())
+
+			if st.State != stateOK {
+				t.Fatalf("State: got %q, want %q", st.State, stateOK)
+			}
+			// Verify trimmed version.
+			if st.Version != tc.wantVersion {
+				t.Errorf("Version: got %q, want %q", st.Version, tc.wantVersion)
+			}
+			// Verify trimmed driver.
+			if v, ok := st.Details["driver"]; !ok || v.(string) != tc.wantDriver {
+				t.Errorf("driver: got %q, want %q", st.Details["driver"], tc.wantDriver)
+			}
+		})
+	}
+}
+
+// TestDockerChecker_CheckedAtTimestamp verifies that CheckedAt is set correctly
+// for both v28 and v29 responses using the injected clock.
+func TestDockerChecker_CheckedAtTimestamp(t *testing.T) {
+	fixedTime := time.Date(2024, 12, 5, 10, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		ping client.PingResult
+		info system.Info
+	}{
+		{
+			name: "v28 timestamp",
+			ping: client.PingResult{APIVersion: "1.44", OSType: "linux"},
+			info: system.Info{ServerVersion: "28.0.0", Driver: "overlay2"},
+		},
+		{
+			name: "v29 timestamp",
+			ping: client.PingResult{APIVersion: "1.45", OSType: "linux"},
+			info: system.Info{ServerVersion: "29.0.0", Driver: "overlay2"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewDockerChecker(DockerCheckerOptions{
+				Client:  fakeDocker{ping: tc.ping, info: tc.info},
+				Timeout: 50 * time.Millisecond,
+				Clock:   func() time.Time { return fixedTime },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			st := c.Check(context.Background())
+
+			if !st.CheckedAt.Equal(fixedTime) {
+				t.Errorf("CheckedAt: got %v, want %v", st.CheckedAt, fixedTime)
+			}
+		})
+	}
+}
+
+// TestDockerChecker_APIVersionNegotiationRange verifies that DockerChecker handles
+// the API version range used by Engine v28 (1.44) and v29 (1.45) correctly.
+// This ensures the api_version Detail reflects the negotiated version.
+func TestDockerChecker_APIVersionNegotiationRange(t *testing.T) {
+	tests := []struct {
+		name       string
+		apiVersion string
+		wantAPI    string
+	}{
+		{name: "v28 API 1.44", apiVersion: "1.44", wantAPI: "1.44"},
+		{name: "v29 API 1.45", apiVersion: "1.45", wantAPI: "1.45"},
+		{name: "older API 1.43", apiVersion: "1.43", wantAPI: "1.43"},
+		{name: "future API 1.46", apiVersion: "1.46", wantAPI: "1.46"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewDockerChecker(DockerCheckerOptions{
+				Client: fakeDocker{
+					ping: client.PingResult{APIVersion: tc.apiVersion, OSType: "linux"},
+					info: system.Info{ServerVersion: "29.0.0", Driver: "overlay2"},
+				},
+				Timeout: 50 * time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			st := c.Check(context.Background())
+
+			if st.State != stateOK {
+				t.Fatalf("State: got %q, want %q", st.State, stateOK)
+			}
+			if v := st.Details["api_version"]; v.(string) != tc.wantAPI {
+				t.Errorf("api_version: got %q, want %q", v, tc.wantAPI)
+			}
+		})
+	}
+}
