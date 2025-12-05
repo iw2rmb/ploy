@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
   - Scope: decide the minimum supported Docker Engine v29.x range and the github.com/moby/moby client/API modules to depend on; record them in GOLANG.md and cluster how-to docs.
   - Tests: docs manual review — docs and roadmap consistently reference the chosen Engine and moby module versions.
   - **Decision**: Docker Engine v29.0+ (API v1.44+); SDK modules: `github.com/moby/moby/client`, `github.com/moby/moby/api/types` (tag: `docker-v29.x.y`).
-- [ ] Introduce moby client and API modules in go.mod — prepare for incremental migration away from github.com/docker/docker.
+- [x] Introduce moby client and API modules in go.mod — prepare for incremental migration away from github.com/docker/docker.
   - Repository: github.com/iw2rmb/ploy
   - Component: go.mod
   - Scope: add github.com/moby/moby/client and github.com/moby/moby/api/... dependencies alongside github.com/docker/docker; run go mod tidy and ensure all packages still compile.
