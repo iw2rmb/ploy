@@ -5,6 +5,10 @@ get:
     Return the job-level workflow graph for a Mods ticket identified by its `ticket_id`
     (equal to the underlying run UUID). The graph view is derived from `jobs` rows and
     uses `step_index` ordering to expose parent/child relationships between jobs.
+
+    This endpoint is intended for debugging and visualization by control-plane operators.
+    It is explicitly marked as non-stable and may change between releases; consumers
+    must treat it as optional and avoid depending on it for core workflows.
   parameters:
     - in: path
       name: id
