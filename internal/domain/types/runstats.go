@@ -163,9 +163,10 @@ func extractGatePhase(gate map[string]any, phase string) string {
 	}
 	// For pre_gate and final_gate, use the phase name; for re-gate, caller supplies label.
 	label := phase
-	if phase == "pre_gate" {
+	switch phase {
+	case "pre_gate":
 		label = "pre-gate"
-	} else if phase == "final_gate" {
+	case "final_gate":
 		label = "final-gate"
 	}
 	return formatGatePhase(phaseMap, label)

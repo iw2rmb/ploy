@@ -1094,15 +1094,15 @@ func TestDockerContainerLifecycleV29(t *testing.T) {
 			}
 			// Verify resource limits when specified.
 			if tc.spec.LimitNanoCPUs > 0 && fake.createOpts.HostConfig != nil {
-				if fake.createOpts.HostConfig.Resources.NanoCPUs != tc.spec.LimitNanoCPUs {
+				if fake.createOpts.HostConfig.NanoCPUs != tc.spec.LimitNanoCPUs {
 					t.Errorf("Create: NanoCPUs = %d, want %d",
-						fake.createOpts.HostConfig.Resources.NanoCPUs, tc.spec.LimitNanoCPUs)
+						fake.createOpts.HostConfig.NanoCPUs, tc.spec.LimitNanoCPUs)
 				}
 			}
 			if tc.spec.LimitMemoryBytes > 0 && fake.createOpts.HostConfig != nil {
-				if fake.createOpts.HostConfig.Resources.Memory != tc.spec.LimitMemoryBytes {
+				if fake.createOpts.HostConfig.Memory != tc.spec.LimitMemoryBytes {
 					t.Errorf("Create: Memory = %d, want %d",
-						fake.createOpts.HostConfig.Resources.Memory, tc.spec.LimitMemoryBytes)
+						fake.createOpts.HostConfig.Memory, tc.spec.LimitMemoryBytes)
 				}
 			}
 			// Verify network mode when specified.
@@ -1442,10 +1442,8 @@ func TestParseDockerTime(t *testing.T) {
 				if tc.wantUTC && result.Location() != time.UTC {
 					t.Error("expected UTC location")
 				}
-			} else {
-				if !result.IsZero() {
-					t.Errorf("expected zero time, got %v", result)
-				}
+			} else if !result.IsZero() {
+				t.Errorf("expected zero time, got %v", result)
 			}
 		})
 	}

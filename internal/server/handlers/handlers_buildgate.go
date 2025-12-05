@@ -116,11 +116,7 @@ func validateBuildGateHandler(st store.Store) http.HandlerFunc {
 					}
 
 					w.Header().Set("Content-Type", "application/json")
-					if job.Status == store.BuildgateJobStatusCompleted {
-						w.WriteHeader(http.StatusOK)
-					} else {
-						w.WriteHeader(http.StatusOK) // Still 200, but status indicates failure
-					}
+					w.WriteHeader(http.StatusOK) // Status field differentiates success vs failure.
 
 					if err := json.NewEncoder(w).Encode(resp); err != nil {
 						slog.Error("validate buildgate: encode sync response failed", "err", err)

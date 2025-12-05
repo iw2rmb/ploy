@@ -103,11 +103,9 @@ func TestHandleRolloutNodesValidatesConcurrency(t *testing.T) {
 				if !strings.Contains(err.Error(), "concurrency must be positive") {
 					t.Fatalf("expected concurrency validation error, got: %v", err)
 				}
-			} else {
+			} else if err != nil && strings.Contains(err.Error(), "concurrency must be positive") {
 				// For valid concurrency with empty node list, we expect success.
-				if err != nil && strings.Contains(err.Error(), "concurrency must be positive") {
-					t.Fatalf("unexpected concurrency validation error for valid concurrency %d: %v", tt.concurrency, err)
-				}
+				t.Fatalf("unexpected concurrency validation error for valid concurrency %d: %v", tt.concurrency, err)
 			}
 		})
 	}
@@ -169,11 +167,9 @@ func TestHandleRolloutNodesValidatesTimeout(t *testing.T) {
 				if !strings.Contains(err.Error(), "timeout must be positive") {
 					t.Fatalf("expected timeout validation error, got: %v", err)
 				}
-			} else {
+			} else if err != nil && strings.Contains(err.Error(), "timeout must be positive") {
 				// For valid timeout with empty node list, we expect success.
-				if err != nil && strings.Contains(err.Error(), "timeout must be positive") {
-					t.Fatalf("unexpected timeout validation error for valid timeout %d: %v", tt.timeout, err)
-				}
+				t.Fatalf("unexpected timeout validation error for valid timeout %d: %v", tt.timeout, err)
 			}
 		})
 	}

@@ -138,15 +138,17 @@ type recordingRunner struct {
 func (r *recordingRunner) Run(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
 	key := cmd
 	if len(args) > 0 {
+		argsStr := strings.Join(args, " ")
 		// Simplify key matching by using command type.
-		if strings.Contains(strings.Join(args, " "), "install") {
+		switch {
+		case strings.Contains(argsStr, "install"):
 			key = "ssh install"
-		} else if strings.Contains(strings.Join(args, " "), "restart") {
+		case strings.Contains(argsStr, "restart"):
 			key = "ssh " + strings.Join(args[len(args)-2:], " ")
-		} else if strings.Contains(strings.Join(args, " "), "is-active") {
+		case strings.Contains(argsStr, "is-active"):
 			key = "ssh " + strings.Join(args[len(args)-3:], " ")
-		} else if strings.Contains(strings.Join(args, " "), "grep") {
-			key = "ssh " + strings.Join(args[len(args)-1:], " ")
+		case strings.Contains(argsStr, "grep"):
+			key = "ssh " + args[len(args)-1]
 		}
 	}
 	r.calls = append(r.calls, key)

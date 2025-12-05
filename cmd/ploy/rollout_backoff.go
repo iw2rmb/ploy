@@ -102,11 +102,12 @@ func PollWithBackoff(ctx context.Context, policy RetryPolicy, logger *slog.Logge
 
 	// Log exhaustion or cancellation using rollout-specific fields.
 	if err != nil {
-		if ctx.Err() != nil && lastErr != nil {
+		switch {
+		case ctx.Err() != nil && lastErr != nil:
 			logger.Warn("poll_backoff_cancelled", "step", step, "attempt", attempt, "error", lastErr.Error())
-		} else if lastErr != nil {
+		case lastErr != nil:
 			logger.Error("poll_backoff_exhausted", "step", step, "max_attempts", policy.MaxAttempts, "error", lastErr.Error())
-		} else {
+		default:
 			logger.Error("poll_backoff_exhausted", "step", step, "max_attempts", policy.MaxAttempts)
 		}
 	}

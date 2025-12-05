@@ -325,7 +325,7 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	}
 
 	// Verify order: 1000 < 2000 < 3000.
-	if !(pos1000 < pos2000 && pos2000 < pos3000) {
+	if pos1000 >= pos2000 || pos2000 >= pos3000 {
 		t.Errorf("jobs not sorted by step_index:\n%s", result)
 	}
 }

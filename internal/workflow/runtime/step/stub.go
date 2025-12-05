@@ -345,13 +345,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	// Run the Build Gate before executing the mod container to fail fast if the codebase doesn't build.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
-	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
-	if gateSpec == nil && req.Manifest.Shift != nil {
+	if gateSpec == nil && req.Manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
 		// Fallback to deprecated Shift for backward compatibility.
 		gateSpec = &contracts.StepGateSpec{
-			Enabled: req.Manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
-			Profile: req.Manifest.Shift.Profile, //lint:ignore SA1019 compat field access
-			Env:     req.Manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+			Enabled: req.Manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
+			Profile: req.Manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
+			Env:     req.Manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
 		}
 	}
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {

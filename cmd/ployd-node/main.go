@@ -16,6 +16,10 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	var configPath string
 	var showVersion bool
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd-node.yaml", "Path to ployd-node configuration")
@@ -27,19 +31,19 @@ func main() {
 
 	if showVersion {
 		slog.Info("ployd-node", "version", iversion.Version, "commit", iversion.Commit, "built_at", iversion.BuiltAt)
-		return
+		return 0
 	}
 
 	cfg, err := nodeagent.LoadConfig(configPath)
 	if err != nil {
 		slog.Error("load config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 
 	agent, err := nodeagent.New(cfg)
 	if err != nil {
 		slog.Error("initialise node agent", "err", err)
-		os.Exit(1)
+		return 1
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -47,6 +51,7 @@ func main() {
 
 	if err := agent.Run(ctx); err != nil && err != context.Canceled {
 		slog.Error("node agent exited", "err", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

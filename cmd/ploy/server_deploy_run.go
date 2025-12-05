@@ -90,17 +90,16 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 			IdentityFile: identityPath,
 		}
 		detection, err := deploy.DetectExisting(ctx, detectRunner, detectOpts)
-		if err != nil {
+		switch {
+		case err != nil:
 			_, _ = fmt.Fprintf(stderr, "Warning: failed to detect existing cluster: %v\n", err)
-		} else if detection.Found {
-			if detection.ClusterID != "" {
-				clusterID = detection.ClusterID
-				reusingCluster = true
-				_, _ = fmt.Fprintf(stderr, "Found existing cluster: %s (reusing CA and server certificate)\n", clusterID)
-			} else {
-				_, _ = fmt.Fprintln(stderr, "Found existing PKI files but could not extract cluster ID; will generate new CA")
-			}
-		} else {
+		case detection.Found && detection.ClusterID != "":
+			clusterID = detection.ClusterID
+			reusingCluster = true
+			_, _ = fmt.Fprintf(stderr, "Found existing cluster: %s (reusing CA and server certificate)\n", clusterID)
+		case detection.Found:
+			_, _ = fmt.Fprintln(stderr, "Found existing PKI files but could not extract cluster ID; will generate new CA")
+		default:
 			_, _ = fmt.Fprintln(stderr, "No existing cluster found; will generate new CA")
 		}
 	}

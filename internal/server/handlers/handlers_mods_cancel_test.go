@@ -246,7 +246,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	if !foundDone {
 		t.Fatal("expected done status event in snapshot")
 	}
-	if !(ticketIdx >= 0 && doneIdx > ticketIdx) {
+	if ticketIdx < 0 || doneIdx <= ticketIdx {
 		t.Fatalf("expected ticket to precede done (ticketIdx=%d, doneIdx=%d)", ticketIdx, doneIdx)
 	}
 }

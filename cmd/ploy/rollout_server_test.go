@@ -109,12 +109,10 @@ func TestHandleRolloutServerValidatesSSHPort(t *testing.T) {
 				if !strings.Contains(err.Error(), "invalid SSH port") {
 					t.Fatalf("expected SSH port validation error, got: %v", err)
 				}
-			} else {
+			} else if err != nil && strings.Contains(err.Error(), "invalid SSH port") {
 				// For valid ports, we expect failure due to stubbed rollout,
 				// but NOT due to port validation.
-				if err != nil && strings.Contains(err.Error(), "invalid SSH port") {
-					t.Fatalf("unexpected SSH port validation error for valid port %d: %v", tt.sshPort, err)
-				}
+				t.Fatalf("unexpected SSH port validation error for valid port %d: %v", tt.sshPort, err)
 			}
 		})
 	}
@@ -168,12 +166,10 @@ func TestHandleRolloutServerValidatesTimeout(t *testing.T) {
 				if !strings.Contains(err.Error(), "timeout must be positive") {
 					t.Fatalf("expected timeout validation error, got: %v", err)
 				}
-			} else {
+			} else if err != nil && strings.Contains(err.Error(), "timeout must be positive") {
 				// For valid timeouts, we expect failure due to stubbed rollout,
 				// but NOT due to timeout validation.
-				if err != nil && strings.Contains(err.Error(), "timeout must be positive") {
-					t.Fatalf("unexpected timeout validation error for valid timeout %d: %v", tt.timeout, err)
-				}
+				t.Fatalf("unexpected timeout validation error for valid timeout %d: %v", tt.timeout, err)
 			}
 		})
 	}

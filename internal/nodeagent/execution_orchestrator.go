@@ -142,8 +142,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	// Disable gate in manifest - mod jobs don't run gates.
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
-	//lint:ignore SA1019 Backward compatibility
-	manifest.Shift = nil
+	manifest.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear hydration since workspace is already hydrated.
 	if len(manifest.Inputs) > 0 {
@@ -311,8 +310,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// Disable gate in manifest - healing jobs don't run gates.
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
-	//lint:ignore SA1019 Backward compatibility
-	manifest.Shift = nil
+	manifest.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear hydration since workspace is already hydrated.
 	if len(manifest.Inputs) > 0 {
@@ -552,7 +550,9 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	// Determine terminal status and exit code based on execution result.
 	terminalStatus := "succeeded"
 	var exitCode int32
-	if execErr != nil {
+
+	switch {
+	case execErr != nil:
 		terminalStatus = "failed"
 		// Check if this is a build gate failure.
 		if errors.Is(execErr, step.ErrBuildGateFailed) {
@@ -562,10 +562,10 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 			// Exit code -1 for other execution errors.
 			exitCode = -1
 		}
-	} else if result.ExitCode != 0 {
+	case result.ExitCode != 0:
 		terminalStatus = "failed"
 		exitCode = int32(result.ExitCode)
-	} else {
+	default:
 		exitCode = int32(result.ExitCode) // 0 for success
 	}
 

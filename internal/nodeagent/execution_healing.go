@@ -139,12 +139,11 @@ func (r *runController) runGateWithHealing(
 ) (*gateRunMetadata, []gateRunMetadata, error) {
 	// Resolve gate spec from manifest (with backward compat for deprecated Shift field).
 	gateSpec := manifest.Gate
-	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
-	if gateSpec == nil && manifest.Shift != nil {
+	if gateSpec == nil && manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
 		gateSpec = &contracts.StepGateSpec{
-			Enabled: manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
-			Profile: manifest.Shift.Profile, //lint:ignore SA1019 compat field access
-			Env:     manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+			Enabled: manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
+			Profile: manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
+			Env:     manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
 		}
 	}
 
@@ -525,8 +524,7 @@ func (r *runController) executeWithHealing(
 	// Inputs[i].Hydration entries so Runner.Run performs container execution only.
 	manifestForMainMod := manifest
 	manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
-	//lint:ignore SA1019 Backward compatibility: also disable deprecated Shift field.
-	manifestForMainMod.Shift = nil
+	manifestForMainMod.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear Hydration on each input to skip re-hydration (workspace already hydrated by pre-gate).
 	if len(manifestForMainMod.Inputs) > 0 {

@@ -59,7 +59,7 @@ type DockerContainerRuntime struct {
 func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRuntime, error) {
 	// Use moby client with FromEnv for DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH,
 	// and WithAPIVersionNegotiation to auto-negotiate API version with the daemon.
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
@@ -115,8 +115,8 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 	}
 	// Apply optional resource limits when provided (0 => unlimited).
 	if spec.LimitNanoCPUs > 0 || spec.LimitMemoryBytes > 0 {
-		hostCfg.Resources.NanoCPUs = spec.LimitNanoCPUs
-		hostCfg.Resources.Memory = spec.LimitMemoryBytes
+		hostCfg.NanoCPUs = spec.LimitNanoCPUs
+		hostCfg.Memory = spec.LimitMemoryBytes
 	}
 	// Optional: attach container to a specific Docker network when configured.
 	if strings.TrimSpace(r.opts.Network) != "" {

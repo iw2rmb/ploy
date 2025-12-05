@@ -36,7 +36,7 @@ func FuzzPartitionPattern(f *testing.F) {
 			t.Fatalf("unexpected submatch length: got %d", len(m))
 		}
 		month := m[3]
-		if !(month >= "01" && month <= "12") {
+		if month < "01" || month > "12" {
 			t.Fatalf("regex matched invalid month: %q", month)
 		}
 	})

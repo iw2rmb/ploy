@@ -360,5 +360,5 @@ func TestNewPusher(t *testing.T) {
 	}
 
 	// Verify it implements the Pusher interface.
-	var _ Pusher = p
+	var _ Pusher = (*pusher)(nil)
 }
