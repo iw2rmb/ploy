@@ -257,6 +257,29 @@ type mockStore struct {
 	markBootstrapTokenUsedCalled bool
 	markBootstrapTokenUsedParam  string
 	markBootstrapTokenUsedErr    error
+
+	// ListRuns tracking (for batch run handlers)
+	listRunsCalled bool
+	listRunsParams store.ListRunsParams
+	listRunsResult []store.Run
+	listRunsErr    error
+
+	// ListRunReposByRun tracking
+	listRunReposByRunCalled bool
+	listRunReposByRunParam  pgtype.UUID
+	listRunReposByRunResult []store.RunRepo
+	listRunReposByRunErr    error
+
+	// CountRunReposByStatus tracking
+	countRunReposByStatusCalled bool
+	countRunReposByStatusParam  pgtype.UUID
+	countRunReposByStatusResult []store.CountRunReposByStatusRow
+	countRunReposByStatusErr    error
+
+	// UpdateRunRepoStatus tracking
+	updateRunRepoStatusCalled bool
+	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
+	updateRunRepoStatusErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -631,4 +654,30 @@ func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) 
 	m.markBootstrapTokenUsedCalled = true
 	m.markBootstrapTokenUsedParam = tokenID
 	return m.markBootstrapTokenUsedErr
+}
+
+// RunRepo methods for batch run handlers
+
+func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
+	m.listRunsCalled = true
+	m.listRunsParams = params
+	return m.listRunsResult, m.listRunsErr
+}
+
+func (m *mockStore) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]store.RunRepo, error) {
+	m.listRunReposByRunCalled = true
+	m.listRunReposByRunParam = runID
+	return m.listRunReposByRunResult, m.listRunReposByRunErr
+}
+
+func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) ([]store.CountRunReposByStatusRow, error) {
+	m.countRunReposByStatusCalled = true
+	m.countRunReposByStatusParam = runID
+	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
+}
+
+func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
+	m.updateRunRepoStatusCalled = true
+	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
+	return m.updateRunRepoStatusErr
 }
