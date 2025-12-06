@@ -331,6 +331,116 @@ func (f *flushRecorder) Flush() {
 	// ResponseRecorder buffers writes; nothing else required.
 }
 
+// TestLogRecordEnrichedFields verifies that enriched fields (NodeID, JobID,
+// ModType, StepIndex) marshal correctly through the publish/subscribe round-trip.
+// Fields with zero values are omitted due to `omitempty` tags.
+func TestLogRecordEnrichedFields(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		record LogRecord
+		want   map[string]any
+	}{
+		{
+			name: "all enriched fields populated",
+			record: LogRecord{
+				Timestamp: "2025-10-22T12:00:00Z",
+				Stream:    "stdout",
+				Line:      "hello world",
+				NodeID:    "node-abc123",
+				JobID:     "job-def456",
+				ModType:   "mod",
+				StepIndex: 2,
+			},
+			want: map[string]any{
+				"timestamp":  "2025-10-22T12:00:00Z",
+				"stream":     "stdout",
+				"line":       "hello world",
+				"node_id":    "node-abc123",
+				"job_id":     "job-def456",
+				"mod_type":   "mod",
+				"step_index": float64(2), // JSON numbers decode as float64
+			},
+		},
+		{
+			name: "omitempty omits zero values",
+			record: LogRecord{
+				Timestamp: "2025-10-22T12:00:01Z",
+				Stream:    "stderr",
+				Line:      "minimal record",
+			},
+			want: map[string]any{
+				"timestamp": "2025-10-22T12:00:01Z",
+				"stream":    "stderr",
+				"line":      "minimal record",
+				// node_id, job_id, mod_type, step_index should be absent
+			},
+		},
+		{
+			name: "partial enrichment",
+			record: LogRecord{
+				Timestamp: "2025-10-22T12:00:02Z",
+				Stream:    "stdout",
+				Line:      "partial context",
+				NodeID:    "node-xyz",
+				StepIndex: 0, // zero value, should be omitted
+			},
+			want: map[string]any{
+				"timestamp": "2025-10-22T12:00:02Z",
+				"stream":    "stdout",
+				"line":      "partial context",
+				"node_id":   "node-xyz",
+				// job_id, mod_type, step_index (0) should be absent
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			streamID := "enriched-test-" + string(rune('0'+i))
+
+			if err := hub.PublishLog(ctx, streamID, tt.record); err != nil {
+				t.Fatalf("publish log: %v", err)
+			}
+
+			snapshot := hub.Snapshot(streamID)
+			if len(snapshot) == 0 {
+				t.Fatal("expected event in snapshot")
+			}
+
+			evt := snapshot[len(snapshot)-1]
+			if evt.Type != "log" {
+				t.Fatalf("expected event type 'log', got %s", evt.Type)
+			}
+
+			// Unmarshal into a generic map to check exact JSON shape.
+			var got map[string]any
+			if err := json.Unmarshal(evt.Data, &got); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+
+			// Verify expected keys are present with correct values.
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("field %q: got %v, want %v", k, got[k], v)
+				}
+			}
+
+			// Verify omitted keys are truly absent.
+			omittedKeys := []string{"node_id", "job_id", "mod_type", "step_index"}
+			for _, k := range omittedKeys {
+				if _, inWant := tt.want[k]; !inWant {
+					if _, inGot := got[k]; inGot {
+						t.Errorf("field %q should be omitted but was present", k)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestPublishTicketTypedPayload verifies that PublishTicket accepts only api.TicketSummary
 // and that the payload marshals correctly through publish/subscribe round-trip.
 func TestPublishTicketTypedPayload(t *testing.T) {
