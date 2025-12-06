@@ -69,6 +69,11 @@ RunRepoCounts:
     cancelled:
       type: integer
       format: int32
+    derived_status:
+      type: string
+      description: |
+        Derived batch-level status computed from per-repo states.
+        One of: pending, running, completed, failed, cancelled.
   required: [total]
 
 RunRepo:
