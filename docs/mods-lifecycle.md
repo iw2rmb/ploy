@@ -490,7 +490,8 @@ Batched runs introduce a parent–child relationship between tables:
 │   │  status   │            │ target_ref│             │   logs    │          │
 │   │           │            │  status   │             │ artifacts │          │
 │   └───────────┘            │  attempt  │             └───────────┘          │
-│                            │ exec_run  │                                    │
+│                            │ execution │                                    │
+│                            │ _run_id   │                                    │
 │                            └───────────┘                                    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -629,19 +630,19 @@ In a batch workflow, `ploy mod run` submits the spec once, then
 ploy mod run --spec mod.yaml --name my-batch
 
 # 2. Add repos to the batch.
-ploy mod run repo add my-batch --repo-url https://github.com/org/repo1.git \
-    --base-ref main --target-ref feature-branch
-ploy mod run repo add my-batch --repo-url https://github.com/org/repo2.git \
-    --base-ref main --target-ref feature-branch
+ploy mod run repo add --repo-url https://github.com/org/repo1.git \
+    --base-ref main --target-ref feature-branch my-batch
+ploy mod run repo add --repo-url https://github.com/org/repo2.git \
+    --base-ref main --target-ref feature-branch my-batch
 
 # 3. Monitor per-repo status within the batch.
 ploy mod run repo status my-batch
 
 # 4. Optionally restart a failed repo with updated refs.
-ploy mod run repo restart my-batch --repo-id <repo-uuid> --base-ref hotfix
+ploy mod run repo restart --repo-id <repo-uuid> --base-ref hotfix my-batch
 
 # 5. Remove a repo from the batch (marks pending as skipped, running as cancelled).
-ploy mod run repo remove my-batch --repo-id <repo-uuid>
+ploy mod run repo remove --repo-id <repo-uuid> my-batch
 ```
 
 ### Relationship summary
