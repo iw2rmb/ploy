@@ -217,7 +217,7 @@ Legend: [ ] todo, [x] done.
     - Validation failures for invalid `repo_id` (bad URL decode or invalid scheme).
     - Empty responses when no runs exist for a repo.
 
-- [ ] Update mods lifecycle docs to cover batched runs — clarify relationship between runs, run_repos, and jobs.
+- [x] Update mods lifecycle docs to cover batched runs — clarify relationship between runs, run_repos, and jobs.
   - Repository: ploy
   - Component: docs
   - Scope:
