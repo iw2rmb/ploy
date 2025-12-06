@@ -603,6 +603,12 @@ All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 header to validate job ownership and attribute artifacts/diffs to the correct
 node.
 
+### 3.3 Runs endpoints (`internal/server/handlers/handlers_runs_batch.go`)
+
+- `GET /v1/runs` — list batch runs with basic metadata (repo_url, refs, status, timestamps) and optional per-repo status counts.
+- `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
+- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `canceled` and marking pending `run_repos` as `cancelled` (idempotent for terminal runs).
+
 ## 4. Node Execution and Rehydration
 
 ### 4.1 Single-step runs

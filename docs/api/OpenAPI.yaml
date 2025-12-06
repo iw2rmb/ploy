@@ -7,7 +7,8 @@ info:
     require mutual TLS authentication. Bearer token auth has been removed.
     Primary endpoints expose the Mods facade under `/v1/mods` (ticket submission,
     status, events, and artifact/log/diff uploads). The old `/v1/mods/crud` and
-    `/v1/runs/*` read/stream endpoints have been removed.
+    legacy `/v1/runs/*` read/stream endpoints have been removed; new batch-level
+    runs endpoints under `/v1/runs` provide list/inspect/stop semantics.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings with the same formats (UUIDs for IDs), preserving compatibility.
@@ -97,6 +98,13 @@ paths:
   # Node logs endpoint (gzipped chunks)
   /v1/nodes/{id}/logs:
     $ref: './paths/nodes_id_logs.yaml'
+  # Batch runs endpoints (list/inspect/stop)
+  /v1/runs:
+    $ref: './paths/runs.yaml'
+  /v1/runs/{id}:
+    $ref: './paths/runs_id.yaml'
+  /v1/runs/{id}/stop:
+    $ref: './paths/runs_id_stop.yaml'
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
     $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
@@ -141,6 +149,10 @@ components:
       $ref: './components/schemas/common.yaml#/Error'
     Run:
       $ref: './components/schemas/controlplane.yaml#/Run'
+    RunBatchSummary:
+      $ref: './components/schemas/controlplane.yaml#/RunBatchSummary'
+    RunRepoCounts:
+      $ref: './components/schemas/controlplane.yaml#/RunRepoCounts'
     CreateRunRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
     CreateRunResponse:

@@ -44,6 +44,59 @@ Run:
       nullable: true
   required: [id, repo_url, status, created_at, base_ref, target_ref]
 
+RunRepoCounts:
+  type: object
+  description: Aggregated per-repo status counts for a batch run.
+  properties:
+    total:
+      type: integer
+      format: int32
+    pending:
+      type: integer
+      format: int32
+    running:
+      type: integer
+      format: int32
+    succeeded:
+      type: integer
+      format: int32
+    failed:
+      type: integer
+      format: int32
+    skipped:
+      type: integer
+      format: int32
+    cancelled:
+      type: integer
+      format: int32
+  required: [total]
+
+RunBatchSummary:
+  type: object
+  description: Batch run summary with optional aggregated repo status counts.
+  properties:
+    id: { type: string, format: uuid }
+    name: { type: string, nullable: true }
+    repo_url: { type: string }
+    status: { type: string }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    created_by: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+    repo_counts:
+      allOf:
+        - $ref: '#/RunRepoCounts'
+      nullable: true
+  required:
+    - id
+    - repo_url
+    - status
+    - base_ref
+    - target_ref
+    - created_at
+
 CreateRunRequest:
   type: object
   properties:
