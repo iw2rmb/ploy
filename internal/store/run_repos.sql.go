@@ -178,6 +178,39 @@ func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) e
 	return err
 }
 
+const listBatchRunsWithPendingRepos = `-- name: ListBatchRunsWithPendingRepos :many
+SELECT DISTINCT r.id
+FROM runs r
+INNER JOIN run_repos rr ON r.id = rr.run_id
+WHERE r.status IN ('queued', 'assigned', 'running')
+  AND rr.status = 'pending'
+ORDER BY r.id
+`
+
+// Lists batch runs that have at least one pending run_repo entry.
+// Used by the batch scheduler to find runs that need repos to be started.
+// Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
+// that have pending repos ready for execution.
+func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listBatchRunsWithPendingRepos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingRunReposByRun = `-- name: ListPendingRunReposByRun :many
 SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
 WHERE run_id = $1 AND status = 'pending'

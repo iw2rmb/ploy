@@ -15,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/pki"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 )
 
@@ -65,10 +66,29 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("create events service: %w", err)
 	}
 
+	// Initialize batch scheduler for processing pending repos in batch runs.
+	// The scheduler is disabled when BatchSchedulerInterval is 0.
+	var batchSched *batchscheduler.Scheduler
+	if cfg.Scheduler.BatchSchedulerInterval > 0 {
+		repoStarter := handlers.NewBatchRepoStarter(st)
+		batchSched, err = batchscheduler.New(batchscheduler.Options{
+			Store:       st,
+			RepoStarter: repoStarter,
+			Interval:    cfg.Scheduler.BatchSchedulerInterval,
+			Logger:      slog.Default(),
+		})
+		if err != nil {
+			return fmt.Errorf("create batch scheduler: %w", err)
+		}
+	}
+
 	// Initialize scheduler and register background tasks.
 	sched := scheduler.New()
 	if ttlWorker != nil {
 		sched.AddTask(ttlWorker)
+	}
+	if batchSched != nil {
+		sched.AddTask(batchSched)
 	}
 
 	// Start PKI manager.

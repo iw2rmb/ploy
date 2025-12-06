@@ -105,7 +105,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `handlers_runs_batch_test.go` to assert that starting a batch run with two repos updates `run_repos` statuses correctly when underlying runs complete.
 
 ## Batch lifecycle and scheduler
-- [ ] Implement simple batch run scheduler — process repos within a batch, without cross-batch FIFO.
+- [x] Implement simple batch run scheduler — process repos within a batch, without cross-batch FIFO.
   - Repository: ploy
   - Component: internal/server/handlers, worker/scheduler (if present)
   - Scope:
