@@ -22,10 +22,30 @@ type Options struct {
 }
 
 // LogRecord represents a structured log frame.
+// The enriched fields (NodeID, JobID, ModType, StepIndex) provide execution
+// context so clients can correlate log lines with specific nodes, jobs, and
+// Mods pipeline stages. These fields are optional — older or internal-only
+// log sources may omit them.
 type LogRecord struct {
 	Timestamp string `json:"timestamp"`
 	Stream    string `json:"stream"`
 	Line      string `json:"line"`
+
+	// NodeID identifies the execution node that produced this log line.
+	// Empty when the source is not node-bound (e.g., hub-generated events).
+	NodeID string `json:"node_id,omitempty"`
+
+	// JobID is the UUID of the job that produced this log line.
+	// Empty for events not tied to a specific job.
+	JobID string `json:"job_id,omitempty"`
+
+	// ModType indicates the Mods step type (e.g., "mod", "hook", "gate").
+	// Empty when not applicable or unknown.
+	ModType string `json:"mod_type,omitempty"`
+
+	// StepIndex is the zero-based index of the step within the Mods pipeline.
+	// Defaults to 0; use -1 or omit to indicate "not applicable" when serializing.
+	StepIndex int `json:"step_index,omitempty"`
 }
 
 // RetentionHint carries retention metadata emitted on the stream.
