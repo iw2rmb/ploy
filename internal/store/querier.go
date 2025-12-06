@@ -136,6 +136,8 @@ type Querier interface {
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
 	// Updates a run_repo's last_error field (e.g., on failure).
 	UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error
+	// Updates a run_repo's base_ref and target_ref (e.g., when restarting with new refs).
+	UpdateRunRepoRefs(ctx context.Context, arg UpdateRunRepoRefsParams) error
 	// Updates a run_repo's status along with timing fields.
 	// started_at is set when transitioning to 'running'.
 	// finished_at is set when transitioning to a terminal status.

@@ -51,6 +51,11 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},
 		{"/v1/runs/{id}/stop", "post"},
+		// RunRepo handlers (repos within a batch)
+		{"/v1/runs/{id}/repos", "get"},
+		{"/v1/runs/{id}/repos", "post"},
+		{"/v1/runs/{id}/repos/{repo_id}", "delete"},
+		{"/v1/runs/{id}/repos/{repo_id}/restart", "post"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management
@@ -142,6 +147,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"NodeClaimResponse",
 		"Event",
 		"Stage",
+		"RunRepo",
 	}
 
 	for _, schema := range requiredSchemas {

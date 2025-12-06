@@ -1047,9 +1047,13 @@ func TestRestartRunRepoHandler(t *testing.T) {
 		mockRepoErr          error
 		mockRestartedRepo    store.RunRepo
 		incrementAttemptErr  error
+		updateRefsErr        error
 		wantStatus           int
 		wantIncrementAttempt bool
 		wantAttempt          int32
+		wantUpdateRefs       bool
+		wantBaseRef          string
+		wantTargetRef        string
 	}{
 		{
 			name:                 "restart failed repo",
@@ -1061,6 +1065,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			wantStatus:           http.StatusOK,
 			wantIncrementAttempt: true,
 			wantAttempt:          2,
+			wantUpdateRefs:       false,
 		},
 		{
 			name:                 "restart with empty body",
@@ -1073,6 +1078,22 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			wantStatus:           http.StatusOK,
 			wantIncrementAttempt: true,
 			wantAttempt:          2,
+			wantUpdateRefs:       false,
+		},
+		{
+			name:                 "restart with new refs",
+			runID:                sampleRunID.String(),
+			repoID:               sampleRepoID.String(),
+			body:                 `{"base_ref":"main-updated","target_ref":"feature-updated"}`,
+			mockRun:              runningRun,
+			mockRepo:             failedRepo,
+			mockRestartedRepo:    restartedRepo,
+			wantStatus:           http.StatusOK,
+			wantIncrementAttempt: true,
+			wantAttempt:          2,
+			wantUpdateRefs:       true,
+			wantBaseRef:          "main-updated",
+			wantTargetRef:        "feature-updated",
 		},
 		{
 			name:       "empty run id",
@@ -1145,6 +1166,20 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			incrementAttemptErr:  pgx.ErrTxClosed,
 			wantStatus:           http.StatusInternalServerError,
 			wantIncrementAttempt: true, // We do call it, but it fails.
+			wantUpdateRefs:       false,
+		},
+		{
+			name:                 "update refs error",
+			runID:                sampleRunID.String(),
+			repoID:               sampleRepoID.String(),
+			body:                 `{"base_ref":"main-updated","target_ref":"feature-updated"}`,
+			mockRun:              runningRun,
+			mockRepo:             failedRepo,
+			mockRestartedRepo:    restartedRepo,
+			updateRefsErr:        pgx.ErrTxClosed,
+			wantStatus:           http.StatusInternalServerError,
+			wantIncrementAttempt: true,
+			wantUpdateRefs:       true,
 		},
 	}
 
@@ -1164,6 +1199,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 				getRunRepoResult:           mockRepoOnGet,
 				getRunRepoErr:              tc.mockRepoErr,
 				incrementRunRepoAttemptErr: tc.incrementAttemptErr,
+				updateRunRepoRefsErr:       tc.updateRefsErr,
 			}
 
 			// On successful restart, GetRunRepo is called twice (before and after increment).
@@ -1199,6 +1235,21 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			}
 			if !tc.wantIncrementAttempt && m.incrementRunRepoAttemptCalled {
 				t.Error("expected IncrementRunRepoAttempt NOT to be called")
+			}
+
+			if tc.wantUpdateRefs {
+				if !m.updateRunRepoRefsCalled {
+					t.Error("expected UpdateRunRepoRefs to be called")
+				} else {
+					if tc.wantBaseRef != "" && m.updateRunRepoRefsParams.BaseRef != tc.wantBaseRef {
+						t.Errorf("base_ref = %s, want %s", m.updateRunRepoRefsParams.BaseRef, tc.wantBaseRef)
+					}
+					if tc.wantTargetRef != "" && m.updateRunRepoRefsParams.TargetRef != tc.wantTargetRef {
+						t.Errorf("target_ref = %s, want %s", m.updateRunRepoRefsParams.TargetRef, tc.wantTargetRef)
+					}
+				}
+			} else if m.updateRunRepoRefsCalled {
+				t.Error("expected UpdateRunRepoRefs NOT to be called")
 			}
 		})
 	}
