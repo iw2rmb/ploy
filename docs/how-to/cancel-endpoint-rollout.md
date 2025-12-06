@@ -117,13 +117,17 @@ When canceling a batch run, all attached `run_repos` and their jobs transition t
 ```bash
 # Create a batch and add repos.
 ploy mod run --spec mod.yaml --name batch-to-cancel
-ploy mod run repo add batch-to-cancel \
+ploy mod run repo add \
   --repo-url https://github.com/org/repo-a.git \
-  --repo-base-ref main --repo-target-ref feature
+  --base-ref main \
+  --target-ref feature \
+  batch-to-cancel
 
-ploy mod run repo add batch-to-cancel \
+ploy mod run repo add \
   --repo-url https://github.com/org/repo-b.git \
-  --repo-base-ref main --repo-target-ref feature
+  --base-ref main \
+  --target-ref feature \
+  batch-to-cancel
 
 # Cancel the entire batch (all run_repos are canceled).
 ploy mod cancel --ticket batch-to-cancel --reason "batch aborted"

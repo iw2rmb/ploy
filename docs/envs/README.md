@@ -81,8 +81,8 @@ Role model (bearer token claims):
 - `--name` — Creates a **batch run** with the given name (no repository attached yet).
   Used with `mod run repo add` to attach multiple repositories under a shared spec.
   Example: `ploy mod run --spec mod.yaml --name my-batch` followed by
-  `ploy mod run repo add my-batch --repo-url https://...`. See `cmd/ploy/README.md`
-  § "Batched Mod Runs" for full usage.
+  `ploy mod run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
+  See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
   - `mods[]` — Array of healing steps (each is a container with image/command/env/retain)

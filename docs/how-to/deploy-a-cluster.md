@@ -224,13 +224,17 @@ Create a named batch first, then attach repos:
 dist/ploy mod run --spec mod.yaml --name fleet-upgrade
 
 # Attach repositories.
-dist/ploy mod run repo add fleet-upgrade \
+dist/ploy mod run repo add \
   --repo-url https://github.com/org/service-a.git \
-  --repo-base-ref main --repo-target-ref upgrade-deps
+  --base-ref main \
+  --target-ref upgrade-deps \
+  fleet-upgrade
 
-dist/ploy mod run repo add fleet-upgrade \
+dist/ploy mod run repo add \
   --repo-url https://github.com/org/service-b.git \
-  --repo-base-ref main --repo-target-ref upgrade-deps
+  --base-ref main \
+  --target-ref upgrade-deps \
+  fleet-upgrade
 
 # Follow all repos in the batch.
 dist/ploy runs follow fleet-upgrade

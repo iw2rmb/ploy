@@ -110,15 +110,17 @@ incrementally:
 ploy mod run --spec mod.yaml --name my-batch
 
 # Step 2: Add repositories to the batch.
-ploy mod run repo add my-batch \
+ploy mod run repo add \
   --repo-url https://github.com/org/repo-a.git \
-  --repo-base-ref main \
-  --repo-target-ref upgrade-deps
+  --base-ref main \
+  --target-ref upgrade-deps \
+  my-batch
 
-ploy mod run repo add my-batch \
+ploy mod run repo add \
   --repo-url https://github.com/org/repo-b.git \
-  --repo-base-ref main \
-  --repo-target-ref upgrade-deps
+  --base-ref main \
+  --target-ref upgrade-deps \
+  my-batch
 
 # Step 3: Optionally follow logs for the entire batch.
 ploy runs follow my-batch
@@ -134,10 +136,11 @@ If a repository job fails or needs reprocessing with a different branch, use
 `mod run repo restart`:
 
 ```bash
-# Restart repo-a with a hotfix branch.
-ploy mod run repo restart my-batch \
-  --repo-url https://github.com/org/repo-a.git \
-  --branch hotfix
+# Restart repo-a with a hotfix branch (use repo-id from `mod run repo status`).
+ploy mod run repo restart \
+  --repo-id <repo-uuid> \
+  --target-ref hotfix \
+  my-batch
 ```
 
 This re-queues the repository under the same batch without recreating the run.
@@ -147,8 +150,9 @@ This re-queues the repository under the same batch without recreating the run.
 To remove a repository from an in-progress batch (e.g., if it was added by mistake):
 
 ```bash
-ploy mod run repo remove my-batch \
-  --repo-url https://github.com/org/repo-a.git
+ploy mod run repo remove \
+  --repo-id <repo-uuid> \
+  my-batch
 ```
 
 ### Batch Workflow Summary

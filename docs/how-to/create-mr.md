@@ -204,15 +204,17 @@ ploy config gitlab set --file gitlab-config.json
 ploy mod run --spec mod.yaml --name java17-fleet --mr-success
 
 # 3. Add repositories — each will create an MR on success.
-ploy mod run repo add java17-fleet \
+ploy mod run repo add \
   --repo-url https://gitlab.com/org/service-a.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/java-17-upgrade
+  --base-ref main \
+  --target-ref workflow/java-17-upgrade \
+  java17-fleet
 
-ploy mod run repo add java17-fleet \
+ploy mod run repo add \
   --repo-url https://gitlab.com/org/service-b.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/java-17-upgrade
+  --base-ref main \
+  --target-ref workflow/java-17-upgrade \
+  java17-fleet
 
 # 4. Follow batch progress.
 ploy runs follow java17-fleet
@@ -223,9 +225,10 @@ ploy runs follow java17-fleet
 If one repository fails due to a missing fix, restart it with a different branch:
 
 ```bash
-ploy mod run repo restart java17-fleet \
-  --repo-url https://gitlab.com/org/service-a.git \
-  --branch hotfix
+ploy mod run repo restart \
+  --repo-id <repo-uuid> \
+  --target-ref hotfix \
+  java17-fleet
 ```
 
 When the restarted job succeeds, an MR is created for the `hotfix` branch merge.
