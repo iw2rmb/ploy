@@ -43,15 +43,32 @@ type RunBatchSummary struct {
 }
 
 // RunRepoCounts aggregates the count of repos by status within a batch.
+// DerivedStatus provides a single batch-level status derived from repo states.
 type RunRepoCounts struct {
-	Total     int32 `json:"total"`
-	Pending   int32 `json:"pending"`
-	Running   int32 `json:"running"`
-	Succeeded int32 `json:"succeeded"`
-	Failed    int32 `json:"failed"`
-	Skipped   int32 `json:"skipped"`
-	Cancelled int32 `json:"cancelled"`
+	Total         int32  `json:"total"`
+	Pending       int32  `json:"pending"`
+	Running       int32  `json:"running"`
+	Succeeded     int32  `json:"succeeded"`
+	Failed        int32  `json:"failed"`
+	Skipped       int32  `json:"skipped"`
+	Cancelled     int32  `json:"cancelled"`
+	DerivedStatus string `json:"derived_status"` // running, completed, failed, cancelled, pending
 }
+
+// Derived batch status constants exposed for API consumers.
+// These represent the batch-level state computed from repo statuses.
+const (
+	// DerivedStatusPending indicates no repos have started (all pending or no repos).
+	DerivedStatusPending = "pending"
+	// DerivedStatusRunning indicates at least one repo is currently running.
+	DerivedStatusRunning = "running"
+	// DerivedStatusCompleted indicates all repos finished with succeeded or skipped.
+	DerivedStatusCompleted = "completed"
+	// DerivedStatusFailed indicates at least one repo failed (and none running).
+	DerivedStatusFailed = "failed"
+	// DerivedStatusCancelled indicates the batch was stopped and repos were cancelled.
+	DerivedStatusCancelled = "cancelled"
+)
 
 // listRunsHandler returns an HTTP handler that lists runs with pagination.
 // GET /v1/runs — Returns a list of run summaries ordered by creation time descending.
@@ -347,7 +364,53 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID pgtype.UUID) (*
 		}
 	}
 
+	// Derive batch-level status from repo counts.
+	counts.DerivedStatus = deriveBatchStatus(counts)
+
 	return counts, nil
+}
+
+// deriveBatchStatus computes a single batch-level status from repo counts.
+// The precedence order is:
+//  1. cancelled — if any repo is cancelled (batch was explicitly stopped).
+//  2. running — if any repo is currently running.
+//  3. failed — if none running, and at least one repo failed.
+//  4. completed — if all repos are in terminal states (succeeded/skipped) with no failures.
+//  5. pending — if no repos have started yet (all pending, or no repos).
+func deriveBatchStatus(counts *RunRepoCounts) string {
+	// No repos in batch — treat as pending (batch has no work yet).
+	if counts.Total == 0 {
+		return DerivedStatusPending
+	}
+
+	// If any repo was cancelled, the batch was explicitly stopped.
+	// This takes precedence because it represents user intent to abort.
+	if counts.Cancelled > 0 {
+		return DerivedStatusCancelled
+	}
+
+	// If any repo is currently running, the batch is actively running.
+	if counts.Running > 0 {
+		return DerivedStatusRunning
+	}
+
+	// At this point, no repos are running or cancelled.
+	// Check if any repos failed — if so, the batch failed.
+	if counts.Failed > 0 {
+		return DerivedStatusFailed
+	}
+
+	// Calculate terminal repos (succeeded + skipped + failed + cancelled).
+	// We already checked Failed and Cancelled above, so only succeeded/skipped remain.
+	terminalCount := counts.Succeeded + counts.Skipped + counts.Failed + counts.Cancelled
+
+	// If all repos are in terminal state and none failed, batch completed successfully.
+	if terminalCount == counts.Total {
+		return DerivedStatusCompleted
+	}
+
+	// Some repos are still pending (not started), batch is pending/waiting.
+	return DerivedStatusPending
 }
 
 // isTerminalRunStatus returns true if the run status is terminal (no further transitions).
