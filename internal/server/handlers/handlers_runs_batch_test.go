@@ -1981,3 +1981,544 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 		})
 	}
 }
+
+// =========================================================================
+// Focused batch run workflow tests (ROADMAP.md line 267):
+// Covers happy path and error paths for batch run operations.
+// =========================================================================
+
+// TestBatchRunWorkflow_HappyPath exercises a complete batch run lifecycle:
+// 1. Create a batch run (list runs empty → create)
+// 2. Add two repos to the batch
+// 3. Start execution → repos transition to running
+// 4. Mark child runs as succeeded → repos marked succeeded
+// 5. Batch summary shows correct counts and derived status
+//
+// This test simulates the end-to-end workflow using mock store interactions.
+func TestBatchRunWorkflow_HappyPath(t *testing.T) {
+	t.Parallel()
+
+	// Sample UUIDs for the batch run and repos.
+	batchRunID := uuid.New()
+	repo1ID := uuid.New()
+	repo2ID := uuid.New()
+	childRun1ID := uuid.New()
+
+	// Batch run (parent) with queued status.
+	batchRun := store.Run{
+		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		Name:      ptrString("integration-batch"),
+		RepoUrl:   "https://github.com/batch/placeholder.git",
+		Status:    store.RunStatusQueued,
+		Spec:      []byte(`{"mod":{"image":"test-image"}}`),
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedBy: ptrString("test-user"),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Run repos representing individual repositories in the batch.
+	pendingRepo1 := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: repo1ID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo1.git",
+		BaseRef:   "main",
+		TargetRef: "feature-1",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	pendingRepo2 := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: repo2ID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo2.git",
+		BaseRef:   "main",
+		TargetRef: "feature-2",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Child runs created when batch execution starts.
+	childRun1 := store.Run{
+		ID:        pgtype.UUID{Bytes: childRun1ID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo1.git",
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature-1",
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Test scenario 1: List runs — returns the batch run with repo counts.
+	t.Run("list runs with repos", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			listRunsResult: []store.Run{batchRun},
+			countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusPending, Count: 2},
+			},
+		}
+
+		handler := listRunsHandler(m)
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+		}
+
+		var resp struct {
+			Runs []RunBatchSummary `json:"runs"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		// Verify batch run is returned with repo counts.
+		if len(resp.Runs) != 1 {
+			t.Fatalf("expected 1 run, got %d", len(resp.Runs))
+		}
+		if resp.Runs[0].Counts == nil {
+			t.Fatal("expected repo counts to be populated")
+		}
+		if resp.Runs[0].Counts.Total != 2 {
+			t.Errorf("total = %d, want 2", resp.Runs[0].Counts.Total)
+		}
+		if resp.Runs[0].Counts.Pending != 2 {
+			t.Errorf("pending = %d, want 2", resp.Runs[0].Counts.Pending)
+		}
+		// Before starting, derived status should be "pending".
+		if resp.Runs[0].Counts.DerivedStatus != DerivedStatusPending {
+			t.Errorf("derived_status = %s, want %s", resp.Runs[0].Counts.DerivedStatus, DerivedStatusPending)
+		}
+	})
+
+	// Test scenario 2: Start batch — pending repos transition to running.
+	t.Run("start batch creates child runs", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult:                   batchRun,
+			listRunReposByRunResult:        []store.RunRepo{pendingRepo1, pendingRepo2},
+			listPendingRunReposByRunResult: []store.RunRepo{pendingRepo1, pendingRepo2},
+			createRunResult:                childRun1,
+		}
+
+		handler := startRunHandler(m)
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+batchRunID.String()+"/start", nil)
+		req.SetPathValue("id", batchRunID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+		}
+
+		var resp StartRunResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		// Both repos should have started.
+		if resp.Started != 2 {
+			t.Errorf("started = %d, want 2", resp.Started)
+		}
+		if resp.AlreadyDone != 0 {
+			t.Errorf("already_done = %d, want 0", resp.AlreadyDone)
+		}
+		if resp.Pending != 0 {
+			t.Errorf("pending = %d, want 0", resp.Pending)
+		}
+
+		// Verify store calls: CreateRun called for each repo.
+		if !m.createRunCalled {
+			t.Error("expected CreateRun to be called")
+		}
+		// Verify SetRunRepoExecutionRun called to link repos to child runs.
+		if !m.setRunRepoExecutionRunCalled {
+			t.Error("expected SetRunRepoExecutionRun to be called")
+		}
+		// Verify AckRunStart called to transition batch to running.
+		if !m.ackRunStartCalled {
+			t.Error("expected AckRunStart to be called")
+		}
+	})
+
+	// Test scenario 3: Batch completion — all repos succeeded.
+	t.Run("batch completes when all repos succeed", func(t *testing.T) {
+		t.Parallel()
+
+		// Mock store returns succeeded status for both repos.
+		m := &mockStore{
+			getRunResult: batchRun,
+			countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusSucceeded, Count: 2},
+			},
+		}
+
+		handler := getRunHandler(m)
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+batchRunID.String(), nil)
+		req.SetPathValue("id", batchRunID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+		}
+
+		var resp RunBatchSummary
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		// Verify batch summary shows completed status.
+		if resp.Counts == nil {
+			t.Fatal("expected repo counts to be populated")
+		}
+		if resp.Counts.Total != 2 {
+			t.Errorf("total = %d, want 2", resp.Counts.Total)
+		}
+		if resp.Counts.Succeeded != 2 {
+			t.Errorf("succeeded = %d, want 2", resp.Counts.Succeeded)
+		}
+		if resp.Counts.DerivedStatus != DerivedStatusCompleted {
+			t.Errorf("derived_status = %s, want %s", resp.Counts.DerivedStatus, DerivedStatusCompleted)
+		}
+	})
+
+	// Test scenario 4: Partial failure — one repo fails.
+	t.Run("batch failed when some repos fail", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult: batchRun,
+			countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusSucceeded, Count: 1},
+				{Status: store.RunRepoStatusFailed, Count: 1},
+			},
+		}
+
+		handler := getRunHandler(m)
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+batchRunID.String(), nil)
+		req.SetPathValue("id", batchRunID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+		}
+
+		var resp RunBatchSummary
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if resp.Counts == nil {
+			t.Fatal("expected repo counts")
+		}
+		// Derived status should be "failed" when any repo fails.
+		if resp.Counts.DerivedStatus != DerivedStatusFailed {
+			t.Errorf("derived_status = %s, want %s", resp.Counts.DerivedStatus, DerivedStatusFailed)
+		}
+	})
+}
+
+// TestBatchRunWorkflow_ErrorPaths exercises error handling scenarios:
+// - Invalid repo URL when adding a repo
+// - Unknown run ID in various operations
+// - Restart on non-terminal repo
+func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	batchRunID := uuid.New()
+	repoID := uuid.New()
+
+	runningRun := store.Run{
+		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		Status:    store.RunStatusRunning,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	pendingRepo := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: repoID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo.git",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	runningRepo := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: repoID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo.git",
+		Status:    store.RunRepoStatusRunning,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Error path 1: Invalid repo URL scheme.
+	t.Run("add repo with invalid URL scheme", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult: runningRun,
+		}
+
+		handler := addRunRepoHandler(m)
+		// FTP scheme is not allowed — only https/http/git.
+		body := `{"repo_url":"ftp://example.com/repo.git","base_ref":"main","target_ref":"feature"}`
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+batchRunID.String()+"/repos", strings.NewReader(body))
+		req.SetPathValue("id", batchRunID.String())
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		// Should return 400 Bad Request for invalid URL scheme.
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want %d; body: %s", w.Code, http.StatusBadRequest, w.Body.String())
+		}
+	})
+
+	// Error path 2: Unknown run ID.
+	t.Run("get unknown run returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		unknownID := uuid.New()
+		m := &mockStore{
+			getRunErr: pgx.ErrNoRows,
+		}
+
+		handler := getRunHandler(m)
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+unknownID.String(), nil)
+		req.SetPathValue("id", unknownID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+		}
+	})
+
+	// Error path 3: List repos for unknown run.
+	t.Run("list repos for unknown run returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		unknownID := uuid.New()
+		m := &mockStore{
+			getRunErr: pgx.ErrNoRows,
+		}
+
+		handler := listRunReposHandler(m)
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+unknownID.String()+"/repos", nil)
+		req.SetPathValue("id", unknownID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+		}
+	})
+
+	// Error path 4: Restart pending repo (not terminal, should fail).
+	t.Run("restart pending repo returns conflict", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult:     runningRun,
+			getRunRepoResult: pendingRepo,
+		}
+
+		handler := restartRunRepoHandler(m)
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+batchRunID.String()+"/repos/"+repoID.String()+"/restart", nil)
+		req.SetPathValue("id", batchRunID.String())
+		req.SetPathValue("repo_id", repoID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		// Should return 409 Conflict — can only restart terminal repos.
+		if w.Code != http.StatusConflict {
+			t.Errorf("status = %d, want %d; body: %s", w.Code, http.StatusConflict, w.Body.String())
+		}
+	})
+
+	// Error path 5: Restart running repo (not terminal, should fail).
+	t.Run("restart running repo returns conflict", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult:     runningRun,
+			getRunRepoResult: runningRepo,
+		}
+
+		handler := restartRunRepoHandler(m)
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+batchRunID.String()+"/repos/"+repoID.String()+"/restart", nil)
+		req.SetPathValue("id", batchRunID.String())
+		req.SetPathValue("repo_id", repoID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		// Should return 409 Conflict — running repos cannot be restarted.
+		if w.Code != http.StatusConflict {
+			t.Errorf("status = %d, want %d; body: %s", w.Code, http.StatusConflict, w.Body.String())
+		}
+	})
+
+	// Error path 6: Stop unknown run.
+	t.Run("stop unknown run returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		unknownID := uuid.New()
+		m := &mockStore{
+			getRunErr: pgx.ErrNoRows,
+		}
+
+		handler := stopRunHandler(m)
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+unknownID.String()+"/stop", nil)
+		req.SetPathValue("id", unknownID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+		}
+	})
+
+	// Error path 7: Start execution for unknown run.
+	t.Run("start unknown run returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		unknownID := uuid.New()
+		m := &mockStore{
+			getRunErr: pgx.ErrNoRows,
+		}
+
+		handler := startRunHandler(m)
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+unknownID.String()+"/start", nil)
+		req.SetPathValue("id", unknownID.String())
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+		}
+	})
+}
+
+// TestBatchRepoStarter_StartPendingRepos verifies the BatchRepoStarter helper
+// that background schedulers use to start pending repos in batch runs.
+func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
+	t.Parallel()
+
+	batchRunID := uuid.New()
+	repo1ID := uuid.New()
+	childRunID := uuid.New()
+
+	queuedBatch := store.Run{
+		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		Status:    store.RunStatusQueued,
+		Spec:      []byte(`{"mod":{"image":"test"}}`),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	pendingRepo := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: repo1ID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		RepoUrl:   "https://github.com/org/repo.git",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	childRun := store.Run{
+		ID:        pgtype.UUID{Bytes: childRunID, Valid: true},
+		Status:    store.RunStatusQueued,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	t.Run("starts pending repos successfully", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult:                   queuedBatch,
+			listPendingRunReposByRunResult: []store.RunRepo{pendingRepo},
+			createRunResult:                childRun,
+		}
+
+		starter := NewBatchRepoStarter(m)
+		started, err := starter.StartPendingRepos(context.Background(), queuedBatch.ID)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if started != 1 {
+			t.Errorf("started = %d, want 1", started)
+		}
+		if !m.createRunCalled {
+			t.Error("expected CreateRun to be called")
+		}
+		if !m.setRunRepoExecutionRunCalled {
+			t.Error("expected SetRunRepoExecutionRun to be called")
+		}
+		if !m.ackRunStartCalled {
+			t.Error("expected AckRunStart to be called")
+		}
+	})
+
+	t.Run("skips terminal batch runs", func(t *testing.T) {
+		t.Parallel()
+
+		canceledBatch := queuedBatch
+		canceledBatch.Status = store.RunStatusCanceled
+
+		m := &mockStore{
+			getRunResult: canceledBatch,
+		}
+
+		starter := NewBatchRepoStarter(m)
+		started, err := starter.StartPendingRepos(context.Background(), canceledBatch.ID)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if started != 0 {
+			t.Errorf("started = %d, want 0 (terminal batch)", started)
+		}
+		// Should not try to list pending repos for terminal batch.
+		if m.listPendingRunReposByRunCalled {
+			t.Error("should not list repos for terminal batch")
+		}
+	})
+
+	t.Run("returns zero when no pending repos", func(t *testing.T) {
+		t.Parallel()
+
+		m := &mockStore{
+			getRunResult:                   queuedBatch,
+			listPendingRunReposByRunResult: []store.RunRepo{}, // No pending repos.
+		}
+
+		starter := NewBatchRepoStarter(m)
+		started, err := starter.StartPendingRepos(context.Background(), queuedBatch.ID)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if started != 0 {
+			t.Errorf("started = %d, want 0", started)
+		}
+	})
+}
