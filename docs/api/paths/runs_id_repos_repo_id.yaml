@@ -1,0 +1,49 @@
+delete:
+  tags: [Control]
+  summary: Remove or cancel a repo within a batch run
+  description: |
+    Remove a repository from a batch run. For repos in `pending` state, the
+    handler marks them as `skipped`. For repos in `running` state, the handler
+    marks them as `cancelled` while in-flight execution winds down. Terminal
+    repos are left unchanged and the operation is idempotent.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Repo entry ID (UUID) within the batch.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunRepo'
+    '400':
+      description: Bad request (invalid run or repo ID)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run or repo not found, or repo does not belong to the run
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

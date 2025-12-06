@@ -358,17 +358,18 @@ type Run struct {
 }
 
 type RunRepo struct {
-	ID         pgtype.UUID        `json:"id"`
-	RunID      pgtype.UUID        `json:"run_id"`
-	RepoUrl    string             `json:"repo_url"`
-	BaseRef    string             `json:"base_ref"`
-	TargetRef  string             `json:"target_ref"`
-	Status     RunRepoStatus      `json:"status"`
-	Attempt    int32              `json:"attempt"`
-	LastError  *string            `json:"last_error"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	ID             pgtype.UUID        `json:"id"`
+	RunID          pgtype.UUID        `json:"run_id"`
+	RepoUrl        string             `json:"repo_url"`
+	BaseRef        string             `json:"base_ref"`
+	TargetRef      string             `json:"target_ref"`
+	Status         RunRepoStatus      `json:"status"`
+	Attempt        int32              `json:"attempt"`
+	LastError      *string            `json:"last_error"`
+	ExecutionRunID pgtype.UUID        `json:"execution_run_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
 }
 
 type RunsTiming struct {

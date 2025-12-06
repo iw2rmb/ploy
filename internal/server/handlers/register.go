@@ -45,10 +45,11 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/artifacts/{id}", getArtifactHandler(st), auth.RoleControlPlane)
 
-	// Runs — batch lifecycle endpoints for listing, inspecting, and stopping batched runs.
+	// Runs — batch lifecycle endpoints for listing, inspecting, stopping, and starting batched runs.
 	s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/stop", stopRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
 
 	// RunRepo — manage repos within a batch (add/remove/restart/list).
 	s.HandleFunc("POST /v1/runs/{id}/repos", addRunRepoHandler(st), auth.RoleControlPlane)

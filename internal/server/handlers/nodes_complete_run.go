@@ -193,5 +193,73 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		"status", runStatus,
 	)
 
+	// If this run is a child execution run linked to a RunRepo, update the repo's status.
+	// This connects the batch orchestration layer to per-repo execution outcomes.
+	if err := maybeUpdateRunRepoFromExecution(ctx, st, runID, runStatus); err != nil {
+		// Log but don't fail — the run completion itself succeeded.
+		slog.Warn("multi-step run completed but failed to update linked run_repo",
+			"run_id", runID,
+			"status", runStatus,
+			"err", err,
+		)
+	}
+
+	return nil
+}
+
+// maybeUpdateRunRepoFromExecution checks if the completed run is linked to a RunRepo entry
+// (i.e., it's a child execution run created by the batch orchestrator) and updates the
+// repo's status to match the execution outcome. This enables batch-level status aggregation.
+//
+// RunStatus → RunRepoStatus mapping:
+//   - succeeded → succeeded
+//   - failed    → failed
+//   - canceled  → cancelled (note spelling difference)
+func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID pgtype.UUID, runStatus store.RunStatus) error {
+	// Look up the RunRepo entry that references this run as its execution_run_id.
+	runRepo, err := st.GetRunRepoByExecutionRun(ctx, runID)
+	if err != nil {
+		// If no RunRepo is linked to this run, it's a standalone run (not part of a batch).
+		// This is expected for single-repo runs created via /v1/mods; silently skip.
+		if err.Error() == "no rows in result set" {
+			return nil
+		}
+		return fmt.Errorf("get run_repo by execution_run: %w", err)
+	}
+
+	// Map RunStatus to RunRepoStatus.
+	var repoStatus store.RunRepoStatus
+	switch runStatus {
+	case store.RunStatusSucceeded:
+		repoStatus = store.RunRepoStatusSucceeded
+	case store.RunStatusFailed:
+		repoStatus = store.RunRepoStatusFailed
+	case store.RunStatusCanceled:
+		repoStatus = store.RunRepoStatusCancelled // Note: RunRepoStatus uses British spelling.
+	default:
+		// Unexpected status; default to failed for safety.
+		repoStatus = store.RunRepoStatusFailed
+		slog.Warn("unexpected run status when updating run_repo",
+			"run_id", runID,
+			"run_status", runStatus,
+		)
+	}
+
+	// Update the RunRepo status to reflect the execution outcome.
+	err = st.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
+		ID:     runRepo.ID,
+		Status: repoStatus,
+	})
+	if err != nil {
+		return fmt.Errorf("update run_repo status: %w", err)
+	}
+
+	slog.Info("run_repo status updated from execution run",
+		"run_repo_id", uuid.UUID(runRepo.ID.Bytes).String(),
+		"run_id", uuid.UUID(runID.Bytes).String(),
+		"batch_run_id", uuid.UUID(runRepo.RunID.Bytes).String(),
+		"status", repoStatus,
+	)
+
 	return nil
 }

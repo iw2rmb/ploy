@@ -847,3 +847,184 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 	}
 }
+
+// -------------------------------------------------------------------------
+// Batch execution handlers — connect RunRepo entries to execution runs.
+// -------------------------------------------------------------------------
+
+// StartRunResponse contains the result of starting a batch run.
+type StartRunResponse struct {
+	RunID       string `json:"run_id"`
+	Started     int    `json:"started"`      // Number of repos that started execution.
+	AlreadyDone int    `json:"already_done"` // Number of repos already in terminal state.
+	Pending     int    `json:"pending"`      // Number of repos still pending (if any).
+}
+
+// startRunHandler returns an HTTP handler that starts execution for pending repos in a batch.
+// POST /v1/runs/{id}/start — Creates child execution runs for each pending repo and creates jobs.
+// Returns 200 on success with counts of started, already done, and remaining pending repos.
+func startRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUID.
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUID.
+		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
+
+		// Fetch the batch run to get shared spec and verify it exists.
+		batchRun, err := st.GetRun(r.Context(), pgRunID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("start run: fetch failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Reject starting execution for terminal runs.
+		if isTerminalRunStatus(batchRun.Status) {
+			http.Error(w, "cannot start repos in a terminal run", http.StatusConflict)
+			return
+		}
+
+		// Fetch all repos for this batch to get counts.
+		allRepos, err := st.ListRunReposByRun(r.Context(), pgRunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			slog.Error("start run: list repos failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Count repos by status.
+		var alreadyDone, stillPending int
+		for _, repo := range allRepos {
+			if isTerminalRunRepoStatus(repo.Status) {
+				alreadyDone++
+			} else if repo.Status == store.RunRepoStatusPending {
+				stillPending++
+			}
+			// Running repos are counted as in-progress, not started by this call.
+		}
+
+		// Fetch pending repos that need to start execution.
+		pendingRepos, err := st.ListPendingRunReposByRun(r.Context(), pgRunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list pending repos: %v", err), http.StatusInternalServerError)
+			slog.Error("start run: list pending repos failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// If no pending repos, return early with current counts.
+		if len(pendingRepos) == 0 {
+			resp := StartRunResponse{
+				RunID:       runIDStr,
+				Started:     0,
+				AlreadyDone: alreadyDone,
+				Pending:     0,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				slog.Error("start run: encode response failed", "err", err)
+			}
+			return
+		}
+
+		// Start execution for each pending repo by creating a child run and jobs.
+		var started int
+		for _, repo := range pendingRepos {
+			// Create child execution run for this repo.
+			// The child run inherits the spec from the batch but has repo-specific URL/refs.
+			childRun, err := st.CreateRun(r.Context(), store.CreateRunParams{
+				Name:      nil, // Child runs don't need a name; batch name is on parent.
+				RepoUrl:   repo.RepoUrl,
+				Spec:      batchRun.Spec,
+				CreatedBy: batchRun.CreatedBy,
+				Status:    store.RunStatusQueued,
+				BaseRef:   repo.BaseRef,
+				TargetRef: repo.TargetRef,
+				CommitSha: nil, // Commit SHA resolved at execution time by node.
+			})
+			if err != nil {
+				slog.Error("start run: create child run failed",
+					"run_id", runIDStr,
+					"repo_id", uuid.UUID(repo.ID.Bytes).String(),
+					"repo_url", repo.RepoUrl,
+					"err", err,
+				)
+				continue // Skip this repo but try others.
+			}
+
+			// Create jobs from the batch spec for this child run.
+			if err := createJobsFromSpec(r.Context(), st, childRun.ID, batchRun.Spec); err != nil {
+				slog.Error("start run: create jobs failed",
+					"run_id", runIDStr,
+					"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+					"repo_url", repo.RepoUrl,
+					"err", err,
+				)
+				// Clean up the orphaned child run.
+				_ = st.DeleteRun(r.Context(), childRun.ID)
+				continue // Skip this repo but try others.
+			}
+
+			// Link the repo entry to its child execution run and mark as running.
+			err = st.SetRunRepoExecutionRun(r.Context(), store.SetRunRepoExecutionRunParams{
+				ID:             repo.ID,
+				ExecutionRunID: childRun.ID,
+			})
+			if err != nil {
+				slog.Error("start run: link repo to child run failed",
+					"run_id", runIDStr,
+					"repo_id", uuid.UUID(repo.ID.Bytes).String(),
+					"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+					"err", err,
+				)
+				// The child run exists but isn't linked; it will still execute.
+				// Log but count as started since jobs were created.
+			}
+
+			started++
+			slog.Info("run repo execution started",
+				"run_id", runIDStr,
+				"repo_id", uuid.UUID(repo.ID.Bytes).String(),
+				"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+				"repo_url", repo.RepoUrl,
+			)
+		}
+
+		// Update batch run status to running if we started at least one repo.
+		if started > 0 && batchRun.Status == store.RunStatusQueued {
+			if err := st.AckRunStart(r.Context(), pgRunID); err != nil {
+				slog.Warn("start run: failed to update batch status to running", "run_id", runIDStr, "err", err)
+			}
+		}
+
+		// Build response.
+		resp := StartRunResponse{
+			RunID:       runIDStr,
+			Started:     started,
+			AlreadyDone: alreadyDone,
+			Pending:     stillPending - started, // Subtract started from pending count.
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("start run: encode response failed", "err", err)
+		}
+	}
+}
