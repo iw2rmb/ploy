@@ -8,13 +8,32 @@ import (
 )
 
 // handleModRun executes the Mods-specific run command.
-// Routes to repo subcommands when args[0] == "repo", otherwise executes
-// the standard mod run workflow for single-repo ticket submission.
+// Routes to batch lifecycle subcommands (list/status/stop/start) and repo
+// subcommands when args[0] matches a known action. Otherwise executes the
+// standard mod run workflow for single-repo ticket submission.
+//
+// Batch lifecycle commands:
+//   - list: Lists all batch runs with status and repo counts.
+//   - status <id>: Shows detailed status of a single batch run.
+//   - stop <id>: Stops a batch run and cancels pending repos.
+//   - start <id>: Starts execution for pending repos in a batch.
+//   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
 func handleModRun(args []string, stderr io.Writer) error {
-	// Check for "repo" subcommand to route to batch repo operations.
-	// This enables `ploy mod run repo add/remove/restart/status` workflows.
-	if len(args) > 0 && args[0] == "repo" {
-		return handleModRunRepo(args[1:], stderr)
+	if len(args) > 0 {
+		switch args[0] {
+		// Batch lifecycle commands: list/status/stop/start.
+		case "list":
+			return handleModRunList(args[1:], stderr)
+		case "status":
+			return handleModRunStatus(args[1:], stderr)
+		case "stop":
+			return handleModRunStop(args[1:], stderr)
+		case "start":
+			return handleModRunStart(args[1:], stderr)
+		// Repo-level operations for managing repos within a batch.
+		case "repo":
+			return handleModRunRepo(args[1:], stderr)
+		}
 	}
 	return executeModRun(args, stderr)
 }
