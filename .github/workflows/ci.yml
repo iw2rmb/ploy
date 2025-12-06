@@ -130,9 +130,12 @@ jobs:
       - name: Vulnerability Scan
         run: grype repo.sbom.json --fail-on high
       - name: Sign SBOM
+        env:
+          COSIGN_PASSWORD: ""
+          COSIGN_YES: "true"
         run: |
-          cosign generate-key-pair --yes
-          cosign sign-blob --yes --key cosign.key --output-signature repo.sbom.json.sig repo.sbom.json
+          cosign generate-key-pair
+          cosign sign-blob --key cosign.key --output-signature repo.sbom.json.sig repo.sbom.json
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         with:
