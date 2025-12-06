@@ -1,0 +1,41 @@
+get:
+  tags: [Control]
+  summary: Inspect a batch run
+  description: |
+    Return a detailed summary for a single batch run identified by its run ID.
+    The response includes run metadata (repo_url, refs, status, timestamps) and
+    optional aggregated repo status counts from `run_repos`.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
+    '400':
+      description: Bad request (invalid run ID)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

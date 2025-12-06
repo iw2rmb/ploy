@@ -1,0 +1,51 @@
+get:
+  tags: [Control]
+  summary: List batch runs
+  description: |
+    Return a paginated list of batch runs backed by the `runs` table. Each
+    entry exposes basic run metadata (id, repo_url, refs, status, timestamps)
+    and optional per-repo status counts aggregated from `run_repos`.
+  parameters:
+    - in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+      description: Maximum number of runs to return (default 50, max 100).
+    - in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+      description: Number of runs to skip from the start of the result set.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              runs:
+                type: array
+                items:
+                  $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
+            required: [runs]
+    '400':
+      description: Bad request (invalid pagination parameters)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

@@ -280,6 +280,23 @@ type mockStore struct {
 	updateRunRepoStatusCalled bool
 	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
 	updateRunRepoStatusErr    error
+
+	// CreateRunRepo tracking
+	createRunRepoCalled bool
+	createRunRepoParams store.CreateRunRepoParams
+	createRunRepoResult store.RunRepo
+	createRunRepoErr    error
+
+	// GetRunRepo tracking
+	getRunRepoCalled bool
+	getRunRepoParam  pgtype.UUID
+	getRunRepoResult store.RunRepo
+	getRunRepoErr    error
+
+	// IncrementRunRepoAttempt tracking
+	incrementRunRepoAttemptCalled bool
+	incrementRunRepoAttemptParam  pgtype.UUID
+	incrementRunRepoAttemptErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -680,4 +697,22 @@ func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.Update
 	m.updateRunRepoStatusCalled = true
 	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
 	return m.updateRunRepoStatusErr
+}
+
+func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
+	m.createRunRepoCalled = true
+	m.createRunRepoParams = params
+	return m.createRunRepoResult, m.createRunRepoErr
+}
+
+func (m *mockStore) GetRunRepo(ctx context.Context, id pgtype.UUID) (store.RunRepo, error) {
+	m.getRunRepoCalled = true
+	m.getRunRepoParam = id
+	return m.getRunRepoResult, m.getRunRepoErr
+}
+
+func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error {
+	m.incrementRunRepoAttemptCalled = true
+	m.incrementRunRepoAttemptParam = id
+	return m.incrementRunRepoAttemptErr
 }
