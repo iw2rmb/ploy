@@ -59,7 +59,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Add unit tests in `internal/store/store_test.go` that create a `Run`, attach a `RunRepo`, transition repo status from `pending` → `running` → `succeeded`, and assert aggregates match expectations.
 
 ## Server API for batched mod runs
-- [ ] Add Run HTTP handlers for batch lifecycle — list, inspect, and stop batched runs on top of `runs`.
+- [x] Add Run HTTP handlers for batch lifecycle — list, inspect, and stop batched runs on top of `runs`.
   - Repository: ploy
   - Component: internal/server/handlers, internal/server/http
   - Scope:
