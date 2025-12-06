@@ -425,21 +425,23 @@ func TestIsTerminalRunStatus(t *testing.T) {
 	}
 }
 
-// TestRunRepoCounts verifies the getRunRepoCounts helper.
+// TestGetRunRepoCounts verifies the getRunRepoCounts helper.
+// Tests both count aggregation and derived status computation.
 func TestGetRunRepoCounts(t *testing.T) {
 	t.Parallel()
 
 	runID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
 
 	tests := []struct {
-		name       string
-		mockCounts []store.CountRunReposByStatusRow
-		mockErr    error
-		wantTotal  int32
-		wantErr    bool
+		name              string
+		mockCounts        []store.CountRunReposByStatusRow
+		mockErr           error
+		wantTotal         int32
+		wantDerivedStatus string
+		wantErr           bool
 	}{
 		{
-			name: "all statuses",
+			name: "all statuses — cancelled takes precedence",
 			mockCounts: []store.CountRunReposByStatusRow{
 				{Status: store.RunRepoStatusPending, Count: 1},
 				{Status: store.RunRepoStatusRunning, Count: 2},
@@ -448,15 +450,43 @@ func TestGetRunRepoCounts(t *testing.T) {
 				{Status: store.RunRepoStatusSkipped, Count: 5},
 				{Status: store.RunRepoStatusCancelled, Count: 6},
 			},
-			wantTotal: 21,
+			wantTotal:         21,
+			wantDerivedStatus: DerivedStatusCancelled,
 		},
 		{
-			name:       "empty",
-			mockCounts: []store.CountRunReposByStatusRow{},
-			wantTotal:  0,
+			name: "running repos — derived running",
+			mockCounts: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusPending, Count: 2},
+				{Status: store.RunRepoStatusRunning, Count: 1},
+			},
+			wantTotal:         3,
+			wantDerivedStatus: DerivedStatusRunning,
 		},
 		{
-			name:    "error",
+			name: "all succeeded — derived completed",
+			mockCounts: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusSucceeded, Count: 3},
+			},
+			wantTotal:         3,
+			wantDerivedStatus: DerivedStatusCompleted,
+		},
+		{
+			name: "some failed — derived failed",
+			mockCounts: []store.CountRunReposByStatusRow{
+				{Status: store.RunRepoStatusSucceeded, Count: 2},
+				{Status: store.RunRepoStatusFailed, Count: 1},
+			},
+			wantTotal:         3,
+			wantDerivedStatus: DerivedStatusFailed,
+		},
+		{
+			name:              "empty — derived pending",
+			mockCounts:        []store.CountRunReposByStatusRow{},
+			wantTotal:         0,
+			wantDerivedStatus: DerivedStatusPending,
+		},
+		{
+			name:    "error propagates",
 			mockErr: pgx.ErrTxClosed,
 			wantErr: true,
 		},
@@ -485,6 +515,201 @@ func TestGetRunRepoCounts(t *testing.T) {
 
 			if counts.Total != tc.wantTotal {
 				t.Errorf("total = %d, want %d", counts.Total, tc.wantTotal)
+			}
+
+			if counts.DerivedStatus != tc.wantDerivedStatus {
+				t.Errorf("derived_status = %q, want %q", counts.DerivedStatus, tc.wantDerivedStatus)
+			}
+		})
+	}
+}
+
+// TestDeriveBatchStatus verifies the deriveBatchStatus helper function.
+// This function computes a single batch-level status from repo counts.
+func TestDeriveBatchStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		counts *RunRepoCounts
+		want   string
+	}{
+		// Empty batch — pending (no work yet).
+		{
+			name:   "empty batch",
+			counts: &RunRepoCounts{Total: 0},
+			want:   DerivedStatusPending,
+		},
+		// All pending — pending.
+		{
+			name: "all pending",
+			counts: &RunRepoCounts{
+				Total:   3,
+				Pending: 3,
+			},
+			want: DerivedStatusPending,
+		},
+		// Some running — running (active execution).
+		{
+			name: "one running rest pending",
+			counts: &RunRepoCounts{
+				Total:   3,
+				Pending: 2,
+				Running: 1,
+			},
+			want: DerivedStatusRunning,
+		},
+		{
+			name: "all running",
+			counts: &RunRepoCounts{
+				Total:   2,
+				Running: 2,
+			},
+			want: DerivedStatusRunning,
+		},
+		{
+			name: "running with some succeeded",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Running:   1,
+				Succeeded: 2,
+			},
+			want: DerivedStatusRunning,
+		},
+		// All succeeded — completed.
+		{
+			name: "all succeeded",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Succeeded: 3,
+			},
+			want: DerivedStatusCompleted,
+		},
+		// Succeeded + skipped — completed.
+		{
+			name: "succeeded and skipped",
+			counts: &RunRepoCounts{
+				Total:     4,
+				Succeeded: 2,
+				Skipped:   2,
+			},
+			want: DerivedStatusCompleted,
+		},
+		// All skipped — completed.
+		{
+			name: "all skipped",
+			counts: &RunRepoCounts{
+				Total:   2,
+				Skipped: 2,
+			},
+			want: DerivedStatusCompleted,
+		},
+		// Some failed — failed.
+		{
+			name: "one failed rest succeeded",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Succeeded: 2,
+				Failed:    1,
+			},
+			want: DerivedStatusFailed,
+		},
+		{
+			name: "all failed",
+			counts: &RunRepoCounts{
+				Total:  2,
+				Failed: 2,
+			},
+			want: DerivedStatusFailed,
+		},
+		{
+			name: "failed with skipped",
+			counts: &RunRepoCounts{
+				Total:   3,
+				Failed:  1,
+				Skipped: 2,
+			},
+			want: DerivedStatusFailed,
+		},
+		// Cancelled takes precedence over other terminal states.
+		{
+			name: "cancelled alone",
+			counts: &RunRepoCounts{
+				Total:     2,
+				Cancelled: 2,
+			},
+			want: DerivedStatusCancelled,
+		},
+		{
+			name: "cancelled with succeeded",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Cancelled: 1,
+				Succeeded: 2,
+			},
+			want: DerivedStatusCancelled,
+		},
+		{
+			name: "cancelled with failed",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Cancelled: 1,
+				Failed:    2,
+			},
+			want: DerivedStatusCancelled,
+		},
+		{
+			name: "cancelled with pending",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Cancelled: 1,
+				Pending:   2,
+			},
+			want: DerivedStatusCancelled,
+		},
+		// Running takes precedence over failed (still active work).
+		{
+			name: "running with failed",
+			counts: &RunRepoCounts{
+				Total:   3,
+				Running: 1,
+				Failed:  2,
+			},
+			want: DerivedStatusRunning,
+		},
+		// Mixed: pending with succeeded — still pending (not all started).
+		{
+			name: "pending with succeeded",
+			counts: &RunRepoCounts{
+				Total:     3,
+				Pending:   1,
+				Succeeded: 2,
+			},
+			want: DerivedStatusPending,
+		},
+		// All six statuses present — cancelled takes precedence.
+		{
+			name: "all statuses",
+			counts: &RunRepoCounts{
+				Total:     21,
+				Pending:   1,
+				Running:   2,
+				Succeeded: 3,
+				Failed:    4,
+				Skipped:   5,
+				Cancelled: 6,
+			},
+			want: DerivedStatusCancelled,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := deriveBatchStatus(tc.counts)
+			if got != tc.want {
+				t.Errorf("deriveBatchStatus() = %q, want %q", got, tc.want)
 			}
 		})
 	}

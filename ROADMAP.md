@@ -117,7 +117,7 @@ Legend: [ ] todo, [x] done.
     - Loop sketch: `runs, _ := st.ListActiveRunsWithRepos(ctx); for each run { repos := st.ListPendingRunRepos(ctx, run.ID); ... }`.
   - Tests: Add unit tests around the scheduler helper (in a new package or file) to validate state transitions; run `go test ./internal/server/...`.
 
-- [ ] Derive batch-level status aggregates — expose repo counts and terminal state in Runs APIs.
+- [x] Derive batch-level status aggregates — expose repo counts and terminal state in Runs APIs.
   - Repository: ploy
   - Component: internal/server/handlers, internal/store
   - Scope:
