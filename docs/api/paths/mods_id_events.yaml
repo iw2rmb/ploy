@@ -16,10 +16,36 @@ get:
   description: |
     Server-Sent Events stream of ticket (mods run) events. Supports `Last-Event-ID` header for resume.
 
-    Event types emitted on the stream:
-    - `ticket` — ticket lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
-    - `log` — structured log frames from the run (JSON: timestamp/stream/line).
-    - `done` — terminal sentinel; stream closes immediately after this frame.
+    ## Event types
+
+    - `ticket` — Ticket lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
+    - `log` — Enriched log record with execution context (see LogRecord schema below).
+    - `retention` — Retention metadata hint (retained, ttl, expires_at, bundle_cid).
+    - `done` — Terminal sentinel; stream closes immediately after this frame.
+
+    ## LogRecord payload (`event: log`)
+
+    Each `event: log` frame carries a JSON-encoded LogRecord:
+
+    **Core fields (always present):**
+    - `timestamp` (string): RFC 3339 timestamp when the log line was captured.
+    - `stream` (string): Output stream, typically `stdout` or `stderr`.
+    - `line` (string): Log message content.
+
+    **Enriched fields (optional, omitempty):**
+    - `node_id` (string): UUID of the execution node that produced this log line.
+    - `job_id` (string): UUID of the job that produced this log line.
+    - `mod_type` (string): Mods step type — `pre_gate`, `mod`, `post_gate`, `heal`, or `re_gate`.
+    - `step_index` (int): Float index of the job within the pipeline (e.g., 1000, 2000, 3000).
+
+    **Example:**
+    ```
+    event: log
+    data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"a1b2c3d4-...","job_id":"e5f6g7h8-...","mod_type":"mod","step_index":2000}
+    ```
+
+    Enriched fields may be empty for events not tied to a specific job or when context is unavailable.
+    See `docs/mods-lifecycle.md` § 7.2 for the complete payload specification.
   responses:
     '200':
       description: OK
