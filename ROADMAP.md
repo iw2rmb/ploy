@@ -149,7 +149,7 @@ Legend: [ ] todo, [x] done.
     - `case "run": if len(args) > 1 && args[1] == "repo" { return handleModRunRepo(args[2:], stderr) }`.
   - Tests: Add `cmd/ploy/mod_run_repo_test.go` to cover argument parsing and error messages (unknown action, missing batch ID, missing repo flags).
 
-- [ ] Implement CLI client for batch run lifecycle — create/list/stop/status using control-plane APIs.
+- [x] Implement CLI client for batch run lifecycle — create/list/stop/status using control-plane APIs.
   - Repository: ploy
   - Component: internal/cli/mods, cmd/ploy
   - Scope:
