@@ -249,7 +249,7 @@ Legend: [ ] todo, [x] done.
   - Tests: None automated; validate examples by running them against a dev cluster once implementation is in place.
 
 ## Type-safety and tests
-- [ ] Tighten type system for batch run and RunRepo inputs/outputs — avoid raw strings for critical fields.
+- [x] Tighten type system for batch run and RunRepo inputs/outputs — avoid raw strings for critical fields.
   - Repository: ploy
   - Component: internal/server/handlers, internal/domain/types
   - Scope:
