@@ -6,9 +6,9 @@
 // subcommand parses its own flags and invokes the corresponding HTTP handler.
 //
 // Command structure:
-//   - ploy mod run repo add <batch-id> --repo-url <url> --base-ref <ref> --target-ref <ref>
-//   - ploy mod run repo remove <batch-id> --repo-id <id>
-//   - ploy mod run repo restart <batch-id> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]
+//   - ploy mod run repo add --repo-url <url> --base-ref <ref> --target-ref <ref> <batch-id>
+//   - ploy mod run repo remove --repo-id <id> <batch-id>
+//   - ploy mod run repo restart --repo-id <id> [--base-ref <ref>] [--target-ref <ref>] <batch-id>
 //   - ploy mod run repo status <batch-id>
 package main
 
@@ -53,7 +53,7 @@ func handleModRunRepo(args []string, stderr io.Writer) error {
 
 // printModRunRepoUsage renders help for mod run repo subcommands.
 func printModRunRepoUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run repo <action> <batch-id> [flags]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run repo <action> [flags] <batch-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Actions:")
 	_, _ = fmt.Fprintln(w, "  add       Add a repo to a batch run")
@@ -62,9 +62,9 @@ func printModRunRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  status    Show repos and their statuses within a batch run")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo add <batch-id> --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove <batch-id> --repo-id <repo-uuid>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart <batch-id> --repo-id <repo-uuid>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo add --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature <batch-id>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove --repo-id <repo-uuid> <batch-id>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart --repo-id <repo-uuid> <batch-id>")
 	_, _ = fmt.Fprintln(w, "  ploy mod run repo status <batch-id>")
 }
 

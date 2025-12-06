@@ -169,12 +169,12 @@ Legend: [ ] todo, [x] done.
   - Component: cmd/ploy, internal/cli/mods
   - Scope:
     - In `cmd/ploy/mod_run_repo.go`, define four subcommands:
-      - `repo add <batch-id> --repo-url <url> --repo-base-ref <ref> --repo-target-ref <ref>` (plus optional flags like `--name` or `--attempt` later).
-      - `repo remove <batch-id> --repo-url <url>` (or `--repo-id` once exposed by API).
-      - `repo restart <batch-id> --repo-url <url> [--branch <ref>]`.
+      - `repo add [flags] <batch-id>` with `--repo-url <url> --base-ref <ref> --target-ref <ref>` (plus optional flags like `--name` or `--attempt` later).
+      - `repo remove [flags] <batch-id>` with `--repo-id <repo-id>` (or `--repo-url` lookup, if added later).
+      - `repo restart [flags] <batch-id>` with `--repo-id <repo-id> [--base-ref <ref>] [--target-ref <ref>]`.
       - `repo status <batch-id>` — prints a table with columns: repo, base_ref, target_ref, attempt, status, last_error.
     - Parse flags using `flag.FlagSet` per subcommand, consistent with `cmd/ploy/mod_run_flags.go`.
-    - Delegate HTTP calls to `internal/cli/mods` batch client functions.
+    - Delegate HTTP calls to the control-plane `/v1/runs/{id}/repos` endpoints using helpers in `cmd/ploy/mod_run_repo.go`.
   - Snippets:
     - Output line: `fmt.Fprintf(w, "%-40s %-16s %-16s %-4d %-10s %s\n", repo.RepoURL, repo.BaseRef, repo.TargetRef, repo.Attempt, repo.Status, repo.LastError)`.
   - Tests: Extend `cmd/ploy/mod_run_repo_test.go` to:
