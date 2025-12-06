@@ -26,12 +26,13 @@ func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
 }
 
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
+INSERT INTO runs (name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
 `
 
 type CreateRunParams struct {
+	Name      *string   `json:"name"`
 	RepoUrl   string    `json:"repo_url"`
 	Spec      []byte    `json:"spec"`
 	CreatedBy *string   `json:"created_by"`
@@ -41,8 +42,10 @@ type CreateRunParams struct {
 	CommitSha *string   `json:"commit_sha"`
 }
 
+// Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
+		arg.Name,
 		arg.RepoUrl,
 		arg.Spec,
 		arg.CreatedBy,
@@ -54,6 +57,7 @@ func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, erro
 	var i Run
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
 		&i.RepoUrl,
 		&i.Spec,
 		&i.CreatedBy,
@@ -81,7 +85,7 @@ func (q *Queries) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 WHERE id = $1
 `
 
@@ -90,6 +94,7 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 	var i Run
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
 		&i.RepoUrl,
 		&i.Spec,
 		&i.CreatedBy,
@@ -122,7 +127,7 @@ func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming,
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -143,6 +148,7 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
+			&i.Name,
 			&i.RepoUrl,
 			&i.Spec,
 			&i.CreatedBy,

@@ -342,6 +342,7 @@ type NodeMetric struct {
 
 type Run struct {
 	ID         pgtype.UUID        `json:"id"`
+	Name       *string            `json:"name"`
 	RepoUrl    string             `json:"repo_url"`
 	Spec       []byte             `json:"spec"`
 	CreatedBy  *string            `json:"created_by"`

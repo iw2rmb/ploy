@@ -81,6 +81,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			commitShaStr = &s
 		}
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
+			Name:      nil, // Single-repo tickets do not use batch naming.
 			RepoUrl:   req.RepoURL.String(),
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,

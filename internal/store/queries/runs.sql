@@ -8,8 +8,9 @@ ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CreateRun :one
-INSERT INTO runs (repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+-- Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
+INSERT INTO runs (name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: UpdateRunStatus :exec

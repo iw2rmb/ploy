@@ -39,6 +39,7 @@ type Querier interface {
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	// Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	// Creates a new run_repo entry for batched runs.
 	// Each run_repo represents one repository within a batch (parent run).
