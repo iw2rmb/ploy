@@ -238,8 +238,9 @@ func TestGetRunHandler(t *testing.T) {
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("decode response: %v", err)
 				}
-				if resp.ID != tc.runID {
-					t.Errorf("id = %s, want %s", resp.ID, tc.runID)
+				// Compare domain type ID with expected string using .String() method.
+				if resp.ID.String() != tc.runID {
+					t.Errorf("id = %s, want %s", resp.ID.String(), tc.runID)
 				}
 				if resp.Status != tc.mockRun.Status {
 					t.Errorf("status = %s, want %s", resp.Status, tc.mockRun.Status)
@@ -720,6 +721,136 @@ func ptrString(s string) *string {
 	return &s
 }
 
+// TestRunBatchSummary_JSONSerialization verifies that RunBatchSummary correctly
+// serializes domain types to JSON strings and preserves type information during
+// round-trip encoding/decoding.
+func TestRunBatchSummary_JSONSerialization(t *testing.T) {
+	t.Parallel()
+
+	summary := RunBatchSummary{
+		ID:        "12345678-1234-1234-1234-123456789abc",
+		Name:      ptrString("test-batch"),
+		Status:    store.RunStatusRunning,
+		RepoURL:   "https://github.com/example/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature-branch",
+		CreatedAt: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Counts: &RunRepoCounts{
+			Total:         5,
+			Pending:       2,
+			Running:       1,
+			Succeeded:     2,
+			DerivedStatus: DerivedStatusRunning,
+		},
+	}
+
+	// Marshal to JSON.
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatalf("marshal RunBatchSummary: %v", err)
+	}
+
+	// Verify JSON contains expected string values (domain types serialize as strings).
+	jsonStr := string(data)
+	checks := []struct {
+		field string
+		want  string
+	}{
+		{"id", `"id":"12345678-1234-1234-1234-123456789abc"`},
+		{"repo_url", `"repo_url":"https://github.com/example/repo.git"`},
+		{"base_ref", `"base_ref":"main"`},
+		{"target_ref", `"target_ref":"feature-branch"`},
+		{"status", `"status":"running"`},
+	}
+	for _, tc := range checks {
+		if !strings.Contains(jsonStr, tc.want) {
+			t.Errorf("JSON missing %s: got %s", tc.field, jsonStr)
+		}
+	}
+
+	// Round-trip: unmarshal back to verify domain types decode correctly.
+	var decoded RunBatchSummary
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal RunBatchSummary: %v", err)
+	}
+
+	// Verify fields match after round-trip.
+	if decoded.ID.String() != summary.ID.String() {
+		t.Errorf("ID mismatch: got %s, want %s", decoded.ID.String(), summary.ID.String())
+	}
+	if decoded.RepoURL.String() != summary.RepoURL.String() {
+		t.Errorf("RepoURL mismatch: got %s, want %s", decoded.RepoURL.String(), summary.RepoURL.String())
+	}
+	if decoded.BaseRef.String() != summary.BaseRef.String() {
+		t.Errorf("BaseRef mismatch: got %s, want %s", decoded.BaseRef.String(), summary.BaseRef.String())
+	}
+	if decoded.TargetRef.String() != summary.TargetRef.String() {
+		t.Errorf("TargetRef mismatch: got %s, want %s", decoded.TargetRef.String(), summary.TargetRef.String())
+	}
+}
+
+// TestRunRepoResponse_JSONSerialization verifies that RunRepoResponse correctly
+// serializes domain types (RunRepoID, RunID, RepoURL, GitRef) to JSON strings.
+func TestRunRepoResponse_JSONSerialization(t *testing.T) {
+	t.Parallel()
+
+	resp := RunRepoResponse{
+		ID:        "repo-12345678-1234-1234-1234-123456789abc",
+		RunID:     "run-12345678-1234-1234-1234-123456789abc",
+		RepoURL:   "https://github.com/example/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+	}
+
+	// Marshal to JSON.
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal RunRepoResponse: %v", err)
+	}
+
+	// Verify JSON contains expected string values.
+	jsonStr := string(data)
+	checks := []struct {
+		field string
+		want  string
+	}{
+		{"id", `"id":"repo-12345678-1234-1234-1234-123456789abc"`},
+		{"run_id", `"run_id":"run-12345678-1234-1234-1234-123456789abc"`},
+		{"repo_url", `"repo_url":"https://github.com/example/repo.git"`},
+		{"base_ref", `"base_ref":"main"`},
+		{"target_ref", `"target_ref":"feature"`},
+		{"status", `"status":"pending"`},
+	}
+	for _, tc := range checks {
+		if !strings.Contains(jsonStr, tc.want) {
+			t.Errorf("JSON missing %s: got %s", tc.field, jsonStr)
+		}
+	}
+
+	// Round-trip: unmarshal back to verify domain types decode correctly.
+	var decoded RunRepoResponse
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal RunRepoResponse: %v", err)
+	}
+
+	// Verify typed fields match after round-trip.
+	if decoded.ID.String() != resp.ID.String() {
+		t.Errorf("ID mismatch: got %s, want %s", decoded.ID.String(), resp.ID.String())
+	}
+	if decoded.RunID.String() != resp.RunID.String() {
+		t.Errorf("RunID mismatch: got %s, want %s", decoded.RunID.String(), resp.RunID.String())
+	}
+	if decoded.RepoURL.String() != resp.RepoURL.String() {
+		t.Errorf("RepoURL mismatch: got %s, want %s", decoded.RepoURL.String(), resp.RepoURL.String())
+	}
+	if decoded.Status != resp.Status {
+		t.Errorf("Status mismatch: got %s, want %s", decoded.Status, resp.Status)
+	}
+}
+
 // TestAddRunRepoHandler verifies the POST /v1/runs/{id}/repos handler.
 func TestAddRunRepoHandler(t *testing.T) {
 	t.Parallel()
@@ -868,10 +999,12 @@ func TestAddRunRepoHandler(t *testing.T) {
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("decode response: %v", err)
 				}
-				if resp.ID != tc.wantRepoID {
-					t.Errorf("repo id = %s, want %s", resp.ID, tc.wantRepoID)
+				// Compare domain type ID with expected string using .String() method.
+				if resp.ID.String() != tc.wantRepoID {
+					t.Errorf("repo id = %s, want %s", resp.ID.String(), tc.wantRepoID)
 				}
-				if resp.Status != "pending" {
+				// Compare typed RunRepoStatus with expected value.
+				if resp.Status != store.RunRepoStatusPending {
 					t.Errorf("status = %s, want pending", resp.Status)
 				}
 			}

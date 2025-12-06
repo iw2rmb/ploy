@@ -13,6 +13,7 @@ func TestIDs_Basics(t *testing.T) {
 			b RunID
 			d StepID
 			e ClusterID
+			f RunRepoID
 		)
 		if !a.IsZero() || a.String() != "" {
 			t.Fatalf("TicketID zero failed")
@@ -25,6 +26,9 @@ func TestIDs_Basics(t *testing.T) {
 		}
 		if !e.IsZero() || e.String() != "" {
 			t.Fatalf("ClusterID zero failed")
+		}
+		if !f.IsZero() || f.String() != "" {
+			t.Fatalf("RunRepoID zero failed")
 		}
 	})
 
@@ -45,6 +49,10 @@ func TestIDs_Basics(t *testing.T) {
 		if c1 != c2 || c1.String() != "c1" {
 			t.Fatalf("ClusterID compare/string failed")
 		}
+		rr1, rr2 := RunRepoID("rr1"), RunRepoID("rr1")
+		if rr1 != rr2 || rr1.String() != "rr1" {
+			t.Fatalf("RunRepoID compare/string failed")
+		}
 	})
 }
 
@@ -55,6 +63,7 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		rid  RunID
 		step StepID
 		cid  ClusterID
+		rrid RunRepoID
 	)
 
 	if err := tid.UnmarshalText([]byte("  T-42  ")); err != nil {
@@ -87,8 +96,11 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	if err := cid.UnmarshalText([]byte(" c-1 ")); err != nil {
 		t.Fatalf("cluster UnmarshalText: %v", err)
 	}
+	if err := rrid.UnmarshalText([]byte(" repo-1 ")); err != nil {
+		t.Fatalf("runrepo UnmarshalText: %v", err)
+	}
 
-	for name, v := range map[string]any{"run": rid, "step": step, "cluster": cid} {
+	for name, v := range map[string]any{"run": rid, "step": step, "cluster": cid, "runrepo": rrid} {
 		bb, err := json.Marshal(v)
 		if err != nil {
 			t.Fatalf("%s marshal: %v", name, err)
@@ -108,6 +120,7 @@ func TestIDs_RejectEmpty(t *testing.T) {
 		{"run", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }},
 		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
 		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},
+		{"runrepo", func(b []byte) error { var v RunRepoID; return v.UnmarshalText(b) }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
