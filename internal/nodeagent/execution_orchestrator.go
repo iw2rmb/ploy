@@ -467,8 +467,8 @@ func selectHealingModForJob(req StartRunRequest, healing *HealingConfig) (Healin
 	}
 
 	if img := strings.TrimSpace(req.ModImage); img != "" {
-		for _, strat := range strategies {
-			for i, mod := range strat.Mods {
+		for _, strategy := range strategies {
+			for i, mod := range strategy.Mods {
 				// Resolve the mod image using unknown stack (fallback to default).
 				// This matches universal images directly and stack maps via default.
 				resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)

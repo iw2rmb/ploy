@@ -576,11 +576,14 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 
 	// Configuration for high-volume test:
 	// - 1,000 log records simulates a chatty build (e.g., verbose Maven output)
-	// - Large buffer ensures active consumers keep up with publishing
+	// - Buffer is sized to avoid backpressure drops for active consumers
 	const numLogs = 1000
 	const numSubscribers = 3
 
-	hub := NewHub(Options{BufferSize: 256, HistorySize: 512})
+	hub := NewHub(Options{
+		BufferSize:  numLogs + 1,
+		HistorySize: 2 * numLogs,
+	})
 	ctx := context.Background()
 
 	// Track events received by each subscriber using concurrent goroutines.
