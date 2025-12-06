@@ -34,7 +34,7 @@ Legend: [ ] todo, [x] done.
     - `type Run struct { ID pgtype.UUID; Name *string; RepoUrl string; Spec []byte; ... }`.
   - Tests: Extend `internal/store/store_test.go` to create runs with and without a name and verify round-trip; run `go test ./internal/store/...`.
 
-- [ ] Add RunRepo Go model and status type — ensure repo-level statuses are strongly typed while reusing `Run` and `RunStatus`.
+- [x] Add RunRepo Go model and status type — ensure repo-level statuses are strongly typed while reusing `Run` and `RunStatus`.
   - Repository: ploy
   - Component: internal/store
   - Scope:
