@@ -130,3 +130,198 @@ func list(dir string) []string {
 	}
 	return out
 }
+
+// TestModRunFollowStreamsUnifiedLogs verifies that mod run --follow renders
+// enriched log events using the shared log printer alongside ticket/stage updates.
+// This test covers the unified log streaming wired in via ROADMAP line 32.
+func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
+	ticketID := "mods-unified-logs-test"
+
+	// Control-plane emulator that sends ticket, stage, and log events.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
+			// Accept ticket submission.
+			w.WriteHeader(http.StatusAccepted)
+			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{
+				Ticket: modsapi.TicketSummary{
+					TicketID: domaintypes.TicketID(ticketID),
+					State:    modsapi.TicketStateRunning,
+				},
+			})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
+			// SSE stream with ticket, stage, and log events.
+			w.Header().Set("Content-Type", "text/event-stream")
+			fl, ok := w.(http.Flusher)
+			if !ok {
+				t.Fatalf("no flusher")
+			}
+
+			// Ticket running event.
+			_, _ = w.Write([]byte("event: ticket\n"))
+			ticketData, _ := json.Marshal(modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.TicketStateRunning,
+			})
+			_, _ = w.Write([]byte("data: "))
+			_, _ = w.Write(ticketData)
+			_, _ = w.Write([]byte("\n\n"))
+			fl.Flush()
+
+			// Enriched log event with node_id, mod_type, step_index, job_id.
+			_, _ = w.Write([]byte("event: log\n"))
+			logData := `{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"node-abc123","job_id":"job-def456","mod_type":"mod","step_index":2000}`
+			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
+			fl.Flush()
+
+			// Another log without enriched fields (backward compatibility).
+			_, _ = w.Write([]byte("event: log\n"))
+			logData2 := `{"timestamp":"2025-10-22T10:00:01Z","stream":"stderr","line":"Warning message"}`
+			_, _ = w.Write([]byte("data: " + logData2 + "\n\n"))
+			fl.Flush()
+
+			time.Sleep(5 * time.Millisecond)
+
+			// Ticket succeeded event.
+			_, _ = w.Write([]byte("event: ticket\n"))
+			ticketData2, _ := json.Marshal(modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.TicketStateSucceeded,
+			})
+			_, _ = w.Write([]byte("data: "))
+			_, _ = w.Write(ticketData2)
+			_, _ = w.Write([]byte("\n\n"))
+			fl.Flush()
+
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	args := []string{"--follow"}
+	if err := executeModRun(args, buf); err != nil {
+		t.Fatalf("executeModRun error: %v", err)
+	}
+
+	out := buf.String()
+
+	// Verify ticket state messages are present.
+	if !strings.Contains(out, "submitted") {
+		t.Errorf("expected submission message, got: %s", out)
+	}
+	if !strings.Contains(strings.ToLower(out), "succeeded") {
+		t.Errorf("expected success in output, got: %s", out)
+	}
+
+	// Verify enriched log line is rendered with context fields (structured format).
+	// Expected format: "2025-10-22T10:00:00Z stdout node=node-abc123 mod=mod step=2000 job=job-def456 Step started"
+	if !strings.Contains(out, "node=node-abc123") {
+		t.Errorf("expected enriched log with node_id, got: %s", out)
+	}
+	if !strings.Contains(out, "mod=mod") {
+		t.Errorf("expected enriched log with mod_type, got: %s", out)
+	}
+	if !strings.Contains(out, "step=2000") {
+		t.Errorf("expected enriched log with step_index, got: %s", out)
+	}
+	if !strings.Contains(out, "job=job-def456") {
+		t.Errorf("expected enriched log with job_id, got: %s", out)
+	}
+	if !strings.Contains(out, "Step started") {
+		t.Errorf("expected log message content, got: %s", out)
+	}
+
+	// Verify basic log without enriched fields is also rendered.
+	if !strings.Contains(out, "Warning message") {
+		t.Errorf("expected basic log message, got: %s", out)
+	}
+}
+
+// TestModRunFollowRawLogFormat verifies that --log-format raw renders logs
+// as message-only (no timestamps or context fields).
+func TestModRunFollowRawLogFormat(t *testing.T) {
+	ticketID := "mods-raw-format-test"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
+			w.WriteHeader(http.StatusAccepted)
+			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{
+				Ticket: modsapi.TicketSummary{
+					TicketID: domaintypes.TicketID(ticketID),
+					State:    modsapi.TicketStateRunning,
+				},
+			})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
+			w.Header().Set("Content-Type", "text/event-stream")
+			fl, ok := w.(http.Flusher)
+			if !ok {
+				t.Fatalf("no flusher")
+			}
+
+			// Ticket running.
+			_, _ = w.Write([]byte("event: ticket\n"))
+			ticketData, _ := json.Marshal(modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.TicketStateRunning,
+			})
+			_, _ = w.Write([]byte("data: "))
+			_, _ = w.Write(ticketData)
+			_, _ = w.Write([]byte("\n\n"))
+			fl.Flush()
+
+			// Log event with enriched fields.
+			_, _ = w.Write([]byte("event: log\n"))
+			logData := `{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Raw log line","node_id":"node-xyz","job_id":"job-999","mod_type":"gate","step_index":100}`
+			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
+			fl.Flush()
+
+			// Ticket succeeded.
+			_, _ = w.Write([]byte("event: ticket\n"))
+			ticketData2, _ := json.Marshal(modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.TicketStateSucceeded,
+			})
+			_, _ = w.Write([]byte("data: "))
+			_, _ = w.Write(ticketData2)
+			_, _ = w.Write([]byte("\n\n"))
+			fl.Flush()
+
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	args := []string{"--follow", "--log-format", "raw"}
+	if err := executeModRun(args, buf); err != nil {
+		t.Fatalf("executeModRun error: %v", err)
+	}
+
+	out := buf.String()
+
+	// Verify raw log line is present (message only).
+	if !strings.Contains(out, "Raw log line") {
+		t.Errorf("expected raw log message, got: %s", out)
+	}
+
+	// In raw mode, enriched context fields should NOT appear in the log output.
+	// Note: They may still appear in ticket/stage output, so check specifically
+	// that the log line itself doesn't have the structured prefix.
+	// The raw line "Raw log line" should appear without "node=" prefix on the same line.
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Raw log line") && strings.Contains(line, "node=") {
+			t.Errorf("raw format should not include node= context, got line: %s", line)
+		}
+	}
+}

@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
@@ -91,6 +92,8 @@ func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, r
 
 // followTicketEvents streams ticket events until the ticket reaches a terminal state or timeout.
 // Returns the final ticket state and any errors encountered during streaming.
+// When --follow is used, streams both ticket/stage events and enriched log events using the
+// shared log printer for a unified, informative view of the Mods execution.
 func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID string, flags *modRunFlags, stderr io.Writer) (modsapi.TicketState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
@@ -99,15 +102,27 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 		defer cancel()
 	}
 
+	// Determine log format from flag; default to structured for unified log output.
+	// The format controls how enriched log events are rendered during follow mode.
+	logFormat := logs.FormatStructured
+	if flags.LogFormat != nil && strings.TrimSpace(*flags.LogFormat) == "raw" {
+		logFormat = logs.FormatRaw
+	}
+
+	// Create shared log printer to render enriched log events alongside ticket/stage updates.
+	// This provides a consistent, informative view when following a Mods ticket directly.
+	logPrinter := logs.NewPrinter(logFormat, stderr)
+
 	ev := mods.EventsCommand{
 		Client: stream.Client{
 			HTTPClient:   cloneForStream(httpClient),
 			MaxRetries:   *flags.MaxRetries,
 			RetryBackoff: *flags.RetryWait,
 		},
-		BaseURL: base,
-		Ticket:  ticketID,
-		Output:  stderr,
+		BaseURL:    base,
+		Ticket:     ticketID,
+		Output:     stderr,
+		LogPrinter: logPrinter, // Wire unified logs into follow mode.
 	}
 
 	final, err := ev.Run(followCtx)
