@@ -62,8 +62,11 @@ CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
 -- Runs (acts as a queue with SKIP LOCKED assignment)
+-- The `name` column provides an optional human-readable batch name for grouping
+-- or identifying runs; when NULL, the run is unnamed (single-repo or ad-hoc).
 CREATE TABLE IF NOT EXISTS runs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT,  -- Optional batch name for human-readable identification.
   repo_url     TEXT NOT NULL,
   spec         JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_by   TEXT,
