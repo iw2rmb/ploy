@@ -164,7 +164,7 @@ Legend: [ ] todo, [x] done.
     - `type BatchSummary struct { ID, Name, State string; Counts RunRepoCounts }`.
   - Tests: Add `internal/cli/mods/batch_test.go` using `httptest.Server` to verify JSON request/response, error mapping, and that `BatchSummary` fields are set correctly.
 
-- [ ] Implement `mod run repo` subcommands — add/remove/restart repos and display per-batch status.
+- [x] Implement `mod run repo` subcommands — add/remove/restart repos and display per-batch status.
   - Repository: ploy
   - Component: cmd/ploy, internal/cli/mods
   - Scope:
