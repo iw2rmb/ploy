@@ -46,7 +46,7 @@ Legend: [ ] todo, [x] done.
     - `type RunRepoStatus string` and `const ( RunRepoStatusPending RunRepoStatus = "pending" ... )`.
   - Tests: Add tests in a new `internal/store/run_repos_status_test.go` (or extend `status_conversion_test.go`) validating that only the defined constants are accepted when scanning from the database.
 
-- [ ] Wire store queries for RunRepo — provide minimal CRUD and state-transition helpers around the existing `runs` table.
+- [x] Wire store queries for RunRepo — provide minimal CRUD and state-transition helpers around the existing `runs` table.
   - Repository: ploy
   - Component: internal/store
   - Scope:
