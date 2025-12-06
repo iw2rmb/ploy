@@ -87,12 +87,12 @@ pki:
   bundle_dir: /var/lib/ploy/pki
   renew_before: 12m
 runtime:
-  default_adapter: nomad
+  default_adapter: k8s
   plugins:
-    - name: nomad
-      module: github.com/example/ployd-nomad
+    - name: k8s
+      module: github.com/example/ployd-k8s
       config:
-        address: https://nomad.service.consul
+        address: https://k8s.example.com
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -123,16 +123,16 @@ runtime:
 	if cfg.PKI.RenewBefore != 12*time.Minute {
 		t.Fatalf("PKI.RenewBefore = %v", cfg.PKI.RenewBefore)
 	}
-	if cfg.Runtime.DefaultAdapter != "nomad" {
+	if cfg.Runtime.DefaultAdapter != "k8s" {
 		t.Fatalf("Runtime.DefaultAdapter = %q", cfg.Runtime.DefaultAdapter)
 	}
 	if len(cfg.Runtime.Plugins) != 1 {
 		t.Fatalf("Runtime.Plugins length = %d", len(cfg.Runtime.Plugins))
 	}
-	if cfg.Runtime.Plugins[0].Module != "github.com/example/ployd-nomad" {
+	if cfg.Runtime.Plugins[0].Module != "github.com/example/ployd-k8s" {
 		t.Fatalf("Runtime.Plugins[0].Module = %q", cfg.Runtime.Plugins[0].Module)
 	}
-	if cfg.Runtime.Plugins[0].Config["address"] != "https://nomad.service.consul" {
+	if cfg.Runtime.Plugins[0].Config["address"] != "https://k8s.example.com" {
 		t.Fatalf("Runtime.Plugins[0].Config[address] = %v", cfg.Runtime.Plugins[0].Config["address"])
 	}
 }

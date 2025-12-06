@@ -19,7 +19,7 @@ defaults change, or components adopt additional configuration.
 ## CLI
 
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`. Other adapters (e.g., `k8s`, `nomad`) can plug in here; the CLI
+  `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
