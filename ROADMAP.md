@@ -14,7 +14,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `type LogRecord struct { Timestamp, Stream, Line, NodeID, JobID, ModType string; StepIndex int }`
   - Tests: `go test ./internal/stream ./internal/server/events` — hub tests still pass and new fields are present in marshaled JSON.
 
-- [ ] Enrich log fanout with execution context — attach node_id and mod_type to each log frame using existing jobs metadata.
+- [x] Enrich log fanout with execution context — attach node_id and mod_type to each log frame using existing jobs metadata.
   - Repository: ploy
   - Component: internal/server/events, internal/store
   - Scope: In `internal/server/events/service.go`, look up job metadata (node_id, mod_type, step_index) using `store.Job` (e.g., via `GetJob` or a cached map keyed by `log.JobID`); populate the new fields on `LogRecord` before calling `Hub().PublishLog`.

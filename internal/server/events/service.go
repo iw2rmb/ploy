@@ -183,8 +183,16 @@ func (s *Service) publishEventToHub(ctx context.Context, streamID string, event 
 }
 
 // publishLogToHub converts a database log to a logstream event and publishes it.
+// It enriches each LogRecord with execution context (node_id, job_id, mod_type,
+// step_index) by looking up the associated job metadata when available.
 func (s *Service) publishLogToHub(ctx context.Context, streamID string, log store.Log) error {
 	ts := timestampToString(log.CreatedAt)
+
+	// Fetch job metadata to enrich log records with execution context.
+	// If the job lookup fails (e.g., job doesn't exist yet or store unavailable),
+	// we still publish logs without enrichment to avoid losing data.
+	jobCtx := s.loadJobContext(ctx, log.JobID)
+
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
 	zr, err := gzip.NewReader(bytes.NewReader(log.Data))
 	if err == nil {
@@ -201,21 +209,85 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 			if line == "" {
 				continue
 			}
-			rec := logstream.LogRecord{Timestamp: ts, Stream: "stdout", Line: line}
+			rec := logstream.LogRecord{
+				Timestamp: ts,
+				Stream:    "stdout",
+				Line:      line,
+				NodeID:    jobCtx.NodeID,
+				JobID:     jobCtx.JobID,
+				ModType:   jobCtx.ModType,
+				StepIndex: jobCtx.StepIndex,
+			}
 			if err := s.hub.PublishLog(ctx, streamID, rec); err != nil {
 				return err
 			}
 		}
 		if scanErr := scanner.Err(); scanErr != nil {
 			// On scanner error, emit a fallback lump to avoid total loss.
-			rec := logstream.LogRecord{Timestamp: ts, Stream: "stdout", Line: "[log decode error]"}
+			rec := logstream.LogRecord{
+				Timestamp: ts,
+				Stream:    "stdout",
+				Line:      "[log decode error]",
+				NodeID:    jobCtx.NodeID,
+				JobID:     jobCtx.JobID,
+				ModType:   jobCtx.ModType,
+				StepIndex: jobCtx.StepIndex,
+			}
 			_ = s.hub.PublishLog(ctx, streamID, rec)
 		}
 		return nil
 	}
 	// Fallback: publish raw bytes as a single frame (may look garbled to clients).
-	rec := logstream.LogRecord{Timestamp: ts, Stream: "log", Line: string(log.Data)}
+	rec := logstream.LogRecord{
+		Timestamp: ts,
+		Stream:    "log",
+		Line:      string(log.Data),
+		NodeID:    jobCtx.NodeID,
+		JobID:     jobCtx.JobID,
+		ModType:   jobCtx.ModType,
+		StepIndex: jobCtx.StepIndex,
+	}
 	return s.hub.PublishLog(ctx, streamID, rec)
+}
+
+// jobContext holds execution context extracted from job metadata.
+// Used to enrich log records with node and mod information.
+type jobContext struct {
+	NodeID    string
+	JobID     string
+	ModType   string
+	StepIndex int
+}
+
+// loadJobContext fetches job metadata for a given job ID and extracts
+// fields needed to enrich log records. Returns an empty context if the
+// job ID is invalid or the lookup fails (logs are still published without
+// enrichment in these cases).
+func (s *Service) loadJobContext(ctx context.Context, jobID pgtype.UUID) jobContext {
+	// If job ID is invalid, return empty context.
+	if !jobID.Valid {
+		return jobContext{}
+	}
+	// If store is not configured, return empty context (log-only mode).
+	if s.store == nil {
+		return jobContext{}
+	}
+
+	job, err := s.store.GetJob(ctx, jobID)
+	if err != nil {
+		// Log lookup failure but don't block log publishing.
+		s.logger.Debug("job lookup failed for log enrichment",
+			"job_id", uuidToString(jobID),
+			"error", err)
+		return jobContext{}
+	}
+
+	return jobContext{
+		NodeID:    uuidToString(job.NodeID),
+		JobID:     uuidToString(job.ID),
+		ModType:   job.ModType,
+		StepIndex: int(job.StepIndex),
+	}
 }
 
 // uuidToString converts a pgtype.UUID to its string representation.
