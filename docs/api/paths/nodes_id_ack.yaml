@@ -36,4 +36,3 @@ post:
       description: Conflict (run not in `assigned` state)
     '500':
       description: Internal server error
-

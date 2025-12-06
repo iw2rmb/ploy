@@ -58,4 +58,3 @@ SELECT id,
 FROM runs_timing
 ORDER BY id DESC
 LIMIT $1 OFFSET $2;
-

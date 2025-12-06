@@ -14,4 +14,3 @@ get:
               $ref: '../OpenAPI.yaml#/components/schemas/Node'
     '500':
       description: Internal server error
-

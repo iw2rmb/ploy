@@ -26,4 +26,3 @@ post:
       description: Node not found
     '500':
       description: Internal server error
-

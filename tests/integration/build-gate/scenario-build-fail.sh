@@ -89,4 +89,3 @@ docker run --rm -v "$WORKDIR":/workspace -w /workspace \
   'mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test' >/dev/null 2>&1
 
 echo "OK: build-gate failure produces artifact and can be healed by LLM stub"
-

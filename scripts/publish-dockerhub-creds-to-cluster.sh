@@ -60,4 +60,3 @@ echo "OK: creds applied on $(hostname)"
 done
 
 echo "All done"
-

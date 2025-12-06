@@ -20,4 +20,3 @@ post:
       description: Node is not drained
     '500':
       description: Internal server error
-

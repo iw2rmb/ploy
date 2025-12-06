@@ -24,4 +24,3 @@ USER ploy
 EXPOSE 8443 9100
 ENTRYPOINT ["/usr/local/bin/ployd"]
 CMD ["--config","/etc/ploy/ployd.yaml"]
-
