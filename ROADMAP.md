@@ -44,10 +44,11 @@ Legend: [ ] todo, [x] done.
   - Snippets: `event: log` / `data: {"timestamp":"...","stream":"stdout","line":"...","node_id":"...","job_id":"...","mod_type":"mod","step_index":2000}`
   - Tests: Run `go test ./docs/api/...` (including `docs/api/verify_openapi_test.go`) to ensure schema references remain valid; manually verify rendered docs if applicable.
 
-- [ ] Validate performance and resilience with enriched logs — confirm no regressions for long-running or chatty Mods tickets.
+- [x] Validate performance and resilience with enriched logs — confirm no regressions for long-running or chatty Mods tickets.
   - Repository: ploy
   - Component: internal/cli/stream, internal/server/events, tests/e2e
   - Scope: Exercise `mods logs` and `runs follow` against a high-volume ticket in the lab (multi-node Mods scenarios) to confirm backoff behavior, idle timeouts, and reconnection semantics remain stable with the larger log frames.
   - Snippets: Commands like `dist/ploy mods logs <ticket-id> --format structured` and `dist/ploy runs follow <ticket-id>` against existing E2E scenarios.
   - Tests: Use `tests/e2e/mods` scenarios to smoke-test the new log shape end-to-end; ensure `make test` (including SSE-related tests) passes with coverage thresholds unchanged.
+  - Validation: Added benchmark tests (`BenchmarkHubPublish{Enriched,Minimal,Concurrent}Log`) and resilience tests in `internal/stream/hub_test.go` and `internal/cli/stream/sse_client_test.go` covering high-volume publishing, large payloads, backoff reset, idle timeout, and reconnection with enriched log frames.
 
