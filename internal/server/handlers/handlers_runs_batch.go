@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -450,48 +451,38 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Decode request body with validation via domain types.
-		// Uses domain types for repo_url and refs to ensure scheme/format validation.
+		// Decode request body with domain types for VCS fields.
+		// JSON unmarshaling will automatically normalize values; we validate explicitly.
 		var req struct {
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
+			RepoURL   domaintypes.RepoURL `json:"repo_url"`
+			BaseRef   domaintypes.GitRef  `json:"base_ref"`
+			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		// Validate required fields — repo_url must have valid scheme (https/ssh/file),
-		// refs must be non-empty.
-		if req.RepoURL == "" {
-			http.Error(w, "repo_url is required", http.StatusBadRequest)
+		// Validate domain types explicitly to catch missing/zero-value fields.
+		if err := req.RepoURL.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
 			return
 		}
-		if req.BaseRef == "" {
-			http.Error(w, "base_ref is required", http.StatusBadRequest)
+		if err := req.BaseRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
 			return
 		}
-		if req.TargetRef == "" {
-			http.Error(w, "target_ref is required", http.StatusBadRequest)
-			return
-		}
-
-		// Validate repo_url scheme (https/ssh/file).
-		repoURLLower := strings.ToLower(req.RepoURL)
-		if !strings.HasPrefix(repoURLLower, "https://") &&
-			!strings.HasPrefix(repoURLLower, "ssh://") &&
-			!strings.HasPrefix(repoURLLower, "file://") {
-			http.Error(w, "repo_url: invalid scheme (must be https, ssh, or file)", http.StatusBadRequest)
+		if err := req.TargetRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
 		// Create the run_repo entry with status=pending.
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			RunID:     pgRunID,
-			RepoUrl:   strings.TrimSpace(req.RepoURL),
-			BaseRef:   strings.TrimSpace(req.BaseRef),
-			TargetRef: strings.TrimSpace(req.TargetRef),
+			RepoUrl:   req.RepoURL.String(),
+			BaseRef:   req.BaseRef.String(),
+			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
@@ -776,14 +767,28 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Decode optional request body for ref updates.
 		// Empty body is allowed — just restart with existing refs.
 		var req struct {
-			BaseRef   *string `json:"base_ref,omitempty"`
-			TargetRef *string `json:"target_ref,omitempty"`
+			BaseRef   *domaintypes.GitRef `json:"base_ref,omitempty"`
+			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
 		}
 		// Only decode if body is present (Content-Length > 0 or chunked).
 		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 				return
+			}
+
+			// Validate provided refs when present.
+			if req.BaseRef != nil {
+				if err := req.BaseRef.Validate(); err != nil {
+					http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
+					return
+				}
+			}
+			if req.TargetRef != nil {
+				if err := req.TargetRef.Validate(); err != nil {
+					http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+					return
+				}
 			}
 		}
 
@@ -796,15 +801,26 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// TODO: If base_ref/target_ref updates are provided, update them separately.
-		// Currently the store only has IncrementRunRepoAttempt; adding UpdateRunRepoRefs
-		// would require a new sqlc query. For now, log if refs were requested but ignored.
+		// If base_ref/target_ref updates are provided, persist them.
 		if req.BaseRef != nil || req.TargetRef != nil {
-			slog.Debug("restart run repo: ref updates not yet implemented",
-				"repo_id", repoIDStr,
-				"base_ref", req.BaseRef,
-				"target_ref", req.TargetRef,
-			)
+			newBaseRef := runRepo.BaseRef
+			if req.BaseRef != nil {
+				newBaseRef = req.BaseRef.String()
+			}
+			newTargetRef := runRepo.TargetRef
+			if req.TargetRef != nil {
+				newTargetRef = req.TargetRef.String()
+			}
+
+			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{
+				ID:        pgRepoID,
+				BaseRef:   newBaseRef,
+				TargetRef: newTargetRef,
+			}); err != nil {
+				http.Error(w, fmt.Sprintf("failed to update repo refs: %v", err), http.StatusInternalServerError)
+				slog.Error("restart run repo: update refs failed", "repo_id", repoIDStr, "err", err)
+				return
+			}
 		}
 
 		slog.Info("run repo restarted",

@@ -71,6 +71,43 @@ RunRepoCounts:
       format: int32
   required: [total]
 
+RunRepo:
+  type: object
+  description: Repo entry within a batch run, backed by the `run_repos` table.
+  properties:
+    id: { type: string, format: uuid }
+    run_id: { type: string, format: uuid }
+    repo_url: { type: string }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    status: { type: string }
+    attempt:
+      type: integer
+      format: int32
+      description: Retry attempt number for this repo within the batch.
+    last_error:
+      type: string
+      nullable: true
+      description: Optional failure context for the most recent attempt.
+    created_at: { type: string, format: date-time }
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+  required:
+    - id
+    - run_id
+    - repo_url
+    - base_ref
+    - target_ref
+    - status
+    - attempt
+    - created_at
+
 RunBatchSummary:
   type: object
   description: Batch run summary with optional aggregated repo status counts.

@@ -276,6 +276,11 @@ type mockStore struct {
 	countRunReposByStatusResult []store.CountRunReposByStatusRow
 	countRunReposByStatusErr    error
 
+	// UpdateRunRepoRefs tracking
+	updateRunRepoRefsCalled bool
+	updateRunRepoRefsParams store.UpdateRunRepoRefsParams
+	updateRunRepoRefsErr    error
+
 	// UpdateRunRepoStatus tracking
 	updateRunRepoStatusCalled bool
 	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
@@ -691,6 +696,12 @@ func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID pgtype.UUID
 	m.countRunReposByStatusCalled = true
 	m.countRunReposByStatusParam = runID
 	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
+}
+
+func (m *mockStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
+	m.updateRunRepoRefsCalled = true
+	m.updateRunRepoRefsParams = params
+	return m.updateRunRepoRefsErr
 }
 
 func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {

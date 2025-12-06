@@ -191,6 +191,25 @@ func (q *Queries) UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoError
 	return err
 }
 
+const updateRunRepoRefs = `-- name: UpdateRunRepoRefs :exec
+UPDATE run_repos
+SET base_ref = $2,
+    target_ref = $3
+WHERE id = $1
+`
+
+type UpdateRunRepoRefsParams struct {
+	ID        pgtype.UUID `json:"id"`
+	BaseRef   string      `json:"base_ref"`
+	TargetRef string      `json:"target_ref"`
+}
+
+// Updates a run_repo's base_ref and target_ref (e.g., when restarting with new refs).
+func (q *Queries) UpdateRunRepoRefs(ctx context.Context, arg UpdateRunRepoRefsParams) error {
+	_, err := q.db.Exec(ctx, updateRunRepoRefs, arg.ID, arg.BaseRef, arg.TargetRef)
+	return err
+}
+
 const updateRunRepoStatus = `-- name: UpdateRunRepoStatus :exec
 UPDATE run_repos
 SET status = $2,

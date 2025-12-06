@@ -42,6 +42,13 @@ SET attempt = attempt + 1,
     finished_at = NULL
 WHERE id = $1;
 
+-- name: UpdateRunRepoRefs :exec
+-- Updates a run_repo's base_ref and target_ref (e.g., when restarting with new refs).
+UPDATE run_repos
+SET base_ref = $2,
+    target_ref = $3
+WHERE id = $1;
+
 -- name: CountRunReposByStatus :many
 -- Aggregates run_repos counts by status for a given run.
 -- Used to derive batch-level status (e.g., all succeeded = batch succeeded).
