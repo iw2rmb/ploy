@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
     - `CREATE TABLE IF NOT EXISTS run_repos (... run_id UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE, repo_url TEXT NOT NULL, ...);`
   - Tests: `go test ./internal/store -run TestRunMigrations` — schema applies cleanly and includes the new enum/table; extend tests in `internal/store/store_test.go` to assert `run_repos` exists (simple SELECT) after migrations.
 
-- [ ] Introduce optional batch naming on runs — let callers name a batch while reusing `runs` as the canonical Mods run record.
+- [x] Introduce optional batch naming on runs — let callers name a batch while reusing `runs` as the canonical Mods run record.
   - Repository: ploy
   - Component: internal/store
   - Scope:
