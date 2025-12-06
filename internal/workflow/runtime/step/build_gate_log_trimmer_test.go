@@ -25,10 +25,10 @@ Caused by: java.net.ConnectException: Connection refused
 	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:672)
 [ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.855 s <<< FAILURE! -- in ru.tbank.tpe.ignite.client.pooled.PublishEventsTest
 [ERROR] ru.tbank.tpe.ignite.client.pooled.PublishEventsTest.sendNewNewIgniteConfigurationEventTest -- Time elapsed: 0.025 s <<< ERROR!
-org.springframework.beans.factory.BeanCreationException: 
+org.springframework.beans.factory.BeanCreationException:
 Error creating bean with name 'pooledLazyIgniteClient'
 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:628)
-Caused by: org.mockito.exceptions.base.MockitoException: 
+Caused by: org.mockito.exceptions.base.MockitoException:
 Cannot mock/spy class ru.tbank.tpe.ignite.client.pooled.IgnitePooledClientAutoconfiguration$NoopPooledLazyIgniteClient
 Mockito cannot mock/spy because :
  - final class

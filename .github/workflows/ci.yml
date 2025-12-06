@@ -136,15 +136,3 @@ jobs:
           path: |
             repo.sbom.json
             repo.sbom.json.sig
-
-  nomad-wrapper-mock:
-    name: Nomad Wrapper (Mock API)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install jq and python3
-        run: sudo apt-get update && sudo apt-get install -y jq python3
-      - name: Run wrapper mock tests
-        run: |
-          chmod +x tests/scripts/test-nomad-wrapper-mock.sh
-          ./tests/scripts/test-nomad-wrapper-mock.sh

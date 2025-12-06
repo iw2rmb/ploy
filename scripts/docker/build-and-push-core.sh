@@ -63,4 +63,3 @@ build_push ploy-node docker/node/Dockerfile .
 build_push ploy-db docker/db/Dockerfile .
 
 echo "All core images pushed under ${IMAGE_PREFIX}"
-

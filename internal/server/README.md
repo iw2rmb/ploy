@@ -15,4 +15,3 @@ Related packages
 - internal/stream: Shared SSE hub and HTTP helpers for event streaming.
 - internal/worker: Node-side execution primitives used by the node agent.
 - internal/nodeagent: Node daemon that composes worker primitives and pushes data to the server.
-

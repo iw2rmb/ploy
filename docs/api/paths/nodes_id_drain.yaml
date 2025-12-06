@@ -20,4 +20,3 @@ post:
       description: Node already drained
     '500':
       description: Internal server error
-

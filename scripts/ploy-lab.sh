@@ -50,4 +50,3 @@ if [[ ! -x "$CLI_BIN" ]]; then
 fi
 
 exec env PLOY_CONTROL_PLANE_URL="$LAB_URL" "$CLI_BIN" "$@"
-

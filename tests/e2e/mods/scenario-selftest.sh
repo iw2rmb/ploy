@@ -22,4 +22,3 @@ dist/ploy mod run \
 
 echo "OK: selftest scenario (check logs output)"
 echo "Artifacts saved to: ${ARTIFACT_DIR}"
-

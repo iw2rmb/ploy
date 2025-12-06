@@ -55,4 +55,3 @@ echo "OK: OpenAI key applied on $(hostname)"
 done
 
 echo "All done"
-
