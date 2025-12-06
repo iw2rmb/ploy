@@ -139,6 +139,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"Run",
 		"RunBatchSummary",
 		"RunRepoCounts",
+		"RunRepoStatus",         // Per-repo execution status enum.
+		"RunBatchDerivedStatus", // Batch-level aggregate status enum.
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"TicketSubmitRequest",

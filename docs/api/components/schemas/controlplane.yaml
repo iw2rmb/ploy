@@ -1,3 +1,31 @@
+# RunRepoStatus defines the per-repo execution state within a batch run.
+# Tracks the lifecycle of individual repositories as they progress through
+# the batch processing pipeline (pending → running → terminal).
+RunRepoStatus:
+  type: string
+  description: |
+    Per-repo execution status within a batch run.
+    - pending: Repo is queued and waiting to start execution.
+    - running: Repo execution is in progress (claimed by a node).
+    - succeeded: Repo completed successfully with exit code 0.
+    - failed: Repo execution failed (non-zero exit or error).
+    - skipped: Repo was removed from batch before execution started.
+    - cancelled: Repo was stopped while running (explicit user action).
+  enum: [pending, running, succeeded, failed, skipped, cancelled]
+
+# RunBatchDerivedStatus represents the batch-level aggregate status computed
+# from the per-repo states in RunRepoCounts.DerivedStatus.
+RunBatchDerivedStatus:
+  type: string
+  description: |
+    Batch-level status derived from aggregated per-repo states.
+    - pending: No repos have started (all pending or no repos).
+    - running: At least one repo is currently running.
+    - completed: All repos finished successfully (succeeded/skipped).
+    - failed: At least one repo failed (and none running).
+    - cancelled: Batch was stopped and repos were cancelled.
+  enum: [pending, running, completed, failed, cancelled]
+
 Repo:
   type: object
   properties:
@@ -46,63 +74,100 @@ Run:
 
 RunRepoCounts:
   type: object
-  description: Aggregated per-repo status counts for a batch run.
+  description: |
+    Aggregated per-repo status counts for a batch run. Provides a summary of
+    how many repos are in each lifecycle state (pending, running, terminal).
+    The derived_status field computes a single batch-level status from these
+    counts for easy display in CLI/UI surfaces.
   properties:
     total:
       type: integer
       format: int32
+      description: Total number of repos in the batch.
     pending:
       type: integer
       format: int32
+      description: Repos waiting to start execution.
     running:
       type: integer
       format: int32
+      description: Repos currently executing.
     succeeded:
       type: integer
       format: int32
+      description: Repos that completed successfully.
     failed:
       type: integer
       format: int32
+      description: Repos that failed execution.
     skipped:
       type: integer
       format: int32
+      description: Repos removed before execution started.
     cancelled:
       type: integer
       format: int32
+      description: Repos stopped while running.
     derived_status:
-      type: string
+      $ref: '#/RunBatchDerivedStatus'
       description: |
-        Derived batch-level status computed from per-repo states.
-        One of: pending, running, completed, failed, cancelled.
+        Batch-level status computed from per-repo states. Precedence order:
+        cancelled > running > failed > completed > pending.
   required: [total]
 
 RunRepo:
   type: object
-  description: Repo entry within a batch run, backed by the `run_repos` table.
+  description: |
+    Repo entry within a batch run, backed by the `run_repos` table.
+    Represents a single repository's execution state within the batch,
+    tracking refs, status, attempt count, and timing information.
   properties:
-    id: { type: string, format: uuid }
-    run_id: { type: string, format: uuid }
-    repo_url: { type: string }
-    base_ref: { type: string }
-    target_ref: { type: string }
-    status: { type: string }
+    id:
+      type: string
+      format: uuid
+      description: Unique repo entry ID within the batch.
+    run_id:
+      type: string
+      format: uuid
+      description: Parent batch run ID.
+    repo_url:
+      type: string
+      description: Git repository URL (https, ssh, or file scheme).
+    base_ref:
+      type: string
+      description: Git ref used as the base for comparisons (e.g., main, master).
+    target_ref:
+      type: string
+      description: Git ref representing the target branch for the run.
+    status:
+      $ref: '#/RunRepoStatus'
+      description: Current execution status for this repo.
     attempt:
       type: integer
       format: int32
-      description: Retry attempt number for this repo within the batch.
+      description: |
+        Retry attempt number for this repo within the batch.
+        Starts at 1, incremented on each restart.
     last_error:
       type: string
       nullable: true
-      description: Optional failure context for the most recent attempt.
-    created_at: { type: string, format: date-time }
+      description: |
+        Human-readable error message from the most recent failed attempt.
+        Cleared when the repo is restarted.
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp when the repo entry was created.
     started_at:
       type: string
       format: date-time
       nullable: true
+      description: Timestamp when execution started (status transitioned to running).
     finished_at:
       type: string
       format: date-time
       nullable: true
+      description: Timestamp when execution completed (terminal status reached).
   required:
     - id
     - run_id
@@ -115,22 +180,62 @@ RunRepo:
 
 RunBatchSummary:
   type: object
-  description: Batch run summary with optional aggregated repo status counts.
+  description: |
+    Batch run summary with optional aggregated repo status counts.
+    Returned by list and inspect endpoints for batch runs. The repo_counts
+    field provides aggregate status when multiple repos are attached to
+    the batch (via POST /v1/runs/{id}/repos).
   properties:
-    id: { type: string, format: uuid }
-    name: { type: string, nullable: true }
-    repo_url: { type: string }
-    status: { type: string }
-    base_ref: { type: string }
-    target_ref: { type: string }
-    created_by: { type: string, nullable: true }
-    created_at: { type: string, format: date-time }
-    started_at: { type: string, format: date-time, nullable: true }
-    finished_at: { type: string, format: date-time, nullable: true }
+    id:
+      type: string
+      format: uuid
+      description: Unique batch run identifier.
+    name:
+      type: string
+      nullable: true
+      description: Optional human-readable name for the batch.
+    repo_url:
+      type: string
+      description: |
+        Primary Git repository URL for the batch. When repos are added
+        individually, this serves as the default/template URL.
+    status:
+      type: string
+      description: |
+        Batch run status. Values: queued, running, succeeded, failed, canceled.
+        For multi-repo batches, use repo_counts.derived_status for aggregate state.
+    base_ref:
+      type: string
+      description: Default base Git ref for repos in the batch (e.g., main).
+    target_ref:
+      type: string
+      description: Default target Git ref for repos in the batch.
+    created_by:
+      type: string
+      nullable: true
+      description: User or system that created the batch run.
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp when the batch was created.
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the first repo started execution.
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when all repos reached terminal state.
     repo_counts:
       allOf:
         - $ref: '#/RunRepoCounts'
       nullable: true
+      description: |
+        Aggregated per-repo status counts. Present when repos have been
+        added to the batch. Use derived_status for a single batch-level
+        status value.
   required:
     - id
     - repo_url
