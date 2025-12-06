@@ -302,6 +302,28 @@ type mockStore struct {
 	incrementRunRepoAttemptCalled bool
 	incrementRunRepoAttemptParam  pgtype.UUID
 	incrementRunRepoAttemptErr    error
+
+	// ListPendingRunReposByRun tracking
+	listPendingRunReposByRunCalled bool
+	listPendingRunReposByRunParam  pgtype.UUID
+	listPendingRunReposByRunResult []store.RunRepo
+	listPendingRunReposByRunErr    error
+
+	// SetRunRepoExecutionRun tracking
+	setRunRepoExecutionRunCalled bool
+	setRunRepoExecutionRunParams []store.SetRunRepoExecutionRunParams
+	setRunRepoExecutionRunErr    error
+
+	// GetRunRepoByExecutionRun tracking
+	getRunRepoByExecutionRunCalled bool
+	getRunRepoByExecutionRunParam  pgtype.UUID
+	getRunRepoByExecutionRunResult store.RunRepo
+	getRunRepoByExecutionRunErr    error
+
+	// ClearRunRepoExecutionRun tracking
+	clearRunRepoExecutionRunCalled bool
+	clearRunRepoExecutionRunParam  pgtype.UUID
+	clearRunRepoExecutionRunErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -726,4 +748,32 @@ func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID)
 	m.incrementRunRepoAttemptCalled = true
 	m.incrementRunRepoAttemptParam = id
 	return m.incrementRunRepoAttemptErr
+}
+
+// ListPendingRunReposByRun returns pending run_repos for a batch.
+func (m *mockStore) ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]store.RunRepo, error) {
+	m.listPendingRunReposByRunCalled = true
+	m.listPendingRunReposByRunParam = runID
+	return m.listPendingRunReposByRunResult, m.listPendingRunReposByRunErr
+}
+
+// SetRunRepoExecutionRun links a run_repo to its child execution run.
+func (m *mockStore) SetRunRepoExecutionRun(ctx context.Context, arg store.SetRunRepoExecutionRunParams) error {
+	m.setRunRepoExecutionRunCalled = true
+	m.setRunRepoExecutionRunParams = append(m.setRunRepoExecutionRunParams, arg)
+	return m.setRunRepoExecutionRunErr
+}
+
+// GetRunRepoByExecutionRun finds the run_repo linked to a given execution run.
+func (m *mockStore) GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (store.RunRepo, error) {
+	m.getRunRepoByExecutionRunCalled = true
+	m.getRunRepoByExecutionRunParam = executionRunID
+	return m.getRunRepoByExecutionRunResult, m.getRunRepoByExecutionRunErr
+}
+
+// ClearRunRepoExecutionRun clears the execution_run_id for a run_repo.
+func (m *mockStore) ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error {
+	m.clearRunRepoExecutionRunCalled = true
+	m.clearRunRepoExecutionRunParam = id
+	return m.clearRunRepoExecutionRunErr
 }

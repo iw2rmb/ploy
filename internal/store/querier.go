@@ -23,6 +23,9 @@ type Querier interface {
 	// Server-driven scheduling: only 'pending' jobs are claimable.
 	// Job transitions directly to 'running' (no intermediate 'assigned' state).
 	ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
+	// Clears the execution_run_id for a run_repo (e.g., when restarting).
+	// Also called by IncrementRunRepoAttempt to prepare for a new execution.
+	ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error
 	// Counts total jobs for a run.
 	CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error)
 	// Counts jobs for a run with a specific status.
@@ -75,9 +78,12 @@ type Querier interface {
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, error)
+	// Finds the run_repo entry linked to a given execution run.
+	// Used by completion callbacks to update repo status when execution completes.
+	GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	// Increments the attempt counter and resets status to 'pending' for retry.
-	// Clears timing fields to prepare for a fresh execution attempt.
+	// Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
@@ -114,6 +120,9 @@ type Querier interface {
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
+	// Lists all pending repos for a run (batch), ordered by creation time.
+	// Used by the batch orchestrator to find repos ready to start execution.
+	ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
 	// Lists all repos associated with a run (batch), ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
@@ -124,6 +133,9 @@ type Querier interface {
 	// Called by server after a job completes successfully to enable server-driven scheduling.
 	// Returns the pending job, or null if no more jobs to schedule.
 	ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, error)
+	// Links a run_repo to its child execution run and transitions status to 'running'.
+	// Called when starting execution for a repo entry within a batch.
+	SetRunRepoExecutionRun(ctx context.Context, arg SetRunRepoExecutionRunParams) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error

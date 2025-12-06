@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearRunRepoExecutionRun = `-- name: ClearRunRepoExecutionRun :exec
+UPDATE run_repos
+SET execution_run_id = NULL
+WHERE id = $1
+`
+
+// Clears the execution_run_id for a run_repo (e.g., when restarting).
+// Also called by IncrementRunRepoAttempt to prepare for a new execution.
+func (q *Queries) ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearRunRepoExecutionRun, id)
+	return err
+}
+
 const countRunReposByStatus = `-- name: CountRunReposByStatus :many
 SELECT status, COUNT(*)::int AS count
 FROM run_repos
@@ -48,7 +61,7 @@ func (q *Queries) CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) 
 const createRunRepo = `-- name: CreateRunRepo :one
 INSERT INTO run_repos (run_id, repo_url, base_ref, target_ref, status)
 VALUES ($1, $2, $3, $4, 'pending')
-RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, created_at, started_at, finished_at
+RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at
 `
 
 type CreateRunRepoParams struct {
@@ -77,6 +90,7 @@ func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (R
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
+		&i.ExecutionRunID,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -95,7 +109,7 @@ func (q *Queries) DeleteRunRepo(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getRunRepo = `-- name: GetRunRepo :one
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, created_at, started_at, finished_at FROM run_repos
+SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
 WHERE id = $1
 `
 
@@ -111,6 +125,34 @@ func (q *Queries) GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, erro
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
+		&i.ExecutionRunID,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const getRunRepoByExecutionRun = `-- name: GetRunRepoByExecutionRun :one
+SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
+WHERE execution_run_id = $1
+`
+
+// Finds the run_repo entry linked to a given execution run.
+// Used by completion callbacks to update repo status when execution completes.
+func (q *Queries) GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (RunRepo, error) {
+	row := q.db.QueryRow(ctx, getRunRepoByExecutionRun, executionRunID)
+	var i RunRepo
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.RepoUrl,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.Status,
+		&i.Attempt,
+		&i.LastError,
+		&i.ExecutionRunID,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -123,20 +165,62 @@ UPDATE run_repos
 SET attempt = attempt + 1,
     status = 'pending',
     last_error = NULL,
+    execution_run_id = NULL,
     started_at = NULL,
     finished_at = NULL
 WHERE id = $1
 `
 
 // Increments the attempt counter and resets status to 'pending' for retry.
-// Clears timing fields to prepare for a fresh execution attempt.
+// Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
 func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, incrementRunRepoAttempt, id)
 	return err
 }
 
+const listPendingRunReposByRun = `-- name: ListPendingRunReposByRun :many
+SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
+WHERE run_id = $1 AND status = 'pending'
+ORDER BY created_at ASC
+`
+
+// Lists all pending repos for a run (batch), ordered by creation time.
+// Used by the batch orchestrator to find repos ready to start execution.
+func (q *Queries) ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error) {
+	rows, err := q.db.Query(ctx, listPendingRunReposByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RunRepo{}
+	for rows.Next() {
+		var i RunRepo
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.RepoUrl,
+			&i.BaseRef,
+			&i.TargetRef,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.ExecutionRunID,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunReposByRun = `-- name: ListRunReposByRun :many
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, created_at, started_at, finished_at FROM run_repos
+SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
 WHERE run_id = $1
 ORDER BY created_at ASC
 `
@@ -160,6 +244,7 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]R
 			&i.Status,
 			&i.Attempt,
 			&i.LastError,
+			&i.ExecutionRunID,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
@@ -172,6 +257,26 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]R
 		return nil, err
 	}
 	return items, nil
+}
+
+const setRunRepoExecutionRun = `-- name: SetRunRepoExecutionRun :exec
+UPDATE run_repos
+SET execution_run_id = $2,
+    status = 'running',
+    started_at = CASE WHEN started_at IS NULL THEN now() ELSE started_at END
+WHERE id = $1
+`
+
+type SetRunRepoExecutionRunParams struct {
+	ID             pgtype.UUID `json:"id"`
+	ExecutionRunID pgtype.UUID `json:"execution_run_id"`
+}
+
+// Links a run_repo to its child execution run and transitions status to 'running'.
+// Called when starting execution for a repo entry within a batch.
+func (q *Queries) SetRunRepoExecutionRun(ctx context.Context, arg SetRunRepoExecutionRunParams) error {
+	_, err := q.db.Exec(ctx, setRunRepoExecutionRun, arg.ID, arg.ExecutionRunID)
+	return err
 }
 
 const updateRunRepoError = `-- name: UpdateRunRepoError :exec

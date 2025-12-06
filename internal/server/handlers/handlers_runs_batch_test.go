@@ -1280,3 +1280,346 @@ func TestIsTerminalRunRepoStatus(t *testing.T) {
 		})
 	}
 }
+
+// -------------------------------------------------------------------------
+// Tests for POST /v1/runs/{id}/start — batch execution start handler.
+// -------------------------------------------------------------------------
+
+// TestStartRunHandler verifies the POST /v1/runs/{id}/start handler.
+func TestStartRunHandler(t *testing.T) {
+	t.Parallel()
+
+	sampleBatchRunID := uuid.New()
+	sampleRepoID1 := uuid.New()
+	sampleRepoID2 := uuid.New()
+	childRunID := uuid.New()
+
+	// Sample batch run (queued, ready to start).
+	queuedBatchRun := store.Run{
+		ID:        pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		Name:      ptrString("test-batch"),
+		RepoUrl:   "https://github.com/example/batch.git",
+		Spec:      []byte(`{"mod":{"image":"test-image"}}`),
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedBy: ptrString("test-user"),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Sample canceled batch run (terminal, cannot start).
+	canceledBatchRun := store.Run{
+		ID:        pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		Name:      ptrString("test-batch"),
+		Status:    store.RunStatusCanceled,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Sample pending run repos.
+	pendingRepo1 := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: sampleRepoID1, Valid: true},
+		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		RepoUrl:   "https://github.com/example/repo1.git",
+		BaseRef:   "main",
+		TargetRef: "feature-1",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	pendingRepo2 := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: sampleRepoID2, Valid: true},
+		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		RepoUrl:   "https://github.com/example/repo2.git",
+		BaseRef:   "main",
+		TargetRef: "feature-2",
+		Status:    store.RunRepoStatusPending,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Sample already succeeded repo.
+	succeededRepo := store.RunRepo{
+		ID:        pgtype.UUID{Bytes: sampleRepoID1, Valid: true},
+		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		RepoUrl:   "https://github.com/example/repo1.git",
+		Status:    store.RunRepoStatusSucceeded,
+		Attempt:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	// Sample child run created for execution.
+	childRun := store.Run{
+		ID:        pgtype.UUID{Bytes: childRunID, Valid: true},
+		RepoUrl:   "https://github.com/example/repo1.git",
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature-1",
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	tests := []struct {
+		name                  string
+		runID                 string
+		mockRun               store.Run
+		mockRunErr            error
+		mockAllRepos          []store.RunRepo
+		mockAllReposErr       error
+		mockPendingRepos      []store.RunRepo
+		mockPendingReposErr   error
+		mockChildRun          store.Run
+		mockCreateRunErr      error
+		mockCreateJobErr      error
+		mockSetExecRunErr     error
+		wantStatus            int
+		wantStarted           int
+		wantAlreadyDone       int
+		wantPending           int
+		wantChildRunsCreated  int
+		wantSetExecRunCalled  bool
+		wantAckRunStartCalled bool
+	}{
+		{
+			name:                  "start two pending repos",
+			runID:                 sampleBatchRunID.String(),
+			mockRun:               queuedBatchRun,
+			mockAllRepos:          []store.RunRepo{pendingRepo1, pendingRepo2},
+			mockPendingRepos:      []store.RunRepo{pendingRepo1, pendingRepo2},
+			mockChildRun:          childRun,
+			wantStatus:            http.StatusOK,
+			wantStarted:           2,
+			wantAlreadyDone:       0,
+			wantPending:           0,
+			wantChildRunsCreated:  2,
+			wantSetExecRunCalled:  true,
+			wantAckRunStartCalled: true,
+		},
+		{
+			name:                 "no pending repos (all succeeded)",
+			runID:                sampleBatchRunID.String(),
+			mockRun:              queuedBatchRun,
+			mockAllRepos:         []store.RunRepo{succeededRepo},
+			mockPendingRepos:     []store.RunRepo{},
+			wantStatus:           http.StatusOK,
+			wantStarted:          0,
+			wantAlreadyDone:      1,
+			wantPending:          0,
+			wantChildRunsCreated: 0,
+			wantSetExecRunCalled: false,
+		},
+		{
+			name:       "empty run id",
+			runID:      "",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid uuid",
+			runID:      "not-a-uuid",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "run not found",
+			runID:      uuid.New().String(),
+			mockRunErr: pgx.ErrNoRows,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "terminal run (conflict)",
+			runID:      sampleBatchRunID.String(),
+			mockRun:    canceledBatchRun,
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:            "list all repos error",
+			runID:           sampleBatchRunID.String(),
+			mockRun:         queuedBatchRun,
+			mockAllReposErr: pgx.ErrTxClosed,
+			wantStatus:      http.StatusInternalServerError,
+		},
+		{
+			name:                "list pending repos error",
+			runID:               sampleBatchRunID.String(),
+			mockRun:             queuedBatchRun,
+			mockAllRepos:        []store.RunRepo{pendingRepo1},
+			mockPendingReposErr: pgx.ErrTxClosed,
+			wantStatus:          http.StatusInternalServerError,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := &mockStore{
+				getRunResult:                   tc.mockRun,
+				getRunErr:                      tc.mockRunErr,
+				listRunReposByRunResult:        tc.mockAllRepos,
+				listRunReposByRunErr:           tc.mockAllReposErr,
+				listPendingRunReposByRunResult: tc.mockPendingRepos,
+				listPendingRunReposByRunErr:    tc.mockPendingReposErr,
+				createRunResult:                tc.mockChildRun,
+				createRunErr:                   tc.mockCreateRunErr,
+				createJobErr:                   tc.mockCreateJobErr,
+				setRunRepoExecutionRunErr:      tc.mockSetExecRunErr,
+			}
+
+			handler := startRunHandler(m)
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+tc.runID+"/start", nil)
+			req.SetPathValue("id", tc.runID)
+			w := httptest.NewRecorder()
+
+			handler(w, req)
+
+			if w.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d; body: %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+
+			// For successful responses, verify response body.
+			if tc.wantStatus == http.StatusOK {
+				var resp StartRunResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("decode response: %v", err)
+				}
+				if resp.Started != tc.wantStarted {
+					t.Errorf("started = %d, want %d", resp.Started, tc.wantStarted)
+				}
+				if resp.AlreadyDone != tc.wantAlreadyDone {
+					t.Errorf("already_done = %d, want %d", resp.AlreadyDone, tc.wantAlreadyDone)
+				}
+				if resp.Pending != tc.wantPending {
+					t.Errorf("pending = %d, want %d", resp.Pending, tc.wantPending)
+				}
+			}
+
+			// Verify child runs were created.
+			if tc.wantChildRunsCreated > 0 {
+				if !m.createRunCalled {
+					t.Error("expected CreateRun to be called")
+				}
+			}
+
+			// Verify SetRunRepoExecutionRun was called.
+			if tc.wantSetExecRunCalled && !m.setRunRepoExecutionRunCalled {
+				t.Error("expected SetRunRepoExecutionRun to be called")
+			}
+
+			// Verify AckRunStart was called for batch transition.
+			if tc.wantAckRunStartCalled && !m.ackRunStartCalled {
+				t.Error("expected AckRunStart to be called")
+			}
+		})
+	}
+}
+
+// TestMaybeUpdateRunRepoFromExecution verifies the completion callback updates RunRepo status.
+func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
+	t.Parallel()
+
+	sampleRunRepoID := uuid.New()
+	sampleBatchRunID := uuid.New()
+	sampleExecutionRunID := uuid.New()
+
+	linkedRunRepo := store.RunRepo{
+		ID:             pgtype.UUID{Bytes: sampleRunRepoID, Valid: true},
+		RunID:          pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ExecutionRunID: pgtype.UUID{Bytes: sampleExecutionRunID, Valid: true},
+		RepoUrl:        "https://github.com/example/repo.git",
+		Status:         store.RunRepoStatusRunning,
+		Attempt:        1,
+		CreatedAt:      pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+
+	tests := []struct {
+		name             string
+		runStatus        store.RunStatus
+		mockRunRepo      store.RunRepo
+		mockRunRepoErr   error
+		mockUpdateErr    error
+		wantRepoStatus   store.RunRepoStatus
+		wantUpdateCalled bool
+		wantErr          bool
+	}{
+		{
+			name:             "succeeded execution updates repo to succeeded",
+			runStatus:        store.RunStatusSucceeded,
+			mockRunRepo:      linkedRunRepo,
+			wantRepoStatus:   store.RunRepoStatusSucceeded,
+			wantUpdateCalled: true,
+		},
+		{
+			name:             "failed execution updates repo to failed",
+			runStatus:        store.RunStatusFailed,
+			mockRunRepo:      linkedRunRepo,
+			wantRepoStatus:   store.RunRepoStatusFailed,
+			wantUpdateCalled: true,
+		},
+		{
+			name:             "canceled execution updates repo to cancelled",
+			runStatus:        store.RunStatusCanceled,
+			mockRunRepo:      linkedRunRepo,
+			wantRepoStatus:   store.RunRepoStatusCancelled,
+			wantUpdateCalled: true,
+		},
+		{
+			name:             "standalone run (no linked run_repo) — no update",
+			runStatus:        store.RunStatusSucceeded,
+			mockRunRepoErr:   pgx.ErrNoRows,
+			wantUpdateCalled: false,
+			wantErr:          false, // Not an error — expected for standalone runs.
+		},
+		{
+			name:             "lookup error propagates",
+			runStatus:        store.RunStatusSucceeded,
+			mockRunRepoErr:   pgx.ErrTxClosed,
+			wantUpdateCalled: false,
+			wantErr:          true,
+		},
+		{
+			name:             "update error propagates",
+			runStatus:        store.RunStatusSucceeded,
+			mockRunRepo:      linkedRunRepo,
+			mockUpdateErr:    pgx.ErrTxClosed,
+			wantRepoStatus:   store.RunRepoStatusSucceeded, // We still try to update to succeeded.
+			wantUpdateCalled: true,
+			wantErr:          true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := &mockStore{
+				getRunRepoByExecutionRunResult: tc.mockRunRepo,
+				getRunRepoByExecutionRunErr:    tc.mockRunRepoErr,
+				updateRunRepoStatusErr:         tc.mockUpdateErr,
+			}
+
+			execRunID := pgtype.UUID{Bytes: sampleExecutionRunID, Valid: true}
+			err := maybeUpdateRunRepoFromExecution(context.Background(), m, execRunID, tc.runStatus)
+
+			if tc.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+			if tc.wantUpdateCalled {
+				if !m.updateRunRepoStatusCalled {
+					t.Error("expected UpdateRunRepoStatus to be called")
+				} else if len(m.updateRunRepoStatusParams) > 0 {
+					updatedStatus := m.updateRunRepoStatusParams[0].Status
+					if updatedStatus != tc.wantRepoStatus {
+						t.Errorf("updated status = %s, want %s", updatedStatus, tc.wantRepoStatus)
+					}
+				}
+			} else if m.updateRunRepoStatusCalled {
+				t.Error("expected UpdateRunRepoStatus NOT to be called")
+			}
+		})
+	}
+}

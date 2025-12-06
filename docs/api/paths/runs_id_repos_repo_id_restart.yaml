@@ -1,0 +1,69 @@
+post:
+  tags: [Control]
+  summary: Restart a repo within a batch run
+  description: |
+    Restart execution for a single repo within a batch run. The handler resets
+    the repo's status to `pending`, increments the attempt counter, and clears
+    timing fields. Optionally, callers may supply new `base_ref` and/or
+    `target_ref` values in the request body to update the tracked refs for the
+    repo before the next attempt.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Repo entry ID (UUID) within the batch.
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            base_ref:
+              type: string
+              description: Optional new base ref to assign to the repo.
+            target_ref:
+              type: string
+              description: Optional new target ref to assign to the repo.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunRepo'
+    '400':
+      description: Bad request (invalid IDs or request body)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run or repo not found, or repo does not belong to the run
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict (run is terminal or repo is not in a terminal state)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

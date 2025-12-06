@@ -1,0 +1,110 @@
+get:
+  tags: [Control]
+  summary: List repos for a batch run
+  description: |
+    Return the list of repositories associated with a batch run identified
+    by its run ID. Each entry represents a single repo within the batch and
+    exposes refs, status, attempt count, and timing fields.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              repos:
+                type: array
+                items:
+                  $ref: '../components/schemas/controlplane.yaml#/RunRepo'
+            required: [repos]
+    '400':
+      description: Bad request (invalid run ID)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+
+post:
+  tags: [Control]
+  summary: Add a repo to a batch run
+  description: |
+    Attach a new repository to an existing batch run. Creates a `run_repos`
+    entry with `status=pending` that will be picked up by the batch scheduler.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            repo_url:
+              type: string
+              description: Git repository URL (https, ssh, or file).
+            base_ref:
+              type: string
+              description: Git ref used as the base for comparisons (e.g., main).
+            target_ref:
+              type: string
+              description: Git ref representing the target branch for the run.
+          required: [repo_url, base_ref, target_ref]
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunRepo'
+    '400':
+      description: Bad request (invalid run ID or request body)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict (run is already in a terminal state)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+
