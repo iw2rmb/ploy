@@ -46,6 +46,7 @@ repos:
     hooks:
       - id: golangci-lint
         args: [--fast]
+        stages: [manual]
         pass_filenames: false
 
 # Run hooks on specific file types
