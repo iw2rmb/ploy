@@ -8,19 +8,20 @@ import (
 	"io"
 	"net/url"
 	"strings"
-	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
 
-// Format controls job log rendering.
-type Format string
+// Format controls job log rendering. Re-exported from internal/cli/logs
+// for backward compatibility with existing callers.
+type Format = logs.Format
 
 const (
-	// FormatStructured prints timestamp, stream, and line.
-	FormatStructured Format = "structured"
-	// FormatRaw prints only the log line.
-	FormatRaw Format = "raw"
+	// FormatStructured includes timestamp, stream labels, and execution context.
+	FormatStructured Format = logs.FormatStructured
+	// FormatRaw prints log lines as-is (message only).
+	FormatRaw Format = logs.FormatRaw
 )
 
 // ErrInvalidFormat signals an unsupported format.
@@ -60,28 +61,30 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		return fmt.Errorf("jobs: build endpoint: %w", err)
 	}
 
-	var retention *retentionEvent
+	// Use the shared log printer for consistent formatting across CLI commands.
+	printer := logs.NewPrinter(format, writer)
+
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
 		case "", "log":
 			if len(evt.Data) == 0 {
 				return nil
 			}
-			var payload logEvent
+			// Decode into the shared LogRecord type which supports enriched fields.
+			var payload logs.LogRecord
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
 				return fmt.Errorf("jobs: decode log event: %w", err)
 			}
-			printLog(writer, format, payload)
+			printer.PrintLog(payload)
 		case "retention":
 			if len(evt.Data) == 0 {
 				return nil
 			}
-			var hint retentionEvent
+			var hint logs.RetentionHint
 			if err := json.Unmarshal(evt.Data, &hint); err != nil {
 				return fmt.Errorf("jobs: decode retention event: %w", err)
 			}
-			tmp := hint
-			retention = &tmp
+			printer.RecordRetention(hint)
 		case "done", "complete", "completed":
 			return stream.ErrDone
 		default:
@@ -93,58 +96,6 @@ func (c FollowCommand) Run(ctx context.Context) error {
 	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
 		return err
 	}
-	printRetentionSummary(writer, retention)
+	printer.PrintRetentionSummary()
 	return nil
-}
-
-type logEvent struct {
-	Timestamp string `json:"timestamp"`
-	Stream    string `json:"stream"`
-	Line      string `json:"line"`
-}
-
-type retentionEvent struct {
-	Retained bool   `json:"retained"`
-	TTL      string `json:"ttl"`
-	Expires  string `json:"expires_at"`
-	Bundle   string `json:"bundle_cid"`
-}
-
-func printLog(w io.Writer, format Format, evt logEvent) {
-	line := strings.TrimRight(evt.Line, "\r\n")
-	switch format {
-	case FormatRaw:
-		_, _ = fmt.Fprintf(w, "%s\n", line)
-	default:
-		timestamp := strings.TrimSpace(evt.Timestamp)
-		if timestamp == "" {
-			timestamp = time.Now().UTC().Format(time.RFC3339)
-		}
-		streamName := strings.TrimSpace(evt.Stream)
-		if streamName == "" {
-			streamName = "stdout"
-		}
-		_, _ = fmt.Fprintf(w, "%s %s %s\n", timestamp, streamName, line)
-	}
-}
-
-func printRetentionSummary(w io.Writer, evt *retentionEvent) {
-	if evt == nil {
-		return
-	}
-	ret := *evt
-	ttl := strings.TrimSpace(ret.TTL)
-	expires := strings.TrimSpace(ret.Expires)
-	bundle := strings.TrimSpace(ret.Bundle)
-
-	switch {
-	case ret.Retained && ttl != "" && expires != "":
-		_, _ = fmt.Fprintf(w, "Retention: retained ttl=%s expires=%s cid=%s\n", ttl, expires, bundle)
-	case ret.Retained && ttl != "":
-		_, _ = fmt.Fprintf(w, "Retention: retained ttl=%s cid=%s\n", ttl, bundle)
-	case ret.Retained:
-		_, _ = fmt.Fprintf(w, "Retention: retained cid=%s\n", bundle)
-	default:
-		_, _ = fmt.Fprintln(w, "Retention: not retained (bundle expires per default policy)")
-	}
 }
