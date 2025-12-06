@@ -22,7 +22,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `internal/server/events/service_test.go` and `internal/server/handlers/handlers_events_http_test.go` to assert that SSE `event: log` frames include expected `node_id` and `mod_type` JSON fields for known jobs.
 
 ## CLI consumers
-- [ ] Introduce a shared CLI log printer — ensure Mods and Runs commands print logs using the same formatting rules.
+- [x] Introduce a shared CLI log printer — ensure Mods and Runs commands print logs using the same formatting rules.
   - Repository: ploy
   - Component: internal/cli/mods, internal/cli/runs
   - Scope: Extract a common printer (e.g., `internal/cli/logs` or shared helper) that consumes the enriched log JSON (including node_id/mod_type) and implements `structured`/`raw` formats; refactor `internal/cli/mods/logs.go` and `internal/cli/runs/follow.go` to delegate to it.
