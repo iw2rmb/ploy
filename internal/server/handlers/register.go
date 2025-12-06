@@ -57,6 +57,10 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("DELETE /v1/runs/{id}/repos/{repo_id}", deleteRunRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
 
+	// Repos — repo-centric view: list repos and show runs for a given repo.
+	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/repos/{repo_id}/runs", listRunsForRepoHandler(st), auth.RoleControlPlane)
+
 	// Runs (control plane) — legacy write/management endpoints
 	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)

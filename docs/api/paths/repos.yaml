@@ -1,0 +1,36 @@
+get:
+  summary: List known repositories
+  description: |
+    Returns a list of distinct repository URLs that have been used in batch runs,
+    along with the last run timestamp and status for each. This provides a repo-centric
+    view to complement run-centric navigation.
+  operationId: listRepos
+  tags:
+    - Control
+  security:
+    - mtls: []
+  parameters:
+    - name: contains
+      in: query
+      required: false
+      description: Substring filter for repo_url (e.g., "org/project" to match URLs containing that path)
+      schema:
+        type: string
+  responses:
+    '200':
+      description: List of repositories with last run metadata
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              repos:
+                type: array
+                items:
+                  $ref: '../components/schemas/controlplane.yaml#/RepoSummary'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

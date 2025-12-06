@@ -111,6 +111,11 @@ paths:
     $ref: './paths/runs_id_repos_repo_id.yaml'
   /v1/runs/{id}/repos/{repo_id}/restart:
     $ref: './paths/runs_id_repos_repo_id_restart.yaml'
+  # Repo-centric endpoints — list repos and show runs for a given repo
+  /v1/repos:
+    $ref: './paths/repos.yaml'
+  /v1/repos/{repo_id}/runs:
+    $ref: './paths/repos_repo_id_runs.yaml'
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
     $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
@@ -200,6 +205,11 @@ components:
       $ref: './components/schemas/controlplane.yaml#/BuildGateJobCompleteRequest'
     NodeBuildGateClaimResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeBuildGateClaimResponse'
+    # Repo-centric API types
+    RepoSummary:
+      $ref: './components/schemas/controlplane.yaml#/RepoSummary'
+    RepoRunSummary:
+      $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed

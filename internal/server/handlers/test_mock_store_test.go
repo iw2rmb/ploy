@@ -324,6 +324,18 @@ type mockStore struct {
 	clearRunRepoExecutionRunCalled bool
 	clearRunRepoExecutionRunParam  pgtype.UUID
 	clearRunRepoExecutionRunErr    error
+
+	// ListDistinctRepos tracking (for repo-centric handlers)
+	listDistinctReposCalled bool
+	listDistinctReposParam  string
+	listDistinctReposResult []store.ListDistinctReposRow
+	listDistinctReposErr    error
+
+	// ListRunsForRepo tracking
+	listRunsForRepoCalled bool
+	listRunsForRepoParams store.ListRunsForRepoParams
+	listRunsForRepoResult []store.ListRunsForRepoRow
+	listRunsForRepoErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -776,4 +788,18 @@ func (m *mockStore) ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID
 	m.clearRunRepoExecutionRunCalled = true
 	m.clearRunRepoExecutionRunParam = id
 	return m.clearRunRepoExecutionRunErr
+}
+
+// ListDistinctRepos returns distinct repos with optional substring filter.
+func (m *mockStore) ListDistinctRepos(ctx context.Context, filter string) ([]store.ListDistinctReposRow, error) {
+	m.listDistinctReposCalled = true
+	m.listDistinctReposParam = filter
+	return m.listDistinctReposResult, m.listDistinctReposErr
+}
+
+// ListRunsForRepo returns runs for a specific repository URL.
+func (m *mockStore) ListRunsForRepo(ctx context.Context, arg store.ListRunsForRepoParams) ([]store.ListRunsForRepoRow, error) {
+	m.listRunsForRepoCalled = true
+	m.listRunsForRepoParams = arg
+	return m.listRunsForRepoResult, m.listRunsForRepoErr
 }

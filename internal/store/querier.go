@@ -108,6 +108,10 @@ type Querier interface {
 	// Returns diffs for a run ordered by job step_index, then by created_at.
 	// Joins with jobs to get ordering from job's step_index.
 	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
+	// Lists distinct repository URLs from run_repos with optional substring filter.
+	// Returns repo_url along with the most recent run timestamp and status for each repo.
+	// Used by GET /v1/repos to provide a repo-centric view of batch activity.
+	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
@@ -131,6 +135,10 @@ type Querier interface {
 	// Lists all repos associated with a run (batch), ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
+	// Lists all runs (via run_repos) for a given repository URL.
+	// Returns run details joined with run_repo status and timing for repo-centric view.
+	// Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
