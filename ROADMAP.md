@@ -196,7 +196,7 @@ Legend: [ ] todo, [x] done.
     - Example YAML: `RunBatchSummary: { type: object, properties: { id: {type: string, format: uuid}, name: {type: string}, status: { $ref: '#/components/schemas/RunStatus' }, counts: { $ref: '#/components/schemas/RunRepoCounts' } } }`.
   - Tests: Run `go test ./docs/api/...` (including `docs/api/verify_openapi_test.go`) to validate schema references and path registration.
 
-- [ ] Add repo-centric API endpoints — list repos and show runs for a given repo.
+- [x] Add repo-centric API endpoints — list repos and show runs for a given repo.
   - Repository: ploy
   - Component: internal/server/handlers, internal/store, docs/api
   - Scope:
