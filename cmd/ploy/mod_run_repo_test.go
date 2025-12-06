@@ -362,3 +362,185 @@ func TestModRunRepoAddServerError(t *testing.T) {
 		t.Errorf("expected error mentioning 404 or not found, got: %v", err)
 	}
 }
+
+// =========================================================================
+// Focused batch run workflow CLI tests (ROADMAP.md line 267):
+// Verifies that CLI subcommands validate arguments and call correct endpoints.
+// =========================================================================
+
+// TestModRunRepoRemoveServerError verifies error handling when remove fails.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoRemoveServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456" {
+			http.Error(w, "repo not found", http.StatusNotFound)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{
+		"mod", "run", "repo", "remove",
+		"--repo-id", "repo-uuid-456",
+		"batch-uuid-123",
+	}, buf)
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+	if !strings.Contains(err.Error(), "404") && !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected error mentioning 404 or not found, got: %v", err)
+	}
+}
+
+// TestModRunRepoRestartServerError verifies error handling when restart fails.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoRestartServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+			// Conflict: cannot restart a non-terminal repo.
+			http.Error(w, "can only restart repos in terminal state", http.StatusConflict)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{
+		"mod", "run", "repo", "restart",
+		"--repo-id", "repo-uuid-456",
+		"batch-uuid-123",
+	}, buf)
+	if err == nil {
+		t.Fatal("expected error for 409 response")
+	}
+	if !strings.Contains(err.Error(), "409") && !strings.Contains(err.Error(), "terminal") {
+		t.Errorf("expected error mentioning 409 or terminal, got: %v", err)
+	}
+}
+
+// TestModRunRepoStatusServerError verifies error handling when status query fails.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoStatusServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/unknown-batch/repos" {
+			http.Error(w, "run not found", http.StatusNotFound)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{"mod", "run", "repo", "status", "unknown-batch"}, buf)
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+	if !strings.Contains(err.Error(), "404") && !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected error mentioning 404 or not found, got: %v", err)
+	}
+}
+
+// TestModRunRepoRestartWithBaseRef verifies restart sends optional base-ref.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoRestartWithBaseRef(t *testing.T) {
+	var receivedBody map[string]*string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			resp := runRepoResponse{
+				ID:        "repo-uuid-456",
+				RunID:     "batch-uuid-123",
+				RepoURL:   "https://github.com/org/repo.git",
+				BaseRef:   "main-v2",
+				TargetRef: "feature-branch",
+				Status:    "pending",
+				Attempt:   2,
+				CreatedAt: time.Now(),
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{
+		"mod", "run", "repo", "restart",
+		"--repo-id", "repo-uuid-456",
+		"--base-ref", "main-v2",
+		"batch-uuid-123",
+	}, buf)
+	if err != nil {
+		t.Fatalf("mod run repo restart error: %v", err)
+	}
+
+	// Verify base-ref was sent in request body.
+	if receivedBody["base_ref"] == nil || *receivedBody["base_ref"] != "main-v2" {
+		t.Errorf("expected base_ref=main-v2 in request body, got %v", receivedBody)
+	}
+}
+
+// TestModRunRepoRestartWithBothRefs verifies restart sends both base and target refs.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoRestartWithBothRefs(t *testing.T) {
+	var receivedBody map[string]*string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			resp := runRepoResponse{
+				ID:        "repo-uuid-456",
+				RunID:     "batch-uuid-123",
+				RepoURL:   "https://github.com/org/repo.git",
+				BaseRef:   "main-v2",
+				TargetRef: "feature-v2",
+				Status:    "pending",
+				Attempt:   2,
+				CreatedAt: time.Now(),
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{
+		"mod", "run", "repo", "restart",
+		"--repo-id", "repo-uuid-456",
+		"--base-ref", "main-v2",
+		"--target-ref", "feature-v2",
+		"batch-uuid-123",
+	}, buf)
+	if err != nil {
+		t.Fatalf("mod run repo restart error: %v", err)
+	}
+
+	// Verify both refs were sent in request body.
+	if receivedBody["base_ref"] == nil || *receivedBody["base_ref"] != "main-v2" {
+		t.Errorf("expected base_ref=main-v2 in request body, got %v", receivedBody)
+	}
+	if receivedBody["target_ref"] == nil || *receivedBody["target_ref"] != "feature-v2" {
+		t.Errorf("expected target_ref=feature-v2 in request body, got %v", receivedBody)
+	}
+}
