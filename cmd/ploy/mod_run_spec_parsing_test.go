@@ -32,7 +32,7 @@ mr_on_success: true
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -121,7 +121,7 @@ mod:
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload: %v", err)
 	}
@@ -152,7 +152,7 @@ mod:
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
-	payload, err := buildSpecPayload(specPath, nil, "", false, `["echo","cli"]`, "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, `["echo","cli"]`, "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload: %v", err)
 	}
@@ -174,7 +174,7 @@ mod:
 // when attempting to read a non-existent spec file.
 func TestBuildSpecPayloadInvalidFile(t *testing.T) {
 	// Non-existent file should error
-	_, err := buildSpecPayload("/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false, false)
+	_, err := buildSpecPayload("/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Errorf("expected error for non-existent file")
 	}
@@ -190,7 +190,7 @@ func TestBuildSpecPayloadInvalidFormat(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Errorf("expected error for invalid YAML/JSON")
 	}
@@ -208,7 +208,6 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 		`["/bin/sh", "-c", "echo test"]`,
 		"",
 		"",
-		false,
 		false,
 		false,
 	)
@@ -247,7 +246,6 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 		"",
 		false,
 		false,
-		false,
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -284,7 +282,7 @@ build_gate_healing:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -357,7 +355,7 @@ build_gate_healing:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -448,7 +446,7 @@ mods:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -513,7 +511,6 @@ mod:
 		"",
 		"",
 		"",
-		false,
 		false,
 		false,
 	)
@@ -592,7 +589,6 @@ mods:
 		"",
 		"",
 		"",
-		false,
 		false,
 		false,
 	)

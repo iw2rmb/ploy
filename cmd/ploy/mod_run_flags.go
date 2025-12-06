@@ -64,9 +64,6 @@ type modRunFlags struct {
 	GitLabDomain *string
 	MRSuccess    *bool
 	MRFail       *bool
-
-	// Deprecated flags
-	HealOnBuild *bool
 }
 
 // parseModRunFlags creates a FlagSet, defines all mod run flags, and parses the provided arguments.
@@ -111,9 +108,6 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	flags.MRSuccess = fs.Bool("mr-success", false, "Create a merge request on success")
 	flags.MRFail = fs.Bool("mr-fail", false, "Create a merge request on failure")
 
-	// Deprecated flags
-	flags.HealOnBuild = fs.Bool("heal-on-build", false, "DEPRECATED: inject default build_gate_healing (use --spec with build_gate_healing instead)")
-
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
@@ -123,5 +117,5 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 
 // printModRunUsage writes usage information for the mod run command to the provided writer.
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--heal-on-build (deprecated)] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }

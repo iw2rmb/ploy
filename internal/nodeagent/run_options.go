@@ -61,32 +61,13 @@ type BuildGateOptions struct {
 
 // HealingConfig describes the heal → re-gate loop configuration.
 // When the build gate fails, the agent can execute one or more healing mods
-// to fix the workspace, then re-run the gate. This struct specifies the
-// retry limit and the healing mods to execute.
-//
-// HealingConfig supports two schema forms for backward compatibility:
-//
-//  1. Single-strategy (legacy): A flat `mods` list that is internally converted
-//     to a single unnamed strategy. This preserves existing behavior.
-//
-//  2. Multi-strategy (branching): A `strategies` array where each strategy is
-//     a named branch with its own mods[] list. Strategies can be executed in
-//     parallel by the control plane, with the first passing re-gate winning.
-//
-// When `strategies` is present, it takes precedence over `mods`. If only `mods`
-// is present, it is normalized into a single-element Strategies slice.
+// grouped into named strategies (branches), then re-run the gate. This struct
+// specifies the retry limit and the healing strategies to execute.
 type HealingConfig struct {
 	// Retries is the maximum number of healing attempts (default: 1).
 	// Each retry executes all healing mods in sequence, then re-runs the gate.
 	// For multi-strategy configs, retries apply per-strategy.
 	Retries int
-
-	// Mods is the list of healing mod specifications to execute on gate failure.
-	// Each mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
-	//
-	// Deprecated: Prefer Strategies for new specs. Mods is retained for backward
-	// compatibility and is internally normalized to a single unnamed strategy.
-	Mods []HealingMod
 
 	// Strategies is the list of healing strategies (branches) to attempt.
 	// Each strategy has a name and its own mods[] list. Strategies can be
@@ -116,20 +97,14 @@ type HealingStrategy struct {
 }
 
 // NormalizedStrategies returns the healing strategies to use for execution.
-// If Strategies is populated, returns it directly. Otherwise, converts the
-// legacy Mods list into a single unnamed strategy for backward compatibility.
-// Returns nil if no healing configuration is present.
+// If Strategies is populated, returns it directly. Returns nil if no healing
+// configuration is present.
 func (h *HealingConfig) NormalizedStrategies() []HealingStrategy {
 	if h == nil {
 		return nil
 	}
-	// Multi-strategy form takes precedence.
 	if len(h.Strategies) > 0 {
 		return h.Strategies
-	}
-	// Normalize legacy single-strategy form to a single unnamed strategy.
-	if len(h.Mods) > 0 {
-		return []HealingStrategy{{Name: "", Mods: h.Mods}}
 	}
 	return nil
 }
@@ -303,7 +278,7 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.BuildGate.Profile = profile
 	}
 
-	// Parse healing configuration (supports both legacy mods[] and multi-strategy forms).
+	// Parse healing configuration (multi-strategy form).
 	if healingMap, ok := opts["build_gate_healing"].(map[string]any); ok {
 		healing := &HealingConfig{
 			Retries: 1, // Default to 1 retry.
@@ -316,22 +291,12 @@ func parseRunOptions(opts map[string]any) RunOptions {
 			healing.Retries = int(rf)
 		}
 
-		// Check for multi-strategy form first (strategies takes precedence over mods).
-		// This supports the new parallel healing branches schema while maintaining
-		// backward compatibility with the legacy single-strategy mods[] form.
+		// Multi-strategy form: strategies[] is the supported schema.
 		if strategiesSlice, ok := healingMap["strategies"].([]any); ok && len(strategiesSlice) > 0 {
 			for _, stratEntry := range strategiesSlice {
 				if stratMap, ok := stratEntry.(map[string]any); ok {
 					strategy := parseHealingStrategy(stratMap)
 					healing.Strategies = append(healing.Strategies, strategy)
-				}
-			}
-		} else if modsSlice, ok := healingMap["mods"].([]any); ok {
-			// Legacy single-strategy form: extract healing mods directly.
-			for _, modEntry := range modsSlice {
-				if modMap, ok := modEntry.(map[string]any); ok {
-					mod := parseHealingMod(modMap)
-					healing.Mods = append(healing.Mods, mod)
 				}
 			}
 		}

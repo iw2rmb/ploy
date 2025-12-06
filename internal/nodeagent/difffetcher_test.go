@@ -358,17 +358,6 @@ func TestExtractBranchFromJobName(t *testing.T) {
 			jobName:    "heal-static-patch-2-3",
 			wantBranch: "static-patch",
 		},
-		// Legacy single-branch healing (returns empty).
-		{
-			name:       "legacy heal job (no branch)",
-			jobName:    "heal-1-0",
-			wantBranch: "",
-		},
-		{
-			name:       "legacy re-gate job (no branch)",
-			jobName:    "re-gate-1",
-			wantBranch: "",
-		},
 		// Mainline jobs (not healing branches).
 		{
 			name:       "pre-gate job",

@@ -657,7 +657,7 @@ ploy mod run repo remove --repo-id <repo-uuid> my-batch
 
 ### Implementation references
 
-- Parent/child run creation: `internal/server/handlers/handlers_runs_batch.go`.
+- Parent/child run creation: `internal/server/handlers/runs_batch_http.go`.
 - Run repos queries: `internal/store/queries/run_repos.sql`.
 - Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
 - CLI subcommands: `cmd/ploy/mod_run_repo.go`.
@@ -807,7 +807,7 @@ All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 header to validate job ownership and attribute artifacts/diffs to the correct
 node.
 
-### 3.3 Runs endpoints (`internal/server/handlers/handlers_runs_batch.go`)
+### 3.3 Runs endpoints (`internal/server/handlers/runs_batch_http.go`)
 
 - `GET /v1/runs` — list batch runs with basic metadata (repo_url, refs, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.

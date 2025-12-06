@@ -59,14 +59,9 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		return err
 	}
 	if c.Output != nil {
-		// Prefer mods TicketSummary shape; fall back to legacy keys if present.
 		id := toString(payload["ticket_id"])
-		if id == "" {
-			id = toString(payload["id"]) // legacy fallback
-		}
-		status := toString(payload["status"]) // common in both
-		step := toString(payload["step_id"])  // may be empty
-		// Keep message format stable enough for tests while reflecting new facade.
+		status := toString(payload["status"])
+		step := toString(payload["step_id"]) // may be empty
 		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s step=%s\n", id, status, step)
 	}
 	return nil

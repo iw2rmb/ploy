@@ -79,7 +79,6 @@ func executeModRun(args []string, stderr io.Writer) error {
 		strings.TrimSpace(*flags.GitLabDomain),
 		*flags.MRSuccess,
 		*flags.MRFail,
-		*flags.HealOnBuild,
 	)
 	if err != nil {
 		return fmt.Errorf("build spec: %w", err)

@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/deploy/bootstrap"
 )
 
 // ProvisionOptions configure remote host preparation using the embedded bootstrap script.
@@ -136,7 +134,7 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 }
 
 func renderBootstrapScript(env map[string]string) string {
-	exports := bootstrap.DefaultExports()
+	exports := DefaultExports()
 	for key, value := range env {
 		key = strings.TrimSpace(key)
 		if key == "" {
@@ -145,7 +143,7 @@ func renderBootstrapScript(env map[string]string) string {
 		exports[key] = strings.TrimSpace(value)
 	}
 
-	return bootstrap.PrefixedScript(exports)
+	return PrefixedScript(exports)
 }
 
 func shellQuote(value string) string {

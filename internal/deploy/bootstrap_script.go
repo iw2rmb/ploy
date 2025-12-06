@@ -1,4 +1,4 @@
-package bootstrap
+package deploy
 
 // Minimal bootstrap script helpers used by deploy.ProvisionHost.
 // These replace the legacy bootstrap package and generate a shell
