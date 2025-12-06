@@ -216,6 +216,28 @@ dist/ploy mod run --repo-url https://github.com/example/repo.git \
 The server schedules the run, and a node claims it, clones the repository shallow, executes the build gate,
 and uploads logs/diffs/artifacts to PostgreSQL.
 
+**Batch runs:** `mod run` can also operate as a batch over multiple repositories.
+Create a named batch first, then attach repos:
+
+```bash
+# Create batch (no repos yet).
+dist/ploy mod run --spec mod.yaml --name fleet-upgrade
+
+# Attach repositories.
+dist/ploy mod run repo add fleet-upgrade \
+  --repo-url https://github.com/org/service-a.git \
+  --repo-base-ref main --repo-target-ref upgrade-deps
+
+dist/ploy mod run repo add fleet-upgrade \
+  --repo-url https://github.com/org/service-b.git \
+  --repo-base-ref main --repo-target-ref upgrade-deps
+
+# Follow all repos in the batch.
+dist/ploy runs follow fleet-upgrade
+```
+
+See `cmd/ploy/README.md` § "Batched Mod Runs" for the full command reference.
+
 ## Reuse Existing Cluster
 
 When redeploying a Ploy server to a host that already contains a cluster, the deploy command automatically detects and reuses the existing cluster CA and server identity. This enables **idempotent** deployments: running `ploy server deploy` multiple times against the same host will not clobber PKI material or cluster identity.

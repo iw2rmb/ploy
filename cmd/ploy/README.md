@@ -76,6 +76,95 @@ lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
 and the local `path`. Filenames are sanitized and deterministic; when a content
 digest is available it prefixes the name, otherwise the artifact CID is used.
 
+## Batched Mod Runs
+
+`mod run` supports two usage patterns: **single-repo runs** and **batch runs** that
+operate over multiple repositories under a shared run spec. In a batch, `ploy mod run`
+submits the spec once, then `ploy mod run repo add` attaches multiple repositories
+under the same run via `run_repos`.
+
+### Single-Repo Run (Default)
+
+A single-repo run specifies all repository parameters inline with the initial command.
+The run executes immediately against that repository:
+
+```bash
+# Single repository run — executes mods against one repo and follows logs.
+ploy mod run --spec mod.yaml \
+  --repo-url https://github.com/example/repo.git \
+  --repo-base-ref main \
+  --repo-target-ref feature-branch \
+  --follow
+```
+
+This is the most common usage for quick, ad-hoc transformations.
+
+### Batch Run (Multiple Repositories)
+
+Batch runs allow orchestrating the same mod spec across multiple repositories.
+First, create a batch run with a name but no repository; then attach repos
+incrementally:
+
+```bash
+# Step 1: Create a named batch run (no repository attached yet).
+ploy mod run --spec mod.yaml --name my-batch
+
+# Step 2: Add repositories to the batch.
+ploy mod run repo add my-batch \
+  --repo-url https://github.com/org/repo-a.git \
+  --repo-base-ref main \
+  --repo-target-ref upgrade-deps
+
+ploy mod run repo add my-batch \
+  --repo-url https://github.com/org/repo-b.git \
+  --repo-base-ref main \
+  --repo-target-ref upgrade-deps
+
+# Step 3: Optionally follow logs for the entire batch.
+ploy runs follow my-batch
+```
+
+Each attached repository creates a `run_repo` entry, and jobs execute per-repo
+according to the batch scheduler. Batch runs simplify fleet-wide updates where
+the same transformation (e.g., Java 17 upgrade) applies to many repositories.
+
+### Restart a Repo Within a Batch
+
+If a repository job fails or needs reprocessing with a different branch, use
+`mod run repo restart`:
+
+```bash
+# Restart repo-a with a hotfix branch.
+ploy mod run repo restart my-batch \
+  --repo-url https://github.com/org/repo-a.git \
+  --branch hotfix
+```
+
+This re-queues the repository under the same batch without recreating the run.
+
+### Remove a Repo From a Batch
+
+To remove a repository from an in-progress batch (e.g., if it was added by mistake):
+
+```bash
+ploy mod run repo remove my-batch \
+  --repo-url https://github.com/org/repo-a.git
+```
+
+### Batch Workflow Summary
+
+| Command                  | Description                                  |
+|--------------------------|----------------------------------------------|
+| `mod run --name <batch>` | Create a batch run (no repos yet)            |
+| `mod run repo add`       | Attach a repository to an existing batch     |
+| `mod run repo remove`    | Detach a repository from a batch             |
+| `mod run repo restart`   | Re-queue a repo job with optional new branch |
+| `runs follow <batch>`    | Follow logs for all repos in a batch         |
+
+See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
+
+---
+
 `mod resume` requests resumption of a failed or canceled Mods ticket via the
 control plane `POST /v1/mods/{id}/resume` endpoint. This enables continuation
 of previously interrupted workflows without resubmitting the entire spec.

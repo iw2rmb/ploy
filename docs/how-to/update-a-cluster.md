@@ -244,6 +244,27 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
 ./dist/ploy runs follow <run-id>
 ```
 
+- **Batch run verification**: Test batch workflows to confirm multi-repo scheduling works:
+
+```bash
+# Create a batch (no repos yet).
+./dist/ploy mod run --spec mod.yaml --name post-update-test
+
+# Add a repo and restart it with a different branch to test the restart flow.
+./dist/ploy mod run repo add post-update-test \
+  --repo-url https://github.com/example/repo.git \
+  --repo-base-ref main --repo-target-ref feature/verify-batch
+
+./dist/ploy mod run repo restart post-update-test \
+  --repo-url https://github.com/example/repo.git \
+  --branch hotfix
+
+# Follow batch logs.
+./dist/ploy runs follow post-update-test
+```
+
+See `cmd/ploy/README.md` § "Batched Mod Runs" for full batch command reference.
+
 ## Rollback Tips
 
 - Keep a backup of the previous binaries on each host (e.g., `/usr/local/bin/ployd.prev`, `/usr/local/bin/ployd-node.prev`).
