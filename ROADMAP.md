@@ -7,7 +7,7 @@ Documentation: docs/mods-lifecycle.md, cmd/ploy/README.md, docs/how-to/deploy-a-
 Legend: [ ] todo, [x] done.
 
 ## Data model and types
-- [ ] Introduce RunRepo schema for batched runs — reuse `runs` as batch metadata and move per-repo execution state into a separate table.
+- [x] Introduce RunRepo schema for batched runs — reuse `runs` as batch metadata and move per-repo execution state into a separate table.
   - Repository: ploy
   - Component: internal/store
   - Scope: Extend `internal/store/schema.sql` with:

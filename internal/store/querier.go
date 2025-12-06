@@ -27,6 +27,9 @@ type Querier interface {
 	CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error)
 	// Counts jobs for a run with a specific status.
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
+	// Aggregates run_repos counts by status for a given run.
+	// Used to derive batch-level status (e.g., all succeeded = batch succeeded).
+	CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) ([]CountRunReposByStatusRow, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
 	// Creates a new diff entry associated with a job.
@@ -37,6 +40,9 @@ type Querier interface {
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
+	// Creates a new run_repo entry for batched runs.
+	// Each run_repo represents one repository within a batch (parent run).
+	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
@@ -54,6 +60,7 @@ type Querier interface {
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
+	DeleteRunRepo(ctx context.Context, id pgtype.UUID) error
 	// Get the step_index of a job and the next job's step_index for healing insertion.
 	// Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
 	GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (GetAdjacentJobIndicesRow, error)
@@ -66,7 +73,11 @@ type Querier interface {
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
+	GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
+	// Increments the attempt counter and resets status to 'pending' for retry.
+	// Clears timing fields to prepare for a fresh execution attempt.
+	IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error)
@@ -102,6 +113,8 @@ type Querier interface {
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
+	// Lists all repos associated with a run (batch), ordered by creation time.
+	ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
@@ -120,6 +133,12 @@ type Querier interface {
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
+	// Updates a run_repo's last_error field (e.g., on failure).
+	UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error
+	// Updates a run_repo's status along with timing fields.
+	// started_at is set when transitioning to 'running'.
+	// finished_at is set when transitioning to a terminal status.
+	UpdateRunRepoStatus(ctx context.Context, arg UpdateRunRepoStatusParams) error
 	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
 	UpdateRunResume(ctx context.Context, id pgtype.UUID) error

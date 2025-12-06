@@ -104,6 +104,52 @@ func (ns NullJobStatus) Value() (driver.Value, error) {
 	return string(ns.JobStatus), nil
 }
 
+type RunRepoStatus string
+
+const (
+	RunRepoStatusPending   RunRepoStatus = "pending"
+	RunRepoStatusRunning   RunRepoStatus = "running"
+	RunRepoStatusSucceeded RunRepoStatus = "succeeded"
+	RunRepoStatusFailed    RunRepoStatus = "failed"
+	RunRepoStatusSkipped   RunRepoStatus = "skipped"
+	RunRepoStatusCancelled RunRepoStatus = "cancelled"
+)
+
+func (e *RunRepoStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RunRepoStatus(s)
+	case string:
+		*e = RunRepoStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRunRepoStatus struct {
+	RunRepoStatus RunRepoStatus `json:"run_repo_status"`
+	Valid         bool          `json:"valid"` // Valid is true if RunRepoStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRunRepoStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RunRepoStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RunRepoStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRunRepoStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RunRepoStatus), nil
+}
+
 type RunStatus string
 
 const (
@@ -308,6 +354,20 @@ type Run struct {
 	TargetRef  string             `json:"target_ref"`
 	CommitSha  *string            `json:"commit_sha"`
 	Stats      []byte             `json:"stats"`
+}
+
+type RunRepo struct {
+	ID         pgtype.UUID        `json:"id"`
+	RunID      pgtype.UUID        `json:"run_id"`
+	RepoUrl    string             `json:"repo_url"`
+	BaseRef    string             `json:"base_ref"`
+	TargetRef  string             `json:"target_ref"`
+	Status     RunRepoStatus      `json:"status"`
+	Attempt    int32              `json:"attempt"`
+	LastError  *string            `json:"last_error"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 }
 
 type RunsTiming struct {

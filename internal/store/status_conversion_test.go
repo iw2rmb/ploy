@@ -215,3 +215,88 @@ func TestValidateBuildgateJobStatus(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRunRepoStatus verifies that ValidateRunRepoStatus correctly validates
+// canonical store.RunRepoStatus values for per-repo execution state in batched runs.
+func TestValidateRunRepoStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    RunRepoStatus
+		wantErr bool
+	}{
+		{name: "pending", input: "pending", want: RunRepoStatusPending, wantErr: false},
+		{name: "running", input: "running", want: RunRepoStatusRunning, wantErr: false},
+		{name: "succeeded", input: "succeeded", want: RunRepoStatusSucceeded, wantErr: false},
+		{name: "failed", input: "failed", want: RunRepoStatusFailed, wantErr: false},
+		{name: "skipped", input: "skipped", want: RunRepoStatusSkipped, wantErr: false},
+		{name: "cancelled", input: "cancelled", want: RunRepoStatusCancelled, wantErr: false},
+
+		// Invalid cases (non-canonical values)
+		{name: "canceled invalid", input: "canceled", want: "", wantErr: true},
+		{name: "created invalid", input: "created", want: "", wantErr: true},
+		{name: "queued invalid", input: "queued", want: "", wantErr: true},
+		{name: "unknown", input: "unknown", want: "", wantErr: true},
+		{name: "empty", input: "", want: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ValidateRunRepoStatus(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRunRepoStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ValidateRunRepoStatus(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestConvertToRunRepoStatus verifies that ConvertToRunRepoStatus correctly maps
+// various string representations to canonical store.RunRepoStatus values.
+func TestConvertToRunRepoStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    RunRepoStatus
+		wantErr bool
+	}{
+		// Direct matches
+		{name: "pending", input: "pending", want: RunRepoStatusPending, wantErr: false},
+		{name: "running", input: "running", want: RunRepoStatusRunning, wantErr: false},
+		{name: "succeeded", input: "succeeded", want: RunRepoStatusSucceeded, wantErr: false},
+		{name: "failed", input: "failed", want: RunRepoStatusFailed, wantErr: false},
+		{name: "skipped", input: "skipped", want: RunRepoStatusSkipped, wantErr: false},
+		{name: "cancelled", input: "cancelled", want: RunRepoStatusCancelled, wantErr: false},
+
+		// US spelling compatibility
+		{name: "canceled (US)", input: "canceled", want: RunRepoStatusCancelled, wantErr: false},
+
+		// Error cases
+		{name: "unknown", input: "unknown", want: "", wantErr: true},
+		{name: "empty", input: "", want: "", wantErr: true},
+		{name: "created", input: "created", want: "", wantErr: true},
+		{name: "queued", input: "queued", want: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ConvertToRunRepoStatus(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ConvertToRunRepoStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ConvertToRunRepoStatus(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
