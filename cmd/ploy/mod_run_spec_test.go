@@ -36,7 +36,6 @@ gitlab_domain: gitlab.com
 		"gitlab.example.com", // override domain
 		true,                 // mr_success
 		false,                // mr_fail
-		false,                // healOnBuild
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -102,7 +101,6 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 		"",
 		false,
 		false,
-		false,
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -131,7 +129,7 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 // no spec file or CLI overrides are provided (empty payload case).
 func TestBuildSpecPayloadEmpty(t *testing.T) {
 	// No spec file and no CLI overrides
-	payload, err := buildSpecPayload("", nil, "", false, "", "", "", false, false, false)
+	payload, err := buildSpecPayload("", nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -141,140 +139,8 @@ func TestBuildSpecPayloadEmpty(t *testing.T) {
 	}
 }
 
-// TestBuildSpecPayloadHealOnBuildInjectsDefault verifies that when --heal-on-build
-// is passed and no build_gate_healing exists in the spec, a default structure is injected.
-func TestBuildSpecPayloadHealOnBuildInjectsDefault(t *testing.T) {
-	// Test that --heal-on-build injects default build_gate_healing when absent
-	payload, err := buildSpecPayload(
-		"",    // no spec file
-		nil,   // no env
-		"",    // no image
-		false, // no retain
-		"",    // no command
-		"",    // no gitlab_pat
-		"",    // no gitlab_domain
-		false, // no mr_success
-		false, // no mr_fail
-		true,  // healOnBuild=true
-	)
-	if err != nil {
-		t.Fatalf("buildSpecPayload error: %v", err)
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(payload, &result); err != nil {
-		t.Fatalf("unmarshal payload: %v", err)
-	}
-
-	// Verify build_gate_healing was injected
-	healing, ok := result["build_gate_healing"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected build_gate_healing in payload when healOnBuild=true")
-	}
-
-	// Verify default retries
-	if retries, ok := healing["retries"].(float64); !ok || retries != 1 {
-		t.Errorf("expected build_gate_healing.retries=1, got %v", healing["retries"])
-	}
-
-	// Verify default mods array (empty)
-	mods, ok := healing["mods"].([]any)
-	if !ok || len(mods) != 0 {
-		t.Errorf("expected build_gate_healing.mods to be empty array, got %v", healing["mods"])
-	}
-}
-
-// TestBuildSpecPayloadHealOnBuildPreservesExisting verifies that when --heal-on-build
-// is passed but build_gate_healing already exists in the spec, the existing value is preserved.
-func TestBuildSpecPayloadHealOnBuildPreservesExisting(t *testing.T) {
-	// Test that --heal-on-build does NOT override existing build_gate_healing from spec
-	tmpDir := t.TempDir()
-	specPath := filepath.Join(tmpDir, "test.yaml")
-	specContent := `
-build_gate_healing:
-  retries: 3
-  mods:
-    - image: docker.io/custom/healer:v1
-`
-	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
-		t.Fatalf("write spec file: %v", err)
-	}
-
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, true)
-	if err != nil {
-		t.Fatalf("buildSpecPayload error: %v", err)
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(payload, &result); err != nil {
-		t.Fatalf("unmarshal payload: %v", err)
-	}
-
-	// Verify existing build_gate_healing is preserved (not overwritten)
-	healing, ok := result["build_gate_healing"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected build_gate_healing in payload")
-	}
-
-	// Verify original retries value is preserved
-	if retries, ok := healing["retries"].(float64); !ok || retries != 3 {
-		t.Errorf("expected build_gate_healing.retries=3 (from spec), got %v", healing["retries"])
-	}
-
-	// Verify mods array from spec is preserved
-	mods, ok := healing["mods"].([]any)
-	if !ok || len(mods) != 1 {
-		t.Fatalf("expected build_gate_healing.mods array with 1 element (from spec), got %v", healing["mods"])
-	}
-}
-
-// TestBuildSpecPayloadHealOnBuildWithOtherFlags verifies that --heal-on-build
-// integrates correctly with other CLI flags (env, image, retain).
-func TestBuildSpecPayloadHealOnBuildWithOtherFlags(t *testing.T) {
-	// Test that --heal-on-build works alongside other CLI flags
-	payload, err := buildSpecPayload(
-		"",                          // no spec file
-		[]string{"KEY1=value1"},     // env
-		"docker.io/test/mod:latest", // image
-		true,                        // retain
-		"",                          // no command
-		"",                          // no gitlab_pat
-		"",                          // no gitlab_domain
-		false,                       // no mr_success
-		false,                       // no mr_fail
-		true,                        // healOnBuild=true
-	)
-	if err != nil {
-		t.Fatalf("buildSpecPayload error: %v", err)
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(payload, &result); err != nil {
-		t.Fatalf("unmarshal payload: %v", err)
-	}
-
-	// Verify build_gate_healing was injected
-	if _, ok := result["build_gate_healing"]; !ok {
-		t.Errorf("expected build_gate_healing in payload when healOnBuild=true")
-	}
-
-	// Verify other flags are still present
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected image=docker.io/test/mod:latest, got %v", result["image"])
-	}
-
-	if retain, ok := result["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
-	}
-
-	if env, ok := result["env"].(map[string]any); ok {
-		if v, ok := env["KEY1"].(string); !ok || v != "value1" {
-			t.Errorf("expected env.KEY1=value1, got %v", env["KEY1"])
-		}
-	} else {
-		t.Errorf("expected env in payload")
-	}
-}
+// heal-on-build back-compat behavior has been removed; specs must configure
+// build_gate_healing explicitly when needed.
 
 // TestBuildSpecPayloadGitLabDomainDefaulting verifies the precedence and defaulting
 // logic for gitlab_domain: CLI overrides spec; PAT presence triggers gitlab.com default.
@@ -359,7 +225,6 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 				tt.gitlabDomain,
 				false,
 				false,
-				false,
 			)
 			if err != nil {
 				t.Fatalf("buildSpecPayload error: %v", err)
@@ -420,7 +285,6 @@ env:
 		"",               // domain NOT specified - should default to gitlab.com
 		false,            // mr_on_success=false
 		true,             // mr_on_fail=true
-		false,            // no healOnBuild
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -484,7 +348,6 @@ mod:
 		`["/bin/sh","-c","echo hi"]`,                // command override (JSON array)
 		"",
 		"",
-		false,
 		false,
 		false,
 	)

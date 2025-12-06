@@ -110,7 +110,15 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 
 	// Use float64 for retries as produced by encoding/json when decoding into map[string]any.
 	req := StartRunRequest{RunID: types.RunID("t-f64"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
-		"build_gate_healing": map[string]any{"retries": float64(2), "mods": []any{map[string]any{"image": "heal:latest"}}},
+		"build_gate_healing": map[string]any{
+			"retries": float64(2),
+			"strategies": []any{
+				map[string]any{
+					"name": "default",
+					"mods": []any{map[string]any{"image": "heal:latest"}},
+				},
+			},
+		},
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
@@ -130,7 +138,7 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 
 // TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing verifies that an empty mods array
 // behaves as no-healing configuration (return pre-gate failure immediately).
-func TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing(t *testing.T) {
+func TestExecuteWithHealing_HealingConfiguredNoStrategies_NoHealing(t *testing.T) {
 	mockGate := &mockGateExecutor{executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 		return &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "java", Passed: false}}, LogsText: "fail"}, nil
 	}}
@@ -149,8 +157,8 @@ func TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-empty-mods"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
-		"build_gate_healing": map[string]any{"retries": 3, "mods": []any{}},
+	req := StartRunRequest{RunID: types.RunID("t-empty-strategies"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
+		"build_gate_healing": map[string]any{"retries": 3, "strategies": []any{}},
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 

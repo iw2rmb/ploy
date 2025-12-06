@@ -195,7 +195,6 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 		specJSON         string
 		wantRetries      int
 		wantStrategies   int
-		wantLegacyMods   int
 		wantStratNames   []string
 		wantModsPerStrat []int
 	}{
@@ -211,8 +210,7 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 				}
 			}`,
 			wantRetries:      2,
-			wantStrategies:   0, // No strategies array.
-			wantLegacyMods:   2, // Legacy mods populated.
+			wantStrategies:   0, // No strategies array; legacy mods ignored by parser.
 			wantStratNames:   nil,
 			wantModsPerStrat: nil,
 		},
@@ -240,7 +238,6 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 			}`,
 			wantRetries:      3,
 			wantStrategies:   2,
-			wantLegacyMods:   0, // Legacy mods empty when strategies present.
 			wantStratNames:   []string{"codex-ai", "static-patch"},
 			wantModsPerStrat: []int{1, 2},
 		},
@@ -262,7 +259,6 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 			}`,
 			wantRetries:      1,
 			wantStrategies:   1, // Strategies populated.
-			wantLegacyMods:   0, // Legacy mods ignored when strategies present.
 			wantStratNames:   []string{"preferred"},
 			wantModsPerStrat: []int{1},
 		},
@@ -280,7 +276,6 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 			}`,
 			wantRetries:      1,
 			wantStrategies:   1,
-			wantLegacyMods:   0,
 			wantStratNames:   []string{""}, // Empty name allowed.
 			wantModsPerStrat: []int{1},
 		},
@@ -309,10 +304,6 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 
 			if len(typedOpts.Healing.Strategies) != tc.wantStrategies {
 				t.Errorf("Strategies count: got %d, want %d", len(typedOpts.Healing.Strategies), tc.wantStrategies)
-			}
-
-			if len(typedOpts.Healing.Mods) != tc.wantLegacyMods {
-				t.Errorf("Legacy Mods count: got %d, want %d", len(typedOpts.Healing.Mods), tc.wantLegacyMods)
 			}
 
 			// Verify strategy names.
@@ -357,19 +348,6 @@ func TestHealingConfig_NormalizedStrategies(t *testing.T) {
 			wantStrategies: 0,
 		},
 		{
-			name: "legacy_mods_normalized_to_single_unnamed_strategy",
-			config: &HealingConfig{
-				Retries: 2,
-				Mods: []HealingMod{
-					{Image: contracts.ModImage{Universal: "img1:latest"}},
-					{Image: contracts.ModImage{Universal: "img2:latest"}},
-				},
-			},
-			wantStrategies: 1,
-			wantFirstName:  "", // Unnamed.
-			wantFirstMods:  2,
-		},
-		{
 			name: "multi_strategy_returned_directly",
 			config: &HealingConfig{
 				Retries: 1,
@@ -380,19 +358,6 @@ func TestHealingConfig_NormalizedStrategies(t *testing.T) {
 			},
 			wantStrategies: 2,
 			wantFirstName:  "alpha",
-			wantFirstMods:  1,
-		},
-		{
-			name: "strategies_takes_precedence_over_mods",
-			config: &HealingConfig{
-				Retries: 1,
-				Mods:    []HealingMod{{Image: contracts.ModImage{Universal: "legacy:latest"}}},
-				Strategies: []HealingStrategy{
-					{Name: "preferred", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "new:latest"}}}},
-				},
-			},
-			wantStrategies: 1,
-			wantFirstName:  "preferred",
 			wantFirstMods:  1,
 		},
 		{

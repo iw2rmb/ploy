@@ -14,44 +14,18 @@ import (
 
 // healBranchPattern matches healing job names with branch identifiers.
 // Format: heal-{branch_name}-{attempt}-{mod_index} or re-gate-{branch_name}-{attempt}
-// Examples: "heal-branch-a-1-0", "heal-codex-ai-1-0", "re-gate-branch-a-1"
-// Legacy format without branch: "heal-1-0", "re-gate-1" (returns empty branch).
+// Examples: "heal-branch-a-1-0", "heal-codex-ai-1-0", "re-gate-branch-a-1".
 var healBranchPattern = regexp.MustCompile(`^(?:heal|re-gate)-(.+?)-\d+(?:-\d+)?$`)
 
 // ExtractBranchFromJobName extracts the branch name from a healing job name.
-// Returns the branch name if the job is part of a multi-branch healing strategy,
-// or empty string for mainline jobs and legacy single-branch healing.
-//
-// Branch naming conventions:
-//   - Multi-branch: "heal-{branch_name}-{attempt}-{mod}" → branch_name
-//   - Legacy single-branch: "heal-{attempt}-{mod}" → "" (empty, considered mainline)
-//   - Non-healing jobs: "pre-gate", "mod-0", etc. → "" (mainline)
+// Returns the branch name if the job is part of a branch-local healing strategy,
+// or empty string for mainline jobs (non-healing or non-branch names).
 func ExtractBranchFromJobName(jobName string) string {
 	matches := healBranchPattern.FindStringSubmatch(jobName)
 	if len(matches) < 2 {
-		return "" // Mainline or legacy single-branch format.
+		return ""
 	}
-
-	candidate := matches[1]
-
-	// Check if candidate is purely numeric (legacy format like "heal-1-0").
-	// Legacy format uses heal-{attempt}-{mod_index}, so candidate would be just the attempt number.
-	// In multi-branch format, the candidate includes the branch name which is not purely numeric.
-	if isNumeric(candidate) {
-		return "" // Legacy single-branch format (e.g., "heal-1-0").
-	}
-
-	return candidate
-}
-
-// isNumeric checks if a string contains only digits.
-func isNumeric(s string) bool {
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return len(s) > 0
+	return matches[1]
 }
 
 // DiffFetcher fetches diffs from the control-plane server.

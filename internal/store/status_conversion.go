@@ -4,24 +4,20 @@ import (
 	"fmt"
 )
 
-// ConvertToJobStatus converts various job status string representations
-// to the canonical store.JobStatus type. This helper provides type-safe
-// conversion from external API representations (e.g., mods API StageState)
-// to the database-authoritative store.JobStatus.
+// ConvertToJobStatus converts a job status string to the canonical JobStatus.
+// Only canonical values are accepted; non-canonical aliases are rejected.
 //
 // Supported mappings:
 //   - "created" -> JobStatusCreated
 //   - "pending" -> JobStatusPending
-//   - "queued" -> JobStatusCreated (mods API compatibility)
 //   - "running" -> JobStatusRunning
 //   - "succeeded" -> JobStatusSucceeded
 //   - "failed" -> JobStatusFailed
 //   - "skipped" -> JobStatusSkipped
-//   - "canceled"/"cancelled" -> JobStatusCanceled (US/UK spelling)
-//   - "cancelling" -> JobStatusCanceled (mods API in-progress cancellation maps to final state)
+//   - "canceled" -> JobStatusCanceled
 func ConvertToJobStatus(status string) (JobStatus, error) {
 	switch status {
-	case "created", "queued":
+	case "created":
 		return JobStatusCreated, nil
 	case "pending":
 		return JobStatusPending, nil
@@ -33,30 +29,26 @@ func ConvertToJobStatus(status string) (JobStatus, error) {
 		return JobStatusFailed, nil
 	case "skipped":
 		return JobStatusSkipped, nil
-	case "canceled", "cancelled", "cancelling":
+	case "canceled":
 		return JobStatusCanceled, nil
 	default:
 		return "", fmt.Errorf("unknown job status: %q", status)
 	}
 }
 
-// ConvertToRunStatus converts various run status string representations
-// to the canonical store.RunStatus type. This helper provides type-safe
-// conversion from external API representations (e.g., mods API TicketState)
-// to the database-authoritative store.RunStatus.
+// ConvertToRunStatus converts a run status string to the canonical RunStatus.
+// Only canonical values are accepted; non-canonical aliases are rejected.
 //
 // Supported mappings:
-//   - "pending" -> RunStatusQueued (mods API compatibility)
 //   - "queued" -> RunStatusQueued
 //   - "assigned" -> RunStatusAssigned
 //   - "running" -> RunStatusRunning
 //   - "succeeded" -> RunStatusSucceeded
 //   - "failed" -> RunStatusFailed
-//   - "canceled"/"cancelled" -> RunStatusCanceled (US/UK spelling)
-//   - "cancelling" -> RunStatusCanceled (mods API in-progress cancellation maps to final state)
+//   - "canceled" -> RunStatusCanceled
 func ConvertToRunStatus(status string) (RunStatus, error) {
 	switch status {
-	case "pending", "queued":
+	case "queued":
 		return RunStatusQueued, nil
 	case "assigned":
 		return RunStatusAssigned, nil
@@ -66,7 +58,7 @@ func ConvertToRunStatus(status string) (RunStatus, error) {
 		return RunStatusSucceeded, nil
 	case "failed":
 		return RunStatusFailed, nil
-	case "canceled", "cancelled", "cancelling":
+	case "canceled":
 		return RunStatusCanceled, nil
 	default:
 		return "", fmt.Errorf("unknown run status: %q", status)
@@ -127,9 +119,7 @@ func ValidateRunRepoStatus(status string) (RunRepoStatus, error) {
 }
 
 // ConvertToRunRepoStatus converts various run repo status string representations
-// to the canonical store.RunRepoStatus type. This helper provides type-safe
-// conversion from external API representations to the database-authoritative
-// store.RunRepoStatus.
+// to the canonical RunRepoStatus type. Only canonical values are accepted.
 //
 // Supported mappings:
 //   - "pending" -> RunRepoStatusPending
@@ -138,7 +128,6 @@ func ValidateRunRepoStatus(status string) (RunRepoStatus, error) {
 //   - "failed" -> RunRepoStatusFailed
 //   - "skipped" -> RunRepoStatusSkipped
 //   - "cancelled" -> RunRepoStatusCancelled
-//   - "canceled" -> RunRepoStatusCancelled (US spelling compatibility)
 func ConvertToRunRepoStatus(status string) (RunRepoStatus, error) {
 	switch status {
 	case "pending":
@@ -151,7 +140,7 @@ func ConvertToRunRepoStatus(status string) (RunRepoStatus, error) {
 		return RunRepoStatusFailed, nil
 	case "skipped":
 		return RunRepoStatusSkipped, nil
-	case "cancelled", "canceled":
+	case "cancelled":
 		return RunRepoStatusCancelled, nil
 	default:
 		return "", fmt.Errorf("unknown run repo status: %q", status)

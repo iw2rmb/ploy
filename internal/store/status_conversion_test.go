@@ -24,10 +24,10 @@ func TestConvertToJobStatus(t *testing.T) {
 		{name: "skipped", input: "skipped", want: JobStatusSkipped, wantErr: false},
 		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
 
-		// Mods API compatibility mappings
-		{name: "queued->created", input: "queued", want: JobStatusCreated, wantErr: false},
-		{name: "cancelled (UK)", input: "cancelled", want: JobStatusCanceled, wantErr: false},
-		{name: "cancelling", input: "cancelling", want: JobStatusCanceled, wantErr: false},
+		// Non-canonical aliases should now be rejected
+		{name: "queued alias rejected", input: "queued", want: "", wantErr: true},
+		{name: "cancelled alias rejected", input: "cancelled", want: "", wantErr: true},
+		{name: "cancelling alias rejected", input: "cancelling", want: "", wantErr: true},
 
 		// Error cases
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
@@ -69,10 +69,10 @@ func TestConvertToRunStatus(t *testing.T) {
 		{name: "failed", input: "failed", want: RunStatusFailed, wantErr: false},
 		{name: "canceled", input: "canceled", want: RunStatusCanceled, wantErr: false},
 
-		// Mods API compatibility mappings
-		{name: "pending->queued", input: "pending", want: RunStatusQueued, wantErr: false},
-		{name: "cancelled (UK)", input: "cancelled", want: RunStatusCanceled, wantErr: false},
-		{name: "cancelling", input: "cancelling", want: RunStatusCanceled, wantErr: false},
+		// Non-canonical aliases should now be rejected
+		{name: "pending alias rejected", input: "pending", want: "", wantErr: true},
+		{name: "cancelled alias rejected", input: "cancelled", want: "", wantErr: true},
+		{name: "cancelling alias rejected", input: "cancelling", want: "", wantErr: true},
 
 		// Error cases
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
@@ -276,8 +276,8 @@ func TestConvertToRunRepoStatus(t *testing.T) {
 		{name: "skipped", input: "skipped", want: RunRepoStatusSkipped, wantErr: false},
 		{name: "cancelled", input: "cancelled", want: RunRepoStatusCancelled, wantErr: false},
 
-		// US spelling compatibility
-		{name: "canceled (US)", input: "canceled", want: RunRepoStatusCancelled, wantErr: false},
+		// US spelling should now be rejected
+		{name: "canceled (US) rejected", input: "canceled", want: "", wantErr: true},
 
 		// Error cases
 		{name: "unknown", input: "unknown", want: "", wantErr: true},

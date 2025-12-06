@@ -132,7 +132,6 @@ func buildSpecPayload(
 	gitlabDomain string,
 	mrSuccess bool,
 	mrFail bool,
-	healOnBuild bool,
 ) ([]byte, error) {
 	// Start with spec from file (if provided)
 	var base map[string]any
@@ -194,7 +193,7 @@ func buildSpecPayload(
 
 	// Merge CLI flag overrides (CLI flags take precedence)
 	hasOverrides := len(modEnvs) > 0 || modImage != "" || retain || modCommand != "" ||
-		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail || healOnBuild
+		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
 
 	// Only proceed if we have a spec file or CLI overrides
 	if len(base) == 0 && !hasOverrides {
@@ -316,17 +315,6 @@ func buildSpecPayload(
 	if _, hasPAT := base["gitlab_pat"]; hasPAT {
 		if _, hasDomain := base["gitlab_domain"]; !hasDomain {
 			base["gitlab_domain"] = "gitlab.com"
-		}
-	}
-
-	// DEPRECATED: --heal-on-build injects a default build_gate_healing when spec lacks it.
-	// This is a back-compat shim kept for one release cycle.
-	if healOnBuild {
-		if _, exists := base["build_gate_healing"]; !exists {
-			base["build_gate_healing"] = map[string]any{
-				"retries": 1,
-				"mods":    []any{},
-			}
 		}
 	}
 

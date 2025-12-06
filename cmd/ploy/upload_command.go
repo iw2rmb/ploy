@@ -24,30 +24,20 @@ func handleUpload(args []string, stderr io.Writer) error {
 	}
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	// New flags
+	// Flags
 	runID := fs.String("run-id", "", "Run identifier to attach the artifact bundle to (UUID)")
-	stageID := fs.String("stage-id", "", "DEPRECATED (ignored)")
 	buildID := fs.String("build-id", "", "Optional build identifier (UUID)")
 	name := fs.String("name", "", "Optional artifact name override (defaults to filename)")
-	// Backward-compat: accept --job-id as an alias for --run-id
-	jobIDCompat := fs.String("job-id", "", "(deprecated) alias for --run-id")
-	// Deprecated/ignored flags retained for compatibility; no-ops
-	_ = fs.String("kind", "", "(deprecated; ignored)")
 	if err := fs.Parse(args); err != nil {
 		printUploadUsage(stderr)
 		return err
 	}
-	// stageID flag is accepted for backward compatibility but ignored.
-	_ = stageID
 	remaining := fs.Args()
 	if len(remaining) == 0 {
 		printUploadUsage(stderr)
 		return errors.New("upload path required")
 	}
 	trimmedRun := strings.TrimSpace(*runID)
-	if trimmedRun == "" {
-		trimmedRun = strings.TrimSpace(*jobIDCompat)
-	}
 	if trimmedRun == "" {
 		printUploadUsage(stderr)
 		return errors.New("--run-id is required")
@@ -123,7 +113,7 @@ func handleUpload(args []string, stderr io.Writer) error {
 }
 
 func printUploadUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy upload --run-id <uuid> [--stage-id <uuid>] [--build-id <uuid>] [--name <string>] <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>")
 }
 
 // report command removed: server provides no GET route for artifact bundles.

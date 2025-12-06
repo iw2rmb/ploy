@@ -77,8 +77,6 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Validate and convert status to canonical RunStatus type.
-		// This uses ConvertToRunStatus to handle various API representations
-		// (e.g., "cancelled" vs "canceled", "pending" -> "queued").
 		if strings.TrimSpace(req.Status) == "" {
 			http.Error(w, "status is required", http.StatusBadRequest)
 			return

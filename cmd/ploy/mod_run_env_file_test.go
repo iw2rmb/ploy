@@ -257,7 +257,7 @@ mod:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -308,7 +308,7 @@ mod:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -353,7 +353,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -400,7 +400,7 @@ env:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -444,7 +444,7 @@ build_gate_healing:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -496,7 +496,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err == nil {
 			t.Errorf("expected error for nonexistent env file")
 		}
@@ -539,7 +539,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}

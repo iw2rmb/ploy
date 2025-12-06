@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
-	"github.com/iw2rmb/ploy/internal/deploy/bootstrap"
 )
 
 // RunBootstrap orchestrates remote installation via SSH and finalises PKI metadata locally.
@@ -67,7 +66,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	}
 
 	envVars := map[string]string{
-		"PLOY_BOOTSTRAP_VERSION": bootstrap.Version,
+		"PLOY_BOOTSTRAP_VERSION": Version,
 	}
 	envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
 	if sanitized := sanitizeNodeID(nodeID); sanitized != "" {

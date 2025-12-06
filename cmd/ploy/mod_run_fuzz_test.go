@@ -9,11 +9,11 @@ import (
 // buildSpecPayload never panics and always returns valid JSON when non-nil.
 func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
 	// Seeds cover command-as-array, plain string, and empty values.
-	f.Add("[/bin/sh,-c,echo]", "", "gitlab.example.com", true, true, false, false)
-	f.Add("echo hello", "glpat-123", "", false, false, true, true)
-	f.Add("", "", "", false, false, false, false)
+	f.Add("[/bin/sh,-c,echo]", "", "gitlab.example.com", true, true, false)
+	f.Add("echo hello", "glpat-123", "", false, false, true)
+	f.Add("", "", "", false, false, false)
 
-	f.Fuzz(func(t *testing.T, modCommand, gitlabPAT, gitlabDomain string, retain, mrSuccess, mrFail, healOnBuild bool) {
+	f.Fuzz(func(t *testing.T, modCommand, gitlabPAT, gitlabDomain string, retain, mrSuccess, mrFail bool) {
 		// Provide a small variety of env shapes, including malformed entries.
 		modEnvs := []string{"KEY=VALUE", "A=B=C", "EMPTY=", "ONLYKEY"}
 
@@ -27,7 +27,6 @@ func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
 			gitlabDomain, // gitlab domain (may be empty)
 			mrSuccess,    // MR on success
 			mrFail,       // MR on fail
-			healOnBuild,  // deprecated back-compat flag
 		)
 		if err != nil {
 			// On parse/merge error just return; fuzzer will expand inputs.

@@ -255,10 +255,14 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// When build_gate_healing is configured, hydrate the healing manifest from the
 	// typed HealingConfig so that discrete healing jobs use the correct image/env.
-	if typedOpts.Healing != nil && len(typedOpts.Healing.Mods) > 0 {
-		healMod, healIndex := selectHealingModForJob(req, typedOpts.Healing)
-		manifest, err = buildHealingManifestWithStack(req, healMod, healIndex, "", stack)
-	} else {
+	if typedOpts.Healing != nil {
+		strategies := typedOpts.Healing.NormalizedStrategies()
+		if len(strategies) > 0 {
+			healMod, healIndex := selectHealingModForJob(req, typedOpts.Healing)
+			manifest, err = buildHealingManifestWithStack(req, healMod, healIndex, "", stack)
+		}
+	}
+	if manifest.Image == "" {
 		manifest, err = buildManifestFromRequestWithStack(req, typedOpts, 0, stack)
 	}
 	if err != nil {
@@ -445,33 +449,44 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 
 // selectHealingModForJob selects the HealingMod that should back this healing job.
 // Preference order:
-//  1. Match StartRunRequest.ModImage against HealingConfig.Mods[i].Image (resolved).
-//  2. Fall back to the first configured healing mod.
+//  1. Match StartRunRequest.ModImage against any HealingStrategy.Mods[i].Image (resolved).
+//  2. Fall back to the first configured healing mod in the first strategy.
 //
 // When matching, the mod image is resolved using ModStackUnknown since we don't
 // have stack information at job selection time. For universal images, this returns
 // the exact image string. For stack-specific images, this compares against the
 // default fallback (if any).
 func selectHealingModForJob(req StartRunRequest, healing *HealingConfig) (HealingMod, int) {
-	if healing == nil || len(healing.Mods) == 0 {
+	if healing == nil {
+		return HealingMod{}, 0
+	}
+
+	strategies := healing.NormalizedStrategies()
+	if len(strategies) == 0 {
 		return HealingMod{}, 0
 	}
 
 	if img := strings.TrimSpace(req.ModImage); img != "" {
-		for i, mod := range healing.Mods {
-			// Resolve the mod image using unknown stack (fallback to default).
-			// This matches universal images directly and stack maps via default.
-			resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)
-			if err != nil {
-				continue // Skip mods that can't be resolved without stack context.
-			}
-			if strings.TrimSpace(resolved) == img {
-				return mod, i
+		for _, strat := range strategies {
+			for i, mod := range strat.Mods {
+				// Resolve the mod image using unknown stack (fallback to default).
+				// This matches universal images directly and stack maps via default.
+				resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)
+				if err != nil {
+					continue // Skip mods that can't be resolved without stack context.
+				}
+				if strings.TrimSpace(resolved) == img {
+					return mod, i
+				}
 			}
 		}
 	}
 
-	return healing.Mods[0], 0
+	// Fallback to first mod of first strategy.
+	if len(strategies[0].Mods) == 0 {
+		return HealingMod{}, 0
+	}
+	return strategies[0].Mods[0], 0
 }
 
 // uploadFailureStatus uploads a failure status for early errors.

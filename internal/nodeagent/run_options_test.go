@@ -33,14 +33,19 @@ func TestParseRunOptions_HealingConfig(t *testing.T) {
 	opts := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(3), // JSON unmarshals numbers as float64
-			"mods": []any{
+			"strategies": []any{
 				map[string]any{
-					"image":   "docker.io/test/heal:v1",
-					"command": "heal.sh",
-					"env": map[string]any{
-						"MODE": "auto",
+					"name": "default",
+					"mods": []any{
+						map[string]any{
+							"image":   "docker.io/test/heal:v1",
+							"command": "heal.sh",
+							"env": map[string]any{
+								"MODE": "auto",
+							},
+							"retain_container": true,
+						},
 					},
-					"retain_container": true,
 				},
 			},
 		},
@@ -54,11 +59,11 @@ func TestParseRunOptions_HealingConfig(t *testing.T) {
 	if runOpts.Healing.Retries != 3 {
 		t.Errorf("expected retries=3, got %d", runOpts.Healing.Retries)
 	}
-	if len(runOpts.Healing.Mods) != 1 {
-		t.Fatalf("expected 1 healing mod, got %d", len(runOpts.Healing.Mods))
+	if len(runOpts.Healing.Strategies) != 1 {
+		t.Fatalf("expected 1 healing strategy, got %d", len(runOpts.Healing.Strategies))
 	}
 
-	mod := runOpts.Healing.Mods[0]
+	mod := runOpts.Healing.Strategies[0].Mods[0]
 	// Image is now a ModImage type; verify universal image was parsed.
 	resolved, err := mod.Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
@@ -86,10 +91,15 @@ func TestParseRunOptions_HealingWithArrayCommand(t *testing.T) {
 	opts := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": 1,
-			"mods": []any{
+			"strategies": []any{
 				map[string]any{
-					"image":   "docker.io/test/heal:v2",
-					"command": []any{"/bin/sh", "-c", "echo healing"},
+					"name": "default",
+					"mods": []any{
+						map[string]any{
+							"image":   "docker.io/test/heal:v2",
+							"command": []any{"/bin/sh", "-c", "echo healing"},
+						},
+					},
 				},
 			},
 		},
@@ -100,11 +110,11 @@ func TestParseRunOptions_HealingWithArrayCommand(t *testing.T) {
 	if runOpts.Healing == nil {
 		t.Fatal("expected healing config to be parsed")
 	}
-	if len(runOpts.Healing.Mods) != 1 {
-		t.Fatalf("expected 1 healing mod, got %d", len(runOpts.Healing.Mods))
+	if len(runOpts.Healing.Strategies) != 1 {
+		t.Fatalf("expected 1 healing strategy, got %d", len(runOpts.Healing.Strategies))
 	}
 
-	mod := runOpts.Healing.Mods[0]
+	mod := runOpts.Healing.Strategies[0].Mods[0]
 	want := []string{"/bin/sh", "-c", "echo healing"}
 	if len(mod.Command.Exec) != len(want) {
 		t.Fatalf("expected command.exec length=%d, got %d", len(want), len(mod.Command.Exec))
@@ -724,13 +734,18 @@ func TestParseRunOptions_HealingStackAwareImage(t *testing.T) {
 	opts := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": 1,
-			"mods": []any{
+			"strategies": []any{
 				map[string]any{
-					"image": map[string]any{
-						"default":    "docker.io/user/heal:latest",
-						"java-maven": "docker.io/user/heal-maven:latest",
+					"name": "default",
+					"mods": []any{
+						map[string]any{
+							"image": map[string]any{
+								"default":    "docker.io/user/heal:latest",
+								"java-maven": "docker.io/user/heal-maven:latest",
+							},
+							"command": "heal.sh",
+						},
 					},
-					"command": "heal.sh",
 				},
 			},
 		},
@@ -738,11 +753,11 @@ func TestParseRunOptions_HealingStackAwareImage(t *testing.T) {
 
 	runOpts := parseRunOptions(opts)
 
-	if runOpts.Healing == nil || len(runOpts.Healing.Mods) != 1 {
-		t.Fatal("expected 1 healing mod")
+	if runOpts.Healing == nil || len(runOpts.Healing.Strategies) != 1 {
+		t.Fatal("expected 1 healing strategy")
 	}
 
-	mod := runOpts.Healing.Mods[0]
+	mod := runOpts.Healing.Strategies[0].Mods[0]
 
 	// Verify stack-specific resolution.
 	mavenImg, err := mod.Image.ResolveImage(contracts.ModStackJavaMaven)

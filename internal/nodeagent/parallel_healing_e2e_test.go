@@ -89,57 +89,8 @@ func TestParseRunOptions_MultiStrategy(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// TestParseRunOptions_LegacyFormPreserved verifies backward compatibility with
-// legacy single-strategy specs (mods[] at top level).
-// -----------------------------------------------------------------------------
-func TestParseRunOptions_LegacyFormPreserved(t *testing.T) {
-	t.Parallel()
-
-	// Legacy spec with mods at top level.
-	options := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(3),
-			"mods": []any{
-				map[string]any{"image": "heal-a:latest"},
-				map[string]any{"image": "heal-b:latest"},
-			},
-		},
-	}
-
-	runOpts := parseRunOptions(options)
-
-	if runOpts.Healing == nil {
-		t.Fatalf("expected Healing to be non-nil")
-	}
-	if runOpts.Healing.Retries != 3 {
-		t.Fatalf("expected retries=3, got %d", runOpts.Healing.Retries)
-	}
-
-	// Legacy form should populate Mods, not Strategies.
-	if len(runOpts.Healing.Mods) != 2 {
-		t.Fatalf("expected 2 mods, got %d", len(runOpts.Healing.Mods))
-	}
-
-	if runOpts.Healing.Mods[0].Image.Universal != "heal-a:latest" {
-		t.Fatalf("mods[0].Image = %q, want heal-a:latest", runOpts.Healing.Mods[0].Image.Universal)
-	}
-	if runOpts.Healing.Mods[1].Image.Universal != "heal-b:latest" {
-		t.Fatalf("mods[1].Image = %q, want heal-b:latest", runOpts.Healing.Mods[1].Image.Universal)
-	}
-
-	// NormalizedStrategies should convert legacy mods to a single unnamed strategy.
-	normalized := runOpts.Healing.NormalizedStrategies()
-	if len(normalized) != 1 {
-		t.Fatalf("NormalizedStrategies() should return 1 for legacy form, got %d", len(normalized))
-	}
-	if normalized[0].Name != "" {
-		t.Fatalf("expected empty name for legacy strategy, got %q", normalized[0].Name)
-	}
-	if len(normalized[0].Mods) != 2 {
-		t.Fatalf("expected 2 mods in normalized strategy, got %d", len(normalized[0].Mods))
-	}
-}
+// Legacy mods[]-only healing specs are no longer supported; callers must
+// populate build_gate_healing.strategies explicitly.
 
 // -----------------------------------------------------------------------------
 // TestParseRunOptions_StrategiesTakesPrecedence verifies that when both mods[]
@@ -211,66 +162,4 @@ func TestNormalizedStrategies_EmptyConfig(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// TestNormalizedStrategies_ReturnsStrategiesOverMods verifies NormalizedStrategies
-// returns Strategies[] when populated, ignoring legacy Mods[].
-// -----------------------------------------------------------------------------
-func TestNormalizedStrategies_ReturnsStrategiesOverMods(t *testing.T) {
-	t.Parallel()
-
-	// Config with both Strategies and Mods.
-	config := &HealingConfig{
-		Retries: 1,
-		Mods: []HealingMod{
-			{Image: testModImage("legacy:ignored")},
-		},
-		Strategies: []HealingStrategy{
-			{Name: "winner", Mods: []HealingMod{{Image: testModImage("strategy:used")}}},
-		},
-	}
-
-	normalized := config.NormalizedStrategies()
-
-	if len(normalized) != 1 {
-		t.Fatalf("expected 1 strategy, got %d", len(normalized))
-	}
-	if normalized[0].Name != "winner" {
-		t.Fatalf("expected strategy name 'winner', got %q", normalized[0].Name)
-	}
-	if normalized[0].Mods[0].Image.Universal != "strategy:used" {
-		t.Fatalf("expected mod image 'strategy:used', got %q", normalized[0].Mods[0].Image.Universal)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// TestNormalizedStrategies_NormalizesLegacyMods verifies NormalizedStrategies
-// converts legacy Mods[] to a single unnamed strategy when Strategies[] is empty.
-// -----------------------------------------------------------------------------
-func TestNormalizedStrategies_NormalizesLegacyMods(t *testing.T) {
-	t.Parallel()
-
-	// Config with only legacy Mods.
-	config := &HealingConfig{
-		Retries: 2,
-		Mods: []HealingMod{
-			{Image: testModImage("heal-a:latest")},
-			{Image: testModImage("heal-b:latest")},
-		},
-	}
-
-	normalized := config.NormalizedStrategies()
-
-	if len(normalized) != 1 {
-		t.Fatalf("expected 1 normalized strategy, got %d", len(normalized))
-	}
-
-	// Strategy should be unnamed (legacy form).
-	if normalized[0].Name != "" {
-		t.Fatalf("expected empty name for legacy strategy, got %q", normalized[0].Name)
-	}
-
-	// Should contain all legacy mods.
-	if len(normalized[0].Mods) != 2 {
-		t.Fatalf("expected 2 mods in normalized strategy, got %d", len(normalized[0].Mods))
-	}
-}
+// NormalizedStrategies now returns only the configured Strategies slice.

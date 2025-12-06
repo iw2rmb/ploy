@@ -202,7 +202,6 @@ classifier drift without leaving the workstation.
 
 `upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH). The CLI always targets the default descriptor at `~/.config/ploy/clusters/default`.
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.
-The deprecated `--job-id` flag remains as an alias for `--run-id` for backward compatibility.
 
 ## Shell Completion
 
