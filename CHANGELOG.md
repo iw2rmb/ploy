@@ -781,7 +781,7 @@
 
 ## [2025-09-25] Legacy Teardown
 
-- Removed all legacy API, Nomad, Consul, SeaweedFS, and deployment scaffolding.
+- Removed legacy API surface and deployment scaffolding tied to the pre-pivot orchestration stack.
 - Replaced the repo with a CLI-only stub (`ploy mod run`, formerly `ploy workflow run`) that validates
   ticket input and returns `ErrNotImplemented`.
 - Added guardrail tests that fail if legacy binaries or imports reappear.
@@ -791,7 +791,7 @@
 
 ## [History]
 
-Prior releases documented Nomad-based services, security engines, and lane
+Prior releases documented the pre-pivot orchestration stack, security engines, and lane
 orchestration. Refer to the Git history before `2025-09-25` for archival
 details.
 ## [2025-10-30] Snapshot/JetStream Removal and Grid Pruning
