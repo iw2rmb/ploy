@@ -37,12 +37,12 @@ type LogRecord struct {
 	// Empty for events not tied to a specific job.
 	JobID string `json:"job_id,omitempty"`
 
-	// ModType indicates the Mods step type (e.g., "mod", "hook", "gate").
+	// ModType indicates the Mods step type (e.g., "pre_gate", "mod", "post_gate", "heal", "re_gate").
 	// Empty when not applicable or unknown.
 	ModType string `json:"mod_type,omitempty"`
 
-	// StepIndex is the zero-based index of the step within the Mods pipeline.
-	// Zero when not applicable or omitted by the source.
+	// StepIndex mirrors jobs.step_index and is used to order steps within a Mods run.
+	// Typical values are float-style indices (1000, 1500, 2000, 3000); zero when omitted.
 	StepIndex int `json:"step_index,omitempty"`
 }
 
