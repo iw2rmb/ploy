@@ -189,6 +189,58 @@ echo "Ticket: $TICKET"; echo "MR: ${MR_URL:-<none>}"
 # Otherwise, iterate with additional Mods runs
 ```
 
+## Batch Workflows with MR Creation
+
+Batch runs enable applying the same mod spec to multiple repositories, with MR creation
+per repo. Each `run_repo` can produce its own merge request.
+
+### Create Batch with MR-on-Success
+
+```bash
+# 1. Configure GitLab credentials once.
+ploy config gitlab set --file gitlab-config.json
+
+# 2. Create a named batch.
+ploy mod run --spec mod.yaml --name java17-fleet --mr-success
+
+# 3. Add repositories — each will create an MR on success.
+ploy mod run repo add java17-fleet \
+  --repo-url https://gitlab.com/org/service-a.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/java-17-upgrade
+
+ploy mod run repo add java17-fleet \
+  --repo-url https://gitlab.com/org/service-b.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/java-17-upgrade
+
+# 4. Follow batch progress.
+ploy runs follow java17-fleet
+```
+
+### Restart a Repo with a Hotfix Branch
+
+If one repository fails due to a missing fix, restart it with a different branch:
+
+```bash
+ploy mod run repo restart java17-fleet \
+  --repo-url https://gitlab.com/org/service-a.git \
+  --branch hotfix
+```
+
+When the restarted job succeeds, an MR is created for the `hotfix` branch merge.
+
+### Inspect MRs from a Batch
+
+Use `ploy mod inspect` to view MR URLs for each repo in the batch:
+
+```bash
+ploy mod inspect java17-fleet
+# Output lists each run_repo with its MR URL (if created).
+```
+
+See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
+
 ## Related Documentation
 
 - [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options

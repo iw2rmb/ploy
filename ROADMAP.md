@@ -233,7 +233,7 @@ Legend: [ ] todo, [x] done.
     - Text example: "In a batch, `ploy mod run` submits the spec once, then `ploy mod run repo add` attaches multiple repositories under the same run via `run_repos`."
   - Tests: Manual review; ensure `docs/mods-lifecycle.md` still builds and is referenced from any docs index if present.
 
-- [ ] Update CLI and how-to docs — show `mod run` vs `mod run repo` usage and batch workflows.
+- [x] Update CLI and how-to docs — show `mod run` vs `mod run repo` usage and batch workflows.
   - Repository: ploy
   - Component: cmd/ploy/README.md, docs/how-to
   - Scope:

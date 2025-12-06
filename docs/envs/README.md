@@ -78,6 +78,11 @@ Role model (bearer token claims):
   - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mod.example.yaml` for the full schema
+- `--name` — Creates a **batch run** with the given name (no repository attached yet).
+  Used with `mod run repo add` to attach multiple repositories under a shared spec.
+  Example: `ploy mod run --spec mod.yaml --name my-batch` followed by
+  `ploy mod run repo add my-batch --repo-url https://...`. See `cmd/ploy/README.md`
+  § "Batched Mod Runs" for full usage.
 - `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
   - `mods[]` — Array of healing steps (each is a container with image/command/env/retain)
