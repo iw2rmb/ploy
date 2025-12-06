@@ -277,11 +277,11 @@ Legend: [ ] todo, [x] done.
         - Each subcommand (`add/remove/restart/status`) validates arguments.
         - The CLI calls the expected HTTP paths with correct payloads (using a test HTTP server).
     - E2E:
-      - Add `tests/e2e/mods/scenario-batch-run/` with a `run.sh` that:
-        - Uses `dist/ploy mod run --spec mod.yaml --name batch-1` to create a batch run.
+      - Add `tests/e2e/mods/scenario-batch-run.sh` that:
+        - Uses `dist/ploy mod run --spec mod.yaml --name batch-1` (or an equivalent spec file) to create a batch run.
         - Adds at least two repos with `mod run repo add`.
         - Restarts one repo with a different branch.
         - Stops the batch and asserts that final statuses are visible via `mod run repo status`.
   - Snippets:
     - Example E2E invocation: `dist/ploy mod run repo status "$BATCH_ID" --watch` (once watch support is added).
-  - Tests: Run `make test` and `tests/e2e/mods/scenario-batch-run/run.sh` locally as part of RED→GREEN cycles; ensure coverage thresholds in `GOLANG.md` remain satisfied.
+  - Tests: Run `make test` and `tests/e2e/mods/scenario-batch-run.sh` locally as part of RED→GREEN cycles; ensure coverage thresholds in `GOLANG.md` remain satisfied.
