@@ -107,6 +107,9 @@ type SchedulerConfig struct {
 	// DropPartitions enables dropping entire monthly partitions for expired data
 	// instead of row-by-row deletion. More efficient for large datasets.
 	DropPartitions bool `yaml:"drop_partitions"`
+	// BatchSchedulerInterval is how often the batch scheduler checks for pending repos.
+	// Set to 0 to disable the batch scheduler. Default: 5 seconds.
+	BatchSchedulerInterval time.Duration `yaml:"batch_scheduler_interval"`
 }
 
 // LoggingConfig configures logging destinations.

@@ -6,19 +6,20 @@ import (
 )
 
 const (
-	defaultHTTPListen        = ":8443"
-	defaultMetricsListen     = ":9100"
-	defaultAdminSocket       = "/run/ployd.sock"
-	defaultHeartbeatInterval = 10 * time.Second
-	defaultAssignmentPoll    = 5 * time.Second
-	defaultStatusPublish     = 30 * time.Second
-	defaultPKIRenewBefore    = time.Hour
-	defaultTaskConcurrency   = 2
-	defaultHousekeeping      = 5 * time.Minute
-	defaultDiskPrune         = time.Hour
-	defaultTransfersBaseDir  = "/var/lib/ploy/ssh-artifacts"
-	defaultGuardBinary       = "/usr/lib/openssh/sftp-server"
-	defaultJanitorInterval   = time.Minute
+	defaultHTTPListen             = ":8443"
+	defaultMetricsListen          = ":9100"
+	defaultAdminSocket            = "/run/ployd.sock"
+	defaultHeartbeatInterval      = 10 * time.Second
+	defaultAssignmentPoll         = 5 * time.Second
+	defaultStatusPublish          = 30 * time.Second
+	defaultPKIRenewBefore         = time.Hour
+	defaultTaskConcurrency        = 2
+	defaultHousekeeping           = 5 * time.Minute
+	defaultDiskPrune              = time.Hour
+	defaultTransfersBaseDir       = "/var/lib/ploy/ssh-artifacts"
+	defaultGuardBinary            = "/usr/lib/openssh/sftp-server"
+	defaultJanitorInterval        = time.Minute
+	defaultBatchSchedulerInterval = 5 * time.Second
 )
 
 // defaultConfig returns the baseline configuration with baked-in defaults.
@@ -40,8 +41,9 @@ func defaultConfig() Config {
 			DefaultAdapter: "local",
 		},
 		Scheduler: SchedulerConfig{
-			HousekeepingInterval: defaultHousekeeping,
-			DiskPruneInterval:    defaultDiskPrune,
+			HousekeepingInterval:   defaultHousekeeping,
+			DiskPruneInterval:      defaultDiskPrune,
+			BatchSchedulerInterval: defaultBatchSchedulerInterval,
 		},
 		Worker: WorkerConfig{
 			TaskConcurrency: defaultTaskConcurrency,
@@ -142,6 +144,11 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Transfers.JanitorInterval <= 0 {
 		cfg.Transfers.JanitorInterval = defaultJanitorInterval
+	}
+
+	// Batch scheduler interval: 0 disables the scheduler, negative uses default.
+	if cfg.Scheduler.BatchSchedulerInterval < 0 {
+		cfg.Scheduler.BatchSchedulerInterval = defaultBatchSchedulerInterval
 	}
 
 	normalizeRuntimeConfig(&cfg.Runtime)

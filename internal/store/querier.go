@@ -94,6 +94,11 @@ type Querier interface {
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// Lists batch runs that have at least one pending run_repo entry.
+	// Used by the batch scheduler to find runs that need repos to be started.
+	// Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
+	// that have pending repos ready for execution.
+	ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.UUID, error)
 	// List all created (not yet pending) jobs for a run, ordered by step_index.
 	ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.

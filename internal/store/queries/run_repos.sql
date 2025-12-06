@@ -90,3 +90,15 @@ WHERE execution_run_id = $1;
 UPDATE run_repos
 SET execution_run_id = NULL
 WHERE id = $1;
+
+-- name: ListBatchRunsWithPendingRepos :many
+-- Lists batch runs that have at least one pending run_repo entry.
+-- Used by the batch scheduler to find runs that need repos to be started.
+-- Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
+-- that have pending repos ready for execution.
+SELECT DISTINCT r.id
+FROM runs r
+INNER JOIN run_repos rr ON r.id = rr.run_id
+WHERE r.status IN ('queued', 'assigned', 'running')
+  AND rr.status = 'pending'
+ORDER BY r.id;

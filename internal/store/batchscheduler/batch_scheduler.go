@@ -1,0 +1,146 @@
+// Package batchscheduler provides a background worker for scheduling pending repos within batch runs.
+//
+// The batch scheduler continuously monitors batch runs (parent runs with associated run_repos)
+// and starts execution for any pending repos. This eliminates the need for manual POST /v1/runs/{id}/start
+// calls and ensures repos are processed automatically after being added to a batch.
+//
+// State transitions:
+//   - Batch run: queued → running (when first repo starts) → succeeded/failed/canceled (when all repos complete)
+//   - Run repo: pending → running (when execution starts) → succeeded/failed/skipped/cancelled (on completion)
+//
+// The scheduler focuses on per-batch processing without cross-batch FIFO ordering.
+package batchscheduler
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// RepoStarter is the interface for starting execution of pending repos.
+// Implemented by handlers.BatchRepoStarter to decouple scheduler from HTTP layer.
+type RepoStarter interface {
+	// StartPendingRepos starts execution for all pending repos in a batch run.
+	// Returns the number of repos that were started successfully.
+	StartPendingRepos(ctx context.Context, runID pgtype.UUID) (started int, err error)
+}
+
+// Options configures the batch scheduler.
+type Options struct {
+	// Store is the database store for querying batch runs and repos.
+	Store store.Store
+	// RepoStarter handles the actual execution start logic.
+	RepoStarter RepoStarter
+	// Interval is how often the scheduler checks for pending repos. Default: 5 seconds.
+	Interval time.Duration
+	// Logger is used for structured logging. If nil, a default logger is used.
+	Logger *slog.Logger
+}
+
+// Scheduler is a background task that processes pending repos within batch runs.
+// It implements the scheduler.Task interface for integration with the server's
+// task scheduler.
+type Scheduler struct {
+	store       store.Store
+	repoStarter RepoStarter
+	interval    time.Duration
+	logger      *slog.Logger
+}
+
+// New constructs a new batch scheduler.
+// Returns nil if store or repoStarter is nil.
+func New(opts Options) (*Scheduler, error) {
+	if opts.Store == nil || opts.RepoStarter == nil {
+		return nil, nil
+	}
+
+	interval := opts.Interval
+	if interval <= 0 {
+		interval = 5 * time.Second // Default: poll every 5 seconds
+	}
+
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	return &Scheduler{
+		store:       opts.Store,
+		repoStarter: opts.RepoStarter,
+		interval:    interval,
+		logger:      logger,
+	}, nil
+}
+
+// Name returns the task name for the scheduler.
+func (s *Scheduler) Name() string {
+	return "batch-scheduler"
+}
+
+// Interval returns how often the task should run.
+func (s *Scheduler) Interval() time.Duration {
+	return s.interval
+}
+
+// Run executes one cycle of the batch scheduler.
+//
+// The scheduler loop:
+// 1. Query for batch runs with pending repos (ListBatchRunsWithPendingRepos)
+// 2. For each batch, start execution for pending repos via RepoStarter
+// 3. Track and log progress
+//
+// Errors from individual batch processing are logged but don't stop the scheduler.
+func (s *Scheduler) Run(ctx context.Context) error {
+	if s == nil || s.store == nil || s.repoStarter == nil {
+		return nil
+	}
+
+	// Find batch runs with pending repos.
+	runIDs, err := s.store.ListBatchRunsWithPendingRepos(ctx)
+	if err != nil {
+		s.logger.Error("batch-scheduler: failed to list runs with pending repos", "err", err)
+		return nil // Non-fatal; retry on next cycle.
+	}
+
+	if len(runIDs) == 0 {
+		// No work to do; quiet exit.
+		return nil
+	}
+
+	s.logger.Debug("batch-scheduler: found runs with pending repos", "count", len(runIDs))
+
+	// Process each batch run.
+	var totalStarted int
+	for _, runID := range runIDs {
+		started, err := s.repoStarter.StartPendingRepos(ctx, runID)
+		if err != nil {
+			s.logger.Error("batch-scheduler: failed to start repos",
+				"run_id", uuid.UUID(runID.Bytes).String(),
+				"err", err,
+			)
+			continue // Try other runs.
+		}
+
+		if started > 0 {
+			s.logger.Info("batch-scheduler: started repos",
+				"run_id", uuid.UUID(runID.Bytes).String(),
+				"started", started,
+			)
+			totalStarted += started
+		}
+	}
+
+	if totalStarted > 0 {
+		s.logger.Info("batch-scheduler: cycle completed",
+			"runs_processed", len(runIDs),
+			"repos_started", totalStarted,
+		)
+	}
+
+	return nil
+}
