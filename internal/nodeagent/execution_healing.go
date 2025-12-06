@@ -260,10 +260,10 @@ func (r *runController) runGateWithHealing(
 		// Execute each healing mod in sequence using typed HealingMod structs
 		// across all configured strategies. For now, strategies are executed
 		// serially within this node; parallelism is handled at the scheduler.
-		for _, strat := range strategies {
-			slog.Info("executing healing strategy", "run_id", req.RunID, "attempt", attempt, "strategy", strat.Name, "mod_count", len(strat.Mods), "phase", gatePhase)
+		for _, strategy := range strategies {
+			slog.Info("executing healing strategy", "run_id", req.RunID, "attempt", attempt, "strategy", strategy.Name, "mod_count", len(strategy.Mods), "phase", gatePhase)
 
-			for idx, mod := range strat.Mods {
+			for idx, mod := range strategy.Mods {
 				// Pass codexSession to enable CODEX_RESUME=1 injection for Codex-based healers.
 				healManifest, buildErr := buildHealingManifest(req, mod, idx, codexSession)
 				if buildErr != nil {
@@ -331,8 +331,8 @@ func (r *runController) runGateWithHealing(
 				// E3: Pass job name for branch-local diff tagging in multi-strategy healing.
 				// Include strategy name in jobName for branch-local tagging when present.
 				jobName := req.JobName
-				if strat.Name != "" {
-					jobName = fmt.Sprintf("heal-%s-%d-%d", strat.Name, attempt, idx)
+				if strategy.Name != "" {
+					jobName = fmt.Sprintf("heal-%s-%d-%d", strategy.Name, attempt, idx)
 				}
 				r.uploadHealingModDiff(ctx, req.RunID, req.JobID, jobName, workspace, healResult, idx, attempt, stepIndex)
 

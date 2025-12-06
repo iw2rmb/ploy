@@ -89,7 +89,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	}
 
 	if len(c.Spec) > 0 {
-		spec := json.RawMessage(c.Spec)
+		spec := c.Spec
 		req.Spec = &spec
 	}
 
