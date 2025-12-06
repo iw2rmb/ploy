@@ -7,7 +7,7 @@ Documentation: docs/mods-lifecycle.md, docs/api/components/schemas/controlplane.
 Legend: [ ] todo, [x] done.
 
 ## Data model and SSE payload
-- [ ] Extend log payload model for Mods streams — define a single enriched log record shape used by the hub and SSE clients.
+- [x] Extend log payload model for Mods streams — define a single enriched log record shape used by the hub and SSE clients.
   - Repository: ploy
   - Component: internal/stream, internal/server/events
   - Scope: Update `internal/stream/hub.go` (`LogRecord`) to add `node_id`, `job_id`, `mod_type`, and `step_index` fields; ensure `internal/server/events/service.go` (`publishLogToHub`, `publishEventToHub`) continues to marshal the updated struct without changing event types.
