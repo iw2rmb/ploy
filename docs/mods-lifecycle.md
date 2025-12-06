@@ -35,6 +35,10 @@ and no further mods execute.
 
 ### Single-mod runs (no `mods[]`)
 
+> **Note:** A single-repo submission is internally a degenerate batch with one
+> `run_repos` entry. See § 1.4 (Batched Mods Runs) for the parent/child run
+> model and how single-repo runs fit into the unified architecture.
+
 When the spec contains a single `mod` entry (or uses the legacy top-level
 image/command), the execution sequence is:
 
@@ -458,6 +462,205 @@ post-gate  ───────────────▶├─▶ heal-a (150
 - Graph types: `internal/workflow/graph/types.go`
 - Graph builder: `internal/workflow/graph/builder.go`
 - Detailed DAG documentation: `ROADMAP_DAG.md`
+
+## 1.4 Batched Mods Runs (`runs` + `run_repos`)
+
+This section describes how batch runs coordinate multiple repositories under a
+single specification. A batch run allows executing the same mod workflow across
+many repos without submitting separate tickets for each.
+
+### Conceptual model
+
+Batched runs introduce a parent–child relationship between tables:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Batch Run Hierarchy                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────┐          ┌──────────────┐          ┌──────────────┐       │
+│   │  runs (P)   │──────────│  run_repos   │──────────│  runs (C)    │       │
+│   │  (parent)   │  1 : N   │  (mapping)   │  1 : 1   │  (child)     │       │
+│   └─────────────┘          └──────────────┘          └──────────────┘       │
+│         │                        │                         │                │
+│         │                        │                         │                │
+│   ┌─────▼─────┐            ┌─────▼─────┐             ┌─────▼─────┐          │
+│   │   spec    │            │ repo_url  │             │   jobs    │          │
+│   │   name    │            │ base_ref  │             │  diffs    │          │
+│   │  status   │            │ target_ref│             │   logs    │          │
+│   │           │            │  status   │             │ artifacts │          │
+│   └───────────┘            │  attempt  │             └───────────┘          │
+│                            │ exec_run  │                                    │
+│                            └───────────┘                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Parent run (`runs`)** — Stores the shared specification (`spec` JSONB),
+  optional batch name, and aggregate status. The parent holds no per-repo
+  details; those live in `run_repos`.
+
+- **Run repos (`run_repos`)** — Mapping table that attaches repositories to a
+  parent run. Each row captures:
+  - `repo_url`, `base_ref`, `target_ref` — repository coordinates.
+  - `status` — per-repo execution state (`pending`, `running`, `succeeded`,
+    `failed`, `skipped`, `cancelled`).
+  - `attempt` — retry counter; incremented on `restart`.
+  - `execution_run_id` — foreign key to the child `runs` row that holds the
+    actual job pipeline for this repo.
+
+- **Child run (`runs`)** — Created when a `run_repo` transitions from `pending`
+  to `running`. The child inherits the parent's `spec` and owns its own `jobs`
+  rows (pre-gate, mod, post-gate, heal, re-gate). Logs, diffs, and artifacts
+  are stored against the child run.
+
+### Single-repo vs batch runs
+
+A single-repo submission via `ploy mod run --repo-url ... --spec ...` is
+internally a **degenerate batch** with exactly one `run_repos` entry. The same
+code paths handle both cases:
+
+| Aspect           | Single-repo run              | Batch run                              |
+|------------------|------------------------------|----------------------------------------|
+| Parent run       | Created with `repo_url`      | Created with optional `name`, no repo  |
+| `run_repos` rows | 1 (auto-created)             | 0 initially; added via `repo add`      |
+| Child runs       | 1 (linked by `execution_run_id`) | 1 per `run_repo`                   |
+| Spec storage     | On parent; inherited by child| Same                                   |
+
+### State machines
+
+#### Parent run state machine
+
+The parent run aggregates status from its `run_repos` entries:
+
+```
+         ┌─────────────────────────────────────────────────────────┐
+         │                  Parent Run Status                      │
+         ├─────────────────────────────────────────────────────────┤
+         │                                                         │
+         │    ┌─────────┐                                          │
+         │    │ queued  │  (initial; no repos running yet)         │
+         │    └────┬────┘                                          │
+         │         │ first run_repo transitions to 'running'       │
+         │         ▼                                               │
+         │    ┌─────────┐                                          │
+         │    │ running │  (at least one repo is active)           │
+         │    └────┬────┘                                          │
+         │         │ all run_repos reach terminal state            │
+         │         ▼                                               │
+         │    ┌──────────────────────────────────┐                 │
+         │    │ succeeded │ failed │ canceled   │                  │
+         │    └──────────────────────────────────┘                 │
+         │    (aggregate: all succeeded → succeeded,               │
+         │     any failed → failed, else canceled)                 │
+         │                                                         │
+         └─────────────────────────────────────────────────────────┘
+```
+
+#### Run repo state machine
+
+Each `run_repos` row tracks individual repository progress:
+
+```
+         ┌───────────────────────────────────────────────────────────────┐
+         │                   Run Repo Status                             │
+         ├───────────────────────────────────────────────────────────────┤
+         │                                                               │
+         │    ┌─────────┐    scheduler picks up repo                     │
+         │    │ pending │ ─────────────────────────────┐                 │
+         │    └────┬────┘                              │                 │
+         │         │                                   ▼                 │
+         │         │              ┌─────────────────────────────────┐    │
+         │         │              │ Create child run + jobs        │    │
+         │         │              │ Link via execution_run_id      │    │
+         │         │              └────────────────┬────────────────┘    │
+         │         │                               │                     │
+         │         │                               ▼                     │
+         │         │                         ┌─────────┐                 │
+         │         │                         │ running │                 │
+         │         │                         └────┬────┘                 │
+         │         │                              │                      │
+         │         │         ┌────────────────────┼──────────────────┐   │
+         │         │         │                    │                  │   │
+         │         ▼         ▼                    ▼                  ▼   │
+         │    ┌─────────┐ ┌─────────┐       ┌──────────┐      ┌─────────┐│
+         │    │ skipped │ │succeeded│       │  failed  │      │cancelled││
+         │    └─────────┘ └─────────┘       └──────────┘      └─────────┘│
+         │                                                               │
+         └───────────────────────────────────────────────────────────────┘
+```
+
+### Jobs pipeline within a batch
+
+Each `run_repo` that transitions to `running` spawns its own child run with a
+complete jobs pipeline. The pipeline follows the same logic described in
+§ 1.1 (Build Gate Sequence):
+
+```
+  run_repos[0] → child_run_0 → jobs: pre-gate → mod-0 → post-gate
+  run_repos[1] → child_run_1 → jobs: pre-gate → mod-0 → post-gate
+  ...
+```
+
+Child runs execute independently. There is no cross-repo ordering within a
+batch—repos may complete in any order depending on node availability and
+execution time.
+
+### Batch scheduler
+
+The `batchscheduler` package (`internal/store/batchscheduler/batch_scheduler.go`)
+automatically starts pending repos:
+
+1. Polls for parent runs with `run_repos` in `pending` status.
+2. For each pending repo, creates a child run and links it via
+   `execution_run_id`.
+3. Transitions the `run_repo` to `running`.
+4. When the child run completes, a completion callback updates the `run_repo`
+   status to the child's terminal state.
+
+### CLI workflow for batched runs
+
+In a batch workflow, `ploy mod run` submits the spec once, then
+`ploy mod run repo add` attaches multiple repositories under the same run via
+`run_repos`:
+
+```bash
+# 1. Create a batch run with a shared spec (no repo attached yet).
+ploy mod run --spec mod.yaml --name my-batch
+
+# 2. Add repos to the batch.
+ploy mod run repo add my-batch --repo-url https://github.com/org/repo1.git \
+    --base-ref main --target-ref feature-branch
+ploy mod run repo add my-batch --repo-url https://github.com/org/repo2.git \
+    --base-ref main --target-ref feature-branch
+
+# 3. Monitor per-repo status within the batch.
+ploy mod run repo status my-batch
+
+# 4. Optionally restart a failed repo with updated refs.
+ploy mod run repo restart my-batch --repo-id <repo-uuid> --base-ref hotfix
+
+# 5. Remove a repo from the batch (marks pending as skipped, running as cancelled).
+ploy mod run repo remove my-batch --repo-id <repo-uuid>
+```
+
+### Relationship summary
+
+| Table        | Purpose                                        | Key Relationships                     |
+|--------------|------------------------------------------------|---------------------------------------|
+| `runs`       | Stores spec + status for parent or child runs  | Parent→run_repos (1:N), Child→jobs    |
+| `run_repos`  | Maps repos to a parent run; tracks per-repo state | run_repos→parent (N:1), →child (1:1)|
+| `jobs`       | Execution units (pre-gate, mod, post-gate, etc.) | jobs→child_run (N:1)                |
+| `diffs`      | Per-job workspace patches                      | diffs→child_run, diffs→job            |
+| `logs`       | Execution logs                                 | logs→child_run, logs→job              |
+
+### Implementation references
+
+- Parent/child run creation: `internal/server/handlers/handlers_runs_batch.go`.
+- Run repos queries: `internal/store/queries/run_repos.sql`.
+- Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
+- CLI subcommands: `cmd/ploy/mod_run_repo.go`.
+- Schema: `internal/store/schema.sql` (see `runs`, `run_repos`, `jobs` tables).
 
 ## 2. Data Model
 
