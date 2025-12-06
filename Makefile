@@ -52,7 +52,7 @@ test-coverage: $(COVERAGE_FILE) ## Run tests and generate coverage report
 $(COVERAGE_FILE):
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
-	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...; \
+	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./internal/... ./cmd/...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-coverage-threshold
