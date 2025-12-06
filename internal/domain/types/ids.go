@@ -25,6 +25,10 @@ type ClusterID string
 // NodeID identifies a worker node in the cluster.
 type NodeID string
 
+// RunRepoID identifies a repo entry within a batch run.
+// Used in batch run handlers to provide type-safe repo identification.
+type RunRepoID string
+
 // StepIndex identifies a step's position within a job execution sequence.
 // It is a zero-based index representing the order of execution.
 type StepIndex float64
@@ -64,6 +68,12 @@ func (v NodeID) String() string { return string(v) }
 
 // IsZero reports whether the value is empty (after trimming spaces).
 func (v NodeID) IsZero() bool { return IsEmpty(string(v)) }
+
+// String returns the underlying string value.
+func (v RunRepoID) String() string { return string(v) }
+
+// IsZero reports whether the value is empty (after trimming spaces).
+func (v RunRepoID) IsZero() bool { return IsEmpty(string(v)) }
 
 // Float64 returns the underlying float64 value.
 func (v StepIndex) Float64() float64 { return float64(v) }
@@ -151,5 +161,15 @@ func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
 func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
 func (v NodeID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *NodeID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
+
+var _ interface {
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+} = (*RunRepoID)(nil)
+
+func (v RunRepoID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
+func (v *RunRepoID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func (v RunRepoID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
+func (v *RunRepoID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
 // StepIndex uses standard float64 JSON marshaling (not text-based like string IDs).

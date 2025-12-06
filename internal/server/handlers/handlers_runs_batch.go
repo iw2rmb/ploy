@@ -28,18 +28,20 @@ import (
 
 // RunBatchSummary represents a run with aggregated repo status counts.
 // Used for list and detail responses.
+// Uses domain types (RunID, RepoURL, GitRef) for type-safe serialization
+// and validation at API boundaries.
 type RunBatchSummary struct {
-	ID         string          `json:"id"`
-	Name       *string         `json:"name,omitempty"`
-	Status     store.RunStatus `json:"status"`
-	RepoURL    string          `json:"repo_url"`
-	BaseRef    string          `json:"base_ref"`
-	TargetRef  string          `json:"target_ref"`
-	CreatedBy  *string         `json:"created_by,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
-	StartedAt  *time.Time      `json:"started_at,omitempty"`
-	FinishedAt *time.Time      `json:"finished_at,omitempty"`
-	Counts     *RunRepoCounts  `json:"repo_counts,omitempty"`
+	ID         domaintypes.RunID   `json:"id"`
+	Name       *string             `json:"name,omitempty"`
+	Status     store.RunStatus     `json:"status"`
+	RepoURL    domaintypes.RepoURL `json:"repo_url"`
+	BaseRef    domaintypes.GitRef  `json:"base_ref"`
+	TargetRef  domaintypes.GitRef  `json:"target_ref"`
+	CreatedBy  *string             `json:"created_by,omitempty"`
+	CreatedAt  time.Time           `json:"created_at"`
+	StartedAt  *time.Time          `json:"started_at,omitempty"`
+	FinishedAt *time.Time          `json:"finished_at,omitempty"`
+	Counts     *RunRepoCounts      `json:"repo_counts,omitempty"`
 }
 
 // RunRepoCounts aggregates the count of repos by status within a batch.
@@ -316,14 +318,17 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 }
 
 // runToSummary converts a store.Run to a RunBatchSummary.
+// Wraps raw store strings in domain types for type-safe API output.
 func runToSummary(run store.Run) RunBatchSummary {
 	summary := RunBatchSummary{
-		ID:        uuid.UUID(run.ID.Bytes).String(),
-		Name:      run.Name,
-		Status:    run.Status,
-		RepoURL:   run.RepoUrl,
-		BaseRef:   run.BaseRef,
-		TargetRef: run.TargetRef,
+		// Convert UUID to domain type for consistent serialization.
+		ID:     domaintypes.RunID(uuid.UUID(run.ID.Bytes).String()),
+		Name:   run.Name,
+		Status: run.Status,
+		// Wrap VCS fields in domain types; values are validated at input time.
+		RepoURL:   domaintypes.RepoURL(run.RepoUrl),
+		BaseRef:   domaintypes.GitRef(run.BaseRef),
+		TargetRef: domaintypes.GitRef(run.TargetRef),
 		CreatedBy: run.CreatedBy,
 		CreatedAt: run.CreatedAt.Time,
 	}
@@ -440,29 +445,35 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 
 // RunRepoResponse represents a single repo within a batch for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
+// Uses domain types (RunRepoID, RunID, RepoURL, GitRef) for type-safe
+// serialization at API boundaries.
 type RunRepoResponse struct {
-	ID         string     `json:"id"`
-	RunID      string     `json:"run_id"`
-	RepoURL    string     `json:"repo_url"`
-	BaseRef    string     `json:"base_ref"`
-	TargetRef  string     `json:"target_ref"`
-	Status     string     `json:"status"`
-	Attempt    int32      `json:"attempt"`
-	LastError  *string    `json:"last_error,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	StartedAt  *time.Time `json:"started_at,omitempty"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	ID         domaintypes.RunRepoID `json:"id"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoURL    domaintypes.RepoURL   `json:"repo_url"`
+	BaseRef    domaintypes.GitRef    `json:"base_ref"`
+	TargetRef  domaintypes.GitRef    `json:"target_ref"`
+	Status     store.RunRepoStatus   `json:"status"`
+	Attempt    int32                 `json:"attempt"`
+	LastError  *string               `json:"last_error,omitempty"`
+	CreatedAt  time.Time             `json:"created_at"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
+// Wraps raw store strings in domain types for type-safe API output.
 func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
 	resp := RunRepoResponse{
-		ID:        uuid.UUID(rr.ID.Bytes).String(),
-		RunID:     uuid.UUID(rr.RunID.Bytes).String(),
-		RepoURL:   rr.RepoUrl,
-		BaseRef:   rr.BaseRef,
-		TargetRef: rr.TargetRef,
-		Status:    string(rr.Status),
+		// Convert UUIDs to domain types for consistent serialization.
+		ID:    domaintypes.RunRepoID(uuid.UUID(rr.ID.Bytes).String()),
+		RunID: domaintypes.RunID(uuid.UUID(rr.RunID.Bytes).String()),
+		// Wrap VCS fields in domain types; values are validated at input time.
+		RepoURL:   domaintypes.RepoURL(rr.RepoUrl),
+		BaseRef:   domaintypes.GitRef(rr.BaseRef),
+		TargetRef: domaintypes.GitRef(rr.TargetRef),
+		// Use typed status instead of raw string for type safety.
+		Status:    rr.Status,
 		Attempt:   rr.Attempt,
 		LastError: rr.LastError,
 		CreatedAt: rr.CreatedAt.Time,
@@ -919,11 +930,12 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 // -------------------------------------------------------------------------
 
 // StartRunResponse contains the result of starting a batch run.
+// Uses domain type RunID for type-safe run identification.
 type StartRunResponse struct {
-	RunID       string `json:"run_id"`
-	Started     int    `json:"started"`      // Number of repos that started execution.
-	AlreadyDone int    `json:"already_done"` // Number of repos already in terminal state.
-	Pending     int    `json:"pending"`      // Number of repos still pending (if any).
+	RunID       domaintypes.RunID `json:"run_id"`
+	Started     int               `json:"started"`      // Number of repos that started execution.
+	AlreadyDone int               `json:"already_done"` // Number of repos already in terminal state.
+	Pending     int               `json:"pending"`      // Number of repos still pending (if any).
 }
 
 // startRunHandler returns an HTTP handler that starts execution for pending repos in a batch.
@@ -996,7 +1008,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 		// If no pending repos, return early with current counts.
 		if len(pendingRepos) == 0 {
 			resp := StartRunResponse{
-				RunID:       runIDStr,
+				RunID:       domaintypes.RunID(runIDStr),
 				Started:     0,
 				AlreadyDone: alreadyDone,
 				Pending:     0,
@@ -1081,7 +1093,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 
 		// Build response.
 		resp := StartRunResponse{
-			RunID:       runIDStr,
+			RunID:       domaintypes.RunID(runIDStr),
 			Started:     started,
 			AlreadyDone: alreadyDone,
 			Pending:     stillPending - started, // Subtract started from pending count.
