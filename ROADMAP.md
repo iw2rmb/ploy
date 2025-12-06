@@ -73,7 +73,7 @@ Legend: [ ] todo, [x] done.
     - Route registration: `s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)`.
   - Tests: Create `internal/server/handlers/handlers_runs_batch_test.go` with table-driven tests validating 200 responses, validation errors for bad IDs, and proper status codes for unknown runs.
 
-- [ ] Add RunRepo HTTP handlers — manage repos within a batch (add/remove/restart/list) under `/v1/runs/{id}/repos`.
+- [x] Add RunRepo HTTP handlers — manage repos within a batch (add/remove/restart/list) under `/v1/runs/{id}/repos`.
   - Repository: ploy
   - Component: internal/server/handlers
   - Scope:
