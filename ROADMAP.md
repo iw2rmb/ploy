@@ -182,7 +182,7 @@ Legend: [ ] todo, [x] done.
     - Use a fake `internal/cli/mods` client (or httptest.Server) to assert correct endpoints are called and output formatting matches expectations.
 
 ## Documentation and OpenAPI
-- [ ] Extend OpenAPI spec for batch run endpoints — document control-plane surfaces for runs and repos.
+- [x] Extend OpenAPI spec for batch run endpoints — document control-plane surfaces for runs and repos.
   - Repository: ploy
   - Component: docs/api
   - Scope:

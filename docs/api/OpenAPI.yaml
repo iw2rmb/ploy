@@ -161,6 +161,10 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RunRepo'
     RunRepoCounts:
       $ref: './components/schemas/controlplane.yaml#/RunRepoCounts'
+    RunRepoStatus:
+      $ref: './components/schemas/controlplane.yaml#/RunRepoStatus'
+    RunBatchDerivedStatus:
+      $ref: './components/schemas/controlplane.yaml#/RunBatchDerivedStatus'
     CreateRunRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
     CreateRunResponse:
