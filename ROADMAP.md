@@ -264,7 +264,7 @@ Legend: [ ] todo, [x] done.
     - `type runBatchCreateRequest struct { Name string 'json:"name"'; Spec *json.RawMessage 'json:"spec"'; CreatedBy *string 'json:"created_by,omitempty"' }`.
   - Tests: Add/extend tests in `internal/domain/types/vcs_test.go` or a new test file to validate that RepoURL/GitRef validation still passes existing cases and rejects invalid inputs in RunRepo handlers.
 
-- [ ] Add focused tests for batch run workflow across server, CLI, and E2E — keep regression surface small.
+- [x] Add focused tests for batch run workflow across server, CLI, and E2E — keep regression surface small.
   - Repository: ploy
   - Component: internal/server/handlers, cmd/ploy, tests/e2e/mods
   - Scope:
