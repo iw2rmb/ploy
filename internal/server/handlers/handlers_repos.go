@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -129,14 +130,12 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate that the decoded URL looks like a valid repo URL.
-		// We do a minimal check: non-empty and parseable as URL.
+		// Validate that the decoded URL is a valid RepoURL according to domain rules.
 		if repoURL == "" {
 			http.Error(w, "repo_id cannot be empty", http.StatusBadRequest)
 			return
 		}
-		parsed, err := url.Parse(repoURL)
-		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
 			http.Error(w, "repo_id must be a valid repository URL", http.StatusBadRequest)
 			return
 		}
