@@ -38,4 +38,3 @@ get:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
-
