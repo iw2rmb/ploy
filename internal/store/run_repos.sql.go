@@ -211,6 +211,47 @@ func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.U
 	return items, nil
 }
 
+const listDistinctRepos = `-- name: ListDistinctRepos :many
+SELECT DISTINCT ON (rr.repo_url)
+    rr.repo_url,
+    rr.started_at AS last_run_at,
+    rr.status AS last_status
+FROM run_repos rr
+WHERE
+    -- Optional substring filter: if @filter is NULL or empty, match all.
+    ($1::text IS NULL OR $1 = '' OR rr.repo_url ILIKE '%' || $1 || '%')
+ORDER BY rr.repo_url, rr.started_at DESC NULLS LAST
+`
+
+type ListDistinctReposRow struct {
+	RepoUrl    string             `json:"repo_url"`
+	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
+	LastStatus RunRepoStatus      `json:"last_status"`
+}
+
+// Lists distinct repository URLs from run_repos with optional substring filter.
+// Returns repo_url along with the most recent run timestamp and status for each repo.
+// Used by GET /v1/repos to provide a repo-centric view of batch activity.
+func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error) {
+	rows, err := q.db.Query(ctx, listDistinctRepos, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDistinctReposRow{}
+	for rows.Next() {
+		var i ListDistinctReposRow
+		if err := rows.Scan(&i.RepoUrl, &i.LastRunAt, &i.LastStatus); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingRunReposByRun = `-- name: ListPendingRunReposByRun :many
 SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
 WHERE run_id = $1 AND status = 'pending'
@@ -279,6 +320,76 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]R
 			&i.LastError,
 			&i.ExecutionRunID,
 			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsForRepo = `-- name: ListRunsForRepo :many
+SELECT
+    r.id AS run_id,
+    r.name,
+    r.status AS run_status,
+    rr.status AS repo_status,
+    rr.base_ref,
+    rr.target_ref,
+    rr.attempt,
+    rr.started_at,
+    rr.finished_at
+FROM run_repos rr
+INNER JOIN runs r ON rr.run_id = r.id
+WHERE rr.repo_url = $1
+ORDER BY rr.created_at DESC
+LIMIT $3
+OFFSET $2
+`
+
+type ListRunsForRepoParams struct {
+	RepoUrl string `json:"repo_url"`
+	Off     int32  `json:"off"`
+	Lim     int32  `json:"lim"`
+}
+
+type ListRunsForRepoRow struct {
+	RunID      pgtype.UUID        `json:"run_id"`
+	Name       *string            `json:"name"`
+	RunStatus  RunStatus          `json:"run_status"`
+	RepoStatus RunRepoStatus      `json:"repo_status"`
+	BaseRef    string             `json:"base_ref"`
+	TargetRef  string             `json:"target_ref"`
+	Attempt    int32              `json:"attempt"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+}
+
+// Lists all runs (via run_repos) for a given repository URL.
+// Returns run details joined with run_repo status and timing for repo-centric view.
+// Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
+	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoUrl, arg.Off, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunsForRepoRow{}
+	for rows.Next() {
+		var i ListRunsForRepoRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.Name,
+			&i.RunStatus,
+			&i.RepoStatus,
+			&i.BaseRef,
+			&i.TargetRef,
+			&i.Attempt,
 			&i.StartedAt,
 			&i.FinishedAt,
 		); err != nil {

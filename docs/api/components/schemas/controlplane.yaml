@@ -706,3 +706,76 @@ WorkflowGraph:
       type: boolean
       description: True when graph is a simple linear chain
   required: [run_id, nodes, root_ids, leaf_ids, linear]
+
+# -------------------------------------------------------------------------
+# Repo-centric API types — list repos and show runs for a given repo
+# -------------------------------------------------------------------------
+
+RepoSummary:
+  type: object
+  description: |
+    Repository summary returned by GET /v1/repos. Includes the repo URL
+    along with metadata from the most recent run (if any).
+  properties:
+    repo_url:
+      type: string
+      description: Git repository URL (https, ssh, or file scheme)
+    last_run_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the most recent run started (if any)
+    last_status:
+      type: string
+      nullable: true
+      description: Status of the most recent run (pending, running, succeeded, etc.)
+  required:
+    - repo_url
+
+RepoRunSummary:
+  type: object
+  description: |
+    Run summary for a specific repository, returned by GET /v1/repos/{repo_id}/runs.
+    Includes both the parent run status and per-repo status within the batch.
+  properties:
+    run_id:
+      type: string
+      format: uuid
+      description: Unique run identifier
+    name:
+      type: string
+      nullable: true
+      description: Optional batch run name
+    run_status:
+      type: string
+      description: Parent run status (queued, running, succeeded, failed, canceled)
+    repo_status:
+      type: string
+      description: Per-repo status within the batch (pending, running, succeeded, etc.)
+    base_ref:
+      type: string
+      description: Git base ref for the run
+    target_ref:
+      type: string
+      description: Git target ref for the run
+    attempt:
+      type: integer
+      format: int32
+      description: Retry attempt number for this repo in the batch
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when execution started
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when execution completed
+  required:
+    - run_id
+    - run_status
+    - repo_status
+    - base_ref
+    - target_ref
+    - attempt

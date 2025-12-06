@@ -102,3 +102,38 @@ INNER JOIN run_repos rr ON r.id = rr.run_id
 WHERE r.status IN ('queued', 'assigned', 'running')
   AND rr.status = 'pending'
 ORDER BY r.id;
+
+-- name: ListDistinctRepos :many
+-- Lists distinct repository URLs from run_repos with optional substring filter.
+-- Returns repo_url along with the most recent run timestamp and status for each repo.
+-- Used by GET /v1/repos to provide a repo-centric view of batch activity.
+SELECT DISTINCT ON (rr.repo_url)
+    rr.repo_url,
+    rr.started_at AS last_run_at,
+    rr.status AS last_status
+FROM run_repos rr
+WHERE
+    -- Optional substring filter: if @filter is NULL or empty, match all.
+    (@filter::text IS NULL OR @filter = '' OR rr.repo_url ILIKE '%' || @filter || '%')
+ORDER BY rr.repo_url, rr.started_at DESC NULLS LAST;
+
+-- name: ListRunsForRepo :many
+-- Lists all runs (via run_repos) for a given repository URL.
+-- Returns run details joined with run_repo status and timing for repo-centric view.
+-- Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+SELECT
+    r.id AS run_id,
+    r.name,
+    r.status AS run_status,
+    rr.status AS repo_status,
+    rr.base_ref,
+    rr.target_ref,
+    rr.attempt,
+    rr.started_at,
+    rr.finished_at
+FROM run_repos rr
+INNER JOIN runs r ON rr.run_id = r.id
+WHERE rr.repo_url = @repo_url
+ORDER BY rr.created_at DESC
+LIMIT @lim
+OFFSET @off;
