@@ -90,7 +90,7 @@ Legend: [ ] todo, [x] done.
     - Return 404 for unknown run IDs.
     - Correctly move repo status from `pending` to `skipped` on DELETE and from terminal states back to `pending` on restart.
 
-- [ ] Connect RunRepo entries to execution runs — map each repo entry to the existing `runs` jobs pipeline.
+- [x] Connect RunRepo entries to execution runs — map each repo entry to the existing `runs` jobs pipeline.
   - Repository: ploy
   - Component: internal/server/handlers, internal/store
   - Scope:
