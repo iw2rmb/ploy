@@ -47,6 +47,10 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/{id}/logs", "post"},
 		{"/v1/mods/{id}/diffs", "post"},
 		{"/v1/diffs/{id}", "get"},
+		// Batch runs lifecycle
+		{"/v1/runs", "get"},
+		{"/v1/runs/{id}", "get"},
+		{"/v1/runs/{id}/stop", "post"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management
@@ -128,6 +132,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"PKIAdminSignRequest",
 		"PKIClientSignRequest",
 		"Run",
+		"RunBatchSummary",
+		"RunRepoCounts",
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"TicketSubmitRequest",
