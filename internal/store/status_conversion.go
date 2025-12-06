@@ -111,3 +111,49 @@ func ValidateBuildgateJobStatus(status string) (BuildgateJobStatus, error) {
 		return "", fmt.Errorf("invalid buildgate job status: %q (expected: pending, claimed, running, completed, failed)", status)
 	}
 }
+
+// ValidateRunRepoStatus validates that a string is a valid RunRepoStatus value.
+// Returns the typed status if valid, otherwise returns an error.
+// RunRepoStatus tracks per-repo execution state within a batched run.
+func ValidateRunRepoStatus(status string) (RunRepoStatus, error) {
+	s := RunRepoStatus(status)
+	switch s {
+	case RunRepoStatusPending, RunRepoStatusRunning, RunRepoStatusSucceeded,
+		RunRepoStatusFailed, RunRepoStatusSkipped, RunRepoStatusCancelled:
+		return s, nil
+	default:
+		return "", fmt.Errorf("invalid run repo status: %q (expected: pending, running, succeeded, failed, skipped, cancelled)", status)
+	}
+}
+
+// ConvertToRunRepoStatus converts various run repo status string representations
+// to the canonical store.RunRepoStatus type. This helper provides type-safe
+// conversion from external API representations to the database-authoritative
+// store.RunRepoStatus.
+//
+// Supported mappings:
+//   - "pending" -> RunRepoStatusPending
+//   - "running" -> RunRepoStatusRunning
+//   - "succeeded" -> RunRepoStatusSucceeded
+//   - "failed" -> RunRepoStatusFailed
+//   - "skipped" -> RunRepoStatusSkipped
+//   - "cancelled" -> RunRepoStatusCancelled
+//   - "canceled" -> RunRepoStatusCancelled (US spelling compatibility)
+func ConvertToRunRepoStatus(status string) (RunRepoStatus, error) {
+	switch status {
+	case "pending":
+		return RunRepoStatusPending, nil
+	case "running":
+		return RunRepoStatusRunning, nil
+	case "succeeded":
+		return RunRepoStatusSucceeded, nil
+	case "failed":
+		return RunRepoStatusFailed, nil
+	case "skipped":
+		return RunRepoStatusSkipped, nil
+	case "cancelled", "canceled":
+		return RunRepoStatusCancelled, nil
+	default:
+		return "", fmt.Errorf("unknown run repo status: %q", status)
+	}
+}

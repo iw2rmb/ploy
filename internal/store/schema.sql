@@ -22,6 +22,12 @@ CREATE TYPE buildgate_job_status AS ENUM (
   'pending', 'claimed', 'running', 'completed', 'failed'
 );
 
+-- RunRepoStatus tracks per-repo execution state within a batched run.
+-- Mirrors job_status without 'created' since repos enter as 'pending'.
+CREATE TYPE run_repo_status AS ENUM (
+  'pending', 'running', 'succeeded', 'failed', 'skipped', 'cancelled'
+);
+
 
 
 -- Nodes (no labels; each node must have an IP address).
@@ -74,6 +80,27 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status);
 CREATE INDEX IF NOT EXISTS runs_node_idx ON runs(node_id);
 CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
+
+-- RunRepos tracks per-repo execution state within a batched run.
+-- The parent run holds shared spec and metadata; each run_repos row captures
+-- a single repository's execution state, allowing multiple repos per batch.
+CREATE TABLE IF NOT EXISTS run_repos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id      UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  repo_url    TEXT NOT NULL,
+  base_ref    TEXT NOT NULL,
+  target_ref  TEXT NOT NULL,
+  status      run_repo_status NOT NULL DEFAULT 'pending',
+  attempt     INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
+  last_error  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at  TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ
+);
+-- Index for listing repos by run (batch lookups).
+CREATE INDEX IF NOT EXISTS run_repos_run_idx ON run_repos(run_id);
+-- Partial index for scheduling: find pending/running repos efficiently.
+CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE status IN ('pending','running');
 
 -- Jobs (unified job queue for all execution units: pre-gate, mod, heal, post-gate)
 -- Float step_index enables inserting healing jobs between existing jobs:
