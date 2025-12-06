@@ -2,6 +2,7 @@ Usage: ploy mod <command>
 
 Commands:
   run         Submit a Mods run to the control plane
+  run repo    Manage repos within a batch run (add/remove/restart/status)
   cancel      Cancel a Mods ticket via the control plane
   resume      Resume a paused Mods ticket
   inspect     Show summary for a Mods ticket
@@ -9,6 +10,7 @@ Commands:
   diffs       List diffs or download newest patch
 
 Use 'ploy mod run --help' for flag details.
+Use 'ploy mod run repo' for batch repo subcommands.
 
 Flags for 'ploy mod run':
   --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)

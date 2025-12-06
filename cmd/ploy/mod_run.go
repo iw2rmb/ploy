@@ -8,7 +8,14 @@ import (
 )
 
 // handleModRun executes the Mods-specific run command.
+// Routes to repo subcommands when args[0] == "repo", otherwise executes
+// the standard mod run workflow for single-repo ticket submission.
 func handleModRun(args []string, stderr io.Writer) error {
+	// Check for "repo" subcommand to route to batch repo operations.
+	// This enables `ploy mod run repo add/remove/restart/status` workflows.
+	if len(args) > 0 && args[0] == "repo" {
+		return handleModRunRepo(args[1:], stderr)
+	}
 	return executeModRun(args, stderr)
 }
 

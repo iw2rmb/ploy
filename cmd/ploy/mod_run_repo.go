@@ -1,0 +1,432 @@
+// mod_run_repo.go implements the `ploy mod run repo` subcommands for managing
+// repos within a batch run.
+//
+// This file provides CLI routing for repo add/remove/restart/status operations
+// that delegate to the control plane's /v1/runs/{id}/repos endpoints. Each
+// subcommand parses its own flags and invokes the corresponding HTTP handler.
+//
+// Command structure:
+//   - ploy mod run repo add <batch-id> --repo-url <url> --base-ref <ref> --target-ref <ref>
+//   - ploy mod run repo remove <batch-id> --repo-id <id>
+//   - ploy mod run repo restart <batch-id> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]
+//   - ploy mod run repo status <batch-id>
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"text/tabwriter"
+	"time"
+)
+
+// handleModRunRepo routes `mod run repo <action>` subcommands.
+// Called when args[0] == "repo" in the mod run context.
+func handleModRunRepo(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printModRunRepoUsage(stderr)
+		return errors.New("mod run repo action required")
+	}
+
+	// Dispatch to the appropriate subcommand handler.
+	switch args[0] {
+	case "add":
+		return handleModRunRepoAdd(args[1:], stderr)
+	case "remove":
+		return handleModRunRepoRemove(args[1:], stderr)
+	case "restart":
+		return handleModRunRepoRestart(args[1:], stderr)
+	case "status":
+		return handleModRunRepoStatus(args[1:], stderr)
+	default:
+		printModRunRepoUsage(stderr)
+		return fmt.Errorf("unknown mod run repo action %q", args[0])
+	}
+}
+
+// printModRunRepoUsage renders help for mod run repo subcommands.
+func printModRunRepoUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run repo <action> <batch-id> [flags]")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Actions:")
+	_, _ = fmt.Fprintln(w, "  add       Add a repo to a batch run")
+	_, _ = fmt.Fprintln(w, "  remove    Remove/cancel a repo from a batch run")
+	_, _ = fmt.Fprintln(w, "  restart   Restart a repo within a batch run")
+	_, _ = fmt.Fprintln(w, "  status    Show repos and their statuses within a batch run")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Examples:")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo add <batch-id> --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove <batch-id> --repo-id <repo-uuid>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart <batch-id> --repo-id <repo-uuid>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo status <batch-id>")
+}
+
+// handleModRunRepoAdd implements `ploy mod run repo add <batch-id> --repo-url <url> --base-ref <ref> --target-ref <ref>`.
+// Adds a new repo entry to a batch run with status=pending.
+func handleModRunRepoAdd(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod run repo add", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	repoURL := fs.String("repo-url", "", "Git repository URL")
+	baseRef := fs.String("base-ref", "", "Git base ref (branch or commit)")
+	targetRef := fs.String("target-ref", "", "Git target ref (branch to create)")
+
+	if err := fs.Parse(args); err != nil {
+		printModRunRepoUsage(stderr)
+		return err
+	}
+
+	// Extract positional batch ID.
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("batch-id required")
+	}
+	batchID := strings.TrimSpace(rest[0])
+
+	// Validate required flags.
+	if strings.TrimSpace(*repoURL) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--repo-url required")
+	}
+	if strings.TrimSpace(*baseRef) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--base-ref required")
+	}
+	if strings.TrimSpace(*targetRef) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--target-ref required")
+	}
+
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Build and send the request to POST /v1/runs/{id}/repos.
+	reqBody := runRepoAddRequest{
+		RepoURL:   strings.TrimSpace(*repoURL),
+		BaseRef:   strings.TrimSpace(*baseRef),
+		TargetRef: strings.TrimSpace(*targetRef),
+	}
+	resp, err := doRunRepoAdd(ctx, base, httpClient, batchID, reqBody)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Repo added: %s (id: %s, status: %s)\n", resp.RepoURL, resp.ID, resp.Status)
+	return nil
+}
+
+// handleModRunRepoRemove implements `ploy mod run repo remove <batch-id> --repo-id <id>`.
+// Marks pending repos as skipped, running repos as cancelled.
+func handleModRunRepoRemove(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod run repo remove", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	repoID := fs.String("repo-id", "", "Repo UUID to remove")
+
+	if err := fs.Parse(args); err != nil {
+		printModRunRepoUsage(stderr)
+		return err
+	}
+
+	// Extract positional batch ID.
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("batch-id required")
+	}
+	batchID := strings.TrimSpace(rest[0])
+
+	// Validate required flags.
+	if strings.TrimSpace(*repoID) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--repo-id required")
+	}
+
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Send DELETE /v1/runs/{id}/repos/{repo_id}.
+	resp, err := doRunRepoRemove(ctx, base, httpClient, batchID, strings.TrimSpace(*repoID))
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (id: %s, status: %s)\n", resp.RepoURL, resp.ID, resp.Status)
+	return nil
+}
+
+// handleModRunRepoRestart implements `ploy mod run repo restart <batch-id> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]`.
+// Resets repo status to pending, increments attempt, optionally updates refs.
+func handleModRunRepoRestart(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod run repo restart", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	repoID := fs.String("repo-id", "", "Repo UUID to restart")
+	baseRef := fs.String("base-ref", "", "Optional new base ref")
+	targetRef := fs.String("target-ref", "", "Optional new target ref")
+
+	if err := fs.Parse(args); err != nil {
+		printModRunRepoUsage(stderr)
+		return err
+	}
+
+	// Extract positional batch ID.
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("batch-id required")
+	}
+	batchID := strings.TrimSpace(rest[0])
+
+	// Validate required flags.
+	if strings.TrimSpace(*repoID) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--repo-id required")
+	}
+
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Build the optional request body for ref updates.
+	reqBody := runRepoRestartRequest{}
+	if br := strings.TrimSpace(*baseRef); br != "" {
+		reqBody.BaseRef = &br
+	}
+	if tr := strings.TrimSpace(*targetRef); tr != "" {
+		reqBody.TargetRef = &tr
+	}
+
+	// Send POST /v1/runs/{id}/repos/{repo_id}/restart.
+	resp, err := doRunRepoRestart(ctx, base, httpClient, batchID, strings.TrimSpace(*repoID), reqBody)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (id: %s, attempt: %d, status: %s)\n", resp.RepoURL, resp.ID, resp.Attempt, resp.Status)
+	return nil
+}
+
+// handleModRunRepoStatus implements `ploy mod run repo status <batch-id>`.
+// Lists all repos within a batch with their status, attempt count, and timing.
+func handleModRunRepoStatus(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod run repo status", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	if err := fs.Parse(args); err != nil {
+		printModRunRepoUsage(stderr)
+		return err
+	}
+
+	// Extract positional batch ID.
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("batch-id required")
+	}
+	batchID := strings.TrimSpace(rest[0])
+
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Send GET /v1/runs/{id}/repos.
+	repos, err := doRunRepoList(ctx, base, httpClient, batchID)
+	if err != nil {
+		return err
+	}
+
+	if len(repos) == 0 {
+		_, _ = fmt.Fprintln(stderr, "No repos found in this batch.")
+		return nil
+	}
+
+	// Print table with repo details.
+	tw := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "ID\tREPO URL\tBASE REF\tTARGET REF\tATTEMPT\tSTATUS\tLAST ERROR")
+	for _, r := range repos {
+		lastErr := "-"
+		if r.LastError != nil && *r.LastError != "" {
+			// Truncate long error messages.
+			errStr := *r.LastError
+			if len(errStr) > 40 {
+				errStr = errStr[:37] + "..."
+			}
+			lastErr = errStr
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+			r.ID, r.RepoURL, r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
+	}
+	_ = tw.Flush()
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+// HTTP client helpers for batch repo operations
+// -----------------------------------------------------------------------------
+
+// runRepoAddRequest is the request body for adding a repo to a batch.
+type runRepoAddRequest struct {
+	RepoURL   string `json:"repo_url"`
+	BaseRef   string `json:"base_ref"`
+	TargetRef string `json:"target_ref"`
+}
+
+// runRepoRestartRequest is the optional request body for restarting a repo.
+type runRepoRestartRequest struct {
+	BaseRef   *string `json:"base_ref,omitempty"`
+	TargetRef *string `json:"target_ref,omitempty"`
+}
+
+// runRepoResponse mirrors the server's RunRepoResponse for CLI consumption.
+type runRepoResponse struct {
+	ID         string     `json:"id"`
+	RunID      string     `json:"run_id"`
+	RepoURL    string     `json:"repo_url"`
+	BaseRef    string     `json:"base_ref"`
+	TargetRef  string     `json:"target_ref"`
+	Status     string     `json:"status"`
+	Attempt    int32      `json:"attempt"`
+	LastError  *string    `json:"last_error,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	StartedAt  *time.Time `json:"started_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
+
+// doRunRepoAdd sends POST /v1/runs/{id}/repos to add a repo to a batch.
+func doRunRepoAdd(ctx context.Context, base *url.URL, client *http.Client, batchID string, req runRepoAddRequest) (runRepoResponse, error) {
+	endpoint := base.JoinPath("/v1/runs", batchID, "repos")
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return runRepoResponse{}, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	var result runRepoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return runRepoResponse{}, fmt.Errorf("decode response: %w", err)
+	}
+	return result, nil
+}
+
+// doRunRepoRemove sends DELETE /v1/runs/{id}/repos/{repo_id} to remove a repo.
+func doRunRepoRemove(ctx context.Context, base *url.URL, client *http.Client, batchID, repoID string) (runRepoResponse, error) {
+	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return runRepoResponse{}, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	var result runRepoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return runRepoResponse{}, fmt.Errorf("decode response: %w", err)
+	}
+	return result, nil
+}
+
+// doRunRepoRestart sends POST /v1/runs/{id}/repos/{repo_id}/restart to restart a repo.
+func doRunRepoRestart(ctx context.Context, base *url.URL, client *http.Client, batchID, repoID string, req runRepoRestartRequest) (runRepoResponse, error) {
+	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID, "restart")
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return runRepoResponse{}, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return runRepoResponse{}, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	var result runRepoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return runRepoResponse{}, fmt.Errorf("decode response: %w", err)
+	}
+	return result, nil
+}
+
+// doRunRepoList sends GET /v1/runs/{id}/repos to list repos within a batch.
+func doRunRepoList(ctx context.Context, base *url.URL, client *http.Client, batchID string) ([]runRepoResponse, error) {
+	endpoint := base.JoinPath("/v1/runs", batchID, "repos")
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	// Response is {"repos": [...]}
+	var result struct {
+		Repos []runRepoResponse `json:"repos"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return result.Repos, nil
+}
