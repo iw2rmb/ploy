@@ -1,5 +1,7 @@
 # Ploy — Mods Orchestrator and Control Plane
 
+[![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml)
+
 Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
 
 - `ploy` — a CLI for submitting Mods, following logs, managing runs, and administering clusters.
@@ -186,5 +188,3 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - `http.tls.require_client_cert` (config YAML) was removed. When `http.tls.enabled` is true, the server always requires mTLS with client certificates verified against `http.tls.client_ca`. TLS is pinned to 1.3. Example configs and bootstrap have been updated accordingly.
 
 License: see `LICENSE` when present.
-
-[![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml)
