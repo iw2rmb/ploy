@@ -350,7 +350,7 @@ See `internal/mods/api/types.go` for the full schema.
 
 ## Environment
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`; other adapters (`k8s`, `nomad`) can register here and
+  `local-step`; other adapters (e.g., `k8s`) can register here and
   unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache

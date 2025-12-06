@@ -111,7 +111,7 @@ jobs:
           ./bin/ploy --version || echo "CLI built successfully"
           echo "Controller built successfully"
 
-  # Integration tests require external services
+  # Integration tests require external services (Consul + SeaweedFS)
   integration-tests:
     runs-on: ubuntu-latest
     needs: build-verification
@@ -140,20 +140,6 @@ jobs:
             hashicorp/consul:1.16 \
             consul agent -dev -client=0.0.0.0 -bootstrap-expect=1
 
-      - name: Start Nomad
-        run: |
-          echo "🚀 Starting Nomad..."
-          docker run -d --name nomad \
-            -p 4646:4646 \
-            --privileged \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            --health-cmd="nomad status" \
-            --health-interval=15s \
-            --health-timeout=10s \
-            --health-retries=5 \
-            hashicorp/nomad:1.6 \
-            nomad agent -dev -bind=0.0.0.0
-
       - name: Start SeaweedFS
         run: |
           echo "🚀 Starting SeaweedFS..."
@@ -180,10 +166,6 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:8500/v1/status/leader; do sleep 2; done'
           echo "✅ Consul is ready"
           
-          # Wait for Nomad
-          timeout 60 bash -c 'until curl -f http://localhost:4646/v1/status/leader; do sleep 2; done'
-          echo "✅ Nomad is ready"
-          
           # Wait for SeaweedFS
           timeout 60 bash -c 'until curl -f http://localhost:9333/dir/status; do sleep 2; done'
           echo "✅ SeaweedFS is ready"
@@ -192,7 +174,6 @@ jobs:
         run: |
           echo "🔧 Setting up integration test environment..."
           export CONSUL_HTTP_ADDR=localhost:8500
-          export NOMAD_ADDR=http://localhost:4646
           export SEAWEEDFS_MASTER=http://localhost:9333
           export SEAWEEDFS_FILER=http://localhost:8888
 
@@ -206,7 +187,6 @@ jobs:
             ./tests/integration/...
         env:
           CONSUL_HTTP_ADDR: localhost:8500
-          NOMAD_ADDR: http://localhost:4646
           SEAWEEDFS_MASTER: http://localhost:9333
           SEAWEEDFS_FILER: http://localhost:8888
 
@@ -223,7 +203,6 @@ jobs:
         run: |
           echo "📋 Service logs for debugging..."
           docker logs consul || true
-          docker logs nomad || true
           docker logs seaweedfs-master || true
           docker logs seaweedfs-volume || true
           docker logs seaweedfs-filer || true
