@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
@@ -44,17 +45,25 @@ func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 }
 
 // EventsCommand streams ticket events until a terminal state is reached.
+// When LogPrinter is set, also handles "log" events using the shared log printer
+// for unified log output alongside ticket/stage updates (used by `mod run --follow`).
 type EventsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
 	Ticket  string
 	Output  io.Writer
 	Printer EventsPrinter
+
+	// LogPrinter is an optional log printer for handling "log" events.
+	// When set, enriched log events are rendered using the shared logs.Printer,
+	// providing a consistent view for `mod run --follow`. When nil, log events
+	// are ignored (backward-compatible with existing behavior).
+	LogPrinter *logs.Printer
 }
 
-// Run consumes "ticket" and "stage" SSE events from /v1/mods/{id}/events.
-// Unknown event types are ignored so the CLI remains forward compatible and it
-// returns the final ticket state.
+// Run consumes "ticket", "stage", and optionally "log" SSE events from /v1/mods/{id}/events.
+// Unknown event types are ignored so the CLI remains forward compatible. Returns the final
+// ticket state. When LogPrinter is set, "log" events are rendered using the shared printer.
 func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 	if c.Client.HTTPClient == nil {
 		return "", errors.New("mods events: http client required")
@@ -100,6 +109,27 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 				return fmt.Errorf("mods events: decode stage: %w", err)
 			}
 			printer.Stage(payload.Stage)
+		case "", "log":
+			// Handle log events when LogPrinter is configured (for unified log streaming).
+			// Empty event type is treated as "log" for backward compatibility with servers
+			// that omit the event type field.
+			if c.LogPrinter != nil && len(evt.Data) > 0 {
+				var rec logs.LogRecord
+				if err := json.Unmarshal(evt.Data, &rec); err != nil {
+					return fmt.Errorf("mods events: decode log: %w", err)
+				}
+				c.LogPrinter.PrintLog(rec)
+			}
+		case "retention":
+			// Handle retention hints when LogPrinter is configured.
+			// Retention metadata is recorded for summary output at stream completion.
+			if c.LogPrinter != nil && len(evt.Data) > 0 {
+				var hint logs.RetentionHint
+				if err := json.Unmarshal(evt.Data, &hint); err != nil {
+					return fmt.Errorf("mods events: decode retention: %w", err)
+				}
+				c.LogPrinter.RecordRetention(hint)
+			}
 		default:
 			// ignore unknown event types
 		}
@@ -107,6 +137,10 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 	}
 	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
 		return "", err
+	}
+	// Print retention summary if LogPrinter was configured (for unified log streaming).
+	if c.LogPrinter != nil {
+		c.LogPrinter.PrintRetentionSummary()
 	}
 	return final, nil
 }

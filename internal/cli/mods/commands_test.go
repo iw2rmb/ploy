@@ -4,16 +4,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
+
+// newTestLogPrinter creates a LogPrinter for testing that writes to the provided writer.
+// Uses structured format to enable verification of enriched fields.
+func newTestLogPrinter(w io.Writer) *logs.Printer {
+	return logs.NewPrinter(logs.FormatStructured, w)
+}
 
 func TestInspectAndArtifactsCommands(t *testing.T) {
 	ticket := modsapi.TicketSummary{
@@ -257,5 +265,162 @@ func TestSimplePrinterFormats(t *testing.T) {
 	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
+	}
+}
+
+// TestEventsCommandWithLogPrinter verifies that EventsCommand renders log events
+// using the shared LogPrinter when configured (unified log streaming for mod run --follow).
+func TestEventsCommandWithLogPrinter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		events     []string // SSE event lines to send
+		wantLog    string   // expected substring in log output
+		wantFinal  modsapi.TicketState
+		wantNodeID bool // whether node= context should appear
+	}{
+		{
+			name: "log event with enriched fields",
+			events: []string{
+				"event: ticket\ndata: {\"ticket_id\":\"t-log\",\"state\":\"running\"}\n\n",
+				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"node-1\",\"job_id\":\"job-1\",\"mod_type\":\"mod\",\"step_index\":100}\n\n",
+				"event: ticket\ndata: {\"ticket_id\":\"t-log\",\"state\":\"succeeded\"}\n\n",
+			},
+			wantLog:    "Build started",
+			wantFinal:  modsapi.TicketStateSucceeded,
+			wantNodeID: true,
+		},
+		{
+			name: "log event without enriched fields",
+			events: []string{
+				"event: ticket\ndata: {\"ticket_id\":\"t-log2\",\"state\":\"running\"}\n\n",
+				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:01Z\",\"stream\":\"stderr\",\"line\":\"Warning\"}\n\n",
+				"event: ticket\ndata: {\"ticket_id\":\"t-log2\",\"state\":\"succeeded\"}\n\n",
+			},
+			wantLog:    "Warning",
+			wantFinal:  modsapi.TicketStateSucceeded,
+			wantNodeID: false,
+		},
+		{
+			name: "retention event recorded",
+			events: []string{
+				"event: ticket\ndata: {\"ticket_id\":\"t-ret\",\"state\":\"running\"}\n\n",
+				"event: retention\ndata: {\"retained\":true,\"ttl\":\"24h\",\"expires_at\":\"2025-10-23T10:00:00Z\",\"bundle_cid\":\"bafy-bundle\"}\n\n",
+				"event: ticket\ndata: {\"ticket_id\":\"t-ret\",\"state\":\"succeeded\"}\n\n",
+			},
+			wantLog:    "retained", // retention summary is printed
+			wantFinal:  modsapi.TicketStateSucceeded,
+			wantNodeID: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fl, ok := w.(http.Flusher)
+				if !ok {
+					t.Fatal("no flusher")
+				}
+				fl.Flush()
+
+				for _, evt := range tt.events {
+					_, _ = w.Write([]byte(evt))
+					fl.Flush()
+					time.Sleep(2 * time.Millisecond)
+				}
+			}))
+			defer sse.Close()
+
+			base, _ := url.Parse(sse.URL)
+			var buf bytes.Buffer
+
+			// Create a LogPrinter to capture log output.
+			logPrinter := newTestLogPrinter(&buf)
+
+			cmd := EventsCommand{
+				Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
+				BaseURL:    base,
+				Ticket:     "t-test",
+				Output:     &buf,
+				LogPrinter: logPrinter,
+			}
+
+			state, err := cmd.Run(context.Background())
+			if err != nil {
+				t.Fatalf("events run: %v", err)
+			}
+			if state != tt.wantFinal {
+				t.Errorf("state=%s, want %s", state, tt.wantFinal)
+			}
+
+			out := buf.String()
+			if tt.wantLog != "" && !bytes.Contains([]byte(out), []byte(tt.wantLog)) {
+				t.Errorf("output missing %q, got: %s", tt.wantLog, out)
+			}
+			if tt.wantNodeID && !bytes.Contains([]byte(out), []byte("node=")) {
+				t.Errorf("output missing node= context, got: %s", out)
+			}
+		})
+	}
+}
+
+// TestEventsCommandWithoutLogPrinter verifies backward compatibility: when
+// LogPrinter is nil, log events are ignored and only ticket/stage events are processed.
+func TestEventsCommandWithoutLogPrinter(t *testing.T) {
+	t.Parallel()
+
+	sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fl, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("no flusher")
+		}
+		fl.Flush()
+
+		// Send ticket, log, and ticket events.
+		events := []string{
+			"event: ticket\ndata: {\"ticket_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
+			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
+			"event: ticket\ndata: {\"ticket_id\":\"t-nolog\",\"state\":\"succeeded\"}\n\n",
+		}
+		for _, evt := range events {
+			_, _ = w.Write([]byte(evt))
+			fl.Flush()
+			time.Sleep(2 * time.Millisecond)
+		}
+	}))
+	defer sse.Close()
+
+	base, _ := url.Parse(sse.URL)
+	var buf bytes.Buffer
+
+	cmd := EventsCommand{
+		Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
+		BaseURL:    base,
+		Ticket:     "t-nolog",
+		Output:     &buf,
+		LogPrinter: nil, // No LogPrinter configured.
+	}
+
+	state, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("events run: %v", err)
+	}
+	if state != modsapi.TicketStateSucceeded {
+		t.Errorf("state=%s, want succeeded", state)
+	}
+
+	out := buf.String()
+	// Log message should NOT appear since LogPrinter is nil.
+	if bytes.Contains([]byte(out), []byte("Should be ignored")) {
+		t.Errorf("log message should not appear when LogPrinter is nil, got: %s", out)
+	}
+	// Ticket state should still appear via SimplePrinter.
+	if !bytes.Contains([]byte(out), []byte("t-nolog")) {
+		t.Errorf("ticket ID should appear in output, got: %s", out)
 	}
 }

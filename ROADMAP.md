@@ -29,7 +29,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: Structured line: `2025-10-22T10:00:00Z stdout node=<node_id> mod=<mod_type> step=<step_index> job=<job_id> Step started`
   - Tests: Update `cmd/ploy/mods_logs_test.go` and `internal/cli/runs/follow_test.go` golden expectations to match the unified structured format, keeping `--format raw` as message-only.
 
-- [ ] Wire unified logs into `ploy mod run --follow` — provide a consistent, informative view when following a Mods ticket directly.
+- [x] Wire unified logs into `ploy mod run --follow` — provide a consistent, informative view when following a Mods ticket directly.
   - Repository: ploy
   - Component: cmd/ploy, internal/cli/mods
   - Scope: Keep `internal/cli/mods.EventsCommand` responsible for ticket/stage events but add an option in `cmd/ploy/mod_run_exec.go` (or a follow helper) to also stream enriched log records via the same SSE endpoint, reusing the shared printer so `mod run --follow` looks like `mods logs` plus ticket/state headers.
