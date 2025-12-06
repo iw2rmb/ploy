@@ -37,7 +37,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `cmd/ploy/mod_run_follow_test.go` to assert that followed runs print the new header plus enriched log lines, and still handle caps/cancellation correctly.
 
 ## API and documentation
-- [ ] Document enriched `event: log` payload — keep API, server, and CLI aligned on log semantics.
+- [x] Document enriched `event: log` payload — keep API, server, and CLI aligned on log semantics.
   - Repository: ploy
   - Component: docs/api, docs
   - Scope: Update `docs/mods-lifecycle.md` SSE section for `/v1/mods/{id}/events` to describe `event: log` as `LogRecord {timestamp, stream, line, node_id, job_id, mod_type, step_index}`; add a short note in `cmd/ploy/README.md` explaining the structured log format used by `mods logs` and `runs follow`.

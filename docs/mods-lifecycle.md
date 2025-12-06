@@ -726,21 +726,64 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 The event hub (`internal/stream/hub.go`) and HTTP wrapper (`internal/stream/http.go`)
 implement a minimal SSE protocol used by the Mods endpoints.
 
-- Event types:
-  - `"log"` — `LogRecord {timestamp, stream, line}`.
-  - `"retention"` — `RetentionHint {retained, ttl, expires_at, bundle_cid}`.
-  - `"ticket"` — `mods/api.TicketSummary`.
-  - `"done"` — `Status {status:"done"}` sentinel; the stream is finished and the
-    hub closes subscribers.
+### 7.1 Event types
 
-- Clients:
-  - `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
-    retry streams.
-  - `internal/cli/mods.EventsCommand` handles `"ticket"` and `"stage"` events
-    (from higher-level publishers) and ignores unknown types to remain
-    forwards-compatible.
-  - `internal/cli/runs.FollowCommand` and `ploy mods logs` focus on `"log"` and
-    `"retention"` events for human-readable tails.
+- `"log"` — Enriched `LogRecord` with execution context (see below).
+- `"retention"` — `RetentionHint {retained, ttl, expires_at, bundle_cid}`.
+- `"ticket"` — `mods/api.TicketSummary`.
+- `"done"` — `Status {status:"done"}` sentinel; the stream is finished and the
+  hub closes subscribers.
+
+### 7.2 LogRecord payload (`event: log`)
+
+Each `event: log` frame carries a JSON-encoded `LogRecord` with both core and
+enriched fields. Enriched fields provide execution context so clients can
+correlate log lines with specific nodes, jobs, and pipeline stages.
+
+**Core fields (always present):**
+
+| Field       | Type   | Description                                       |
+|-------------|--------|---------------------------------------------------|
+| `timestamp` | string | RFC 3339 timestamp when the log line was captured |
+| `stream`    | string | Output stream (`stdout` or `stderr`)              |
+| `line`      | string | Log message content                               |
+
+**Enriched fields (optional, omitempty):**
+
+| Field        | Type   | Description                                                        |
+|--------------|--------|--------------------------------------------------------------------|
+| `node_id`    | string | UUID of the execution node that produced this log line             |
+| `job_id`     | string | UUID of the job that produced this log line                        |
+| `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`  |
+| `step_index` | int    | Float index of the job within the pipeline (e.g., 1000, 2000)      |
+
+**Example SSE frame:**
+
+```
+event: log
+data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"a1b2c3d4-...","job_id":"e5f6g7h8-...","mod_type":"mod","step_index":2000}
+```
+
+**Notes:**
+
+- Enriched fields may be empty for events not tied to a specific job (e.g.,
+  hub-generated system events) or when context is unavailable.
+- `step_index` uses float values (1000, 2000, 3000) to allow dynamic insertion
+  of healing jobs at midpoints (e.g., 1500 for heal-1).
+- CLI consumers (`ploy mods logs`, `ploy runs follow`) use the enriched fields
+  to display contextual information in structured output format.
+
+### 7.3 Clients
+
+- `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
+  retry streams.
+- `internal/cli/mods.EventsCommand` handles `"ticket"` and `"stage"` events
+  (from higher-level publishers) and ignores unknown types to remain
+  forwards-compatible.
+- `internal/cli/runs.FollowCommand` and `ploy mods logs` focus on `"log"` and
+  `"retention"` events for human-readable tails.
+- The shared log printer (`internal/cli/logs`) formats log records using
+  enriched fields when available (see "Structured Log Format" below).
 
 ## 8. References
 

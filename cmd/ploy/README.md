@@ -198,6 +198,63 @@ ploy completion <shell> --help
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
 
+## Structured Log Format
+
+The `ploy mods logs` and `ploy runs follow` commands consume enriched log events
+from the Mods SSE stream (`GET /v1/mods/{id}/events`). A shared log printer
+(`internal/cli/logs`) formats these events consistently across both commands.
+
+### Log record fields
+
+Each `event: log` frame contains a JSON `LogRecord` with core and optional
+enriched fields for execution context:
+
+| Field        | Type   | Description                                                       |
+|--------------|--------|-------------------------------------------------------------------|
+| `timestamp`  | string | RFC 3339 timestamp when the log line was captured                 |
+| `stream`     | string | Output stream (`stdout` or `stderr`)                              |
+| `line`       | string | Log message content                                               |
+| `node_id`    | string | UUID of the execution node (optional)                             |
+| `job_id`     | string | UUID of the job (optional)                                        |
+| `mod_type`   | string | Step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate` (opt)|
+| `step_index` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
+
+### Output formats
+
+**Structured (default, `--format structured`):**
+
+When enriched fields are present:
+```
+2025-10-22T10:00:00Z stdout node=a1b2c3d4 mod=mod step=2000 job=e5f6g7h8 Step started
+```
+
+When only core fields are available:
+```
+2025-10-22T10:00:00Z stdout Step started
+```
+
+**Raw (`--format raw`):**
+
+Prints only the log line content, omitting timestamps and context:
+```
+Step started
+```
+
+### Example usage
+
+```bash
+# Follow logs in structured format (default)
+ploy mods logs <ticket-id>
+
+# Follow logs in raw format (message only)
+ploy mods logs <ticket-id> --format raw
+
+# Follow a run with structured log output
+ploy runs follow <ticket-id>
+```
+
+See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.
+
 ## GitLab MR Integration
 
 The GitLab merge request client uses `gitlab.com/gitlab-org/api/client-go` for typed API interactions and integrates with the shared backoff policy for resilient operation.
