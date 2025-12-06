@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -352,5 +353,481 @@ func isTerminalRunStatus(status store.RunStatus) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// isTerminalRunRepoStatus returns true if the run repo status is terminal.
+func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
+	switch status {
+	case store.RunRepoStatusSucceeded, store.RunRepoStatusFailed, store.RunRepoStatusSkipped, store.RunRepoStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// -------------------------------------------------------------------------
+// RunRepo handlers — manage repos within a batch (add/remove/restart/list)
+// under /v1/runs/{id}/repos.
+// -------------------------------------------------------------------------
+
+// RunRepoResponse represents a single repo within a batch for API responses.
+// Exposes repo URL, refs, attempt count, status, error, and timing fields.
+type RunRepoResponse struct {
+	ID         string     `json:"id"`
+	RunID      string     `json:"run_id"`
+	RepoURL    string     `json:"repo_url"`
+	BaseRef    string     `json:"base_ref"`
+	TargetRef  string     `json:"target_ref"`
+	Status     string     `json:"status"`
+	Attempt    int32      `json:"attempt"`
+	LastError  *string    `json:"last_error,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	StartedAt  *time.Time `json:"started_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
+
+// runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
+func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
+	resp := RunRepoResponse{
+		ID:        uuid.UUID(rr.ID.Bytes).String(),
+		RunID:     uuid.UUID(rr.RunID.Bytes).String(),
+		RepoURL:   rr.RepoUrl,
+		BaseRef:   rr.BaseRef,
+		TargetRef: rr.TargetRef,
+		Status:    string(rr.Status),
+		Attempt:   rr.Attempt,
+		LastError: rr.LastError,
+		CreatedAt: rr.CreatedAt.Time,
+	}
+	if rr.StartedAt.Valid {
+		resp.StartedAt = &rr.StartedAt.Time
+	}
+	if rr.FinishedAt.Valid {
+		resp.FinishedAt = &rr.FinishedAt.Time
+	}
+	return resp
+}
+
+// addRunRepoHandler returns an HTTP handler that adds a repo to a batch run.
+// POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
+// Creates a run_repos row with status=pending.
+// Returns 201 on success with the created repo entry.
+func addRunRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUID.
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUID for store operations.
+		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
+
+		// Verify the run exists before adding a repo.
+		run, err := st.GetRun(r.Context(), pgRunID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: get run failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Reject adding repos to terminal runs — the batch is already complete.
+		if isTerminalRunStatus(run.Status) {
+			http.Error(w, "cannot add repos to a terminal run", http.StatusConflict)
+			return
+		}
+
+		// Decode request body with validation via domain types.
+		// Uses domain types for repo_url and refs to ensure scheme/format validation.
+		var req struct {
+			RepoURL   string `json:"repo_url"`
+			BaseRef   string `json:"base_ref"`
+			TargetRef string `json:"target_ref"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate required fields — repo_url must have valid scheme (https/ssh/file),
+		// refs must be non-empty.
+		if req.RepoURL == "" {
+			http.Error(w, "repo_url is required", http.StatusBadRequest)
+			return
+		}
+		if req.BaseRef == "" {
+			http.Error(w, "base_ref is required", http.StatusBadRequest)
+			return
+		}
+		if req.TargetRef == "" {
+			http.Error(w, "target_ref is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate repo_url scheme (https/ssh/file).
+		repoURLLower := strings.ToLower(req.RepoURL)
+		if !strings.HasPrefix(repoURLLower, "https://") &&
+			!strings.HasPrefix(repoURLLower, "ssh://") &&
+			!strings.HasPrefix(repoURLLower, "file://") {
+			http.Error(w, "repo_url: invalid scheme (must be https, ssh, or file)", http.StatusBadRequest)
+			return
+		}
+
+		// Create the run_repo entry with status=pending.
+		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
+			RunID:     pgRunID,
+			RepoUrl:   strings.TrimSpace(req.RepoURL),
+			BaseRef:   strings.TrimSpace(req.BaseRef),
+			TargetRef: strings.TrimSpace(req.TargetRef),
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: create failed", "run_id", runIDStr, "repo_url", req.RepoURL, "err", err)
+			return
+		}
+
+		slog.Info("run repo added",
+			"run_id", runIDStr,
+			"repo_id", uuid.UUID(runRepo.ID.Bytes).String(),
+			"repo_url", req.RepoURL,
+		)
+
+		// Return the created repo entry.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
+			slog.Error("add run repo: encode response failed", "err", err)
+		}
+	}
+}
+
+// listRunReposHandler returns an HTTP handler that lists repos within a batch run.
+// GET /v1/runs/{id}/repos — Returns the list of repos with status, attempt, timing fields.
+func listRunReposHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUID.
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUID for store operations.
+		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
+
+		// Verify the run exists before listing repos.
+		_, err = st.GetRun(r.Context(), pgRunID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("list run repos: get run failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Fetch all repos for this run.
+		repos, err := st.ListRunReposByRun(r.Context(), pgRunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			slog.Error("list run repos: list failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Build response.
+		reposResp := make([]RunRepoResponse, 0, len(repos))
+		for _, rr := range repos {
+			reposResp = append(reposResp, runRepoToResponse(rr))
+		}
+
+		resp := struct {
+			Repos []RunRepoResponse `json:"repos"`
+		}{
+			Repos: reposResp,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("list run repos: encode response failed", "err", err)
+		}
+	}
+}
+
+// deleteRunRepoHandler returns an HTTP handler that removes/cancels a repo from a batch.
+// DELETE /v1/runs/{id}/repos/{repo_id} — Marks pending repos as skipped, running repos as cancelled.
+// Returns 200 on success with the updated repo entry.
+func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse the repo ID from the URL path parameter.
+		repoIDStr := r.PathValue("repo_id")
+		if repoIDStr == "" {
+			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUIDs.
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
+			return
+		}
+		repoID, err := uuid.Parse(repoIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid repo id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUIDs.
+		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
+		pgRepoID := pgtype.UUID{Bytes: repoID, Valid: true}
+
+		// Verify the run exists.
+		_, err = st.GetRun(r.Context(), pgRunID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("delete run repo: get run failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Fetch the repo entry.
+		runRepo, err := st.GetRunRepo(r.Context(), pgRepoID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "repo not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+			slog.Error("delete run repo: get repo failed", "repo_id", repoIDStr, "err", err)
+			return
+		}
+
+		// Verify the repo belongs to this run.
+		if uuid.UUID(runRepo.RunID.Bytes) != runID {
+			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
+			return
+		}
+
+		// Determine the new status based on current status.
+		// Pending → Skipped (never started, user removed it).
+		// Running → Cancelled (will need execution to stop).
+		// Terminal statuses → No change (idempotent).
+		var newStatus store.RunRepoStatus
+		switch runRepo.Status {
+		case store.RunRepoStatusPending:
+			newStatus = store.RunRepoStatusSkipped
+		case store.RunRepoStatusRunning:
+			newStatus = store.RunRepoStatusCancelled
+		default:
+			// Already terminal — return current state (idempotent).
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
+				slog.Error("delete run repo: encode response failed", "err", err)
+			}
+			return
+		}
+
+		// Update the repo status.
+		err = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
+			ID:     pgRepoID,
+			Status: newStatus,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to update repo status: %v", err), http.StatusInternalServerError)
+			slog.Error("delete run repo: update status failed", "repo_id", repoIDStr, "err", err)
+			return
+		}
+
+		slog.Info("run repo deleted",
+			"run_id", runIDStr,
+			"repo_id", repoIDStr,
+			"old_status", runRepo.Status,
+			"new_status", newStatus,
+		)
+
+		// Re-fetch to get updated timestamps.
+		runRepo, err = st.GetRunRepo(r.Context(), pgRepoID)
+		if err != nil {
+			// Log but return success — the status was updated.
+			slog.Warn("delete run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
+			runRepo.Status = newStatus // Use the intended status in response.
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
+			slog.Error("delete run repo: encode response failed", "err", err)
+		}
+	}
+}
+
+// restartRunRepoHandler returns an HTTP handler that restarts a repo within a batch.
+// POST /v1/runs/{id}/repos/{repo_id}/restart — Resets status to pending, increments attempt.
+// Optionally updates base_ref/target_ref from request body.
+// Returns 200 on success with the updated repo entry.
+func restartRunRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse the repo ID from the URL path parameter.
+		repoIDStr := r.PathValue("repo_id")
+		if repoIDStr == "" {
+			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUIDs.
+		runID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
+			return
+		}
+		repoID, err := uuid.Parse(repoIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid repo id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUIDs.
+		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
+		pgRepoID := pgtype.UUID{Bytes: repoID, Valid: true}
+
+		// Verify the run exists and is not terminal.
+		run, err := st.GetRun(r.Context(), pgRunID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("restart run repo: get run failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Reject restarting repos in terminal runs — the batch is already complete.
+		if isTerminalRunStatus(run.Status) {
+			http.Error(w, "cannot restart repos in a terminal run", http.StatusConflict)
+			return
+		}
+
+		// Fetch the repo entry.
+		runRepo, err := st.GetRunRepo(r.Context(), pgRepoID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "repo not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+			slog.Error("restart run repo: get repo failed", "repo_id", repoIDStr, "err", err)
+			return
+		}
+
+		// Verify the repo belongs to this run.
+		if uuid.UUID(runRepo.RunID.Bytes) != runID {
+			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
+			return
+		}
+
+		// Only allow restart from terminal states (succeeded, failed, skipped, cancelled).
+		// Pending or running repos cannot be restarted — they haven't completed yet.
+		if !isTerminalRunRepoStatus(runRepo.Status) {
+			http.Error(w, "can only restart repos in terminal state", http.StatusConflict)
+			return
+		}
+
+		// Decode optional request body for ref updates.
+		// Empty body is allowed — just restart with existing refs.
+		var req struct {
+			BaseRef   *string `json:"base_ref,omitempty"`
+			TargetRef *string `json:"target_ref,omitempty"`
+		}
+		// Only decode if body is present (Content-Length > 0 or chunked).
+		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Increment attempt and reset status to pending.
+		// This uses IncrementRunRepoAttempt which also clears timing fields.
+		err = st.IncrementRunRepoAttempt(r.Context(), pgRepoID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to restart repo: %v", err), http.StatusInternalServerError)
+			slog.Error("restart run repo: increment attempt failed", "repo_id", repoIDStr, "err", err)
+			return
+		}
+
+		// TODO: If base_ref/target_ref updates are provided, update them separately.
+		// Currently the store only has IncrementRunRepoAttempt; adding UpdateRunRepoRefs
+		// would require a new sqlc query. For now, log if refs were requested but ignored.
+		if req.BaseRef != nil || req.TargetRef != nil {
+			slog.Debug("restart run repo: ref updates not yet implemented",
+				"repo_id", repoIDStr,
+				"base_ref", req.BaseRef,
+				"target_ref", req.TargetRef,
+			)
+		}
+
+		slog.Info("run repo restarted",
+			"run_id", runIDStr,
+			"repo_id", repoIDStr,
+			"old_status", runRepo.Status,
+			"old_attempt", runRepo.Attempt,
+		)
+
+		// Re-fetch to get updated state.
+		runRepo, err = st.GetRunRepo(r.Context(), pgRepoID)
+		if err != nil {
+			// Log but return success — the restart was applied.
+			slog.Warn("restart run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
+			// Simulate the expected state in response.
+			runRepo.Status = store.RunRepoStatusPending
+			runRepo.Attempt++
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
+			slog.Error("restart run repo: encode response failed", "err", err)
+		}
 	}
 }

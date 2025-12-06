@@ -1,0 +1,42 @@
+post:
+  tags: [Control]
+  summary: Stop a batch run
+  description: |
+    Stop a batch run identified by its run ID. Transitions the run status to
+    `canceled` and marks all `pending` `run_repos` as `cancelled`. The operation
+    is idempotent: if the run is already in a terminal state (succeeded, failed,
+    or canceled), the handler returns the current summary with `200 OK`.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Run ID (UUID).
+  responses:
+    '200':
+      description: OK; run is now in a terminal state
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
+    '400':
+      description: Bad request (invalid run ID)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+
