@@ -134,7 +134,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `handlers_runs_batch_test.go` to cover combinations of repo statuses and verify the summary fields and derived batch run status.
 
 ## CLI surfaces for batched runs
-- [ ] Extend `mod run` CLI grammar to route `mod run repo` subcommands — support `repo add/remove/restart/status`.
+- [x] Extend `mod run` CLI grammar to route `mod run repo` subcommands — support `repo add/remove/restart/status`.
   - Repository: ploy
   - Component: cmd/ploy
   - Scope:
