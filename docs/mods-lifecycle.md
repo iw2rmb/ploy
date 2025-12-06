@@ -562,7 +562,7 @@ post-gate  ───────────────▶├─▶ heal-a (150
 - `GET /v1/mods/{id}/events` — SSE event stream for a ticket.
   - Handler: `getModEventsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
-    - `event: log`, data: `LogRecord {timestamp,stream,line}`.
+    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
     - `event: ticket`, data: `TicketSummary`.
     - `event: retention`, data: `RetentionHint`.
     - `event: done`, data: `Status {status:"done"}` sentinel.
