@@ -14,6 +14,14 @@ import (
 	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
+// indirection points for testability.
+var (
+	loadConfig = nodeagent.LoadConfig
+	newAgent   = func(cfg nodeagent.Config) (interface{ Run(context.Context) error }, error) {
+		return nodeagent.New(cfg)
+	}
+)
+
 func main() {
 	os.Exit(run())
 }
@@ -33,13 +41,13 @@ func run() int {
 		return 0
 	}
 
-	cfg, err := nodeagent.LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		slog.Error("load config", "err", err)
 		return 1
 	}
 
-	agent, err := nodeagent.New(cfg)
+	agent, err := newAgent(cfg)
 	if err != nil {
 		slog.Error("initialise node agent", "err", err)
 		return 1
