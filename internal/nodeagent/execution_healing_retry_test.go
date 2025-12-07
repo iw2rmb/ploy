@@ -607,13 +607,14 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 	}
 }
 
-// TestExecuteWithHealing_CodexSessionPropagation verifies that Codex session
+// TestExecuteWithHealing_SessionPropagation verifies that healing session
 // artifacts are propagated across healing retries:
-//  1. After a healing mod run, codex-session.txt from /out is read.
+//  1. After a healing mod run, the session file (codex-session.txt) from /out is read.
 //  2. The session is persisted to /in for subsequent attempts.
-//  3. CODEX_RESUME=1 is injected into subsequent Codex-based healer manifests.
-func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
-	// Track healing mod container specs to verify CODEX_RESUME injection.
+//  3. Agent-specific resume env (currently CODEX_RESUME=1 for Codex-based healers)
+//     is injected into subsequent healing manifests when the image opts in.
+func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
+	// Track healing mod container specs to verify resume env injection.
 	var healerSpecs []step.ContainerSpec
 	gateCallCount := 0
 
@@ -637,20 +638,20 @@ func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
 		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
 	}
 
-	ws, err := os.MkdirTemp("", "ploy-codex-ws-*")
+	ws, err := os.MkdirTemp("", "ploy-session-ws-*")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll(ws) }()
 
-	outDir, err := os.MkdirTemp("", "ploy-codex-out-*")
+	outDir, err := os.MkdirTemp("", "ploy-session-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll(outDir) }()
 
 	// Write codex-session.txt to /out before healing mod runs (simulating
-	// what a Codex-based healer would produce).
+	// what a session-aware healing agent would produce).
 	sessionFile := filepath.Join(outDir, "codex-session.txt")
 	if err := os.WriteFile(sessionFile, []byte("session-id-abc-123\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -668,7 +669,7 @@ func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
 	req := StartRunRequest{
-		RunID:     types.RunID("t-codex-session"),
+		RunID:     types.RunID("t-session"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -723,9 +724,10 @@ func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
 	}
 }
 
-// TestExecuteWithHealing_NonCodexHealerNoResume verifies that non-Codex healing
-// mods do not receive CODEX_RESUME even when a session is available.
-func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
+// TestExecuteWithHealing_NonSessionAwareHealerNoResume verifies that healing
+// mods that are not marked as session-aware do not receive CODEX_RESUME even
+// when a session file is available.
+func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 	var healerSpecs []step.ContainerSpec
 	gateCallCount := 0
 
@@ -747,19 +749,19 @@ func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
 		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
 	}
 
-	ws, err := os.MkdirTemp("", "ploy-noncodex-ws-*")
+	ws, err := os.MkdirTemp("", "ploy-nonsession-ws-*")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll(ws) }()
 
-	outDir, err := os.MkdirTemp("", "ploy-noncodex-out-*")
+	outDir, err := os.MkdirTemp("", "ploy-nonsession-out-*")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll(outDir) }()
 
-	// Write a session file (simulating a previous Codex run or external source).
+	// Write a session file (simulating a previous agent run or external source).
 	sessionFile := filepath.Join(outDir, "codex-session.txt")
 	if err := os.WriteFile(sessionFile, []byte("some-session-id\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -771,7 +773,7 @@ func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
 	req := StartRunRequest{
-		RunID:     types.RunID("t-noncodex-session"),
+		RunID:     types.RunID("t-nonsession"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -801,7 +803,7 @@ func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
 		t.Fatalf("healing container calls = %d, want 2", len(healerSpecs))
 	}
 
-	// Neither attempt should have CODEX_RESUME (non-Codex image).
+	// Neither attempt should have CODEX_RESUME (non-session-aware image).
 	for i, spec := range healerSpecs {
 		if _, hasResume := spec.Env["CODEX_RESUME"]; hasResume {
 			t.Errorf("healing attempt %d has CODEX_RESUME=%q, want absent (non-Codex healer)", i+1, spec.Env["CODEX_RESUME"])
