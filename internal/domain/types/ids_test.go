@@ -130,3 +130,135 @@ func TestIDs_RejectEmpty(t *testing.T) {
 		})
 	}
 }
+
+// TestIDGenerators verifies the KSUID and NanoID-based ID generation helpers.
+func TestIDGenerators(t *testing.T) {
+	t.Run("NewRunID", func(t *testing.T) {
+		// Verify non-empty output with expected KSUID length (27 characters).
+		id := NewRunID()
+		if id.IsZero() {
+			t.Fatal("NewRunID returned zero value")
+		}
+		// KSUID string representation is always 27 characters.
+		if len(id.String()) != 27 {
+			t.Fatalf("NewRunID length = %d, want 27", len(id.String()))
+		}
+
+		// Verify multiple calls produce different values (probabilistic uniqueness).
+		seen := make(map[RunID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewRunID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewRunID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewJobID", func(t *testing.T) {
+		// Verify non-empty output with expected KSUID length (27 characters).
+		id := NewJobID()
+		if id.IsZero() {
+			t.Fatal("NewJobID returned zero value")
+		}
+		if len(id.String()) != 27 {
+			t.Fatalf("NewJobID length = %d, want 27", len(id.String()))
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[JobID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewJobID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewJobID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewBuildID", func(t *testing.T) {
+		// Verify non-empty output with expected KSUID length (27 characters).
+		id := NewBuildID()
+		if id == "" {
+			t.Fatal("NewBuildID returned empty string")
+		}
+		if len(id) != 27 {
+			t.Fatalf("NewBuildID length = %d, want 27", len(id))
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[string]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewBuildID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewBuildID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewRunRepoID", func(t *testing.T) {
+		// Verify non-empty output with expected NanoID length (8 characters).
+		id := NewRunRepoID()
+		if id.IsZero() {
+			t.Fatal("NewRunRepoID returned zero value")
+		}
+		if len(id.String()) != 8 {
+			t.Fatalf("NewRunRepoID length = %d, want 8", len(id.String()))
+		}
+
+		// Verify characters are from the expected URL-safe alphabet.
+		for _, c := range id.String() {
+			if !isURLSafeChar(c) {
+				t.Fatalf("NewRunRepoID contains invalid character: %c", c)
+			}
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[RunRepoID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewRunRepoID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewRunRepoID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewNodeKey", func(t *testing.T) {
+		// Verify non-empty output with expected NanoID length (6 characters).
+		id := NewNodeKey()
+		if id == "" {
+			t.Fatal("NewNodeKey returned empty string")
+		}
+		if len(id) != 6 {
+			t.Fatalf("NewNodeKey length = %d, want 6", len(id))
+		}
+
+		// Verify characters are from the expected URL-safe alphabet.
+		for _, c := range id {
+			if !isURLSafeChar(c) {
+				t.Fatalf("NewNodeKey contains invalid character: %c", c)
+			}
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[string]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewNodeKey()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewNodeKey produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+}
+
+// isURLSafeChar checks if a character is in the NanoID URL-safe alphabet.
+// The alphabet is: 0-9, A-Z, a-z, _, -
+func isURLSafeChar(c rune) bool {
+	return (c >= '0' && c <= '9') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= 'a' && c <= 'z') ||
+		c == '_' || c == '-'
+}

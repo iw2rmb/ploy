@@ -13,12 +13,16 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
+	// KSUID for time-sortable, globally unique identifiers (runs, jobs, builds).
+	// NanoID for compact, human-friendly identifiers (run repos, node keys).
+	github.com/matoous/go-nanoid/v2 v2.1.0
 	// Docker Engine v29 SDK modules for incremental migration from docker/docker.
 	// See ROADMAP.md "Dependency and SDK selection" for migration plan.
 	github.com/moby/moby/api v1.52.0
 	github.com/moby/moby/client v0.2.1
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.23.2
+	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/spf13/cobra v1.10.1
 	github.com/tmaxmax/go-sse v0.11.0
