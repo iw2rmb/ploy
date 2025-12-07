@@ -7,7 +7,7 @@ Documentation: ../auto/ROADMAP.md, internal/domain/types/ids.go, internal/domain
 Legend: [ ] todo, [x] done.
 
 ## Identifier helpers and libraries
-- [ ] Add KSUID/NanoID dependencies and central ID helpers — Provide explicit constructors for KSUID- and NanoID-based IDs so call sites do not embed library calls.
+- [x] Add KSUID/NanoID dependencies and central ID helpers — Provide explicit constructors for KSUID- and NanoID-based IDs so call sites do not embed library calls.
   - Repository: github.com/iw2rmb/ploy
   - Component: go.mod, go.sum, internal/domain/types
   - Scope:
