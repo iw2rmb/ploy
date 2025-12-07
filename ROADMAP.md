@@ -101,7 +101,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/server/handlers/... ./internal/store/...` and fix any compilation errors or failing assertions related to repo IDs.
 
 ## NanoID(6) for node-id — DB nodes.id and node agent identifiers
-- [ ] Switch `nodes.id` and related foreign keys from UUID to NanoID(6) strings — Use compact node identifiers across DB and APIs.
+- [x] Switch `nodes.id` and related foreign keys from UUID to NanoID(6) strings — Use compact node identifiers across DB and APIs.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/nodes.sql.go, internal/store/buildgate_jobs.sql.go, internal/store/jobs.sql.go, internal/store/runs.sql.go, internal/store/tokens.sql.go, internal/store/node_metrics.sql.go, internal/store/models.go
   - Scope:
