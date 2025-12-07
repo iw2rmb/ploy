@@ -186,10 +186,10 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 
 // TestParseRunOptions_MultiStrategyHealing verifies that parseRunOptions correctly
 // parses the healing schema where:
-//   - legacy build_gate_healing.mods[] is mapped to a single unnamed strategy, and
+//   - single-strategy build_gate_healing.mods[] is mapped to a single unnamed strategy, and
 //   - strategies[] takes precedence over mods[] when both are present.
 //
-// This test ensures backward compatibility with the legacy single-strategy form.
+// This test ensures backward compatibility with the single-strategy mods[] form.
 func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 	t.Parallel()
 
@@ -202,7 +202,7 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 		wantModsPerStrat []int
 	}{
 		{
-			name: "legacy_single_strategy_form",
+			name: "single_strategy_mods_form",
 			specJSON: `{
 				"build_gate_healing": {
 					"retries": 2,
@@ -213,8 +213,8 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 				}
 			}`,
 			wantRetries:      2,
-			wantStrategies:   1,            // Legacy mods[] mapped to a single unnamed strategy.
-			wantStratNames:   []string{""}, // Empty name for legacy single-strategy.
+			wantStrategies:   1,            // mods[] mapped to a single unnamed strategy.
+			wantStratNames:   []string{""}, // Empty name for single-strategy mods[].
 			wantModsPerStrat: []int{2},
 		},
 		{
@@ -334,7 +334,7 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 }
 
 // TestHealingConfig_NormalizedStrategies verifies that NormalizedStrategies()
-// correctly converts both legacy and multi-strategy forms into a unified slice.
+// correctly converts both single-strategy and multi-strategy forms into a unified slice.
 func TestHealingConfig_NormalizedStrategies(t *testing.T) {
 	t.Parallel()
 

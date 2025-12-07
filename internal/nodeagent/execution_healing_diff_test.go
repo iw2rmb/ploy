@@ -226,7 +226,7 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 
 	// Call uploadHealingModDiff (will fail at upload but we can verify the setup logic).
 	// C2: Pass stepIndex=3 to tag the healing diff with the parent step.
-	// E3: Pass job name for branch identification (empty string for legacy single-branch healing).
+	// E3: Pass job name for branch identification (empty string for single-branch healing).
 	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", "heal-1-0", workspace, healResult, 2, 1, 3)
 
 	// Verify that the function completes without panics (basic smoke test).

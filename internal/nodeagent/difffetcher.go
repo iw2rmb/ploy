@@ -152,7 +152,7 @@ func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepI
 // Branch isolation rules:
 //   - Mainline diffs (branch_id="" or absent) are included for all branches.
 //   - Branch-specific diffs (branch_id="branch-a") are only included when targetBranch matches.
-//   - If targetBranch is empty, only mainline diffs are included (legacy single-branch behavior).
+//   - If targetBranch is empty, only mainline diffs are included (single-branch behavior).
 //
 // This ensures that parallel healing branches (e.g., branch-a, branch-b) don't accidentally
 // apply each other's diffs during rehydration, keeping workspaces isolated per branch.

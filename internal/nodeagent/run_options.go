@@ -300,9 +300,9 @@ func parseRunOptions(opts map[string]any) RunOptions {
 				}
 			}
 		} else if modsSlice, ok := healingMap["mods"].([]any); ok && len(modsSlice) > 0 {
-			// Backward-compatibility: legacy single-strategy form using
-			// build_gate_healing.mods[]. Map this to a single unnamed strategy
-			// so downstream code can treat both forms uniformly.
+			// Also support the single-strategy form using build_gate_healing.mods[].
+			// Map this to a single unnamed strategy so downstream code can treat
+			// both forms uniformly.
 			strategy := HealingStrategy{}
 			for _, modEntry := range modsSlice {
 				if modMap, ok := modEntry.(map[string]any); ok {
