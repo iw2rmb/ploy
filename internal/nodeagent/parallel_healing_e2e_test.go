@@ -89,8 +89,9 @@ func TestParseRunOptions_MultiStrategy(t *testing.T) {
 	}
 }
 
-// Legacy mods[]-only healing specs are no longer supported; callers must
-// populate build_gate_healing.strategies explicitly.
+// Single-strategy mods[]-only healing specs are still supported and are
+// normalized to a single unnamed strategy; callers can also opt into
+// build_gate_healing.strategies for explicit multi-branch healing.
 
 // -----------------------------------------------------------------------------
 // TestParseRunOptions_StrategiesTakesPrecedence verifies that when both mods[]
@@ -99,7 +100,7 @@ func TestParseRunOptions_MultiStrategy(t *testing.T) {
 func TestParseRunOptions_StrategiesTakesPrecedence(t *testing.T) {
 	t.Parallel()
 
-	// Spec with both mods[] (legacy) and strategies[] (new).
+	// Spec with both mods[] (single-strategy form) and strategies[] (multi-strategy).
 	// Per documentation, strategies[] should take precedence.
 	options := map[string]any{
 		"build_gate_healing": map[string]any{
@@ -129,7 +130,7 @@ func TestParseRunOptions_StrategiesTakesPrecedence(t *testing.T) {
 		t.Fatalf("expected 1 strategy, got %d", len(runOpts.Healing.Strategies))
 	}
 
-	// The mod should be from strategies[], not legacy mods[].
+	// The mod should be from strategies[], not the top-level mods[] list.
 	if runOpts.Healing.Strategies[0].Mods[0].Image.Universal != "strategy:winner" {
 		t.Fatalf("mod.Image = %q, want strategy:winner (from strategies[])",
 			runOpts.Healing.Strategies[0].Mods[0].Image.Universal)

@@ -18,12 +18,12 @@ import (
 // healingStrategy represents a named healing strategy (branch) parsed from the spec.
 // A strategy contains a name and a list of healing mods to execute sequentially.
 type healingStrategy struct {
-	Name string           // Strategy name (e.g., "codex-ai", "static-patch"); empty for legacy single-strategy.
+	Name string           // Strategy name (e.g., "codex-ai", "static-patch"); empty for single-strategy mods-only configs.
 	Mods []map[string]any // Ordered list of healing mod definitions (image, command, env, etc.).
 }
 
 // parseHealingStrategies extracts healing strategies from the build_gate_healing config.
-// Returns a slice of strategies that supports both legacy single-strategy (mods[]) and
+// Returns a slice of strategies that supports both single-strategy (mods[]) and
 // multi-strategy (strategies[]) forms.
 //
 // The function handles three cases:
@@ -62,7 +62,7 @@ func parseHealingStrategies(healingConfig map[string]any) []healingStrategy {
 		return strategies
 	}
 
-	// Fallback to legacy single-strategy form (mods[] at top level).
+	// Fallback to single-strategy form (mods[] at top level).
 	if modsRaw, ok := healingConfig["mods"].([]any); ok && len(modsRaw) > 0 {
 		var mods []map[string]any
 		for _, mRaw := range modsRaw {
@@ -95,7 +95,7 @@ func parseHealingStrategies(healingConfig map[string]any) []healingStrategy {
 //	                       → branch-b: heal-b-0 (1700), re-gate-b (1800)
 //	→ mod-0 (2000)
 //
-// For legacy single-strategy specs, maintains existing behavior:
+// For single-strategy specs that only use mods[], maintains existing behavior:
 //
 //	pre-gate (1000) → FAIL → healing-0 (1100) → healing-1 (1200) → re-gate (1300) → mod-0 (2000)
 func maybeCreateHealingJobs(
@@ -156,7 +156,7 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Parse healing strategies (supports both legacy mods[] and multi-strategy forms).
+	// Parse healing strategies (supports both mods[]-only and multi-strategy forms).
 	strategies := parseHealingStrategies(healingConfig)
 	if len(strategies) == 0 {
 		slog.Debug("maybeCreateHealingJobs: no healing strategies configured, canceling remaining jobs",
@@ -303,7 +303,7 @@ func maybeCreateHealingJobs(
 	numStrategies := len(strategies)
 
 	// For multi-strategy, allocate distinct windows per branch (e.g., 1500-1600, 1700-1800).
-	// For single-strategy (legacy), use the existing behavior with evenly distributed indices.
+	// For single-strategy (mods-only), use the existing behavior with evenly distributed indices.
 	if numStrategies > 1 {
 		// Multi-strategy branch planner: allocate non-overlapping step_index windows.
 		// Window size = gap / (numStrategies + 1) to leave buffer before nextStepIndex.
@@ -405,8 +405,8 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Single-strategy (legacy) behavior: create healing jobs sequentially with one re-gate.
-	// This preserves backward compatibility for specs with only mods[] and no strategies[].
+	// Single-strategy behavior: create healing jobs sequentially with one re-gate.
+	// This preserves the behavior for specs with only mods[] and no strategies[].
 	strategy := strategies[0]
 	healingMods := strategy.Mods
 	healingCount := len(healingMods)

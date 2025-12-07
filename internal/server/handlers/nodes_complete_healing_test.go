@@ -277,9 +277,9 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 	}
 }
 
-// TestMaybeCreateHealingJobs_LegacySingleStrategy verifies backward compatibility
-// with legacy specs that use build_gate_healing.mods[] instead of strategies[].
-func TestMaybeCreateHealingJobs_LegacySingleStrategy(t *testing.T) {
+// TestMaybeCreateHealingJobs_SingleStrategyMods verifies behavior for specs
+// that use build_gate_healing.mods[] without strategies[] (single-strategy form).
+func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -287,7 +287,7 @@ func TestMaybeCreateHealingJobs_LegacySingleStrategy(t *testing.T) {
 	runUUID := uuid.New()
 	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
 
-	// Legacy single-strategy spec (mods at top level, no strategies array).
+	// Single-strategy spec (mods at top level, no strategies array).
 	spec := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(2),
@@ -337,12 +337,12 @@ func TestMaybeCreateHealingJobs_LegacySingleStrategy(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	// Legacy behavior: 2 healing mods + 1 re-gate = 3 jobs.
+	// Single-strategy behavior: 2 healing mods + 1 re-gate = 3 jobs.
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected 3 CreateJob calls (2 heal + 1 re-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify legacy job naming (heal-1-0, heal-1-1, re-gate-1).
+	// Verify job naming (heal-1-0, heal-1-1, re-gate-1).
 	expectedNames := []string{"heal-1-0", "heal-1-1", "re-gate-1"}
 	for i, expected := range expectedNames {
 		if st.createJobParams[i].Name != expected {
@@ -942,7 +942,8 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 	}
 }
 
-// TestParseHealingStrategies verifies strategy parsing for both legacy and multi-strategy forms.
+// TestParseHealingStrategies verifies strategy parsing for both single-strategy
+// (mods[] only) and multi-strategy (strategies[]) forms.
 func TestParseHealingStrategies(t *testing.T) {
 	t.Parallel()
 
@@ -954,7 +955,7 @@ func TestParseHealingStrategies(t *testing.T) {
 		wantFirstModsLen int
 	}{
 		{
-			name: "legacy mods form",
+			name: "mods-only form",
 			config: map[string]any{
 				"mods": []any{
 					map[string]any{"image": "heal:latest"},
@@ -962,7 +963,7 @@ func TestParseHealingStrategies(t *testing.T) {
 				},
 			},
 			wantStrategies:   1,
-			wantFirstName:    "", // Unnamed strategy for legacy form.
+			wantFirstName:    "", // Unnamed strategy for mods-only form.
 			wantFirstModsLen: 2,
 		},
 		{
