@@ -1,8 +1,9 @@
 -- name: CreateRunRepo :one
 -- Creates a new run_repo entry for batched runs.
 -- Each run_repo represents one repository within a batch (parent run).
-INSERT INTO run_repos (run_id, repo_url, base_ref, target_ref, status)
-VALUES ($1, $2, $3, $4, 'pending')
+-- The id parameter is a NanoID-backed string generated via NewRunRepoID().
+INSERT INTO run_repos (id, run_id, repo_url, base_ref, target_ref, status)
+VALUES ($1, $2, $3, $4, $5, 'pending')
 RETURNING *;
 
 -- name: GetRunRepo :one

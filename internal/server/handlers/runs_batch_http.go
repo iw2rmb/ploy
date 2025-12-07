@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -18,9 +17,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// NOTE: This file uses KSUID-backed string IDs for runs.
-// Run IDs are treated as opaque strings; no UUID parsing is performed.
-// Run_repo IDs (repo_id) are still UUIDs (outside scope of KSUID migration).
+// NOTE: This file uses KSUID-backed string IDs for runs and NanoID(8)-backed string IDs for run_repos.
+// Run IDs are KSUID strings (27 chars); run_repo IDs are NanoID strings (8 chars).
+// Both are treated as opaque strings; no UUID parsing is performed.
 
 // Batch run handlers implement HTTP endpoints for listing, inspecting, and stopping
 // batched mod runs. These handlers build on the `runs` table and aggregate per-repo
@@ -157,30 +156,20 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 // stopRunHandler returns an HTTP handler that stops a batched run.
 // POST /v1/runs/{id}/stop — Marks the run as canceled and cancels all pending run_repos.
 // Returns 200 on success with the updated run summary.
+//
+// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func stopRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID.
-		pgID := pgtype.UUID{
-			Bytes: runID,
-			Valid: true,
-		}
-
-		// Fetch the run to verify it exists and check current status.
-		run, err := st.GetRun(r.Context(), pgID)
+		// Fetch the run using string ID directly (no UUID parsing needed).
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -211,7 +200,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 
 		// Update the run status to canceled.
 		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
-			ID:         pgID,
+			ID:         runIDStr,
 			Status:     store.RunStatusCanceled,
 			FinishedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		})
@@ -223,7 +212,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 
 		// Cancel all pending run_repos entries for this batch.
 		// Fetch and update each pending repo to 'cancelled'.
-		repos, err := st.ListRunReposByRun(r.Context(), pgID)
+		repos, err := st.ListRunReposByRun(r.Context(), runIDStr)
 		if err != nil {
 			// Log but continue — the run is already marked as canceled.
 			slog.Warn("stop run: failed to list run repos", "run_id", runIDStr, "err", err)
@@ -231,12 +220,13 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			for _, repo := range repos {
 				// Only cancel repos that are still pending.
 				if repo.Status == store.RunRepoStatusPending {
+					// repo.ID is now a string (NanoID); use directly.
 					err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
 						ID:     repo.ID,
 						Status: store.RunRepoStatusCancelled,
 					})
 					if err != nil {
-						slog.Warn("stop run: failed to cancel repo", "run_id", runIDStr, "repo_id", uuid.UUID(repo.ID.Bytes).String(), "err", err)
+						slog.Warn("stop run: failed to cancel repo", "run_id", runIDStr, "repo_id", repo.ID, "err", err)
 					}
 				}
 			}
@@ -245,7 +235,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 		slog.Info("run stopped", "run_id", runIDStr)
 
 		// Re-fetch the run to get updated state.
-		run, err = st.GetRun(r.Context(), pgID)
+		run, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			// The run was just updated, so this should not fail. Log and return the pre-updated summary.
 			slog.Error("stop run: re-fetch failed", "run_id", runIDStr, "err", err)
@@ -268,29 +258,22 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 
 // addRunRepoHandler returns an HTTP handler that adds a repo to a batch run.
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
-// Creates a run_repos row with status=pending.
+// Creates a run_repos row with status=pending using a NanoID(8) for the repo ID.
 // Returns 201 on success with the created repo entry.
+//
+// Run IDs are KSUID strings; run_repo IDs are NanoID strings generated via NewRunRepoID().
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID for store operations.
-		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
-
 		// Verify the run exists before adding a repo.
-		run, err := st.GetRun(r.Context(), pgRunID)
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -337,13 +320,16 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Create the run_repo entry with status=pending.
+		// Generate a NanoID(8) for the repo ID using the ID helper.
 		targetRef := ""
 		if req.TargetRef != nil {
 			targetRef = req.TargetRef.String()
 		}
 
+		repoID := domaintypes.NewRunRepoID()
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			RunID:     pgRunID,
+			ID:        string(repoID),
+			RunID:     runIDStr,
 			RepoUrl:   req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: targetRef,
@@ -356,7 +342,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		slog.Info("run repo added",
 			"run_id", runIDStr,
-			"repo_id", uuid.UUID(runRepo.ID.Bytes).String(),
+			"repo_id", runRepo.ID, // NanoID string; use directly.
 			"repo_url", req.RepoURL,
 		)
 
@@ -371,27 +357,20 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 
 // listRunReposHandler returns an HTTP handler that lists repos within a batch run.
 // GET /v1/runs/{id}/repos — Returns the list of repos with status, attempt, timing fields.
+//
+// Run IDs are KSUID strings; treated as opaque identifiers.
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID for store operations.
-		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
-
 		// Verify the run exists before listing repos.
-		_, err = st.GetRun(r.Context(), pgRunID)
+		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -403,7 +382,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Fetch all repos for this run.
-		repos, err := st.ListRunReposByRun(r.Context(), pgRunID)
+		repos, err := st.ListRunReposByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
 			slog.Error("list run repos: list failed", "run_id", runIDStr, "err", err)
@@ -433,40 +412,28 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 // deleteRunRepoHandler returns an HTTP handler that removes/cancels a repo from a batch.
 // DELETE /v1/runs/{id}/repos/{repo_id} — Marks pending repos as skipped, running repos as cancelled.
 // Returns 200 on success with the updated repo entry.
+//
+// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter.
-		repoIDStr := r.PathValue("repo_id")
+		// Repo IDs are NanoID strings (8 chars); treated as opaque identifiers.
+		repoIDStr := strings.TrimSpace(r.PathValue("repo_id"))
 		if repoIDStr == "" {
 			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUIDs.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-		repoID, err := uuid.Parse(repoIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid repo id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUIDs.
-		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
-		pgRepoID := pgtype.UUID{Bytes: repoID, Valid: true}
-
 		// Verify the run exists.
-		_, err = st.GetRun(r.Context(), pgRunID)
+		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -477,8 +444,8 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the repo entry.
-		runRepo, err := st.GetRunRepo(r.Context(), pgRepoID)
+		// Fetch the repo entry using string ID directly.
+		runRepo, err := st.GetRunRepo(r.Context(), repoIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "repo not found", http.StatusNotFound)
@@ -489,8 +456,8 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify the repo belongs to this run.
-		if uuid.UUID(runRepo.RunID.Bytes) != runID {
+		// Verify the repo belongs to this run by comparing string run IDs.
+		if runRepo.RunID != runIDStr {
 			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
 			return
 		}
@@ -515,9 +482,9 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Update the repo status.
+		// Update the repo status using string ID.
 		err = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
-			ID:     pgRepoID,
+			ID:     repoIDStr,
 			Status: newStatus,
 		})
 		if err != nil {
@@ -534,7 +501,7 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 		)
 
 		// Re-fetch to get updated timestamps.
-		runRepo, err = st.GetRunRepo(r.Context(), pgRepoID)
+		runRepo, err = st.GetRunRepo(r.Context(), repoIDStr)
 		if err != nil {
 			// Log but return success — the status was updated.
 			slog.Warn("delete run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
@@ -553,40 +520,28 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos/{repo_id}/restart — Resets status to pending, increments attempt.
 // Optionally updates base_ref/target_ref from request body.
 // Returns 200 on success with the updated repo entry.
+//
+// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter.
-		repoIDStr := r.PathValue("repo_id")
+		// Repo IDs are NanoID strings (8 chars); treated as opaque identifiers.
+		repoIDStr := strings.TrimSpace(r.PathValue("repo_id"))
 		if repoIDStr == "" {
 			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUIDs.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-		repoID, err := uuid.Parse(repoIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid repo id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUIDs.
-		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
-		pgRepoID := pgtype.UUID{Bytes: repoID, Valid: true}
-
 		// Verify the run exists and is not terminal.
-		run, err := st.GetRun(r.Context(), pgRunID)
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -603,8 +558,8 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the repo entry.
-		runRepo, err := st.GetRunRepo(r.Context(), pgRepoID)
+		// Fetch the repo entry using string ID directly.
+		runRepo, err := st.GetRunRepo(r.Context(), repoIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "repo not found", http.StatusNotFound)
@@ -615,8 +570,8 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify the repo belongs to this run.
-		if uuid.UUID(runRepo.RunID.Bytes) != runID {
+		// Verify the repo belongs to this run by comparing string run IDs.
+		if runRepo.RunID != runIDStr {
 			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
 			return
 		}
@@ -658,7 +613,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Increment attempt and reset status to pending.
 		// This uses IncrementRunRepoAttempt which also clears timing fields.
-		err = st.IncrementRunRepoAttempt(r.Context(), pgRepoID)
+		err = st.IncrementRunRepoAttempt(r.Context(), repoIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to restart repo: %v", err), http.StatusInternalServerError)
 			slog.Error("restart run repo: increment attempt failed", "repo_id", repoIDStr, "err", err)
@@ -677,7 +632,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			}
 
 			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{
-				ID:        pgRepoID,
+				ID:        repoIDStr,
 				BaseRef:   newBaseRef,
 				TargetRef: newTargetRef,
 			}); err != nil {
@@ -695,7 +650,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		)
 
 		// Re-fetch to get updated state.
-		runRepo, err = st.GetRunRepo(r.Context(), pgRepoID)
+		runRepo, err = st.GetRunRepo(r.Context(), repoIDStr)
 		if err != nil {
 			// Log but return success — the restart was applied.
 			slog.Warn("restart run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
@@ -728,27 +683,20 @@ type StartRunResponse struct {
 // startRunHandler returns an HTTP handler that starts execution for pending repos in a batch.
 // POST /v1/runs/{id}/start — Creates child execution runs for each pending repo and creates jobs.
 // Returns 200 on success with counts of started, already done, and remaining pending repos.
+//
+// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func startRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID.
-		pgRunID := pgtype.UUID{Bytes: runID, Valid: true}
-
 		// Fetch the batch run to get shared spec and verify it exists.
-		batchRun, err := st.GetRun(r.Context(), pgRunID)
+		batchRun, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -766,7 +714,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Fetch all repos for this batch to get counts.
-		allRepos, err := st.ListRunReposByRun(r.Context(), pgRunID)
+		allRepos, err := st.ListRunReposByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
 			slog.Error("start run: list repos failed", "run_id", runIDStr, "err", err)
@@ -785,7 +733,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Fetch pending repos that need to start execution.
-		pendingRepos, err := st.ListPendingRunReposByRun(r.Context(), pgRunID)
+		pendingRepos, err := st.ListPendingRunReposByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list pending repos: %v", err), http.StatusInternalServerError)
 			slog.Error("start run: list pending repos failed", "run_id", runIDStr, "err", err)
@@ -826,7 +774,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			if err != nil {
 				slog.Error("start run: create child run failed",
 					"run_id", runIDStr,
-					"repo_id", uuid.UUID(repo.ID.Bytes).String(),
+					"repo_id", repo.ID, // NanoID string; use directly.
 					"repo_url", repo.RepoUrl,
 					"err", err,
 				)
@@ -837,7 +785,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			if err := createJobsFromSpec(r.Context(), st, childRun.ID, batchRun.Spec); err != nil {
 				slog.Error("start run: create jobs failed",
 					"run_id", runIDStr,
-					"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+					"child_run_id", childRun.ID, // KSUID string; use directly.
 					"repo_url", repo.RepoUrl,
 					"err", err,
 				)
@@ -847,15 +795,16 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Link the repo entry to its child execution run and mark as running.
+			// Both IDs are now strings (NanoID for repo, KSUID for child run).
 			err = st.SetRunRepoExecutionRun(r.Context(), store.SetRunRepoExecutionRunParams{
 				ID:             repo.ID,
-				ExecutionRunID: childRun.ID,
+				ExecutionRunID: &childRun.ID,
 			})
 			if err != nil {
 				slog.Error("start run: link repo to child run failed",
 					"run_id", runIDStr,
-					"repo_id", uuid.UUID(repo.ID.Bytes).String(),
-					"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+					"repo_id", repo.ID, // NanoID string; use directly.
+					"child_run_id", childRun.ID, // KSUID string; use directly.
 					"err", err,
 				)
 				// The child run exists but isn't linked; it will still execute.
@@ -865,15 +814,15 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			started++
 			slog.Info("run repo execution started",
 				"run_id", runIDStr,
-				"repo_id", uuid.UUID(repo.ID.Bytes).String(),
-				"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+				"repo_id", repo.ID, // NanoID string; use directly.
+				"child_run_id", childRun.ID, // KSUID string; use directly.
 				"repo_url", repo.RepoUrl,
 			)
 		}
 
 		// Update batch run status to running if we started at least one repo.
 		if started > 0 && batchRun.Status == store.RunStatusQueued {
-			if err := st.AckRunStart(r.Context(), pgRunID); err != nil {
+			if err := st.AckRunStart(r.Context(), runIDStr); err != nil {
 				slog.Warn("start run: failed to update batch status to running", "run_id", runIDStr, "err", err)
 			}
 		}

@@ -25,7 +25,7 @@ type Querier interface {
 	ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
 	// Clears the execution_run_id for a run_repo (e.g., when restarting).
 	// Also called by IncrementRunRepoAttempt to prepare for a new execution.
-	ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error
+	ClearRunRepoExecutionRun(ctx context.Context, id string) error
 	// Counts total jobs for a run.
 	CountJobsByRun(ctx context.Context, runID string) (int64, error)
 	// Counts jobs for a run with a specific status.
@@ -48,6 +48,7 @@ type Querier interface {
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	// Creates a new run_repo entry for batched runs.
 	// Each run_repo represents one repository within a batch (parent run).
+	// The id parameter is a NanoID-backed string generated via NewRunRepoID().
 	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
@@ -66,7 +67,7 @@ type Querier interface {
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id string) error
-	DeleteRunRepo(ctx context.Context, id pgtype.UUID) error
+	DeleteRunRepo(ctx context.Context, id string) error
 	// Get the step_index of a job and the next job's step_index for healing insertion.
 	// Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
 	GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error)
@@ -79,14 +80,14 @@ type Querier interface {
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id string) (Run, error)
-	GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, error)
+	GetRunRepo(ctx context.Context, id string) (RunRepo, error)
 	// Finds the run_repo entry linked to a given execution run.
 	// Used by completion callbacks to update repo status when execution completes.
 	GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
 	// Increments the attempt counter and resets status to 'pending' for retry.
 	// Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
-	IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error
+	IncrementRunRepoAttempt(ctx context.Context, id string) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error)

@@ -264,15 +264,15 @@ type mockStore struct {
 	listRunsResult []store.Run
 	listRunsErr    error
 
-	// ListRunReposByRun tracking
+	// ListRunReposByRun tracking — run IDs are now strings (KSUID).
 	listRunReposByRunCalled bool
-	listRunReposByRunParam  pgtype.UUID
+	listRunReposByRunParam  string
 	listRunReposByRunResult []store.RunRepo
 	listRunReposByRunErr    error
 
-	// CountRunReposByStatus tracking
+	// CountRunReposByStatus tracking — run IDs are now strings (KSUID).
 	countRunReposByStatusCalled bool
-	countRunReposByStatusParam  pgtype.UUID
+	countRunReposByStatusParam  string
 	countRunReposByStatusResult []store.CountRunReposByStatusRow
 	countRunReposByStatusErr    error
 
@@ -292,37 +292,37 @@ type mockStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
-	// GetRunRepo tracking
+	// GetRunRepo tracking — repo IDs are now strings (NanoID).
 	getRunRepoCalled bool
-	getRunRepoParam  pgtype.UUID
+	getRunRepoParam  string
 	getRunRepoResult store.RunRepo
 	getRunRepoErr    error
 
-	// IncrementRunRepoAttempt tracking
+	// IncrementRunRepoAttempt tracking — repo IDs are now strings (NanoID).
 	incrementRunRepoAttemptCalled bool
-	incrementRunRepoAttemptParam  pgtype.UUID
+	incrementRunRepoAttemptParam  string
 	incrementRunRepoAttemptErr    error
 
-	// ListPendingRunReposByRun tracking
+	// ListPendingRunReposByRun tracking — run IDs are now strings (KSUID).
 	listPendingRunReposByRunCalled bool
-	listPendingRunReposByRunParam  pgtype.UUID
+	listPendingRunReposByRunParam  string
 	listPendingRunReposByRunResult []store.RunRepo
 	listPendingRunReposByRunErr    error
 
-	// SetRunRepoExecutionRun tracking
+	// SetRunRepoExecutionRun tracking — repo IDs are strings (NanoID), execution run IDs are strings (KSUID).
 	setRunRepoExecutionRunCalled bool
 	setRunRepoExecutionRunParams []store.SetRunRepoExecutionRunParams
 	setRunRepoExecutionRunErr    error
 
-	// GetRunRepoByExecutionRun tracking
+	// GetRunRepoByExecutionRun tracking — execution run IDs are now strings (KSUID).
 	getRunRepoByExecutionRunCalled bool
-	getRunRepoByExecutionRunParam  pgtype.UUID
+	getRunRepoByExecutionRunParam  *string
 	getRunRepoByExecutionRunResult store.RunRepo
 	getRunRepoByExecutionRunErr    error
 
-	// ClearRunRepoExecutionRun tracking
+	// ClearRunRepoExecutionRun tracking — repo IDs are now strings (NanoID).
 	clearRunRepoExecutionRunCalled bool
-	clearRunRepoExecutionRunParam  pgtype.UUID
+	clearRunRepoExecutionRunParam  string
 	clearRunRepoExecutionRunErr    error
 
 	// ListDistinctRepos tracking (for repo-centric handlers)
@@ -720,13 +720,15 @@ func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) (
 	return m.listRunsResult, m.listRunsErr
 }
 
-func (m *mockStore) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]store.RunRepo, error) {
+// ListRunReposByRun — run IDs are now strings (KSUID).
+func (m *mockStore) ListRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
 	m.listRunReposByRunCalled = true
 	m.listRunReposByRunParam = runID
 	return m.listRunReposByRunResult, m.listRunReposByRunErr
 }
 
-func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) ([]store.CountRunReposByStatusRow, error) {
+// CountRunReposByStatus — run IDs are now strings (KSUID).
+func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID string) ([]store.CountRunReposByStatusRow, error) {
 	m.countRunReposByStatusCalled = true
 	m.countRunReposByStatusParam = runID
 	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
@@ -750,20 +752,22 @@ func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRep
 	return m.createRunRepoResult, m.createRunRepoErr
 }
 
-func (m *mockStore) GetRunRepo(ctx context.Context, id pgtype.UUID) (store.RunRepo, error) {
+// GetRunRepo — repo IDs are now strings (NanoID).
+func (m *mockStore) GetRunRepo(ctx context.Context, id string) (store.RunRepo, error) {
 	m.getRunRepoCalled = true
 	m.getRunRepoParam = id
 	return m.getRunRepoResult, m.getRunRepoErr
 }
 
-func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error {
+// IncrementRunRepoAttempt — repo IDs are now strings (NanoID).
+func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, id string) error {
 	m.incrementRunRepoAttemptCalled = true
 	m.incrementRunRepoAttemptParam = id
 	return m.incrementRunRepoAttemptErr
 }
 
-// ListPendingRunReposByRun returns pending run_repos for a batch.
-func (m *mockStore) ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]store.RunRepo, error) {
+// ListPendingRunReposByRun — run IDs are now strings (KSUID).
+func (m *mockStore) ListPendingRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
 	m.listPendingRunReposByRunCalled = true
 	m.listPendingRunReposByRunParam = runID
 	return m.listPendingRunReposByRunResult, m.listPendingRunReposByRunErr
@@ -776,15 +780,15 @@ func (m *mockStore) SetRunRepoExecutionRun(ctx context.Context, arg store.SetRun
 	return m.setRunRepoExecutionRunErr
 }
 
-// GetRunRepoByExecutionRun finds the run_repo linked to a given execution run.
-func (m *mockStore) GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (store.RunRepo, error) {
+// GetRunRepoByExecutionRun — execution run IDs are now strings (KSUID).
+func (m *mockStore) GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (store.RunRepo, error) {
 	m.getRunRepoByExecutionRunCalled = true
 	m.getRunRepoByExecutionRunParam = executionRunID
 	return m.getRunRepoByExecutionRunResult, m.getRunRepoByExecutionRunErr
 }
 
-// ClearRunRepoExecutionRun clears the execution_run_id for a run_repo.
-func (m *mockStore) ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error {
+// ClearRunRepoExecutionRun — repo IDs are now strings (NanoID).
+func (m *mockStore) ClearRunRepoExecutionRun(ctx context.Context, id string) error {
 	m.clearRunRepoExecutionRunCalled = true
 	m.clearRunRepoExecutionRunParam = id
 	return m.clearRunRepoExecutionRunErr
