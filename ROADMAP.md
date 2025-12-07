@@ -48,7 +48,7 @@ Legend: [ ] todo, [x] done.
       - Update tests in `internal/store/store_test.go`, `internal/store/claims_state_test.go`, and `internal/store/batchscheduler/*.go` that construct `pgtype.UUID` run/job/build IDs to use string IDs instead.
 
 ## KSUID for run-id / job-id / build-id — server, nodeagent, CLI, OpenAPI
-- [ ] Treat run, job, and build IDs as KSUID-backed strings in application code — Remove UUID parsing from request paths and payloads; align OpenAPI formats.
+- [x] Treat run, job, and build IDs as KSUID-backed strings in application code — Remove UUID parsing from request paths and payloads; align OpenAPI formats.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers, internal/server/events, internal/nodeagent, cmd/ploy, docs/api
   - Scope:
