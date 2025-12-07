@@ -29,8 +29,8 @@
 //     API directly for intermediate validation (e.g., testing if a fix works
 //     before committing). However, these in-container calls are advisory only.
 //     The authoritative gate result is always from the node agent's re-gate.
-//     Note: Direct HTTP Build Gate calls from healing mods are now DISCOURAGED
-//     for mods-codex; the node agent handles all gate orchestration.
+//     Direct HTTP Build Gate calls from healing mods are discouraged; the node
+//     agent is the single source of truth for gate orchestration.
 //
 //  4. Workspace semantics: Both gate execution paths use identical semantics:
 //     - HTTP API: Validates repo_url+ref with optional diff_patch parameter
@@ -230,10 +230,12 @@ func (r *runController) runGateWithHealing(
 	// Track re-gate runs for stats.
 	var reGates []gateRunMetadata
 
-	// Track Codex session state across healing loop iterations.
-	// When a Codex-based healing mod writes codex-session.txt to /out, the agent
-	// reads and persists this session ID to /in for subsequent attempts.
-	var codexSession string
+	// Track healing session state across healing loop iterations.
+	// When a healing agent writes a session file (codex-session.txt) to /out,
+	// the agent reads and persists this session ID to /in for subsequent attempts.
+	// The concrete env/filename contract (e.g. CODEX_RESUME + codex-session.txt)
+	// is defined in buildHealingManifest; this loop is agnostic to the agent.
+	var healingSession string
 
 	// Attempt healing loop.
 	// Note: This is a domain-specific healing retry loop (not a transient error retry).
@@ -264,8 +266,10 @@ func (r *runController) runGateWithHealing(
 			slog.Info("executing healing strategy", "run_id", req.RunID, "attempt", attempt, "strategy", strategy.Name, "mod_count", len(strategy.Mods), "phase", gatePhase)
 
 			for idx, mod := range strategy.Mods {
-				// Pass codexSession to enable CODEX_RESUME=1 injection for Codex-based healers.
-				healManifest, buildErr := buildHealingManifest(req, mod, idx, codexSession)
+				// Pass healingSession through so agent-specific session env (for example,
+				// CODEX_RESUME=1 for Codex-based healers) can be injected by
+				// buildHealingManifest when appropriate.
+				healManifest, buildErr := buildHealingManifest(req, mod, idx, healingSession)
 				if buildErr != nil {
 					slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
 					return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
@@ -336,23 +340,25 @@ func (r *runController) runGateWithHealing(
 				}
 				r.uploadHealingModDiff(ctx, req.RunID, req.JobID, jobName, workspace, healResult, idx, attempt, stepIndex)
 
-				// Read Codex session artifacts from /out for session propagation.
+				// Read session artifacts from /out for propagation across retries.
 				if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
 					if session := strings.TrimSpace(string(sessionBytes)); session != "" {
-						codexSession = session
-						slog.Info("healing: captured codex session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", codexSession)
+						healingSession = session
+						slog.Info("healing: captured session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", healingSession)
 					}
 				}
 			}
 		}
 
 		// Persist codex-session.txt to /in for subsequent healing attempts.
-		if codexSession != "" && *inDir != "" {
+		// The filename is part of the current session contract; callers inside
+		// containers remain free to interpret it as needed.
+		if healingSession != "" && *inDir != "" {
 			sessionPath := filepath.Join(*inDir, "codex-session.txt")
-			if writeErr := os.WriteFile(sessionPath, []byte(codexSession), 0o644); writeErr != nil {
+			if writeErr := os.WriteFile(sessionPath, []byte(healingSession), 0o644); writeErr != nil {
 				slog.Warn("healing: failed to persist codex-session.txt into /in", "run_id", req.RunID, "error", writeErr)
 			} else {
-				slog.Info("healing: persisted codex-session.txt to /in for resume", "run_id", req.RunID, "session_id", codexSession)
+				slog.Info("healing: persisted codex-session.txt to /in for resume", "run_id", req.RunID, "session_id", healingSession)
 			}
 		}
 
