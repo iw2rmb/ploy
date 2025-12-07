@@ -6,22 +6,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/segmentio/ksuid"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // mockStore implements store.Store for testing.
+// Uses string IDs (KSUID-backed) per the KSUID migration.
 type mockStore struct {
 	store.Store
-	listRunsWithPendingReposResult []pgtype.UUID
+	listRunsWithPendingReposResult []string
 	listRunsWithPendingReposErr    error
 	listRunsWithPendingReposCalled bool
 }
 
-func (m *mockStore) ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.UUID, error) {
+func (m *mockStore) ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, error) {
 	m.listRunsWithPendingReposCalled = true
 	return m.listRunsWithPendingReposResult, m.listRunsWithPendingReposErr
 }
@@ -33,35 +33,35 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 }
 
 // mockRepoStarter implements RepoStarter for testing.
+// Uses string IDs (KSUID-backed) per the KSUID migration.
 type mockRepoStarter struct {
-	startCalls   []pgtype.UUID
-	startResults map[uuid.UUID]int
-	startErrors  map[uuid.UUID]error
+	startCalls   []string
+	startResults map[string]int
+	startErrors  map[string]error
 }
 
 func newMockRepoStarter() *mockRepoStarter {
 	return &mockRepoStarter{
-		startCalls:   []pgtype.UUID{},
-		startResults: make(map[uuid.UUID]int),
-		startErrors:  make(map[uuid.UUID]error),
+		startCalls:   []string{},
+		startResults: make(map[string]int),
+		startErrors:  make(map[string]error),
 	}
 }
 
-func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.UUID) (int, error) {
+func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID string) (int, error) {
 	m.startCalls = append(m.startCalls, runID)
-	uid := uuid.UUID(runID.Bytes)
-	if err, ok := m.startErrors[uid]; ok && err != nil {
+	if err, ok := m.startErrors[runID]; ok && err != nil {
 		return 0, err
 	}
-	if result, ok := m.startResults[uid]; ok {
+	if result, ok := m.startResults[runID]; ok {
 		return result, nil
 	}
 	return 0, nil
 }
 
-// uuidToPgtype converts uuid.UUID to pgtype.UUID.
-func uuidToPgtype(u uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: u, Valid: true}
+// newTestKSUID generates a new KSUID string for test IDs.
+func newTestKSUID() string {
+	return ksuid.New().String()
 }
 
 func TestNew(t *testing.T) {
@@ -159,7 +159,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("no runs with pending repos", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []pgtype.UUID{},
+			listRunsWithPendingReposResult: []string{},
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -185,14 +185,12 @@ func TestScheduler_Run(t *testing.T) {
 	})
 
 	t.Run("starts repos for each batch run", func(t *testing.T) {
-		runID1 := uuid.New()
-		runID2 := uuid.New()
+		// Use KSUID-backed string IDs per the migration.
+		runID1 := newTestKSUID()
+		runID2 := newTestKSUID()
 
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []pgtype.UUID{
-				uuidToPgtype(runID1),
-				uuidToPgtype(runID2),
-			},
+			listRunsWithPendingReposResult: []string{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()
@@ -216,9 +214,9 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		// Verify both runs were processed.
-		processedRuns := make(map[uuid.UUID]bool)
+		processedRuns := make(map[string]bool)
 		for _, runID := range mockStarter.startCalls {
-			processedRuns[uuid.UUID(runID.Bytes)] = true
+			processedRuns[runID] = true
 		}
 
 		if !processedRuns[runID1] {
@@ -230,14 +228,12 @@ func TestScheduler_Run(t *testing.T) {
 	})
 
 	t.Run("continues on error", func(t *testing.T) {
-		runID1 := uuid.New()
-		runID2 := uuid.New()
+		// Use KSUID-backed string IDs per the migration.
+		runID1 := newTestKSUID()
+		runID2 := newTestKSUID()
 
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []pgtype.UUID{
-				uuidToPgtype(runID1),
-				uuidToPgtype(runID2),
-			},
+			listRunsWithPendingReposResult: []string{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()

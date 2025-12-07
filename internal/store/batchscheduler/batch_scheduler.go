@@ -16,9 +16,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -26,8 +23,9 @@ import (
 // Implemented by handlers.BatchRepoStarter to decouple scheduler from HTTP layer.
 type RepoStarter interface {
 	// StartPendingRepos starts execution for all pending repos in a batch run.
+	// runID is a KSUID-backed string identifier for the batch run.
 	// Returns the number of repos that were started successfully.
-	StartPendingRepos(ctx context.Context, runID pgtype.UUID) (started int, err error)
+	StartPendingRepos(ctx context.Context, runID string) (started int, err error)
 }
 
 // Options configures the batch scheduler.
@@ -115,12 +113,13 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	s.logger.Debug("batch-scheduler: found runs with pending repos", "count", len(runIDs))
 
 	// Process each batch run.
+	// runIDs are KSUID-backed strings from ListBatchRunsWithPendingRepos.
 	var totalStarted int
 	for _, runID := range runIDs {
 		started, err := s.repoStarter.StartPendingRepos(ctx, runID)
 		if err != nil {
 			s.logger.Error("batch-scheduler: failed to start repos",
-				"run_id", uuid.UUID(runID.Bytes).String(),
+				"run_id", runID,
 				"err", err,
 			)
 			continue // Try other runs.
@@ -128,7 +127,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 		if started > 0 {
 			s.logger.Info("batch-scheduler: started repos",
-				"run_id", uuid.UUID(runID.Bytes).String(),
+				"run_id", runID,
 				"started", started,
 			)
 			totalStarted += started

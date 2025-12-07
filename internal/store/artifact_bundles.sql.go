@@ -18,13 +18,13 @@ RETURNING id, run_id, job_id, build_id, name, bundle, cid, digest, created_at
 `
 
 type CreateArtifactBundleParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	JobID   pgtype.UUID `json:"job_id"`
-	BuildID pgtype.UUID `json:"build_id"`
-	Name    *string     `json:"name"`
-	Bundle  []byte      `json:"bundle"`
-	Cid     *string     `json:"cid"`
-	Digest  *string     `json:"digest"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	BuildID *string `json:"build_id"`
+	Name    *string `json:"name"`
+	Bundle  []byte  `json:"bundle"`
+	Cid     *string `json:"cid"`
+	Digest  *string `json:"digest"`
 }
 
 func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error) {
@@ -136,7 +136,7 @@ WHERE run_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error) {
+func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID string) ([]ArtifactBundle, error) {
 	rows, err := q.db.Query(ctx, listArtifactBundlesByRun, runID)
 	if err != nil {
 		return nil, err
@@ -173,8 +173,8 @@ ORDER BY created_at DESC
 `
 
 type ListArtifactBundlesByRunAndJobParams struct {
-	RunID pgtype.UUID `json:"run_id"`
-	JobID pgtype.UUID `json:"job_id"`
+	RunID string  `json:"run_id"`
+	JobID *string `json:"job_id"`
 }
 
 func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error) {

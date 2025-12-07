@@ -28,7 +28,7 @@ Legend: [ ] todo, [x] done.
       - Multiple calls produce different values over a small sample (probabilistic uniqueness sanity check).
 
 ## KSUID for run-id / job-id / build-id — schema and store
-- [ ] Migrate run, job, and build IDs (and their FKs) from UUID to text KSUIDs in the database and store layer — Make IDs KSUID-backed strings end-to-end instead of Postgres UUIDs.
+- [x] Migrate run, job, and build IDs (and their FKs) from UUID to text KSUIDs in the database and store layer — Make IDs KSUID-backed strings end-to-end instead of Postgres UUIDs.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/queries/*.sql, internal/store/*.sql.go, internal/store/models.go, sqlc.yaml
   - Scope:

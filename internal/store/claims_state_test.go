@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Tests use ClaimJob to test job claiming behavior.
@@ -30,7 +32,9 @@ func TestClaimJob_Basic(t *testing.T) {
 	defer db.Close()
 
 	// Create a queued run directly (no separate repo/mod creation needed).
+	// ID is now KSUID-backed; generate via types.NewRunID().
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/repo",
 		Spec:      []byte(`{"type":"test"}`),
 		Status:    RunStatusQueued,
@@ -46,7 +50,9 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 
 	// Create a pending job for the run.
+	// Job ID is now KSUID-backed; generate via types.NewJobID().
 	job, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
@@ -75,6 +81,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 
 	// Verify the claimed job has the correct properties.
+	// Job ID is now a string (KSUID-backed).
 	if claimedJob.ID != job.ID {
 		t.Errorf("Expected job ID %v, got %v", job.ID, claimedJob.ID)
 	}
@@ -83,6 +90,7 @@ func TestClaimJob_Basic(t *testing.T) {
 		t.Errorf("Expected status assigned, got %s", claimedJob.Status)
 	}
 
+	// Node ID remains pgtype.UUID.
 	if !claimedJob.NodeID.Valid || claimedJob.NodeID.Bytes != node.ID.Bytes {
 		t.Errorf("Expected node_id %v, got %v", node.ID, claimedJob.NodeID)
 	}
@@ -114,6 +122,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/fifo",
 		Spec:      []byte(`{"type":"fifo"}`),
 		Status:    RunStatusQueued,
@@ -126,6 +135,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create three pending jobs with different step_index values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-1",
 		ModType:   "",
@@ -139,6 +149,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-2",
 		ModType:   "",
@@ -152,6 +163,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	job3, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-3",
 		ModType:   "",
@@ -232,6 +244,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/skip-locked",
 		Spec:      []byte(`{"type":"concurrent"}`),
 		Status:    RunStatusQueued,
@@ -247,6 +260,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	jobs := make([]Job, numJobs)
 	for i := 0; i < numJobs; i++ {
 		job, err := db.CreateJob(ctx, CreateJobParams{
+			ID:        string(types.NewJobID()),
 			RunID:     run.ID,
 			Name:      "job-" + strconv.Itoa(i),
 			ModType:   "",
@@ -292,8 +306,9 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 
 	// Count successful claims.
 	successCount := 0
-	claimedIDs := make(map[[16]byte]bool)
-	// Build a set of valid node IDs to verify assignment correctness.
+	// Job IDs are now strings (KSUID-backed), use map[string]bool for deduplication.
+	claimedIDs := make(map[string]bool)
+	// Node IDs remain pgtype.UUID; use [16]byte for deduplication.
 	validNode := make(map[[16]byte]bool, numNodes)
 	for i := range nodes {
 		validNode[nodes[i].ID.Bytes] = true
@@ -302,11 +317,12 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		if errors[i] == nil {
 			successCount++
 			// Verify each job is claimed only once.
-			idBytes := claimedJobs[i].ID.Bytes
-			if claimedIDs[idBytes] {
+			// Job ID is now a string.
+			jobID := claimedJobs[i].ID
+			if claimedIDs[jobID] {
 				t.Errorf("Job %v was claimed multiple times", claimedJobs[i].ID)
 			}
-			claimedIDs[idBytes] = true
+			claimedIDs[jobID] = true
 
 			// Additional invariants for claimed jobs.
 			if claimedJobs[i].Status != JobStatusRunning {
@@ -382,6 +398,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 
 	// Create a queued run directly.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/ackstart",
 		Spec:      []byte(`{"type":"acktest"}`),
 		Status:    RunStatusQueued,
@@ -394,6 +411,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 
 	// Create a pending job for the run.
 	_, err = db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
@@ -460,6 +478,7 @@ func TestAckRunStart_WrongStatus(t *testing.T) {
 
 	// Create a queued run (not assigned).
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/wrongstatus",
 		Spec:      []byte(`{"type":"wrongstatustest"}`),
 		Status:    RunStatusQueued,
@@ -505,6 +524,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	// Create a queued run with a pending job.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/drained",
 		Spec:      []byte(`{"type":"draintest"}`),
 		Status:    RunStatusQueued,
@@ -516,6 +536,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	}
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
@@ -579,6 +600,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	// Create a queued run with a pending job.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/undrained",
 		Spec:      []byte(`{"type":"undraintest"}`),
 		Status:    RunStatusQueued,
@@ -590,6 +612,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	}
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
@@ -661,6 +684,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/step-order",
 		Spec:      []byte(`{"type":"step-order"}`),
 		Status:    RunStatusQueued,
@@ -673,6 +697,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create jobs in reverse step_index order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-3",
 		ModType:   "",
@@ -686,6 +711,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	job1, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-1",
 		ModType:   "",
@@ -699,6 +725,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "job-2",
 		ModType:   "",
@@ -763,6 +790,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
+		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/only-pending",
 		Spec:      []byte(`{"type":"only-pending"}`),
 		Status:    RunStatusQueued,
@@ -775,6 +803,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a non-pending job (already running).
 	_, err = db.CreateJob(ctx, CreateJobParams{
+		ID:        string(types.NewJobID()),
 		RunID:     run.ID,
 		Name:      "running-job",
 		Status:    JobStatusRunning,

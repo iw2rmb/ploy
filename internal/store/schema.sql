@@ -64,8 +64,10 @@ CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained
 -- Runs (acts as a queue with SKIP LOCKED assignment)
 -- The `name` column provides an optional human-readable batch name for grouping
 -- or identifying runs; when NULL, the run is unnamed (single-repo or ad-hoc).
+-- Note: id is TEXT (KSUID-backed) rather than UUID; application code generates IDs
+-- via types.NewRunID() before insertion.
 CREATE TABLE IF NOT EXISTS runs (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
   name         TEXT,  -- Optional batch name for human-readable identification.
   repo_url     TEXT NOT NULL,
   spec         JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -88,16 +90,17 @@ CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
 -- The parent run holds shared spec and metadata; each run_repos row captures
 -- a single repository's execution state, allowing multiple repos per batch.
 -- execution_run_id links to the child run created for this repo's job pipeline.
+-- Note: run_id and execution_run_id are TEXT (KSUID-backed) to match runs.id.
 CREATE TABLE IF NOT EXISTS run_repos (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id           UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   repo_url         TEXT NOT NULL,
   base_ref         TEXT NOT NULL,
   target_ref       TEXT NOT NULL,
   status           run_repo_status NOT NULL DEFAULT 'pending',
   attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error       TEXT,
-  execution_run_id UUID REFERENCES runs(id) ON DELETE SET NULL,  -- Child run for this repo's execution.
+  execution_run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,  -- Child run for this repo's execution; KSUID string.
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   started_at       TIMESTAMPTZ,
   finished_at      TIMESTAMPTZ
@@ -115,9 +118,10 @@ CREATE INDEX IF NOT EXISTS run_repos_execution_run_idx ON run_repos(execution_ru
 --   heal-1 inserted at 1500, re-gate at 1750, etc.
 -- Server-driven scheduling: first job is 'pending', rest are 'created'.
 -- When a job completes, server schedules the next 'created' job.
+-- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
 CREATE TABLE IF NOT EXISTS jobs (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id       UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
+  run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   status       job_status NOT NULL DEFAULT 'created',
   mod_type     TEXT NOT NULL DEFAULT '',
@@ -136,10 +140,12 @@ CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE st
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
 
 -- Events (append-only)
+-- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
+-- events.id remains BIGSERIAL per ROADMAP.md (unchanged).
 CREATE TABLE IF NOT EXISTS events (
   id        BIGSERIAL PRIMARY KEY,
-  run_id    UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id    UUID REFERENCES jobs(id) ON DELETE SET NULL,
+  run_id    TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id    TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   time      TIMESTAMPTZ NOT NULL DEFAULT now(),
   level     TEXT NOT NULL DEFAULT 'info',
   message   TEXT NOT NULL,
@@ -151,10 +157,11 @@ CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 -- Builds (timed invocations inside a job, e.g., Maven/Gradle/Bazel)
 -- Note: status uses job_status enum; default is 'created' (not 'pending', which is not
 -- a valid job_status value). This aligns builds.status with the job_status vocabulary.
+-- Note: id is TEXT (KSUID-backed); run_id and job_id are TEXT to match their parent tables.
 CREATE TABLE IF NOT EXISTS builds (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id       UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id       UUID REFERENCES jobs(id) ON DELETE SET NULL,
+  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
+  run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id       TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   tool         TEXT,             -- e.g., 'maven', 'gradle', 'npm', 'bazel'
   command      TEXT,             -- full command line if available
   status       job_status NOT NULL DEFAULT 'created',
@@ -171,10 +178,11 @@ CREATE INDEX IF NOT EXISTS builds_job_idx ON builds(job_id);
 -- Diffs store `job_id` and `run_id` for association; summary JSONB contains:
 --   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
 -- Rehydration applies diffs from jobs ordered by step_index.
+-- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id     UUID REFERENCES jobs(id) ON DELETE SET NULL,
+  run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   patch      BYTEA NOT NULL CHECK (octet_length(patch) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -183,11 +191,13 @@ CREATE INDEX IF NOT EXISTS diffs_run_idx ON diffs(run_id);
 CREATE INDEX IF NOT EXISTS diffs_job_idx ON diffs(job_id);
 
 -- Logs (append-only)
+-- Note: run_id, job_id, and build_id are TEXT (KSUID-backed) to match their parent tables.
+-- logs.id remains BIGSERIAL per ROADMAP.md (unchanged).
 CREATE TABLE IF NOT EXISTS logs (
   id         BIGSERIAL PRIMARY KEY,
-  run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id     UUID REFERENCES jobs(id) ON DELETE SET NULL,
-  build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
+  run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  build_id   TEXT REFERENCES builds(id) ON DELETE SET NULL,
   chunk_no   INTEGER NOT NULL,
   data       BYTEA NOT NULL CHECK (octet_length(data) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -197,11 +207,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS logs_run_job_build_chunk_uniq ON logs(run_id, 
 CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 
 -- Artifact bundles (zipped tar of changed files or outputs)
+-- Note: run_id, job_id, and build_id are TEXT (KSUID-backed) to match their parent tables.
+-- artifact_bundles.id remains UUID per ROADMAP.md (unchanged).
 CREATE TABLE IF NOT EXISTS artifact_bundles (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id     UUID REFERENCES jobs(id) ON DELETE SET NULL,
-  build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
+  run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  build_id   TEXT REFERENCES builds(id) ON DELETE SET NULL,
   name       TEXT,                -- optional logical name
   bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
   cid        TEXT,                -- content-addressed ID for deduplication

@@ -18,10 +18,10 @@ RETURNING id, run_id, job_id, patch, summary, created_at
 `
 
 type CreateDiffParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	JobID   pgtype.UUID `json:"job_id"`
-	Patch   []byte      `json:"patch"`
-	Summary []byte      `json:"summary"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	Patch   []byte  `json:"patch"`
+	Summary []byte  `json:"summary"`
 }
 
 // Creates a new diff entry associated with a job.
@@ -93,8 +93,8 @@ ORDER BY j.step_index ASC, d.created_at ASC
 `
 
 type ListDiffsBeforeStepParams struct {
-	RunID     pgtype.UUID `json:"run_id"`
-	StepIndex float64     `json:"step_index"`
+	RunID     string  `json:"run_id"`
+	StepIndex float64 `json:"step_index"`
 }
 
 // Returns all diffs for a run up to (and including) the specified step_index.
@@ -136,7 +136,7 @@ ORDER BY j.step_index NULLS LAST, d.created_at ASC
 
 // Returns diffs for a run ordered by job step_index, then by created_at.
 // Joins with jobs to get ordering from job's step_index.
-func (q *Queries) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error) {
+func (q *Queries) ListDiffsByRun(ctx context.Context, runID string) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
 	if err != nil {
 		return nil, err

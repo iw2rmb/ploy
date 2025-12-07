@@ -18,11 +18,11 @@ RETURNING id, run_id, job_id, build_id, chunk_no, data, created_at
 `
 
 type CreateLogParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	JobID   pgtype.UUID `json:"job_id"`
-	BuildID pgtype.UUID `json:"build_id"`
-	ChunkNo int32       `json:"chunk_no"`
-	Data    []byte      `json:"data"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	BuildID *string `json:"build_id"`
+	ChunkNo int32   `json:"chunk_no"`
+	Data    []byte  `json:"data"`
 }
 
 func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, error) {
@@ -92,7 +92,7 @@ WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
 
-func (q *Queries) ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error) {
+func (q *Queries) ListLogsByRun(ctx context.Context, runID string) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRun, runID)
 	if err != nil {
 		return nil, err
@@ -127,8 +127,8 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobParams struct {
-	RunID pgtype.UUID `json:"run_id"`
-	JobID pgtype.UUID `json:"job_id"`
+	RunID string  `json:"run_id"`
+	JobID *string `json:"job_id"`
 }
 
 func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
@@ -166,9 +166,9 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobSinceParams struct {
-	RunID pgtype.UUID `json:"run_id"`
-	JobID pgtype.UUID `json:"job_id"`
-	ID    int64       `json:"id"`
+	RunID string  `json:"run_id"`
+	JobID *string `json:"job_id"`
+	ID    int64   `json:"id"`
 }
 
 func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
@@ -206,9 +206,9 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunJobAndBuildParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	JobID   pgtype.UUID `json:"job_id"`
-	BuildID pgtype.UUID `json:"build_id"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	BuildID *string `json:"build_id"`
 }
 
 func (q *Queries) ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error) {
@@ -246,10 +246,10 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunJobAndBuildSinceParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	JobID   pgtype.UUID `json:"job_id"`
-	BuildID pgtype.UUID `json:"build_id"`
-	ID      int64       `json:"id"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	BuildID *string `json:"build_id"`
+	ID      int64   `json:"id"`
 }
 
 func (q *Queries) ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLogsByRunJobAndBuildSinceParams) ([]Log, error) {
@@ -292,8 +292,8 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunSinceParams struct {
-	RunID pgtype.UUID `json:"run_id"`
-	ID    int64       `json:"id"`
+	RunID string `json:"run_id"`
+	ID    int64  `json:"id"`
 }
 
 func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {

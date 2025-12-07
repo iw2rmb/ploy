@@ -18,8 +18,8 @@ RETURNING id, run_id, job_id, time, level, message, meta
 `
 
 type CreateEventParams struct {
-	RunID   pgtype.UUID        `json:"run_id"`
-	JobID   pgtype.UUID        `json:"job_id"`
+	RunID   string             `json:"run_id"`
+	JobID   *string            `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
 	Message string             `json:"message"`
@@ -74,7 +74,7 @@ WHERE run_id = $1
 ORDER BY time ASC, id ASC
 `
 
-func (q *Queries) ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error) {
+func (q *Queries) ListEventsByRun(ctx context.Context, runID string) ([]Event, error) {
 	rows, err := q.db.Query(ctx, listEventsByRun, runID)
 	if err != nil {
 		return nil, err
@@ -109,8 +109,8 @@ ORDER BY time ASC, id ASC
 `
 
 type ListEventsByRunSinceParams struct {
-	RunID pgtype.UUID `json:"run_id"`
-	ID    int64       `json:"id"`
+	RunID string `json:"run_id"`
+	ID    int64  `json:"id"`
 }
 
 func (q *Queries) ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error) {

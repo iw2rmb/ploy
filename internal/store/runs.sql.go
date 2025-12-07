@@ -20,18 +20,19 @@ WHERE id = $1 AND status IN ('assigned', 'queued')
 // Transitions run status to 'running' when execution starts.
 // Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
 // the first job starts execution.
-func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) AckRunStart(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, ackRunStart, id)
 	return err
 }
 
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO runs (id, name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
 `
 
 type CreateRunParams struct {
+	ID        string    `json:"id"`
 	Name      *string   `json:"name"`
 	RepoUrl   string    `json:"repo_url"`
 	Spec      []byte    `json:"spec"`
@@ -43,8 +44,10 @@ type CreateRunParams struct {
 }
 
 // Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
+// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
+		arg.ID,
 		arg.Name,
 		arg.RepoUrl,
 		arg.Spec,
@@ -79,7 +82,7 @@ DELETE FROM runs
 WHERE id = $1
 `
 
-func (q *Queries) DeleteRun(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeleteRun(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteRun, id)
 	return err
 }
@@ -89,7 +92,7 @@ SELECT id, name, repo_url, spec, created_by, status, created_at, started_at, fin
 WHERE id = $1
 `
 
-func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
+func (q *Queries) GetRun(ctx context.Context, id string) (Run, error) {
 	row := q.db.QueryRow(ctx, getRun, id)
 	var i Run
 	err := row.Scan(
@@ -119,7 +122,7 @@ FROM runs_timing
 WHERE id = $1
 `
 
-func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error) {
+func (q *Queries) GetRunTiming(ctx context.Context, id string) (RunsTiming, error) {
 	row := q.db.QueryRow(ctx, getRunTiming, id)
 	var i RunsTiming
 	err := row.Scan(&i.ID, &i.QueueMs, &i.RunMs)
@@ -213,9 +216,9 @@ WHERE id = $1
 `
 
 type UpdateRunCompletionParams struct {
-	ID     pgtype.UUID `json:"id"`
-	Status RunStatus   `json:"status"`
-	Stats  []byte      `json:"stats"`
+	ID     string    `json:"id"`
+	Status RunStatus `json:"status"`
+	Stats  []byte    `json:"stats"`
 }
 
 func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
@@ -234,7 +237,7 @@ WHERE id = $1
 
 // Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 // Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
-func (q *Queries) UpdateRunResume(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) UpdateRunResume(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, updateRunResume, id)
 	return err
 }
@@ -246,7 +249,7 @@ WHERE id = $1
 `
 
 type UpdateRunStatusParams struct {
-	ID         pgtype.UUID        `json:"id"`
+	ID         string             `json:"id"`
 	Status     RunStatus          `json:"status"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 }
