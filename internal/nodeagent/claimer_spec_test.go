@@ -185,7 +185,10 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 }
 
 // TestParseRunOptions_MultiStrategyHealing verifies that parseRunOptions correctly
-// parses the multi-strategy healing schema where strategies[] takes precedence over mods[].
+// parses the healing schema where:
+//   - legacy build_gate_healing.mods[] is mapped to a single unnamed strategy, and
+//   - strategies[] takes precedence over mods[] when both are present.
+//
 // This test ensures backward compatibility with the legacy single-strategy form.
 func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 	t.Parallel()
@@ -210,9 +213,9 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 				}
 			}`,
 			wantRetries:      2,
-			wantStrategies:   0, // No strategies array; legacy mods ignored by parser.
-			wantStratNames:   nil,
-			wantModsPerStrat: nil,
+			wantStrategies:   1,            // Legacy mods[] mapped to a single unnamed strategy.
+			wantStratNames:   []string{""}, // Empty name for legacy single-strategy.
+			wantModsPerStrat: []int{2},
 		},
 		{
 			name: "multi_strategy_form_two_branches",
