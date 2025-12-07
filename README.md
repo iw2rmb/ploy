@@ -1,6 +1,6 @@
 # Ploy — Mods Orchestrator and Control Plane
 
-[![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml)
+[![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml) [![Coverage (native)](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml) [![Test Suite](https://github.com/iw2rmb/ploy/actions/workflows/test.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/test.yml) [![Build](https://github.com/iw2rmb/ploy/actions/workflows/build.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/build.yml)
 
 Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
 
