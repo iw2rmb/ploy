@@ -3,9 +3,6 @@ package graph
 import (
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -18,14 +15,10 @@ import (
 //
 // The runID parameter identifies the ticket/run; it's included in the
 // graph for context. All jobs should belong to the same run.
-func BuildFromJobs(runID pgtype.UUID, jobs []store.Job) *WorkflowGraph {
-	// Convert runID to string for JSON-friendly output.
-	runIDStr := ""
-	if runID.Valid {
-		runIDStr = uuid.UUID(runID.Bytes).String()
-	}
-
-	graph := NewWorkflowGraph(runIDStr)
+//
+// runID is now a string (KSUID-backed); no UUID conversion needed.
+func BuildFromJobs(runID string, jobs []store.Job) *WorkflowGraph {
+	graph := NewWorkflowGraph(runID)
 
 	// Phase 1: Create nodes from jobs.
 	for _, job := range jobs {
@@ -41,13 +34,8 @@ func BuildFromJobs(runID pgtype.UUID, jobs []store.Job) *WorkflowGraph {
 
 // jobToNode converts a store.Job to a GraphNode.
 // Maps database fields to graph node properties.
+// job.ID is now a string (KSUID-backed); no UUID conversion needed.
 func jobToNode(job store.Job) *GraphNode {
-	// Convert job ID to string.
-	jobID := ""
-	if job.ID.Valid {
-		jobID = uuid.UUID(job.ID.Bytes).String()
-	}
-
 	// Map job status to node status.
 	nodeStatus := mapJobStatus(job.Status)
 
@@ -66,7 +54,7 @@ func jobToNode(job store.Job) *GraphNode {
 	}
 
 	return &GraphNode{
-		ID:         jobID,
+		ID:         job.ID, // job.ID is now a string (KSUID-backed).
 		Name:       job.Name,
 		Type:       nodeType,
 		StepIndex:  job.StepIndex,
@@ -127,7 +115,8 @@ func mapModType(modType string) NodeType {
 // BuildFromJobsWithEdgeStrategy allows specifying a custom edge computation
 // strategy. This is provided for future extensibility (e.g., parallel healing
 // branches). Currently delegates to the standard linear edge computation.
-func BuildFromJobsWithEdgeStrategy(runID pgtype.UUID, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
+// runID is now a string (KSUID-backed).
+func BuildFromJobsWithEdgeStrategy(runID string, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
 	graph := BuildFromJobs(runID, jobs)
 
 	// If a custom strategy is provided, re-compute edges.

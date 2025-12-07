@@ -51,7 +51,7 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 	if manifest.Name == "" || manifest.Version == "" {
 		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
-	return WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: types.TicketID(trimmed), Manifest: manifest, Repo: b.Repo}, nil
+	return WorkflowTicket{SchemaVersion: SchemaVersion, RunID: types.RunID(trimmed), Manifest: manifest, Repo: b.Repo}, nil
 }
 
 // PublishCheckpoint records a checkpoint in memory only.

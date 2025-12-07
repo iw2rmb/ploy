@@ -23,6 +23,8 @@ import (
 // - job_id: References the job that produced this diff; job's step_index provides ordering.
 // - mod_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
 // Rehydration queries fetch all diffs ordered by job step_index.
+//
+// NOTE: job_id is now a KSUID-backed string (no UUID parsing).
 type diffItem struct {
 	ID        string                  `json:"id"`
 	JobID     string                  `json:"job_id"`
@@ -37,6 +39,7 @@ type diffListResponse struct {
 }
 
 // diffGetResponse is the typed response for getting a single diff's metadata.
+// NOTE: run_id and job_id are now KSUID-backed strings.
 type diffGetResponse struct {
 	ID          string                  `json:"id"`
 	RunID       string                  `json:"run_id"`
@@ -48,20 +51,19 @@ type diffGetResponse struct {
 
 // listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
 // GET /v1/mods/{id}/diffs
+//
+// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Run IDs are KSUID strings; treated as opaque identifiers.
 		idStr := strings.TrimSpace(r.PathValue("id"))
 		if idStr == "" {
 			http.Error(w, "ticket id is required", http.StatusBadRequest)
 			return
 		}
-		runUUID, err := uuid.Parse(idStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid ticket id: %v", err), http.StatusBadRequest)
-			return
-		}
 
-		diffs, err := st.ListDiffsByRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true})
+		// Use string run ID directly (no UUID parsing needed).
+		diffs, err := st.ListDiffsByRun(r.Context(), idStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
 			slog.Error("list diffs: query failed", "ticket_id", idStr, "err", err)
@@ -74,12 +76,13 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
+			// d.JobID is now *string (KSUID-backed).
 			jobIDStr := ""
-			if d.JobID.Valid {
-				jobIDStr = uuid.UUID(d.JobID.Bytes).String()
+			if d.JobID != nil && *d.JobID != "" {
+				jobIDStr = *d.JobID
 			}
 			items = append(items, diffItem{
-				ID:        uuid.UUID(d.ID.Bytes).String(),
+				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
 				JobID:     jobIDStr,
 				CreatedAt: d.CreatedAt.Time,
 				Size:      len(d.Patch),
@@ -95,6 +98,8 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 // getDiffHandler returns diff bytes for a diff id. When ?download=true, writes
 // the gzipped patch as application/gzip. Otherwise returns minimal JSON metadata.
 // GET /v1/diffs/{id}
+//
+// NOTE: diffs.id is still UUID; run_id and job_id are KSUID strings.
 func getDiffHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := strings.TrimSpace(r.PathValue("id"))
@@ -102,6 +107,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, "id is required", http.StatusBadRequest)
 			return
 		}
+		// diffs.id is still UUID (outside scope of this task).
 		diffUUID, err := uuid.Parse(idStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
@@ -130,16 +136,16 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		if len(d.Summary) > 0 {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
+		// d.ID is still pgtype.UUID; d.RunID and d.JobID are now strings.
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
-			RunID:       uuid.UUID(d.RunID.Bytes).String(),
+			RunID:       d.RunID, // run_id is now a string (KSUID)
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,
 		}
-		if d.JobID.Valid {
-			jid := uuid.UUID(d.JobID.Bytes).String()
-			resp.JobID = &jid
+		if d.JobID != nil && *d.JobID != "" {
+			resp.JobID = d.JobID
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

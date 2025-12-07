@@ -49,8 +49,9 @@ Run:
   # Note: The `reason` field was removed to prevent schema drift from the DB model.
   # Failure context is derived from `stats.exit_code` and `metadata`. The `stats`
   # field contains job/run metrics including exit codes; use it for failure analysis.
+  # Note: run IDs are now KSUID-backed strings (27 characters); format: uuid removed.
   properties:
-    id: { type: string, format: uuid }
+    id: { type: string, description: "Run ID (KSUID string)" }
     repo_url: { type: string }
     spec: {}
     created_by: { type: string, nullable: true }
@@ -121,15 +122,15 @@ RunRepo:
     Repo entry within a batch run, backed by the `run_repos` table.
     Represents a single repository's execution state within the batch,
     tracking refs, status, attempt count, and timing information.
+    Note: run_id is now a KSUID-backed string (27 characters).
   properties:
     id:
       type: string
       format: uuid
-      description: Unique repo entry ID within the batch.
+      description: Unique repo entry ID within the batch (still UUID).
     run_id:
       type: string
-      format: uuid
-      description: Parent batch run ID.
+      description: Parent batch run ID (KSUID string).
     repo_url:
       type: string
       description: Git repository URL (https, ssh, or file scheme).
@@ -185,11 +186,11 @@ RunBatchSummary:
     Returned by list and inspect endpoints for batch runs. The repo_counts
     field provides aggregate status when multiple repos are attached to
     the batch (via POST /v1/runs/{id}/repos).
+    Note: id is now a KSUID-backed string (27 characters).
   properties:
     id:
       type: string
-      format: uuid
-      description: Unique batch run identifier.
+      description: Unique batch run identifier (KSUID string).
     name:
       type: string
       nullable: true
@@ -256,8 +257,9 @@ CreateRunRequest:
 
 CreateRunResponse:
   type: object
+  # Note: run_id is now a KSUID-backed string (27 characters).
   properties:
-    run_id: { type: string, format: uuid }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
   required: [run_id]
 
 # Ticket submission (simplified Mods facade)
@@ -274,8 +276,9 @@ RunSubmitRequest:
 
 RunSummary:
   type: object
+  # Note: run_id is now a KSUID-backed string (27 characters).
   properties:
-    run_id: { type: string, format: uuid }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
     status: { type: string }
     repo_url: { type: string }
     base_ref: { type: string }
@@ -286,10 +289,11 @@ RunSummary:
 # Note: The `reason` field was removed to prevent schema drift from the DB model.
 # Failure context is derived from job `stats.exit_code` and `metadata`. Cancellation
 # reasons are stored in `metadata.reason` by the cancel endpoint.
+# Note: run_id is now a KSUID-backed string (27 characters).
 RunStatus:
   type: object
   properties:
-    run_id: { type: string, format: uuid }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
     status: { type: string }
     repo_url: { type: string }
     base_ref: { type: string }
@@ -343,8 +347,9 @@ BuildGateValidateRequest:
 BuildGateValidateResponse:
   type: object
   description: Returns result when ready; otherwise JobID for polling.
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, format: uuid }
+    job_id: { type: string, description: "Job ID (KSUID string)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
     result:
       description: Present only for completed jobs.
@@ -355,8 +360,9 @@ BuildGateValidateResponse:
 
 BuildGateJobStatusResponse:
   type: object
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, format: uuid }
+    job_id: { type: string, description: "Job ID (KSUID string)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
     result:
       type: object
@@ -378,8 +384,9 @@ BuildGateJobCompleteRequest:
 
 NodeBuildGateClaimResponse:
   type: object
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, format: uuid }
+    job_id: { type: string, description: "Job ID (KSUID string)" }
     request:
       $ref: '#/BuildGateValidateRequest'
     status: { type: string, enum: [claimed] }
@@ -387,17 +394,16 @@ NodeBuildGateClaimResponse:
 
 # Response returned by POST /v1/nodes/{id}/claim
 # Schema aligned with claimJobHandler response — exposes job-centric fields.
+# Note: id (run_id) and job_id are now KSUID-backed strings (27 characters).
 NodeClaimResponse:
   type: object
   properties:
     id:
       type: string
-      format: uuid
-      description: Run ID (parent run of the claimed job)
+      description: Run ID (parent run of the claimed job, KSUID string)
     job_id:
       type: string
-      format: uuid
-      description: Claimed job ID
+      description: Claimed job ID (KSUID string)
     job_name:
       type: string
       description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
@@ -439,10 +445,11 @@ NodeClaimResponse:
 
 Event:
   type: object
+  # Note: run_id and job_id are now KSUID-backed strings (27 characters).
   properties:
     id: { type: integer, format: int64 }
-    run_id: { type: string, format: uuid }
-    job_id: { type: string, format: uuid, nullable: true }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
     time: { type: string, format: date-time }
     level: { type: string }
     message: { type: string }
@@ -451,9 +458,10 @@ Event:
 
 Stage:
   type: object
+  # Note: id (job_id) and run_id are now KSUID-backed strings (27 characters).
   properties:
-    id: { type: string, format: uuid }
-    run_id: { type: string, format: uuid }
+    id: { type: string, description: "Job ID (KSUID string)" }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
     name: { type: string }
     status: { type: string }
     started_at: { type: string, format: date-time, nullable: true }
@@ -464,8 +472,9 @@ Stage:
 
 RunTiming:
   type: object
+  # Note: id (run_id) is now a KSUID-backed string (27 characters).
   properties:
-    id: { type: string, format: uuid }
+    id: { type: string, description: "Run ID (KSUID string)" }
     queue_ms: { type: integer, format: int64 }
     run_ms: { type: integer, format: int64 }
   required: [id, queue_ms, run_ms]
@@ -481,10 +490,11 @@ ListRunsTimingsResponse:
 
 Diff:
   type: object
+  # Note: id (diffs.id is still UUID), but run_id and job_id are KSUID strings.
   properties:
-    id: { type: string, format: uuid }
-    run_id: { type: string, format: uuid }
-    job_id: { type: string, format: uuid, nullable: true }
+    id: { type: string, format: uuid, description: "Diff ID (still UUID)" }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
       description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
@@ -495,8 +505,9 @@ Diff:
 
 CreateDiffRequest:
   type: object
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
       description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
@@ -506,11 +517,12 @@ CreateDiffRequest:
 
 Log:
   type: object
+  # Note: run_id, job_id, and build_id are now KSUID-backed strings (27 characters).
   properties:
     id: { type: integer, format: int64 }
-    run_id: { type: string, format: uuid }
-    job_id: { type: string, format: uuid, nullable: true }
-    build_id: { type: string, format: uuid, nullable: true }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -531,9 +543,10 @@ NodeCreateLogResponse:
 
 CreateLogRequest:
   type: object
+  # Note: job_id and build_id are now KSUID-backed strings (27 characters).
   properties:
-    job_id: { type: string, format: uuid, nullable: true }
-    build_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -544,10 +557,11 @@ CreateLogRequest:
 # Request used by node → server log ingestion.
 NodeCreateLogRequest:
   type: object
+  # Note: run_id, job_id, and build_id are now KSUID-backed strings (27 characters).
   properties:
-    run_id: { type: string, format: uuid }
-    job_id: { type: string, format: uuid, nullable: true }
-    build_id: { type: string, format: uuid, nullable: true }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -557,11 +571,12 @@ NodeCreateLogRequest:
 
 ArtifactBundle:
   type: object
+  # Note: artifact_bundles.id is still UUID, but run_id, job_id, build_id are KSUID strings.
   properties:
-    id: { type: string, format: uuid }
-    run_id: { type: string, format: uuid }
-    job_id: { type: string, format: uuid, nullable: true }
-    build_id: { type: string, format: uuid, nullable: true }
+    id: { type: string, format: uuid, description: "Artifact bundle ID (still UUID)" }
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string
@@ -572,9 +587,10 @@ ArtifactBundle:
 
 CreateArtifactBundleRequest:
   type: object
+  # Note: job_id and build_id are now KSUID-backed strings (27 characters).
   properties:
-    job_id: { type: string, format: uuid, nullable: true }
-    build_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string
@@ -620,10 +636,11 @@ Node:
 
 WorkflowGraphNode:
   type: object
+  # Note: job IDs (id, parent_ids, child_ids) are now KSUID-backed strings.
   properties:
     id:
       type: string
-      format: uuid
+      description: Job ID (KSUID string)
     name:
       type: string
       description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
@@ -648,13 +665,13 @@ WorkflowGraphNode:
       description: IDs of predecessor jobs derived from step_index ordering
       items:
         type: string
-        format: uuid
+        description: Job ID (KSUID string)
     child_ids:
       type: array
       description: IDs of successor jobs derived from step_index ordering
       items:
         type: string
-        format: uuid
+        description: Job ID (KSUID string)
     image:
       type: string
       nullable: true
@@ -680,11 +697,11 @@ WorkflowGraphNode:
 
 WorkflowGraph:
   type: object
+  # Note: run_id and job IDs (root_ids, leaf_ids) are now KSUID-backed strings.
   properties:
     run_id:
       type: string
-      format: uuid
-      description: Ticket/run identifier
+      description: Ticket/run identifier (KSUID string)
     nodes:
       type: object
       description: Map of job IDs to graph nodes
@@ -695,13 +712,13 @@ WorkflowGraph:
       description: IDs of entry-point nodes (jobs with no parents)
       items:
         type: string
-        format: uuid
+        description: Job ID (KSUID string)
     leaf_ids:
       type: array
       description: IDs of terminal nodes (jobs with no children)
       items:
         type: string
-        format: uuid
+        description: Job ID (KSUID string)
     linear:
       type: boolean
       description: True when graph is a simple linear chain
@@ -737,11 +754,11 @@ RepoRunSummary:
   description: |
     Run summary for a specific repository, returned by GET /v1/repos/{repo_id}/runs.
     Includes both the parent run status and per-repo status within the batch.
+    Note: run_id is now a KSUID-backed string (27 characters).
   properties:
     run_id:
       type: string
-      format: uuid
-      description: Unique run identifier
+      description: Unique run identifier (KSUID string)
     name:
       type: string
       nullable: true

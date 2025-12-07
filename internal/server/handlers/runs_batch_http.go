@@ -7,16 +7,20 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// NOTE: This file uses KSUID-backed string IDs for runs.
+// Run IDs are treated as opaque strings; no UUID parsing is performed.
+// Run_repo IDs (repo_id) are still UUIDs (outside scope of KSUID migration).
 
 // Batch run handlers implement HTTP endpoints for listing, inspecting, and stopping
 // batched mod runs. These handlers build on the `runs` table and aggregate per-repo
@@ -76,10 +80,11 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 			summary := runToSummary(run)
 
 			// Fetch repo counts for this run to provide batch-level aggregates.
+			// run.ID is now a string (KSUID).
 			counts, err := getRunRepoCounts(r.Context(), st, run.ID)
 			if err != nil {
 				// Log but continue — repo counts are optional enhancement.
-				slog.Warn("list runs: failed to fetch repo counts", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+				slog.Warn("list runs: failed to fetch repo counts", "run_id", run.ID, "err", err)
 			} else if counts.Total > 0 {
 				summary.Counts = counts
 			}
@@ -104,30 +109,20 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 // getRunHandler returns an HTTP handler that fetches a single run by ID.
 // GET /v1/runs/{id} — Returns detailed run summary including batch-level status and repo counts.
+//
+// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID.
-		pgID := pgtype.UUID{
-			Bytes: runID,
-			Valid: true,
-		}
-
-		// Fetch the run.
-		run, err := st.GetRun(r.Context(), pgID)
+		// Fetch the run using string ID directly (no UUID parsing needed).
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -142,6 +137,7 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 		summary := runToSummary(run)
 
 		// Fetch repo counts to provide batch-level aggregates.
+		// run.ID is now a string (KSUID).
 		counts, err := getRunRepoCounts(r.Context(), st, run.ID)
 		if err != nil {
 			slog.Warn("get run: failed to fetch repo counts", "run_id", runIDStr, "err", err)

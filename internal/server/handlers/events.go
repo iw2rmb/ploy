@@ -3,15 +3,12 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -34,34 +31,29 @@ func parseLastEventID(header string) int64 {
 // getModEventsHandler returns an HTTP handler that streams mod (ticket) events over SSE.
 // Supports Last-Event-ID header for resuming streams from a specific event.
 // GET /v1/mods/{id}/events — Native SSE under mods (no proxy).
+//
+// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
+// Validation is limited to non-empty check; the database layer rejects invalid IDs.
 func getModEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract ticket ID from path parameter.
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Run IDs are KSUID strings (27 chars); treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse and validate ticket_id.
-		ticketUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Verify run exists in the database (ticket_id == run UUID).
-		_, err = st.GetRun(r.Context(), pgtype.UUID{
-			Bytes: ticketUUID,
-			Valid: true,
-		})
+		// Verify run exists in the database using string ID directly.
+		// No UUID parsing needed; store accepts KSUID strings.
+		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "ticket not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
 			slog.Error("get mod events: database error", "ticket_id", runIDStr, "err", err)
+			http.Error(w, "failed to get ticket", http.StatusInternalServerError)
 			return
 		}
 

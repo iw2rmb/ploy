@@ -86,6 +86,8 @@ func (s *Service) Stop(ctx context.Context) error {
 // The runID is used as the streamID for SSE fanout.
 // Returns the created event from the database. If persistence fails, an error
 // is returned; SSE fanout errors are logged but do not fail the operation.
+//
+// params.RunID is now a string (KSUID-backed); used directly as streamID.
 func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
@@ -100,8 +102,8 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 		return store.Event{}, fmt.Errorf("persist event: %w", err)
 	}
 
-	// Convert runID to string for streamID.
-	streamID := uuidToString(params.RunID)
+	// Use runID string directly as streamID (KSUID-backed).
+	streamID := strings.TrimSpace(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
@@ -120,6 +122,8 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 // CreateAndPublishLog persists a log chunk to the database and publishes it to the SSE hub.
 // The runID is used as the streamID for SSE fanout. Log data is decoded into per-line
 // stdout LogRecord frames before fanout so clients see structured "log" events.
+//
+// params.RunID is now a string (KSUID-backed); used directly as streamID.
 func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	if s.store == nil {
 		return store.Log{}, errors.New("events: store not configured")
@@ -131,8 +135,8 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 		return store.Log{}, fmt.Errorf("persist log: %w", err)
 	}
 
-	// Convert runID to string for streamID.
-	streamID := uuidToString(params.RunID)
+	// Use runID string directly as streamID (KSUID-backed).
+	streamID := strings.TrimSpace(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
@@ -149,14 +153,14 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 }
 
 // PublishTicket publishes a ticket lifecycle event (queued/running/succeeded/failed/cancelled)
-// to the SSE hub. The runID (mods ticket UUID) is used as the streamID for SSE fanout.
+// to the SSE hub. The runID (KSUID string) is used as the streamID for SSE fanout.
 //
-// The payload is intentionally typed as modsapi.TicketSummary to enforce a
+// The payload is intentionally typed as modsapi.RunSummary to enforce a
 // JSON‑serializable contract at the service boundary and prevent accidental
 // non‑JSON payloads from being published. Callers should also emit a terminal
 // "done" status via Hub().PublishStatus when the ticket reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
-func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.TicketSummary) error {
+func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.RunSummary) error {
 	// Validate stream id after trimming whitespace so callers can't silently
 	// succeed with an all‑whitespace runID (the hub ignores empty ids).
 	if strings.TrimSpace(runID) == "" {
@@ -191,6 +195,7 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 	// Fetch job metadata to enrich log records with execution context.
 	// If the job lookup fails (e.g., job doesn't exist yet or store unavailable),
 	// we still publish logs without enrichment to avoid losing data.
+	// log.JobID is now *string (KSUID-backed).
 	jobCtx := s.loadJobContext(ctx, log.JobID)
 
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
@@ -261,11 +266,13 @@ type jobContext struct {
 
 // loadJobContext fetches job metadata for a given job ID and extracts
 // fields needed to enrich log records. Returns an empty context if the
-// job ID is invalid or the lookup fails (logs are still published without
+// job ID is nil/empty or the lookup fails (logs are still published without
 // enrichment in these cases).
-func (s *Service) loadJobContext(ctx context.Context, jobID pgtype.UUID) jobContext {
-	// If job ID is invalid, return empty context.
-	if !jobID.Valid {
+//
+// jobID is now *string (KSUID-backed).
+func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext {
+	// If job ID is nil or empty, return empty context.
+	if jobID == nil || strings.TrimSpace(*jobID) == "" {
 		return jobContext{}
 	}
 	// If store is not configured, return empty context (log-only mode).
@@ -273,18 +280,20 @@ func (s *Service) loadJobContext(ctx context.Context, jobID pgtype.UUID) jobCont
 		return jobContext{}
 	}
 
-	job, err := s.store.GetJob(ctx, jobID)
+	job, err := s.store.GetJob(ctx, *jobID)
 	if err != nil {
 		// Log lookup failure but don't block log publishing.
 		s.logger.Debug("job lookup failed for log enrichment",
-			"job_id", uuidToString(jobID),
+			"job_id", *jobID,
 			"error", err)
 		return jobContext{}
 	}
 
+	// job.ID is now a string (KSUID-backed).
+	// job.NodeID is still pgtype.UUID (node IDs not migrated in this task).
 	return jobContext{
 		NodeID:    uuidToString(job.NodeID),
-		JobID:     uuidToString(job.ID),
+		JobID:     job.ID,
 		ModType:   job.ModType,
 		StepIndex: int(job.StepIndex),
 	}
@@ -292,6 +301,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID pgtype.UUID) jobCont
 
 // uuidToString converts a pgtype.UUID to its string representation.
 // Returns empty string if the UUID is invalid or null.
+// NOTE: Used for node_id which is still UUID; run/job/build IDs are now strings.
 func uuidToString(id pgtype.UUID) string {
 	if !id.Valid {
 		return ""

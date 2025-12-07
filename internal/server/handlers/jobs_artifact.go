@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -19,37 +18,25 @@ import (
 
 // createJobArtifactHandler stores gzipped artifact bundle in artifact_bundles table (≤1 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/artifact
+//
+// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
 	const maxBodySize = 2 << 20   // 2 MiB
 	const maxBundleSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run_id from path parameter.
-		runIDStr := r.PathValue("run_id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Extract run_id from path parameter (KSUID string).
+		runIDStr := strings.TrimSpace(r.PathValue("run_id"))
+		if runIDStr == "" {
 			http.Error(w, "run_id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse and validate run_id.
-		runID := domaintypes.ToPGUUID(runIDStr)
-		if !runID.Valid {
-			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
-		// Extract job_id from path parameter.
-		jobIDStr := r.PathValue("job_id")
-		if strings.TrimSpace(jobIDStr) == "" {
+		// Extract job_id from path parameter (KSUID string).
+		jobIDStr := strings.TrimSpace(r.PathValue("job_id"))
+		if jobIDStr == "" {
 			http.Error(w, "job_id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate job_id.
-		jobID := domaintypes.ToPGUUID(jobIDStr)
-		if !jobID.Valid {
-			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -64,7 +51,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Decode request body.
 		var req struct {
-			BuildID *string `json:"build_id"` // optional
+			BuildID *string `json:"build_id"` // optional (KSUID string)
 			Name    *string `json:"name"`     // optional logical name
 			Bundle  []byte  `json:"bundle"`   // gzipped tar (raw bytes)
 		}
@@ -92,9 +79,9 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the run exists.
+		// Check if the run exists using string ID directly.
 		var err error
-		_, err = st.GetRun(r.Context(), runID)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -105,8 +92,8 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the job exists.
-		job, err := st.GetJob(r.Context(), jobID)
+		// Check if the job exists using string ID directly.
+		job, err := st.GetJob(r.Context(), jobIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -117,14 +104,15 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Ensure the job belongs to the provided run.
-		if job.RunID != runID {
+		// Ensure the job belongs to the provided run (both are strings now).
+		if job.RunID != runIDStr {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
+		// NOTE: node IDs are still UUID (not migrated in this task).
 		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeader == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
@@ -140,23 +128,16 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate build_id if provided.
-		var buildID pgtype.UUID
-		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
-			buildID = domaintypes.ToPGUUID(*req.BuildID)
-			if !buildID.Valid {
-				http.Error(w, "invalid build_id: invalid uuid", http.StatusBadRequest)
-				return
-			}
-		}
+		// Normalize optional build_id (KSUID string).
+		buildID := normalizeOptionalID(req.BuildID)
 
 		// Compute CID and digest for content-addressable storage.
 		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 
-		// Create artifact bundle params.
+		// Create artifact bundle params using string IDs.
 		params := store.CreateArtifactBundleParams{
-			RunID:   runID,
-			JobID:   jobID,
+			RunID:   runIDStr,
+			JobID:   &jobIDStr,
 			BuildID: buildID,
 			Name:    req.Name,
 			Bundle:  req.Bundle,
@@ -179,6 +160,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Return success response with artifact_bundle_id.
+		// artifact_bundles.id is still UUID.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(map[string]interface{}{

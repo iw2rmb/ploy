@@ -47,16 +47,10 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		ctx := r.Context()
 
 		// Extract job_id from URL path parameter.
-		jobIDStr := r.PathValue("job_id")
-		if strings.TrimSpace(jobIDStr) == "" {
+		// Job IDs are KSUID strings; treated as opaque identifiers.
+		jobIDStr := strings.TrimSpace(r.PathValue("job_id"))
+		if jobIDStr == "" {
 			http.Error(w, "job_id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate job_id as UUID.
-		jobID := domaintypes.ToPGUUID(jobIDStr)
-		if !jobID.Valid {
-			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -112,8 +106,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			statsBytes = req.Stats
 		}
 
-		// Look up the job by job_id.
-		job, err := st.GetJob(ctx, jobID)
+		// Look up the job by job_id using string ID directly.
+		// No UUID parsing needed; store accepts KSUID strings.
+		job, err := st.GetJob(ctx, jobIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)

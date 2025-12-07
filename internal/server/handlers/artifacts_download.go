@@ -121,18 +121,17 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 			Size      int64   `json:"size"`
 			CreatedAt string  `json:"created_at"`
 		}
+		// bundle.ID is still pgtype.UUID; run_id, job_id, build_id are now strings.
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
-			RunID: uuid.UUID(bundle.RunID.Bytes).String(),
+			RunID: bundle.RunID, // run_id is now a string (KSUID)
 			Size:  int64(len(bundle.Bundle)),
 		}
-		if bundle.JobID.Valid {
-			jobID := uuid.UUID(bundle.JobID.Bytes).String()
-			detail.JobID = &jobID
+		if bundle.JobID != nil && *bundle.JobID != "" {
+			detail.JobID = bundle.JobID
 		}
-		if bundle.BuildID.Valid {
-			buildID := uuid.UUID(bundle.BuildID.Bytes).String()
-			detail.BuildID = &buildID
+		if bundle.BuildID != nil && *bundle.BuildID != "" {
+			detail.BuildID = bundle.BuildID
 		}
 		if bundle.Name != nil {
 			detail.Name = bundle.Name

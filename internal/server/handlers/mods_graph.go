@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/graph"
@@ -41,30 +40,21 @@ import (
 //	  "leaf_ids": ["job-3"],
 //	  "linear": true
 //	}
+//
+// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func getModGraphHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the ticket ID from the URL path parameter.
-		ticketIDStr := r.PathValue("id")
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		ticketIDStr := strings.TrimSpace(r.PathValue("id"))
 		if ticketIDStr == "" {
 			http.Error(w, "ticket id is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		ticketID, err := uuid.Parse(ticketIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid ticket id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID for store queries.
-		pgID := pgtype.UUID{
-			Bytes: ticketID,
-			Valid: true,
-		}
-
-		// Verify the run exists before fetching jobs.
-		_, err = st.GetRun(r.Context(), pgID)
+		// Verify the run exists before fetching jobs using string ID directly.
+		// No UUID parsing needed; store accepts KSUID strings.
+		_, err := st.GetRun(r.Context(), ticketIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "ticket not found", http.StatusNotFound)
@@ -76,7 +66,8 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Fetch all jobs for the run, ordered by step_index.
-		jobs, err := st.ListJobsByRun(r.Context(), pgID)
+		// Uses string run ID directly.
+		jobs, err := st.ListJobsByRun(r.Context(), ticketIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("get mod graph: list jobs failed", "ticket_id", ticketIDStr, "err", err)
@@ -85,8 +76,8 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 
 		// Build the workflow graph from jobs.
 		// The graph materializes nodes from jobs and computes edges from
-		// step_index ordering.
-		workflowGraph := graph.BuildFromJobs(pgID, jobs)
+		// step_index ordering. runID is now a string (KSUID).
+		workflowGraph := graph.BuildFromJobs(ticketIDStr, jobs)
 
 		// Return the graph as JSON.
 		w.Header().Set("Content-Type", "application/json")
