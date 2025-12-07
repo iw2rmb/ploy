@@ -291,13 +291,27 @@ func parseRunOptions(opts map[string]any) RunOptions {
 			healing.Retries = int(rf)
 		}
 
-		// Multi-strategy form: strategies[] is the supported schema.
+		// Multi-strategy form: strategies[] is the preferred schema.
 		if strategiesSlice, ok := healingMap["strategies"].([]any); ok && len(strategiesSlice) > 0 {
 			for _, stratEntry := range strategiesSlice {
 				if stratMap, ok := stratEntry.(map[string]any); ok {
 					strategy := parseHealingStrategy(stratMap)
 					healing.Strategies = append(healing.Strategies, strategy)
 				}
+			}
+		} else if modsSlice, ok := healingMap["mods"].([]any); ok && len(modsSlice) > 0 {
+			// Backward-compatibility: legacy single-strategy form using
+			// build_gate_healing.mods[]. Map this to a single unnamed strategy
+			// so downstream code can treat both forms uniformly.
+			strategy := HealingStrategy{}
+			for _, modEntry := range modsSlice {
+				if modMap, ok := modEntry.(map[string]any); ok {
+					mod := parseHealingMod(modMap)
+					strategy.Mods = append(strategy.Mods, mod)
+				}
+			}
+			if len(strategy.Mods) > 0 {
+				healing.Strategies = append(healing.Strategies, strategy)
 			}
 		}
 
