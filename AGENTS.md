@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Backward Compatibility and Deprecation Policy
+Unless otherwise specified, the following policies apply when planning changes:
+- **DO NOT** provide fallbacks or compatibility layers.
+- **DO NOT** keep old versions/algorithms.
+- **REMOVE** code and docs of replaced solutions.
+- **DO NOT** plan or develop solutions for data migration.
+
 ## Before You Start
 
 - Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.

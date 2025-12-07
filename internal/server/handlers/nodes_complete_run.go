@@ -155,21 +155,21 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 
 	// Publish terminal ticket event and done status to SSE hub.
 	if eventsService != nil {
-		// Map store.RunStatus to modsapi.TicketState.
-		var ticketState modsapi.TicketState
+		// Map store.RunStatus to modsapi.RunState.
+		var ticketState modsapi.RunState
 		switch runStatus {
 		case store.RunStatusSucceeded:
-			ticketState = modsapi.TicketStateSucceeded
+			ticketState = modsapi.RunStateSucceeded
 		case store.RunStatusFailed:
-			ticketState = modsapi.TicketStateFailed
+			ticketState = modsapi.RunStateFailed
 		case store.RunStatusCanceled:
-			ticketState = modsapi.TicketStateCancelled
+			ticketState = modsapi.RunStateCancelled
 		default:
-			ticketState = modsapi.TicketStateFailed
+			ticketState = modsapi.RunStateFailed
 		}
 
 		runUUID := uuid.UUID(runID.Bytes)
-		ticketSummary := modsapi.TicketSummary{
+		ticketSummary := modsapi.RunSummary{
 			TicketID:   domaintypes.TicketID(runUUID.String()),
 			State:      ticketState,
 			Repository: run.RepoUrl,

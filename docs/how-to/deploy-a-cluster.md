@@ -513,7 +513,7 @@ mods:
 - Diffs with `step_index=NULL` sort last in queries (`NULLS LAST`), preserving legacy behavior
 
 For detailed implementation reference, see:
-- `docs/mods-lifecycle.md` — Multi-Node Mods architecture, ticket model and rehydration flow
+- `docs/mods-lifecycle.md` — Multi-Node Mods architecture, run model and rehydration flow
 - `ROADMAP.md` — Comprehensive delivery plan for multi-node features
 - Implementation files:
   - `internal/nodeagent/execution_orchestrator.go` — Step loop orchestration
@@ -533,10 +533,10 @@ See also:
 - **Logs**: Structured logs (slog) on stdout; capture with journalctl or systemd.
 - **Database**: Monitor PostgreSQL disk usage, connection pool, and query performance.
 
-### Follow Ticket Events
+### Follow Run Events
 
 ```bash
-dist/ploy mods logs <ticket-id>
+dist/ploy mods logs <run-id>
 ```
 
 Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in PostgreSQL.
@@ -577,7 +577,7 @@ If the CA variables are not present, rotation is skipped and a warning is logged
 renew via your external process.
 
 Legacy endpoint notice:
-- All `/v1/jobs*` endpoints and `/v1/mods/{ticket}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
+- All `/v1/jobs*` endpoints and `/v1/mods/{run}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
   - Logs: `GET /v1/mods/{id}/events`
   - Heartbeat/complete: `POST /v1/nodes/{id}/heartbeat` and `POST /v1/nodes/{id}/complete`
 

@@ -12,13 +12,13 @@ parameters:
       example: "42"
 get:
   tags: [Control]
-  summary: Stream ticket events (SSE)
+  summary: Stream run events (SSE)
   description: |
-    Server-Sent Events stream of ticket (mods run) events. Supports `Last-Event-ID` header for resume.
+    Server-Sent Events stream of run (mods run) events. Supports `Last-Event-ID` header for resume.
 
     ## Event types
 
-    - `ticket` — Ticket lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
+    - `run` — Run lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
     - `log` — Enriched log record with execution context (see LogRecord schema below).
     - `retention` — Retention metadata hint (retained, ttl, expires_at, bundle_cid).
     - `done` — Terminal sentinel; stream closes immediately after this frame.

@@ -6,9 +6,9 @@ checkpoint notes in the repository.
 
 ## 1. Core Concepts
 
-- **Ticket** — A Mods run submitted to the control plane. Tickets are stored as
+- **Run** — A Mods run submitted to the control plane. Tickets are stored as
   `runs` rows in PostgreSQL and exposed via the `/v1/mods` API.
-- **Job** — A unit of work inside a ticket (for example `pre-gate`, `mod-0`,
+- **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
   `post-gate`). Jobs are stored as `jobs` rows.
 - **StepIndex** — Float index that orders jobs and ties them to diffs. Jobs use
   float step_index (e.g., 1000, 2000, 3000) to allow dynamic insertion of
@@ -139,7 +139,7 @@ All Build Gate failures (pre or post) follow identical handling:
 The final gate result (pre-gate for runs with no mods executed, or the last
 post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
-- `ploy mod inspect <ticket-id>` output as `Gate: passed|failed ...`.
+- `ploy mod inspect < run-id>` output as `Gate: passed|failed ...`.
 
 ### Multi-strategy healing
 
@@ -467,7 +467,7 @@ post-gate  ───────────────▶├─▶ heal-a (150
 
 This section describes how batch runs coordinate multiple repositories under a
 single specification. A batch run allows executing the same mod workflow across
-many repos without submitting separate tickets for each.
+many repos without submitting separate  runs for each.
 
 ### Conceptual model
 
@@ -665,12 +665,12 @@ ploy mod run repo remove --repo-id <repo-uuid> my-batch
 
 ## 2. Data Model
 
-### 2.1 Ticket summary (`internal/mods/api`)
+### 2.1 Run summary (`internal/mods/api`)
 
 - `TicketSummary` (in `internal/mods/api/types.go`) is the wire type returned by
   `GET /v1/mods/{id}` and streamed on SSE:
-  - `ticket_id` — run UUID.
-  - `state` — ticket lifecycle state (`pending`, `running`, `succeeded`,
+  - ` run_id` — run UUID.
+  - `state` —  run lifecycle state (`pending`, `running`, `succeeded`,
     `failed`, `cancelled`).
   - `repository` — repo URL for this run.
   - `metadata` — string map for additional diagnostics:
@@ -733,7 +733,7 @@ ploy mod run repo remove --repo-id <repo-uuid> my-batch
 
 - Nodeagents upload artifact bundles with:
   - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`.
-  - Control plane exposes bundles per ticket:
+  - Control plane exposes bundles per  run:
     - `POST /v1/mods/{id}/artifact_bundles`.
     - `GET /v1/artifacts` and `GET /v1/artifacts/{id}` for listing/downloading
       by CID/id.
@@ -744,7 +744,7 @@ ploy mod run repo remove --repo-id <repo-uuid> my-batch
 
 ### 3.1 Mods endpoints (`internal/server/handlers`)
 
-- `POST /v1/mods` — submit a Mods ticket.
+- `POST /v1/mods` — submit a Mods  run.
   - Simplified shape: `{repo_url, base_ref, target_ref, commit_sha?, spec?, created_by?}`.
   - Handler: `submitTicketHandler`.
   - Behaviour:
@@ -754,25 +754,25 @@ ploy mod run repo remove --repo-id <repo-uuid> my-batch
     - Publishes an initial `TicketSummary` snapshot to SSE via
       `events.Service.PublishTicket`.
 
-- `GET /v1/mods/{id}` — ticket status.
+- `GET /v1/mods/{id}` —  run status.
   - Handler: `getTicketStatusHandler`.
   - Aggregates:
     - `runs` row.
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
     - Run stats (MR URL, gate summary).
-  - Returns `TicketStatusResponse` (`modsapi.TicketStatusResponse{Ticket: TicketSummary}`).
+  - Returns `TicketStatusResponse` (`modsapi.TicketStatusResponse{Run: TicketSummary}`).
 
-- `GET /v1/mods/{id}/events` — SSE event stream for a ticket.
+- `GET /v1/mods/{id}/events` — SSE event stream for a  run.
   - Handler: `getModEventsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
-    - `event: ticket`, data: `TicketSummary`.
+    - `event:  run`, data: `TicketSummary`.
     - `event: retention`, data: `RetentionHint`.
     - `event: done`, data: `Status {status:"done"}` sentinel.
   - Supports `Last-Event-ID` for resumption.
 
-- `POST /v1/mods/{id}/cancel` — cancel a ticket.
+- `POST /v1/mods/{id}/cancel` — cancel a  run.
   - Handler: `cancelTicketHandler`.
   - Behaviour:
     - Transitions run to `canceled`, updates jobs in `pending|running` to
@@ -833,7 +833,7 @@ For a spec without `mods[]` (single `mod` or legacy top-level image):
      - Executes the job (gate check or mod container).
      - Generates diffs with `DiffGenerator` and uploads them.
      - Completes the job via `/v1/nodes/{id}/complete`.
-4. Control plane updates ticket status and emits a final `ticket` snapshot plus
+4. Control plane updates  run status and emits a final ` run` snapshot plus
    a `done` status on the SSE stream.
 
 ### 4.2 Multi-step runs (`mods[]`) and rehydration
@@ -898,7 +898,7 @@ Mods container images are standard OCI images with the following expectations:
   - Output artifacts, logs and plans should be written under `/out`.
   - Exit code `0` signals success. Non-zero exit code is treated as failure and
     surfaces in:
-    - ticket `state=failed`,
+    -  run `state=failed`,
     - `metadata["reason"]` where available,
     - Build Gate summary (if the failure happened in the gate).
 
@@ -919,15 +919,15 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Constructs `TicketSubmitRequest` with stage definitions in
     `cmd/ploy/mod_run_exec.go`.
   - Submits via `internal/cli/mods.SubmitCommand`.
-  - Optional `--follow` streams ticket events via
+  - Optional `--follow` streams  run events via
     `internal/cli/mods.EventsCommand`, backed by `internal/cli/stream`.
 
-- `ploy mods logs <ticket>`:
+- `ploy mods logs < run>`:
   - Streams logs from `/v1/mods/{id}/events`, focusing on `log` and
     `retention` events (see `cmd/ploy/mods_jobs_commands.go` and
     `internal/cli/runs/follow.go`).
 
-- `ploy runs inspect <ticket>`:
+- `ploy runs inspect < run>`:
   - Calls `GET /v1/mods/{id}` and prints a concise summary
     (`internal/cli/runs/inspect.go`).
 
@@ -940,7 +940,7 @@ implement a minimal SSE protocol used by the Mods endpoints.
 
 - `"log"` — Enriched `LogRecord` with execution context (see below).
 - `"retention"` — `RetentionHint {retained, ttl, expires_at, bundle_cid}`.
-- `"ticket"` — `mods/api.TicketSummary`.
+- `" run"` — `mods/api.TicketSummary`.
 - `"done"` — `Status {status:"done"}` sentinel; the stream is finished and the
   hub closes subscribers.
 
@@ -987,7 +987,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 
 - `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
   retry streams.
-- `internal/cli/mods.EventsCommand` handles `"ticket"` and `"stage"` events
+- `internal/cli/mods.EventsCommand` handles `" run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
 - `internal/cli/runs.FollowCommand` and `ploy mods logs` focus on `"log"` and
@@ -1006,7 +1006,7 @@ Code paths most relevant for Mods:
   - `internal/cli/mods/*`
 - Control plane:
   - `internal/mods/api/*`
-  - `internal/server/handlers/handlers_mods_ticket.go`
+  - `internal/server/handlers/handlers_mods_ run.go`
   - `internal/server/handlers/handlers_diffs.go`
   - `internal/server/handlers/nodes_complete.go` — job completion
   - `internal/server/handlers/nodes_claim.go` — job claiming
@@ -1037,8 +1037,8 @@ For concrete end-to-end scenarios and sample specs see:
 
 When changing Mods behaviour, prefer these anchors:
 
-- Ticket/status model:
-  - Update `internal/mods/api/types.go` (ticket/job types).
+- Run/status model:
+  - Update `internal/mods/api/types.go` ( run/job types).
   - Wire server handlers in `internal/server/handlers/handlers_mods_*.go`.
   - Keep `docs/mods-lifecycle.md` and `tests/e2e/mods/README.md` in sync.
 - SSE/event flow:

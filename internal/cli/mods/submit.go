@@ -17,22 +17,22 @@ import (
 type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Request modsapi.TicketSubmitRequest
+	Request modsapi.RunSubmitRequest
 	// Spec, when non-empty, is forwarded to the simplified submit payload
 	// for servers that accept repo_url/base_ref/target_ref (+optional spec).
 	Spec []byte
 }
 
 // Run executes the submission against the control plane endpoint.
-func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
+func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if c.Client == nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: http client required")
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: http client required")
 	}
 	if c.BaseURL == nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: base url required")
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: base url required")
 	}
 	// Control-plane submission endpoint: POST /v1/mods
-	// Keep request shape compatible with existing server/tests (modsapi.TicketSubmitRequest).
+	// Keep request shape compatible with existing server/tests (modsapi.RunSubmitRequest).
 	// The server may introduce a simplified 201 flow, but we continue to send the
 	// canonical request for backward compatibility and map 201 responses below.
 	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
@@ -40,34 +40,34 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 	// Marshal the canonical submit request as-is.
 	payload, err := json.Marshal(c.Request)
 	if err != nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: marshal request: %w", err)
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: marshal request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: build request: %w", err)
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: http request failed: %w", err)
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusCreated: // 201 — server simplified summary
 		var srvResp struct {
-			TicketID  string `json:"ticket_id"`
+			TicketID  string `json:"run_id"`
 			Status    string `json:"status"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
 			TargetRef string `json:"target_ref"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
-			return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
 		// Map to modsapi summary type.
-		return modsapi.TicketSummary{
+		return modsapi.RunSummary{
 			TicketID:   domaintypes.TicketID(srvResp.TicketID),
 			State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 			Repository: srvResp.RepoURL,
@@ -78,9 +78,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 			Stages: make(map[string]modsapi.StageStatus),
 		}, nil
 	case http.StatusAccepted: // 202 — legacy/alternate response shape still supported
-		var submitResp modsapi.TicketSubmitResponse
+		var submitResp modsapi.RunSubmitResponse
 		if err := json.NewDecoder(resp.Body).Decode(&submitResp); err != nil {
-			return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
 		return submitResp.Ticket, nil
 	default:
@@ -116,16 +116,16 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 							defer func() { _ = resp2.Body.Close() }()
 							if resp2.StatusCode == http.StatusCreated {
 								var srvResp struct {
-									TicketID  string `json:"ticket_id"`
+									TicketID  string `json:"run_id"`
 									Status    string `json:"status"`
 									RepoURL   string `json:"repo_url"`
 									BaseRef   string `json:"base_ref"`
 									TargetRef string `json:"target_ref"`
 								}
 								if err := json.NewDecoder(resp2.Body).Decode(&srvResp); err != nil {
-									return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+									return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 								}
-								return modsapi.TicketSummary{
+								return modsapi.RunSummary{
 									TicketID:   domaintypes.TicketID(srvResp.TicketID),
 									State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 									Repository: srvResp.RepoURL,
@@ -150,6 +150,6 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 		if message == "" {
 			message = resp.Status
 		}
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: %s", message)
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: %s", message)
 	}
 }

@@ -511,7 +511,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				}
 
 				resp := struct {
-					TicketID  string `json:"ticket_id"`
+					TicketID  string `json:"run_id"`
 					Status    string `json:"status"`
 					RepoURL   string `json:"repo_url"`
 					BaseRef   string `json:"base_ref"`

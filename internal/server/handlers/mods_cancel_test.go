@@ -203,7 +203,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	foundTicket := false
 	foundDone := false
 	for i, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicket = true
 			if ticketIdx < 0 {
 				ticketIdx = i

@@ -26,7 +26,7 @@ const (
 // timing and metadata; `Artifacts` may be attached and require metadata.
 type WorkflowCheckpoint struct {
 	SchemaVersion string               `json:"schema_version"`
-	TicketID      types.TicketID       `json:"ticket_id"`
+	RunID         types.RunID          `json:"ticket_id"`
 	Stage         StageName            `json:"stage"`
 	Status        CheckpointStatus     `json:"status"`
 	CacheKey      string               `json:"cache_key,omitempty"`
@@ -42,7 +42,7 @@ func (c WorkflowCheckpoint) Validate() error {
 	if c.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")
 	}
-	if c.TicketID.IsZero() {
+	if c.RunID.IsZero() {
 		return fmt.Errorf("ticket_id is required")
 	}
 	if strings.TrimSpace(string(c.Stage)) == "" {
@@ -75,7 +75,7 @@ func (c WorkflowCheckpoint) Validate() error {
 // Subject returns the per‑ticket checkpoint subject or an empty string when
 // the ticket ID is blank to allow callers to short‑circuit publishing.
 func (c WorkflowCheckpoint) Subject() string {
-	ticket := strings.TrimSpace(c.TicketID.String())
+	ticket := strings.TrimSpace(c.RunID.String())
 	if ticket == "" {
 		return ""
 	}

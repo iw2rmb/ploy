@@ -122,7 +122,7 @@ func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint Retent
 // Event types emitted by the hub are:
 //   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, ModType, StepIndex}
 //   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
-//   - "ticket": api.TicketSummary snapshot
+//   - "run": api.TicketSummary snapshot
 //   - "done": Status {Status: "done"} sentinel for stream completion.
 func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status) error {
 	if err := h.publish(ctx, streamID, "done", status); err != nil {
@@ -140,9 +140,9 @@ func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status)
 // The payload is strongly typed as api.TicketSummary to prevent accidental
 // publication of non‑JSON payloads (e.g., raw []byte or strings). The hub
 // still performs generic JSON marshaling internally, but this boundary keeps
-// the "ticket" event contract consistent and JSON‑serializable.
+// the "run" event contract consistent and JSON‑serializable.
 func (h *Hub) PublishTicket(ctx context.Context, streamID string, ticket api.TicketSummary) error {
-	return h.publish(ctx, streamID, "ticket", ticket)
+	return h.publish(ctx, streamID, "run", ticket)
 }
 
 func (h *Hub) publish(ctx context.Context, streamID, eventType string, payload any) error {

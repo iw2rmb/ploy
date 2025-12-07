@@ -21,34 +21,34 @@ func TestModRunBatchRouting(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "status without batch-id",
+			name:    "status without run-name",
 			args:    []string{"mod", "run", "status"},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 		{
-			name:    "stop without batch-id",
+			name:    "stop without run-name",
 			args:    []string{"mod", "run", "stop"},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 		{
-			name:    "start without batch-id",
+			name:    "start without run-name",
 			args:    []string{"mod", "run", "start"},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 		{
-			name:    "status with empty batch-id",
+			name:    "status with empty run-name",
 			args:    []string{"mod", "run", "status", "   "},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 		{
-			name:    "stop with empty batch-id",
+			name:    "stop with empty run-name",
 			args:    []string{"mod", "run", "stop", ""},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 		{
-			name:    "start with empty batch-id",
+			name:    "start with empty run-name",
 			args:    []string{"mod", "run", "start", ""},
-			wantErr: "batch-id required",
+			wantErr: "run-name required",
 		},
 	}
 

@@ -80,7 +80,7 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	// Repository configuration
 	flags.RepoURL = fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
 	flags.RepoBaseRef = fs.String("repo-base-ref", "", "Git base ref used for materialisation")
-	flags.RepoTargetRef = fs.String("repo-target-ref", "", "Git target ref created for the run")
+	flags.RepoTargetRef = fs.String("repo-target-ref", "", "Git target ref (branch) for the run; when omitted, the node derives a default of /mod/<run-id> for MR and workspace context")
 	flags.RepoWorkspaceHint = fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
 
 	// Follow/polling behavior
@@ -117,5 +117,5 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 
 // printModRunUsage writes usage information for the mod run command to the provided writer.
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }

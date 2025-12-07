@@ -31,7 +31,7 @@ TICKET=$(dist/ploy mod run --json \
   --spec "$SPEC" \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \
-  "${EXTRA_FLAGS[@]}" | jq -r '.ticket_id')
+  "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
 if [[ -n "${TICKET:-}" ]]; then
   dist/ploy mod inspect "$TICKET" || true

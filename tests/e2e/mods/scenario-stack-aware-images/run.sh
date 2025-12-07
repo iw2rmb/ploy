@@ -56,7 +56,7 @@ TICKET=$(dist/ploy mod run --json \
   --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC" \
   --follow \
-  "${EXTRA_FLAGS[@]}" | jq -r '.ticket_id')
+  "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
 if [[ -n "${TICKET:-}" ]]; then
   echo ""

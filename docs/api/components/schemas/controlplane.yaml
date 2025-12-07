@@ -261,7 +261,7 @@ CreateRunResponse:
   required: [run_id]
 
 # Ticket submission (simplified Mods facade)
-TicketSubmitRequest:
+RunSubmitRequest:
   type: object
   properties:
     repo_url: { type: string }
@@ -272,24 +272,24 @@ TicketSubmitRequest:
     created_by: { type: string, nullable: true }
   required: [repo_url, base_ref, target_ref]
 
-TicketSummary:
+RunSummary:
   type: object
   properties:
-    ticket_id: { type: string, format: uuid }
+    run_id: { type: string, format: uuid }
     status: { type: string }
     repo_url: { type: string }
     base_ref: { type: string }
     target_ref: { type: string }
-  required: [ticket_id, status, repo_url, base_ref, target_ref]
+  required: [run_id, status, repo_url, base_ref, target_ref]
 
 # Detailed status returned by GET /v1/mods/{id}
 # Note: The `reason` field was removed to prevent schema drift from the DB model.
 # Failure context is derived from job `stats.exit_code` and `metadata`. Cancellation
 # reasons are stored in `metadata.reason` by the cancel endpoint.
-TicketStatus:
+RunStatus:
   type: object
   properties:
-    ticket_id: { type: string, format: uuid }
+    run_id: { type: string, format: uuid }
     status: { type: string }
     repo_url: { type: string }
     base_ref: { type: string }
@@ -308,7 +308,7 @@ TicketStatus:
       type: object
       additionalProperties:
         type: string
-  required: [ticket_id, status, repo_url, base_ref, target_ref, created_at]
+  required: [run_id, status, repo_url, base_ref, target_ref, created_at]
 
 # Build Gate — client requests and responses
 BuildGateValidateRequest:

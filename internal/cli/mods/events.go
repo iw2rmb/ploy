@@ -16,15 +16,15 @@ import (
 
 // EventsPrinter renders ticket and stage updates.
 type EventsPrinter interface {
-	Ticket(modsapi.TicketSummary)
+	Run(modsapi.TicketSummary)
 	Stage(stage modsapi.StageStatus)
 }
 
 // SimplePrinter prints a short human-readable summary.
 type SimplePrinter struct{ out io.Writer }
 
-func (p SimplePrinter) Ticket(t modsapi.TicketSummary) {
-	_, _ = fmt.Fprintf(p.out, "Ticket %s: %s\n", strings.TrimSpace(string(t.TicketID)), strings.ToLower(string(t.State)))
+func (p SimplePrinter) Run(t modsapi.TicketSummary) {
+	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.TicketID)), strings.ToLower(string(t.State)))
 }
 func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 	label := strings.TrimSpace(string(s.CurrentJobID))
@@ -50,7 +50,7 @@ func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 type EventsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	Ticket  string
+	Run     string
 	Output  io.Writer
 	Printer EventsPrinter
 
@@ -61,17 +61,17 @@ type EventsCommand struct {
 	LogPrinter *logs.Printer
 }
 
-// Run consumes "ticket", "stage", and optionally "log" SSE events from /v1/mods/{id}/events.
+// Run consumes "run", "stage", and optionally "log" SSE events from /v1/mods/{id}/events.
 // Unknown event types are ignored so the CLI remains forward compatible. Returns the final
 // ticket state. When LogPrinter is set, "log" events are rendered using the shared printer.
-func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
+func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.Client.HTTPClient == nil {
 		return "", errors.New("mods events: http client required")
 	}
 	if c.BaseURL == nil {
 		return "", errors.New("mods events: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
+	ticket := strings.TrimSpace(c.Run)
 	if ticket == "" {
 		return "", errors.New("mods events: ticket required")
 	}
@@ -87,22 +87,22 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 	if err != nil {
 		return "", err
 	}
-	var final modsapi.TicketState
+	var final modsapi.RunState
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
-		case "ticket":
+		case "run":
 			var t modsapi.TicketSummary
 			if err := json.Unmarshal(evt.Data, &t); err != nil {
 				return fmt.Errorf("mods events: decode ticket: %w", err)
 			}
-			printer.Ticket(t)
-			if isTerminalTicketState(t.State) {
+			printer.Run(t)
+			if isTerminalRunState(t.State) {
 				final = t.State
 				return stream.ErrDone
 			}
 		case "stage":
 			var payload struct {
-				TicketID string              `json:"ticket_id"`
+				TicketID string              `json:"run_id"`
 				Stage    modsapi.StageStatus `json:"stage"`
 			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
@@ -145,9 +145,9 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 	return final, nil
 }
 
-func isTerminalTicketState(s modsapi.TicketState) bool {
+func isTerminalRunState(s modsapi.RunState) bool {
 	switch s {
-	case modsapi.TicketStateSucceeded, modsapi.TicketStateFailed, modsapi.TicketStateCancelled:
+	case modsapi.RunStateSucceeded, modsapi.RunStateFailed, modsapi.RunStateCancelled:
 		return true
 	default:
 		return false

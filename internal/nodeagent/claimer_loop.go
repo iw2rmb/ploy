@@ -15,6 +15,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -152,12 +153,19 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Parse spec into options/env and typed RunOptions.
 	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
 
+	// Derive target ref: prefer server-provided value, otherwise default to
+	// /mod/<run-id> so MR branch and PLOY_TARGET_REF have a deterministic name.
+	targetRef := strings.TrimSpace(claim.TargetRef)
+	if targetRef == "" {
+		targetRef = fmt.Sprintf("/mod/%s", claim.ID)
+	}
+
 	startReq := StartRunRequest{
 		RunID:     claim.ID,    // Already types.RunID from ClaimResponse
 		JobID:     claim.JobID, // Already types.JobID from ClaimResponse
 		RepoURL:   types.RepoURL(claim.RepoURL),
 		BaseRef:   types.GitRef(claim.BaseRef),
-		TargetRef: types.GitRef(claim.TargetRef),
+		TargetRef: types.GitRef(targetRef),
 		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
 		StepIndex: claim.StepIndex, // Job step_index from server
 		ModType:   claim.ModType,

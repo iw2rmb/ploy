@@ -27,25 +27,25 @@ import (
 // 4. Already-succeeded jobs within a run are preserved; only failed/canceled jobs are reset.
 // 5. A job that is already pending/running triggers idempotent 200 OK (no double-scheduling).
 
-// resumeTicketHandler resumes a failed or canceled Mods ticket (run) by requeueing eligible jobs.
+// resumeTicketHandler resumes a failed or canceled Mods  run (run) by requeueing eligible jobs.
 // POST /v1/mods/{id}/resume
 // Responses:
 //   - 202 Accepted on successful resume initiation
 //   - 200 OK if already running/queued (idempotent) or if all jobs already succeeded
-//   - 404 Not Found if ticket does not exist
+//   - 404 Not Found if  run does not exist
 //   - 400 Bad Request for invalid id
 //   - 409 Conflict if the run cannot be resumed (e.g., state=succeeded is not resumable)
 func resumeTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract and validate the ticket ID from the path.
-		ticketIDStr := r.PathValue("id")
-		if strings.TrimSpace(ticketIDStr) == "" {
+		// Extract and validate the  run ID from the path.
+		runIDStr := r.PathValue("id")
+		if strings.TrimSpace(runIDStr) == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse UUID using domain types helper for consistent validation.
-		pgID := domaintypes.ToPGUUID(ticketIDStr)
+		pgID := domaintypes.ToPGUUID(runIDStr)
 		if !pgID.Valid {
 			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
@@ -55,11 +55,11 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		run, err := st.GetRun(r.Context(), pgID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "ticket not found", http.StatusNotFound)
+				http.Error(w, " run not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("resume ticket: lookup failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to get  run: %v", err), http.StatusInternalServerError)
+			slog.Error("resume  run: lookup failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
@@ -68,7 +68,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		resumable, httpStatus, errMsg := checkResumability(run)
 		if !resumable {
 			// Log rejected resume attempts for observability.
-			slog.Info("resume rejected", "ticket_id", ticketIDStr, "state", run.Status, "reason", errMsg)
+			slog.Info("resume rejected", " run_id", runIDStr, "state", run.Status, "reason", errMsg)
 			if httpStatus == http.StatusOK {
 				// Idempotent case: run is already in progress.
 				w.WriteHeader(http.StatusOK)
@@ -82,7 +82,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		jobs, err := st.ListJobsByRun(r.Context(), pgID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("resume ticket: list jobs failed", "ticket_id", ticketIDStr, "err", err)
+			slog.Error("resume  run: list jobs failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
@@ -145,7 +145,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to reset job: %v", err), http.StatusInternalServerError)
-				slog.Error("resume ticket: update job status failed", "ticket_id", ticketIDStr, "job_id", job.ID, "err", err)
+				slog.Error("resume  run: update job status failed", " run_id", runIDStr, "job_id", job.ID, "err", err)
 				return
 			}
 		}
@@ -154,7 +154,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// transition it to 'pending' using ScheduleNextJob for consistency.
 		if len(jobsToReset) == 0 && firstJobToSchedule != nil && firstJobToSchedule.Status == store.JobStatusCreated {
 			if _, err := st.ScheduleNextJob(r.Context(), pgID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				slog.Error("resume ticket: schedule next job failed", "ticket_id", ticketIDStr, "err", err)
+				slog.Error("resume  run: schedule next job failed", " run_id", runIDStr, "err", err)
 				// Non-fatal: job is already 'created' and will be picked up by future scheduling.
 			}
 		}
@@ -167,23 +167,23 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			FinishedAt: pgtype.Timestamptz{Valid: false}, // Clear terminal timestamp.
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to resume ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("resume ticket: update run status failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to resume  run: %v", err), http.StatusInternalServerError)
+			slog.Error("resume  run: update run status failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
 		// Track resume metadata (resume_count, last_resumed_at) in runs.stats.
-		// This allows clients to see resume history via ticket status and SSE events.
+		// This allows clients to see resume history via  run status and SSE events.
 		if err := st.UpdateRunResume(r.Context(), pgID); err != nil {
 			// Log but don't fail the operation; the resume itself succeeded.
-			slog.Error("resume ticket: update resume stats failed", "ticket_id", ticketIDStr, "err", err)
+			slog.Error("resume  run: update resume stats failed", " run_id", runIDStr, "err", err)
 		}
 
-		// Publish ticket event for SSE clients to indicate the run has resumed.
+		// Publish  run event for SSE clients to indicate the run has resumed.
 		// Include resume metadata so watchers can see the resume transition in the stream.
 		if eventsService != nil {
 			now := time.Now().UTC()
-			ticketSummary := modsapi.TicketSummary{
+			runSummary := modsapi.RunSummary{
 				TicketID:   domaintypes.TicketID(uuid.UUID(pgID.Bytes).String()),
 				State:      modsapi.TicketStatePending, // 'pending' maps to 'queued' in mods API.
 				Repository: run.RepoUrl,
@@ -195,15 +195,15 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			// Re-fetch run to get updated stats with resume_count and last_resumed_at.
 			// Use fresh stats to ensure event reflects the latest resume metadata.
 			if updatedRun, err := st.GetRun(r.Context(), pgID); err == nil {
-				ticketSummary.Metadata = buildResumeMetadata(updatedRun)
+				runSummary.Metadata = buildResumeMetadata(updatedRun)
 			}
-			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), ticketSummary); err != nil {
-				slog.Error("resume ticket: publish ticket event failed", "ticket_id", ticketIDStr, "err", err)
+			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), runSummary); err != nil {
+				slog.Error("resume  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 		}
 
 		w.WriteHeader(http.StatusAccepted)
-		slog.Info("ticket resumed", "ticket_id", ticketIDStr, "jobs_reset", len(jobsToReset))
+		slog.Info(" run resumed", " run_id", runIDStr, "jobs_reset", len(jobsToReset))
 	}
 }
 
@@ -213,18 +213,18 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 //   - resumable=false with httpStatus=200: idempotent case (already in progress)
 //   - resumable=false with httpStatus=409: conflict (state not resumable)
 //
-// Error messages follow the format: "ticket state=<state> is not resumable[: reason]"
+// Error messages follow the format: " run state=<state> is not resumable[: reason]"
 // to provide clear, consistent feedback to API clients.
 func checkResumability(run store.Run) (resumable bool, httpStatus int, errMsg string) {
 	switch run.Status {
 	case store.RunStatusQueued, store.RunStatusAssigned, store.RunStatusRunning:
 		// Invariant 3: In-progress runs return 200 OK for idempotency.
 		// The run is already active; no action needed.
-		return false, http.StatusOK, fmt.Sprintf("ticket state=%s is already in progress", run.Status)
+		return false, http.StatusOK, fmt.Sprintf(" run state=%s is already in progress", run.Status)
 
 	case store.RunStatusSucceeded:
 		// Invariant 2: Succeeded runs cannot be resumed — nothing to fix.
-		return false, http.StatusConflict, fmt.Sprintf("ticket state=%s is not resumable: nothing to fix", run.Status)
+		return false, http.StatusConflict, fmt.Sprintf(" run state=%s is not resumable: nothing to fix", run.Status)
 
 	case store.RunStatusFailed, store.RunStatusCanceled:
 		// Invariant 1: Terminal failure states are resumable.
@@ -232,13 +232,13 @@ func checkResumability(run store.Run) (resumable bool, httpStatus int, errMsg st
 
 	default:
 		// Unknown state: reject with 409 to be safe.
-		return false, http.StatusConflict, fmt.Sprintf("ticket state=%s is not resumable", run.Status)
+		return false, http.StatusConflict, fmt.Sprintf(" run state=%s is not resumable", run.Status)
 	}
 }
 
-// buildResumeMetadata extracts standard ticket metadata from a run, including
+// buildResumeMetadata extracts standard  run metadata from a run, including
 // resume-related fields (resume_count, last_resumed_at) when present in runs.stats.
-// Used by resume handler to populate TicketSummary.Metadata for SSE events.
+// Used by resume handler to populate RunSummary.Metadata for SSE events.
 func buildResumeMetadata(run store.Run) map[string]string {
 	meta := map[string]string{
 		"repo_base_ref":   run.BaseRef,

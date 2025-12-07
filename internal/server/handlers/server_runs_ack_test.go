@@ -309,10 +309,10 @@ func TestAckJobStart_PublishesEvent(t *testing.T) {
 		t.Fatal("expected at least one ticket event to be published")
 	}
 
-	// Verify the event type is "ticket".
+	// Verify the event type is "run".
 	foundTicketEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicketEvent = true
 			// Verify the event contains ticket state information with "running" status.
 			if !strings.Contains(string(evt.Data), "running") {

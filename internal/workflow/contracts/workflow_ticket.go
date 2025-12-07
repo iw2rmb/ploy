@@ -12,7 +12,7 @@ import (
 // details for nodes to hydrate workspaces.
 type WorkflowTicket struct {
 	SchemaVersion string              `json:"schema_version"`
-	TicketID      types.TicketID      `json:"ticket_id"`
+	RunID         types.RunID         `json:"ticket_id"`
 	Manifest      ManifestReference   `json:"manifest"`
 	Repo          RepoMaterialization `json:"repo,omitempty"`
 }
@@ -24,7 +24,7 @@ func (t WorkflowTicket) Validate() error {
 	if t.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")
 	}
-	if t.TicketID.IsZero() {
+	if t.RunID.IsZero() {
 		return fmt.Errorf("ticket_id is required")
 	}
 	if err := t.Manifest.Validate(); err != nil {

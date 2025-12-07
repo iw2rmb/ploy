@@ -283,9 +283,9 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		{
 			name: "log event with enriched fields",
 			events: []string{
-				"event: ticket\ndata: {\"ticket_id\":\"t-log\",\"state\":\"running\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-log\",\"state\":\"running\"}\n\n",
 				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"node-1\",\"job_id\":\"job-1\",\"mod_type\":\"mod\",\"step_index\":100}\n\n",
-				"event: ticket\ndata: {\"ticket_id\":\"t-log\",\"state\":\"succeeded\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-log\",\"state\":\"succeeded\"}\n\n",
 			},
 			wantLog:    "Build started",
 			wantFinal:  modsapi.TicketStateSucceeded,
@@ -294,9 +294,9 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		{
 			name: "log event without enriched fields",
 			events: []string{
-				"event: ticket\ndata: {\"ticket_id\":\"t-log2\",\"state\":\"running\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-log2\",\"state\":\"running\"}\n\n",
 				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:01Z\",\"stream\":\"stderr\",\"line\":\"Warning\"}\n\n",
-				"event: ticket\ndata: {\"ticket_id\":\"t-log2\",\"state\":\"succeeded\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-log2\",\"state\":\"succeeded\"}\n\n",
 			},
 			wantLog:    "Warning",
 			wantFinal:  modsapi.TicketStateSucceeded,
@@ -305,9 +305,9 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		{
 			name: "retention event recorded",
 			events: []string{
-				"event: ticket\ndata: {\"ticket_id\":\"t-ret\",\"state\":\"running\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-ret\",\"state\":\"running\"}\n\n",
 				"event: retention\ndata: {\"retained\":true,\"ttl\":\"24h\",\"expires_at\":\"2025-10-23T10:00:00Z\",\"bundle_cid\":\"bafy-bundle\"}\n\n",
-				"event: ticket\ndata: {\"ticket_id\":\"t-ret\",\"state\":\"succeeded\"}\n\n",
+				"event: ticket\ndata: {\"run_id\":\"t-ret\",\"state\":\"succeeded\"}\n\n",
 			},
 			wantLog:    "retained", // retention summary is printed
 			wantFinal:  modsapi.TicketStateSucceeded,
@@ -383,9 +383,9 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 
 		// Send ticket, log, and ticket events.
 		events := []string{
-			"event: ticket\ndata: {\"ticket_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
+			"event: ticket\ndata: {\"run_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
 			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
-			"event: ticket\ndata: {\"ticket_id\":\"t-nolog\",\"state\":\"succeeded\"}\n\n",
+			"event: ticket\ndata: {\"run_id\":\"t-nolog\",\"state\":\"succeeded\"}\n\n",
 		}
 		for _, evt := range events {
 			_, _ = w.Write([]byte(evt))

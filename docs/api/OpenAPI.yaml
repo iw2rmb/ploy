@@ -174,12 +174,12 @@ components:
       $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
     CreateRunResponse:
       $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
-    TicketSubmitRequest:
-      $ref: './components/schemas/controlplane.yaml#/TicketSubmitRequest'
-    TicketSummary:
-      $ref: './components/schemas/controlplane.yaml#/TicketSummary'
-    TicketStatus:
-      $ref: './components/schemas/controlplane.yaml#/TicketStatus'
+    RunSubmitRequest:
+      $ref: './components/schemas/controlplane.yaml#/RunSubmitRequest'
+    RunSummary:
+      $ref: './components/schemas/controlplane.yaml#/RunSummary'
+    RunStatus:
+      $ref: './components/schemas/controlplane.yaml#/RunStatus'
     NodeClaimResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
     Event:

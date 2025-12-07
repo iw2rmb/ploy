@@ -21,21 +21,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// Mods ticket handlers implement the /v1/mods facade: ticket submission from
-// repo/spec, ticket status as mods-style TicketSummary, and stage/run_step
+// Mods  run handlers implement the /v1/mods facade:  run submission from
+// repo/spec,  run status as mods-style RunSummary, and stage/run_step
 // materialization for single- and multi-step runs.
 
-// submitTicketHandler returns an HTTP handler that submits a new ticket (mods run).
-// POST /v1/mods — Accepts TicketSubmitRequest, returns TicketSummary (ticket_id == run UUID).
+// submitTicketHandler returns an HTTP handler that submits a new  run (mods run).
+// POST /v1/mods — Accepts RunSubmitRequest, returns RunSummary ( run_id == run UUID).
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
 func submitTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body with domain types for VCS fields.
 		// JSON unmarshaling will automatically validate repo URL scheme and non-empty refs.
 		var req struct {
-			RepoURL   domaintypes.RepoURL    `json:"repo_url"`
-			BaseRef   domaintypes.GitRef     `json:"base_ref"`
-			TargetRef domaintypes.GitRef     `json:"target_ref"`
+			RepoURL domaintypes.RepoURL `json:"repo_url"`
+			BaseRef domaintypes.GitRef  `json:"base_ref"`
+			// TargetRef is optional; when omitted, downstream components derive a default
+			// branch name when an MR is actually created (using the DB run UUID).
+			TargetRef *domaintypes.GitRef    `json:"target_ref,omitempty"`
 			CommitSha *domaintypes.CommitSHA `json:"commit_sha,omitempty"`
 			Spec      *json.RawMessage       `json:"spec,omitempty"`
 			CreatedBy *string                `json:"created_by,omitempty"`
@@ -56,9 +58,11 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
 			return
 		}
-		if err := req.TargetRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
-			return
+		if req.TargetRef != nil {
+			if err := req.TargetRef.Validate(); err != nil {
+				http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+				return
+			}
 		}
 		if req.CommitSha != nil {
 			if err := req.CommitSha.Validate(); err != nil {
@@ -80,19 +84,24 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			s := req.CommitSha.String()
 			commitShaStr = &s
 		}
+		targetRef := ""
+		if req.TargetRef != nil {
+			targetRef = req.TargetRef.String()
+		}
+
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			Name:      nil, // Single-repo tickets do not use batch naming.
+			Name:      nil, // Single-repo  runs do not use batch naming.
 			RepoUrl:   req.RepoURL.String(),
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
 			Status:    store.RunStatusQueued,
 			BaseRef:   req.BaseRef.String(),
-			TargetRef: req.TargetRef.String(),
+			TargetRef: targetRef,
 			CommitSha: commitShaStr,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create run failed", "repo_url", req.RepoURL, "err", err)
+			slog.Error("submit  run: create run failed", "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
@@ -102,15 +111,15 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// For multi-step runs (mods[] array), creates one mod job per entry.
 		if err := createJobsFromSpec(r.Context(), st, run.ID, spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create jobs failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			slog.Error("submit  run: create jobs failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
 
-		// Build response with TicketSummary (ticket_id == run UUID).
+		// Build response with RunSummary ( run_id == run UUID).
 		// Use typed status (store.RunStatus) instead of string cast for type safety;
 		// JSON encoder will serialize the underlying string value.
 		resp := struct {
-			TicketID  string          `json:"ticket_id"`
+			TicketID  string          `json:" run_id"`
 			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
 			RepoURL   string          `json:"repo_url"`
 			BaseRef   string          `json:"base_ref"`
@@ -125,27 +134,27 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
-			ticketSummary := modsapi.TicketSummary{
+			runSummary := modsapi.RunSummary{
 				TicketID:   domaintypes.TicketID(resp.TicketID),
-				State:      modsapi.TicketState(run.Status),
+				State:      modsapi.RunState(run.Status),
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  run.CreatedAt.Time,
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishTicket(r.Context(), resp.TicketID, ticketSummary); err != nil {
-				slog.Error("submit ticket: publish ticket event failed", "ticket_id", resp.TicketID, "err", err)
+			if err := eventsService.PublishTicket(r.Context(), resp.TicketID, runSummary); err != nil {
+				slog.Error("submit  run: publish  run event failed", " run_id", resp.TicketID, "err", err)
 			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("submit ticket: encode response failed", "err", err)
+			slog.Error("submit  run: encode response failed", "err", err)
 		}
 
-		slog.Info("ticket submitted",
-			"ticket_id", resp.TicketID,
+		slog.Info(" run submitted",
+			" run_id", resp.TicketID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
@@ -154,27 +163,27 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 	}
 }
 
-// getTicketStatusHandler returns an HTTP handler that fetches ticket (run) status by ID.
-// GET /v1/mods/{id} — Returns TicketSummary by run UUID.
+// getTicketStatusHandler returns an HTTP handler that fetches  run (run) status by ID.
+// GET /v1/mods/{id} — Returns RunSummary by run UUID.
 func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the ticket ID from the URL path parameter.
-		ticketIDStr := r.PathValue("id")
-		if ticketIDStr == "" {
-			http.Error(w, "ticket id is required", http.StatusBadRequest)
+		// Parse the  run ID from the URL path parameter.
+		runIDStr := r.PathValue("id")
+		if runIDStr == "" {
+			http.Error(w, " run id is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse UUID.
-		ticketID, err := uuid.Parse(ticketIDStr)
+		runID, err := uuid.Parse(runIDStr)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid ticket id: %v", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("invalid  run id: %v", err), http.StatusBadRequest)
 			return
 		}
 
 		// Convert to pgtype.UUID.
 		pgID := pgtype.UUID{
-			Bytes: ticketID,
+			Bytes: runID,
 			Valid: true,
 		}
 
@@ -182,21 +191,21 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		run, err := st.GetRun(r.Context(), pgID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "ticket not found", http.StatusNotFound)
+				http.Error(w, " run not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("get ticket status: fetch run failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to get  run: %v", err), http.StatusInternalServerError)
+			slog.Error("get  run status: fetch run failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
-		// Build mods-style TicketStatusResponse with Stages and Artifacts.
-		// Use conversion helper to map store.RunStatus to modsapi.TicketState.
-		ticketState := modsapi.TicketStatusFromStore(run.Status)
+		// Build mods-style RunStatusResponse with Stages and Artifacts.
+		// Use conversion helper to map store.RunStatus to modsapi.RunState.
+		runState := modsapi.RunStatusFromStore(run.Status)
 
-		summary := modsapi.TicketSummary{
+		summary := modsapi.RunSummary{
 			TicketID:   domaintypes.TicketID(uuid.UUID(run.ID.Bytes).String()),
-			State:      ticketState,
+			State:      runState,
 			Submitter:  "",
 			Repository: run.RepoUrl,
 			Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
@@ -250,7 +259,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		jobs, err := st.ListJobsByRun(r.Context(), storePgUUID(run.ID))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("get ticket status: list jobs failed", "ticket_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			slog.Error("get  run status: list jobs failed", " run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
 		for _, job := range jobs {
@@ -260,7 +269,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: storePgUUID(run.ID), JobID: job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
-				slog.Error("get ticket status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
+				slog.Error("get  run status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
 				return
 			}
 			for _, b := range bundles {
@@ -289,8 +298,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: summary}); err != nil {
-			slog.Error("get ticket status: encode response failed", "err", err)
+		if err := json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: summary}); err != nil {
+			slog.Error("get  run status: encode response failed", "err", err)
 		}
 	}
 }

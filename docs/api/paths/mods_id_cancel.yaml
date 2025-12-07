@@ -5,12 +5,12 @@ parameters:
     schema:
       type: string
       format: uuid
-    description: Ticket ID (run UUID)
+    description: Run ID (run UUID)
 post:
   tags: [Control]
-  summary: Cancel a Mods ticket
+  summary: Cancel a Mods run
   description: |
-    Control-plane cancel request for a Mods ticket identified by its `id`.
+    Control-plane cancel request for a Mods run identified by its `id`.
     Transitions the run and any in-flight or pending stages to `canceled` status.
     The request is idempotent: if the run is already in a terminal state, returns
     `200 OK`; otherwise, transitions to `canceled` and returns `202 Accepted`.
@@ -28,9 +28,9 @@ post:
               description: Optional human-readable cancellation reason
   responses:
     '202':
-      description: Accepted; ticket and stages transitioned to canceled
+      description: Accepted; run and stages transitioned to canceled
     '200':
-      description: OK; ticket was already in a terminal state (idempotent)
+      description: OK; run was already in a terminal state (idempotent)
     '400':
       description: Bad request (invalid UUID)
       content:
@@ -38,7 +38,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '404':
-      description: Ticket not found
+      description: Run not found
       content:
         application/json:
           schema:

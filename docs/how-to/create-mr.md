@@ -53,17 +53,16 @@ ploy config gitlab show
 ### Step 3: Run a Mod with MR creation
 
 Source branch naming
-- Ploy now always uses a unique source branch per run named `ploy-<ticket-id>` when creating the MR.
-- The `--repo-target-ref` you pass is still accepted for workspace context, but the MR’s source branch is derived from the ticket id to avoid collisions.
+- Ploy uses the effective target ref as the MR source branch. When you pass `--repo-target-ref`, that value is used directly. When you omit it, the node derives a default of `/mod/<run-id>` using the database run UUID. The base branch remains the one provided via `--repo-base-ref` (commonly `main`).
 
-Create an MR on success (capture server-assigned ticket via JSON):
+Create an MR on success (capture server-assigned run via JSON):
 ```bash
 TICKET=$(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade-java-17 \
   --mr-success \
-  --follow | jq -r '.ticket_id')
+  --follow | jq -r '.run_id')
 ```
 
 Create an MR on failure (useful for debugging):
@@ -73,7 +72,7 @@ TICKET=$(ploy mod run --json \
   --repo-base-ref main \
   --repo-target-ref workflow/debug-build-failure \
   --mr-fail \
-  --follow | jq -r '.ticket_id')
+  --follow | jq -r '.run_id')
 ```
 
 Create an MR in both success and failure cases and capture MR URL too:
@@ -84,14 +83,14 @@ read TICKET MR_URL < <(ploy mod run --json \
   --repo-target-ref workflow/experiment \
   --mr-success \
   --mr-fail \
-  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
-echo "Ticket: $TICKET"
+  --follow | jq -r '[.run_id, .mr_url] | @tsv')
+echo "Run: $TICKET"
 echo "MR:     ${MR_URL:-<none>}"
 ```
 
 ### Step 4: View the MR URL
 
-If you only captured the ticket, you can inspect to retrieve MR URL later:
+If you only captured the run, you can inspect to retrieve MR URL later:
 ```bash
 ploy mod inspect "$TICKET"
 # Output includes:
@@ -100,7 +99,7 @@ ploy mod inspect "$TICKET"
 
 ## Method 2: Per-Run GitLab Credentials
 
-Override the global GitLab configuration for a single run using flags, capture ticket+MR via JSON:
+Override the global GitLab configuration for a single run using flags, capture run+MR via JSON:
 
 ```bash
 read TICKET MR_URL < <(ploy mod run --json \
@@ -110,7 +109,7 @@ read TICKET MR_URL < <(ploy mod run --json \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.com \
   --mr-success \
-  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
+  --follow | jq -r '[.run_id, .mr_url] | @tsv')
 ```
 
 This is useful for:
@@ -179,10 +178,10 @@ read TICKET MR_URL < <(ploy mod run --json \
   --repo-base-ref main \
   --repo-target-ref workflow/java-17-upgrade \
   --mr-success \
-  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
+  --follow | jq -r '[.run_id, .mr_url] | @tsv')
 
 # 3. View the MR (source branch will be ploy-$TICKET)
-echo "Ticket: $TICKET"; echo "MR: ${MR_URL:-<none>}"
+echo "Run: $TICKET"; echo "MR: ${MR_URL:-<none>}"
 # Copy the MR URL and review in GitLab
 
 # 4. If tests pass, merge the MR

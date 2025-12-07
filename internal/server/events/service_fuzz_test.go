@@ -11,7 +11,7 @@ import (
 )
 
 // FuzzPublishTicketRoundTrip ensures arbitrary ticket payloads marshal/unmarshal without panicking
-// and that the hub stores "ticket"-typed events. Runs only with `-fuzz`.
+// and that the hub stores "run"-typed events. Runs only with `-fuzz`.
 func FuzzPublishTicketRoundTrip(f *testing.F) {
 	svc, err := New(Options{BufferSize: 2, HistorySize: 8})
 	if err != nil {
@@ -50,7 +50,7 @@ func FuzzPublishTicketRoundTrip(f *testing.F) {
 		if len(snap) == 0 {
 			t.Fatalf("expected at least one event in snapshot")
 		}
-		if got := strings.ToLower(snap[0].Type); got != "ticket" {
+		if got := strings.ToLower(snap[0].Type); got != "run" {
 			t.Fatalf("unexpected event type: %s", got)
 		}
 		var out modsapi.TicketSummary
