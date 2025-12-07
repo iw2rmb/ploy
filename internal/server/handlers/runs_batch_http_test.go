@@ -8,21 +8,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// NOTE: Run IDs are now KSUID strings; run_repo IDs are NanoID(8) strings.
+// Tests use string IDs generated via domaintypes helpers (NewRunID, NewRunRepoID).
 
 // TestListRunsHandler verifies the GET /v1/runs handler with various scenarios.
 func TestListRunsHandler(t *testing.T) {
 	t.Parallel()
 
-	// Sample run for testing.
-	sampleRunID := uuid.New()
+	// Sample run for testing — use KSUID string ID.
+	sampleRunID := string(domaintypes.NewRunID())
 	sampleRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunStatusQueued,
@@ -150,9 +153,10 @@ func TestListRunsHandler(t *testing.T) {
 func TestGetRunHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
+	// Use KSUID string for run IDs.
+	sampleRunID := string(domaintypes.NewRunID())
 	sampleRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunStatusRunning,
@@ -172,13 +176,13 @@ func TestGetRunHandler(t *testing.T) {
 	}{
 		{
 			name:       "valid run",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			mockRun:    sampleRun,
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:    "run with repo counts",
-			runID:   sampleRunID.String(),
+			runID:   sampleRunID,
 			mockRun: sampleRun,
 			mockRepoCounts: []store.CountRunReposByStatusRow{
 				{Status: store.RunRepoStatusRunning, Count: 1},
@@ -191,20 +195,17 @@ func TestGetRunHandler(t *testing.T) {
 			runID:      "",
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid uuid",
-			runID:      "not-a-uuid",
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" test removed — run IDs are now opaque KSUID strings,
+		// no UUID parsing is performed; validation is done by the store.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "database error",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			mockRunErr: pgx.ErrTxClosed,
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -262,12 +263,13 @@ func TestGetRunHandler(t *testing.T) {
 func TestStopRunHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
-	pendingRepoID := uuid.New()
-	runningRepoID := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleRunID := string(domaintypes.NewRunID())
+	pendingRepoID := string(domaintypes.NewRunRepoID())
+	runningRepoID := string(domaintypes.NewRunRepoID())
 
 	runningRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunStatusRunning,
@@ -278,7 +280,7 @@ func TestStopRunHandler(t *testing.T) {
 	}
 
 	canceledRun := store.Run{
-		ID:         pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:         sampleRunID,
 		Name:       ptrString("test-batch"),
 		RepoUrl:    "https://github.com/example/repo.git",
 		Status:     store.RunStatusCanceled,
@@ -302,17 +304,17 @@ func TestStopRunHandler(t *testing.T) {
 	}{
 		{
 			name:    "stop running run",
-			runID:   sampleRunID.String(),
+			runID:   sampleRunID,
 			mockRun: runningRun,
 			mockRepos: []store.RunRepo{
 				{
-					ID:     pgtype.UUID{Bytes: pendingRepoID, Valid: true},
-					RunID:  pgtype.UUID{Bytes: sampleRunID, Valid: true},
+					ID:     pendingRepoID,
+					RunID:  sampleRunID,
 					Status: store.RunRepoStatusPending,
 				},
 				{
-					ID:     pgtype.UUID{Bytes: runningRepoID, Valid: true},
-					RunID:  pgtype.UUID{Bytes: sampleRunID, Valid: true},
+					ID:     runningRepoID,
+					RunID:  sampleRunID,
 					Status: store.RunRepoStatusRunning,
 				},
 			},
@@ -322,7 +324,7 @@ func TestStopRunHandler(t *testing.T) {
 		},
 		{
 			name:            "stop already canceled run (idempotent)",
-			runID:           sampleRunID.String(),
+			runID:           sampleRunID,
 			mockRun:         canceledRun,
 			wantStatus:      http.StatusOK,
 			wantCanceledRun: false, // Already canceled, no update
@@ -332,20 +334,16 @@ func TestStopRunHandler(t *testing.T) {
 			runID:      "",
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid uuid",
-			runID:      "not-a-uuid",
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" test removed — run IDs are now opaque KSUID strings.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:            "update status error",
-			runID:           sampleRunID.String(),
+			runID:           sampleRunID,
 			mockRun:         runningRun,
 			updateStatusErr: pgx.ErrTxClosed,
 			wantStatus:      http.StatusInternalServerError,
@@ -403,11 +401,12 @@ func TestStopRunHandler(t *testing.T) {
 func TestAddRunRepoHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
-	sampleRepoID := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleRunID := string(domaintypes.NewRunID())
+	sampleRepoID := string(domaintypes.NewRunRepoID())
 
 	runningRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunStatusRunning,
@@ -417,14 +416,14 @@ func TestAddRunRepoHandler(t *testing.T) {
 	}
 
 	canceledRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Status:    store.RunStatusCanceled,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	createdRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		RepoUrl:   "https://github.com/example/new-repo.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -447,12 +446,12 @@ func TestAddRunRepoHandler(t *testing.T) {
 	}{
 		{
 			name:          "valid add repo",
-			runID:         sampleRunID.String(),
+			runID:         sampleRunID,
 			body:          `{"repo_url":"https://github.com/example/new-repo.git","base_ref":"main","target_ref":"feature-2"}`,
 			mockRun:       runningRun,
 			mockRepoRes:   createdRepo,
 			wantStatus:    http.StatusCreated,
-			wantRepoID:    sampleRepoID.String(),
+			wantRepoID:    sampleRepoID,
 			wantCallStore: true,
 		},
 		{
@@ -461,57 +460,52 @@ func TestAddRunRepoHandler(t *testing.T) {
 			body:       `{}`,
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid uuid",
-			runID:      "not-a-uuid",
-			body:       `{}`,
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" test removed — run IDs are now opaque KSUID strings.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
 			mockRunErr: pgx.ErrNoRows,
 			body:       `{}`,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "run is terminal",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			body:       `{"repo_url":"https://github.com/example/repo.git","base_ref":"main","target_ref":"feature"}`,
 			mockRun:    canceledRun,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:       "missing repo_url",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			body:       `{"base_ref":"main","target_ref":"feature"}`,
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "missing base_ref",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			body:       `{"repo_url":"https://github.com/example/repo.git","target_ref":"feature"}`,
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "missing target_ref",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			body:       `{"repo_url":"https://github.com/example/repo.git","base_ref":"main"}`,
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "invalid repo_url scheme",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			body:       `{"repo_url":"ftp://example.com/repo.git","base_ref":"main","target_ref":"feature"}`,
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:        "store error",
-			runID:       sampleRunID.String(),
+			runID:       sampleRunID,
 			body:        `{"repo_url":"https://github.com/example/repo.git","base_ref":"main","target_ref":"feature"}`,
 			mockRun:     runningRun,
 			mockRepoErr: pgx.ErrTxClosed,
@@ -568,20 +562,21 @@ func TestAddRunRepoHandler(t *testing.T) {
 func TestListRunReposHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
-	sampleRepoID1 := uuid.New()
-	sampleRepoID2 := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleRunID := string(domaintypes.NewRunID())
+	sampleRepoID1 := string(domaintypes.NewRunRepoID())
+	sampleRepoID2 := string(domaintypes.NewRunRepoID())
 
 	sampleRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Status:    store.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	sampleRepos := []store.RunRepo{
 		{
-			ID:        pgtype.UUID{Bytes: sampleRepoID1, Valid: true},
-			RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+			ID:        sampleRepoID1,
+			RunID:     sampleRunID,
 			RepoUrl:   "https://github.com/example/repo1.git",
 			BaseRef:   "main",
 			TargetRef: "feature-1",
@@ -590,8 +585,8 @@ func TestListRunReposHandler(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		{
-			ID:        pgtype.UUID{Bytes: sampleRepoID2, Valid: true},
-			RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+			ID:        sampleRepoID2,
+			RunID:     sampleRunID,
 			RepoUrl:   "https://github.com/example/repo2.git",
 			BaseRef:   "main",
 			TargetRef: "feature-2",
@@ -613,7 +608,7 @@ func TestListRunReposHandler(t *testing.T) {
 	}{
 		{
 			name:          "list repos successfully",
-			runID:         sampleRunID.String(),
+			runID:         sampleRunID,
 			mockRun:       sampleRun,
 			mockRepos:     sampleRepos,
 			wantStatus:    http.StatusOK,
@@ -621,7 +616,7 @@ func TestListRunReposHandler(t *testing.T) {
 		},
 		{
 			name:          "empty list",
-			runID:         sampleRunID.String(),
+			runID:         sampleRunID,
 			mockRun:       sampleRun,
 			mockRepos:     []store.RunRepo{},
 			wantStatus:    http.StatusOK,
@@ -632,20 +627,16 @@ func TestListRunReposHandler(t *testing.T) {
 			runID:      "",
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid uuid",
-			runID:      "not-a-uuid",
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" test removed — run IDs are now opaque KSUID strings.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:         "list repos error",
-			runID:        sampleRunID.String(),
+			runID:        sampleRunID,
 			mockRun:      sampleRun,
 			mockReposErr: pgx.ErrTxClosed,
 			wantStatus:   http.StatusInternalServerError,
@@ -693,18 +684,19 @@ func TestListRunReposHandler(t *testing.T) {
 func TestDeleteRunRepoHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
-	sampleRepoID := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleRunID := string(domaintypes.NewRunID())
+	sampleRepoID := string(domaintypes.NewRunRepoID())
 
 	sampleRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Status:    store.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	pendingRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
@@ -712,8 +704,8 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 	}
 
 	runningRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusRunning,
 		Attempt:   1,
@@ -721,8 +713,8 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 	}
 
 	succeededRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusSucceeded,
 		Attempt:   1,
@@ -730,10 +722,10 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 	}
 
 	// Repo that belongs to a different run.
-	differentRunID := uuid.New()
+	differentRunID := string(domaintypes.NewRunID())
 	differentRunRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: differentRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     differentRunID,
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
@@ -755,8 +747,8 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 	}{
 		{
 			name:             "delete pending repo (skipped)",
-			runID:            sampleRunID.String(),
-			repoID:           sampleRepoID.String(),
+			runID:            sampleRunID,
+			repoID:           sampleRepoID,
 			mockRun:          sampleRun,
 			mockRepo:         pendingRepo,
 			wantStatus:       http.StatusOK,
@@ -765,8 +757,8 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 		},
 		{
 			name:             "delete running repo (cancelled)",
-			runID:            sampleRunID.String(),
-			repoID:           sampleRepoID.String(),
+			runID:            sampleRunID,
+			repoID:           sampleRepoID,
 			mockRun:          sampleRun,
 			mockRepo:         runningRepo,
 			wantStatus:       http.StatusOK,
@@ -775,8 +767,8 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 		},
 		{
 			name:       "delete succeeded repo (idempotent)",
-			runID:      sampleRunID.String(),
-			repoID:     sampleRepoID.String(),
+			runID:      sampleRunID,
+			repoID:     sampleRepoID,
 			mockRun:    sampleRun,
 			mockRepo:   succeededRepo,
 			wantStatus: http.StatusOK,
@@ -784,54 +776,43 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 		{
 			name:       "empty run id",
 			runID:      "",
-			repoID:     sampleRepoID.String(),
+			repoID:     sampleRepoID,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "empty repo id",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			repoID:     "",
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid run uuid",
-			runID:      "not-a-uuid",
-			repoID:     sampleRepoID.String(),
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "invalid repo uuid",
-			runID:      sampleRunID.String(),
-			repoID:     "not-a-uuid",
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" tests removed — IDs are now opaque KSUID/NanoID strings.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
-			repoID:     sampleRepoID.String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
+			repoID:     sampleRepoID,
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:        "repo not found",
-			runID:       sampleRunID.String(),
-			repoID:      uuid.New().String(),
+			runID:       sampleRunID,
+			repoID:      string(domaintypes.NewRunRepoID()), // Generate a different NanoID.
 			mockRun:     sampleRun,
 			mockRepoErr: pgx.ErrNoRows,
 			wantStatus:  http.StatusNotFound,
 		},
 		{
 			name:       "repo belongs to different run",
-			runID:      sampleRunID.String(),
-			repoID:     sampleRepoID.String(),
+			runID:      sampleRunID,
+			repoID:     sampleRepoID,
 			mockRun:    sampleRun,
 			mockRepo:   differentRunRepo,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:            "update status error",
-			runID:           sampleRunID.String(),
-			repoID:          sampleRepoID.String(),
+			runID:           sampleRunID,
+			repoID:          sampleRepoID,
 			mockRun:         sampleRun,
 			mockRepo:        pendingRepo,
 			updateStatusErr: pgx.ErrTxClosed,
@@ -879,33 +860,34 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 func TestRestartRunRepoHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleRunID := uuid.New()
-	sampleRepoID := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleRunID := string(domaintypes.NewRunID())
+	sampleRepoID := string(domaintypes.NewRunRepoID())
 
 	runningRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Name:      ptrString("test-batch"),
 		Status:    store.RunStatusRunning,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	canceledRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRunID,
 		Status:    store.RunStatusCanceled,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	pendingRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	failedRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleRunID, Valid: true},
+		ID:        sampleRepoID,
+		RunID:     sampleRunID,
 		Status:    store.RunRepoStatusFailed,
 		Attempt:   1,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -936,8 +918,8 @@ func TestRestartRunRepoHandler(t *testing.T) {
 	}{
 		{
 			name:                 "restart failed repo",
-			runID:                sampleRunID.String(),
-			repoID:               sampleRepoID.String(),
+			runID:                sampleRunID,
+			repoID:               sampleRepoID,
 			mockRun:              runningRun,
 			mockRepo:             failedRepo,
 			mockRestartedRepo:    restartedRepo,
@@ -948,8 +930,8 @@ func TestRestartRunRepoHandler(t *testing.T) {
 		},
 		{
 			name:                 "restart with empty body",
-			runID:                sampleRunID.String(),
-			repoID:               sampleRepoID.String(),
+			runID:                sampleRunID,
+			repoID:               sampleRepoID,
 			body:                 "",
 			mockRun:              runningRun,
 			mockRepo:             failedRepo,
@@ -961,8 +943,8 @@ func TestRestartRunRepoHandler(t *testing.T) {
 		},
 		{
 			name:                 "restart with new refs",
-			runID:                sampleRunID.String(),
-			repoID:               sampleRepoID.String(),
+			runID:                sampleRunID,
+			repoID:               sampleRepoID,
 			body:                 `{"base_ref":"main-updated","target_ref":"feature-updated"}`,
 			mockRun:              runningRun,
 			mockRepo:             failedRepo,
@@ -977,69 +959,58 @@ func TestRestartRunRepoHandler(t *testing.T) {
 		{
 			name:       "empty run id",
 			runID:      "",
-			repoID:     sampleRepoID.String(),
+			repoID:     sampleRepoID,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "empty repo id",
-			runID:      sampleRunID.String(),
+			runID:      sampleRunID,
 			repoID:     "",
 			wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "invalid run uuid",
-			runID:      "not-a-uuid",
-			repoID:     sampleRepoID.String(),
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "invalid repo uuid",
-			runID:      sampleRunID.String(),
-			repoID:     "not-a-uuid",
-			wantStatus: http.StatusBadRequest,
-		},
+		// NOTE: "invalid uuid" tests removed — IDs are now opaque KSUID/NanoID strings.
 		{
 			name:       "run not found",
-			runID:      uuid.New().String(),
-			repoID:     sampleRepoID.String(),
+			runID:      string(domaintypes.NewRunID()), // Generate a different KSUID.
+			repoID:     sampleRepoID,
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "run is terminal",
-			runID:      sampleRunID.String(),
-			repoID:     sampleRepoID.String(),
+			runID:      sampleRunID,
+			repoID:     sampleRepoID,
 			mockRun:    canceledRun,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:        "repo not found",
-			runID:       sampleRunID.String(),
-			repoID:      uuid.New().String(),
+			runID:       sampleRunID,
+			repoID:      string(domaintypes.NewRunRepoID()), // Generate a different NanoID.
 			mockRun:     runningRun,
 			mockRepoErr: pgx.ErrNoRows,
 			wantStatus:  http.StatusNotFound,
 		},
 		{
 			name:       "repo belongs to different run",
-			runID:      sampleRunID.String(),
-			repoID:     sampleRepoID.String(),
+			runID:      sampleRunID,
+			repoID:     sampleRepoID,
 			mockRun:    runningRun,
-			mockRepo:   store.RunRepo{RunID: pgtype.UUID{Bytes: uuid.New(), Valid: true}},
+			mockRepo:   store.RunRepo{RunID: string(domaintypes.NewRunID())}, // Different KSUID.
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "cannot restart pending repo",
-			runID:      sampleRunID.String(),
-			repoID:     sampleRepoID.String(),
+			runID:      sampleRunID,
+			repoID:     sampleRepoID,
 			mockRun:    runningRun,
 			mockRepo:   pendingRepo,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:                 "increment attempt error",
-			runID:                sampleRunID.String(),
-			repoID:               sampleRepoID.String(),
+			runID:                sampleRunID,
+			repoID:               sampleRepoID,
 			mockRun:              runningRun,
 			mockRepo:             failedRepo,
 			incrementAttemptErr:  pgx.ErrTxClosed,
@@ -1049,8 +1020,8 @@ func TestRestartRunRepoHandler(t *testing.T) {
 		},
 		{
 			name:                 "update refs error",
-			runID:                sampleRunID.String(),
-			repoID:               sampleRepoID.String(),
+			runID:                sampleRunID,
+			repoID:               sampleRepoID,
 			body:                 `{"base_ref":"main-updated","target_ref":"feature-updated"}`,
 			mockRun:              runningRun,
 			mockRepo:             failedRepo,
@@ -1068,7 +1039,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 
 			// Mock returns the restarted repo on second GetRunRepo call (after increment).
 			mockRepoOnGet := tc.mockRepo
-			if tc.mockRestartedRepo.ID.Valid {
+			if tc.mockRestartedRepo.ID != "" {
 				mockRepoOnGet = tc.mockRestartedRepo
 			}
 
@@ -1142,14 +1113,15 @@ func TestRestartRunRepoHandler(t *testing.T) {
 func TestStartRunHandler(t *testing.T) {
 	t.Parallel()
 
-	sampleBatchRunID := uuid.New()
-	sampleRepoID1 := uuid.New()
-	sampleRepoID2 := uuid.New()
-	childRunID := uuid.New()
+	// Use KSUID strings for run IDs and NanoID strings for repo IDs.
+	sampleBatchRunID := string(domaintypes.NewRunID())
+	sampleRepoID1 := string(domaintypes.NewRunRepoID())
+	sampleRepoID2 := string(domaintypes.NewRunRepoID())
+	childRunID := string(domaintypes.NewRunID())
 
 	// Sample batch run (queued, ready to start).
 	queuedBatchRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ID:        sampleBatchRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/batch.git",
 		Spec:      []byte(`{"mod":{"image":"test-image"}}`),
@@ -1162,7 +1134,7 @@ func TestStartRunHandler(t *testing.T) {
 
 	// Sample canceled batch run (terminal, cannot start).
 	canceledBatchRun := store.Run{
-		ID:        pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ID:        sampleBatchRunID,
 		Name:      ptrString("test-batch"),
 		Status:    store.RunStatusCanceled,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -1170,8 +1142,8 @@ func TestStartRunHandler(t *testing.T) {
 
 	// Sample pending run repos.
 	pendingRepo1 := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID1, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ID:        sampleRepoID1,
+		RunID:     sampleBatchRunID,
 		RepoUrl:   "https://github.com/example/repo1.git",
 		BaseRef:   "main",
 		TargetRef: "feature-1",
@@ -1181,8 +1153,8 @@ func TestStartRunHandler(t *testing.T) {
 	}
 
 	pendingRepo2 := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID2, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ID:        sampleRepoID2,
+		RunID:     sampleBatchRunID,
 		RepoUrl:   "https://github.com/example/repo2.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -1193,8 +1165,8 @@ func TestStartRunHandler(t *testing.T) {
 
 	// Sample already succeeded repo.
 	succeededRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: sampleRepoID1, Valid: true},
-		RunID:     pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
+		ID:        sampleRepoID1,
+		RunID:     sampleBatchRunID,
 		RepoUrl:   "https://github.com/example/repo1.git",
 		Status:    store.RunRepoStatusSucceeded,
 		Attempt:   1,
@@ -1203,7 +1175,7 @@ func TestStartRunHandler(t *testing.T) {
 
 	// Sample child run created when starting pending repos.
 	childRun := store.Run{
-		ID:        pgtype.UUID{Bytes: childRunID, Valid: true},
+		ID:        childRunID,
 		RepoUrl:   "https://github.com/example/repo1.git",
 		Status:    store.RunStatusQueued,
 		BaseRef:   "main",
@@ -1232,7 +1204,7 @@ func TestStartRunHandler(t *testing.T) {
 	}{
 		{
 			name:                          "start with pending repos",
-			runID:                         sampleBatchRunID.String(),
+			runID:                         sampleBatchRunID,
 			mockRun:                       queuedBatchRun,
 			mockAllRepos:                  []store.RunRepo{pendingRepo1, pendingRepo2},
 			mockPendingRepos:              []store.RunRepo{pendingRepo1, pendingRepo2},
@@ -1247,7 +1219,7 @@ func TestStartRunHandler(t *testing.T) {
 		},
 		{
 			name:             "no pending repos",
-			runID:            sampleBatchRunID.String(),
+			runID:            sampleBatchRunID,
 			mockRun:          queuedBatchRun,
 			mockAllRepos:     []store.RunRepo{succeededRepo},
 			mockPendingRepos: []store.RunRepo{},
@@ -1258,19 +1230,19 @@ func TestStartRunHandler(t *testing.T) {
 		},
 		{
 			name:       "run not found",
-			runID:      sampleBatchRunID.String(),
+			runID:      sampleBatchRunID,
 			mockRunErr: pgx.ErrNoRows,
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "run is terminal",
-			runID:      sampleBatchRunID.String(),
+			runID:      sampleBatchRunID,
 			mockRun:    canceledBatchRun,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:           "list repos error",
-			runID:          sampleBatchRunID.String(),
+			runID:          sampleBatchRunID,
 			mockRun:        queuedBatchRun,
 			mockAllRepos:   nil,
 			mockPendingErr: pgx.ErrTxClosed,

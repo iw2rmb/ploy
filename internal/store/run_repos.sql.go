@@ -19,7 +19,7 @@ WHERE id = $1
 
 // Clears the execution_run_id for a run_repo (e.g., when restarting).
 // Also called by IncrementRunRepoAttempt to prepare for a new execution.
-func (q *Queries) ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) ClearRunRepoExecutionRun(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, clearRunRepoExecutionRun, id)
 	return err
 }
@@ -59,12 +59,13 @@ func (q *Queries) CountRunReposByStatus(ctx context.Context, runID string) ([]Co
 }
 
 const createRunRepo = `-- name: CreateRunRepo :one
-INSERT INTO run_repos (run_id, repo_url, base_ref, target_ref, status)
-VALUES ($1, $2, $3, $4, 'pending')
+INSERT INTO run_repos (id, run_id, repo_url, base_ref, target_ref, status)
+VALUES ($1, $2, $3, $4, $5, 'pending')
 RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at
 `
 
 type CreateRunRepoParams struct {
+	ID        string `json:"id"`
 	RunID     string `json:"run_id"`
 	RepoUrl   string `json:"repo_url"`
 	BaseRef   string `json:"base_ref"`
@@ -73,8 +74,10 @@ type CreateRunRepoParams struct {
 
 // Creates a new run_repo entry for batched runs.
 // Each run_repo represents one repository within a batch (parent run).
+// The id parameter is a NanoID-backed string generated via NewRunRepoID().
 func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, createRunRepo,
+		arg.ID,
 		arg.RunID,
 		arg.RepoUrl,
 		arg.BaseRef,
@@ -103,7 +106,7 @@ DELETE FROM run_repos
 WHERE id = $1
 `
 
-func (q *Queries) DeleteRunRepo(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeleteRunRepo(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteRunRepo, id)
 	return err
 }
@@ -113,7 +116,7 @@ SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, 
 WHERE id = $1
 `
 
-func (q *Queries) GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, error) {
+func (q *Queries) GetRunRepo(ctx context.Context, id string) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, getRunRepo, id)
 	var i RunRepo
 	err := row.Scan(
@@ -173,7 +176,7 @@ WHERE id = $1
 
 // Increments the attempt counter and resets status to 'pending' for retry.
 // Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
-func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, incrementRunRepoAttempt, id)
 	return err
 }
@@ -412,8 +415,8 @@ WHERE id = $1
 `
 
 type SetRunRepoExecutionRunParams struct {
-	ID             pgtype.UUID `json:"id"`
-	ExecutionRunID *string     `json:"execution_run_id"`
+	ID             string  `json:"id"`
+	ExecutionRunID *string `json:"execution_run_id"`
 }
 
 // Links a run_repo to its child execution run and transitions status to 'running'.
@@ -430,8 +433,8 @@ WHERE id = $1
 `
 
 type UpdateRunRepoErrorParams struct {
-	ID        pgtype.UUID `json:"id"`
-	LastError *string     `json:"last_error"`
+	ID        string  `json:"id"`
+	LastError *string `json:"last_error"`
 }
 
 // Updates a run_repo's last_error field (e.g., on failure).
@@ -448,9 +451,9 @@ WHERE id = $1
 `
 
 type UpdateRunRepoRefsParams struct {
-	ID        pgtype.UUID `json:"id"`
-	BaseRef   string      `json:"base_ref"`
-	TargetRef string      `json:"target_ref"`
+	ID        string `json:"id"`
+	BaseRef   string `json:"base_ref"`
+	TargetRef string `json:"target_ref"`
 }
 
 // Updates a run_repo's base_ref and target_ref (e.g., when restarting with new refs).
@@ -468,7 +471,7 @@ WHERE id = $1
 `
 
 type UpdateRunRepoStatusParams struct {
-	ID     pgtype.UUID   `json:"id"`
+	ID     string        `json:"id"`
 	Status RunRepoStatus `json:"status"`
 }
 

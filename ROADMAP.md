@@ -77,7 +77,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./docs/api/...` to ensure `docs/api/verify_openapi_test.go` passes with updated formats.
 
 ## NanoID(8) for repo-id — run_repos.id
-- [ ] Convert `run_repos.id` and its uses to NanoID(8)-backed `RunRepoID` strings — Make per-repo IDs compact and human-friendly.
+- [x] Convert `run_repos.id` and its uses to NanoID(8)-backed `RunRepoID` strings — Make per-repo IDs compact and human-friendly.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/run_repos.sql.go, internal/store/models.go, internal/server/handlers/runs_batch_http.go, internal/server/handlers/runs_batch_types.go
   - Scope:

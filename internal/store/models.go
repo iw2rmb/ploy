@@ -358,7 +358,7 @@ type Run struct {
 }
 
 type RunRepo struct {
-	ID             pgtype.UUID        `json:"id"`
+	ID             string             `json:"id"`
 	RunID          string             `json:"run_id"`
 	RepoUrl        string             `json:"repo_url"`
 	BaseRef        string             `json:"base_ref"`

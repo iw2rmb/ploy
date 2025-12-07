@@ -90,9 +90,10 @@ CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
 -- The parent run holds shared spec and metadata; each run_repos row captures
 -- a single repository's execution state, allowing multiple repos per batch.
 -- execution_run_id links to the child run created for this repo's job pipeline.
+-- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly IDs.
 -- Note: run_id and execution_run_id are TEXT (KSUID-backed) to match runs.id.
 CREATE TABLE IF NOT EXISTS run_repos (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id               TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewRunRepoID().
   run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   repo_url         TEXT NOT NULL,
   base_ref         TEXT NOT NULL,

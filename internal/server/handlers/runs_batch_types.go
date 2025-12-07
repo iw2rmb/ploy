@@ -4,14 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// NOTE: Run IDs in this file are now KSUID-backed strings.
-// RunRepo IDs (repo_id) are still UUIDs (outside scope of KSUID migration).
+// NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
+// Both are now string types in the store layer; no UUID parsing is needed.
 
 // RunBatchSummary represents a run with aggregated repo status counts.
 // Used for list and detail responses.
@@ -202,12 +200,12 @@ type RunRepoResponse struct {
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
-// rr.RunID is now a string (KSUID); rr.ID is still UUID.
+// rr.ID is now a string (NanoID); rr.RunID is a string (KSUID).
 func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
 	resp := RunRepoResponse{
-		// rr.ID is still pgtype.UUID (run_repos.id is outside KSUID migration scope).
-		ID: domaintypes.RunRepoID(uuid.UUID(rr.ID.Bytes).String()),
-		// rr.RunID is now a string (KSUID); cast directly.
+		// rr.ID is now a string (NanoID-backed); cast directly to domain type.
+		ID: domaintypes.RunRepoID(rr.ID),
+		// rr.RunID is a string (KSUID-backed); cast directly.
 		RunID: domaintypes.RunID(rr.RunID),
 		// Wrap VCS fields in domain types; values are validated at input time.
 		RepoURL:   domaintypes.RepoURL(rr.RepoUrl),
