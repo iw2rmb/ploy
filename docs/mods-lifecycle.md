@@ -143,9 +143,9 @@ post-gate) is surfaced in:
 
 ### Multi-strategy healing
 
-The healing configuration supports two forms for backward compatibility:
+The healing configuration supports two forms:
 
-**Single-strategy (legacy form)** — A flat `mods` list executed sequentially:
+**Single-strategy (mods form)** — A flat `mods` list executed sequentially:
 ```yaml
 build_gate_healing:
   retries: 1
@@ -170,7 +170,7 @@ build_gate_healing:
           command: apply-known-fixes.sh
 ```
 
-When using the legacy `mods` form, it is internally normalized to a single
+When using the single-strategy `mods` form, it is internally normalized to a single
 unnamed strategy, preserving existing behavior. If both `mods` and `strategies`
 are present, `strategies` takes precedence.
 
