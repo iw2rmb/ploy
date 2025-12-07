@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -26,12 +25,8 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Parse and validate node_id.
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
-			return
-		}
+		// Use node ID directly as a string (no UUID parsing needed).
+		nodeID := nodeIDStr
 
 		// Decode request body.
 		var req struct {

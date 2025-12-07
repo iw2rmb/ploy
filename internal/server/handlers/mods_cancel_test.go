@@ -20,13 +20,13 @@ func TestCancelTicket_Success(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: id, Valid: true},
+			ID:        id.String(),
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
+			{ID: uuid.New().String(), Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestCancelTicket_Idempotent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			id := uuid.New()
-			st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: tt.runStatus}}
+			st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: tt.runStatus}}
 			handler := cancelTicketHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
 			req.SetPathValue("id", id.String())
@@ -93,7 +93,8 @@ func TestCancelTicket_Idempotent(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_BadID and NotFound paths.
+// TestCancelTicket_BadID_And_NotFound verifies rejection of invalid IDs and not found handling.
+// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
 func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -103,14 +104,7 @@ func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{
-			name:       "invalid uuid format",
-			id:         "abc",
-			urlID:      "abc",
-			mockStore:  &mockStore{},
-			wantStatus: http.StatusBadRequest,
-			wantBody:   "invalid id: invalid uuid",
-		},
+		// Note: "invalid uuid format" test removed - with KSUID string IDs, any non-empty string is valid.
 		{
 			name:       "empty id",
 			id:         "",
@@ -128,12 +122,12 @@ func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
 			wantBody:   "id path parameter is required",
 		},
 		{
-			name:       "ticket not found",
+			name:       "run not found",
 			id:         uuid.New().String(),
 			urlID:      "",
 			mockStore:  &mockStore{getRunErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
-			wantBody:   "ticket not found",
+			wantBody:   "not found",
 		},
 	}
 
@@ -163,7 +157,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: id, Valid: true},
+			ID:        id.String(),
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -256,14 +250,20 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	id := uuid.New()
 	now := time.Now()
-	stgPending := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCreated}
-	stgRunning := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
-	stgSucceeded := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded}
-	stgFailed := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed}
-	stgCanceled := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCanceled}
+	pendingID := uuid.New().String()
+	runningID := uuid.New().String()
+	succeededID := uuid.New().String()
+	failedID := uuid.New().String()
+	canceledID := uuid.New().String()
+
+	stgPending := store.Job{ID: pendingID, Status: store.JobStatusCreated}
+	stgRunning := store.Job{ID: runningID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
+	stgSucceeded := store.Job{ID: succeededID, Status: store.JobStatusSucceeded}
+	stgFailed := store.Job{ID: failedID, Status: store.JobStatusFailed}
+	stgCanceled := store.Job{ID: canceledID, Status: store.JobStatusCanceled}
 
 	st := &mockStore{
-		getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: store.RunStatusRunning},
+		getRunResult: store.Run{ID: id.String(), Status: store.RunStatusRunning},
 		listJobsByRunResult: []store.Job{
 			stgPending, stgRunning, stgSucceeded, stgFailed, stgCanceled,
 		},
@@ -287,15 +287,15 @@ func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	}
 	updated := map[string]bool{}
 	for _, c := range st.updateJobStatusCalls {
-		updated[uuid.UUID(c.ID.Bytes).String()] = true
+		updated[c.ID] = true
 		if c.Status != store.JobStatusCanceled {
 			t.Fatalf("expected job status canceled, got %s", c.Status)
 		}
 	}
-	if !updated[uuid.UUID(stgPending.ID.Bytes).String()] || !updated[uuid.UUID(stgRunning.ID.Bytes).String()] {
+	if !updated[pendingID] || !updated[runningID] {
 		t.Fatalf("expected pending and running jobs to be updated; got %+v", updated)
 	}
-	if updated[uuid.UUID(stgSucceeded.ID.Bytes).String()] || updated[uuid.UUID(stgFailed.ID.Bytes).String()] || updated[uuid.UUID(stgCanceled.ID.Bytes).String()] {
+	if updated[succeededID] || updated[failedID] || updated[canceledID] {
 		t.Fatalf("did not expect terminal jobs to be updated; got %+v", updated)
 	}
 }
@@ -305,7 +305,7 @@ func TestCancelTicket_NoStages(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: id, Valid: true},
+			ID:        id.String(),
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -374,7 +374,7 @@ func TestCancelTicket_JSONBodyVariations(t *testing.T) {
 			id := uuid.New()
 			st := &mockStore{
 				getRunResult: store.Run{
-					ID:        pgtype.UUID{Bytes: id, Valid: true},
+					ID:        id.String(),
 					Status:    store.RunStatusRunning,
 					RepoUrl:   "https://example/repo.git",
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -421,14 +421,14 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 			jobID := uuid.New()
 			st := &mockStore{
 				getRunResult: store.Run{
-					ID:        pgtype.UUID{Bytes: id, Valid: true},
+					ID:        id.String(),
 					Status:    store.RunStatusRunning,
 					RepoUrl:   "https://example/repo.git",
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
 				listJobsByRunResult: []store.Job{
 					{
-						ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+						ID:        jobID.String(),
 						Status:    store.JobStatusRunning,
 						StartedAt: tt.startedAt,
 					},

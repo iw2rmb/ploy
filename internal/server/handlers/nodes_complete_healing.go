@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -102,7 +101,7 @@ func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
 	run store.Run,
-	runID pgtype.UUID,
+	runID string, // KSUID-backed string ID after run ID migration.
 	failedStepIndex domaintypes.StepIndex,
 	jobs []store.Job,
 ) error {
@@ -506,7 +505,7 @@ func maybeCreateHealingJobs(
 func cancelLoserBranches(
 	ctx context.Context,
 	st store.Store,
-	runID pgtype.UUID,
+	runID string, // KSUID-backed string ID after run ID migration.
 	winnerJob store.Job,
 	jobs []store.Job,
 ) error {
@@ -602,13 +601,13 @@ func cancelLoserBranches(
 			FinishedAt: finishedAt,
 			DurationMs: durationMs,
 		}); err != nil {
-			return fmt.Errorf("cancel loser job %s: %w", uuid.UUID(job.ID.Bytes).String(), err)
+			return fmt.Errorf("cancel loser job %s: %w", job.ID, err)
 		}
 
 		canceledCount++
 		slog.Info("skipped loser branch job",
 			"run_id", runID,
-			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"job_id", job.ID, // Job IDs are KSUID strings.
 			"job_name", job.Name,
 			"step_index", job.StepIndex,
 			"winner_job", winnerJob.Name,
@@ -635,7 +634,7 @@ func cancelLoserBranches(
 func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
-	runID pgtype.UUID,
+	runID string, // KSUID-backed string ID after run ID migration.
 	failedStepIndex domaintypes.StepIndex,
 	jobs []store.Job,
 ) error {
@@ -672,12 +671,12 @@ func cancelRemainingJobsAfterFailure(
 			FinishedAt: finishedAt,
 			DurationMs: durationMs,
 		}); err != nil {
-			return fmt.Errorf("cancel job %s: %w", uuid.UUID(job.ID.Bytes).String(), err)
+			return fmt.Errorf("cancel job %s: %w", job.ID, err)
 		}
 
 		slog.Info("canceled job after failure",
 			"run_id", runID,
-			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"job_id", job.ID, // Job IDs are KSUID strings.
 			"step_index", job.StepIndex,
 		)
 	}

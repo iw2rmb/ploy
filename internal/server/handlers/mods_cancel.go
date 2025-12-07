@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -35,13 +34,6 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Parse UUID
-		pgID := domaintypes.ToPGUUID(runIDStr)
-		if !pgID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		// Optional body: { reason?: string }
 		var req struct {
 			Reason *string `json:"reason"`
@@ -50,7 +42,7 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		// Load current run
-		run, err := st.GetRun(r.Context(), pgID)
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, " run not found", http.StatusNotFound)
@@ -70,7 +62,7 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Transition to canceled; set finished_at to now.
 		now := time.Now().UTC()
 		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
-			ID:         pgID,
+			ID:         runIDStr,
 			Status:     store.RunStatusCanceled,
 			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		})
@@ -81,7 +73,7 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		// Best-effort job updates to canceled — only for created|pending|running jobs
-		if jobs, err := st.ListJobsByRun(r.Context(), pgID); err == nil && len(jobs) > 0 {
+		if jobs, err := st.ListJobsByRun(r.Context(), runIDStr); err == nil && len(jobs) > 0 {
 			for _, job := range jobs {
 				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusPending && job.Status != store.JobStatusRunning {
 					continue
@@ -107,8 +99,8 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Publish terminal  run event + done status for SSE clients
 		if eventsService != nil {
 			runSummary := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID(uuid.UUID(pgID.Bytes).String()),
-				State:      modsapi.TicketStateCancelled,
+				TicketID:   domaintypes.TicketID(runIDStr),
+				State:      modsapi.RunStateCancelled,
 				Repository: run.RepoUrl,
 				CreatedAt:  timeOrZero(run.CreatedAt),
 				UpdatedAt:  now,
@@ -120,11 +112,11 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 				}
 				runSummary.Metadata["reason"] = strings.TrimSpace(*req.Reason)
 			}
-			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), runSummary); err != nil {
+			if err := eventsService.PublishTicket(r.Context(), runIDStr, runSummary); err != nil {
 				slog.Error("cancel  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 			// Signal done on the stream
-			if err := eventsService.Hub().PublishStatus(r.Context(), uuid.UUID(pgID.Bytes).String(), logstream.Status{Status: "done"}); err != nil {
+			if err := eventsService.Hub().PublishStatus(r.Context(), runIDStr, logstream.Status{Status: "done"}); err != nil {
 				slog.Error("cancel  run: publish done status failed", " run_id", runIDStr, "err", err)
 			}
 		}

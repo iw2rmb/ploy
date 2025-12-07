@@ -55,7 +55,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("mods artifacts: %s", msg)
 	}
-	var payload modsapi.TicketStatusResponse
+	var payload modsapi.RunStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return err
 	}

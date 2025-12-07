@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -24,7 +23,7 @@ func TestGetRunTiming_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunTimingResult: store.RunsTiming{
-			ID:      pgtype.UUID{Bytes: runID, Valid: true},
+			ID:      runID.String(),
 			QueueMs: 1500,
 			RunMs:   3000,
 		},
@@ -46,7 +45,7 @@ func TestGetRunTiming_Success(t *testing.T) {
 	if !st.getRunTimingCalled {
 		t.Fatal("expected GetRunTiming to be called")
 	}
-	if st.getRunTimingParams.Bytes != runID {
+	if st.getRunTimingParams != runID.String() {
 		t.Fatalf("GetRunTiming called with wrong run id: %v", st.getRunTimingParams)
 	}
 
@@ -90,15 +89,17 @@ func TestGetRunTiming_NotFound(t *testing.T) {
 	}
 }
 
-// TestGetRunTiming_InvalidID verifies 400 for invalid UUID.
-func TestGetRunTiming_InvalidID(t *testing.T) {
+// TestGetRunTiming_EmptyID verifies 400 for empty or whitespace ID.
+// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+func TestGetRunTiming_EmptyID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
 	handler := getRunTimingHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid-uuid/timing", nil)
-	req.SetPathValue("id", "invalid-uuid")
+	// Note: "invalid-uuid" is now a valid KSUID string ID, so we only test empty ID.
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs//timing", nil)
+	req.SetPathValue("id", "   ") // Whitespace ID
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

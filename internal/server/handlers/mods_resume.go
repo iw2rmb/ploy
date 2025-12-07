@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -44,15 +43,8 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Parse UUID using domain types helper for consistent validation.
-		pgID := domaintypes.ToPGUUID(runIDStr)
-		if !pgID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		// Fetch current run state from database.
-		run, err := st.GetRun(r.Context(), pgID)
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, " run not found", http.StatusNotFound)
@@ -79,7 +71,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		// Fetch all jobs for this run to determine which need to be requeued.
-		jobs, err := st.ListJobsByRun(r.Context(), pgID)
+		jobs, err := st.ListJobsByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("resume  run: list jobs failed", " run_id", runIDStr, "err", err)
@@ -153,7 +145,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// If no jobs were reset but we have a firstJobToSchedule (must be 'created' status),
 		// transition it to 'pending' using ScheduleNextJob for consistency.
 		if len(jobsToReset) == 0 && firstJobToSchedule != nil && firstJobToSchedule.Status == store.JobStatusCreated {
-			if _, err := st.ScheduleNextJob(r.Context(), pgID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			if _, err := st.ScheduleNextJob(r.Context(), runIDStr); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				slog.Error("resume  run: schedule next job failed", " run_id", runIDStr, "err", err)
 				// Non-fatal: job is already 'created' and will be picked up by future scheduling.
 			}
@@ -162,7 +154,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Transition run back to 'queued' status to indicate it's ready for execution.
 		// Clear finished_at since the run is no longer terminal.
 		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
-			ID:         pgID,
+			ID:         runIDStr,
 			Status:     store.RunStatusQueued,
 			FinishedAt: pgtype.Timestamptz{Valid: false}, // Clear terminal timestamp.
 		})
@@ -174,7 +166,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Track resume metadata (resume_count, last_resumed_at) in runs.stats.
 		// This allows clients to see resume history via  run status and SSE events.
-		if err := st.UpdateRunResume(r.Context(), pgID); err != nil {
+		if err := st.UpdateRunResume(r.Context(), runIDStr); err != nil {
 			// Log but don't fail the operation; the resume itself succeeded.
 			slog.Error("resume  run: update resume stats failed", " run_id", runIDStr, "err", err)
 		}
@@ -184,8 +176,8 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		if eventsService != nil {
 			now := time.Now().UTC()
 			runSummary := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID(uuid.UUID(pgID.Bytes).String()),
-				State:      modsapi.TicketStatePending, // 'pending' maps to 'queued' in mods API.
+				TicketID:   domaintypes.TicketID(runIDStr),
+				State:      modsapi.RunStatePending, // 'pending' maps to 'queued' in mods API.
 				Repository: run.RepoUrl,
 				Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
 				CreatedAt:  timeOrZero(run.CreatedAt),
@@ -194,10 +186,10 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			}
 			// Re-fetch run to get updated stats with resume_count and last_resumed_at.
 			// Use fresh stats to ensure event reflects the latest resume metadata.
-			if updatedRun, err := st.GetRun(r.Context(), pgID); err == nil {
+			if updatedRun, err := st.GetRun(r.Context(), runIDStr); err == nil {
 				runSummary.Metadata = buildResumeMetadata(updatedRun)
 			}
-			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), runSummary); err != nil {
+			if err := eventsService.PublishTicket(r.Context(), runIDStr, runSummary); err != nil {
 				slog.Error("resume  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 		}
@@ -245,8 +237,8 @@ func buildResumeMetadata(run store.Run) map[string]string {
 		"repo_target_ref": run.TargetRef,
 	}
 	// Include claiming node id when available for diagnostics.
-	if run.NodeID.Valid {
-		meta["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
+	if run.NodeID != nil {
+		meta["node_id"] = *run.NodeID
 	}
 	// Parse stats to extract resume metadata.
 	if len(run.Stats) > 0 && json.Valid(run.Stats) {

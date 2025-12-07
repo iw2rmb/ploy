@@ -25,23 +25,23 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusRunning,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
 			{
-				ID:        pgtype.UUID{Bytes: job1ID, Valid: true},
-				RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+				ID:        job1ID.String(),
+				RunID:     runID.String(),
 				Name:      "pre-gate",
 				Status:    store.JobStatusSucceeded,
 				ModType:   "pre_gate",
 				StepIndex: 1000,
 			},
 			{
-				ID:        pgtype.UUID{Bytes: job2ID, Valid: true},
-				RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+				ID:        job2ID.String(),
+				RunID:     runID.String(),
 				Name:      "mod-0",
 				Status:    store.JobStatusRunning,
 				ModType:   "mod",
@@ -49,8 +49,8 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 				StepIndex: 2000,
 			},
 			{
-				ID:        pgtype.UUID{Bytes: job3ID, Valid: true},
-				RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+				ID:        job3ID.String(),
+				RunID:     runID.String(),
 				Name:      "post-gate",
 				Status:    store.JobStatusCreated,
 				ModType:   "post_gate",
@@ -160,16 +160,16 @@ func TestGetModGraphHandler_WithHealing(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			Status:    store.RunStatusRunning,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: preGateID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
-			{ID: pgtype.UUID{Bytes: heal1ID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
-			{ID: pgtype.UUID{Bytes: reGateID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
-			{ID: pgtype.UUID{Bytes: mod0ID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
-			{ID: pgtype.UUID{Bytes: postGateID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
+			{ID: preGateID.String(), RunID: runID.String(), Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
+			{ID: heal1ID.String(), RunID: runID.String(), Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
+			{ID: reGateID.String(), RunID: runID.String(), Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
+			{ID: mod0ID.String(), RunID: runID.String(), Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
+			{ID: postGateID.String(), RunID: runID.String(), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 		},
 	}
 
@@ -273,7 +273,7 @@ func TestGetModGraphHandler_EmptyJobs(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			Status:    store.RunStatusQueued,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},

@@ -7,17 +7,8 @@ SELECT * FROM nodes
 ORDER BY created_at DESC;
 
 -- name: CreateNode :one
-INSERT INTO nodes (
-  name,
-  ip_address,
-  version,
-  concurrency
-) VALUES (
-  $1, $2, $3, $4
-)
-RETURNING *;
-
--- name: InsertNodeWithID :one
+-- Creates a new node with an application-supplied NanoID(6) as the primary key.
+-- The `id` parameter must be generated via types.NewNodeKey() before calling.
 INSERT INTO nodes (
   id,
   name,

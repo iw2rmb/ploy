@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -228,21 +229,16 @@ func claimBuildGateJobHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Parse UUID.
-		nodeID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid node id: %v", err), http.StatusBadRequest)
+		// Validate node ID is non-empty (now NanoID(6) string, no UUID parsing).
+		nodeIDTrimmed := strings.TrimSpace(nodeIDStr)
+		if nodeIDTrimmed == "" {
+			http.Error(w, "invalid node id: must be a non-empty string", http.StatusBadRequest)
 			return
 		}
 
-		// Convert to pgtype.UUID.
-		pgNodeID := pgtype.UUID{
-			Bytes: nodeID,
-			Valid: true,
-		}
-
 		// Claim a buildgate job.
-		job, err := st.ClaimBuildGateJob(r.Context(), pgNodeID)
+		// Node ID is now a *string pointer for nullable FK.
+		job, err := st.ClaimBuildGateJob(r.Context(), &nodeIDTrimmed)
 		if err != nil {
 			// Check if it's "no rows" (no work available).
 			if errors.Is(err, pgx.ErrNoRows) {

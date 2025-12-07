@@ -7,9 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
@@ -37,8 +34,9 @@ import (
 //
 // This avoids rewriting per-job terminal states after completion; each job's
 // terminal status is set atomically by UpdateJobCompletion and remains unchanged.
-func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID pgtype.UUID) error {
+func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID string) error {
 	// Fetch all jobs for the run to compute gate-aware status in a single pass.
+	// runID is now a KSUID-backed string after run ID migration.
 	jobs, err := st.ListJobsByRun(ctx, runID)
 	if err != nil {
 		return fmt.Errorf("list jobs: %w", err)
@@ -168,22 +166,22 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 			ticketState = modsapi.RunStateFailed
 		}
 
-		runUUID := uuid.UUID(runID.Bytes)
+		// Run IDs are now KSUID strings.
 		ticketSummary := modsapi.RunSummary{
-			TicketID:   domaintypes.TicketID(runUUID.String()),
+			TicketID:   domaintypes.TicketID(runID),
 			State:      ticketState,
 			Repository: run.RepoUrl,
 			CreatedAt:  run.CreatedAt.Time,
 			UpdatedAt:  time.Now().UTC(),
 			Stages:     make(map[string]modsapi.StageStatus),
 		}
-		if err := eventsService.PublishTicket(ctx, runUUID.String(), ticketSummary); err != nil {
+		if err := eventsService.PublishTicket(ctx, runID, ticketSummary); err != nil {
 			slog.Error("complete multi-step run: publish ticket event failed", "run_id", runID, "err", err)
 		}
 
 		// Publish done event to signal stream completion.
 		doneStatus := logstream.Status{Status: "done"}
-		if err := eventsService.Hub().PublishStatus(ctx, runUUID.String(), doneStatus); err != nil {
+		if err := eventsService.Hub().PublishStatus(ctx, runID, doneStatus); err != nil {
 			slog.Error("complete multi-step run: publish done status failed", "run_id", runID, "err", err)
 		}
 	}
@@ -215,9 +213,10 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 //   - succeeded → succeeded
 //   - failed    → failed
 //   - canceled  → cancelled (note spelling difference)
-func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID pgtype.UUID, runStatus store.RunStatus) error {
+func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID string, runStatus store.RunStatus) error {
 	// Look up the RunRepo entry that references this run as its execution_run_id.
-	runRepo, err := st.GetRunRepoByExecutionRun(ctx, runID)
+	// runID is now a KSUID string after run ID migration.
+	runRepo, err := st.GetRunRepoByExecutionRun(ctx, &runID)
 	if err != nil {
 		// If no RunRepo is linked to this run, it's a standalone run (not part of a batch).
 		// This is expected for single-repo runs created via /v1/mods; silently skip.
@@ -246,6 +245,7 @@ func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID 
 	}
 
 	// Update the RunRepo status to reflect the execution outcome.
+	// runRepo.ID is now a NanoID string.
 	err = st.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
 		ID:     runRepo.ID,
 		Status: repoStatus,
@@ -255,9 +255,9 @@ func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID 
 	}
 
 	slog.Info("run_repo status updated from execution run",
-		"run_repo_id", uuid.UUID(runRepo.ID.Bytes).String(),
-		"run_id", uuid.UUID(runID.Bytes).String(),
-		"batch_run_id", uuid.UUID(runRepo.RunID.Bytes).String(),
+		"run_repo_id", runRepo.ID, // RunRepo IDs are NanoID strings.
+		"run_id", runID, // Run IDs are KSUID strings.
+		"batch_run_id", runRepo.RunID,
 		"status", repoStatus,
 	)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -35,7 +36,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 
 	st := &mockStore{
 		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Spec:      []byte("{}"),
 			Status:    store.RunStatusQueued,
@@ -96,6 +97,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 
 // TestSubmitTicketHandlerMissingFields verifies validation of required fields.
 // Domain types now validate at JSON unmarshal time, rejecting empty/invalid values.
+// Note: target_ref is optional in the handler; omitted target_ref is allowed.
 func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 	st := &mockStore{}
 	handler := submitTicketHandler(st, nil)
@@ -113,7 +115,7 @@ func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 		{"no base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "target_ref": "feature"}, "empty"},
 		{"empty target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": ""}, "empty"},
 		{"whitespace target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "   "}, "empty"},
-		{"no target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main"}, "empty"},
+		// Note: "no target_ref" removed - target_ref is optional in the handler.
 	}
 
 	for _, tc := range cases {
@@ -200,7 +202,7 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 
 	st := &mockStore{
 		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Spec:      customSpec,
 			CreatedBy: &createdBy,
@@ -259,16 +261,17 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	now := time.Now()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
+			ID:        ticketID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusRunning,
 			BaseRef:   "main",
 			TargetRef: "feature",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt: pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			NodeID:    &nodeIDStr,
 		},
 	}
 
@@ -283,7 +286,7 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.TicketStatusResponse
+	var resp modsapi.RunStatusResponse
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -291,7 +294,7 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	if string(resp.Ticket.TicketID) != ticketID.String() {
 		t.Errorf("expected ticket_id %s, got %s", ticketID.String(), string(resp.Ticket.TicketID))
 	}
-	if resp.Ticket.State != modsapi.TicketStateRunning {
+	if resp.Ticket.State != modsapi.RunStateRunning {
 		t.Errorf("expected status running, got %s", resp.Ticket.State)
 	}
 	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
@@ -330,8 +333,8 @@ func TestGetTicketStatusHandlerNotFound(t *testing.T) {
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "ticket not found") {
-		t.Errorf("expected 'ticket not found' error, got: %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "not found") {
+		t.Errorf("expected 'not found' error, got: %s", rr.Body.String())
 	}
 
 	if !st.getRunCalled {
@@ -339,13 +342,15 @@ func TestGetTicketStatusHandlerNotFound(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerInvalidUUID verifies 400 when ticket ID is invalid.
-func TestGetTicketStatusHandlerInvalidUUID(t *testing.T) {
+// TestGetTicketStatusHandlerEmptyID verifies 400 when ticket ID is empty.
+// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+// Note: "not-a-uuid" is now a valid KSUID string ID, so this test only checks empty ID.
+func TestGetTicketStatusHandlerEmptyID(t *testing.T) {
 	st := &mockStore{}
 	handler := getTicketStatusHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/not-a-uuid", nil)
-	req.SetPathValue("id", "not-a-uuid")
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/", nil)
+	req.SetPathValue("id", "")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -353,12 +358,9 @@ func TestGetTicketStatusHandlerInvalidUUID(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rr.Code)
 	}
-	if !strings.Contains(rr.Body.String(), "invalid ticket id") {
-		t.Errorf("expected 'invalid ticket id' error, got: %s", rr.Body.String())
-	}
 
 	if st.getRunCalled {
-		t.Error("expected GetRun NOT to be called for invalid UUID")
+		t.Error("expected GetRun NOT to be called for empty ID")
 	}
 }
 
@@ -372,7 +374,7 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: ticketID, Valid: true},
+			ID:         ticketID.String(),
 			RepoUrl:    "https://github.com/user/repo.git",
 			Status:     store.RunStatusFailed,
 			BaseRef:    "main",
@@ -396,7 +398,7 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.TicketStatusResponse
+	var resp modsapi.RunStatusResponse
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -418,7 +420,7 @@ func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
 
 	st := &mockStore{
 		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Spec:      []byte("{}"),
 			Status:    store.RunStatusQueued,
@@ -477,7 +479,7 @@ func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 
 	st := &mockStore{
 		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
 			Status:    store.RunStatusQueued,
@@ -570,7 +572,7 @@ func TestSubmitTicketHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 			specBytes, _ := json.Marshal(tc.spec)
 			st := &mockStore{
 				createRunResult: store.Run{
-					ID:        pgtype.UUID{Bytes: runID, Valid: true},
+					ID:        runID.String(),
 					RepoUrl:   "https://github.com/user/repo.git",
 					Spec:      specBytes,
 					Status:    store.RunStatusQueued,
@@ -625,7 +627,7 @@ func TestSubmitTicketHandlerMultiStepNoRunSteps(t *testing.T) {
 
 	st := &mockStore{
 		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
 			Status:    store.RunStatusQueued,
@@ -694,7 +696,7 @@ func TestSubmitTicketHandlerSingleStep(t *testing.T) {
 			specBytes, _ := json.Marshal(tc.spec)
 			st := &mockStore{
 				createRunResult: store.Run{
-					ID:        pgtype.UUID{Bytes: runID, Valid: true},
+					ID:        runID.String(),
 					RepoUrl:   "https://github.com/user/repo.git",
 					Spec:      specBytes,
 					Status:    store.RunStatusQueued,
@@ -739,16 +741,16 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 	// Create mock jobs with step_index field set.
 	// Note: StepIndex is read from the Job struct directly, not from metadata.
 	job0 := store.Job{
-		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:     pgtype.UUID{Bytes: ticketID, Valid: true},
+		ID:        types.NewJobID().String(),
+		RunID:     ticketID.String(),
 		Name:      "mod-0",
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000, // First mod job
 		Meta:      []byte(`{"mod_type":"mod","mod_image":"img1:latest"}`),
 	}
 	job1 := store.Job{
-		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:     pgtype.UUID{Bytes: ticketID, Valid: true},
+		ID:        types.NewJobID().String(),
+		RunID:     ticketID.String(),
 		Name:      "mod-1",
 		Status:    store.JobStatusCreated,
 		StepIndex: 3000, // Second mod job
@@ -757,7 +759,7 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
+			ID:        ticketID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusQueued,
 			BaseRef:   "main",
@@ -778,7 +780,7 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.TicketStatusResponse
+	var resp modsapi.RunStatusResponse
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -788,8 +790,8 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 		t.Fatalf("expected 2 jobs, got %d", len(resp.Ticket.Stages))
 	}
 
-	job0ID := uuid.UUID(job0.ID.Bytes).String()
-	job1ID := uuid.UUID(job1.ID.Bytes).String()
+	job0ID := job0.ID
+	job1ID := job1.ID
 
 	if _, ok := resp.Ticket.Stages[job0ID]; !ok {
 		t.Errorf("expected job %s to be present", job0ID)

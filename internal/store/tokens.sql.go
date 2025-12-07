@@ -52,7 +52,7 @@ LIMIT 1
 `
 
 type GetBootstrapTokenRow struct {
-	NodeID       pgtype.UUID        `json:"node_id"`
+	NodeID       *string            `json:"node_id"`
 	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
@@ -133,7 +133,7 @@ INSERT INTO bootstrap_tokens (
 type InsertBootstrapTokenParams struct {
 	TokenHash string             `json:"token_hash"`
 	TokenID   string             `json:"token_id"`
-	NodeID    pgtype.UUID        `json:"node_id"`
+	NodeID    *string            `json:"node_id"`
 	ClusterID *string            `json:"cluster_id"`
 	IssuedAt  pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`

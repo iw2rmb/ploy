@@ -67,6 +67,7 @@ func TestClaimJob_Basic(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-1",
 		IpAddress: mustParseAddr(t, "192.168.1.100"),
 	})
@@ -75,7 +76,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 
 	// Claim the job for the node.
-	claimedJob, err := db.ClaimJob(ctx, node.ID)
+	claimedJob, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() failed: %v", err)
 	}
@@ -90,8 +91,8 @@ func TestClaimJob_Basic(t *testing.T) {
 		t.Errorf("Expected status assigned, got %s", claimedJob.Status)
 	}
 
-	// Node ID remains pgtype.UUID.
-	if !claimedJob.NodeID.Valid || claimedJob.NodeID.Bytes != node.ID.Bytes {
+	// Node ID is now *string.
+	if claimedJob.NodeID == nil || *claimedJob.NodeID != node.ID {
 		t.Errorf("Expected node_id %v, got %v", node.ID, claimedJob.NodeID)
 	}
 
@@ -100,7 +101,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 
 	// Verify no more jobs can be claimed.
-	_, err = db.ClaimJob(ctx, node.ID)
+	_, err = db.ClaimJob(ctx, &node.ID)
 	if err == nil {
 		t.Error("Expected ClaimJob to fail when no pending jobs exist")
 	}
@@ -178,6 +179,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create test nodes.
 	node1, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-fifo-1",
 		IpAddress: mustParseAddr(t, "192.168.2.100"),
 	})
@@ -186,6 +188,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	node2, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-fifo-2",
 		IpAddress: mustParseAddr(t, "192.168.2.101"),
 	})
@@ -194,6 +197,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	node3, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-fifo-3",
 		IpAddress: mustParseAddr(t, "192.168.2.102"),
 	})
@@ -202,7 +206,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	// Claim jobs and verify they are claimed in step_index order.
-	claimed1, err := db.ClaimJob(ctx, node1.ID)
+	claimed1, err := db.ClaimJob(ctx, &node1.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() for node1 failed: %v", err)
 	}
@@ -210,7 +214,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		t.Errorf("Expected first claim to get job1 (%v), got %v", job1.ID, claimed1.ID)
 	}
 
-	claimed2, err := db.ClaimJob(ctx, node2.ID)
+	claimed2, err := db.ClaimJob(ctx, &node2.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() for node2 failed: %v", err)
 	}
@@ -218,7 +222,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		t.Errorf("Expected second claim to get job2 (%v), got %v", job2.ID, claimed2.ID)
 	}
 
-	claimed3, err := db.ClaimJob(ctx, node3.ID)
+	claimed3, err := db.ClaimJob(ctx, &node3.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() for node3 failed: %v", err)
 	}
@@ -280,6 +284,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	nodes := make([]Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		node, err := db.CreateNode(ctx, CreateNodeParams{
+			ID:        types.NewNodeKey(),
 			Name:      nodeNameForTest(t, "concurrent", i),
 			IpAddress: mustParseAddr(t, ipForTest(3, i)),
 		})
@@ -298,7 +303,8 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			claimedJobs[idx], errors[idx] = db.ClaimJob(ctx, nodes[idx].ID)
+			nodeID := nodes[idx].ID
+			claimedJobs[idx], errors[idx] = db.ClaimJob(ctx, &nodeID)
 		}(i)
 	}
 
@@ -308,10 +314,10 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	successCount := 0
 	// Job IDs are now strings (KSUID-backed), use map[string]bool for deduplication.
 	claimedIDs := make(map[string]bool)
-	// Node IDs remain pgtype.UUID; use [16]byte for deduplication.
-	validNode := make(map[[16]byte]bool, numNodes)
+	// Node IDs are now strings (NanoID-backed); use map[string]bool for deduplication.
+	validNode := make(map[string]bool, numNodes)
 	for i := range nodes {
-		validNode[nodes[i].ID.Bytes] = true
+		validNode[nodes[i].ID] = true
 	}
 	for i := 0; i < numNodes; i++ {
 		if errors[i] == nil {
@@ -331,7 +337,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			if !claimedJobs[i].StartedAt.Valid {
 				t.Errorf("claimed job %v missing started_at", claimedJobs[i].ID)
 			}
-			if !claimedJobs[i].NodeID.Valid || !validNode[claimedJobs[i].NodeID.Bytes] {
+			if claimedJobs[i].NodeID == nil || !validNode[*claimedJobs[i].NodeID] {
 				t.Errorf("claimed job %v has unexpected node_id %v", claimedJobs[i].ID, claimedJobs[i].NodeID)
 			}
 		}
@@ -364,6 +370,7 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-empty",
 		IpAddress: mustParseAddr(t, "192.168.4.100"),
 	})
@@ -372,7 +379,7 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 	}
 
 	// Try to claim when no pending jobs exist.
-	_, err = db.ClaimJob(ctx, node.ID)
+	_, err = db.ClaimJob(ctx, &node.ID)
 	if err == nil {
 		t.Error("Expected ClaimJob to fail when no pending jobs exist")
 	}
@@ -426,6 +433,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-ack",
 		IpAddress: mustParseAddr(t, "192.168.5.100"),
 	})
@@ -434,7 +442,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 	}
 
 	// Claim the job for the node.
-	claimedJob, err := db.ClaimJob(ctx, node.ID)
+	claimedJob, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() failed: %v", err)
 	}
@@ -551,6 +559,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-drained",
 		IpAddress: mustParseAddr(t, "192.168.6.100"),
 	})
@@ -570,7 +579,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	// Note: ClaimJob currently does not check node drained status.
 	// The handler should check this before calling ClaimJob.
 	// For now, we just verify the claim succeeds at the DB level.
-	claimedJob, err := db.ClaimJob(ctx, node.ID)
+	claimedJob, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		// If the claim fails, that's acceptable (the query might have been updated).
 		t.Logf("ClaimJob for drained node failed as expected: %v", err)
@@ -627,6 +636,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-undrained",
 		IpAddress: mustParseAddr(t, "192.168.7.100"),
 	})
@@ -635,7 +645,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	}
 
 	// Now the node should be able to claim the job.
-	claimedJob, err := db.ClaimJob(ctx, node.ID)
+	claimedJob, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() failed: %v", err)
 	}
@@ -647,7 +657,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	if claimedJob.Status != JobStatusRunning {
 		t.Errorf("Expected status assigned, got %s", claimedJob.Status)
 	}
-	if !claimedJob.NodeID.Valid || claimedJob.NodeID.Bytes != node.ID.Bytes {
+	if claimedJob.NodeID == nil || *claimedJob.NodeID != node.ID {
 		t.Errorf("Expected node_id %v, got %v", node.ID, claimedJob.NodeID)
 	}
 }
@@ -740,6 +750,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-step-order",
 		IpAddress: mustParseAddr(t, "192.168.10.100"),
 	})
@@ -748,7 +759,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	// Claim jobs and verify they come in step_index order (1000, 2000, 3000).
-	claimed1, err := db.ClaimJob(ctx, node.ID)
+	claimed1, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() 1 failed: %v", err)
 	}
@@ -756,7 +767,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Errorf("Expected first claim to get job1 (step_index=1000), got job with step_index=%v", claimed1.StepIndex)
 	}
 
-	claimed2, err := db.ClaimJob(ctx, node.ID)
+	claimed2, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() 2 failed: %v", err)
 	}
@@ -764,7 +775,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Errorf("Expected second claim to get job2 (step_index=2000), got job with step_index=%v", claimed2.StepIndex)
 	}
 
-	claimed3, err := db.ClaimJob(ctx, node.ID)
+	claimed3, err := db.ClaimJob(ctx, &node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() 3 failed: %v", err)
 	}
@@ -818,6 +829,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
+		ID:        types.NewNodeKey(),
 		Name:      "test-node-only-pending",
 		IpAddress: mustParseAddr(t, "192.168.11.100"),
 	})
@@ -826,7 +838,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	}
 
 	// Attempt to claim a job. Should fail because the only job is already running.
-	_, err = db.ClaimJob(ctx, node.ID)
+	_, err = db.ClaimJob(ctx, &node.ID)
 	if err == nil {
 		t.Error("Expected ClaimJob to fail when no pending jobs exist, but it succeeded")
 	}

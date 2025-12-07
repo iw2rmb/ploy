@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -36,17 +35,18 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, statsJSON []byte) {
 		// Set up job for GetJob lookup (job_id-based).
+		nodeIDStr := nodeID.String()
 		job := store.Job{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        jobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning,
 			StepIndex: 1000,
 		}
 		st := &mockStore{
-			getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+			getNodeResult: store.Node{ID: nodeID.String()},
 			getRunResult: store.Run{
-				ID:     pgtype.UUID{Bytes: runID, Valid: true},
+				ID:     runID.String(),
 				Status: store.RunStatusRunning,
 			},
 			getJobResult:        job,

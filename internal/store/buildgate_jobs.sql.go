@@ -38,7 +38,7 @@ WHERE bg.id = cte.id
 RETURNING bg.id, bg.request_payload, bg.status, bg.node_id, bg.result, bg.error, bg.created_at, bg.started_at, bg.finished_at
 `
 
-func (q *Queries) ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error) {
+func (q *Queries) ClaimBuildGateJob(ctx context.Context, nodeID *string) (BuildgateJob, error) {
 	row := q.db.QueryRow(ctx, claimBuildGateJob, nodeID)
 	var i BuildgateJob
 	err := row.Scan(

@@ -9,10 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -25,9 +23,10 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
+		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
+		nodeID := strings.TrimSpace(nodeIDStr)
+		if nodeID == "" {
+			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
 			return
 		}
 
@@ -71,9 +70,10 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
+		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
+		nodeID := strings.TrimSpace(nodeIDStr)
+		if nodeID == "" {
+			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
 			return
 		}
 
@@ -143,7 +143,7 @@ func listNodesHandler(st store.Store) http.HandlerFunc {
 		resp := make([]nodeResponse, 0, len(nodes))
 		for _, node := range nodes {
 			nr := nodeResponse{
-				ID:              uuid.UUID(node.ID.Bytes).String(),
+				ID:              node.ID, // Node ID is now a NanoID(6) string.
 				Name:            node.Name,
 				IPAddress:       node.IpAddress.String(),
 				Version:         node.Version,

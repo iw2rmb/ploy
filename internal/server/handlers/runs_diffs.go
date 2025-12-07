@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -28,11 +27,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
-		runUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
-			return
-		}
+		runID := runIDStr
 
 		if r.ContentLength > maxBodySize {
 			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
@@ -64,14 +59,9 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate job belongs to run if provided.
-		var jobID pgtype.UUID
+		var jobID *string
 		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			jobUUID, err := uuid.Parse(*req.JobID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid job_id: %v", err), http.StatusBadRequest)
-				return
-			}
-			job, err := st.GetJob(r.Context(), pgtype.UUID{Bytes: jobUUID, Valid: true})
+			job, err := st.GetJob(r.Context(), *req.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					http.Error(w, "job not found", http.StatusNotFound)
@@ -81,15 +71,15 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 				slog.Error("run diff: job check failed", "job_id", *req.JobID, "err", err)
 				return
 			}
-			if uuid.UUID(job.RunID.Bytes) != runUUID {
+			if job.RunID != runID {
 				http.Error(w, "job does not belong to run", http.StatusBadRequest)
 				return
 			}
-			jobID = job.ID
+			jobID = &job.ID
 		}
 
 		// Ensure the run exists.
-		if _, err := st.GetRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true}); err != nil {
+		if _, err := st.GetRun(r.Context(), runID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
 				return
@@ -105,7 +95,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 		params := store.CreateDiffParams{
-			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
+			RunID:   runID,
 			JobID:   jobID,
 			Patch:   req.Patch,
 			Summary: summaryBytes,

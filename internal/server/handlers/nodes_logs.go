@@ -9,9 +9,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -33,13 +31,6 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		nodeIDStr := r.PathValue("id")
 		if strings.TrimSpace(nodeIDStr) == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate node_id.
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -78,13 +69,6 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		// Validate run_id is a valid UUID.
-		runID := domaintypes.ToPGUUID(req.RunID)
-		if !runID.Valid {
-			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		// Validate data is not empty.
 		if len(req.Data) == 0 {
 			http.Error(w, "data is required and must not be empty", http.StatusBadRequest)
@@ -99,7 +83,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		// Check if the node exists before processing.
 		var err error
-		_, err = st.GetNode(r.Context(), nodeID)
+		_, err = st.GetNode(r.Context(), nodeIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -111,28 +95,22 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		// Parse job_id if provided.
-		var jobID pgtype.UUID
+		var jobID *string
 		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			jobID = domaintypes.ToPGUUID(*req.JobID)
-			if !jobID.Valid {
-				http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
-				return
-			}
+			jobIDStr := strings.TrimSpace(*req.JobID)
+			jobID = &jobIDStr
 		}
 
 		// Parse build_id if provided.
-		var buildID pgtype.UUID
+		var buildID *string
 		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
-			buildID = domaintypes.ToPGUUID(*req.BuildID)
-			if !buildID.Valid {
-				http.Error(w, "invalid build_id: invalid uuid", http.StatusBadRequest)
-				return
-			}
+			buildIDStr := strings.TrimSpace(*req.BuildID)
+			buildID = &buildIDStr
 		}
 
 		// Store the gzipped log chunk in the database.
 		params := store.CreateLogParams{
-			RunID:   runID,
+			RunID:   req.RunID,
 			JobID:   jobID,
 			BuildID: buildID,
 			ChunkNo: req.ChunkNo,

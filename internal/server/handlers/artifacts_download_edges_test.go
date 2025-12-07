@@ -44,7 +44,7 @@ func TestGetArtifactHandler_Metadata_Fields(t *testing.T) {
 	run := uuid.New()
 	st := &mockStore{getArtifactBundleResult: store.ArtifactBundle{
 		ID:    pgtype.UUID{Bytes: id, Valid: true},
-		RunID: pgtype.UUID{Bytes: run, Valid: true},
+		RunID: run.String(),
 		// no CreatedAt valid timestamp here; handler should omit formatting without panicking
 		Bundle: []byte("x"),
 	}}

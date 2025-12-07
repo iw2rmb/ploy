@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -92,10 +91,10 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			issuedBy = &identity.CommonName
 		}
 
-		// Parse node_id to UUID.
-		nodeID := domaintypes.ToPGUUID(req.NodeID)
-		if !nodeID.Valid {
-			http.Error(w, "invalid node_id: must be a valid UUID", http.StatusBadRequest)
+		// Validate node_id is non-empty (now NanoID(6) string).
+		nodeID := strings.TrimSpace(req.NodeID)
+		if nodeID == "" {
+			http.Error(w, "invalid node_id: must be a non-empty string", http.StatusBadRequest)
 			return
 		}
 
@@ -103,7 +102,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		err = st.InsertBootstrapToken(r.Context(), store.InsertBootstrapTokenParams{
 			TokenHash: tokenHash,
 			TokenID:   claims.ID,
-			NodeID:    nodeID,
+			NodeID:    &nodeID,
 			ClusterID: &clusterID,
 			IssuedAt:  pgtype.Timestamptz{Time: now, Valid: true},
 			ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
@@ -269,24 +268,26 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		// Register node in database if it doesn't exist yet.
 		// Use the node_id from the bootstrap token and default values for other fields.
-		nodeUUID := domaintypes.ToPGUUID(claims.NodeID)
-		if !nodeUUID.Valid {
+		// Node IDs are now NanoID(6) strings; validate non-empty.
+		nodeIDStr := strings.TrimSpace(claims.NodeID)
+		if nodeIDStr == "" {
 			http.Error(w, "invalid node_id in token", http.StatusInternalServerError)
 			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID)
 			return
 		}
 
 		// Check if node already exists
-		_, err = st.GetNode(r.Context(), nodeUUID)
+		_, err = st.GetNode(r.Context(), nodeIDStr)
 		if err != nil {
-			// Node doesn't exist, create it with default values
+			// Node doesn't exist, create it with default values.
+			// CreateNode now requires an app-supplied ID (NanoID-backed).
 			ipAddr, _ := netip.ParseAddr("0.0.0.0")
-			_, err = st.InsertNodeWithID(r.Context(), store.InsertNodeWithIDParams{
-				ID:          nodeUUID,
-				Name:        "node-" + claims.NodeID[:8], // Use first 8 chars of UUID as name
-				IpAddress:   ipAddr,                      // Placeholder IP, will be updated on first heartbeat
-				Version:     nil,                         // Will be updated on first heartbeat
-				Concurrency: 1,                           // Default concurrency
+			_, err = st.CreateNode(r.Context(), store.CreateNodeParams{
+				ID:          nodeIDStr,
+				Name:        "node-" + nodeIDStr, // Use node ID as name suffix
+				IpAddress:   ipAddr,              // Placeholder IP, will be updated on first heartbeat
+				Version:     nil,                 // Will be updated on first heartbeat
+				Concurrency: 1,                   // Default concurrency
 			})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to register node: %v", err), http.StatusInternalServerError)

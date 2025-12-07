@@ -115,7 +115,7 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 			RetryBackoff: *flags.RetryWait,
 		},
 		BaseURL:    base,
-		Ticket:     runID,
+		RunID:      runID,
 		Output:     stderr,
 		LogPrinter: logPrinter, // Wire unified logs into follow mode.
 	}

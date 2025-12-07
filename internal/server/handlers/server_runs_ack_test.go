@@ -28,18 +28,19 @@ func TestAckJobStart_Success(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:     runID.String(),
+			NodeID: &nodeIDStr,
 			Status: store.RunStatusQueued,
 		},
 		getJobResult: store.Job{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:     jobID.String(),
+			RunID:  runID.String(),
+			NodeID: &nodeIDStr,
 			Name:   "mod-0",
 			Status: store.JobStatusRunning, // Jobs go directly to running on claim
 		},
@@ -75,17 +76,18 @@ func TestAckJobStart_WrongNode(t *testing.T) {
 	otherNode := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	otherNodeStr := otherNode.String()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusQueued,
 		},
 		getJobResult: store.Job{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: otherNode, Valid: true}, // Different node
+			ID:     jobID.String(),
+			RunID:  runID.String(),
+			NodeID: &otherNodeStr, // Different node
 			Name:   "mod-0",
 			Status: store.JobStatusRunning, // Jobs go directly to running on claim
 		},
@@ -117,17 +119,18 @@ func TestAckJobStart_WrongStatus(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult: store.Job{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:     jobID.String(),
+			RunID:  runID.String(),
+			NodeID: &nodeIDStr,
 			Name:   "mod-0",
 			Status: store.JobStatusSucceeded, // Job already completed, not running
 		},
@@ -161,9 +164,9 @@ func TestAckJobStart_JobNotFound(t *testing.T) {
 	jobID := uuid.New()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusQueued,
 		},
 		getJobErr: pgx.ErrNoRows, // Job not found
@@ -196,17 +199,18 @@ func TestAckJobStart_JobRunMismatch(t *testing.T) {
 	runID := uuid.New()
 	otherRunID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusQueued,
 		},
 		getJobResult: store.Job{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: otherRunID, Valid: true}, // Different run
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:     jobID.String(),
+			RunID:  otherRunID.String(), // Different run
+			NodeID: &nodeIDStr,
 			Name:   "mod-0",
 			Status: store.JobStatusRunning, // Jobs go directly to running on claim
 		},
@@ -264,20 +268,21 @@ func TestAckJobStart_PublishesEvent(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	now := time.Now()
+	nodeIDStr := nodeID.String()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.RunStatusQueued,
 			RepoUrl:   "https://github.com/user/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		getJobResult: store.Job{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:     jobID.String(),
+			RunID:  runID.String(),
+			NodeID: &nodeIDStr,
 			Name:   "pre-gate",
 			Status: store.JobStatusRunning, // Jobs go directly to running on claim
 		},

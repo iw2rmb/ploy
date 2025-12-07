@@ -21,15 +21,15 @@ func TestInspectCommand_Run(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		ticket         modsapi.TicketSummary
+		ticket         modsapi.RunSummary
 		wantSubstrings []string
 		wantMissing    []string
 	}{
 		{
 			name: "basic ticket with MR and gate",
-			ticket: modsapi.TicketSummary{
+			ticket: modsapi.RunSummary{
 				TicketID: domaintypes.TicketID("mods-abc123"),
-				State:    modsapi.TicketStateRunning,
+				State:    modsapi.RunStateRunning,
 				Metadata: map[string]string{
 					"mr_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
 					"gate_summary": "failed pre-gate duration=567ms",
@@ -45,9 +45,9 @@ func TestInspectCommand_Run(t *testing.T) {
 		},
 		{
 			name: "ticket with job graph",
-			ticket: modsapi.TicketSummary{
+			ticket: modsapi.RunSummary{
 				TicketID: domaintypes.TicketID("mods-def456"),
-				State:    modsapi.TicketStateSucceeded,
+				State:    modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
 					"gate_summary": "passed duration=1234ms",
 				},
@@ -79,9 +79,9 @@ func TestInspectCommand_Run(t *testing.T) {
 		},
 		{
 			name: "ticket with healing jobs at midpoint indices",
-			ticket: modsapi.TicketSummary{
+			ticket: modsapi.RunSummary{
 				TicketID: domaintypes.TicketID("mods-heal789"),
-				State:    modsapi.TicketStateRunning,
+				State:    modsapi.RunStateRunning,
 				Metadata: map[string]string{
 					"gate_summary": "failed pre-gate duration=200ms",
 				},
@@ -112,9 +112,9 @@ func TestInspectCommand_Run(t *testing.T) {
 		},
 		{
 			name: "ticket without MR or gate",
-			ticket: modsapi.TicketSummary{
+			ticket: modsapi.RunSummary{
 				TicketID:  domaintypes.TicketID("mods-minimal"),
-				State:     modsapi.TicketStatePending,
+				State:     modsapi.RunStatePending,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			},
@@ -129,9 +129,9 @@ func TestInspectCommand_Run(t *testing.T) {
 		},
 		{
 			name: "ticket with empty stages map",
-			ticket: modsapi.TicketSummary{
+			ticket: modsapi.RunSummary{
 				TicketID:  domaintypes.TicketID("mods-empty"),
-				State:     modsapi.TicketStateRunning,
+				State:     modsapi.RunStateRunning,
 				Stages:    map[string]modsapi.StageStatus{},
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
@@ -151,7 +151,7 @@ func TestInspectCommand_Run(t *testing.T) {
 
 			// Set up mock server returning the test ticket.
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := modsapi.TicketStatusResponse{Ticket: tc.ticket}
+				resp := modsapi.RunStatusResponse{Ticket: tc.ticket}
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(resp)
 			}))
@@ -280,9 +280,9 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	t.Parallel()
 
 	// Jobs with out-of-order step indices to verify sorting.
-	ticket := modsapi.TicketSummary{
+	ticket := modsapi.RunSummary{
 		TicketID: domaintypes.TicketID("mods-sort"),
-		State:    modsapi.TicketStateSucceeded,
+		State:    modsapi.RunStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
 			"zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz": {State: modsapi.StageStateSucceeded, StepIndex: 3000},
 			"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": {State: modsapi.StageStateSucceeded, StepIndex: 1000},
@@ -293,7 +293,7 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := modsapi.TicketStatusResponse{Ticket: ticket}
+		resp := modsapi.RunStatusResponse{Ticket: ticket}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))

@@ -28,7 +28,7 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:            nodeID.String(),
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -61,17 +61,18 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 }
 
 // TestDrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
+// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are invalid.
 func TestDrainNodeHandlerInvalidID(t *testing.T) {
 	st := &mockStore{}
 	handler := drainNodeHandler(st)
 
+	// Note: "not-a-uuid" is now a valid NanoID string, so we only test empty/whitespace.
 	cases := []struct {
 		name  string
 		id    string
 		urlID string
 	}{
 		{"empty id", "", "x"},
-		{"invalid uuid", "not-a-uuid", "not-a-uuid"},
 		{"whitespace", "   ", "x"},
 	}
 
@@ -119,7 +120,7 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:            nodeID.String(),
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -154,7 +155,7 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:            nodeID.String(),
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -187,17 +188,19 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 }
 
 // TestUndrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
+// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are invalid.
 func TestUndrainNodeHandlerInvalidID(t *testing.T) {
 	st := &mockStore{}
 	handler := undrainNodeHandler(st)
 
+	// Note: "not-a-uuid" is now a valid NanoID string, so we only test empty/whitespace.
 	cases := []struct {
 		name  string
 		id    string
 		urlID string
 	}{
 		{"empty id", "", "x"},
-		{"invalid uuid", "not-a-uuid", "not-a-uuid"},
+		{"whitespace", "   ", "x"},
 	}
 
 	for _, tc := range cases {
@@ -244,7 +247,7 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:            nodeID.String(),
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -281,7 +284,7 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	st := &mockStore{
 		listNodesResult: []store.Node{
 			{
-				ID:              pgtype.UUID{Bytes: node1ID, Valid: true},
+				ID:              node1ID.String(),
 				Name:            "worker-1",
 				IpAddress:       netip.MustParseAddr("10.0.0.1"),
 				Version:         strPtr("v1.0.0"),
@@ -301,7 +304,7 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 				CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
 			},
 			{
-				ID:             pgtype.UUID{Bytes: node2ID, Valid: true},
+				ID:             node2ID.String(),
 				Name:           "worker-2",
 				IpAddress:      netip.MustParseAddr("10.0.0.2"),
 				Concurrency:    2,

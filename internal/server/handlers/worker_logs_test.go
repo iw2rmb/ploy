@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -135,11 +134,11 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 	if !mockStore.logCreated {
 		t.Fatal("log was not created in store")
 	}
-	if !mockStore.lastCreateLog.BuildID.Valid {
-		t.Fatal("expected BuildID to be set and valid")
+	if mockStore.lastCreateLog.BuildID == nil {
+		t.Fatal("expected BuildID to be set")
 	}
-	if uuid.UUID(mockStore.lastCreateLog.BuildID.Bytes).String() != buildID {
-		t.Fatalf("BuildID mismatch: got %s, want %s", uuid.UUID(mockStore.lastCreateLog.BuildID.Bytes).String(), buildID)
+	if *mockStore.lastCreateLog.BuildID != buildID {
+		t.Fatalf("BuildID mismatch: got %s, want %s", *mockStore.lastCreateLog.BuildID, buildID)
 	}
 }
 
@@ -332,7 +331,7 @@ type mockStoreForLogs struct {
 	lastCreateLog store.CreateLogParams
 }
 
-func (m *mockStoreForLogs) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
+func (m *mockStoreForLogs) GetNode(ctx context.Context, id string) (store.Node, error) {
 	if !m.nodeExists {
 		return store.Node{}, pgx.ErrNoRows
 	}

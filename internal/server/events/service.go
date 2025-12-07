@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -290,23 +289,22 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 	}
 
 	// job.ID is now a string (KSUID-backed).
-	// job.NodeID is still pgtype.UUID (node IDs not migrated in this task).
+	// job.NodeID is now *string (NanoID-backed after node ID migration).
 	return jobContext{
-		NodeID:    uuidToString(job.NodeID),
+		NodeID:    stringPtrToString(job.NodeID),
 		JobID:     job.ID,
 		ModType:   job.ModType,
 		StepIndex: int(job.StepIndex),
 	}
 }
 
-// uuidToString converts a pgtype.UUID to its string representation.
-// Returns empty string if the UUID is invalid or null.
-// NOTE: Used for node_id which is still UUID; run/job/build IDs are now strings.
-func uuidToString(id pgtype.UUID) string {
-	if !id.Valid {
+// stringPtrToString dereferences a *string, returning empty string if nil.
+// Used for nullable TEXT fields like node_id (now NanoID-backed strings).
+func stringPtrToString(s *string) string {
+	if s == nil {
 		return ""
 	}
-	return uuid.UUID(id.Bytes).String()
+	return *s
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.

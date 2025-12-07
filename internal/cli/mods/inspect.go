@@ -55,7 +55,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("mods inspect: %s", msg)
 	}
-	var payload modsapi.TicketStatusResponse
+	var payload modsapi.RunStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return err
 	}

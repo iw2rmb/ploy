@@ -227,7 +227,7 @@ type BootstrapToken struct {
 	ID           pgtype.UUID        `json:"id"`
 	TokenHash    string             `json:"token_hash"`
 	TokenID      string             `json:"token_id"`
-	NodeID       pgtype.UUID        `json:"node_id"`
+	NodeID       *string            `json:"node_id"`
 	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
@@ -254,7 +254,7 @@ type BuildgateJob struct {
 	ID             pgtype.UUID        `json:"id"`
 	RequestPayload []byte             `json:"request_payload"`
 	Status         BuildgateJobStatus `json:"status"`
-	NodeID         pgtype.UUID        `json:"node_id"`
+	NodeID         *string            `json:"node_id"`
 	Result         []byte             `json:"result"`
 	Error          *string            `json:"error"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -289,7 +289,7 @@ type Job struct {
 	ModType    string             `json:"mod_type"`
 	ModImage   string             `json:"mod_image"`
 	StepIndex  float64            `json:"step_index"`
-	NodeID     pgtype.UUID        `json:"node_id"`
+	NodeID     *string            `json:"node_id"`
 	ExitCode   *int32             `json:"exit_code"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
@@ -308,7 +308,7 @@ type Log struct {
 }
 
 type Node struct {
-	ID              pgtype.UUID        `json:"id"`
+	ID              string             `json:"id"`
 	Name            string             `json:"name"`
 	IpAddress       netip.Addr         `json:"ip_address"`
 	Version         *string            `json:"version"`
@@ -330,7 +330,7 @@ type Node struct {
 
 type NodeMetric struct {
 	ID             int64              `json:"id"`
-	NodeID         pgtype.UUID        `json:"node_id"`
+	NodeID         string             `json:"node_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	CpuTotalMillis int32              `json:"cpu_total_millis"`
 	CpuFreeMillis  int32              `json:"cpu_free_millis"`
@@ -350,7 +350,7 @@ type Run struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	NodeID     pgtype.UUID        `json:"node_id"`
+	NodeID     *string            `json:"node_id"`
 	BaseRef    string             `json:"base_ref"`
 	TargetRef  string             `json:"target_ref"`
 	CommitSha  *string            `json:"commit_sha"`
