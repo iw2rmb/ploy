@@ -52,6 +52,10 @@ func TestGenerateClusterID(t *testing.T) {
 	})
 }
 
+// nanoIDAlphabet is the URL-safe alphabet used by NewNodeKey().
+// Matches the alphabet defined in internal/domain/types/idgen.go.
+const nanoIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
+
 func TestGenerateNodeID(t *testing.T) {
 	t.Run("generates valid node ID", func(t *testing.T) {
 		id, err := GenerateNodeID()
@@ -59,25 +63,16 @@ func TestGenerateNodeID(t *testing.T) {
 			t.Fatalf("GenerateNodeID() error = %v, want nil", err)
 		}
 
-		if !strings.HasPrefix(id, "node-") {
-			t.Errorf("GenerateNodeID() = %q, want prefix 'node-'", id)
+		// NanoID(6) format: 6 characters from URL-safe alphabet.
+		// Total length should be exactly 6.
+		if len(id) != 6 {
+			t.Errorf("GenerateNodeID() length = %d, want 6", len(id))
 		}
 
-		// Expect format: node-<16 hex chars>
-		// Total length should be 5 ("node-") + 16 = 21
-		if len(id) != 21 {
-			t.Errorf("GenerateNodeID() length = %d, want 21", len(id))
-		}
-
-		// Extract hex part and validate it's hex
-		hexPart := strings.TrimPrefix(id, "node-")
-		if len(hexPart) != 16 {
-			t.Errorf("hex part length = %d, want 16", len(hexPart))
-		}
-
-		for _, c := range hexPart {
-			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-				t.Errorf("invalid hex character %q in node ID %q", c, id)
+		// Validate all characters are from the NanoID URL-safe alphabet.
+		for _, c := range id {
+			if !strings.ContainsRune(nanoIDAlphabet, c) {
+				t.Errorf("invalid character %q in node ID %q; expected URL-safe alphabet", c, id)
 			}
 		}
 	})

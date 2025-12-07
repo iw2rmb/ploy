@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -133,9 +132,10 @@ func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler
 			}
 
 			// For worker-role callers using mutating methods, require explicit
-			// node UUID header so node identity is always available to downstream
+			// node ID header so node identity is always available to downstream
 			// handlers regardless of auth mechanism (mTLS or bearer). Skip this
 			// enforcement in insecure mode to preserve local test behaviors.
+			// Note: Node IDs are now NanoID(6) strings (6 characters from URL-safe alphabet).
 			if !a.allowInsecure &&
 				identity.Role == RoleWorker &&
 				(r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete) &&
@@ -147,8 +147,12 @@ func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler
 					http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 					return
 				}
-				if _, err := uuid.Parse(nodeHeader); err != nil {
-					http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
+				// Validate NanoID format: must be non-empty string.
+				// NanoID(6) uses URL-safe alphabet (A-Za-z0-9_-) but we don't
+				// enforce strict character validation here since the store layer
+				// will reject invalid node IDs on lookup.
+				if len(nodeHeader) == 0 {
+					http.Error(w, "invalid PLOY_NODE_UUID header: empty value", http.StatusBadRequest)
 					return
 				}
 			}

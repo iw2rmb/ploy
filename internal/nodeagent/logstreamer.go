@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -185,11 +183,9 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		return nil
 	}
 
-	// Parse node ID from config.
-	nodeID, err := uuid.Parse(ls.cfg.NodeID)
-	if err != nil {
-		return fmt.Errorf("parse node id: %w", err)
-	}
+	// Use cfg.NodeID directly as a string. Node IDs are NanoID(6) strings
+	// that don't require UUID parsing.
+	nodeID := ls.cfg.NodeID
 
 	// Prepare request payload.
 	payload := struct {
@@ -211,8 +207,8 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		return fmt.Errorf("marshal payload: %w", err)
 	}
 
-	// Send to server endpoint.
-	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
+	// Send to server endpoint using the node ID string directly.
+	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID)
 	// Per-request timeout; no struct-stored context.
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {

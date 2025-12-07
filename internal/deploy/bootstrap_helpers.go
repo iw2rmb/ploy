@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // This file contains bootstrap helper utilities shared across provisioning flows.
@@ -67,12 +69,13 @@ func GenerateClusterID() (string, error) {
 	return fmt.Sprintf("cluster-%s", hexPart), nil
 }
 
-// GenerateNodeID creates a new node identifier using random bytes.
-// Returns a string in the format "node-<16 hex chars>".
+// GenerateNodeID creates a new node identifier using NanoID(6).
+// Returns a 6-character NanoID string using the URL-safe alphabet.
+// The compact format balances brevity with sufficient uniqueness for
+// typical cluster sizes while being human-friendly for display in URLs
+// and CLI output.
 func GenerateNodeID() (string, error) {
-	hexPart, err := RandomHexString(16)
-	if err != nil {
-		return "", fmt.Errorf("generate node id: %w", err)
-	}
-	return fmt.Sprintf("node-%s", hexPart), nil
+	// types.NewNodeKey() uses NanoID with a URL-safe alphabet (A-Za-z0-9_-)
+	// and generates a 6-character identifier suitable for node IDs.
+	return types.NewNodeKey(), nil
 }
