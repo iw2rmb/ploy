@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -112,18 +111,14 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
-		// NOTE: node IDs are still UUID (not migrated in this task).
+		// Node IDs are now NanoID(6) strings; validate non-empty and match job assignment.
 		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeader == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.ToPGUUID(nodeIDHeader)
-		if !nodeID.Valid {
-			http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
-			return
-		}
-		if !job.NodeID.Valid || job.NodeID != nodeID {
+		// job.NodeID is *string after node ID migration.
+		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
 		}

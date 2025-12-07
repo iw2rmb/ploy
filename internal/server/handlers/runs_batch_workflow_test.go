@@ -24,10 +24,11 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 	sampleBatchRunID := uuid.New()
 	sampleExecutionRunID := uuid.New()
 
+	executionRunIDStr := sampleExecutionRunID.String()
 	linkedRunRepo := store.RunRepo{
-		ID:             pgtype.UUID{Bytes: sampleRunRepoID, Valid: true},
-		RunID:          pgtype.UUID{Bytes: sampleBatchRunID, Valid: true},
-		ExecutionRunID: pgtype.UUID{Bytes: sampleExecutionRunID, Valid: true},
+		ID:             sampleRunRepoID.String(),
+		RunID:          sampleBatchRunID.String(),
+		ExecutionRunID: &executionRunIDStr,
 		RepoUrl:        "https://github.com/example/repo.git",
 		Status:         store.RunRepoStatusRunning,
 		Attempt:        1,
@@ -100,7 +101,7 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 				updateRunRepoStatusErr:         tc.mockUpdateErr,
 			}
 
-			execRunID := pgtype.UUID{Bytes: sampleExecutionRunID, Valid: true}
+			execRunID := sampleExecutionRunID.String()
 			err := maybeUpdateRunRepoFromExecution(context.Background(), m, execRunID, tc.runStatus)
 
 			if tc.wantErr {
@@ -153,7 +154,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 
 	// Batch run (parent) with queued status.
 	batchRun := store.Run{
-		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        batchRunID.String(),
 		Name:      ptrString("integration-batch"),
 		RepoUrl:   "https://github.com/batch/placeholder.git",
 		Status:    store.RunStatusQueued,
@@ -166,8 +167,8 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 
 	// Run repos representing individual repositories in the batch.
 	pendingRepo1 := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: repo1ID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        repo1ID.String(),
+		RunID:     batchRunID.String(),
 		RepoUrl:   "https://github.com/org/repo1.git",
 		BaseRef:   "main",
 		TargetRef: "feature-1",
@@ -177,8 +178,8 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 	}
 
 	pendingRepo2 := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: repo2ID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        repo2ID.String(),
+		RunID:     batchRunID.String(),
 		RepoUrl:   "https://github.com/org/repo2.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -189,7 +190,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 
 	// Child runs created when batch execution starts.
 	childRun1 := store.Run{
-		ID:        pgtype.UUID{Bytes: childRun1ID, Valid: true},
+		ID:        childRun1ID.String(),
 		RepoUrl:   "https://github.com/org/repo1.git",
 		Status:    store.RunStatusQueued,
 		BaseRef:   "main",
@@ -389,7 +390,7 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 	unknownID := uuid.New()
 
 	runningRun := store.Run{
-		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        batchRunID.String(),
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/batch/placeholder.git",
 		Status:    store.RunStatusRunning,
@@ -400,8 +401,8 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 	}
 
 	failedRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        repoID.String(),
+		RunID:     batchRunID.String(),
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusFailed,
 		Attempt:   1,
@@ -409,8 +410,8 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 	}
 
 	runningRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        repoID.String(),
+		RunID:     batchRunID.String(),
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusRunning,
 		Attempt:   1,
@@ -466,8 +467,8 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 		m := &mockStore{
 			getRunResult: runningRun,
 			getRunRepoResult: store.RunRepo{
-				ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-				RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+				ID:        repoID.String(),
+				RunID:     batchRunID.String(),
 				Status:    store.RunRepoStatusPending,
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},

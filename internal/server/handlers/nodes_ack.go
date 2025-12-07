@@ -29,13 +29,6 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Parse and validate node_id.
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		// Decode request body to get run_id and job_id.
 		var req struct {
 			RunID domaintypes.RunID `json:"run_id"`
@@ -59,23 +52,9 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Parse and validate run_id.
-		runID := domaintypes.ToPGUUID(req.RunID.String())
-		if !runID.Valid {
-			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate job_id.
-		jobID := domaintypes.ToPGUUID(req.JobID.String())
-		if !jobID.Valid {
-			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		var err error
 		// Verify node exists before attempting to acknowledge.
-		_, err = st.GetNode(r.Context(), nodeID)
+		_, err = st.GetNode(r.Context(), nodeIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -87,7 +66,7 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify run exists.
-		run, err := st.GetRun(r.Context(), runID)
+		run, err := st.GetRun(r.Context(), req.RunID.String())
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -99,7 +78,7 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Get the job and verify it belongs to the run and is assigned to this node.
-		job, err := st.GetJob(r.Context(), jobID)
+		job, err := st.GetJob(r.Context(), req.JobID.String())
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -111,13 +90,13 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify the job belongs to the specified run.
-		if job.RunID != runID {
+		if job.RunID != req.RunID.String() {
 			http.Error(w, "job does not belong to this run", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the job is assigned to the requesting node.
-		if !job.NodeID.Valid || job.NodeID != nodeID {
+		if job.NodeID == nil || *job.NodeID != nodeIDStr {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
 		}
@@ -133,7 +112,7 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Transition run status to 'running' if it's still queued or assigned.
 		// AckRunStart is idempotent and only updates if status allows transition.
-		_ = st.AckRunStart(r.Context(), runID)
+		_ = st.AckRunStart(r.Context(), req.RunID.String())
 
 		slog.Info("job start acknowledged",
 			"run_id", req.RunID,
@@ -145,9 +124,9 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Publish running event to SSE hub.
 		if eventsService != nil {
-			ticketSummary := modsapi.TicketSummary{
+			ticketSummary := modsapi.RunSummary{
 				TicketID:   domaintypes.TicketID(req.RunID.String()),
-				State:      modsapi.TicketStateRunning,
+				State:      modsapi.RunStateRunning,
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  time.Now().UTC(),

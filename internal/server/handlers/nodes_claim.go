@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -35,10 +34,10 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Parse and validate node_id.
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
+		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
+		nodeID := strings.TrimSpace(nodeIDStr)
+		if nodeID == "" {
+			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
 			return
 		}
 
@@ -55,8 +54,8 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Claim the next pending job.
-		job, err := st.ClaimJob(r.Context(), nodeID)
+		// Claim the next pending job. ClaimJob expects *string for nullable FK.
+		job, err := st.ClaimJob(r.Context(), &nodeID)
 		if err != nil {
 			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -69,27 +68,27 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Fetch parent run metadata.
+		// Fetch parent run metadata. Run IDs are KSUID strings.
 		run, err := st.GetRun(r.Context(), job.RunID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
-			slog.Error("claim: get run failed for job", "node_id", nodeIDStr, "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
+			slog.Error("claim: get run failed for job", "node_id", nodeIDStr, "job_id", job.ID, "err", err)
 			return
 		}
 
 		// Transition run to 'running' if it's still queued.
 		if run.Status == store.RunStatusQueued {
 			if err := st.AckRunStart(r.Context(), run.ID); err != nil {
-				slog.Warn("claim: failed to ack run start", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+				slog.Warn("claim: failed to ack run start", "run_id", run.ID, "err", err)
 			}
 		}
 
 		// Build and send response with job and run information.
 		buildAndSendJobClaimResponse(w, r, configHolder, run, job)
 		slog.Info("job claimed",
-			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"job_id", job.ID, // Job IDs are KSUID strings.
 			"job_name", job.Name,
-			"run_id", uuid.UUID(run.ID.Bytes).String(),
+			"run_id", run.ID, // Run IDs are KSUID strings.
 			"step_index", job.StepIndex,
 			"node_id", nodeIDStr,
 		)
@@ -105,8 +104,8 @@ func buildAndSendJobClaimResponse(
 	job store.Job,
 ) {
 	// Merge job_id into spec for downstream execution.
-	jobIDStr := uuid.UUID(job.ID.Bytes).String()
-	mergedSpec := mergeJobIDIntoSpec(run.Spec, jobIDStr)
+	// Job IDs are now KSUID strings.
+	mergedSpec := mergeJobIDIntoSpec(run.Spec, job.ID)
 
 	// For mod jobs (names following "mod-N" pattern), inject a numeric
 	// mod_index derived from job name so the node agent can map this job
@@ -139,15 +138,15 @@ func buildAndSendJobClaimResponse(
 		CreatedAt string                `json:"created_at"`
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
-		ID:        uuid.UUID(run.ID.Bytes).String(),
-		JobID:     jobIDStr,
+		ID:        run.ID, // Run IDs are KSUID strings.
+		JobID:     job.ID, // Job IDs are KSUID strings.
 		JobName:   job.Name,
 		ModType:   job.ModType,
 		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
-		NodeID:    uuid.UUID(job.NodeID.Bytes).String(),
+		NodeID:    stringPtrOrEmpty(job.NodeID), // Node IDs are NanoID strings (nullable).
 		BaseRef:   run.BaseRef,
 		TargetRef: run.TargetRef,
 		CommitSha: run.CommitSha,
@@ -201,4 +200,13 @@ func parseModIndex(name string) (int, error) {
 		return 0, fmt.Errorf("parse mod index from %q: %w", name, err)
 	}
 	return idx, nil
+}
+
+// stringPtrOrEmpty dereferences a *string, returning empty string if nil.
+// Used for nullable TEXT FK fields like node_id.
+func stringPtrOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

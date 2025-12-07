@@ -42,7 +42,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
 	}
-	if uuid.UUID(ms.lastCreate.RunID.Bytes).String() != runID {
+	if ms.lastCreate.RunID != runID {
 		t.Fatalf("runID mismatch")
 	}
 }
@@ -72,10 +72,10 @@ type mockStoreRunDiffs struct {
 	created store.CreateDiffParams
 }
 
-func (m *mockStoreRunDiffs) GetJob(_ context.Context, id pgtype.UUID) (store.Job, error) {
+func (m *mockStoreRunDiffs) GetJob(_ context.Context, id string) (store.Job, error) {
 	return m.job, nil
 }
-func (m *mockStoreRunDiffs) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
+func (m *mockStoreRunDiffs) GetRun(_ context.Context, id string) (store.Run, error) {
 	return m.run, nil
 }
 func (m *mockStoreRunDiffs) CreateDiff(_ context.Context, p store.CreateDiffParams) (store.Diff, error) {
@@ -87,8 +87,8 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	ms := &mockStoreRunDiffs{
-		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
-		run: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
+		job: store.Job{ID: jobID.String(), RunID: runID.String()},
+		run: store.Run{ID: runID.String()},
 	}
 	h := createRunDiffHandler(ms)
 	payload := map[string]any{"job_id": jobID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
@@ -111,10 +111,10 @@ type mockStoreRunArtifacts struct {
 	created store.CreateArtifactBundleParams
 }
 
-func (m *mockStoreRunArtifacts) GetJob(_ context.Context, id pgtype.UUID) (store.Job, error) {
+func (m *mockStoreRunArtifacts) GetJob(_ context.Context, id string) (store.Job, error) {
 	return m.job, nil
 }
-func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
+func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id string) (store.Run, error) {
 	return m.run, nil
 }
 func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
@@ -126,8 +126,8 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
-		run: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
+		job: store.Job{ID: jobID.String(), RunID: runID.String()},
+		run: store.Run{ID: runID.String()},
 	}
 	h := createRunArtifactBundleHandler(ms)
 	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
@@ -146,8 +146,8 @@ func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 	modID := uuid.New()
 	jobID := uuid.New()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: modID, Valid: true}},
-		run: store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
+		job: store.Job{ID: jobID.String(), RunID: modID.String()},
+		run: store.Run{ID: modID.String()},
 	}
 	h := createRunArtifactBundleHandler(ms)
 	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
@@ -165,7 +165,7 @@ func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
 	modID := uuid.New()
 	ms := &mockStoreRunArtifacts{
-		run: store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
+		run: store.Run{ID: modID.String()},
 	}
 	h := createRunArtifactBundleHandler(ms)
 	big := make([]byte, 1<<20+1)
@@ -186,7 +186,7 @@ type mockStoreRunArtifactsNotFound struct {
 	store.Store
 }
 
-func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
+func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id string) (store.Run, error) {
 	return store.Run{}, pgx.ErrNoRows
 }
 

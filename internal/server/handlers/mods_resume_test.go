@@ -20,7 +20,7 @@ func TestResumeTicket_FailedRun(t *testing.T) {
 	jobID := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -28,7 +28,7 @@ func TestResumeTicket_FailedRun(t *testing.T) {
 		},
 		listJobsByRunResult: []store.Job{
 			{
-				ID:         pgtype.UUID{Bytes: jobID, Valid: true},
+				ID:         jobID.String(),
 				Status:     store.JobStatusFailed,
 				StepIndex:  1000,
 				StartedAt:  pgtype.Timestamptz{Time: time.Now().Add(-30 * time.Second), Valid: true},
@@ -81,14 +81,14 @@ func TestResumeTicket_CanceledRun(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusCanceled,
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCanceled, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusCanceled, StepIndex: 1000},
 		},
 	}
 
@@ -124,7 +124,7 @@ func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			id := uuid.New()
-			st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: tt.runStatus}}
+			st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: tt.runStatus}}
 			handler := resumeTicketHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 			req.SetPathValue("id", id.String())
@@ -145,7 +145,7 @@ func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
 func TestResumeTicket_SucceededConflict(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: store.RunStatusSucceeded}}
+	st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: store.RunStatusSucceeded}}
 	handler := resumeTicketHandler(st, nil)
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -156,12 +156,13 @@ func TestResumeTicket_SucceededConflict(t *testing.T) {
 	}
 	// Verify error message follows the invariant format.
 	body := rr.Body.String()
-	if !contains(body, "ticket state=succeeded is not resumable") {
+	if !contains(body, "state=succeeded is not resumable") {
 		t.Fatalf("expected error message with invariant format, got: %s", body)
 	}
 }
 
 // TestResumeTicket_BadID_And_NotFound tests error handling for invalid IDs and missing tickets.
+// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected as invalid.
 func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -171,13 +172,7 @@ func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 		wantStatus int
 		wantBody   string
 	}{
-		{
-			name:       "invalid uuid format",
-			id:         "abc",
-			mockStore:  &mockStore{},
-			wantStatus: http.StatusBadRequest,
-			wantBody:   "invalid id: invalid uuid",
-		},
+		// Note: "abc" is now a valid KSUID string ID, so we removed the "invalid uuid format" test.
 		{
 			name:       "empty id",
 			id:         "",
@@ -197,7 +192,7 @@ func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 			id:         uuid.New().String(),
 			mockStore:  &mockStore{getRunErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
-			wantBody:   "ticket not found",
+			wantBody:   "not found",
 		},
 	}
 
@@ -223,13 +218,13 @@ func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 func TestResumeTicket_PartiallySucceeded(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
-	successJob := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 1000}
-	failedJob := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 2000}
-	createdJob := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCreated, StepIndex: 3000}
+	successJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
+	failedJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 2000}
+	createdJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusCreated, StepIndex: 3000}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -255,8 +250,8 @@ func TestResumeTicket_PartiallySucceeded(t *testing.T) {
 	}
 	// The failed job should be set to 'pending' (it's the first non-succeeded job).
 	call := st.updateJobStatusCalls[0]
-	if uuid.UUID(call.ID.Bytes) != uuid.UUID(failedJob.ID.Bytes) {
-		t.Fatalf("expected failed job to be updated, got %s", uuid.UUID(call.ID.Bytes))
+	if call.ID != failedJob.ID {
+		t.Fatalf("expected failed job to be updated, got %s", call.ID)
 	}
 	if call.Status != store.JobStatusPending {
 		t.Fatalf("expected failed job status pending, got %s", call.Status)
@@ -267,13 +262,13 @@ func TestResumeTicket_PartiallySucceeded(t *testing.T) {
 func TestResumeTicket_MultipleFailedJobs(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
-	job1 := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 1000}
-	job2 := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 2000}
-	job3 := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCanceled, StepIndex: 3000}
+	job1 := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
+	job2 := store.Job{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 2000}
+	job3 := store.Job{ID: uuid.New().String(), Status: store.JobStatusCanceled, StepIndex: 3000}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -300,13 +295,13 @@ func TestResumeTicket_MultipleFailedJobs(t *testing.T) {
 	// First job (job2, failed) should be 'pending', second job (job3, canceled) should be 'created'.
 	statusByJob := make(map[string]store.JobStatus)
 	for _, call := range st.updateJobStatusCalls {
-		statusByJob[uuid.UUID(call.ID.Bytes).String()] = call.Status
+		statusByJob[call.ID] = call.Status
 	}
-	if statusByJob[uuid.UUID(job2.ID.Bytes).String()] != store.JobStatusPending {
-		t.Fatalf("expected job2 to be pending, got %s", statusByJob[uuid.UUID(job2.ID.Bytes).String()])
+	if statusByJob[job2.ID] != store.JobStatusPending {
+		t.Fatalf("expected job2 to be pending, got %s", statusByJob[job2.ID])
 	}
-	if statusByJob[uuid.UUID(job3.ID.Bytes).String()] != store.JobStatusCreated {
-		t.Fatalf("expected job3 to be created, got %s", statusByJob[uuid.UUID(job3.ID.Bytes).String()])
+	if statusByJob[job3.ID] != store.JobStatusCreated {
+		t.Fatalf("expected job3 to be created, got %s", statusByJob[job3.ID])
 	}
 }
 
@@ -316,14 +311,14 @@ func TestResumeTicket_SSEPublish(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -366,14 +361,14 @@ func TestResumeTicket_IdempotentWhenPendingJobExists(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed, // Run is terminal but has a pending job (edge case).
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusPending, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusPending, StepIndex: 1000},
 		},
 	}
 
@@ -400,15 +395,15 @@ func TestResumeTicket_AllJobsSucceeded(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed, // Run is failed but all jobs succeeded (edge case).
 			RepoUrl:    "https://example/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 1000},
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 2000},
+			{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 2000},
 		},
 	}
 
@@ -435,7 +430,7 @@ func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			BaseRef:    "main",
@@ -444,7 +439,7 @@ func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -463,9 +458,9 @@ func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
 	if !st.updateRunResumeCalled {
 		t.Fatal("expected UpdateRunResume to be called")
 	}
-	if uuid.UUID(st.updateRunResumeParam.Bytes) != id {
+	if st.updateRunResumeParam != id.String() {
 		t.Fatalf("UpdateRunResume called with wrong id: got %s, want %s",
-			uuid.UUID(st.updateRunResumeParam.Bytes), id)
+			st.updateRunResumeParam, id)
 	}
 }
 
@@ -477,7 +472,7 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 	statsJSON := []byte(`{"resume_count":1,"last_resumed_at":"2025-01-15T10:00:00Z"}`)
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         pgtype.UUID{Bytes: id, Valid: true},
+			ID:         id.String(),
 			Status:     store.RunStatusFailed,
 			RepoUrl:    "https://example/repo.git",
 			BaseRef:    "main",
@@ -487,7 +482,7 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -555,7 +550,7 @@ func TestResumeTicket_ResumabilityInvariants(t *testing.T) {
 			name:           "succeeded run returns 409 conflict",
 			runStatus:      store.RunStatusSucceeded,
 			wantStatus:     http.StatusConflict,
-			wantBodySubstr: "ticket state=succeeded is not resumable",
+			wantBodySubstr: "state=succeeded is not resumable",
 		},
 		// Invariant 3: In-progress runs return 200 OK for idempotency.
 		{
@@ -583,12 +578,12 @@ func TestResumeTicket_ResumabilityInvariants(t *testing.T) {
 			jobs := []store.Job{}
 			if tt.runStatus == store.RunStatusFailed || tt.runStatus == store.RunStatusCanceled {
 				jobs = []store.Job{
-					{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed, StepIndex: 1000},
+					{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 				}
 			}
 			st := &mockStore{
 				getRunResult: store.Run{
-					ID:        pgtype.UUID{Bytes: id, Valid: true},
+					ID:        id.String(),
 					Status:    tt.runStatus,
 					RepoUrl:   "https://example/repo.git",
 					CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
@@ -665,14 +660,14 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 
 		st := &mockStore{
 			getRunResult: store.Run{
-				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				ID:        id.String(),
 				Status:    store.RunStatusFailed,
 				RepoUrl:   "https://example/repo.git",
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			},
 			listJobsByRunResult: []store.Job{
-				{ID: pgtype.UUID{Bytes: succeededJobID, Valid: true}, Status: store.JobStatusSucceeded, StepIndex: 1000},
-				{ID: pgtype.UUID{Bytes: failedJobID, Valid: true}, Status: store.JobStatusFailed, StepIndex: 2000},
+				{ID: succeededJobID.String(), Status: store.JobStatusSucceeded, StepIndex: 1000},
+				{ID: failedJobID.String(), Status: store.JobStatusFailed, StepIndex: 2000},
 			},
 		}
 
@@ -690,10 +685,10 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 		if len(st.updateJobStatusCalls) != 1 {
 			t.Fatalf("expected 1 job update, got %d", len(st.updateJobStatusCalls))
 		}
-		if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) == succeededJobID {
+		if st.updateJobStatusCalls[0].ID == succeededJobID.String() {
 			t.Fatal("succeeded job should NOT be updated")
 		}
-		if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) != failedJobID {
+		if st.updateJobStatusCalls[0].ID != failedJobID.String() {
 			t.Fatal("failed job should be updated")
 		}
 	})
@@ -704,13 +699,13 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 
 		st := &mockStore{
 			getRunResult: store.Run{
-				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				ID:        id.String(),
 				Status:    store.RunStatusFailed, // Terminal but has a pending job (edge case).
 				RepoUrl:   "https://example/repo.git",
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			},
 			listJobsByRunResult: []store.Job{
-				{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusPending, StepIndex: 1000},
+				{ID: uuid.New().String(), Status: store.JobStatusPending, StepIndex: 1000},
 			},
 		}
 
@@ -736,13 +731,13 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 
 		st := &mockStore{
 			getRunResult: store.Run{
-				ID:        pgtype.UUID{Bytes: id, Valid: true},
+				ID:        id.String(),
 				Status:    store.RunStatusFailed, // Terminal but has a running job (edge case).
 				RepoUrl:   "https://example/repo.git",
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			},
 			listJobsByRunResult: []store.Job{
-				{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StepIndex: 1000},
+				{ID: uuid.New().String(), Status: store.JobStatusRunning, StepIndex: 1000},
 			},
 		}
 

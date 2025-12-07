@@ -29,7 +29,7 @@ RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.mod_type, jobs.mod_
 // Atomically claim the next pending job for a node.
 // Server-driven scheduling: only 'pending' jobs are claimable.
 // Job transitions directly to 'running' (no intermediate 'assigned' state).
-func (q *Queries) ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error) {
+func (q *Queries) ClaimJob(ctx context.Context, nodeID *string) (Job, error) {
 	row := q.db.QueryRow(ctx, claimJob, nodeID)
 	var i Job
 	err := row.Scan(

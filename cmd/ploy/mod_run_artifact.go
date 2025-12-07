@@ -47,11 +47,11 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)
 	}
-	var payload modsapi.TicketStatusResponse
+	var payload modsapi.RunStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		if errors.Is(err, io.EOF) {
 			// Treat empty body as an empty status (no artifacts).
-			payload = modsapi.TicketStatusResponse{}
+			payload = modsapi.RunStatusResponse{}
 		} else {
 			return fmt.Errorf("decode ticket status: %w", err)
 		}
@@ -223,7 +223,7 @@ func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, tic
 	if resp.StatusCode != http.StatusOK {
 		return "", controlPlaneHTTPError(resp)
 	}
-	var payload modsapi.TicketStatusResponse
+	var payload modsapi.RunStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return "", err
 	}

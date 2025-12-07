@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -214,9 +213,9 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Include claiming node id when available for easier diagnostics.
-		// Note: node_id is still UUID.
-		if run.NodeID.Valid {
-			summary.Metadata["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
+		// Node IDs are now NanoID(6) strings.
+		if run.NodeID != nil {
+			summary.Metadata["node_id"] = *run.NodeID
 		}
 
 		// Surface MR URL, gate summary, and resume metadata from runs.stats if present.

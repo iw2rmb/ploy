@@ -18,12 +18,13 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
 	jobID := uuid.New()
+	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 	st.listDiffsByRunResult = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     runID.String(),
+		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{"exit_code":0}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -64,11 +65,12 @@ func TestGetDiff_Download(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
 	jobID := uuid.New()
+	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     runID.String(),
+		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -92,12 +94,13 @@ func TestGetDiff_Metadata(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
 	jobID := uuid.New()
+	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     runID.String(),
+		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -186,8 +189,8 @@ func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		JobID:     pgtype.UUID{Valid: false},
+		RunID:     runID.String(),
+		JobID:     nil,
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},

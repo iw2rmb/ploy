@@ -31,8 +31,10 @@ CREATE TYPE run_repo_status AS ENUM (
 
 
 -- Nodes (no labels; each node must have an IP address).
+-- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly node identifiers.
+-- Application code generates IDs via types.NewNodeKey() before insertion.
 CREATE TABLE IF NOT EXISTS nodes (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id              TEXT PRIMARY KEY,  -- NanoID-backed string ID (6 chars); no default, app-generated via NewNodeKey().
   name            TEXT NOT NULL,
   ip_address      INET NOT NULL,
   version         TEXT,
@@ -76,7 +78,7 @@ CREATE TABLE IF NOT EXISTS runs (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   started_at   TIMESTAMPTZ,
   finished_at  TIMESTAMPTZ,
-  node_id      UUID REFERENCES nodes(id) ON DELETE SET NULL,
+  node_id      TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id.
   base_ref     TEXT NOT NULL,
   target_ref   TEXT NOT NULL,
   commit_sha   TEXT,
@@ -128,7 +130,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   mod_type     TEXT NOT NULL DEFAULT '',
   mod_image    TEXT NOT NULL DEFAULT '',
   step_index   FLOAT NOT NULL DEFAULT 0,  -- float for dynamic insertion between jobs
-  node_id      UUID REFERENCES nodes(id) ON DELETE SET NULL,  -- which node claimed this job
+  node_id      TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.
   exit_code    INT,  -- exit code from job execution (null until completed)
   started_at   TIMESTAMPTZ,
   finished_at  TIMESTAMPTZ,
@@ -228,7 +230,7 @@ CREATE INDEX IF NOT EXISTS artifact_bundles_cid_idx ON artifact_bundles(cid) WHE
 -- Node metrics history (optional, TTL purged; latest snapshot lives in nodes)
 CREATE TABLE IF NOT EXISTS node_metrics (
   id               BIGSERIAL PRIMARY KEY,
-  node_id          UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  node_id          TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,  -- NanoID string FK to nodes.id.
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   cpu_total_millis INTEGER NOT NULL DEFAULT 0,
   cpu_free_millis  INTEGER NOT NULL DEFAULT 0,
@@ -245,7 +247,7 @@ CREATE TABLE IF NOT EXISTS buildgate_jobs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   status          buildgate_job_status NOT NULL DEFAULT 'pending',
-  node_id         UUID REFERENCES nodes(id) ON DELETE SET NULL,
+  node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id.
   result          JSONB,
   error           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -276,7 +278,7 @@ CREATE TABLE IF NOT EXISTS bootstrap_tokens (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token_hash     TEXT NOT NULL UNIQUE,
   token_id       TEXT NOT NULL UNIQUE,
-  node_id        UUID REFERENCES nodes(id) ON DELETE CASCADE,
+  node_id        TEXT REFERENCES nodes(id) ON DELETE CASCADE,  -- NanoID string FK to nodes.id.
   cluster_id     TEXT,
   issued_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at     TIMESTAMPTZ,

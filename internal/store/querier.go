@@ -18,11 +18,11 @@ type Querier interface {
 	AckRunStart(ctx context.Context, id string) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
-	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
+	ClaimBuildGateJob(ctx context.Context, nodeID *string) (BuildgateJob, error)
 	// Atomically claim the next pending job for a node.
 	// Server-driven scheduling: only 'pending' jobs are claimable.
 	// Job transitions directly to 'running' (no intermediate 'assigned' state).
-	ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
+	ClaimJob(ctx context.Context, nodeID *string) (Job, error)
 	// Clears the execution_run_id for a run_repo (e.g., when restarting).
 	// Also called by IncrementRunRepoAttempt to prepare for a new execution.
 	ClearRunRepoExecutionRun(ctx context.Context, id string) error
@@ -42,6 +42,8 @@ type Querier interface {
 	// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
+	// Creates a new node with an application-supplied NanoID(6) as the primary key.
+	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	// Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
 	// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
@@ -65,7 +67,7 @@ type Querier interface {
 	DeleteJob(ctx context.Context, id string) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
-	DeleteNode(ctx context.Context, id pgtype.UUID) error
+	DeleteNode(ctx context.Context, id string) error
 	DeleteRun(ctx context.Context, id string) error
 	DeleteRunRepo(ctx context.Context, id string) error
 	// Get the step_index of a job and the next job's step_index for healing insertion.
@@ -78,7 +80,7 @@ type Querier interface {
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetJob(ctx context.Context, id string) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
-	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
+	GetNode(ctx context.Context, id string) (Node, error)
 	GetRun(ctx context.Context, id string) (Run, error)
 	GetRunRepo(ctx context.Context, id string) (RunRepo, error)
 	// Finds the run_repo entry linked to a given execution run.
@@ -90,7 +92,6 @@ type Querier interface {
 	IncrementRunRepoAttempt(ctx context.Context, id string) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
-	InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error)
 	ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)

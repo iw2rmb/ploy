@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -28,20 +29,21 @@ func TestCompleteRun_Success(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Set up mock to return job via GetJob (by job_id).
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -70,7 +72,7 @@ func TestCompleteRun_Success(t *testing.T) {
 	if !st.getJobCalled {
 		t.Fatal("expected GetJob to be called")
 	}
-	if st.updateRunCompletionCalled && st.updateRunCompletionParams.ID.Bytes != runID {
+	if st.updateRunCompletionCalled && st.updateRunCompletionParams.ID != runID.String() {
 		t.Fatalf("UpdateRunCompletion called with wrong run id: %v", st.updateRunCompletionParams.ID)
 	}
 }
@@ -83,20 +85,21 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 	otherNode := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	otherNodeStr := otherNode.String()
 
 	// Job is assigned to a different node (otherNode).
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: otherNode, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &otherNodeStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -133,20 +136,21 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Job is in 'assigned' status (not 'running').
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusPending, // Not 'running'
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -185,9 +189,9 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 	jobID := uuid.New()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		// Note: status validation happens before job lookup, but job_id is validated first.
@@ -223,19 +227,20 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -293,7 +298,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 
 	// Run not found
 	st2 := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunErr:     pgx.ErrNoRows,
 	}
 	handler2 := completeRunHandler(st2, nil)
@@ -313,9 +318,9 @@ func TestCompleteRun_NotFound(t *testing.T) {
 
 	// Job not found
 	st3 := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobErr: pgx.ErrNoRows,
@@ -345,19 +350,20 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	now := time.Now()
+	nodeIDStr := nodeID.String()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://github.com/user/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -437,41 +443,42 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	modJobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Build jobs with gate metadata: pre-gate failed, heal succeeded, re-gate succeeded, mod succeeded.
 	// The final gate (re-gate) succeeded, so run should succeed.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusFailed, // pre-gate failed initially
 			StepIndex: 1000,
 			ModType:   "pre_gate",
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // healing job succeeded
 			StepIndex: 1100,
 			ModType:   "heal",
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // re-gate succeeded (final gate)
 			StepIndex: 1200,
 			ModType:   "re_gate",
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        modJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning, // mod running (to be completed)
 			StepIndex: 2000,
 			ModType:   "mod",
@@ -480,9 +487,9 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[3], // Return the mod job via GetJob
@@ -525,23 +532,24 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	modJobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Build jobs: pre-gate succeeded, mod failed.
 	// Mod failure should cause run to fail.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // pre-gate succeeded
 			StepIndex: 1000,
 			ModType:   "pre_gate",
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        modJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning, // mod running, about to fail
 			StepIndex: 2000,
 			ModType:   "mod",
@@ -550,9 +558,9 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[1], // Return the mod job via GetJob
@@ -595,31 +603,32 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	postGateJobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Build jobs: pre-gate succeeded, mod succeeded, post-gate failed.
 	// Final gate failure should cause run to fail.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // pre-gate succeeded
 			StepIndex: 1000,
 			ModType:   "pre_gate",
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // mod succeeded
 			StepIndex: 2000,
 			Meta:      []byte(`{"mod_type":"mod"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: postGateJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        postGateJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning, // post-gate running, about to fail
 			StepIndex: 3000,
 			Meta:      []byte(`{"mod_type":"post_gate"}`),
@@ -627,9 +636,9 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[2], // Return the post-gate job via GetJob
@@ -675,36 +684,37 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 	healJobID := uuid.New()
 	reGateJobID := uuid.New()
 	modJobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: preGateJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        preGateJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusFailed, // pre-gate failed
 			StepIndex: 1000,
 			Meta:      []byte(`{"mod_type":"pre_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: healJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        healJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning, // healing job about to fail
 			StepIndex: 1333.3333,
 			Meta:      []byte(`{"mod_type":"heal"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: reGateJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        reGateJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusCreated, // re-gate not yet scheduled
 			StepIndex: 1500,
 			Meta:      []byte(`{"mod_type":"re_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        modJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusCreated, // mod not yet scheduled
 			StepIndex: 2000,
 			Meta:      []byte(`{"mod_type":"mod"}`),
@@ -712,9 +722,9 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[1], // healing job
@@ -749,11 +759,11 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 	// Verify that re-gate and mod jobs were targeted for cancellation.
 	var canceledReGate, canceledMod bool
 	for _, call := range st.updateJobStatusCalls {
-		id := uuid.UUID(call.ID.Bytes)
-		if id == reGateJobID && call.Status == store.JobStatusCanceled {
+		id := call.ID
+		if id == reGateJobID.String() && call.Status == store.JobStatusCanceled {
 			canceledReGate = true
 		}
-		if id == modJobID && call.Status == store.JobStatusCanceled {
+		if id == modJobID.String() && call.Status == store.JobStatusCanceled {
 			canceledMod = true
 		}
 	}
@@ -773,20 +783,21 @@ func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	jobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 		Meta:      []byte(`{"mod_type":"mod"}`),
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -832,21 +843,22 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	modJobID := uuid.New()
+	nodeIDStr := nodeID.String()
 
 	// Build jobs: pre-gate succeeded, mod canceled (no failures).
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        types.NewJobID().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded, // pre-gate succeeded
 			StepIndex: 1000,
 			Meta:      []byte(`{"mod_type":"pre_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        modJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning, // mod running, about to be canceled
 			StepIndex: 2000,
 			ModType:   "mod",
@@ -855,9 +867,9 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getNodeResult: store.Node{ID: nodeID.String()},
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[1], // Return the mod job via GetJob

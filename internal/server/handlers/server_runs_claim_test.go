@@ -26,24 +26,25 @@ func TestClaimJob_Success(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	now := time.Now()
+	nodeIDStr := nodeID.String()
 
 	// Mock store that returns a node, a claimed job, and the parent run.
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID: nodeID.String(),
 		},
 		claimJobResult: store.Job{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        jobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Name:      "mod-0",
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
 			StepIndex: 2000,
 			Meta:      []byte("{}"),
 		},
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://github.com/user/repo.git",
 			BaseRef:   "main",
@@ -73,7 +74,7 @@ func TestClaimJob_Success(t *testing.T) {
 	if !st.claimJobCalled {
 		t.Fatal("expected ClaimJob to be called")
 	}
-	if st.claimJobParams.Bytes != nodeID {
+	if *st.claimJobParams != nodeID.String() {
 		t.Fatalf("ClaimJob called with wrong node id: %v", st.claimJobParams)
 	}
 
@@ -131,7 +132,7 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	// Mock store that returns a node but no available jobs (ClaimJob returns ErrNoRows).
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID: nodeID.String(),
 		},
 		claimJobErr: pgx.ErrNoRows,
 	}
@@ -188,17 +189,19 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 	}
 }
 
-// TestClaimJob_InvalidNodeID verifies 400 Bad Request is returned when
-// the node ID path parameter is not a valid UUID.
-func TestClaimJob_InvalidNodeID(t *testing.T) {
+// TestClaimJob_EmptyNodeID verifies 400 Bad Request is returned when
+// the node ID path parameter is empty or whitespace.
+// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are rejected.
+func TestClaimJob_EmptyNodeID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
 	configHolder := &ConfigHolder{}
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid-uuid/claim", nil)
-	req.SetPathValue("id", "invalid-uuid")
+	// Note: "invalid-uuid" is now a valid NanoID string ID, so we only test empty ID.
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//claim", nil)
+	req.SetPathValue("id", "   ") // Whitespace ID
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -218,24 +221,25 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 	now := time.Now()
+	nodeIDStr := nodeID.String()
 
 	// Mock store with a queued run - should trigger AckRunStart.
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID: nodeID.String(),
 		},
 		claimJobResult: store.Job{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        jobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Name:      "pre-gate",
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
 			StepIndex: 1000,
 			Meta:      []byte("{}"),
 		},
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.RunStatusQueued, // Still queued
 			RepoUrl:   "https://github.com/user/repo.git",
 			BaseRef:   "main",
@@ -264,7 +268,7 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 	if !st.ackRunStartCalled {
 		t.Fatal("expected AckRunStart to be called for queued run")
 	}
-	if st.ackRunStartParam.Bytes != runID {
+	if st.ackRunStartParam != runID.String() {
 		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
 	}
 }

@@ -14,25 +14,30 @@ import (
 
 const createNode = `-- name: CreateNode :one
 INSERT INTO nodes (
+  id,
   name,
   ip_address,
   version,
   concurrency
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
 `
 
 type CreateNodeParams struct {
+	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	IpAddress   netip.Addr `json:"ip_address"`
 	Version     *string    `json:"version"`
 	Concurrency int32      `json:"concurrency"`
 }
 
+// Creates a new node with an application-supplied NanoID(6) as the primary key.
+// The `id` parameter must be generated via types.NewNodeKey() before calling.
 func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error) {
 	row := q.db.QueryRow(ctx, createNode,
+		arg.ID,
 		arg.Name,
 		arg.IpAddress,
 		arg.Version,
@@ -67,7 +72,7 @@ DELETE FROM nodes
 WHERE id = $1
 `
 
-func (q *Queries) DeleteNode(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeleteNode(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteNode, id)
 	return err
 }
@@ -77,61 +82,8 @@ SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_mi
 WHERE id = $1
 `
 
-func (q *Queries) GetNode(ctx context.Context, id pgtype.UUID) (Node, error) {
+func (q *Queries) GetNode(ctx context.Context, id string) (Node, error) {
 	row := q.db.QueryRow(ctx, getNode, id)
-	var i Node
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.IpAddress,
-		&i.Version,
-		&i.Concurrency,
-		&i.CpuTotalMillis,
-		&i.CpuFreeMillis,
-		&i.MemTotalBytes,
-		&i.MemFreeBytes,
-		&i.DiskTotalBytes,
-		&i.DiskFreeBytes,
-		&i.Drained,
-		&i.CertSerial,
-		&i.CertFingerprint,
-		&i.CertNotBefore,
-		&i.CertNotAfter,
-		&i.LastHeartbeat,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const insertNodeWithID = `-- name: InsertNodeWithID :one
-INSERT INTO nodes (
-  id,
-  name,
-  ip_address,
-  version,
-  concurrency
-) VALUES (
-  $1, $2, $3, $4, $5
-)
-RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
-`
-
-type InsertNodeWithIDParams struct {
-	ID          pgtype.UUID `json:"id"`
-	Name        string      `json:"name"`
-	IpAddress   netip.Addr  `json:"ip_address"`
-	Version     *string     `json:"version"`
-	Concurrency int32       `json:"concurrency"`
-}
-
-func (q *Queries) InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error) {
-	row := q.db.QueryRow(ctx, insertNodeWithID,
-		arg.ID,
-		arg.Name,
-		arg.IpAddress,
-		arg.Version,
-		arg.Concurrency,
-	)
 	var i Node
 	err := row.Scan(
 		&i.ID,
@@ -211,7 +163,7 @@ WHERE id = $1
 `
 
 type UpdateNodeCertMetadataParams struct {
-	ID              pgtype.UUID        `json:"id"`
+	ID              string             `json:"id"`
 	CertSerial      *string            `json:"cert_serial"`
 	CertFingerprint *string            `json:"cert_fingerprint"`
 	CertNotBefore   pgtype.Timestamptz `json:"cert_not_before"`
@@ -236,8 +188,8 @@ WHERE id = $1
 `
 
 type UpdateNodeDrainedParams struct {
-	ID      pgtype.UUID `json:"id"`
-	Drained bool        `json:"drained"`
+	ID      string `json:"id"`
+	Drained bool   `json:"drained"`
 }
 
 func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error {
@@ -261,7 +213,7 @@ WHERE id = $1
 `
 
 type UpdateNodeHeartbeatParams struct {
-	ID             pgtype.UUID        `json:"id"`
+	ID             string             `json:"id"`
 	LastHeartbeat  pgtype.Timestamptz `json:"last_heartbeat"`
 	CpuTotalMillis int32              `json:"cpu_total_millis"`
 	CpuFreeMillis  int32              `json:"cpu_free_millis"`

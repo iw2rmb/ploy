@@ -16,14 +16,14 @@ import (
 
 // EventsPrinter renders ticket and stage updates.
 type EventsPrinter interface {
-	Run(modsapi.TicketSummary)
+	Run(modsapi.RunSummary)
 	Stage(stage modsapi.StageStatus)
 }
 
 // SimplePrinter prints a short human-readable summary.
 type SimplePrinter struct{ out io.Writer }
 
-func (p SimplePrinter) Run(t modsapi.TicketSummary) {
+func (p SimplePrinter) Run(t modsapi.RunSummary) {
 	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.TicketID)), strings.ToLower(string(t.State)))
 }
 func (p SimplePrinter) Stage(s modsapi.StageStatus) {
@@ -50,7 +50,7 @@ func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 type EventsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	Run     string
+	RunID   string
 	Output  io.Writer
 	Printer EventsPrinter
 
@@ -71,7 +71,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.BaseURL == nil {
 		return "", errors.New("mods events: base url required")
 	}
-	ticket := strings.TrimSpace(c.Run)
+	ticket := strings.TrimSpace(c.RunID)
 	if ticket == "" {
 		return "", errors.New("mods events: ticket required")
 	}
@@ -91,7 +91,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
 		case "run":
-			var t modsapi.TicketSummary
+			var t modsapi.RunSummary
 			if err := json.Unmarshal(evt.Data, &t); err != nil {
 				return fmt.Errorf("mods events: decode ticket: %w", err)
 			}

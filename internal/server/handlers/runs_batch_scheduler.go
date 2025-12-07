@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -30,8 +27,8 @@ func NewBatchRepoStarter(st store.Store) *BatchRepoStarter {
 //
 // Returns the number of repos that were successfully started.
 // Errors from individual repos are logged but don't prevent processing other repos.
-func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.UUID) (int, error) {
-	runIDStr := uuid.UUID(runID.Bytes).String()
+func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) (int, error) {
+	runIDStr := runID
 
 	// Fetch the batch run to get the shared spec.
 	batchRun, err := s.store.GetRun(ctx, runID)
@@ -72,7 +69,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.U
 		if err != nil {
 			slog.Error("batch-scheduler: create child run failed",
 				"run_id", runIDStr,
-				"repo_id", uuid.UUID(repo.ID.Bytes).String(),
+				"repo_id", repo.ID,
 				"repo_url", repo.RepoUrl,
 				"err", err,
 			)
@@ -83,7 +80,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.U
 		if err := createJobsFromSpec(ctx, s.store, childRun.ID, batchRun.Spec); err != nil {
 			slog.Error("batch-scheduler: create jobs failed",
 				"run_id", runIDStr,
-				"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+				"child_run_id", childRun.ID,
 				"repo_url", repo.RepoUrl,
 				"err", err,
 			)
@@ -95,13 +92,13 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.U
 		// Link the repo entry to its child execution run and mark as running.
 		err = s.store.SetRunRepoExecutionRun(ctx, store.SetRunRepoExecutionRunParams{
 			ID:             repo.ID,
-			ExecutionRunID: childRun.ID,
+			ExecutionRunID: &childRun.ID,
 		})
 		if err != nil {
 			slog.Error("batch-scheduler: link repo to child run failed",
 				"run_id", runIDStr,
-				"repo_id", uuid.UUID(repo.ID.Bytes).String(),
-				"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+				"repo_id", repo.ID,
+				"child_run_id", childRun.ID,
 				"err", err,
 			)
 			// The child run exists but isn't linked; it will still execute.
@@ -111,8 +108,8 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID pgtype.U
 		started++
 		slog.Info("batch-scheduler: repo execution started",
 			"run_id", runIDStr,
-			"repo_id", uuid.UUID(repo.ID.Bytes).String(),
-			"child_run_id", uuid.UUID(childRun.ID.Bytes).String(),
+			"repo_id", repo.ID,
+			"child_run_id", childRun.ID,
 			"repo_url", repo.RepoUrl,
 		)
 	}

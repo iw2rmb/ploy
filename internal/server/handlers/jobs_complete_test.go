@@ -28,21 +28,22 @@ func TestCompleteJob_Success(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	// Set up mock to return job via GetJob.
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -87,20 +88,21 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -166,8 +168,9 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_InvalidJobID returns 400 for malformed UUID.
-func TestCompleteJob_InvalidJobID(t *testing.T) {
+// TestCompleteJob_EmptyJobID returns 400 for empty job_id.
+// Job IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+func TestCompleteJob_EmptyJobID(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
@@ -175,8 +178,9 @@ func TestCompleteJob_InvalidJobID(t *testing.T) {
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/not-a-uuid/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", "not-a-uuid")
+	// Note: "not-a-uuid" is now a valid KSUID string ID, so we only test empty ID.
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", "   ") // Whitespace ID
 	req.Header.Set(nodeUUIDHeader, nodeID.String())
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
@@ -214,25 +218,27 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_InvalidNodeHeader returns 400 when PLOY_NODE_UUID header is not a valid UUID.
-func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
+// TestCompleteJob_EmptyNodeHeader returns 400 when PLOY_NODE_UUID header is empty.
+// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are rejected.
+func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -244,7 +250,8 @@ func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, "not-a-uuid")
+	// Note: "not-a-uuid" is now a valid NanoID string ID, so we test empty header.
+	req.Header.Set(nodeUUIDHeader, "   ") // Whitespace header
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
@@ -268,20 +275,21 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -318,14 +326,15 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 
 	nodeID := uuid.New()
 	otherNode := uuid.New()
+	otherNodeStr := otherNode.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	// Job is assigned to a different node (otherNode).
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: otherNode, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &otherNodeStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
@@ -364,14 +373,15 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	// Job is in 'pending' status (not 'running').
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusPending, // Not 'running'
 		StepIndex: 1000,
 	}
@@ -471,13 +481,14 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
@@ -553,21 +564,22 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 	now := time.Now()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        runID.String(),
 			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://github.com/user/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -638,28 +650,29 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 	nextJobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	nextJob := store.Job{
-		ID:        pgtype.UUID{Bytes: nextJobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		ID:        nextJobID.String(),
+		RunID:     runID.String(),
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:          job,
@@ -699,20 +712,21 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,
@@ -752,6 +766,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	modJobID := uuid.New()
 	postJobID := uuid.New()
@@ -759,24 +774,24 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	// Jobs: pre-gate succeeded, mod failed, post-gate created.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        uuid.New().String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded,
 			StepIndex: 1000,
 			Meta:      []byte(`{"mod_type":"pre_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			ID:        modJobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning,
 			StepIndex: 2000,
 			Meta:      []byte(`{"mod_type":"mod"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: postJobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:        postJobID.String(),
+			RunID:     runID.String(),
 			Status:    store.JobStatusCreated,
 			StepIndex: 3000,
 			Meta:      []byte(`{"mod_type":"post_gate"}`),
@@ -785,7 +800,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        jobs[1], // mod job
@@ -849,20 +864,21 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
 	runID := uuid.New()
 	jobID := uuid.New()
 
 	job := store.Job{
-		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			ID:     runID.String(),
 			Status: store.RunStatusRunning,
 		},
 		getJobResult:        job,

@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -182,7 +180,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:      uuid.UUID(run.RunID.Bytes).String(),
+				RunID:      run.RunID,
 				Name:       run.Name,
 				RunStatus:  string(run.RunStatus),
 				RepoStatus: string(run.RepoStatus),

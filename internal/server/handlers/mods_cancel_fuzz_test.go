@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -33,7 +32,7 @@ func FuzzCancelTicket_Body(f *testing.F) {
 		if useValidID {
 			runID := uuid.New()
 			idStr = runID.String()
-			st.getRunResult = store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning}
+			st.getRunResult = store.Run{ID: runID.String(), Status: store.RunStatusRunning}
 		} else {
 			idStr = "not-a-uuid"
 		}

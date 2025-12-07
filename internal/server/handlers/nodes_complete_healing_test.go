@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -21,8 +18,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// build_gate_healing with a single healing mod and retries=3
 	spec := map[string]any{
@@ -46,7 +42,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 	reGateStepIndex := 1666.6666666666665
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -55,7 +51,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -64,7 +60,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "re-gate-1",
 			Status:    store.JobStatusFailed,
@@ -73,7 +69,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -82,7 +78,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "post-gate",
 			Status:    store.JobStatusCreated,
@@ -140,8 +136,7 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Multi-strategy spec with two named branches, each with one healing mod.
 	spec := map[string]any{
@@ -171,7 +166,7 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 	// Jobs for a fresh run where pre-gate just failed.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -180,7 +175,7 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -284,8 +279,7 @@ func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Single-strategy spec (mods at top level, no strategies array).
 	spec := map[string]any{
@@ -305,7 +299,7 @@ func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 	// Jobs for a fresh run where pre-gate just failed.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -314,7 +308,7 @@ func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -378,8 +372,7 @@ func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Multi-strategy spec: branch A has 2 mods, branch B has 1 mod.
 	spec := map[string]any{
@@ -409,7 +402,7 @@ func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
 
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -418,7 +411,7 @@ func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
 			Meta:      []byte(`{}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -519,8 +512,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Scenario: Two-branch healing where branch "codex-ai" re-gate succeeds first.
 	// Branch "static-patch" jobs should be canceled.
@@ -532,14 +524,14 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 	//   heal-static-patch-1-0 (1555) → RUNNING (should be canceled)
 	//   re-gate-static-patch-1 (1666) → CREATED (should be canceled)
 	//   mod-0 (2000) → CREATED (mainline, should NOT be canceled)
-	winnerJobID := uuid.New()
-	loserHealID := uuid.New()
-	loserReGateID := uuid.New()
-	mainlineModID := uuid.New()
+	winnerJobID := domaintypes.NewJobID().String()
+	loserHealID := domaintypes.NewJobID().String()
+	loserReGateID := domaintypes.NewJobID().String()
+	mainlineModID := domaintypes.NewJobID().String()
 
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -547,7 +539,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 			StepIndex: 1000,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-codex-ai-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -555,7 +547,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 			StepIndex: 1333,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			ID:        winnerJobID,
 			RunID:     runID,
 			Name:      "re-gate-codex-ai-1",
 			Status:    store.JobStatusSucceeded,
@@ -563,7 +555,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 			StepIndex: 1444,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: loserHealID, Valid: true},
+			ID:        loserHealID,
 			RunID:     runID,
 			Name:      "heal-static-patch-1-0",
 			Status:    store.JobStatusRunning,
@@ -571,7 +563,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 			StepIndex: 1555,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: loserReGateID, Valid: true},
+			ID:        loserReGateID,
 			RunID:     runID,
 			Name:      "re-gate-static-patch-1",
 			Status:    store.JobStatusCreated,
@@ -579,7 +571,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 			StepIndex: 1666,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: mainlineModID, Valid: true},
+			ID:        mainlineModID,
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -604,12 +596,12 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 	}
 
 	// Collect skipped job IDs.
-	skippedIDs := make(map[uuid.UUID]bool)
+	skippedIDs := make(map[string]bool)
 	for _, call := range st.updateJobStatusCalls {
 		if call.Status != store.JobStatusSkipped {
 			t.Fatalf("expected skipped status, got %s", call.Status)
 		}
-		skippedIDs[uuid.UUID(call.ID.Bytes)] = true
+		skippedIDs[call.ID] = true
 	}
 
 	// Verify the loser heal job was skipped.
@@ -635,14 +627,13 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Single-branch legacy healing: only one re-gate, so no losers to cancel.
-	winnerJobID := uuid.New()
+	winnerJobID := domaintypes.NewJobID().String()
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -650,7 +641,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 			StepIndex: 1000,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -658,7 +649,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 			StepIndex: 1333,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			ID:        winnerJobID,
 			RunID:     runID,
 			Name:      "re-gate-1",
 			Status:    store.JobStatusSucceeded,
@@ -666,7 +657,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 			StepIndex: 1666,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -698,16 +689,15 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
-	winnerJobID := uuid.New()
-	alreadyFailedID := uuid.New()
-	pendingLoserID := uuid.New()
+	winnerJobID := domaintypes.NewJobID().String()
+	alreadyFailedID := domaintypes.NewJobID().String()
+	pendingLoserID := domaintypes.NewJobID().String()
 
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -715,7 +705,7 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 			StepIndex: 1000,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: winnerJobID, Valid: true},
+			ID:        winnerJobID,
 			RunID:     runID,
 			Name:      "re-gate-branch-a-1",
 			Status:    store.JobStatusSucceeded,
@@ -724,7 +714,7 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 		},
 		{
 			// This loser re-gate already failed (maybe timeout); should not be re-canceled.
-			ID:        pgtype.UUID{Bytes: alreadyFailedID, Valid: true},
+			ID:        alreadyFailedID,
 			RunID:     runID,
 			Name:      "re-gate-branch-b-1",
 			Status:    store.JobStatusFailed,
@@ -733,7 +723,7 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 		},
 		{
 			// This loser heal is still pending; should be canceled.
-			ID:        pgtype.UUID{Bytes: pendingLoserID, Valid: true},
+			ID:        pendingLoserID,
 			RunID:     runID,
 			Name:      "heal-branch-c-1-0",
 			Status:    store.JobStatusPending,
@@ -741,7 +731,7 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 			StepIndex: 1700,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCreated,
@@ -766,9 +756,9 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 		t.Fatalf("expected 1 UpdateJobStatus call, got %d", len(st.updateJobStatusCalls))
 	}
 
-	if uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes) != pendingLoserID {
+	if st.updateJobStatusCalls[0].ID != pendingLoserID {
 		t.Fatalf("expected heal-branch-c-1-0 to be skipped, got job %v",
-			uuid.UUID(st.updateJobStatusCalls[0].ID.Bytes))
+			st.updateJobStatusCalls[0].ID)
 	}
 }
 
@@ -780,12 +770,11 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -793,7 +782,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 			StepIndex: 1000,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-branch-a-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -801,7 +790,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 			StepIndex: 1333,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "re-gate-branch-a-1",
 			Status:    store.JobStatusSucceeded,
@@ -809,7 +798,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 			StepIndex: 1444,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-branch-b-1-0",
 			Status:    store.JobStatusSkipped, // Loser branch heal skipped after winner selected.
@@ -817,7 +806,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 			StepIndex: 1555,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "re-gate-branch-b-1",
 			Status:    store.JobStatusSkipped, // Loser branch re-gate skipped after winner selected.
@@ -825,7 +814,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 			StepIndex: 1666,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusSucceeded,
@@ -863,14 +852,13 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 
 	ctx := context.Background()
 
-	runUUID := uuid.New()
-	runID := pgtype.UUID{Bytes: runUUID, Valid: true}
+	runID := domaintypes.NewRunID().String()
 
 	// Both branches failed; no winner selection happens.
 	// The run should eventually fail via maybeCompleteMultiStepRun.
 	jobs := []store.Job{
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "pre-gate",
 			Status:    store.JobStatusFailed,
@@ -878,7 +866,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 			StepIndex: 1000,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-branch-a-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -886,7 +874,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 			StepIndex: 1333,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "re-gate-branch-a-1",
 			Status:    store.JobStatusFailed, // Branch A re-gate failed
@@ -894,7 +882,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 			StepIndex: 1444,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "heal-branch-b-1-0",
 			Status:    store.JobStatusSucceeded,
@@ -902,7 +890,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 			StepIndex: 1555,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "re-gate-branch-b-1",
 			Status:    store.JobStatusFailed, // Branch B re-gate also failed
@@ -910,7 +898,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 			StepIndex: 1666,
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
 			Name:      "mod-0",
 			Status:    store.JobStatusCanceled, // Canceled after healing exhausted

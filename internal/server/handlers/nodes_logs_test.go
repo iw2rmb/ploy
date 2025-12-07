@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -23,13 +22,13 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 
 	// Mock GetNode to succeed (node exists).
 	st.getNodeResult = store.Node{
-		ID: pgtype.UUID{Bytes: nodeID, Valid: true},
+		ID: nodeID.String(),
 	}
 
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
 	st.createLogResult = store.Log{
 		ID:      logID,
-		RunID:   pgtype.UUID{Bytes: runID, Valid: true},
+		RunID:   runID.String(),
 		ChunkNo: chunkNo,
 		Data:    []byte{0x1f, 0x8b},
 	}

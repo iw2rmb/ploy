@@ -24,31 +24,17 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxPatchSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run_id from path parameter.
-		runIDStr := r.PathValue("run_id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Extract run_id from path parameter (KSUID-backed string).
+		runIDStr := strings.TrimSpace(r.PathValue("run_id"))
+		if runIDStr == "" {
 			http.Error(w, "run_id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse and validate run_id.
-		runID := domaintypes.ToPGUUID(runIDStr)
-		if !runID.Valid {
-			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
-		// Extract job_id from path parameter.
-		jobIDStr := r.PathValue("job_id")
-		if strings.TrimSpace(jobIDStr) == "" {
+		// Extract job_id from path parameter (KSUID-backed string).
+		jobIDStr := strings.TrimSpace(r.PathValue("job_id"))
+		if jobIDStr == "" {
 			http.Error(w, "job_id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate job_id.
-		jobID := domaintypes.ToPGUUID(jobIDStr)
-		if !jobID.Valid {
-			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -90,9 +76,9 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the run exists.
+		// Check if the run exists. Run IDs are KSUID strings.
 		var err error
-		_, err = st.GetRun(r.Context(), runID)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -103,8 +89,8 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the job exists.
-		job, err := st.GetJob(r.Context(), jobID)
+		// Check if the job exists. Job IDs are KSUID strings.
+		job, err := st.GetJob(r.Context(), jobIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -116,24 +102,22 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the job belongs to the provided run.
-		if job.RunID != runID {
+		// job.RunID is now a string (KSUID-backed).
+		if job.RunID != runIDStr {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
+		// Node IDs are now NanoID(6) strings.
 		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeader == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.ToPGUUID(nodeIDHeader)
-		if !nodeID.Valid {
-			http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
-			return
-		}
-		if !job.NodeID.Valid || job.NodeID != nodeID {
+		// job.NodeID is *string after node ID migration.
+		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
 		}
@@ -145,9 +129,10 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Store params use string IDs (KSUID-backed).
 		params := store.CreateDiffParams{
-			RunID:   runID,
-			JobID:   jobID,
+			RunID:   runIDStr,
+			JobID:   &jobIDStr,
 			Patch:   req.Patch,
 			Summary: summaryBytes,
 		}

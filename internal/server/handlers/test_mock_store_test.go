@@ -3,10 +3,10 @@ package handlers
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -23,12 +23,12 @@ type mockStore struct {
 	createRunErr    error
 
 	getRunCalled bool
-	getRunParams pgtype.UUID
+	getRunParams string
 	getRunResult store.Run
 	getRunErr    error
 
 	getRunTimingCalled bool
-	getRunTimingParams pgtype.UUID
+	getRunTimingParams string
 	getRunTimingResult store.RunsTiming
 	getRunTimingErr    error
 
@@ -38,21 +38,21 @@ type mockStore struct {
 	listRunsTimingsErr    error
 
 	deleteRunCalled bool
-	deleteRunParams pgtype.UUID
+	deleteRunParams string
 	deleteRunErr    error
 
 	claimRunCalled bool
-	claimRunParams pgtype.UUID
+	claimRunParams *string
 	claimRunResult store.Run
 	claimRunErr    error
 
 	claimJobCalled bool
-	claimJobParams pgtype.UUID
+	claimJobParams *string
 	claimJobResult store.Job
 	claimJobErr    error
 
 	getNodeCalled bool
-	getNodeParams pgtype.UUID
+	getNodeParams string
 	getNodeResult store.Node
 	getNodeErr    error
 
@@ -66,7 +66,7 @@ type mockStore struct {
 	createEventErr    error
 
 	getJobCalled bool
-	getJobParams pgtype.UUID
+	getJobParams string
 	getJobResult store.Job
 	getJobErr    error
 
@@ -82,7 +82,7 @@ type mockStore struct {
 
 	// AckRunStart tracking
 	ackRunStartCalled bool
-	ackRunStartParam  pgtype.UUID
+	ackRunStartParam  string
 	ackRunStartErr    error
 
 	// UpdateRunCompletion tracking
@@ -97,7 +97,7 @@ type mockStore struct {
 
 	// UpdateRunResume tracking (resume_count, last_resumed_at)
 	updateRunResumeCalled bool
-	updateRunResumeParam  pgtype.UUID
+	updateRunResumeParam  string
 	updateRunResumeErr    error
 
 	// Node drain/undrain tracking
@@ -137,13 +137,13 @@ type mockStore struct {
 
 	// ListJobsByRun tracking
 	listJobsByRunCalled bool
-	listJobsByRunParam  pgtype.UUID
+	listJobsByRunParam  string
 	listJobsByRunResult []store.Job
 	listJobsByRunErr    error
 
 	// CountJobsByRun tracking
 	countJobsByRunCalled bool
-	countJobsByRunParam  pgtype.UUID
+	countJobsByRunParam  string
 	countJobsByRunResult int64
 	countJobsByRunErr    error
 
@@ -166,13 +166,13 @@ type mockStore struct {
 
 	// ScheduleNextJob tracking
 	scheduleNextJobCalled bool
-	scheduleNextJobParam  pgtype.UUID
+	scheduleNextJobParam  string
 	scheduleNextJobResult store.Job
 	scheduleNextJobErr    error
 
 	// ListDiffsByRun tracking
 	listDiffsByRunCalled bool
-	listDiffsByRunParam  pgtype.UUID
+	listDiffsByRunParam  string
 	listDiffsByRunResult []store.Diff
 	listDiffsByRunErr    error
 
@@ -194,7 +194,7 @@ type mockStore struct {
 	getBGJobErr    error
 
 	claimBGJobCalled bool
-	claimBGJobParam  pgtype.UUID
+	claimBGJobParam  *string
 	claimBGJobResult store.BuildgateJob
 	claimBGJobErr    error
 
@@ -350,13 +350,13 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 	return m.createRunResult, m.createRunErr
 }
 
-func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+func (m *mockStore) GetRun(ctx context.Context, id string) (store.Run, error) {
 	m.getRunCalled = true
 	m.getRunParams = id
 	return m.getRunResult, m.getRunErr
 }
 
-func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
+func (m *mockStore) GetRunTiming(ctx context.Context, id string) (store.RunsTiming, error) {
 	m.getRunTimingCalled = true
 	m.getRunTimingParams = id
 	return m.getRunTimingResult, m.getRunTimingErr
@@ -368,32 +368,32 @@ func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimin
 	return m.listRunsTimingsResult, m.listRunsTimingsErr
 }
 
-func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
+func (m *mockStore) DeleteRun(ctx context.Context, id string) error {
 	m.deleteRunCalled = true
 	m.deleteRunParams = id
 	return m.deleteRunErr
 }
 
-func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run, error) {
+func (m *mockStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
 	m.claimRunCalled = true
 	m.claimRunParams = nodeID
 	return m.claimRunResult, m.claimRunErr
 }
 
 // ClaimJob implements job claiming for the new unified job model.
-func (m *mockStore) ClaimJob(ctx context.Context, nodeID pgtype.UUID) (store.Job, error) {
+func (m *mockStore) ClaimJob(ctx context.Context, nodeID *string) (store.Job, error) {
 	m.claimJobCalled = true
 	m.claimJobParams = nodeID
 	if m.claimJobErr != nil {
 		return store.Job{}, m.claimJobErr
 	}
-	if !m.claimJobResult.ID.Valid {
+	if m.claimJobResult.ID == "" {
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.claimJobResult, nil
 }
 
-func (m *mockStore) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
+func (m *mockStore) GetNode(ctx context.Context, id string) (store.Node, error) {
 	m.getNodeCalled = true
 	m.getNodeParams = id
 	return m.getNodeResult, m.getNodeErr
@@ -411,7 +411,7 @@ func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventPar
 	return m.createEventResult, m.createEventErr
 }
 
-func (m *mockStore) GetJob(ctx context.Context, id pgtype.UUID) (store.Job, error) {
+func (m *mockStore) GetJob(ctx context.Context, id string) (store.Job, error) {
 	m.getJobCalled = true
 	m.getJobParams = id
 	return m.getJobResult, m.getJobErr
@@ -429,7 +429,7 @@ func (m *mockStore) CreateArtifactBundle(ctx context.Context, params store.Creat
 	return m.createArtifactBundleResult, m.createArtifactBundleErr
 }
 
-func (m *mockStore) AckRunStart(ctx context.Context, id pgtype.UUID) error {
+func (m *mockStore) AckRunStart(ctx context.Context, id string) error {
 	m.ackRunStartCalled = true
 	m.ackRunStartParam = id
 	return m.ackRunStartErr
@@ -447,7 +447,7 @@ func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunS
 	return m.updateRunStatusErr
 }
 
-func (m *mockStore) UpdateRunResume(ctx context.Context, id pgtype.UUID) error {
+func (m *mockStore) UpdateRunResume(ctx context.Context, id string) error {
 	m.updateRunResumeCalled = true
 	m.updateRunResumeParam = id
 	return m.updateRunResumeErr
@@ -490,9 +490,9 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 
 	// Build a result job for this call.
 	result := m.createJobResult
-	if !result.ID.Valid {
+	if result.ID == "" {
 		// Provide a default job id when not preset by the test.
-		result.ID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
+		result.ID = types.NewJobID().String()
 	}
 	result.RunID = params.RunID
 	result.Name = params.Name
@@ -503,7 +503,7 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 	return result, m.createJobErr
 }
 
-func (m *mockStore) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Job, error) {
+func (m *mockStore) ListJobsByRun(ctx context.Context, runID string) ([]store.Job, error) {
 	m.listJobsByRunCalled = true
 	m.listJobsByRunParam = runID
 
@@ -520,7 +520,7 @@ func (m *mockStore) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]sto
 	return result, m.listJobsByRunErr
 }
 
-func (m *mockStore) CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error) {
+func (m *mockStore) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
 	m.countJobsByRunCalled = true
 	m.countJobsByRunParam = runID
 	if m.countJobsByRunErr != nil {
@@ -570,20 +570,20 @@ func (m *mockStore) UpdateJobCompletion(ctx context.Context, params store.Update
 	return m.updateJobCompletionErr
 }
 
-func (m *mockStore) ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (store.Job, error) {
+func (m *mockStore) ScheduleNextJob(ctx context.Context, runID string) (store.Job, error) {
 	m.scheduleNextJobCalled = true
 	m.scheduleNextJobParam = runID
 	if m.scheduleNextJobErr != nil {
 		return store.Job{}, m.scheduleNextJobErr
 	}
 	// Return no rows by default if no result configured.
-	if !m.scheduleNextJobResult.ID.Valid {
+	if m.scheduleNextJobResult.ID == "" {
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.scheduleNextJobResult, nil
 }
 
-func (m *mockStore) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Diff, error) {
+func (m *mockStore) ListDiffsByRun(ctx context.Context, runID string) ([]store.Diff, error) {
 	m.listDiffsByRunCalled = true
 	m.listDiffsByRunParam = runID
 	return m.listDiffsByRunResult, m.listDiffsByRunErr
@@ -621,7 +621,7 @@ func (m *mockStore) GetBuildGateJob(ctx context.Context, id pgtype.UUID) (store.
 	return m.getBGJobResult, nil
 }
 
-func (m *mockStore) ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (store.BuildgateJob, error) {
+func (m *mockStore) ClaimBuildGateJob(ctx context.Context, nodeID *string) (store.BuildgateJob, error) {
 	m.claimBGJobCalled = true
 	m.claimBGJobParam = nodeID
 	if !m.claimBGJobResult.ID.Valid && m.claimBGJobErr == nil {

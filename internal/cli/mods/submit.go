@@ -69,7 +69,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		// Map to modsapi summary type.
 		return modsapi.RunSummary{
 			TicketID:   domaintypes.TicketID(srvResp.TicketID),
-			State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
+			State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 			Repository: srvResp.RepoURL,
 			Metadata: map[string]string{
 				"repo_base_ref":   srvResp.BaseRef,
@@ -127,7 +127,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 								}
 								return modsapi.RunSummary{
 									TicketID:   domaintypes.TicketID(srvResp.TicketID),
-									State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
+									State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 									Repository: srvResp.RepoURL,
 									Metadata: map[string]string{
 										"repo_base_ref":   srvResp.BaseRef,

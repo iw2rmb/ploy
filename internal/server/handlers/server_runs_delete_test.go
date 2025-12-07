@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -23,7 +22,7 @@ func TestDeleteRun_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID: pgtype.UUID{Bytes: runID, Valid: true},
+			ID: runID.String(),
 		},
 	}
 
@@ -43,7 +42,7 @@ func TestDeleteRun_Success(t *testing.T) {
 	if !st.deleteRunCalled {
 		t.Fatal("expected DeleteRun to be called")
 	}
-	if st.deleteRunParams.Bytes != runID {
+	if st.deleteRunParams != runID.String() {
 		t.Fatalf("DeleteRun called with wrong run id: %v", st.deleteRunParams)
 	}
 }
@@ -76,15 +75,17 @@ func TestDeleteRun_NotFound(t *testing.T) {
 	}
 }
 
-// TestDeleteRun_InvalidID verifies 400 is returned for an invalid run ID.
-func TestDeleteRun_InvalidID(t *testing.T) {
+// TestDeleteRun_EmptyID verifies 400 is returned for an empty or whitespace run ID.
+// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+func TestDeleteRun_EmptyID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
 	handler := deleteRunHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/invalid-uuid", nil)
-	req.SetPathValue("id", "invalid-uuid")
+	// Note: "invalid-uuid" is now a valid KSUID string ID, so we only test empty ID.
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/", nil)
+	req.SetPathValue("id", "   ") // Whitespace ID
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -25,13 +24,6 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		nodeIDStr := r.PathValue("id")
 		if strings.TrimSpace(nodeIDStr) == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Parse and validate node_id.
-		nodeID := domaintypes.ToPGUUID(nodeIDStr)
-		if !nodeID.Valid {
-			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -73,13 +65,6 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			return
 		}
 
-		// Validate run_id is a valid UUID.
-		runID := domaintypes.ToPGUUID(req.RunID)
-		if !runID.Valid {
-			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
-			return
-		}
-
 		// Validate events array is not empty.
 		if len(req.Events) == 0 {
 			http.Error(w, "events array is required and must not be empty", http.StatusBadRequest)
@@ -88,7 +73,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 		// Check if the node exists before processing.
 		var err error
-		_, err = st.GetNode(r.Context(), nodeID)
+		_, err = st.GetNode(r.Context(), nodeIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -113,13 +98,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			}
 
 			// Parse job_id if provided.
-			var jobID pgtype.UUID
+			var jobID *string
 			if evt.JobID != nil && strings.TrimSpace(*evt.JobID) != "" {
-				jobID = domaintypes.ToPGUUID(*evt.JobID)
-				if !jobID.Valid {
-					http.Error(w, fmt.Sprintf("events[%d]: invalid job_id: invalid uuid", i), http.StatusBadRequest)
-					return
-				}
+				jobIDStr := strings.TrimSpace(*evt.JobID)
+				jobID = &jobIDStr
 			}
 
 			// Parse event time if provided, otherwise use server time.
@@ -151,7 +133,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID: runID,
+				RunID: req.RunID,
 				JobID: jobID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,

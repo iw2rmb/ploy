@@ -21,22 +21,22 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 	childRunID := uuid.New()
 
 	queuedBatch := store.Run{
-		ID:        pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        batchRunID.String(),
 		Status:    store.RunStatusQueued,
 		Spec:      []byte(`{"mod":{"image":"test"}}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	pendingRepo := store.RunRepo{
-		ID:        pgtype.UUID{Bytes: repo1ID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: batchRunID, Valid: true},
+		ID:        repo1ID.String(),
+		RunID:     batchRunID.String(),
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusPending,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
 	childRun := store.Run{
-		ID:        pgtype.UUID{Bytes: childRunID, Valid: true},
+		ID:        childRunID.String(),
 		Status:    store.RunStatusQueued,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}

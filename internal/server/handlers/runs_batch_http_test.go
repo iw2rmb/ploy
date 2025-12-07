@@ -489,12 +489,17 @@ func TestAddRunRepoHandler(t *testing.T) {
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},
+		// Note: target_ref is optional per handler design (comment on line 298 of runs_batch_http.go).
+		// When omitted, downstream MR creation derives a default. Test verifies success.
 		{
-			name:       "missing target_ref",
-			runID:      sampleRunID,
-			body:       `{"repo_url":"https://github.com/example/repo.git","base_ref":"main"}`,
-			mockRun:    runningRun,
-			wantStatus: http.StatusBadRequest,
+			name:          "missing target_ref (optional)",
+			runID:         sampleRunID,
+			body:          `{"repo_url":"https://github.com/example/repo.git","base_ref":"main"}`,
+			mockRun:       runningRun,
+			mockRepoRes:   createdRepo,
+			wantStatus:    http.StatusCreated,
+			wantRepoID:    sampleRepoID,
+			wantCallStore: true,
 		},
 		{
 			name:       "invalid repo_url scheme",
@@ -1055,7 +1060,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			// On successful restart, GetRunRepo is called twice (before and after increment).
 			// First call returns the original repo, second returns restarted.
 			// For simplicity, we set the result to the restarted repo if available.
-			if tc.mockRepo.ID.Valid && tc.mockRestartedRepo.ID.Valid {
+			if tc.mockRepo.ID != "" && tc.mockRestartedRepo.ID != "" {
 				m.getRunRepoResult = tc.mockRepo
 			}
 

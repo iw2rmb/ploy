@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -93,7 +92,7 @@ func TestGetModEventsHandler_Success(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}}}
+	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
 	h := getModEventsHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/events", nil)
@@ -132,7 +131,7 @@ func TestGetModEventsHandler_Resume(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}}}
+	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
 	h := getModEventsHandler(st, eventsService)
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
@@ -185,7 +184,7 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 	hub := eventsService.Hub()
 
 	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}}}
+	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
 	h := getModEventsHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/events", nil)

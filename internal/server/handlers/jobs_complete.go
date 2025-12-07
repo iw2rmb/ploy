@@ -122,22 +122,19 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Derive run_id from the job for run completion checks.
 		runID := job.RunID
 
-		// Derive node UUID from required header. auth middleware already enforces
-		// presence and UUID shape for worker-role callers; this handler performs
-		// an additional check and uses the value for job ownership validation.
+		// Derive node ID from required header. auth middleware already enforces
+		// presence for worker-role callers; this handler performs an additional
+		// check and uses the value for job ownership validation.
+		// Node IDs are now NanoID(6) strings.
 		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeader == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.ToPGUUID(nodeIDHeader)
-		if !nodeID.Valid {
-			http.Error(w, "invalid PLOY_NODE_UUID header: invalid uuid", http.StatusBadRequest)
-			return
-		}
 
 		// Verify the job is assigned to the calling node.
-		if !job.NodeID.Valid || job.NodeID != nodeID {
+		// job.NodeID is *string after node ID migration.
+		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
 		}

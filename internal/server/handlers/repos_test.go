@@ -157,7 +157,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
-				RunID:      pgtype.UUID{Bytes: runID, Valid: true},
+				RunID:      runID.String(),
 				Name:       &name,
 				RunStatus:  store.RunStatusSucceeded,
 				RepoStatus: store.RunRepoStatusSucceeded,

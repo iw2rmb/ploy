@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -45,7 +44,7 @@ func TestIsTerminalRunStatus(t *testing.T) {
 func TestGetRunRepoCounts(t *testing.T) {
 	t.Parallel()
 
-	runID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	runID := uuid.New().String()
 
 	tests := []struct {
 		name              string
