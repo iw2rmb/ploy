@@ -137,11 +137,11 @@ func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status)
 
 // PublishTicket appends a typed ticket snapshot to a stream.
 //
-// The payload is strongly typed as api.TicketSummary to prevent accidental
+// The payload is strongly typed as api.RunSummary to prevent accidental
 // publication of non‑JSON payloads (e.g., raw []byte or strings). The hub
 // still performs generic JSON marshaling internally, but this boundary keeps
 // the "run" event contract consistent and JSON‑serializable.
-func (h *Hub) PublishTicket(ctx context.Context, streamID string, ticket api.TicketSummary) error {
+func (h *Hub) PublishTicket(ctx context.Context, streamID string, ticket api.RunSummary) error {
 	return h.publish(ctx, streamID, "run", ticket)
 }
 

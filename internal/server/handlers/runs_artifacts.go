@@ -10,26 +10,25 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createRunArtifactBundleHandler stores a gzipped artifact bundle for a run using an optional job-scoped association.
+//
+// Run, job, and build IDs are now KSUID-backed strings; no UUID parsing is performed.
+// IDs are treated as opaque; validation is limited to non-empty checks and existence checks.
 func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
 	const maxBodySize = 2 << 20   // 2 MiB
 	const maxBundleSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Extract run id from path parameter.
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-		runUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -63,33 +62,31 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Normalize optional job/build IDs (KSUID strings; no UUID parsing).
+		jobID := normalizeOptionalID(req.JobID)
+		buildID := normalizeOptionalID(req.BuildID)
+
 		// Validate job belongs to run if provided.
-		var jobID pgtype.UUID
-		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			jobUUID, err := uuid.Parse(*req.JobID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid job_id: %v", err), http.StatusBadRequest)
-				return
-			}
-			job, err := st.GetJob(r.Context(), pgtype.UUID{Bytes: jobUUID, Valid: true})
+		if jobID != nil {
+			job, err := st.GetJob(r.Context(), *jobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					http.Error(w, "job not found", http.StatusNotFound)
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
-				slog.Error("run artifact: job check failed", "job_id", *req.JobID, "err", err)
+				slog.Error("run artifact: job check failed", "job_id", *jobID, "err", err)
 				return
 			}
-			if uuid.UUID(job.RunID.Bytes) != runUUID {
+			// Compare string run IDs directly (both are KSUID strings).
+			if job.RunID != runIDStr {
 				http.Error(w, "job does not belong to run", http.StatusBadRequest)
 				return
 			}
-			jobID = job.ID
 		}
 
-		// Ensure the run exists.
-		if _, err := st.GetRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true}); err != nil {
+		// Ensure the run exists using string ID directly.
+		if _, err := st.GetRun(r.Context(), runIDStr); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
 				return
@@ -99,17 +96,10 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build optional build_id
-		buildID, err := parseOptionalUUID(req.BuildID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid build_id: %v", err), http.StatusBadRequest)
-			return
-		}
-
 		// Compute CID and digest for content-addressable storage.
 		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 		params := store.CreateArtifactBundleParams{
-			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
+			RunID:   runIDStr,
 			JobID:   jobID,
 			BuildID: buildID,
 			Name:    req.Name,
@@ -125,6 +115,7 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		// artifact_bundles.id is still UUID (not in scope of this task).
 		if err := json.NewEncoder(w).Encode(map[string]any{"artifact_bundle_id": uuid.UUID(artifact.ID.Bytes).String()}); err != nil {
 			slog.Error("run artifact: encode response failed", "err", err)
 		}

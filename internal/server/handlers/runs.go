@@ -8,17 +8,19 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // getRunTimingHandler returns an HTTP handler that retrieves timing data for a run.
+//
+// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
+// IDs are treated as opaque; validation is limited to non-empty checks.
 func getRunTimingHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Accept id from path parameter first, then fallback to query parameter.
+		// Run IDs are KSUID strings; treated as opaque identifiers.
 		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
@@ -28,18 +30,9 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Parse and validate run_id.
-		runUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Get timing data from the database.
-		timing, err := st.GetRunTiming(r.Context(), pgtype.UUID{
-			Bytes: runUUID,
-			Valid: true,
-		})
+		// Get timing data from the database using string ID directly.
+		// No UUID parsing needed; store accepts KSUID strings.
+		timing, err := st.GetRunTiming(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -50,13 +43,13 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response.
+		// Build response. timing.ID is now a string (KSUID).
 		resp := struct {
 			ID      string `json:"id"`
 			QueueMs int64  `json:"queue_ms"`
 			RunMs   int64  `json:"run_ms"`
 		}{
-			ID:      uuid.UUID(timing.ID.Bytes).String(),
+			ID:      timing.ID,
 			QueueMs: timing.QueueMs,
 			RunMs:   timing.RunMs,
 		}
@@ -72,27 +65,22 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 }
 
 // deleteRunHandler returns an HTTP handler that deletes a run by id.
+//
+// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
+// IDs are treated as opaque; validation is limited to non-empty checks.
 func deleteRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract id from path parameter.
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse and validate run_id.
-		runUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
-			return
-		}
-
 		// Check if the run exists before attempting to delete.
-		_, err = st.GetRun(r.Context(), pgtype.UUID{
-			Bytes: runUUID,
-			Valid: true,
-		})
+		// No UUID parsing needed; store accepts KSUID strings.
+		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -103,11 +91,8 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Delete the run.
-		err = st.DeleteRun(r.Context(), pgtype.UUID{
-			Bytes: runUUID,
-			Valid: true,
-		})
+		// Delete the run using string ID directly.
+		err = st.DeleteRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to delete run: %v", err), http.StatusInternalServerError)
 			slog.Error("delete run: database error", "run_id", runIDStr, "err", err)

@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// NOTE: Run IDs in this file are now KSUID-backed strings.
+// RunRepo IDs (repo_id) are still UUIDs (outside scope of KSUID migration).
 
 // RunBatchSummary represents a run with aggregated repo status counts.
 // Used for list and detail responses.
@@ -60,10 +61,11 @@ const (
 
 // runToSummary converts a store.Run to a RunBatchSummary.
 // Wraps raw store strings in domain types for type-safe API output.
+// run.ID is now a string (KSUID), so no UUID conversion is needed.
 func runToSummary(run store.Run) RunBatchSummary {
 	summary := RunBatchSummary{
-		// Convert UUID to domain type for consistent serialization.
-		ID:     domaintypes.RunID(uuid.UUID(run.ID.Bytes).String()),
+		// run.ID is now a string (KSUID); cast directly to domain type.
+		ID:     domaintypes.RunID(run.ID),
 		Name:   run.Name,
 		Status: run.Status,
 		// Wrap VCS fields in domain types; values are validated at input time.
@@ -85,7 +87,8 @@ func runToSummary(run store.Run) RunBatchSummary {
 }
 
 // getRunRepoCounts fetches and aggregates repo counts by status for a run.
-func getRunRepoCounts(ctx context.Context, st store.Store, runID pgtype.UUID) (*RunRepoCounts, error) {
+// runID is now a string (KSUID).
+func getRunRepoCounts(ctx context.Context, st store.Store, runID string) (*RunRepoCounts, error) {
 	rows, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
 		return nil, err
@@ -199,11 +202,13 @@ type RunRepoResponse struct {
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
+// rr.RunID is now a string (KSUID); rr.ID is still UUID.
 func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
 	resp := RunRepoResponse{
-		// Convert UUIDs to domain types for consistent serialization.
-		ID:    domaintypes.RunRepoID(uuid.UUID(rr.ID.Bytes).String()),
-		RunID: domaintypes.RunID(uuid.UUID(rr.RunID.Bytes).String()),
+		// rr.ID is still pgtype.UUID (run_repos.id is outside KSUID migration scope).
+		ID: domaintypes.RunRepoID(uuid.UUID(rr.ID.Bytes).String()),
+		// rr.RunID is now a string (KSUID); cast directly.
+		RunID: domaintypes.RunID(rr.RunID),
 		// Wrap VCS fields in domain types; values are validated at input time.
 		RepoURL:   domaintypes.RepoURL(rr.RepoUrl),
 		BaseRef:   domaintypes.GitRef(rr.BaseRef),

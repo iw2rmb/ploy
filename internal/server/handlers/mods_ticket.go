@@ -21,12 +21,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// NOTE: This file uses KSUID-backed string IDs for runs and jobs.
+// Run and job IDs are generated using domaintypes.NewRunID() and domaintypes.NewJobID().
+// UUID parsing is no longer performed for run/job IDs; they are treated as opaque strings.
+
 // Mods  run handlers implement the /v1/mods facade:  run submission from
 // repo/spec,  run status as mods-style RunSummary, and stage/run_step
 // materialization for single- and multi-step runs.
 
-// submitTicketHandler returns an HTTP handler that submits a new  run (mods run).
-// POST /v1/mods — Accepts RunSubmitRequest, returns RunSummary ( run_id == run UUID).
+// submitTicketHandler returns an HTTP handler that submits a new run (mods run).
+// POST /v1/mods — Accepts RunSubmitRequest, returns RunSummary (run_id is a KSUID string).
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
 func submitTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +40,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			RepoURL domaintypes.RepoURL `json:"repo_url"`
 			BaseRef domaintypes.GitRef  `json:"base_ref"`
 			// TargetRef is optional; when omitted, downstream components derive a default
-			// branch name when an MR is actually created (using the DB run UUID).
+			// branch name when an MR is actually created (using the DB run ID).
 			TargetRef *domaintypes.GitRef    `json:"target_ref,omitempty"`
 			CommitSha *domaintypes.CommitSHA `json:"commit_sha,omitempty"`
 			Spec      *json.RawMessage       `json:"spec,omitempty"`
@@ -79,6 +83,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Create the run directly with repo_url and spec inlined.
 		// Convert domain types to strings for storage layer.
+		// Generate KSUID-backed run ID using central helper.
 		var commitShaStr *string
 		if req.CommitSha != nil {
 			s := req.CommitSha.String()
@@ -89,8 +94,10 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			targetRef = req.TargetRef.String()
 		}
 
+		runID := domaintypes.NewRunID()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			Name:      nil, // Single-repo  runs do not use batch naming.
+			ID:        string(runID),
+			Name:      nil, // Single-repo runs do not use batch naming.
 			RepoUrl:   req.RepoURL.String(),
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
@@ -101,7 +108,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit  run: create run failed", "repo_url", req.RepoURL, "err", err)
+			slog.Error("submit run: create run failed", "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
@@ -109,23 +116,24 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Jobs are created with float step_index for ordered execution:
 		//   pre-gate (1000) → mod-0 (2000) → post-gate (3000)
 		// For multi-step runs (mods[] array), creates one mod job per entry.
+		// run.ID is now a string (KSUID).
 		if err := createJobsFromSpec(r.Context(), st, run.ID, spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("submit  run: create jobs failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			slog.Error("submit run: create jobs failed", "run_id", run.ID, "err", err)
 			return
 		}
 
-		// Build response with RunSummary ( run_id == run UUID).
+		// Build response with RunSummary (run_id is a KSUID string).
 		// Use typed status (store.RunStatus) instead of string cast for type safety;
 		// JSON encoder will serialize the underlying string value.
 		resp := struct {
-			TicketID  string          `json:" run_id"`
+			TicketID  string          `json:"run_id"`
 			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
 			RepoURL   string          `json:"repo_url"`
 			BaseRef   string          `json:"base_ref"`
 			TargetRef string          `json:"target_ref"`
 		}{
-			TicketID:  uuid.UUID(run.ID.Bytes).String(),
+			TicketID:  run.ID, // run.ID is now a string (KSUID).
 			Status:    run.Status,
 			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
@@ -143,18 +151,18 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
 			if err := eventsService.PublishTicket(r.Context(), resp.TicketID, runSummary); err != nil {
-				slog.Error("submit  run: publish  run event failed", " run_id", resp.TicketID, "err", err)
+				slog.Error("submit run: publish run event failed", "run_id", resp.TicketID, "err", err)
 			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("submit  run: encode response failed", "err", err)
+			slog.Error("submit run: encode response failed", "err", err)
 		}
 
-		slog.Info(" run submitted",
-			" run_id", resp.TicketID,
+		slog.Info("run submitted",
+			"run_id", resp.TicketID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
@@ -163,39 +171,29 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 	}
 }
 
-// getTicketStatusHandler returns an HTTP handler that fetches  run (run) status by ID.
-// GET /v1/mods/{id} — Returns RunSummary by run UUID.
+// getTicketStatusHandler returns an HTTP handler that fetches run (run) status by ID.
+// GET /v1/mods/{id} — Returns RunSummary by run ID (KSUID string).
+//
+// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the  run ID from the URL path parameter.
-		runIDStr := r.PathValue("id")
+		// Parse the run ID from the URL path parameter.
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
-			http.Error(w, " run id is required", http.StatusBadRequest)
+			http.Error(w, "run id is required", http.StatusBadRequest)
 			return
 		}
 
-		// Parse UUID.
-		runID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid  run id: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Convert to pgtype.UUID.
-		pgID := pgtype.UUID{
-			Bytes: runID,
-			Valid: true,
-		}
-
-		// Fetch run (now includes repo_url directly).
-		run, err := st.GetRun(r.Context(), pgID)
+		// Fetch run using string ID directly (no UUID parsing needed).
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, " run not found", http.StatusNotFound)
+				http.Error(w, "run not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get  run: %v", err), http.StatusInternalServerError)
-			slog.Error("get  run status: fetch run failed", " run_id", runIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("get run status: fetch run failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
@@ -203,8 +201,9 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
 		runState := modsapi.RunStatusFromStore(run.Status)
 
+		// run.ID is now a string (KSUID).
 		summary := modsapi.RunSummary{
-			TicketID:   domaintypes.TicketID(uuid.UUID(run.ID.Bytes).String()),
+			TicketID:   domaintypes.TicketID(run.ID),
 			State:      runState,
 			Submitter:  "",
 			Repository: run.RepoUrl,
@@ -215,6 +214,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Include claiming node id when available for easier diagnostics.
+		// Note: node_id is still UUID.
 		if run.NodeID.Valid {
 			summary.Metadata["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
 		}
@@ -255,21 +255,22 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		// Load jobs and their artifacts.
-		jobs, err := st.ListJobsByRun(r.Context(), storePgUUID(run.ID))
+		// Load jobs and their artifacts using string run ID.
+		jobs, err := st.ListJobsByRun(r.Context(), run.ID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("get  run status: list jobs failed", " run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			slog.Error("get run status: list jobs failed", "run_id", run.ID, "err", err)
 			return
 		}
 		for _, job := range jobs {
 			// Use conversion helper to map store.JobStatus -> modsapi.StageState
 			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
-			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: storePgUUID(run.ID), JobID: job.ID})
+			// job.ID and run.ID are now strings (KSUID).
+			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
-				slog.Error("get  run status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
+				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", job.ID, "err", err)
 				return
 			}
 			for _, b := range bundles {
@@ -287,7 +288,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.
-			summary.Stages[uuid.UUID(job.ID.Bytes).String()] = modsapi.StageStatus{
+			// job.ID is now a string (KSUID).
+			summary.Stages[job.ID] = modsapi.StageStatus{
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
@@ -299,7 +301,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: summary}); err != nil {
-			slog.Error("get  run status: encode response failed", "err", err)
+			slog.Error("get run status: encode response failed", "err", err)
 		}
 	}
 }
@@ -314,7 +316,9 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 //
 // For multi-step runs (mods[] array), creates one mod job per entry.
 // Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
-func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
+//
+// runID is now a string (KSUID); job IDs are generated using domaintypes.NewJobID().
+func createJobsFromSpec(ctx context.Context, st store.Store, runID string, spec []byte) error {
 	// Parse spec to detect multi-step vs single-step.
 	var specMap map[string]interface{}
 	if len(spec) > 0 && json.Valid(spec) {
@@ -371,7 +375,8 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 
 // createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
 // Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
-func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, modImage string) error {
+// runID is a string (KSUID).
+func createSingleModJob(ctx context.Context, st store.Store, runID string, modImage string) error {
 	// Pre-gate is pending (ready to claim), others are created (wait for server to schedule).
 	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusPending); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
@@ -388,9 +393,13 @@ func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, 
 // createJobWithIndex creates a job with the given step_index, status, and metadata.
 // modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
 // status should be JobStatusPending for the first job, JobStatusCreated for others.
-func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
+// runID is a string (KSUID); job ID is generated using domaintypes.NewJobID().
+func createJobWithIndex(ctx context.Context, st store.Store, runID string, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
+	// Generate KSUID-backed job ID using central helper.
+	jobID := domaintypes.NewJobID()
 	// Create the job with step_index and status.
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
+		ID:        string(jobID),
 		RunID:     runID,
 		Name:      name,
 		Status:    status,
@@ -409,5 +418,3 @@ func timeOrZero(ts pgtype.Timestamptz) time.Time {
 	}
 	return time.Unix(0, 0).UTC()
 }
-
-func storePgUUID(id pgtype.UUID) pgtype.UUID { return id }

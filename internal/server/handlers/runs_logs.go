@@ -8,15 +8,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createRunLogHandler handles POST /v1/runs/{id}/logs for receiving gzipped log chunks.
 // This variant does not require a node path parameter; it ingests logs scoped to a run.
+//
+// Run, job, and build IDs are now KSUID-backed strings; no UUID parsing is performed.
+// IDs are treated as opaque; validation is limited to non-empty checks.
 func createRunLogHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
@@ -24,14 +24,10 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run id from path parameter.
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
+		// Run IDs are KSUID strings; treated as opaque identifiers.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-		runUUID, err := uuid.Parse(runIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -68,21 +64,13 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Parse optional job/build IDs using helper.
-		jobID, err := parseOptionalUUID(req.JobID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid job_id: %v", err), http.StatusBadRequest)
-			return
-		}
-		buildID, err := parseOptionalUUID(req.BuildID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid build_id: %v", err), http.StatusBadRequest)
-			return
-		}
+		// Normalize optional job/build IDs (KSUID strings; no UUID parsing).
+		jobID := normalizeOptionalID(req.JobID)
+		buildID := normalizeOptionalID(req.BuildID)
 
-		// Create log row.
+		// Create log row using string IDs directly.
 		params := store.CreateLogParams{
-			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
+			RunID:   runIDStr,
 			JobID:   jobID,
 			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
@@ -91,6 +79,7 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		// Persist and publish to SSE when events service is available; otherwise
 		// fall back to direct store write for backward compatibility.
 		var logRow store.Log
+		var err error
 		if eventsService != nil {
 			logRow, err = eventsService.CreateAndPublishLog(r.Context(), params)
 		} else {
