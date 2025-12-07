@@ -59,7 +59,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		return err
 	}
 	if c.Output != nil {
-		id := toString(payload["ticket_id"])
+		id := toString(payload["run_id"])
 		status := toString(payload["status"])
 		step := toString(payload["step_id"]) // may be empty
 		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s step=%s\n", id, status, step)

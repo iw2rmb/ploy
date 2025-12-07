@@ -1,6 +1,6 @@
 # Ploy Workflow CLI
 
-`ploy` is a single-purpose CLI that claims workflow tickets from the Ploy control plane,
+`ploy` is a single-purpose CLI that claims workflow runs from the Ploy control plane,
 reconstructs the default mods→build→test DAG, and dispatches stages via the
 configured runtime adapter. Legacy subcommands (apps, env, mods, security, etc.) were
 removed during the workstation legacy teardown.
@@ -22,7 +22,7 @@ ploy lanes describe --lane <lane-name> \
   [--commit <sha>] [--manifest <version>] \
   [--aster <toggle,...>]
 ploy mod run \
-  [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
+  [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap] \
   [--aster <toggle,...>] \
@@ -35,7 +35,7 @@ ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>
 ```
 
 Note on `--json` output:
-- When `--json` is supplied (e.g., `ploy mod run --json`), stdout emits a compact JSON summary (fields include `ticket_id`, `final_state`, optional `artifact_dir`, `mr_url`).
+- When `--json` is supplied (e.g., `ploy mod run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, optional `artifact_dir`, `mr_url`).
 - Human‑readable progress and logs continue to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
 
 Quick capture example:
@@ -44,7 +44,7 @@ TICKET=$(ploy mod run --json \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade \
-  --follow | jq -r '.ticket_id')
+  --follow | jq -r '.run_id')
 ```
 
 `lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
@@ -55,14 +55,14 @@ commit/manifest/Aster toggles. Aster inputs are only included when
 behind a feature flag. The preview mirrors what the workflow runner supplies to
 the runtime when dispatching stages.
 
-`mod run` submits a run to the control plane (server assigns the ticket id),
+`mod run` submits a run to the control plane (server assigns the run id),
 materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
 flow into stage metadata so the control plane can respect concurrency/timebox controls. `--cap` enforces an overall
-time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the ticket. When
+time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests. When
@@ -169,23 +169,23 @@ See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and
 
 ---
 
-`mod resume` requests resumption of a failed or canceled Mods ticket via the
+`mod resume` requests resumption of a failed or canceled Mods run via the
 control plane `POST /v1/mods/{id}/resume` endpoint. This enables continuation
 of previously interrupted workflows without resubmitting the entire spec.
 
 ```bash
-ploy mod resume <ticket-id>
+ploy mod resume <run-id>
 # Output: Resume requested
 ```
 
 The command handles the following server responses:
 - **202 Accepted**: Resume successfully initiated; eligible jobs are requeued.
-- **200 OK**: Ticket is already running (idempotent) or all jobs succeeded.
-- **404 Not Found**: Ticket does not exist.
-- **409 Conflict**: Ticket state is not resumable (e.g., already succeeded).
-- **400 Bad Request**: Invalid ticket ID format.
+- **200 OK**: Run is already running (idempotent) or all jobs succeeded.
+- **404 Not Found**: Run does not exist.
+- **409 Conflict**: Run state is not resumable (e.g., already succeeded).
+- **400 Bad Request**: Invalid run ID format.
 
-Only tickets in `failed` or `canceled` state can be resumed. Succeeded tickets
+Only runs in `failed` or `canceled` state can be resumed. Succeeded runs
 cannot be resumed since there are no jobs to requeue.
 
 `environment materialize` evaluates the integration manifest for a given
@@ -269,10 +269,7 @@ ploy completion <shell> --help
   (`build_gate_healing`), and GitLab MR settings. See `docs/schemas/mod.example.yaml`
   for the full schema and `tests/e2e/mods/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-target-ref` is
-  required; `--repo-base-ref` defaults to the repository's default branch. The
-  workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods
-  stages execute.
+  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `/mod/<run-id>` (using the database run UUID) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
@@ -288,7 +285,7 @@ ploy completion <shell> --help
   - `--retry-wait <duration>` (deprecated; default `1s` for `mods logs`, `500ms` for `runs follow`): Initial wait duration between reconnect attempts. The backoff policy applies exponential growth with jitter (2x multiplier, capped at 30s). This flag is preserved for backward compatibility; the shared backoff policy handles reconnect delays.
   - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (starting at `--retry-wait` if set, otherwise 250ms for SSE streams). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
-- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
+- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Structured Log Format
 
@@ -336,13 +333,13 @@ Step started
 
 ```bash
 # Follow logs in structured format (default)
-ploy mods logs <ticket-id>
+ploy mods logs <run-id>
 
 # Follow logs in raw format (message only)
-ploy mods logs <ticket-id> --format raw
+ploy mods logs <run-id> --format raw
 
 # Follow a run with structured log output
-ploy runs follow <ticket-id>
+ploy runs follow <run-id>
 ```
 
 See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.
@@ -407,7 +404,7 @@ Gate execution runs on dedicated Build Gate worker nodes (configured via
 enables horizontal scaling of gate validation without affecting Mods node capacity.
 
 **CLI-visible gate summaries:**
-Gate results are surfaced via `ploy mod inspect <ticket-id>` in the same format regardless
+Gate results are surfaced via `ploy mod inspect <run-id>` in the same format regardless
 of execution location:
 - `Gate: passed duration=1234ms`
 - `Gate: failed pre-gate duration=567ms`
@@ -466,11 +463,11 @@ fix. If re-gate passes, the DAG continues to the next mod.
 
 **CLI inspection:**
 
-Use `ploy mod inspect <ticket-id>` to view job-level state:
+Use `ploy mod inspect <run-id>` to view job-level state:
 
 ```bash
 $ ploy mod inspect mods-abc123
-Ticket mods-abc123: running
+Run mods-abc123: running
 MR: https://gitlab.com/org/repo/-/merge_requests/1
 Gate: failed pre-gate duration=567ms
 Jobs:
@@ -493,7 +490,7 @@ See `internal/mods/api/types.go` for the full schema.
 
 ## Exit Codes
 
-- `0` — success (ticket claimed, stages completed, workspace cleaned).
+- `0` — success (run claimed, stages completed, workspace cleaned).
 - `1` — error (missing flags, unsupported subcommand, stage failure, or
   downstream error).
 

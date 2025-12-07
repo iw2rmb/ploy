@@ -314,9 +314,10 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Decode request body with domain types for VCS fields.
 		// JSON unmarshaling will automatically normalize values; we validate explicitly.
 		var req struct {
-			RepoURL   domaintypes.RepoURL `json:"repo_url"`
-			BaseRef   domaintypes.GitRef  `json:"base_ref"`
-			TargetRef domaintypes.GitRef  `json:"target_ref"`
+			RepoURL domaintypes.RepoURL `json:"repo_url"`
+			BaseRef domaintypes.GitRef  `json:"base_ref"`
+			// TargetRef is optional; when omitted, downstream MR creation derives a default.
+			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
@@ -332,17 +333,24 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
 			return
 		}
-		if err := req.TargetRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
-			return
+		if req.TargetRef != nil {
+			if err := req.TargetRef.Validate(); err != nil {
+				http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+				return
+			}
 		}
 
 		// Create the run_repo entry with status=pending.
+		targetRef := ""
+		if req.TargetRef != nil {
+			targetRef = req.TargetRef.String()
+		}
+
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			RunID:     pgRunID,
 			RepoUrl:   req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
-			TargetRef: req.TargetRef.String(),
+			TargetRef: targetRef,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)

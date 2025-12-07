@@ -37,14 +37,14 @@ func parseLastEventID(header string) int64 {
 func getModEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract ticket ID from path parameter.
-		ticketIDStr := r.PathValue("id")
-		if strings.TrimSpace(ticketIDStr) == "" {
+		runIDStr := r.PathValue("id")
+		if strings.TrimSpace(runIDStr) == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse and validate ticket_id.
-		ticketUUID, err := uuid.Parse(ticketIDStr)
+		ticketUUID, err := uuid.Parse(runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
 			return
@@ -61,7 +61,7 @@ func getModEventsHandler(st store.Store, eventsService *events.Service) http.Han
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("get mod events: database error", "ticket_id", ticketIDStr, "err", err)
+			slog.Error("get mod events: database error", "ticket_id", runIDStr, "err", err)
 			return
 		}
 
@@ -72,13 +72,13 @@ func getModEventsHandler(st store.Store, eventsService *events.Service) http.Han
 		hub := eventsService.Hub()
 
 		// Ensure the stream exists (creates if not present).
-		hub.Ensure(ticketIDStr)
+		hub.Ensure(runIDStr)
 
 		// Delegate to logstream.Serve for SSE streaming.
-		if err := logstream.Serve(w, r, hub, ticketIDStr, sinceID); err != nil {
+		if err := logstream.Serve(w, r, hub, runIDStr, sinceID); err != nil {
 			// Only log non-cancellation errors (client disconnect is normal).
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream mod events", "ticket_id", ticketIDStr, "err", err)
+				slog.Error("stream mod events", "ticket_id", runIDStr, "err", err)
 			}
 		}
 	}

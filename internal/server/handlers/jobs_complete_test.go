@@ -614,7 +614,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	foundTicketEvent := false
 	foundDoneEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicketEvent = true
 			if !strings.Contains(string(evt.Data), "succeeded") {
 				t.Errorf("expected ticket event data to contain 'succeeded', got: %s", string(evt.Data))

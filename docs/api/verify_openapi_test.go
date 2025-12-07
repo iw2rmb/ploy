@@ -143,9 +143,9 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"RunBatchDerivedStatus", // Batch-level aggregate status enum.
 		"CreateRunRequest",
 		"CreateRunResponse",
-		"TicketSubmitRequest",
-		"TicketSummary",
-		"TicketStatus",
+		"RunSubmitRequest",
+		"RunSummary",
+		"RunStatus",
 		"NodeClaimResponse",
 		"Event",
 		"Stage",

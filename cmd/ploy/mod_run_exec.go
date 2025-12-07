@@ -47,18 +47,13 @@ func defaultStageDefinitions() []modsapi.StageDefinition {
 	}
 }
 
-// buildTicketRequest constructs the initial ticket submission request from CLI flags and defaults.
+// buildTicketRequest constructs the initial run submission request from CLI flags and defaults.
 // Repository metadata (base_ref, target_ref, workspace_hint) is attached when provided.
-func buildTicketRequest(flags *modRunFlags) (modsapi.TicketSubmitRequest, error) {
+func buildTicketRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 	repoURL := strings.TrimSpace(*flags.RepoURL)
 	targetRef := strings.TrimSpace(*flags.RepoTargetRef)
 
-	// Validate that target ref is provided when repo URL is set.
-	if repoURL != "" && targetRef == "" {
-		return modsapi.TicketSubmitRequest{}, fmt.Errorf("repo target ref required when repo url is set")
-	}
-
-	request := modsapi.TicketSubmitRequest{
+	request := modsapi.RunSubmitRequest{
 		Submitter:  strings.TrimSpace(os.Getenv("USER")),
 		Repository: repoURL,
 		Metadata:   make(map[string]string),
@@ -80,7 +75,7 @@ func buildTicketRequest(flags *modRunFlags) (modsapi.TicketSubmitRequest, error)
 }
 
 // submitTicket sends the ticket request to the control plane and returns the initial summary.
-func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.TicketSubmitRequest, specPayload []byte) (modsapi.TicketSummary, error) {
+func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest, specPayload []byte) (modsapi.RunSummary, error) {
 	cmd := mods.SubmitCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -94,7 +89,7 @@ func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, r
 // Returns the final ticket state and any errors encountered during streaming.
 // When --follow is used, streams both ticket/stage events and enriched log events using the
 // shared log printer for a unified, informative view of the Mods execution.
-func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID string, flags *modRunFlags, stderr io.Writer) (modsapi.TicketState, error) {
+func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Client, runID string, flags *modRunFlags, stderr io.Writer) (modsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
 	if *flags.CapDuration > 0 {
@@ -120,7 +115,7 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 			RetryBackoff: *flags.RetryWait,
 		},
 		BaseURL:    base,
-		Ticket:     ticketID,
+		Ticket:     runID,
 		Output:     stderr,
 		LogPrinter: logPrinter, // Wire unified logs into follow mode.
 	}
@@ -134,12 +129,12 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 				_ = mods.CancelCommand{
 					BaseURL: base,
 					Client:  httpClient,
-					Ticket:  ticketID,
+					Ticket:  runID,
 					Reason:  "cap exceeded",
 					Output:  stderr,
 				}.Run(context.Background())
 			} else {
-				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", flags.CapDuration.String(), ticketID)
+				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", flags.CapDuration.String(), runID)
 			}
 			return "", nil
 		}
@@ -147,7 +142,7 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 	}
 
 	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
-	if final != modsapi.TicketStateSucceeded {
+	if final != modsapi.RunStateSucceeded {
 		return final, fmt.Errorf("mod run ended in %s", strings.ToLower(string(final)))
 	}
 
@@ -156,12 +151,12 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 
 // outputJSONSummary writes a machine-readable JSON summary to stdout when requested.
 // Includes ticket ID, initial and final states, artifact directory, and MR URL (if available).
-func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID, initialState, finalState string, flags *modRunFlags) error {
+func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID, initialState, finalState string, flags *modRunFlags) error {
 	// Optional: probe MR URL from ticket status metadata.
-	mrURL, _ := fetchMRURL(ctx, base, httpClient, ticketID)
+	mrURL, _ := fetchMRURL(ctx, base, httpClient, runID)
 
 	type runJSON struct {
-		TicketID    string `json:"ticket_id"`
+		TicketID    string `json:"run_id"`
 		Initial     string `json:"initial_state,omitempty"`
 		Final       string `json:"final_state,omitempty"`
 		ArtifactDir string `json:"artifact_dir,omitempty"`
@@ -169,7 +164,7 @@ func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Clie
 	}
 
 	out := runJSON{
-		TicketID: ticketID,
+		TicketID: runID,
 		Initial:  initialState,
 		Final:    finalState,
 	}

@@ -63,7 +63,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 	}
 
 	var resp struct {
-		TicketID  string `json:"ticket_id"`
+		TicketID  string `json:"run_id"`
 		Status    string `json:"status"`
 		RepoURL   string `json:"repo_url"`
 		BaseRef   string `json:"base_ref"`
@@ -452,10 +452,10 @@ func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
 		t.Fatal("expected at least one ticket event to be published")
 	}
 
-	// Verify the event type is "ticket".
+	// Verify the event type is "run".
 	foundTicketEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicketEvent = true
 			// Verify the event contains ticket state information.
 			if !strings.Contains(string(evt.Data), "queued") {

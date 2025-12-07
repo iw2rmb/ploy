@@ -189,7 +189,7 @@ func TestStream_PublishTicket(t *testing.T) {
 				if len(snapshot) == 0 {
 					t.Fatal("expected ticket event in hub snapshot, got none")
 				}
-				if snapshot[0].Type != "ticket" {
+				if snapshot[0].Type != "run" {
 					t.Fatalf("expected event type 'ticket', got %s", snapshot[0].Type)
 				}
 

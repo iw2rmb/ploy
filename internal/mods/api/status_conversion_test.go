@@ -37,31 +37,31 @@ func TestStageStatusFromStore(t *testing.T) {
 	}
 }
 
-// TestTicketStatusFromStore verifies that store.RunStatus values are correctly
-// converted to mods API TicketState values.
-func TestTicketStatusFromStore(t *testing.T) {
+// TestRunStatusFromStore verifies that store.RunStatus values are correctly
+// converted to mods API RunState values.
+func TestRunStatusFromStore(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
 		input store.RunStatus
-		want  TicketState
+		want  RunState
 	}{
-		{name: "queued->pending", input: store.RunStatusQueued, want: TicketStatePending},
-		{name: "assigned->pending", input: store.RunStatusAssigned, want: TicketStatePending},
-		{name: "running", input: store.RunStatusRunning, want: TicketStateRunning},
-		{name: "succeeded", input: store.RunStatusSucceeded, want: TicketStateSucceeded},
-		{name: "failed", input: store.RunStatusFailed, want: TicketStateFailed},
-		{name: "canceled->cancelled", input: store.RunStatusCanceled, want: TicketStateCancelled},
-		{name: "unknown->pending", input: store.RunStatus("unknown"), want: TicketStatePending},
+		{name: "queued->pending", input: store.RunStatusQueued, want: RunStatePending},
+		{name: "assigned->pending", input: store.RunStatusAssigned, want: RunStatePending},
+		{name: "running", input: store.RunStatusRunning, want: RunStateRunning},
+		{name: "succeeded", input: store.RunStatusSucceeded, want: RunStateSucceeded},
+		{name: "failed", input: store.RunStatusFailed, want: RunStateFailed},
+		{name: "canceled->cancelled", input: store.RunStatusCanceled, want: RunStateCancelled},
+		{name: "unknown->pending", input: store.RunStatus("unknown"), want: RunStatePending},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := TicketStatusFromStore(tt.input)
+			got := RunStatusFromStore(tt.input)
 			if got != tt.want {
-				t.Errorf("TicketStatusFromStore(%v) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("RunStatusFromStore(%v) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -98,31 +98,31 @@ func TestStageStatusToStore(t *testing.T) {
 	}
 }
 
-// TestTicketStatusToStore verifies that mods API TicketState values are correctly
+// TestRunStatusToStore verifies that mods API RunState values are correctly
 // converted to store.RunStatus values.
-func TestTicketStatusToStore(t *testing.T) {
+func TestRunStatusToStore(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		input TicketState
+		input RunState
 		want  store.RunStatus
 	}{
-		{name: "pending->queued", input: TicketStatePending, want: store.RunStatusQueued},
-		{name: "running", input: TicketStateRunning, want: store.RunStatusRunning},
-		{name: "succeeded", input: TicketStateSucceeded, want: store.RunStatusSucceeded},
-		{name: "failed", input: TicketStateFailed, want: store.RunStatusFailed},
-		{name: "cancelling->canceled", input: TicketStateCancelling, want: store.RunStatusCanceled},
-		{name: "cancelled->canceled", input: TicketStateCancelled, want: store.RunStatusCanceled},
-		{name: "unknown->queued", input: TicketState("unknown"), want: store.RunStatusQueued},
+		{name: "pending->queued", input: RunStatePending, want: store.RunStatusQueued},
+		{name: "running", input: RunStateRunning, want: store.RunStatusRunning},
+		{name: "succeeded", input: RunStateSucceeded, want: store.RunStatusSucceeded},
+		{name: "failed", input: RunStateFailed, want: store.RunStatusFailed},
+		{name: "cancelling->canceled", input: RunStateCancelling, want: store.RunStatusCanceled},
+		{name: "cancelled->canceled", input: RunStateCancelled, want: store.RunStatusCanceled},
+		{name: "unknown->queued", input: RunState("unknown"), want: store.RunStatusQueued},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := TicketStatusToStore(tt.input)
+			got := RunStatusToStore(tt.input)
 			if got != tt.want {
-				t.Errorf("TicketStatusToStore(%v) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("RunStatusToStore(%v) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -208,8 +208,8 @@ func TestRoundTripConversion(t *testing.T) {
 		}
 
 		for _, orig := range roundTripStatuses {
-			apiState := TicketStatusFromStore(orig)
-			backToStore := TicketStatusToStore(apiState)
+			apiState := RunStatusFromStore(orig)
+			backToStore := RunStatusToStore(apiState)
 			if backToStore != orig {
 				t.Errorf("Ticket status round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
 			}
@@ -217,11 +217,11 @@ func TestRoundTripConversion(t *testing.T) {
 
 		// Queued and assigned both map to pending in API, which maps back to queued in store
 		for _, orig := range []store.RunStatus{store.RunStatusQueued, store.RunStatusAssigned} {
-			apiState := TicketStatusFromStore(orig)
-			if apiState != TicketStatePending {
+			apiState := RunStatusFromStore(orig)
+			if apiState != RunStatePending {
 				t.Errorf("%v should map to pending in API, got %v", orig, apiState)
 			}
-			backToStore := TicketStatusToStore(apiState)
+			backToStore := RunStatusToStore(apiState)
 			if backToStore != store.RunStatusQueued {
 				t.Errorf("Pending API state should map back to queued in store, got %v", backToStore)
 			}

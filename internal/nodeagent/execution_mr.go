@@ -102,7 +102,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 
 	// Use a unique source branch per run: ploy-<ticket-id>.
 	// This avoids MR conflicts on repeated runs regardless of the submitted target ref.
-	sourceBranch := fmt.Sprintf("ploy-%s", req.RunID)
+	sourceBranch := req.TargetRef.String()
 
 	// Create a commit with any workspace changes before pushing.
 	if committed, cerr := git.EnsureCommit(ctx, workspaceRoot, "ploy-bot", "ploy-bot@ploy.local", fmt.Sprintf("Ploy: apply changes for run %s", req.RunID)); cerr != nil {

@@ -22,16 +22,16 @@ const (
 	StageStateCancelled  StageState = "cancelled"
 )
 
-// TicketState mirrors Mods ticket lifecycle states exposed over the API.
-type TicketState string
+// RunState mirrors Mods ticket lifecycle states exposed over the API.
+type RunState string
 
 const (
-	TicketStatePending    TicketState = "pending"
-	TicketStateRunning    TicketState = "running"
-	TicketStateSucceeded  TicketState = "succeeded"
-	TicketStateFailed     TicketState = "failed"
-	TicketStateCancelling TicketState = "cancelling"
-	TicketStateCancelled  TicketState = "cancelled"
+	RunStatePending    RunState = "pending"
+	RunStateRunning    RunState = "running"
+	RunStateSucceeded  RunState = "succeeded"
+	RunStateFailed     RunState = "failed"
+	RunStateCancelling RunState = "cancelling"
+	RunStateCancelled  RunState = "cancelled"
 )
 
 // StageDefinition defines a stage within the Mods ticket graph.
@@ -44,29 +44,29 @@ type StageDefinition struct {
 	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
-// TicketSubmitRequest represents a ticket submission payload.
-type TicketSubmitRequest struct {
-	TicketID   domaintypes.TicketID `json:"ticket_id,omitempty"`
+// RunSubmitRequest represents a ticket submission payload.
+type RunSubmitRequest struct {
+	TicketID   domaintypes.TicketID `json:"run_id,omitempty"`
 	Submitter  string               `json:"submitter,omitempty"`
 	Repository string               `json:"repository,omitempty"`
 	Metadata   map[string]string    `json:"metadata,omitempty"`
 	Stages     []StageDefinition    `json:"stages"`
 }
 
-// TicketSubmitResponse returns the persisted ticket summary after submission.
-type TicketSubmitResponse struct {
-	Ticket TicketSummary `json:"ticket"`
+// RunSubmitResponse returns the persisted ticket summary after submission.
+type RunSubmitResponse struct {
+	Ticket RunSummary `json:"ticket"`
 }
 
-// TicketStatusResponse returns the current ticket summary.
-type TicketStatusResponse struct {
-	Ticket TicketSummary `json:"ticket"`
+// RunStatusResponse returns the current ticket summary.
+type RunStatusResponse struct {
+	Ticket RunSummary `json:"ticket"`
 }
 
-// TicketSummary summarises ticket lifecycle state and associated stages.
-type TicketSummary struct {
-	TicketID   domaintypes.TicketID `json:"ticket_id"`
-	State      TicketState          `json:"state"`
+// RunSummary summarises ticket lifecycle state and associated stages.
+type RunSummary struct {
+	TicketID   domaintypes.TicketID `json:"run_id"`
+	State      RunState             `json:"state"`
 	Submitter  string               `json:"submitter,omitempty"`
 	Repository string               `json:"repository,omitempty"`
 	Metadata   map[string]string    `json:"metadata,omitempty"`

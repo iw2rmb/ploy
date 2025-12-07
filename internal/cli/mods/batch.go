@@ -115,7 +115,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	// Handle 201 Created response from server.
 	if resp.StatusCode == http.StatusCreated {
 		var srvResp struct {
-			TicketID  string `json:"ticket_id"`
+			TicketID  string `json:"run_id"`
 			Status    string `json:"status"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`

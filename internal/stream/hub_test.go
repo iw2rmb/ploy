@@ -441,14 +441,14 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 	}
 }
 
-// TestPublishTicketTypedPayload verifies that PublishTicket accepts only api.TicketSummary
+// TestPublishTicketTypedPayload verifies that PublishTicket accepts only api.RunSummary
 // and that the payload marshals correctly through publish/subscribe round-trip.
 func TestPublishTicketTypedPayload(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
 
-	// Construct a typed TicketSummary payload.
-	ticket := api.TicketSummary{
+	// Construct a typed RunSummary payload.
+	ticket := api.RunSummary{
 		TicketID: "ticket-123",
 		State:    api.TicketStateRunning,
 		Stages:   make(map[string]api.StageStatus),
@@ -468,16 +468,16 @@ func TestPublishTicketTypedPayload(t *testing.T) {
 
 	select {
 	case evt := <-sub.Events:
-		if evt.Type != "ticket" {
+		if evt.Type != "run" {
 			t.Fatalf("expected event type 'ticket', got %s", evt.Type)
 		}
 		// Unmarshal and verify the payload.
-		var received api.TicketSummary
+		var received api.RunSummary
 		if err := json.Unmarshal(evt.Data, &received); err != nil {
 			t.Fatalf("unmarshal ticket payload: %v", err)
 		}
 		if received.TicketID != ticket.TicketID {
-			t.Fatalf("expected ticket_id %s, got %s", ticket.TicketID, received.TicketID)
+			t.Fatalf("expected run_id %s, got %s", ticket.TicketID, received.TicketID)
 		}
 		if received.State != ticket.State {
 			t.Fatalf("expected state %s, got %s", ticket.State, received.State)

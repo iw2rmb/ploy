@@ -1,25 +1,25 @@
 post:
   tags: [Control]
-  summary: Submit Mods ticket
+  summary: Submit Mods run
   description: |
-    Submit a new Mods ticket using a repository URL and Git refs. The
+    Submit a new Mods run using a repository URL and Git refs. The
     server creates the repository entry if it does not exist, creates a
     mod with the provided `spec` (or `{}`), and enqueues a run. The
-    response includes a `ticket_id` equal to the run UUID and initial
+    response includes a `run_id` equal to the run UUID and initial
     status `queued`.
   requestBody:
     required: true
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/TicketSubmitRequest'
+          $ref: '../components/schemas/controlplane.yaml#/RunSubmitRequest'
   responses:
     '201':
       description: Created
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/TicketSummary'
+            $ref: '../components/schemas/controlplane.yaml#/RunSummary'
     '400':
       description: Bad request
       content:

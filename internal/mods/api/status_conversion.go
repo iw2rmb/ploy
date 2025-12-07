@@ -40,34 +40,34 @@ func StageStatusFromStore(status store.JobStatus) StageState {
 	}
 }
 
-// TicketStatusFromStore converts store.RunStatus to mods API TicketState.
+// RunStatusFromStore converts store.RunStatus to mods API RunState.
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
 // Mapping:
-//   - store.RunStatusQueued -> TicketStatePending
-//   - store.RunStatusAssigned -> TicketStatePending (assigned runs are still pending from API perspective)
-//   - store.RunStatusRunning -> TicketStateRunning
-//   - store.RunStatusSucceeded -> TicketStateSucceeded
-//   - store.RunStatusFailed -> TicketStateFailed
-//   - store.RunStatusCanceled -> TicketStateCancelled (UK spelling for mods API)
-func TicketStatusFromStore(status store.RunStatus) TicketState {
+//   - store.RunStatusQueued -> RunStatePending
+//   - store.RunStatusAssigned -> RunStatePending (assigned runs are still pending from API perspective)
+//   - store.RunStatusRunning -> RunStateRunning
+//   - store.RunStatusSucceeded -> RunStateSucceeded
+//   - store.RunStatusFailed -> RunStateFailed
+//   - store.RunStatusCanceled -> RunStateCancelled (UK spelling for mods API)
+func RunStatusFromStore(status store.RunStatus) RunState {
 	switch status {
 	case store.RunStatusQueued, store.RunStatusAssigned:
 		// Both queued and assigned map to pending in the mods API
 		// since assignment is an internal scheduler state.
-		return TicketStatePending
+		return RunStatePending
 	case store.RunStatusRunning:
-		return TicketStateRunning
+		return RunStateRunning
 	case store.RunStatusSucceeded:
-		return TicketStateSucceeded
+		return RunStateSucceeded
 	case store.RunStatusFailed:
-		return TicketStateFailed
+		return RunStateFailed
 	case store.RunStatusCanceled:
-		return TicketStateCancelled
+		return RunStateCancelled
 	default:
 		// Default to pending for unknown states (defensive).
-		return TicketStatePending
+		return RunStatePending
 	}
 }
 
@@ -99,27 +99,27 @@ func StageStatusToStore(state StageState) store.JobStatus {
 	}
 }
 
-// TicketStatusToStore converts mods API TicketState to store.RunStatus.
+// RunStatusToStore converts mods API RunState to store.RunStatus.
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
 // Mapping:
-//   - TicketStatePending -> store.RunStatusQueued
-//   - TicketStateRunning -> store.RunStatusRunning
-//   - TicketStateSucceeded -> store.RunStatusSucceeded
-//   - TicketStateFailed -> store.RunStatusFailed
-//   - TicketStateCancelling/TicketStateCancelled -> store.RunStatusCanceled
-func TicketStatusToStore(state TicketState) store.RunStatus {
+//   - RunStatePending -> store.RunStatusQueued
+//   - RunStateRunning -> store.RunStatusRunning
+//   - RunStateSucceeded -> store.RunStatusSucceeded
+//   - RunStateFailed -> store.RunStatusFailed
+//   - RunStateCancelling/RunStateCancelled -> store.RunStatusCanceled
+func RunStatusToStore(state RunState) store.RunStatus {
 	switch state {
-	case TicketStatePending:
+	case RunStatePending:
 		return store.RunStatusQueued
-	case TicketStateRunning:
+	case RunStateRunning:
 		return store.RunStatusRunning
-	case TicketStateSucceeded:
+	case RunStateSucceeded:
 		return store.RunStatusSucceeded
-	case TicketStateFailed:
+	case RunStateFailed:
 		return store.RunStatusFailed
-	case TicketStateCancelling, TicketStateCancelled:
+	case RunStateCancelling, RunStateCancelled:
 		return store.RunStatusCanceled
 	default:
 		// Default to queued for unknown states (defensive).

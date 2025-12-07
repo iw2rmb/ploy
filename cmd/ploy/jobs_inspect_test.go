@@ -11,7 +11,7 @@ func TestJobsInspectRequiresArgsAndPrintsSummary(t *testing.T) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/job-55" {
-			_, _ = w.Write([]byte(`{"ticket_id":"job-55","status":"running","base_ref":"main","target_ref":"feat"}`))
+			_, _ = w.Write([]byte(`{"run_id":"job-55","status":"running","base_ref":"main","target_ref":"feat"}`))
 			return
 		}
 		http.NotFound(w, r)

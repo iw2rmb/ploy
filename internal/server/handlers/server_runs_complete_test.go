@@ -401,7 +401,7 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	foundTicketEvent := false
 	foundDoneEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicketEvent = true
 			// Verify the event contains "succeeded" status.
 			if !strings.Contains(string(evt.Data), "succeeded") {

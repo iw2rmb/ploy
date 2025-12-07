@@ -104,7 +104,7 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 		}
 		// Return 201 simplified response
 		resp := map[string]string{
-			"ticket_id":  "mods-gitlab-test",
+			"run_id":     "mods-gitlab-test",
 			"status":     "pending",
 			"repo_url":   "https://example.com/repo.git",
 			"base_ref":   "main",

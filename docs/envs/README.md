@@ -230,9 +230,8 @@ Per-run overrides (CLI flags on `ploy mod run`):
 - `--mr-fail` — Create an MR when the run fails
 
 Branch naming semantics:
-- The MR source branch is always `ploy-<ticket-id>` to guarantee uniqueness across retries and repeated runs.
+- The MR source branch is always the effective target ref for the run. When `--repo-target-ref` is provided, that value is used. When it is omitted, the node derives a default of `/mod/<run-id>` using the database run UUID.
 - The base branch is whatever you pass via `--repo-base-ref` (commonly `main`).
-- The `--repo-target-ref` value is accepted for workspace context but is not used as the MR source branch.
 
 Quick test (PAT via config or flags):
 For local testing or CI environments, set the PAT via control plane config or per‑run flags.

@@ -10,7 +10,7 @@ import (
 
 // TestJSONRoundTrip ensures typed IDs in the Mods API marshal/unmarshal as JSON strings.
 func TestJSONRoundTrip(t *testing.T) {
-	in := TicketSummary{
+	in := RunSummary{
 		TicketID: domaintypes.TicketID("t-123"),
 		State:    TicketStateRunning,
 		Stages: map[string]StageStatus{
@@ -24,13 +24,13 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 	// Expect JSON to contain plain strings for ids.
 	js := string(b)
-	for _, want := range []string{"\"ticket_id\":\"t-123\"", "\"current_job_id\":\"job-1\""} {
+	for _, want := range []string{"\"run_id\":\"t-123\"", "\"current_job_id\":\"job-1\""} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("expected json to contain %s; got %s", want, js)
 		}
 	}
 
-	var out TicketSummary
+	var out RunSummary
 	if err := json.Unmarshal(b, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

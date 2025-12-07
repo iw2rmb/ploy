@@ -6,9 +6,9 @@
 //
 // Command structure:
 //   - ploy mod run list [--limit N] [--offset N]
-//   - ploy mod run status <batch-id>
-//   - ploy mod run stop <batch-id>
-//   - ploy mod run start <batch-id>
+//   - ploy mod run status <run-name>
+//   - ploy mod run stop <run-name>
+//   - ploy mod run start <run-name>
 package main
 
 import (
@@ -103,7 +103,7 @@ func printModRunListUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --offset N  Number of runs to skip (default 0)")
 }
 
-// handleModRunStatus implements `ploy mod run status <batch-id>`.
+// handleModRunStatus implements `ploy mod run status <run-name>`.
 // Shows detailed status of a single batch run including repo counts.
 func handleModRunStatus(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run status", flag.ContinueOnError)
@@ -118,7 +118,7 @@ func handleModRunStatus(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunStatusUsage(stderr)
-		return errors.New("batch-id required")
+		return errors.New("run-name required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -179,12 +179,12 @@ func handleModRunStatus(args []string, stderr io.Writer) error {
 
 // printModRunStatusUsage renders help for mod run status.
 func printModRunStatusUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run status <batch-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run status <run-name>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Shows detailed status of a batch run including repo counts.")
 }
 
-// handleModRunStop implements `ploy mod run stop <batch-id>`.
+// handleModRunStop implements `ploy mod run stop <run-name>`.
 // Stops a batch run and cancels all pending repos.
 func handleModRunStop(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run stop", flag.ContinueOnError)
@@ -199,7 +199,7 @@ func handleModRunStop(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunStopUsage(stderr)
-		return errors.New("batch-id required")
+		return errors.New("run-name required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -231,12 +231,12 @@ func handleModRunStop(args []string, stderr io.Writer) error {
 
 // printModRunStopUsage renders help for mod run stop.
 func printModRunStopUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run stop <batch-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run stop <run-name>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Stops a batch run and cancels all pending repos.")
 }
 
-// handleModRunStart implements `ploy mod run start <batch-id>`.
+// handleModRunStart implements `ploy mod run start <run-name>`.
 // Starts execution for pending repos in a batch run.
 func handleModRunStart(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run start", flag.ContinueOnError)
@@ -251,7 +251,7 @@ func handleModRunStart(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunStartUsage(stderr)
-		return errors.New("batch-id required")
+		return errors.New("run-name required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -281,7 +281,7 @@ func handleModRunStart(args []string, stderr io.Writer) error {
 
 // printModRunStartUsage renders help for mod run start.
 func printModRunStartUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run start <batch-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run start <run-name>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Starts execution for pending repos in a batch run.")
 }

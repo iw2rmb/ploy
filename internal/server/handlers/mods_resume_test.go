@@ -351,7 +351,7 @@ func TestResumeTicket_SSEPublish(t *testing.T) {
 	}
 	foundTicket := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicket = true
 		}
 	}
@@ -518,7 +518,7 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 	// the stats from getRunResult are used. The test verifies the plumbing works.
 	foundTicket := false
 	for _, evt := range snapshot {
-		if evt.Type == "ticket" {
+		if evt.Type == "run" {
 			foundTicket = true
 		}
 	}

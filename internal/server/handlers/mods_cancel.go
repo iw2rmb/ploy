@@ -20,23 +20,23 @@ import (
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
-// cancelTicketHandler cancels a Mods ticket (run) and transitions it to a terminal state.
+// cancelTicketHandler cancels a Mods  run (run) and transitions it to a terminal state.
 // POST /v1/mods/{id}/cancel — Optional JSON body { reason?: string }
 // Responses:
 //   - 202 Accepted on state transition
 //   - 200 OK if already terminal (idempotent)
-//   - 404 Not Found if ticket does not exist
+//   - 404 Not Found if  run does not exist
 //   - 400 Bad Request for invalid id
 func cancelTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ticketIDStr := r.PathValue("id")
-		if strings.TrimSpace(ticketIDStr) == "" {
+		runIDStr := r.PathValue("id")
+		if strings.TrimSpace(runIDStr) == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
 			return
 		}
 
 		// Parse UUID
-		pgID := domaintypes.ToPGUUID(ticketIDStr)
+		pgID := domaintypes.ToPGUUID(runIDStr)
 		if !pgID.Valid {
 			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
@@ -53,11 +53,11 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		run, err := st.GetRun(r.Context(), pgID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "ticket not found", http.StatusNotFound)
+				http.Error(w, " run not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("cancel ticket: lookup failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to get  run: %v", err), http.StatusInternalServerError)
+			slog.Error("cancel  run: lookup failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
@@ -75,8 +75,8 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to cancel ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("cancel ticket: update run failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to cancel  run: %v", err), http.StatusInternalServerError)
+			slog.Error("cancel  run: update run failed", " run_id", runIDStr, "err", err)
 			return
 		}
 
@@ -104,9 +104,9 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			}
 		}
 
-		// Publish terminal ticket event + done status for SSE clients
+		// Publish terminal  run event + done status for SSE clients
 		if eventsService != nil {
-			ticketSummary := modsapi.TicketSummary{
+			runSummary := modsapi.RunSummary{
 				TicketID:   domaintypes.TicketID(uuid.UUID(pgID.Bytes).String()),
 				State:      modsapi.TicketStateCancelled,
 				Repository: run.RepoUrl,
@@ -115,21 +115,21 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
 			if req.Reason != nil && strings.TrimSpace(*req.Reason) != "" {
-				if ticketSummary.Metadata == nil {
-					ticketSummary.Metadata = map[string]string{}
+				if runSummary.Metadata == nil {
+					runSummary.Metadata = map[string]string{}
 				}
-				ticketSummary.Metadata["reason"] = strings.TrimSpace(*req.Reason)
+				runSummary.Metadata["reason"] = strings.TrimSpace(*req.Reason)
 			}
-			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), ticketSummary); err != nil {
-				slog.Error("cancel ticket: publish ticket event failed", "ticket_id", ticketIDStr, "err", err)
+			if err := eventsService.PublishTicket(r.Context(), uuid.UUID(pgID.Bytes).String(), runSummary); err != nil {
+				slog.Error("cancel  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 			// Signal done on the stream
 			if err := eventsService.Hub().PublishStatus(r.Context(), uuid.UUID(pgID.Bytes).String(), logstream.Status{Status: "done"}); err != nil {
-				slog.Error("cancel ticket: publish done status failed", "ticket_id", ticketIDStr, "err", err)
+				slog.Error("cancel  run: publish done status failed", " run_id", runIDStr, "err", err)
 			}
 		}
 
 		w.WriteHeader(http.StatusAccepted)
-		slog.Info("ticket canceled", "ticket_id", ticketIDStr, "had_reason", req.Reason != nil)
+		slog.Info(" run canceled", " run_id", runIDStr, "had_reason", req.Reason != nil)
 	}
 }

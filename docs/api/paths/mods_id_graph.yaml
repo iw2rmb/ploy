@@ -2,7 +2,7 @@ get:
   tags: [Control]
   summary: Get Mods workflow graph
   description: |
-    Return the job-level workflow graph for a Mods ticket identified by its `ticket_id`
+    Return the job-level workflow graph for a Mods run identified by its `run_id`
     (equal to the underlying run UUID). The graph view is derived from `jobs` rows and
     uses `step_index` ordering to expose parent/child relationships between jobs.
 
@@ -16,7 +16,7 @@ get:
       schema:
         type: string
         format: uuid
-      description: Ticket ID (run UUID).
+      description: Run ID (run UUID).
   responses:
     '200':
       description: OK
@@ -31,7 +31,7 @@ get:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '404':
-      description: Ticket not found
+      description: Run not found
       content:
         application/json:
           schema:

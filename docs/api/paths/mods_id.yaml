@@ -1,8 +1,8 @@
 get:
   tags: [Control]
-  summary: Get Mods ticket status
+  summary: Get Mods run status
   description: |
-    Return the current status of a Mods ticket identified by its `ticket_id`
+    Return the current status of a Mods run identified by its `run_id`
     (equal to the underlying run UUID). The response includes status, derived
     failure/gate metadata, repo details, refs, optional commit SHA, and timestamps.
   parameters:
@@ -12,14 +12,14 @@ get:
       schema:
         type: string
         format: uuid
-      description: Ticket ID (run UUID).
+      description: Run ID (run UUID).
   responses:
     '200':
       description: OK
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/TicketStatus'
+            $ref: '../components/schemas/controlplane.yaml#/RunStatus'
     '400':
       description: Bad request (invalid UUID)
       content:
@@ -27,7 +27,7 @@ get:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '404':
-      description: Ticket not found
+      description: Run not found
       content:
         application/json:
           schema:
