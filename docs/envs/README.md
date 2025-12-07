@@ -120,9 +120,10 @@ See `docs/build-gate/README.md` for the complete HTTP Build Gate API contract.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
-- `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap to a sanitized
-  version of the node name. Note: currently exported by bootstrap but not consumed at runtime;
-  node identity is specified in the node YAML (`node_id`).
+- `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
+  string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
+  brevity with sufficient uniqueness for typical cluster sizes. Note: currently exported by
+  bootstrap but not consumed at runtime; node identity is specified in the node YAML (`node_id`).
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Exported by bootstrap as `/root` for
   systemd context; not currently read by the codebase.
 - `PLOYD_CACHE_HOME` — Cache directory for working data. Defaults to `/var/cache/ploy` when set
@@ -363,8 +364,9 @@ usage but are documented here for completeness.
 - `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions
   (e.g., writing server certs instead of node certs). Passed as `--primary` flag and checked
   inline within the script.
-- `NODE_ID` — Node identifier used in the node agent config. Passed as `--node-id` script
-  argument and referenced in `/etc/ploy/ployd-node.yaml` generation.
+- `NODE_ID` — Node identifier used in the node agent config. This is a NanoID(6) string
+  (6 characters from URL-safe alphabet). Passed as `--node-id` script argument and
+  referenced in `/etc/ploy/ployd-node.yaml` generation.
 - `CLUSTER_ID` — Cluster identifier passed as `--cluster-id` script argument. Currently used
   for labeling during provisioning; not yet persisted or consumed by server runtime.
 - `NODE_ADDRESS` — IP/hostname of the node being provisioned, passed as `--node-address` script

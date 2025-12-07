@@ -59,7 +59,7 @@ Run:
     created_at: { type: string, format: date-time }
     started_at: { type: string, format: date-time, nullable: true }
     finished_at: { type: string, format: date-time, nullable: true }
-    node_id: { type: string, format: uuid, nullable: true }
+    node_id: { type: string, nullable: true, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
@@ -413,7 +413,7 @@ NodeClaimResponse:
       description: Job metadata (mod_type, mod_image, etc.)
     repo_url: { type: string }
     status: { type: string }
-    node_id: { type: string, format: uuid }
+    node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
@@ -599,10 +599,11 @@ CreateArtifactBundleRequest:
   required: [bundle]
 
 # Node describes a registered worker node.
+# Note: node IDs are now NanoID(6) strings (6 characters from URL-safe alphabet).
 Node:
   type: object
   properties:
-    id: { type: string, format: uuid }
+    id: { type: string, description: "Node ID (NanoID 6-character string)" }
     name: { type: string }
     ip_address: { type: string }
     version: { type: string, nullable: true }
