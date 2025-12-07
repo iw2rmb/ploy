@@ -112,9 +112,9 @@ build_gate:
 
 # Healing configuration executed when the Build Gate fails (applies globally to all mods).
 #
-# The healing block supports two forms for backward compatibility:
+# The healing block supports two forms:
 #
-# 1. **Single-strategy (legacy form)** — A single `mods` list executed sequentially:
+# 1. **Single-strategy (mods form)** — A single `mods` list executed sequentially:
 #    build_gate_healing:
 #      retries: 1
 #      mods: [...]
@@ -129,7 +129,7 @@ build_gate:
 #        - name: fallback-patch
 #          mods: [...]
 #
-# When using the legacy `mods` form, it is internally mapped to a single unnamed
+# When using the single-strategy `mods` form, it is internally mapped to a single unnamed
 # strategy, preserving existing behavior. Do not mix `mods` and `strategies` in
 # the same block; if both are present, `strategies` takes precedence.
 #
