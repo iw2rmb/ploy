@@ -56,7 +56,7 @@ WHERE run_id = $1
 `
 
 // Counts total jobs for a run.
-func (q *Queries) CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error) {
+func (q *Queries) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
 	row := q.db.QueryRow(ctx, countJobsByRun, runID)
 	var count int64
 	err := row.Scan(&count)
@@ -69,8 +69,8 @@ WHERE run_id = $1 AND status = $2
 `
 
 type CountJobsByRunAndStatusParams struct {
-	RunID  pgtype.UUID `json:"run_id"`
-	Status JobStatus   `json:"status"`
+	RunID  string    `json:"run_id"`
+	Status JobStatus `json:"status"`
 }
 
 // Counts jobs for a run with a specific status.
@@ -82,23 +82,26 @@ func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRu
 }
 
 const createJob = `-- name: CreateJob :one
-INSERT INTO jobs (run_id, name, status, mod_type, mod_image, step_index, meta)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO jobs (id, run_id, name, status, mod_type, mod_image, step_index, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
 `
 
 type CreateJobParams struct {
-	RunID     pgtype.UUID `json:"run_id"`
-	Name      string      `json:"name"`
-	Status    JobStatus   `json:"status"`
-	ModType   string      `json:"mod_type"`
-	ModImage  string      `json:"mod_image"`
-	StepIndex float64     `json:"step_index"`
-	Meta      []byte      `json:"meta"`
+	ID        string    `json:"id"`
+	RunID     string    `json:"run_id"`
+	Name      string    `json:"name"`
+	Status    JobStatus `json:"status"`
+	ModType   string    `json:"mod_type"`
+	ModImage  string    `json:"mod_image"`
+	StepIndex float64   `json:"step_index"`
+	Meta      []byte    `json:"meta"`
 }
 
+// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
 	row := q.db.QueryRow(ctx, createJob,
+		arg.ID,
 		arg.RunID,
 		arg.Name,
 		arg.Status,
@@ -131,7 +134,7 @@ DELETE FROM jobs
 WHERE id = $1
 `
 
-func (q *Queries) DeleteJob(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeleteJob(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteJob, id)
 	return err
 }
@@ -150,7 +153,7 @@ type GetAdjacentJobIndicesRow struct {
 
 // Get the step_index of a job and the next job's step_index for healing insertion.
 // Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
-func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (GetAdjacentJobIndicesRow, error) {
+func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error) {
 	row := q.db.QueryRow(ctx, getAdjacentJobIndices, id)
 	var i GetAdjacentJobIndicesRow
 	err := row.Scan(&i.PrevIndex, &i.NextIndex)
@@ -163,7 +166,7 @@ FROM jobs
 WHERE id = $1
 `
 
-func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
+func (q *Queries) GetJob(ctx context.Context, id string) (Job, error) {
 	row := q.db.QueryRow(ctx, getJob, id)
 	var i Job
 	err := row.Scan(
@@ -192,7 +195,7 @@ ORDER BY step_index ASC
 `
 
 // List all created (not yet pending) jobs for a run, ordered by step_index.
-func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error) {
+func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID string) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listCreatedJobsByRun, runID)
 	if err != nil {
 		return nil, err
@@ -233,7 +236,7 @@ WHERE run_id = $1
 ORDER BY step_index ASC
 `
 
-func (q *Queries) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error) {
+func (q *Queries) ListJobsByRun(ctx context.Context, runID string) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listJobsByRun, runID)
 	if err != nil {
 		return nil, err
@@ -281,7 +284,7 @@ RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, ex
 // Transitions the first 'created' job to 'pending' for a run.
 // Called by server after a job completes successfully to enable server-driven scheduling.
 // Returns the pending job, or null if no more jobs to schedule.
-func (q *Queries) ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, error) {
+func (q *Queries) ScheduleNextJob(ctx context.Context, runID string) (Job, error) {
 	row := q.db.QueryRow(ctx, scheduleNextJob, runID)
 	var i Job
 	err := row.Scan(
@@ -310,9 +313,9 @@ WHERE id = $1
 `
 
 type UpdateJobCompletionParams struct {
-	ID       pgtype.UUID `json:"id"`
-	Status   JobStatus   `json:"status"`
-	ExitCode *int32      `json:"exit_code"`
+	ID       string    `json:"id"`
+	Status   JobStatus `json:"status"`
+	ExitCode *int32    `json:"exit_code"`
 }
 
 // Updates a job's terminal status, exit code, and timing.
@@ -328,7 +331,7 @@ WHERE id = $1
 `
 
 type UpdateJobStatusParams struct {
-	ID         pgtype.UUID        `json:"id"`
+	ID         string             `json:"id"`
 	Status     JobStatus          `json:"status"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`

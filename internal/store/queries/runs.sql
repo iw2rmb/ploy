@@ -9,8 +9,9 @@ LIMIT $1 OFFSET $2;
 
 -- name: CreateRun :one
 -- Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
-INSERT INTO runs (name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+-- Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
+INSERT INTO runs (id, name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: UpdateRunStatus :exec

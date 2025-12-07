@@ -10,8 +10,9 @@ WHERE run_id = $1
 ORDER BY step_index ASC;
 
 -- name: CreateJob :one
-INSERT INTO jobs (run_id, name, status, mod_type, mod_image, step_index, meta)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+-- Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
+INSERT INTO jobs (id, run_id, name, status, mod_type, mod_image, step_index, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta;
 
 -- name: UpdateJobStatus :exec

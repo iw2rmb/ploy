@@ -15,7 +15,7 @@ type Querier interface {
 	// Transitions run status to 'running' when execution starts.
 	// Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
 	// the first job starts execution.
-	AckRunStart(ctx context.Context, id pgtype.UUID) error
+	AckRunStart(ctx context.Context, id string) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
@@ -27,22 +27,24 @@ type Querier interface {
 	// Also called by IncrementRunRepoAttempt to prepare for a new execution.
 	ClearRunRepoExecutionRun(ctx context.Context, id pgtype.UUID) error
 	// Counts total jobs for a run.
-	CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error)
+	CountJobsByRun(ctx context.Context, runID string) (int64, error)
 	// Counts jobs for a run with a specific status.
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Aggregates run_repos counts by status for a given run.
 	// Used to derive batch-level status (e.g., all succeeded = batch succeeded).
-	CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) ([]CountRunReposByStatusRow, error)
+	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
 	// Creates a new diff entry associated with a job.
 	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	// Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
+	// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	// Creates a new run_repo entry for batched runs.
 	// Each run_repo represents one repository within a batch (parent run).
@@ -59,29 +61,29 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
-	DeleteJob(ctx context.Context, id pgtype.UUID) error
+	DeleteJob(ctx context.Context, id string) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
-	DeleteRun(ctx context.Context, id pgtype.UUID) error
+	DeleteRun(ctx context.Context, id string) error
 	DeleteRunRepo(ctx context.Context, id pgtype.UUID) error
 	// Get the step_index of a job and the next job's step_index for healing insertion.
 	// Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
-	GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (GetAdjacentJobIndicesRow, error)
+	GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error)
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetBuildGateJob(ctx context.Context, id pgtype.UUID) (BuildgateJob, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
-	GetJob(ctx context.Context, id pgtype.UUID) (Job, error)
+	GetJob(ctx context.Context, id string) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
-	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
+	GetRun(ctx context.Context, id string) (Run, error)
 	GetRunRepo(ctx context.Context, id pgtype.UUID) (RunRepo, error)
 	// Finds the run_repo entry linked to a given execution run.
 	// Used by completion callbacks to update repo status when execution completes.
-	GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (RunRepo, error)
-	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
+	GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (RunRepo, error)
+	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
 	// Increments the attempt counter and resets status to 'pending' for retry.
 	// Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, id pgtype.UUID) error
@@ -92,34 +94,34 @@ type Querier interface {
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
-	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRun(ctx context.Context, runID string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	// Lists batch runs that have at least one pending run_repo entry.
 	// Used by the batch scheduler to find runs that need repos to be started.
 	// Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
 	// that have pending repos ready for execution.
-	ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.UUID, error)
+	ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, error)
 	// List all created (not yet pending) jobs for a run, ordered by step_index.
-	ListCreatedJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
+	ListCreatedJobsByRun(ctx context.Context, runID string) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
 	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
 	// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
 	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
 	// Returns diffs for a run ordered by job step_index, then by created_at.
 	// Joins with jobs to get ordering from job's step_index.
-	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
+	ListDiffsByRun(ctx context.Context, runID string) ([]Diff, error)
 	// Lists distinct repository URLs from run_repos with optional substring filter.
 	// Returns repo_url along with the most recent run timestamp and status for each repo.
 	// Used by GET /v1/repos to provide a repo-centric view of batch activity.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
-	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
+	ListEventsByRun(ctx context.Context, runID string) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
-	ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
+	ListJobsByRun(ctx context.Context, runID string) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
-	ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error)
+	ListLogsByRun(ctx context.Context, runID string) ([]Log, error)
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
 	ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error)
@@ -131,9 +133,9 @@ type Querier interface {
 	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
 	// Lists all pending repos for a run (batch), ordered by creation time.
 	// Used by the batch orchestrator to find repos ready to start execution.
-	ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
+	ListPendingRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
 	// Lists all repos associated with a run (batch), ordered by creation time.
-	ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error)
+	ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	// Lists all runs (via run_repos) for a given repository URL.
 	// Returns run details joined with run_repo status and timing for repo-centric view.
@@ -145,7 +147,7 @@ type Querier interface {
 	// Transitions the first 'created' job to 'pending' for a run.
 	// Called by server after a job completes successfully to enable server-driven scheduling.
 	// Returns the pending job, or null if no more jobs to schedule.
-	ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (Job, error)
+	ScheduleNextJob(ctx context.Context, runID string) (Job, error)
 	// Links a run_repo to its child execution run and transitions status to 'running'.
 	// Called when starting execution for a repo entry within a batch.
 	SetRunRepoExecutionRun(ctx context.Context, arg SetRunRepoExecutionRunParams) error
@@ -169,7 +171,7 @@ type Querier interface {
 	UpdateRunRepoStatus(ctx context.Context, arg UpdateRunRepoStatusParams) error
 	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
-	UpdateRunResume(ctx context.Context, id pgtype.UUID) error
+	UpdateRunResume(ctx context.Context, id string) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 }
 

@@ -38,7 +38,7 @@ type CountRunReposByStatusRow struct {
 
 // Aggregates run_repos counts by status for a given run.
 // Used to derive batch-level status (e.g., all succeeded = batch succeeded).
-func (q *Queries) CountRunReposByStatus(ctx context.Context, runID pgtype.UUID) ([]CountRunReposByStatusRow, error) {
+func (q *Queries) CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error) {
 	rows, err := q.db.Query(ctx, countRunReposByStatus, runID)
 	if err != nil {
 		return nil, err
@@ -65,10 +65,10 @@ RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_erro
 `
 
 type CreateRunRepoParams struct {
-	RunID     pgtype.UUID `json:"run_id"`
-	RepoUrl   string      `json:"repo_url"`
-	BaseRef   string      `json:"base_ref"`
-	TargetRef string      `json:"target_ref"`
+	RunID     string `json:"run_id"`
+	RepoUrl   string `json:"repo_url"`
+	BaseRef   string `json:"base_ref"`
+	TargetRef string `json:"target_ref"`
 }
 
 // Creates a new run_repo entry for batched runs.
@@ -140,7 +140,7 @@ WHERE execution_run_id = $1
 
 // Finds the run_repo entry linked to a given execution run.
 // Used by completion callbacks to update repo status when execution completes.
-func (q *Queries) GetRunRepoByExecutionRun(ctx context.Context, executionRunID pgtype.UUID) (RunRepo, error) {
+func (q *Queries) GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, getRunRepoByExecutionRun, executionRunID)
 	var i RunRepo
 	err := row.Scan(
@@ -191,15 +191,15 @@ ORDER BY r.id
 // Used by the batch scheduler to find runs that need repos to be started.
 // Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
 // that have pending repos ready for execution.
-func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]pgtype.UUID, error) {
+func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, listBatchRunsWithPendingRepos)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []pgtype.UUID{}
+	items := []string{}
 	for rows.Next() {
-		var id pgtype.UUID
+		var id string
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
@@ -260,7 +260,7 @@ ORDER BY created_at ASC
 
 // Lists all pending repos for a run (batch), ordered by creation time.
 // Used by the batch orchestrator to find repos ready to start execution.
-func (q *Queries) ListPendingRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error) {
+func (q *Queries) ListPendingRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
 	rows, err := q.db.Query(ctx, listPendingRunReposByRun, runID)
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ ORDER BY created_at ASC
 `
 
 // Lists all repos associated with a run (batch), ordered by creation time.
-func (q *Queries) ListRunReposByRun(ctx context.Context, runID pgtype.UUID) ([]RunRepo, error) {
+func (q *Queries) ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
 	rows, err := q.db.Query(ctx, listRunReposByRun, runID)
 	if err != nil {
 		return nil, err
@@ -359,7 +359,7 @@ type ListRunsForRepoParams struct {
 }
 
 type ListRunsForRepoRow struct {
-	RunID      pgtype.UUID        `json:"run_id"`
+	RunID      string             `json:"run_id"`
 	Name       *string            `json:"name"`
 	RunStatus  RunStatus          `json:"run_status"`
 	RepoStatus RunRepoStatus      `json:"repo_status"`
@@ -413,7 +413,7 @@ WHERE id = $1
 
 type SetRunRepoExecutionRunParams struct {
 	ID             pgtype.UUID `json:"id"`
-	ExecutionRunID pgtype.UUID `json:"execution_run_id"`
+	ExecutionRunID *string     `json:"execution_run_id"`
 }
 
 // Links a run_repo to its child execution run and transitions status to 'running'.

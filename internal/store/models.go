@@ -213,9 +213,9 @@ type ApiToken struct {
 
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     pgtype.UUID        `json:"run_id"`
-	JobID     pgtype.UUID        `json:"job_id"`
-	BuildID   pgtype.UUID        `json:"build_id"`
+	RunID     string             `json:"run_id"`
+	JobID     *string            `json:"job_id"`
+	BuildID   *string            `json:"build_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
 	Cid       *string            `json:"cid"`
@@ -238,9 +238,9 @@ type BootstrapToken struct {
 }
 
 type Build struct {
-	ID         pgtype.UUID        `json:"id"`
-	RunID      pgtype.UUID        `json:"run_id"`
-	JobID      pgtype.UUID        `json:"job_id"`
+	ID         string             `json:"id"`
+	RunID      string             `json:"run_id"`
+	JobID      *string            `json:"job_id"`
 	Tool       *string            `json:"tool"`
 	Command    *string            `json:"command"`
 	Status     JobStatus          `json:"status"`
@@ -264,8 +264,8 @@ type BuildgateJob struct {
 
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     pgtype.UUID        `json:"run_id"`
-	JobID     pgtype.UUID        `json:"job_id"`
+	RunID     string             `json:"run_id"`
+	JobID     *string            `json:"job_id"`
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -273,8 +273,8 @@ type Diff struct {
 
 type Event struct {
 	ID      int64              `json:"id"`
-	RunID   pgtype.UUID        `json:"run_id"`
-	JobID   pgtype.UUID        `json:"job_id"`
+	RunID   string             `json:"run_id"`
+	JobID   *string            `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
 	Message string             `json:"message"`
@@ -282,8 +282,8 @@ type Event struct {
 }
 
 type Job struct {
-	ID         pgtype.UUID        `json:"id"`
-	RunID      pgtype.UUID        `json:"run_id"`
+	ID         string             `json:"id"`
+	RunID      string             `json:"run_id"`
 	Name       string             `json:"name"`
 	Status     JobStatus          `json:"status"`
 	ModType    string             `json:"mod_type"`
@@ -299,9 +299,9 @@ type Job struct {
 
 type Log struct {
 	ID        int64              `json:"id"`
-	RunID     pgtype.UUID        `json:"run_id"`
-	JobID     pgtype.UUID        `json:"job_id"`
-	BuildID   pgtype.UUID        `json:"build_id"`
+	RunID     string             `json:"run_id"`
+	JobID     *string            `json:"job_id"`
+	BuildID   *string            `json:"build_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -341,7 +341,7 @@ type NodeMetric struct {
 }
 
 type Run struct {
-	ID         pgtype.UUID        `json:"id"`
+	ID         string             `json:"id"`
 	Name       *string            `json:"name"`
 	RepoUrl    string             `json:"repo_url"`
 	Spec       []byte             `json:"spec"`
@@ -359,21 +359,21 @@ type Run struct {
 
 type RunRepo struct {
 	ID             pgtype.UUID        `json:"id"`
-	RunID          pgtype.UUID        `json:"run_id"`
+	RunID          string             `json:"run_id"`
 	RepoUrl        string             `json:"repo_url"`
 	BaseRef        string             `json:"base_ref"`
 	TargetRef      string             `json:"target_ref"`
 	Status         RunRepoStatus      `json:"status"`
 	Attempt        int32              `json:"attempt"`
 	LastError      *string            `json:"last_error"`
-	ExecutionRunID pgtype.UUID        `json:"execution_run_id"`
+	ExecutionRunID *string            `json:"execution_run_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	StartedAt      pgtype.Timestamptz `json:"started_at"`
 	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
 }
 
 type RunsTiming struct {
-	ID      pgtype.UUID `json:"id"`
-	QueueMs int64       `json:"queue_ms"`
-	RunMs   int64       `json:"run_ms"`
+	ID      string `json:"id"`
+	QueueMs int64  `json:"queue_ms"`
+	RunMs   int64  `json:"run_ms"`
 }
