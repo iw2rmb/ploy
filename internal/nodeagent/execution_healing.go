@@ -6,44 +6,29 @@
 // logic is separated from core orchestration to maintain clear boundaries
 // between run lifecycle (orchestrator) and healing retry mechanics.
 //
-// ## HTTP Build Gate and Docker Gate Consistency
+// ## Gate Execution Model
 //
-// The node agent maintains consistent gate behavior whether validation runs via:
-//   - The HTTP Build Gate API (POST /v1/buildgate/validate)
-//   - The Docker-based GateExecutor (gate_docker.go)
+// Gate validation runs via the Docker-based GateExecutor (gate_docker.go) which
+// executes validation containers locally. After healing mods complete, the node
+// agent ALWAYS re-runs the gate to verify the fix.
 //
-// Key consistency guarantees:
+// Key guarantees:
 //
-//  1. Re-gate execution: After healing mods complete, the node agent ALWAYS
-//     re-runs the gate via runner.Gate.Execute using the configured GateExecutor
-//     (remote HTTP or local Docker). This ensures the canonical gate result is
-//     produced by the gate system triggered by the node agent, not by
-//     in-container scripts that may call the HTTP Build Gate API.
+//  1. Re-gate execution: After healing mods complete, the node agent re-runs
+//     the gate via runner.Gate.Execute. This ensures the canonical gate result
+//     is produced by the gate system triggered by the node agent.
 //
 //  2. Full gate history capture: The node agent records all gate executions:
 //     - PreGate: The initial gate run before healing (BuildGateStageMetadata)
 //     - ReGates: All subsequent re-gate attempts after each healing iteration
 //     This history enables telemetry, debugging, and audit trails.
 //
-//  3. Healing mod flexibility: Healing containers MAY call the HTTP Build Gate
-//     API directly for intermediate validation (e.g., testing if a fix works
-//     before committing). However, these in-container calls are advisory only.
-//     The authoritative gate result is always from the node agent's re-gate.
-//     Direct HTTP Build Gate calls from healing mods are discouraged; the node
-//     agent is the single source of truth for gate orchestration.
+// ## Repo+Diff Semantics
 //
-//  4. Workspace semantics: Both gate execution paths use identical semantics:
-//     - HTTP API: Validates repo_url+ref with optional diff_patch parameter
-//     - Docker gate: Validates workspace directory (repo_url+ref + modifications)
-//     The Docker gate is semantically equivalent to HTTP API with diff_patch.
+// Healing verification uses a repo+diff model:
 //
-// ## Repo+Diff Build Gate Semantics
-//
-// Healing verification aligns with the HTTP Build Gate API's repo+diff model:
-//
-//   - Initial workspace: The Build Gate validates code cloned from repo_url+ref
-//     (see buildgate_executor.go). Healing mods operate on this same workspace,
-//     which contains the repository at the specified ref.
+//   - Initial workspace: The Build Gate validates code cloned from repo_url+ref.
+//     Healing mods operate on this same workspace.
 //
 //   - Healing modifications: Healing containers modify the workspace in-place.
 //     Each healing mod's changes accumulate as diffs on top of the repo baseline.
@@ -51,19 +36,11 @@
 //     multi-node rehydration scenarios.
 //
 //   - Re-gate verification: After healing completes, the gate re-runs against
-//     the same workspace (repo_url+ref + healing modifications). Conceptually,
-//     this is equivalent to calling the Build Gate HTTP API with:
-//     POST /v1/buildgate/validate
-//     {"repo_url": "...", "ref": "...", "diff_patch": "<accumulated-changes>"}
-//     The in-process re-gate skips network round-trips since the workspace
-//     already contains the modified state.
+//     the same workspace (repo_url+ref + healing modifications).
 //
 //   - Diff chain semantics: Workspace state at any point equals base clone plus
 //     an ordered sequence of diffs. This model matches Mods multi-step execution
 //     where each step's changes are captured and can be replayed for rehydration.
-//
-// This alignment ensures healing verification and the HTTP Build Gate API use
-// consistent semantics: both validate repo_url+ref baseline plus optional changes.
 package nodeagent
 
 import (
@@ -387,19 +364,12 @@ func (r *runController) runGateWithHealing(
 		}
 
 		// Re-run the gate after healing mods complete.
-		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
-		// even if healing mods called the HTTP Build Gate API directly.
-		//
-		// For HTTP-based gates (PLOY_BUILDGATE_MODE=remote-http), compute the accumulated
-		// workspace diff and pass it via DiffPatch. This enables remote Build Gate workers
-		// to reconstruct workspace state by cloning repo_url+ref and applying the patch,
-		// decoupling the healing node from the gate node.
+		// The node agent ALWAYS re-runs the gate via runner.Gate.Execute to verify
+		// that healing modifications have resolved the validation failure.
 		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
 
-		// Clone gateSpec and populate DiffPatch for HTTP re-gates.
-		// DiffPatch enables remote gate workers to validate accumulated healing changes
-		// without requiring direct workspace access. Docker-based gates ignore DiffPatch
-		// since they access the workspace directly.
+		// Clone gateSpec for re-gate execution. DiffPatch is computed for potential
+		// future use in distributed gate scenarios but currently unused by Docker gates.
 		regateSpec := &contracts.StepGateSpec{
 			Enabled:   gateSpec.Enabled,
 			Profile:   gateSpec.Profile,
@@ -472,18 +442,11 @@ func (r *runController) runGateWithHealing(
 //
 // ## Repo+Diff Verification Model
 //
-// Healing verification uses the same repo+diff semantics as the HTTP Build Gate API:
+// Healing verification uses a repo+diff model:
 //
 //   - The workspace is initialized by cloning repo_url at ref (see manifest hydration).
 //   - Healing mods modify the workspace in-place; changes accumulate as diffs.
 //   - Re-gate validation runs against workspace = repo_url+ref + healing changes.
-//   - This is semantically equivalent to HTTP Build Gate with diff_patch parameter,
-//     but executed in-process to avoid network overhead for repeated validation.
-//
-// Healing containers can also invoke the HTTP Build Gate API directly using
-// the injected PLOY_* environment variables (see PLOY_HOST_WORKSPACE,
-// PLOY_SERVER_URL env vars below). The system re-runs the gate regardless of
-// any in-container verification results.
 //
 // ## Configuration
 //
@@ -493,12 +456,12 @@ func (r *runController) runGateWithHealing(
 //
 // The healing loop injects additional environment variables into healing containers:
 //   - PLOY_HOST_WORKSPACE: host filesystem path to workspace for in-container tooling
-//   - PLOY_SERVER_URL, PLOY_*_CERT_PATH: server connection details for buildgate API access
+//   - PLOY_SERVER_URL, PLOY_*_CERT_PATH: server connection details for API access
 //   - PLOY_REPO_URL, PLOY_BASE_REF, PLOY_TARGET_REF, PLOY_COMMIT_SHA: repo metadata
 //     enabling healers to derive the same Git baseline used by the Mods run
 //
 // The function also mounts node TLS certificates into healing containers to enable
-// authenticated API calls to the control plane for gate verification and artifact uploads.
+// authenticated API calls to the control plane for artifact uploads.
 //
 // The stepIndex parameter is used for logging and diff upload correlation in multi-step runs.
 func (r *runController) executeWithHealing(

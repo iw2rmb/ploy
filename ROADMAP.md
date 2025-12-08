@@ -67,7 +67,7 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/server/handlers/...` — Ensure all buildgate HTTP tests are removed or updated and remaining handlers compile and pass.
 
-- [ ] Remove HTTP Gate mode from runtime — Always use Docker-based gate executor
+- [x] Remove HTTP Gate mode from runtime — Always use Docker-based gate executor
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step/gate_http_client.go, internal/workflow/runtime/step/gate_http.go, internal/workflow/runtime/step/gate_iface.go, internal/workflow/runtime/step/gate_factory.go, internal/nodeagent/execution_orchestrator.go, internal/nodeagent/execution_healing.go, internal/workflow/runtime/step/runner_gate_test.go
   - Scope:
