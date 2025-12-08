@@ -1,6 +1,6 @@
 {
   "schema_version": "2025-09-27.1",
-  "ticket_id": "ticket-123",
+  "run_id": "run-123",
   "stage": "mods-plan",
   "status": "pending",
   "cache_key": "node-wasm/cache@manifest=2025-09-26@aster=plan",

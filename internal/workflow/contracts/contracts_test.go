@@ -14,34 +14,34 @@ const (
 	buildGateStage = "build-gate"
 )
 
-func TestSubjectsForTicket(t *testing.T) {
-	subjects := SubjectsForTicket("ticket-123")
-	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
+func TestSubjectsForRun(t *testing.T) {
+	subjects := SubjectsForRun("run-123")
+	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
-	if subjects.ArtifactStream != "ploy.artifact.ticket-123" {
+	if subjects.ArtifactStream != "ploy.artifact.run-123" {
 		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
 	}
-	if subjects.StatusStream != "jobs.ticket-123.events" {
+	if subjects.StatusStream != "jobs.run-123.events" {
 		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
 	}
 }
 
-func TestSubjectsForTicketTrimsInput(t *testing.T) {
-	subjects := SubjectsForTicket("  ticket-123  ")
-	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
+func TestSubjectsForRunTrimsInput(t *testing.T) {
+	subjects := SubjectsForRun("  run-123  ")
+	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
-	if subjects.ArtifactStream != "ploy.artifact.ticket-123" {
+	if subjects.ArtifactStream != "ploy.artifact.run-123" {
 		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
 	}
-	if subjects.StatusStream != "jobs.ticket-123.events" {
+	if subjects.StatusStream != "jobs.run-123.events" {
 		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
 	}
 }
 
-func TestSubjectsForTicketEmptyTicket(t *testing.T) {
-	subjects := SubjectsForTicket("")
+func TestSubjectsForRunEmptyRunID(t *testing.T) {
+	subjects := SubjectsForRun("")
 	if subjects.CheckpointStream != "" {
 		t.Fatalf("expected empty checkpoint stream, got %s", subjects.CheckpointStream)
 	}
@@ -61,7 +61,7 @@ func TestWorkflowTicketValidate(t *testing.T) {
 
 	valid := WorkflowTicket{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 	}
 	if err := valid.Validate(); err != nil {
@@ -70,7 +70,7 @@ func TestWorkflowTicketValidate(t *testing.T) {
 
 	withRepo := WorkflowTicket{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-456"),
+		RunID:         types.RunID("run-456"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		Repo: RepoMaterialization{
 			URL:       types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
@@ -115,7 +115,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 
 	cp := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Stage:         StageName(modsStage),
 		Status:        CheckpointStatusPending,
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
@@ -188,7 +188,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	if artifacts, ok := decoded["artifacts"].([]any); !ok || len(artifacts) == 0 {
 		t.Fatalf("expected artifacts in payload: %v", decoded)
 	}
-	if cp.Subject() != "ploy.workflow.ticket-123.checkpoints" {
+	if cp.Subject() != "ploy.workflow.run-123.checkpoints" {
 		t.Fatalf("unexpected subject: %s", cp.Subject())
 	}
 }
@@ -265,7 +265,7 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 
 	envelope := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Stage:         StageName(modsStage),
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
@@ -285,7 +285,7 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 		t.Fatalf("expected valid artifact envelope, got %v", err)
 	}
 
-	if subject := envelope.Subject(); subject != "ploy.artifact.ticket-123" {
+	if subject := envelope.Subject(); subject != "ploy.artifact.run-123" {
 		t.Fatalf("unexpected artifact subject: %s", subject)
 	}
 }
@@ -309,13 +309,13 @@ func TestModsPlanMetadataValidateRejectsInvalidValues(t *testing.T) {
 
 func TestInMemoryBusRecordsMessages(t *testing.T) {
 	bus := NewInMemoryBus()
-	ticket, err := bus.ClaimTicket(context.Background(), "ticket-123")
+	ticket, err := bus.ClaimRun(context.Background(), "run-123")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
 	// tenant removed
-	if len(bus.ClaimedTickets) != 1 {
-		t.Fatalf("expected claimed ticket to be recorded")
+	if len(bus.ClaimedRuns) != 1 {
+		t.Fatalf("expected claimed run to be recorded")
 	}
 	if ticket.Manifest.Name == "" || ticket.Manifest.Version == "" {
 		t.Fatalf("expected manifest reference to be set, got %+v", ticket.Manifest)
@@ -323,8 +323,8 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 
 	checkpoint := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
-		Stage:         StageName("ticket-claimed"),
+		RunID:         types.RunID("run-123"),
+		Stage:         StageName("run-claimed"),
 		Status:        CheckpointStatusClaimed,
 	}
 	if err := bus.PublishCheckpoint(context.Background(), checkpoint); err != nil {
@@ -336,7 +336,7 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 
 	artifact := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Stage:         StageName(modsStage),
 		Artifact: CheckpointArtifact{
 			Name:        "mods-plan",
@@ -351,32 +351,32 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 	}
 }
 
-func TestInMemoryBusAutoTicketFallback(t *testing.T) {
+func TestInMemoryBusAutoRunFallback(t *testing.T) {
 	bus := NewInMemoryBus()
-	bus.EnqueueTicket("queued-1")
-	ticket, err := bus.ClaimTicket(context.Background(), "")
+	bus.EnqueueRun("queued-1")
+	ticket, err := bus.ClaimRun(context.Background(), "")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
-	if ticket.TicketID != "queued-1" {
-		t.Fatalf("expected queued ticket, got %s", ticket.TicketID)
+	if ticket.RunID != "queued-1" {
+		t.Fatalf("expected queued run, got %s", ticket.RunID)
 	}
-	if len(bus.ClaimedTickets) != 1 || bus.ClaimedTickets[0] != "queued-1" {
-		t.Fatalf("unexpected claimed tickets: %v", bus.ClaimedTickets)
+	if len(bus.ClaimedRuns) != 1 || bus.ClaimedRuns[0] != "queued-1" {
+		t.Fatalf("unexpected claimed runs: %v", bus.ClaimedRuns)
 	}
 
-	second, err := bus.ClaimTicket(context.Background(), "")
+	second, err := bus.ClaimRun(context.Background(), "")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
-	if second.TicketID == "" {
-		t.Fatal("expected auto-generated ticket id")
+	if second.RunID == "" {
+		t.Fatal("expected auto-generated run id")
 	}
-	if second.TicketID == "queued-1" {
-		t.Fatal("expected different ticket id for auto fallback")
+	if second.RunID == "queued-1" {
+		t.Fatal("expected different run id for auto fallback")
 	}
-	if len(bus.ClaimedTickets) != 2 {
-		t.Fatalf("expected two claimed tickets, got %v", bus.ClaimedTickets)
+	if len(bus.ClaimedRuns) != 2 {
+		t.Fatalf("expected two claimed runs, got %v", bus.ClaimedRuns)
 	}
 	if second.Manifest.Name == "" || second.Manifest.Version == "" {
 		t.Fatalf("expected auto manifest assignment, got %+v", second.Manifest)

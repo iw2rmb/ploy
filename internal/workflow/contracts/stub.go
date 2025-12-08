@@ -9,16 +9,16 @@ import (
 )
 
 // InMemoryBus is a non-persistent test/local stub of the workflow
-// events bus. It records claimed tickets, checkpoints, and artifacts
+// events bus. It records claimed runs, checkpoints, and artifacts
 // in memory only. It is not concurrency-safe and must not be used in
 // production paths.
 type InMemoryBus struct {
-	ClaimedTickets []string
-	Checkpoints    []WorkflowCheckpoint
-	Artifacts      []WorkflowArtifact
-	tickets        []string
-	Manifest       ManifestReference
-	Repo           RepoMaterialization
+	ClaimedRuns []string
+	Checkpoints []WorkflowCheckpoint
+	Artifacts   []WorkflowArtifact
+	runs        []string
+	Manifest    ManifestReference
+	Repo        RepoMaterialization
 }
 
 // NewInMemoryBus constructs an empty InMemoryBus.
@@ -26,27 +26,27 @@ func NewInMemoryBus() *InMemoryBus {
 	return &InMemoryBus{}
 }
 
-// EnqueueTicket queues a ticket ID to be returned by ClaimTicket
+// EnqueueRun queues a run ID to be returned by ClaimRun
 // when callers pass a blank ID.
-func (b *InMemoryBus) EnqueueTicket(ticketID string) {
-	b.tickets = append(b.tickets, ticketID)
+func (b *InMemoryBus) EnqueueRun(runID string) {
+	b.runs = append(b.runs, runID)
 }
 
-// ClaimTicket returns a WorkflowTicket for the provided ID. When the
+// ClaimRun returns a WorkflowTicket for the provided ID. When the
 // ID is blank, it pops from the internal queue or generates
-// "ticket-auto-N". A default manifest is applied when none is set.
-func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (WorkflowTicket, error) {
+// "run-auto-N". A default manifest is applied when none is set.
+func (b *InMemoryBus) ClaimRun(ctx context.Context, runID string) (WorkflowTicket, error) {
 	_ = ctx
-	trimmed := strings.TrimSpace(ticketID)
+	trimmed := strings.TrimSpace(runID)
 	if trimmed == "" {
-		if len(b.tickets) > 0 {
-			trimmed = b.tickets[0]
-			b.tickets = b.tickets[1:]
+		if len(b.runs) > 0 {
+			trimmed = b.runs[0]
+			b.runs = b.runs[1:]
 		} else {
-			trimmed = fmt.Sprintf("ticket-auto-%d", len(b.ClaimedTickets)+1)
+			trimmed = fmt.Sprintf("run-auto-%d", len(b.ClaimedRuns)+1)
 		}
 	}
-	b.ClaimedTickets = append(b.ClaimedTickets, trimmed)
+	b.ClaimedRuns = append(b.ClaimedRuns, trimmed)
 	manifest := b.Manifest
 	if manifest.Name == "" || manifest.Version == "" {
 		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}

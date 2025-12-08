@@ -11,7 +11,7 @@ import (
 // stream for consumers that hydrate caches without reading checkpoints.
 type WorkflowArtifact struct {
 	SchemaVersion string             `json:"schema_version"`
-	RunID         types.RunID        `json:"ticket_id"`
+	RunID         types.RunID        `json:"run_id"`
 	Stage         StageName          `json:"stage"`
 	CacheKey      string             `json:"cache_key,omitempty"`
 	StageMetadata *CheckpointStage   `json:"stage_metadata,omitempty"`
@@ -24,7 +24,7 @@ func (a WorkflowArtifact) Validate() error {
 		return fmt.Errorf("schema_version is required")
 	}
 	if a.RunID.IsZero() {
-		return fmt.Errorf("ticket_id is required")
+		return fmt.Errorf("run_id is required")
 	}
 	if strings.TrimSpace(string(a.Stage)) == "" {
 		return fmt.Errorf("stage is required")
@@ -45,9 +45,9 @@ func (a WorkflowArtifact) Validate() error {
 
 // Subject returns the artifact stream subject for the envelope.
 func (a WorkflowArtifact) Subject() string {
-	ticket := strings.TrimSpace(a.RunID.String())
-	if ticket == "" {
+	runID := strings.TrimSpace(a.RunID.String())
+	if runID == "" {
 		return ""
 	}
-	return fmt.Sprintf(artifactStreamFormat, ticket)
+	return fmt.Sprintf(artifactStreamFormat, runID)
 }

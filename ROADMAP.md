@@ -51,7 +51,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ploy ./internal/cli/...` — golden outputs and error message assertions adjusted to run-centric wording.
 
 ## Workflow contracts and subjects
-- [ ] Align workflow contracts with Run ID naming — remove `ticket_id` field names and helper names where they encode runs.
+- [x] Align workflow contracts with Run ID naming — remove `ticket_id` field names and helper names where they encode runs.
   - Repository: ploy
   - Component: `internal/workflow/contracts`
   - Scope: 
