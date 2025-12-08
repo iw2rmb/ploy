@@ -28,8 +28,8 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		// Server assigns the run id.
 		resp := modsapi.RunSubmitResponse{
 			Ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("mods-server-123"),
-				State:    modsapi.RunStatePending,
+				RunID: domaintypes.RunID("mods-server-123"),
+				State: modsapi.RunStatePending,
 			},
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -67,8 +67,8 @@ func TestExecuteModRunServerAssignsTicket(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
 		resp := modsapi.RunSubmitResponse{
 			Ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("mods-abc123"),
-				State:    modsapi.RunStatePending,
+				RunID: domaintypes.RunID("mods-abc123"),
+				State: modsapi.RunStatePending,
 			},
 		}
 		w.WriteHeader(http.StatusAccepted)

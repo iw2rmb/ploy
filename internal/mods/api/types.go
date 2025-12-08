@@ -6,7 +6,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Package api defines the Mods ticket and stage types shared by the CLI,
+// Package api defines the Mods run and stage types shared by the CLI,
 // control plane (/v1/mods*) and SSE hub. JSON tags mirror the wire shape.
 
 // StageState mirrors Mods stage lifecycle states exposed over the API.
@@ -22,7 +22,7 @@ const (
 	StageStateCancelled  StageState = "cancelled"
 )
 
-// RunState mirrors Mods ticket lifecycle states exposed over the API.
+// RunState mirrors Mods run lifecycle states exposed over the API.
 type RunState string
 
 const (
@@ -34,7 +34,7 @@ const (
 	RunStateCancelled  RunState = "cancelled"
 )
 
-// StageDefinition defines a stage within the Mods ticket graph.
+// StageDefinition defines a stage within the Mods run graph.
 type StageDefinition struct {
 	ID           string            `json:"id"`
 	Dependencies []string          `json:"dependencies,omitempty"`
@@ -44,34 +44,37 @@ type StageDefinition struct {
 	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
-// RunSubmitRequest represents a ticket submission payload.
+// RunSubmitRequest represents a run submission payload.
+// The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON.
 type RunSubmitRequest struct {
-	TicketID   domaintypes.TicketID `json:"run_id,omitempty"`
-	Submitter  string               `json:"submitter,omitempty"`
-	Repository string               `json:"repository,omitempty"`
-	Metadata   map[string]string    `json:"metadata,omitempty"`
-	Stages     []StageDefinition    `json:"stages"`
+	RunID      domaintypes.RunID `json:"run_id,omitempty"`
+	Submitter  string            `json:"submitter,omitempty"`
+	Repository string            `json:"repository,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	Stages     []StageDefinition `json:"stages"`
 }
 
-// RunSubmitResponse returns the persisted ticket summary after submission.
+// RunSubmitResponse returns the persisted run summary after submission.
 type RunSubmitResponse struct {
 	Ticket RunSummary `json:"ticket"`
 }
 
-// RunStatusResponse returns the current ticket summary.
+// RunStatusResponse returns the current run summary.
 type RunStatusResponse struct {
 	Ticket RunSummary `json:"ticket"`
 }
 
-// RunSummary summarises ticket lifecycle state and associated stages.
+// RunSummary summarises run lifecycle state and associated stages.
+// The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON
+// to maintain wire format compatibility with existing clients.
 type RunSummary struct {
-	TicketID   domaintypes.TicketID `json:"run_id"`
-	State      RunState             `json:"state"`
-	Submitter  string               `json:"submitter,omitempty"`
-	Repository string               `json:"repository,omitempty"`
-	Metadata   map[string]string    `json:"metadata,omitempty"`
-	CreatedAt  time.Time            `json:"created_at"`
-	UpdatedAt  time.Time            `json:"updated_at"`
+	RunID      domaintypes.RunID `json:"run_id"`
+	State      RunState          `json:"state"`
+	Submitter  string            `json:"submitter,omitempty"`
+	Repository string            `json:"repository,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 	// Stages is keyed by job ID (KSUID string from jobs.id). Each entry represents
 	// a row from the `jobs` table. The field name "stages" is retained for API
 	// backward compatibility. Use StageStatus.StepIndex (mirrors jobs.step_index)

@@ -89,7 +89,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.TicketID, summary.State)
+	_, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.RunID, summary.State)
 
 	// Track states for JSON output.
 	initialState := strings.ToLower(string(summary.State))
@@ -97,7 +97,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 	// Follow ticket events if requested.
 	if *flags.Follow {
-		final, err := followTicketEvents(ctx, base, httpClient, string(summary.TicketID), flags, stderr)
+		final, err := followTicketEvents(ctx, base, httpClient, string(summary.RunID), flags, stderr)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 		// Download artifacts after successful completion.
 		if artifactDir := strings.TrimSpace(*flags.ArtifactDir); artifactDir != "" {
-			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.TicketID), artifactDir, stderr); err != nil {
+			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.RunID), artifactDir, stderr); err != nil {
 				return err
 			}
 		}
@@ -113,7 +113,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 	// Output JSON summary if requested.
 	if *flags.JSONOut {
-		if err := outputJSONSummary(ctx, base, httpClient, string(summary.TicketID), initialState, finalState, flags); err != nil {
+		if err := outputJSONSummary(ctx, base, httpClient, string(summary.RunID), initialState, finalState, flags); err != nil {
 			return err
 		}
 	}

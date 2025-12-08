@@ -166,16 +166,16 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 			ticketState = modsapi.RunStateFailed
 		}
 
-		// Run IDs are now KSUID strings.
+		// Run IDs are now KSUID strings. Use RunID field (formerly TicketID).
 		ticketSummary := modsapi.RunSummary{
-			TicketID:   domaintypes.TicketID(runID),
+			RunID:      domaintypes.RunID(runID),
 			State:      ticketState,
 			Repository: run.RepoUrl,
 			CreatedAt:  run.CreatedAt.Time,
 			UpdatedAt:  time.Now().UTC(),
 			Stages:     make(map[string]modsapi.StageStatus),
 		}
-		if err := eventsService.PublishTicket(ctx, runID, ticketSummary); err != nil {
+		if err := eventsService.PublishRun(ctx, runID, ticketSummary); err != nil {
 			slog.Error("complete multi-step run: publish ticket event failed", "run_id", runID, "err", err)
 		}
 

@@ -18,8 +18,8 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticket),
-					State:    modsapi.RunStateSucceeded,
+					RunID: domaintypes.RunID(ticket),
+					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
 						"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},

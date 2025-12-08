@@ -98,8 +98,9 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Publish terminal  run event + done status for SSE clients
 		if eventsService != nil {
+			// Use RunID field (formerly TicketID).
 			runSummary := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID(runIDStr),
+				RunID:      domaintypes.RunID(runIDStr),
 				State:      modsapi.RunStateCancelled,
 				Repository: run.RepoUrl,
 				CreatedAt:  timeOrZero(run.CreatedAt),
@@ -112,7 +113,7 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 				}
 				runSummary.Metadata["reason"] = strings.TrimSpace(*req.Reason)
 			}
-			if err := eventsService.PublishTicket(r.Context(), runIDStr, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), runIDStr, runSummary); err != nil {
 				slog.Error("cancel  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 			// Signal done on the stream

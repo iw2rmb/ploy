@@ -441,22 +441,22 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 	}
 }
 
-// TestPublishTicketTypedPayload verifies that PublishTicket accepts only api.RunSummary
+// TestPublishRunTypedPayload verifies that PublishRun accepts only api.RunSummary
 // and that the payload marshals correctly through publish/subscribe round-trip.
-func TestPublishTicketTypedPayload(t *testing.T) {
+func TestPublishRunTypedPayload(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
 
-	// Construct a typed RunSummary payload.
-	ticket := api.RunSummary{
-		TicketID: "ticket-123",
-		State:    api.RunStateRunning,
-		Stages:   make(map[string]api.StageStatus),
+	// Construct a typed RunSummary payload with RunID field.
+	run := api.RunSummary{
+		RunID:  "run-123",
+		State:  api.RunStateRunning,
+		Stages: make(map[string]api.StageStatus),
 	}
 
-	// Publish the ticket event.
-	if err := hub.PublishTicket(ctx, "run-1", ticket); err != nil {
-		t.Fatalf("publish ticket: %v", err)
+	// Publish the run event using renamed PublishRun method.
+	if err := hub.PublishRun(ctx, "run-1", run); err != nil {
+		t.Fatalf("publish run: %v", err)
 	}
 
 	// Subscribe and receive the event.
@@ -469,21 +469,21 @@ func TestPublishTicketTypedPayload(t *testing.T) {
 	select {
 	case evt := <-sub.Events:
 		if evt.Type != "run" {
-			t.Fatalf("expected event type 'ticket', got %s", evt.Type)
+			t.Fatalf("expected event type 'run', got %s", evt.Type)
 		}
 		// Unmarshal and verify the payload.
 		var received api.RunSummary
 		if err := json.Unmarshal(evt.Data, &received); err != nil {
-			t.Fatalf("unmarshal ticket payload: %v", err)
+			t.Fatalf("unmarshal run payload: %v", err)
 		}
-		if received.TicketID != ticket.TicketID {
-			t.Fatalf("expected run_id %s, got %s", ticket.TicketID, received.TicketID)
+		if received.RunID != run.RunID {
+			t.Fatalf("expected run_id %s, got %s", run.RunID, received.RunID)
 		}
-		if received.State != ticket.State {
-			t.Fatalf("expected state %s, got %s", ticket.State, received.State)
+		if received.State != run.State {
+			t.Fatalf("expected state %s, got %s", run.State, received.State)
 		}
 	case <-time.After(100 * time.Millisecond):
-		t.Fatal("timeout waiting for ticket event")
+		t.Fatal("timeout waiting for run event")
 	}
 }
 
@@ -492,7 +492,7 @@ func TestPublishTicketTypedPayload(t *testing.T) {
 // =============================================================================
 // These tests validate that enriched log payloads (with node_id, job_id,
 // mod_type, step_index) do not regress performance or resilience for
-// long-running or chatty Mods tickets.
+// long-running or chatty Mods runs.
 // Reference: ROADMAP.md - "Validate performance and resilience with enriched logs"
 
 // BenchmarkHubPublishEnrichedLog measures the throughput of publishing enriched

@@ -28,8 +28,8 @@ func TestInspectCommand_Run(t *testing.T) {
 		{
 			name: "basic ticket with MR and gate",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("mods-abc123"),
-				State:    modsapi.RunStateRunning,
+				RunID: domaintypes.RunID("mods-abc123"),
+				State: modsapi.RunStateRunning,
 				Metadata: map[string]string{
 					"mr_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
 					"gate_summary": "failed pre-gate duration=567ms",
@@ -46,8 +46,8 @@ func TestInspectCommand_Run(t *testing.T) {
 		{
 			name: "ticket with job graph",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("mods-def456"),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID("mods-def456"),
+				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
 					"gate_summary": "passed duration=1234ms",
 				},
@@ -80,8 +80,8 @@ func TestInspectCommand_Run(t *testing.T) {
 		{
 			name: "ticket with healing jobs at midpoint indices",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("mods-heal789"),
-				State:    modsapi.RunStateRunning,
+				RunID: domaintypes.RunID("mods-heal789"),
+				State: modsapi.RunStateRunning,
 				Metadata: map[string]string{
 					"gate_summary": "failed pre-gate duration=200ms",
 				},
@@ -113,7 +113,7 @@ func TestInspectCommand_Run(t *testing.T) {
 		{
 			name: "ticket without MR or gate",
 			ticket: modsapi.RunSummary{
-				TicketID:  domaintypes.TicketID("mods-minimal"),
+				RunID:     domaintypes.RunID("mods-minimal"),
 				State:     modsapi.RunStatePending,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
@@ -130,7 +130,7 @@ func TestInspectCommand_Run(t *testing.T) {
 		{
 			name: "ticket with empty stages map",
 			ticket: modsapi.RunSummary{
-				TicketID:  domaintypes.TicketID("mods-empty"),
+				RunID:     domaintypes.RunID("mods-empty"),
 				State:     modsapi.RunStateRunning,
 				Stages:    map[string]modsapi.StageStatus{},
 				CreatedAt: time.Now(),
@@ -166,7 +166,7 @@ func TestInspectCommand_Run(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				Ticket:  string(tc.ticket.TicketID),
+				Ticket:  string(tc.ticket.RunID),
 				Output:  &out,
 			}
 
@@ -281,8 +281,8 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 
 	// Jobs with out-of-order step indices to verify sorting.
 	ticket := modsapi.RunSummary{
-		TicketID: domaintypes.TicketID("mods-sort"),
-		State:    modsapi.RunStateSucceeded,
+		RunID: domaintypes.RunID("mods-sort"),
+		State: modsapi.RunStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
 			"zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz": {State: modsapi.StageStateSucceeded, StepIndex: 3000},
 			"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": {State: modsapi.StageStateSucceeded, StepIndex: 1000},

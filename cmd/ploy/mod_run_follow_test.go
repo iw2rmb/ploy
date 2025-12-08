@@ -32,8 +32,8 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.RunStateRunning,
+					RunID: domaintypes.RunID(ticketID),
+					State: modsapi.RunStateRunning,
 				},
 			})
 
@@ -47,8 +47,8 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			// running
 			_, _ = w.Write([]byte("event: run\n"))
 			data, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateRunning,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data)
@@ -58,8 +58,8 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			// succeeded
 			_, _ = w.Write([]byte("event: run\n"))
 			data2, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data2)
@@ -70,8 +70,8 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.RunStateSucceeded,
+					RunID: domaintypes.RunID(ticketID),
+					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
 					},
@@ -158,8 +158,8 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.RunStateRunning,
+					RunID: domaintypes.RunID(ticketID),
+					State: modsapi.RunStateRunning,
 				},
 			})
 
@@ -174,8 +174,8 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 			// Run running event.
 			_, _ = w.Write([]byte("event: run\n"))
 			ticketData, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateRunning,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData)
@@ -199,8 +199,8 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 			// Run succeeded event.
 			_, _ = w.Write([]byte("event: run\n"))
 			ticketData2, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData2)
@@ -266,8 +266,8 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.RunStateRunning,
+					RunID: domaintypes.RunID(ticketID),
+					State: modsapi.RunStateRunning,
 				},
 			})
 
@@ -281,8 +281,8 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			// Run running.
 			_, _ = w.Write([]byte("event: run\n"))
 			ticketData, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateRunning,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData)
@@ -298,8 +298,8 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			// Run succeeded.
 			_, _ = w.Write([]byte("event: run\n"))
 			ticketData2, _ := json.Marshal(modsapi.RunSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID(ticketID),
+				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData2)

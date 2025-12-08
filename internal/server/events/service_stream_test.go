@@ -75,11 +75,11 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	}
 }
 
-// TestPublishTicket verifies that ticket state changes are correctly published
-// as SSE events to the stream. It tests various ticket states (pending, running,
+// TestStream_PublishRun verifies that run state changes are correctly published
+// as SSE events to the stream. It tests various run states (pending, running,
 // succeeded, failed, cancelled) and validates that the event payload is correctly
 // marshaled and delivered.
-func TestStream_PublishTicket(t *testing.T) {
+func TestStream_PublishRun(t *testing.T) {
 	tests := []struct {
 		name        string
 		runID       string
@@ -88,35 +88,35 @@ func TestStream_PublishTicket(t *testing.T) {
 		checkEvents bool
 	}{
 		{
-			name:        "publish queued ticket",
+			name:        "publish queued run",
 			runID:       uuid.New().String(),
 			state:       modsapi.RunStatePending,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
-			name:        "publish running ticket",
+			name:        "publish running run",
 			runID:       uuid.New().String(),
 			state:       modsapi.RunStateRunning,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
-			name:        "publish succeeded ticket",
+			name:        "publish succeeded run",
 			runID:       uuid.New().String(),
 			state:       modsapi.RunStateSucceeded,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
-			name:        "publish failed ticket",
+			name:        "publish failed run",
 			runID:       uuid.New().String(),
 			state:       modsapi.RunStateFailed,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
-			name:        "publish cancelled ticket",
+			name:        "publish cancelled run",
 			runID:       uuid.New().String(),
 			state:       modsapi.RunStateCancelled,
 			wantErr:     false,
@@ -151,8 +151,9 @@ func TestStream_PublishTicket(t *testing.T) {
 			ctx := context.Background()
 			now := time.Now()
 
+			// Build payload using renamed RunID field instead of TicketID.
 			payload := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID("test-ticket-123"),
+				RunID:      domaintypes.RunID("test-run-123"),
 				State:      tt.state,
 				Submitter:  "test-user",
 				Repository: "test-repo",
@@ -170,7 +171,8 @@ func TestStream_PublishTicket(t *testing.T) {
 				},
 			}
 
-			err = svc.PublishTicket(ctx, tt.runID, payload)
+			// Call renamed PublishRun method.
+			err = svc.PublishRun(ctx, tt.runID, payload)
 
 			if tt.wantErr {
 				if err == nil {
@@ -183,11 +185,11 @@ func TestStream_PublishTicket(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Check if ticket event was published to hub.
+			// Check if run event was published to hub.
 			if tt.checkEvents {
 				snapshot := svc.Hub().Snapshot(tt.runID)
 				if len(snapshot) == 0 {
-					t.Fatal("expected ticket event in hub snapshot, got none")
+					t.Fatal("expected run event in hub snapshot, got none")
 				}
 				if snapshot[0].Type != "run" {
 					t.Fatalf("expected event type 'run', got %s", snapshot[0].Type)
@@ -196,11 +198,12 @@ func TestStream_PublishTicket(t *testing.T) {
 				// Verify the payload is correctly marshaled.
 				var decodedPayload modsapi.RunSummary
 				if err := json.Unmarshal(snapshot[0].Data, &decodedPayload); err != nil {
-					t.Fatalf("failed to unmarshal ticket payload: %v", err)
+					t.Fatalf("failed to unmarshal run payload: %v", err)
 				}
 
-				if decodedPayload.TicketID != payload.TicketID {
-					t.Fatalf("expected ticket ID %s, got %s", payload.TicketID, decodedPayload.TicketID)
+				// Verify RunID field (renamed from TicketID).
+				if decodedPayload.RunID != payload.RunID {
+					t.Fatalf("expected run ID %s, got %s", payload.RunID, decodedPayload.RunID)
 				}
 				if decodedPayload.State != payload.State {
 					t.Fatalf("expected state %s, got %s", payload.State, decodedPayload.State)
@@ -213,10 +216,10 @@ func TestStream_PublishTicket(t *testing.T) {
 	}
 }
 
-// TestPublishTicketWithContext verifies that the PublishTicket method correctly
+// TestStream_PublishRunWithContext verifies that the PublishRun method correctly
 // handles context cancellation and returns appropriate errors when the context
 // is already cancelled before the publish operation begins.
-func TestStream_PublishTicketWithContext(t *testing.T) {
+func TestStream_PublishRunWithContext(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
 		HistorySize: 8,
@@ -226,8 +229,9 @@ func TestStream_PublishTicketWithContext(t *testing.T) {
 	}
 
 	runID := uuid.New().String()
+	// Build payload using renamed RunID field instead of TicketID.
 	payload := modsapi.RunSummary{
-		TicketID:  domaintypes.TicketID("test-ticket"),
+		RunID:     domaintypes.RunID("test-run"),
 		State:     modsapi.RunStateRunning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -238,7 +242,8 @@ func TestStream_PublishTicketWithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = svc.PublishTicket(ctx, runID, payload)
+	// Call renamed PublishRun method.
+	err = svc.PublishRun(ctx, runID, payload)
 	if err == nil {
 		t.Fatal("expected error with cancelled context, got nil")
 	}

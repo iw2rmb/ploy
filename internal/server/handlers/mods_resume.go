@@ -175,8 +175,9 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Include resume metadata so watchers can see the resume transition in the stream.
 		if eventsService != nil {
 			now := time.Now().UTC()
+			// Use RunID field (formerly TicketID).
 			runSummary := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID(runIDStr),
+				RunID:      domaintypes.RunID(runIDStr),
 				State:      modsapi.RunStatePending, // 'pending' maps to 'queued' in mods API.
 				Repository: run.RepoUrl,
 				Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
@@ -189,7 +190,7 @@ func resumeTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			if updatedRun, err := st.GetRun(r.Context(), runIDStr); err == nil {
 				runSummary.Metadata = buildResumeMetadata(updatedRun)
 			}
-			if err := eventsService.PublishTicket(r.Context(), runIDStr, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), runIDStr, runSummary); err != nil {
 				slog.Error("resume  run: publish  run event failed", " run_id", runIDStr, "err", err)
 			}
 		}

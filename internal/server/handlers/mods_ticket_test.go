@@ -291,8 +291,9 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if string(resp.Ticket.TicketID) != ticketID.String() {
-		t.Errorf("expected ticket_id %s, got %s", ticketID.String(), string(resp.Ticket.TicketID))
+	// Use RunID field (formerly TicketID).
+	if string(resp.Ticket.RunID) != ticketID.String() {
+		t.Errorf("expected run_id %s, got %s", ticketID.String(), string(resp.Ticket.RunID))
 	}
 	if resp.Ticket.State != modsapi.RunStateRunning {
 		t.Errorf("expected status running, got %s", resp.Ticket.State)
