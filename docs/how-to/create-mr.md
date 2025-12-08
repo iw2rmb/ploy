@@ -55,9 +55,9 @@ ploy config gitlab show
 Source branch naming
 - Ploy uses the effective target ref as the MR source branch. When you pass `--repo-target-ref`, that value is used directly. When you omit it, the node derives a default of `/mod/<run-id>` using the run ID (KSUID string). The base branch remains the one provided via `--repo-base-ref` (commonly `main`).
 
-Create an MR on success (capture server-assigned run via JSON):
+Create an MR on success (capture server-assigned run ID via JSON):
 ```bash
-TICKET=$(ploy mod run --json \
+RUN_ID=$(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade-java-17 \
@@ -67,7 +67,7 @@ TICKET=$(ploy mod run --json \
 
 Create an MR on failure (useful for debugging):
 ```bash
-TICKET=$(ploy mod run --json \
+RUN_ID=$(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/debug-build-failure \
@@ -77,14 +77,14 @@ TICKET=$(ploy mod run --json \
 
 Create an MR in both success and failure cases and capture MR URL too:
 ```bash
-read TICKET MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/experiment \
   --mr-success \
   --mr-fail \
   --follow | jq -r '[.run_id, .mr_url] | @tsv')
-echo "Run: $TICKET"
+echo "Run: $RUN_ID"
 echo "MR:     ${MR_URL:-<none>}"
 ```
 
@@ -92,7 +92,7 @@ echo "MR:     ${MR_URL:-<none>}"
 
 If you only captured the run, you can inspect to retrieve MR URL later:
 ```bash
-ploy mod inspect "$TICKET"
+ploy mod inspect "$RUN_ID"
 # Output includes:
 # MR: https://gitlab.com/yourorg/yourproject/-/merge_requests/123
 ```
@@ -102,7 +102,7 @@ ploy mod inspect "$TICKET"
 Override the global GitLab configuration for a single run using flags, capture run+MR via JSON:
 
 ```bash
-read TICKET MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade \
@@ -173,15 +173,15 @@ EOF
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Run OpenRewrite to upgrade Java 17
-read TICKET MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/spring-petclinic.git \
   --repo-base-ref main \
   --repo-target-ref workflow/java-17-upgrade \
   --mr-success \
   --follow | jq -r '[.run_id, .mr_url] | @tsv')
 
-# 3. View the MR (source branch will be ploy-$TICKET)
-echo "Run: $TICKET"; echo "MR: ${MR_URL:-<none>}"
+# 3. View the MR (source branch will be ploy-$RUN_ID)
+echo "Run: $RUN_ID"; echo "MR: ${MR_URL:-<none>}"
 # Copy the MR URL and review in GitLab
 
 # 4. If tests pass, merge the MR
