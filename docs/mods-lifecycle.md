@@ -639,10 +639,11 @@ ploy mod run repo add --repo-url https://github.com/org/repo2.git \
 ploy mod run repo status my-batch
 
 # 4. Optionally restart a failed repo with updated refs.
-ploy mod run repo restart --repo-id <repo-uuid> --base-ref hotfix my-batch
+# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
+ploy mod run repo restart --repo-id <repo-id> --base-ref hotfix my-batch
 
 # 5. Remove a repo from the batch (marks pending as skipped, running as cancelled).
-ploy mod run repo remove --repo-id <repo-uuid> my-batch
+ploy mod run repo remove --repo-id <repo-id> my-batch
 ```
 
 ### Relationship summary

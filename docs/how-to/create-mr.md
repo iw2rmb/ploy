@@ -224,8 +224,9 @@ ploy runs follow java17-fleet
 If one repository fails due to a missing fix, restart it with a different branch:
 
 ```bash
+# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mod run repo restart \
-  --repo-id <repo-uuid> \
+  --repo-id <repo-id> \
   --target-ref hotfix \
   java17-fleet
 ```

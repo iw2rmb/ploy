@@ -257,8 +257,9 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
   --target-ref feature/verify-batch \
   post-update-test
 
+# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ./dist/ploy mod run repo restart \
-  --repo-id <repo-uuid> \
+  --repo-id <repo-id> \
   --target-ref hotfix \
   post-update-test
 
