@@ -20,8 +20,9 @@ func TestHandleRolloutRequiresSubcommand(t *testing.T) {
 		t.Fatalf("expected error for missing rollout subcommand")
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy rollout") {
-		t.Fatalf("expected rollout usage output, got: %q", out)
+	// NOTE: Rollout is now accessible via `ploy cluster rollout`.
+	if !strings.Contains(out, "Usage: ploy cluster rollout") {
+		t.Fatalf("expected cluster rollout usage output, got: %q", out)
 	}
 }
 
@@ -45,8 +46,9 @@ func TestHandleRolloutServerRequiresAddress(t *testing.T) {
 	if !strings.Contains(err.Error(), "address is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Usage: ploy rollout server") {
-		t.Fatalf("expected rollout server usage output, got: %q", buf.String())
+	// NOTE: Rollout server is now accessible via `ploy cluster rollout server`.
+	if !strings.Contains(buf.String(), "Usage: ploy cluster rollout server") {
+		t.Fatalf("expected cluster rollout server usage output, got: %q", buf.String())
 	}
 }
 

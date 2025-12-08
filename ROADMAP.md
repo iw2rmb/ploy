@@ -306,7 +306,7 @@ Legend: [ ] todo, [x] done.
     - Adjust any tests that look for the old `ploy node add` usage lines in stderr.
 
 ## Move rollout operations under `ploy cluster rollout`
-- [ ] Change rollout commands from `ploy rollout ...` to `ploy cluster rollout ...` and update usage helpers — Move server and node rollout into the cluster namespace while preserving their flag surfaces and dry‑run behavior.
+- [x] Change rollout commands from `ploy rollout ...` to `ploy cluster rollout ...` and update usage helpers — Move server and node rollout into the cluster namespace while preserving their flag surfaces and dry‑run behavior.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root, commands_server.go, rollout_server.go, rollout_nodes_cmd.go), docs, scripts
   - Scope:

@@ -92,12 +92,22 @@ func handleRolloutServer(args []string, stderr io.Writer) error {
 	return runRolloutServer(cfg, stderr)
 }
 
+// printRolloutUsage prints the rollout command usage information.
+// This provides cluster-scoped usage output for --help, error paths,
+// and unknown subcommand handling.
+// NOTE: Rollout commands are now accessible via `ploy cluster rollout`.
 func printRolloutUsage(w io.Writer) {
-	printCommandUsage(w, "rollout")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout <command>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  server   Roll out a new binary to a control plane server")
+	_, _ = fmt.Fprintln(w, "  nodes    Roll out a new binary to worker nodes (batched)")
 }
 
+// printRolloutServerUsage prints the rollout server subcommand usage information.
+// NOTE: Rollout server is now accessible via `ploy cluster rollout server`.
 func printRolloutServerUsage(w io.Writer) {
-	printCommandUsage(w, "rollout", "server")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout server --address <host-or-ip> [flags]")
 }
 
 type rolloutServerConfig struct {

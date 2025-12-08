@@ -80,6 +80,8 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 	return runRolloutNodes(cfg, stderr)
 }
 
+// printRolloutNodesUsage prints the rollout nodes subcommand usage information.
+// NOTE: Rollout nodes is now accessible via `ploy cluster rollout nodes`.
 func printRolloutNodesUsage(w io.Writer) {
-	printCommandUsage(w, "rollout", "nodes")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout nodes [--all | --selector <pattern>] [flags]")
 }

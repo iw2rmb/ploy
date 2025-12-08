@@ -20,8 +20,9 @@ func TestHandleRolloutNodesRequiresSelector(t *testing.T) {
 	if !strings.Contains(err.Error(), "either --all or --selector is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Usage: ploy rollout nodes") {
-		t.Fatalf("expected rollout nodes usage output, got: %q", buf.String())
+	// NOTE: Rollout nodes is now accessible via `ploy cluster rollout nodes`.
+	if !strings.Contains(buf.String(), "Usage: ploy cluster rollout nodes") {
+		t.Fatalf("expected cluster rollout nodes usage output, got: %q", buf.String())
 	}
 }
 
