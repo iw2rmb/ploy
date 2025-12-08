@@ -3,10 +3,10 @@ Usage: ploy mod <command>
 Commands:
   run         Submit a Mods run to the control plane
   run repo    Manage repos within a batch run (add/remove/restart/status)
-  cancel      Cancel a Mods ticket via the control plane
-  resume      Resume a paused Mods ticket
-  inspect     Show summary for a Mods ticket
-  artifacts   List ticket artifacts by stage
+  cancel      Cancel a Mods run via the control plane
+  resume      Resume a paused Mods run
+  inspect     Show summary for a Mods run
+  artifacts   List run artifacts by stage
   diffs       List diffs or download newest patch
 
 Use 'ploy mod run --help' for flag details.
@@ -26,9 +26,9 @@ Flags for 'ploy mod run':
   --gitlab-domain <domain>   GitLab domain
   --mr-success               Create merge request on success
   --mr-fail                  Create merge request on failure
-  --follow                   Follow ticket events until completion
+  --follow                   Follow run events until completion
   --cap <duration>           Time cap for --follow
-  --cancel-on-cap            Cancel ticket if cap exceeded
+  --cancel-on-cap            Cancel run if cap exceeded
   --artifact-dir <dir>       Download final artifacts
   --json                     Print JSON summary
   --max-retries N            Max reconnect attempts for event stream
