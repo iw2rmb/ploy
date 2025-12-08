@@ -3,14 +3,11 @@ package plan_test
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
 	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
@@ -54,7 +51,7 @@ func TestPlannerAnnotatesMetadataFromAdvisor(t *testing.T) {
 	advisor := &stubAdvisor{advice: plan.Advice{
 		Plan:            plan.AdvicePlan{SelectedRecipes: []string{"recipe.alpha", "recipe.beta"}, ParallelStages: []string{plan.StageNameORWApply, plan.StageNameORWGenerate}, HumanGate: true, Summary: "expect human review after LLM execution"},
 		Human:           plan.AdviceHuman{Required: true, Playbooks: []string{"playbook.mods.review"}},
-		Recommendations: []plan.AdviceRecommendation{{Source: "knowledge-base", Message: "Apply recipe.alpha first", Confidence: 0.91}, {Source: "knowledge-base", Message: "Queue review if diff size > 500", Confidence: 1.4}, {Source: "knowledge-base", Message: " ", Confidence: -0.5}},
+		Recommendations: []plan.AdviceRecommendation{{Source: "advisor", Message: "Apply recipe.alpha first", Confidence: 0.91}, {Source: "advisor", Message: "Queue review if diff size > 500", Confidence: 1.4}, {Source: "advisor", Message: " ", Confidence: -0.5}},
 	}}
 	p := plan.NewPlanner(plan.Options{Advisor: advisor})
 	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-knowledge"}})
@@ -109,20 +106,17 @@ func TestPlannerExposesExecutionHints(t *testing.T) {
 }
 
 func TestPlannerIntegratesKnowledgeBaseAdvisor(t *testing.T) {
-	dir := t.TempDir()
-	fixture := `{"schema_version":"2025-09-27.1","incidents":[{"id":"lint-failure","errors":["lint failed","npm ERR! lint script"],"recipes":["recipe.npm.lint"],"summary":"Run npm run lint with fixes","human_gate":true,"playbooks":["mods.npm.lint"],"recommendations":[{"source":"knowledge-base","message":"Run npm run lint -- --fix","confidence":0.9}]}]}`
-	path := filepath.Join(dir, "catalog.json")
-	if err := os.WriteFile(path, []byte(fixture), 0o600); err != nil {
-		t.Fatalf("write catalog: %v", err)
-	}
-	catalog, err := knowledgebase.LoadCatalogFile(path)
-	if err != nil {
-		t.Fatalf("load catalog: %v", err)
-	}
-	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{Catalog: catalog})
-	if err != nil {
-		t.Fatalf("new advisor: %v", err)
-	}
+	advisor := &stubAdvisor{advice: plan.Advice{
+		Plan: plan.AdvicePlan{
+			SelectedRecipes: []string{"recipe.npm.lint"},
+			HumanGate:       true,
+			Summary:         "Run npm run lint with fixes",
+		},
+		Human: plan.AdviceHuman{
+			Required:  true,
+			Playbooks: []string{"mods.npm.lint"},
+		},
+	}}
 	p := plan.NewPlanner(plan.Options{Advisor: advisor})
 	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-1", Manifest: contracts.ManifestReference{Name: "repo", Version: "1.0.0"}}, Signals: plan.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}}})
 	if err != nil {

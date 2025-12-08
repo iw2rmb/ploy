@@ -6,7 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// Advisor exposes Mods knowledge base guidance to the planner.
+// Advisor exposes Mods guidance to the planner.
 type Advisor interface {
 	Advise(ctx context.Context, req AdviceRequest) (Advice, error)
 }
@@ -30,7 +30,7 @@ type AdviceSignals struct {
 	Manifest contracts.ManifestReference
 }
 
-// AdvicePlan represents the Mods planner advice returned by the knowledge base.
+// AdvicePlan represents planner advice returned by an advisor.
 type AdvicePlan struct {
 	SelectedRecipes []string
 	ParallelStages  []string
@@ -38,13 +38,13 @@ type AdvicePlan struct {
 	Summary         string
 }
 
-// AdviceHuman captures human-stage cues returned by the knowledge base.
+// AdviceHuman captures human-stage cues returned by an advisor.
 type AdviceHuman struct {
 	Required  bool
 	Playbooks []string
 }
 
-// AdviceRecommendation captures a single knowledge base recommendation.
+// AdviceRecommendation captures a single recommendation from an advisor.
 type AdviceRecommendation struct {
 	Source     string
 	Message    string

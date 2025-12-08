@@ -67,10 +67,9 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	root.AddCommand(newUploadCmd(stderr)) // ploy upload
 
 	// Cluster and configuration commands
-	root.AddCommand(newClusterCmd(stderr))       // ploy cluster (not yet implemented)
-	root.AddCommand(newConfigCmd(stderr))        // ploy config (gitlab show/set/validate)
-	root.AddCommand(newManifestCmd(stderr))      // ploy manifest (schema, validate)
-	root.AddCommand(newKnowledgeBaseCmd(stderr)) // ploy knowledge-base (ingest, evaluate)
+	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (not yet implemented)
+	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
+	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
 	// Server and node management commands
 	root.AddCommand(newServerCmd(stderr))  // ploy server (deploy)
