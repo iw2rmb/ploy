@@ -62,7 +62,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.Output == nil {
 		return nil
 	}
-	// Stable iteration order by stage id (map key = job UUID).
+	// Stable iteration order by stage id (map key = job ID, KSUID string).
 	var stageIDs []string
 	for id := range payload.Ticket.Stages {
 		stageIDs = append(stageIDs, id)
