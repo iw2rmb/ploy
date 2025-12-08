@@ -804,7 +804,7 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/nodes/{id}/buildgate/*` — claim/ack/complete Build Gate jobs.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
-`PLOY_NODE_ID` header set to the node's ID (NanoID 6-character string). The
+`PLOY_NODE_UUID` header set to the node's ID (NanoID 6-character string). The
 control plane uses this header to validate job ownership and attribute
 artifacts/diffs to the correct node.
 
