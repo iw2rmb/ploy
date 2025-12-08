@@ -2,7 +2,9 @@ parameters:
   - in: path
     name: id
     required: true
-    schema: { type: string, format: uuid }
+    # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Run ID (KSUID string)
   - in: header
     name: Last-Event-ID
     required: false
@@ -34,7 +36,7 @@ get:
 
     **Enriched fields (optional, omitempty):**
     - `node_id` (string): Node ID (NanoID 6-character string) of the execution node that produced this log line.
-    - `job_id` (string): UUID of the job that produced this log line.
+    - `job_id` (string): Job ID (KSUID string) that produced this log line.
     - `mod_type` (string): Mods step type — `pre_gate`, `mod`, `post_gate`, `heal`, or `re_gate`.
     - `step_index` (int): Float index of the job within the pipeline (e.g., 1000, 2000, 3000).
 

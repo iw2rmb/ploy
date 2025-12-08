@@ -2,13 +2,15 @@ parameters:
   - in: path
     name: run_id
     required: true
-    schema: { type: string, format: uuid }
-    description: Run UUID
+    # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Run ID (KSUID string)
   - in: path
     name: job_id
     required: true
-    schema: { type: string, format: uuid }
-    description: Job UUID
+    # Job IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Job ID (KSUID string)
   - in: header
     name: PLOY_NODE_UUID
     required: true
@@ -32,9 +34,9 @@ post:
           properties:
             build_id:
               type: string
-              format: uuid
               nullable: true
-              description: Optional build ID if artifacts are produced per build
+              # Build IDs are KSUID strings (27 characters, lexicographically sortable).
+              description: Optional build ID (KSUID string) if artifacts are produced per build
             name:
               type: string
               nullable: true
@@ -57,7 +59,7 @@ post:
               Example including optional name and build_id for artifact tracking.
               Name can be used to identify the artifact type (e.g., "dist", "coverage").
             value:
-              build_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              build_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
               name: "dist"
               bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
           size_limit:
@@ -79,7 +81,7 @@ post:
                 format: uuid
                 description: Identifier of the stored artifact bundle
     '400':
-      description: Bad Request (invalid IDs, missing fields, or job/run mismatch)
+      description: Bad Request (missing or empty IDs, missing fields, or job/run mismatch)
     '404':
       description: Run or Job not found
     '413':

@@ -21,13 +21,13 @@ post:
           properties:
             run_id:
               type: string
-              format: uuid
-              description: The run ID to acknowledge
+              # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+              description: Run ID (KSUID string) to acknowledge
   responses:
     '204':
       description: Acknowledged; run status transitioned to `running`
     '400':
-      description: Bad Request (invalid IDs or malformed payload)
+      description: Bad Request (missing or empty ids or malformed payload)
     '403':
       description: Forbidden (run not assigned to this node)
     '404':

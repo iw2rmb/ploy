@@ -4,8 +4,8 @@ parameters:
     required: true
     schema:
       type: string
-      format: uuid
-    description: Run ID (run UUID)
+    # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+    description: Run ID (KSUID string)
 post:
   tags: [Control]
   summary: Cancel a Mods run
@@ -32,7 +32,7 @@ post:
     '200':
       description: OK; run was already in a terminal state (idempotent)
     '400':
-      description: Bad request (invalid UUID)
+      description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:

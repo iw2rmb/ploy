@@ -26,9 +26,12 @@ get:
             type: object
             description: Diff metadata (returned when download=false or omitted)
             properties:
-              id: { type: string, format: uuid }
-              run_id: { type: string, format: uuid }
-              job_id: { type: string, format: uuid, nullable: true }
+              # Diff IDs remain UUID-backed.
+              id: { type: string, format: uuid, description: Diff ID (UUID) }
+              # Run IDs are KSUID strings (27 characters).
+              run_id: { type: string, description: Run ID (KSUID string) }
+              # Job IDs are KSUID strings (27 characters).
+              job_id: { type: string, nullable: true, description: Job ID (KSUID string) }
               created_at: { type: string, format: date-time }
               gzipped_size: { type: integer, format: int32 }
               summary:
@@ -41,6 +44,6 @@ get:
             type: string
             format: binary
             description: Raw gzipped patch bytes (returned when download=true)
-    '400': { description: Bad Request (invalid or missing UUID) }
+    '400': { description: Bad Request (missing or empty diff id) }
     '404': { description: Diff Not Found }
     '500': { description: Internal Server Error }

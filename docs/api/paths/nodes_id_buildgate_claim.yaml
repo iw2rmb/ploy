@@ -5,7 +5,9 @@ post:
     - in: path
       name: id
       required: true
-      schema: { type: string, format: uuid }
+      # Node IDs are NanoID strings (6 characters, URL-safe alphabet).
+      schema: { type: string }
+      description: Node ID (NanoID 6-character string)
   responses:
     '200':
       description: Job claimed

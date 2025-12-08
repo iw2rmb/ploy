@@ -11,8 +11,8 @@ get:
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
   responses:
     '200':
       description: OK
@@ -21,7 +21,7 @@ get:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
     '400':
-      description: Bad request (invalid run ID)
+      description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:

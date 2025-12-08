@@ -3,16 +3,16 @@ get:
   summary: Get Mods run status
   description: |
     Return the current status of a Mods run identified by its `run_id`
-    (equal to the underlying run UUID). The response includes status, derived
-    failure/gate metadata, repo details, refs, optional commit SHA, and timestamps.
+    (KSUID string). The response includes status, derived failure/gate metadata,
+    repo details, refs, optional commit SHA, and timestamps.
   parameters:
     - in: path
       name: id
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (run UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
   responses:
     '200':
       description: OK
@@ -21,7 +21,7 @@ get:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunStatus'
     '400':
-      description: Bad request (invalid UUID)
+      description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:

@@ -23,8 +23,8 @@ post:
           properties:
             run_id:
               type: string
-              format: uuid
-              description: The run ID associated with these events
+              # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+              description: Run ID (KSUID string) associated with these events
             events:
               type: array
               description: Array of structured event records
@@ -36,9 +36,9 @@ post:
                 properties:
                   job_id:
                     type: string
-                    format: uuid
                     nullable: true
-                    description: Optional job UUID associated with this event
+                    # Job IDs are KSUID strings (27 characters, lexicographically sortable).
+                    description: Optional job ID (KSUID string) associated with this event
                   time:
                     type: string
                     format: date-time

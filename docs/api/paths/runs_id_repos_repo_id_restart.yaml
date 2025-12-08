@@ -13,15 +13,15 @@ post:
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
     - in: path
       name: repo_id
       required: true
       schema:
         type: string
-        format: uuid
-      description: Repo entry ID (UUID) within the batch.
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
   requestBody:
     required: false
     content:
@@ -43,7 +43,7 @@ post:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunRepo'
     '400':
-      description: Bad request (invalid IDs or request body)
+      description: Bad request (missing or empty ids or invalid request body)
       content:
         application/json:
           schema:
