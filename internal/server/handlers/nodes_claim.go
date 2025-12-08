@@ -22,7 +22,9 @@ import (
 // Server-driven scheduling: only 'pending' jobs can be claimed. When a job completes,
 // the server schedules the next 'created' job by transitioning it to 'pending'.
 //
-// Jobs are the unified execution unit for all work types: pre-gate, mod, heal, re-gate, post-gate.
+// Jobs are claimed from a single unified queue (FIFO by step_index). There is no
+// separate Build Gate queue or claim path — all job types (pre-gate, mod, heal,
+// re-gate, post-gate) are consumed from the same queue.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
 // Jobs transition directly from 'pending' to 'running' on claim (no 'assigned' intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
