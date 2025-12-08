@@ -41,7 +41,7 @@ func TestLogStreamer_Write(t *testing.T) {
 			t.Parallel()
 
 			cfg := Config{
-				NodeID:    "00000000-0000-0000-0000-000000000001",
+				NodeID:    "aB3xY9",
 				ServerURL: "http://localhost:8443",
 			}
 			ls := NewLogStreamer(cfg, "run-123", "stage-456")
@@ -66,7 +66,7 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
 	ls := NewLogStreamer(cfg, "run-123", "")
@@ -132,7 +132,7 @@ func TestLogStreamer_Close(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
 	ls := NewLogStreamer(cfg, "run-123", "")
@@ -162,7 +162,7 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
 	ls := NewLogStreamer(cfg, "run-123", "")
@@ -195,7 +195,7 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
 	ls := NewLogStreamer(cfg, "run-123", "")

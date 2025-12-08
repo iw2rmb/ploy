@@ -803,9 +803,9 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/nodes/{id}/buildgate/*` — claim/ack/complete Build Gate jobs.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
-`PLOY_NODE_UUID` header set to the node's UUID. The control plane uses this
-header to validate job ownership and attribute artifacts/diffs to the correct
-node.
+`PLOY_NODE_UUID` header set to the node's ID (NanoID 6-character string). The
+control plane uses this header to validate job ownership and attribute
+artifacts/diffs to the correct node.
 
 ### 3.3 Runs endpoints (`internal/server/handlers/runs_batch_http.go`)
 
@@ -960,12 +960,12 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 
 **Enriched fields (optional, omitempty):**
 
-| Field        | Type   | Description                                                        |
-|--------------|--------|--------------------------------------------------------------------|
-| `node_id`    | string | UUID of the execution node that produced this log line             |
-| `job_id`     | string | UUID of the job that produced this log line                        |
-| `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`  |
-| `step_index` | int    | Float index of the job within the pipeline (e.g., 1000, 2000)      |
+| Field        | Type   | Description                                                            |
+|--------------|--------|------------------------------------------------------------------------|
+| `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
+| `job_id`     | string | UUID of the job that produced this log line                            |
+| `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
+| `step_index` | int    | Float index of the job within the pipeline (e.g., 1000, 2000)          |
 
 **Example SSE frame:**
 
