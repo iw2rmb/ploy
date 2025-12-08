@@ -97,6 +97,9 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 				printUsage(stderr)
 			} else {
 				// Dispatch to existing help handlers for subcommands.
+				// NOTE: Commands 'server', 'node', 'rollout', and 'token' have been
+				// re-rooted under 'ploy cluster'. Help requests for these legacy
+				// command names are redirected to the cluster-scoped usage helpers.
 				switch args[0] {
 				case "mod":
 					printModUsage(stderr)
@@ -107,20 +110,18 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 				case "cluster":
 					printClusterUsage(stderr)
 				case "server":
-					// The 'server' command has been re-rooted under 'cluster deploy'.
-					// Point users to the new location for discoverability.
+					// Legacy: 'ploy server' → 'ploy cluster deploy'
 					printServerUsage(stderr)
 				case "node":
-					// The 'node' command has been re-rooted under 'cluster node'.
-					// Point users to the new location for discoverability.
+					// Legacy: 'ploy node' → 'ploy cluster node'
 					printNodeUsage(stderr)
 				case "rollout":
+					// Legacy: 'ploy rollout' → 'ploy cluster rollout'
 					printRolloutUsage(stderr)
 				case "config":
 					printConfigUsage(stderr)
 				case "token":
-					// The 'token' command has been re-rooted under 'cluster token'.
-					// Point users to the new location for discoverability.
+					// Legacy: 'ploy token' → 'ploy cluster token'
 					printTokenUsage(stderr)
 				default:
 					printUsage(stderr)
