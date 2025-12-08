@@ -161,7 +161,7 @@ Legend: [ ] todo, [x] done.
      - Tests:
        - Run `go test ./cmd/ploy/...` and fix any assertions that expect `uuid` / `repo-uuid` strings in usage output.
    
-   - [ ] Align OpenAPI component schemas with KSUID/NanoID and UUID split — Ensure schema types match the actual DB and handler behavior.
+   - [x] Align OpenAPI component schemas with KSUID/NanoID and UUID split — Ensure schema types match the actual DB and handler behavior.
      - Repository: github.com/iw2rmb/ploy
      - Component: docs/api/components/schemas/controlplane.yaml
      - Scope:
