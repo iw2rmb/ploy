@@ -75,17 +75,14 @@ When `build_gate_healing` is configured in the spec:
 
 **Repo+Diff Verification Semantics:**
 
-Healing verification aligns with the HTTP Build Gate API's repo+diff model:
+Healing verification uses the same repo+diff semantics as the unified jobs-based Build Gate:
 
 - **Initial workspace**: The Build Gate validates code cloned from `repo_url+ref`.
 - **Healing modifications**: Healing mods modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
-- **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes`. This is semantically equivalent to calling:
-  ```
-  POST /v1/buildgate/validate
-  {"repo_url": "...", "ref": "...", "diff_patch": "<healing-changes>"}
-  ```
-  The in-process re-gate avoids network overhead since the workspace already contains the modified state.
+- **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes` using the local Docker gate executor (no HTTP Build Gate API call).
 - **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
+
+Historically, this repo+diff model was exposed via the HTTP Build Gate API (`POST /v1/buildgate/validate` with `diff_patch`); that API has been removed in favor of the unified jobs pipeline.
 
 **Codex Healing Handshake (workspace diff):**
 

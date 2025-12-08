@@ -798,8 +798,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact` — upload per-job artifacts.
 - Legacy HTTP Build Gate endpoints (`/v1/nodes/{id}/buildgate/*`) have been
   removed; gate execution now runs as jobs in the unified queue claimed via
-  `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for the historical
-  HTTP design.
+  `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for gate configuration,
+  unified jobs behavior, and a brief historical note on the removed HTTP mode.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 `PLOY_NODE_UUID` header set to the node's ID (NanoID(6) string). The
