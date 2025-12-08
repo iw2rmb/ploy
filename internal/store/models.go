@@ -170,7 +170,6 @@ type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     string             `json:"run_id"`
 	JobID     *string            `json:"job_id"`
-	BuildID   *string            `json:"build_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
 	Cid       *string            `json:"cid"`
@@ -190,19 +189,6 @@ type BootstrapToken struct {
 	CertIssuedAt pgtype.Timestamptz `json:"cert_issued_at"`
 	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
 	IssuedBy     *string            `json:"issued_by"`
-}
-
-type Build struct {
-	ID         string             `json:"id"`
-	RunID      string             `json:"run_id"`
-	JobID      *string            `json:"job_id"`
-	Tool       *string            `json:"tool"`
-	Command    *string            `json:"command"`
-	Status     JobStatus          `json:"status"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	DurationMs int64              `json:"duration_ms"`
-	Metrics    []byte             `json:"metrics"`
 }
 
 type Diff struct {
@@ -244,7 +230,6 @@ type Log struct {
 	ID        int64              `json:"id"`
 	RunID     string             `json:"run_id"`
 	JobID     *string            `json:"job_id"`
-	BuildID   *string            `json:"build_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`

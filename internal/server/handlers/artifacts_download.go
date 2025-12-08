@@ -110,18 +110,18 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Return artifact metadata as JSON.
+		// Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
 		type artifactDetail struct {
 			ID        string  `json:"id"`
 			RunID     string  `json:"run_id"`
 			JobID     *string `json:"job_id,omitempty"`
-			BuildID   *string `json:"build_id,omitempty"`
 			Name      *string `json:"name,omitempty"`
 			CID       string  `json:"cid"`
 			Digest    string  `json:"digest"`
 			Size      int64   `json:"size"`
 			CreatedAt string  `json:"created_at"`
 		}
-		// bundle.ID is still pgtype.UUID; run_id, job_id, build_id are now strings.
+		// bundle.ID is still pgtype.UUID; run_id and job_id are now strings.
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
 			RunID: bundle.RunID, // run_id is now a string (KSUID)
@@ -129,9 +129,6 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 		if bundle.JobID != nil && *bundle.JobID != "" {
 			detail.JobID = bundle.JobID
-		}
-		if bundle.BuildID != nil && *bundle.BuildID != "" {
-			detail.BuildID = bundle.BuildID
 		}
 		if bundle.Name != nil {
 			detail.Name = bundle.Name

@@ -15,8 +15,9 @@ import (
 // createRunLogHandler handles POST /v1/runs/{id}/logs for receiving gzipped log chunks.
 // This variant does not require a node path parameter; it ingests logs scoped to a run.
 //
-// Run, job, and build IDs are now KSUID-backed strings; no UUID parsing is performed.
+// Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 // IDs are treated as opaque; validation is limited to non-empty checks.
+// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 func createRunLogHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
@@ -39,9 +40,9 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		// Decode request body.
+		// Note: build_id removed; logs are now grouped at job level only.
 		var req struct {
 			JobID   *string `json:"job_id,omitempty"`
-			BuildID *string `json:"build_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
 		}
@@ -64,15 +65,13 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Normalize optional job/build IDs (KSUID strings; no UUID parsing).
+		// Normalize optional job ID (KSUID string; no UUID parsing).
 		jobID := normalizeOptionalID(req.JobID)
-		buildID := normalizeOptionalID(req.BuildID)
 
 		// Create log row using string IDs directly.
 		params := store.CreateLogParams{
 			RunID:   runIDStr,
 			JobID:   jobID,
-			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
 		}

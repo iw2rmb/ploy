@@ -13,8 +13,9 @@ WHERE run_id = $1 AND job_id = $2
 ORDER BY created_at DESC;
 
 -- name: CreateArtifactBundle :one
-INSERT INTO artifact_bundles (run_id, job_id, build_id, name, bundle, cid, digest)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+-- Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
+INSERT INTO artifact_bundles (run_id, job_id, name, bundle, cid, digest)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: DeleteArtifactBundle :exec

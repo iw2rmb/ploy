@@ -12,24 +12,23 @@ import (
 )
 
 const createLog = `-- name: CreateLog :one
-INSERT INTO logs (run_id, job_id, build_id, chunk_no, data)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, run_id, job_id, build_id, chunk_no, data, created_at
+INSERT INTO logs (run_id, job_id, chunk_no, data)
+VALUES ($1, $2, $3, $4)
+RETURNING id, run_id, job_id, chunk_no, data, created_at
 `
 
 type CreateLogParams struct {
 	RunID   string  `json:"run_id"`
 	JobID   *string `json:"job_id"`
-	BuildID *string `json:"build_id"`
 	ChunkNo int32   `json:"chunk_no"`
 	Data    []byte  `json:"data"`
 }
 
+// Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
 func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, error) {
 	row := q.db.QueryRow(ctx, createLog,
 		arg.RunID,
 		arg.JobID,
-		arg.BuildID,
 		arg.ChunkNo,
 		arg.Data,
 	)
@@ -38,7 +37,6 @@ func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, erro
 		&i.ID,
 		&i.RunID,
 		&i.JobID,
-		&i.BuildID,
 		&i.ChunkNo,
 		&i.Data,
 		&i.CreatedAt,
@@ -67,7 +65,7 @@ func (q *Queries) DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Time
 }
 
 const getLog = `-- name: GetLog :one
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
 WHERE id = $1
 `
 
@@ -78,7 +76,6 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 		&i.ID,
 		&i.RunID,
 		&i.JobID,
-		&i.BuildID,
 		&i.ChunkNo,
 		&i.Data,
 		&i.CreatedAt,
@@ -87,7 +84,7 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 }
 
 const listLogsByRun = `-- name: ListLogsByRun :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
@@ -105,7 +102,6 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID string) ([]Log, error
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
 			&i.CreatedAt,
@@ -121,7 +117,7 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID string) ([]Log, error
 }
 
 const listLogsByRunAndJob = `-- name: ListLogsByRunAndJob :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -144,7 +140,6 @@ func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJ
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
 			&i.CreatedAt,
@@ -160,7 +155,7 @@ func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJ
 }
 
 const listLogsByRunAndJobSince = `-- name: ListLogsByRunAndJobSince :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC
 `
@@ -184,93 +179,6 @@ func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRu
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.BuildID,
-			&i.ChunkNo,
-			&i.Data,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunJobAndBuild = `-- name: ListLogsByRunJobAndBuild :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND job_id = $2 AND build_id = $3
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunJobAndBuildParams struct {
-	RunID   string  `json:"run_id"`
-	JobID   *string `json:"job_id"`
-	BuildID *string `json:"build_id"`
-}
-
-func (q *Queries) ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunJobAndBuild, arg.RunID, arg.JobID, arg.BuildID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.BuildID,
-			&i.ChunkNo,
-			&i.Data,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunJobAndBuildSince = `-- name: ListLogsByRunJobAndBuildSince :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND job_id = $2 AND build_id = $3 AND id > $4
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunJobAndBuildSinceParams struct {
-	RunID   string  `json:"run_id"`
-	JobID   *string `json:"job_id"`
-	BuildID *string `json:"build_id"`
-	ID      int64   `json:"id"`
-}
-
-func (q *Queries) ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLogsByRunJobAndBuildSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunJobAndBuildSince,
-		arg.RunID,
-		arg.JobID,
-		arg.BuildID,
-		arg.ID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
 			&i.CreatedAt,
@@ -286,7 +194,7 @@ func (q *Queries) ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLog
 }
 
 const listLogsByRunSince = `-- name: ListLogsByRunSince :many
-SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND id > $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -309,7 +217,6 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
 			&i.CreatedAt,

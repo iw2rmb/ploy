@@ -87,7 +87,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/runtime/step/... ./internal/nodeagent/...` — Confirm no references to `PLOY_BUILDGATE_MODE`, `BuildGateHTTPClient`, or HTTP gate remain and Docker gate tests still pass.
 
 ## Remove builds table and build_id foreign keys
-- [ ] Drop builds table and build_id FKs from logs/artifact_bundles — Use job-level grouping only
+- [x] Drop builds table and build_id FKs from logs/artifact_bundles — Use job-level grouping only
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/queries/logs.sql, internal/store/queries/artifact_bundles.sql, internal/store/logs.sql.go, internal/store/artifact_bundles.sql.go, internal/store/models.go
   - Scope:

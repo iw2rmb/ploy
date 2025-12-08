@@ -21,6 +21,7 @@ type nodeLogCreateResponse struct {
 }
 
 // createNodeLogsHandler handles POST /v1/nodes/{id}/logs for receiving gzipped log chunks.
+// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
@@ -44,10 +45,10 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		// Decode request body.
+		// Note: build_id removed; logs are now grouped at job level only.
 		var req struct {
 			RunID   string  `json:"run_id"`
 			JobID   *string `json:"job_id,omitempty"`
-			BuildID *string `json:"build_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
 		}
@@ -101,18 +102,10 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			jobID = &jobIDStr
 		}
 
-		// Parse build_id if provided.
-		var buildID *string
-		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
-			buildIDStr := strings.TrimSpace(*req.BuildID)
-			buildID = &buildIDStr
-		}
-
 		// Store the gzipped log chunk in the database.
 		params := store.CreateLogParams{
 			RunID:   req.RunID,
 			JobID:   jobID,
-			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
 		}
