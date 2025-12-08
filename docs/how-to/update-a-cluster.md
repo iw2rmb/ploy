@@ -37,7 +37,7 @@ Use the first‑class rollout command. Do not re‑run `ploy cluster deploy` for
 update (that regenerates PKI).
 
 ```bash
-dist/ploy rollout server \
+dist/ploy cluster rollout server \
   --address 45.9.42.212 \
   --binary dist/ployd-linux \
   --user root \
@@ -64,7 +64,7 @@ The rollout command will:
 Dry‑run the server rollout to preview actions without changes:
 
 ```bash
-dist/ploy rollout server --address 45.9.42.212 --binary dist/ployd-linux --dry-run
+dist/ploy cluster rollout server --address 45.9.42.212 --binary dist/ployd-linux --dry-run
 ```
 Output lists the upload, install, restart, health checks, and port verification steps and ends with a "Dry run complete" notice.
 
@@ -78,7 +78,7 @@ curl -sk https://45.9.42.212:8443/v1/version | jq .
 
 ## 3) Rolling Update of Nodes
 
-The `ploy rollout nodes` command performs a safe, batched update of worker
+The `ploy cluster rollout nodes` command performs a safe, batched update of worker
 nodes with automatic draining and health checks. Each node goes through the
 following lifecycle:
 
@@ -97,7 +97,7 @@ resumption if interrupted.
 **Roll all nodes sequentially (safest, one at a time):**
 
 ```bash
-dist/ploy rollout nodes \
+dist/ploy cluster rollout nodes \
   --all \
   --binary dist/ployd-node-linux \
   --user root \
@@ -107,7 +107,7 @@ dist/ploy rollout nodes \
 **Roll only nodes matching a pattern:**
 
 ```bash
-dist/ploy rollout nodes \
+dist/ploy cluster rollout nodes \
   --selector 'worker-*' \
   --binary dist/ployd-node-linux \
   --user root \
@@ -117,7 +117,7 @@ dist/ploy rollout nodes \
 **Roll nodes in batches of 2 (faster, requires spare capacity):**
 
 ```bash
-dist/ploy rollout nodes \
+dist/ploy cluster rollout nodes \
   --all \
   --concurrency 2 \
   --binary dist/ployd-node-linux \
@@ -171,13 +171,13 @@ Example:
 
 ```bash
 # First attempt: fails on node 3 of 5
-dist/ploy rollout nodes --all --binary dist/ployd-node-linux
+dist/ploy cluster rollout nodes --all --binary dist/ployd-node-linux
 
 # Output: Rollout summary: 2 succeeded, 1 failed
 # Resume state saved to: ~/.config/ploy/rollout/state.json
 
 # Fix the issue (e.g., bring node back online), then resume:
-dist/ploy rollout nodes --all --binary dist/ployd-node-linux
+dist/ploy cluster rollout nodes --all --binary dist/ployd-node-linux
 
 # Output: [node-1] Already completed, skipping
 #         [node-2] Already completed, skipping
@@ -299,7 +299,7 @@ Before upgrading Docker:
 1. **Drain the node** to prevent new job claims during the upgrade:
    ```bash
    # Drain via rollout (node stops claiming new jobs).
-   dist/ploy rollout nodes --selector '<node-pattern>' --drain-only
+   dist/ploy cluster rollout nodes --selector '<node-pattern>' --drain-only
    ```
    Alternatively, wait for active runs to complete naturally if the cluster has low activity.
 
@@ -411,7 +411,7 @@ Cross-references:
 ## Appendix: Backdoor (Manual Commands)
 
 If you need to bypass the CLI for troubleshooting or in very old environments, the
-following manual commands replicate what `ploy rollout server` does:
+following manual commands replicate what `ploy cluster rollout server` does:
 
 ### Server Update (Manual)
 
@@ -427,8 +427,8 @@ Tip: wrapper for lab
 If you prefer not to type the lab URL each time, use the wrapper:
 
 ```bash
-scripts/ploy-lab.sh rollout server --address 45.9.42.212 --binary dist/ployd-linux --user root
-scripts/ploy-lab.sh rollout nodes --all --binary dist/ployd-node-linux --user root
+scripts/ploy-lab.sh cluster rollout server --address 45.9.42.212 --binary dist/ployd-linux --user root
+scripts/ploy-lab.sh cluster rollout nodes --all --binary dist/ployd-node-linux --user root
 scripts/ploy-lab.sh mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature/x --follow
 ```
 
