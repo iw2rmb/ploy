@@ -149,7 +149,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/deploy/... ./internal/nodeagent/... ./internal/server/handlers/...` and fix failing assertions and URL expectations.
 
 ## KSUID/NanoID docs, CLI, and OpenAPI alignment
-- [ ] Update CLI help and README text to treat IDs as opaque KSUID/NanoID strings — Remove UUID-specific wording from CLI surfaces.
+- [x] Update CLI help and README text to treat IDs as opaque KSUID/NanoID strings — Remove UUID-specific wording from CLI surfaces.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy/upload_command.go, cmd/ploy/mod_run_repo.go, cmd/ploy/README.md
   - Scope:
