@@ -72,9 +72,10 @@ type RunSummary struct {
 	Metadata   map[string]string    `json:"metadata,omitempty"`
 	CreatedAt  time.Time            `json:"created_at"`
 	UpdatedAt  time.Time            `json:"updated_at"`
-	// Stages is keyed by job UUID (jobs.id). Each entry represents a row from the
-	// `jobs` table. The field name "stages" is retained for API backward compatibility.
-	// Use StageStatus.StepIndex (mirrors jobs.step_index) for ordered step sequencing.
+	// Stages is keyed by job ID (KSUID string from jobs.id). Each entry represents
+	// a row from the `jobs` table. The field name "stages" is retained for API
+	// backward compatibility. Use StageStatus.StepIndex (mirrors jobs.step_index)
+	// for ordered step sequencing.
 	Stages map[string]StageStatus `json:"stages"`
 }
 

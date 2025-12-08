@@ -55,7 +55,7 @@ const (
 // Nodes are connected by edges derived from step_index ordering and
 // gate/healing window relationships.
 type GraphNode struct {
-	// ID is the unique job identifier (UUID string).
+	// ID is the unique job identifier (KSUID string).
 	ID string `json:"id"`
 
 	// Name is the job name (e.g., "pre-gate", "mod-0", "heal-1", "re-gate").
@@ -104,7 +104,7 @@ type GraphNode struct {
 // It provides an explicit view of job dependencies materialized from
 // jobs rows using step_index ordering.
 type WorkflowGraph struct {
-	// RunID is the ticket/run identifier (UUID string).
+	// RunID is the ticket/run identifier (KSUID string).
 	RunID string `json:"run_id"`
 
 	// Nodes contains all jobs as graph nodes, keyed by job ID.
