@@ -88,7 +88,7 @@ Legend: [ ] todo, [x] done.
     - Keep `TestExecuteHelpMatchesGolden` and its golden file (`cmd/ploy/testdata/help.txt`) aligned after any formatting changes to root help.
 
 ## Introduce first‑class `ploy cluster` router
-- [ ] Implement a real `ploy cluster` command that owns deploy/node/rollout/token — Replace the stub `cluster` entrypoint with a proper router that delegates to existing server/node/rollout/token handlers while defining the new hierarchy (`ploy cluster deploy`, `ploy cluster node`, `ploy cluster rollout`, `ploy cluster token`).
+- [x] Implement a real `ploy cluster` command that owns deploy/node/rollout/token — Replace the stub `cluster` entrypoint with a proper router that delegates to existing server/node/rollout/token handlers while defining the new hierarchy (`ploy cluster deploy`, `ploy cluster node`, `ploy cluster rollout`, `ploy cluster token`).
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root + cluster + existing handlers)
   - Scope:

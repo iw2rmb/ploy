@@ -104,6 +104,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 					printModsUsage(stderr)
 				case "runs":
 					printRunsUsage(stderr)
+				case "cluster":
+					printClusterUsage(stderr)
 				case "server":
 					printServerUsage(stderr)
 				case "rollout":
