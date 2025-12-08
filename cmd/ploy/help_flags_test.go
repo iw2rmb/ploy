@@ -26,7 +26,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy --help",
 			args:           []string{"--help"},
-			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "cluster", "node", "rollout", "token"},
+			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "cluster", "rollout", "token"},
 			expectNoError:  true,
 		},
 		{
@@ -93,20 +93,6 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			name:           "ploy cluster deploy -h",
 			args:           []string{"cluster", "deploy", "-h"},
 			expectContains: []string{"Usage: ploy cluster deploy"},
-			expectNoError:  true,
-		},
-
-		// node command --help
-		{
-			name:           "ploy node --help",
-			args:           []string{"node", "--help"},
-			expectContains: []string{"Usage: ploy node", "add"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy node -h",
-			args:           []string{"node", "-h"},
-			expectContains: []string{"Usage: ploy node"},
 			expectNoError:  true,
 		},
 
@@ -212,13 +198,13 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy cluster node --help",
 			args:           []string{"cluster", "node", "--help"},
-			expectContains: []string{"Usage: ploy node", "add"},
+			expectContains: []string{"Usage: ploy cluster node", "add"},
 			expectNoError:  true,
 		},
 		{
 			name:           "ploy cluster node -h",
 			args:           []string{"cluster", "node", "-h"},
-			expectContains: []string{"Usage: ploy node"},
+			expectContains: []string{"Usage: ploy cluster node"},
 			expectNoError:  true,
 		},
 
@@ -311,7 +297,6 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 		{"mods", "--help"},
 		{"runs", "--help"},
 		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
-		{"node", "--help"},
 		{"rollout", "--help"},
 		{"config", "--help"},
 		{"config", "gitlab", "--help"},

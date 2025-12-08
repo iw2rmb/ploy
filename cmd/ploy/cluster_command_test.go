@@ -144,7 +144,7 @@ func TestClusterNodeHelp(t *testing.T) {
 
 	// Should print node usage.
 	output := buf.String()
-	if !strings.Contains(output, "Usage: ploy node") {
+	if !strings.Contains(output, "Usage: ploy cluster node") {
 		t.Fatalf("expected node usage, got %q", output)
 	}
 }

@@ -32,16 +32,3 @@ func newRolloutCmd(stderr io.Writer) *cobra.Command {
 	}
 	return rolloutCmd
 }
-
-// newNodeCmd creates the cobra command for 'ploy node'.
-func newNodeCmd(stderr io.Writer) *cobra.Command {
-	nodeCmd := &cobra.Command{
-		Use:                "node",
-		Short:              "Manage worker nodes",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleNode(args, stderr)
-		},
-	}
-	return nodeCmd
-}
