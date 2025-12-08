@@ -746,7 +746,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - Creates `jobs` rows from the spec (pre-gate, mod, post-gate).
     - Jobs use float step_index for ordering (1000, 2000, 3000).
     - Publishes an initial `RunSummary` snapshot to SSE via
-      `events.Service.PublishTicket`.
+      `events.Service.PublishRun`.
 
 - `GET /v1/mods/{id}` —  run status.
   - Handler: `getTicketStatusHandler`.
