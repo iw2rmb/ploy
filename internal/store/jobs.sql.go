@@ -26,7 +26,8 @@ FROM eligible WHERE jobs.id = eligible.id
 RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
 `
 
-// Atomically claim the next pending job for a node.
+// Atomically claim the next pending job for a node (single unified queue).
+// Jobs are ordered by step_index; no special handling for gate vs mod jobs.
 // Server-driven scheduling: only 'pending' jobs are claimable.
 // Job transitions directly to 'running' (no intermediate 'assigned' state).
 func (q *Queries) ClaimJob(ctx context.Context, nodeID *string) (Job, error) {
@@ -321,6 +322,52 @@ type UpdateJobCompletionParams struct {
 // Updates a job's terminal status, exit code, and timing.
 func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error {
 	_, err := q.db.Exec(ctx, updateJobCompletion, arg.ID, arg.Status, arg.ExitCode)
+	return err
+}
+
+const updateJobCompletionWithMeta = `-- name: UpdateJobCompletionWithMeta :exec
+UPDATE jobs
+SET status = $2, exit_code = $3, finished_at = now(),
+    duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000,
+    meta = $4
+WHERE id = $1
+`
+
+type UpdateJobCompletionWithMetaParams struct {
+	ID       string    `json:"id"`
+	Status   JobStatus `json:"status"`
+	ExitCode *int32    `json:"exit_code"`
+	Meta     []byte    `json:"meta"`
+}
+
+// Updates a job's terminal status, exit code, timing, and meta in one operation.
+// Use this when completing a gate or build job that has execution metadata.
+func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
+	_, err := q.db.Exec(ctx, updateJobCompletionWithMeta,
+		arg.ID,
+		arg.Status,
+		arg.ExitCode,
+		arg.Meta,
+	)
+	return err
+}
+
+const updateJobMeta = `-- name: UpdateJobMeta :exec
+UPDATE jobs
+SET meta = $2
+WHERE id = $1
+`
+
+type UpdateJobMetaParams struct {
+	ID   string `json:"id"`
+	Meta []byte `json:"meta"`
+}
+
+// Updates a job's meta JSONB field with structured gate/build metadata.
+// Used to persist gate validation results or build metrics after job execution.
+// The meta parameter should be JSON-encoded JobMeta (see internal/workflow/contracts.JobMeta).
+func (q *Queries) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
+	_, err := q.db.Exec(ctx, updateJobMeta, arg.ID, arg.Meta)
 	return err
 }
 

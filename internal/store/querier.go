@@ -19,7 +19,8 @@ type Querier interface {
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID *string) (BuildgateJob, error)
-	// Atomically claim the next pending job for a node.
+	// Atomically claim the next pending job for a node (single unified queue).
+	// Jobs are ordered by step_index; no special handling for gate vs mod jobs.
 	// Server-driven scheduling: only 'pending' jobs are claimable.
 	// Job transitions directly to 'running' (no intermediate 'assigned' state).
 	ClaimJob(ctx context.Context, nodeID *string) (Job, error)
@@ -158,6 +159,13 @@ type Querier interface {
 	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
 	// Updates a job's terminal status, exit code, and timing.
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
+	// Updates a job's terminal status, exit code, timing, and meta in one operation.
+	// Use this when completing a gate or build job that has execution metadata.
+	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
+	// Updates a job's meta JSONB field with structured gate/build metadata.
+	// Used to persist gate validation results or build metrics after job execution.
+	// The meta parameter should be JSON-encoded JobMeta (see internal/workflow/contracts.JobMeta).
+	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
