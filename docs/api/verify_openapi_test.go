@@ -37,7 +37,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
 		{"/v1/pki/sign/client", "post"},
-		// Mods (Ticket submit + status/events + ingest)
+		// Mods (run submit + status/events + ingest)
 		{"/v1/mods", "post"},
 		{"/v1/mods/{id}", "get"},
 		{"/v1/mods/{id}/graph", "get"},
