@@ -2,7 +2,9 @@ parameters:
   - in: path
     name: id
     required: true
-    schema: { type: string, format: uuid }
+    # Node IDs are NanoID strings (6 characters, URL-safe alphabet).
+    schema: { type: string }
+    description: Node ID (NanoID 6-character string)
 post:
   tags: [Artifacts]
   summary: Ingest a gzipped log chunk for a run (node → server)
@@ -23,7 +25,7 @@ post:
               Minimal example with gzipped log data (base64-encoded).
               The actual payload size is limited to 2 MiB JSON body, with decoded data ≤ 1 MiB.
             value:
-              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              run_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jR"
               chunk_no: 0
               data: "H4sIAAAAAAAA/8rJT0/VLy4pysxLBwQAAP//f0hXFQwAAAA="
           with_job:
@@ -32,9 +34,9 @@ post:
               Example with job_id and build_id included. Demonstrates chunked upload
               pattern where chunk_no increments for each subsequent chunk.
             value:
-              run_id: "550e8400-e29b-41d4-a716-446655440000"
-              job_id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-              build_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              run_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jR"
+              job_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jS"
+              build_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
               chunk_no: 5
               data: "H4sIAAAAAAAA/0vOz0lNzNFQKslIVSjPLMnQL1XQzUtMzlCyUgIEAAD//z3OX5QdAAAA="
           size_limit:

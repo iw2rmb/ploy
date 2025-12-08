@@ -5,8 +5,7 @@ post:
     Submit a new Mods run using a repository URL and Git refs. The
     server creates the repository entry if it does not exist, creates a
     mod with the provided `spec` (or `{}`), and enqueues a run. The
-    response includes a `run_id` equal to the run UUID and initial
-    status `queued`.
+    response includes a `run_id` (KSUID string) and initial status `queued`.
   requestBody:
     required: true
     content:

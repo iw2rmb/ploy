@@ -11,8 +11,8 @@ get:
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
   responses:
     '200':
       description: OK
@@ -27,7 +27,7 @@ get:
                   $ref: '../components/schemas/controlplane.yaml#/RunRepo'
             required: [repos]
     '400':
-      description: Bad request (invalid run ID)
+      description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:
@@ -57,8 +57,8 @@ post:
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
   requestBody:
     required: true
     content:
@@ -84,7 +84,7 @@ post:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunRepo'
     '400':
-      description: Bad request (invalid run ID or request body)
+      description: Bad request (missing or empty run id, or invalid request body)
       content:
         application/json:
           schema:

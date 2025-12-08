@@ -3,8 +3,8 @@ get:
   summary: Get Mods workflow graph
   description: |
     Return the job-level workflow graph for a Mods run identified by its `run_id`
-    (equal to the underlying run UUID). The graph view is derived from `jobs` rows and
-    uses `step_index` ordering to expose parent/child relationships between jobs.
+    (KSUID string). The graph view is derived from `jobs` rows and uses `step_index`
+    ordering to expose parent/child relationships between jobs.
 
     This endpoint is intended for debugging and visualization by control-plane operators.
     It is explicitly marked as non-stable and may change between releases; consumers
@@ -15,8 +15,8 @@ get:
       required: true
       schema:
         type: string
-        format: uuid
-      description: Run ID (run UUID).
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
   responses:
     '200':
       description: OK
@@ -25,7 +25,7 @@ get:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/WorkflowGraph'
     '400':
-      description: Bad request (invalid UUID)
+      description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:

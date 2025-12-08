@@ -2,13 +2,15 @@ parameters:
   - in: path
     name: run_id
     required: true
-    schema: { type: string, format: uuid }
-    description: Run UUID
+    # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Run ID (KSUID string)
   - in: path
     name: job_id
     required: true
-    schema: { type: string, format: uuid }
-    description: Job UUID
+    # Job IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Job ID (KSUID string)
   - in: header
     name: PLOY_NODE_UUID
     required: true
@@ -75,7 +77,7 @@ post:
                 format: uuid
                 description: Identifier of the stored diff
     '400':
-      description: Bad Request (invalid IDs, missing fields, or job/run mismatch)
+      description: Bad Request (missing or empty IDs, missing fields, or job/run mismatch)
     '404':
       description: Run or Job not found
     '413':

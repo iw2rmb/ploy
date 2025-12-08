@@ -5,8 +5,9 @@ parameters:
   - in: path
     name: job_id
     required: true
-    schema: { type: string, format: uuid }
-    description: Job UUID
+    # Job IDs are KSUID strings (27 characters, lexicographically sortable).
+    schema: { type: string }
+    description: Job ID (KSUID string)
   - in: header
     name: PLOY_NODE_UUID
     required: true
@@ -59,7 +60,7 @@ post:
     '400':
       description: |
         Bad Request — possible causes:
-        - Missing or invalid `job_id` path parameter
+        - Missing or empty `job_id` path parameter
         - Missing `status` or non-terminal status value
         - Malformed `stats` JSON (must be a JSON object)
     '401':
