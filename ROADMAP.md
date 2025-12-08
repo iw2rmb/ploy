@@ -183,7 +183,7 @@ Legend: [ ] todo, [x] done.
     - Update `cmd/ploy/testdata/help.txt` (later step) so that the `cluster` line reflects its broader scope and no longer describes only “local cluster descriptors”.
 
 ## Move server deployment under `ploy cluster deploy`
-- [ ] Re‑root server deployment as `ploy cluster deploy` and stop exposing `ploy server` as a top‑level command — Route server deploy logic through the cluster router while keeping the underlying implementation and validation behavior unchanged.
+- [x] Re‑root server deployment as `ploy cluster deploy` and stop exposing `ploy server` as a top‑level command — Route server deploy logic through the cluster router while keeping the underlying implementation and validation behavior unchanged.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root, commands_server.go, server_deploy_cmd.go, testdata)
   - Scope:
