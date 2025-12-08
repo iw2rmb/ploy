@@ -215,7 +215,7 @@ This makes gate health visible without requiring raw artifact inspection.
 
 **How This Maps From the Legacy E2E**
 
-- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The same Build Gate is reused for verification via the buildgate API.
+- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The current implementation reuses the same Build Gate logic via the unified jobs pipeline instead of a separate HTTP Build Gate API.
 
 **Troubleshooting**
 
