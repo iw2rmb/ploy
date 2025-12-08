@@ -44,15 +44,15 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	ticketArgs := fs.Args()
-	if len(ticketArgs) == 0 {
+	runIDArgs := fs.Args()
+	if len(runIDArgs) == 0 {
 		printModsUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
-	ticket := strings.TrimSpace(ticketArgs[0])
-	if ticket == "" {
+	runID := strings.TrimSpace(runIDArgs[0])
+	if runID == "" {
 		printModsUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
 	if *maxRetries < -1 {
 		printModsUsage(stderr)
@@ -75,7 +75,7 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 	}
 
 	cmd := mods.LogsCommand{
-		Ticket: ticket,
+		RunID:  runID,
 		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{

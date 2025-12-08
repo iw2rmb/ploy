@@ -13,7 +13,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-func TestExecuteModRunSubmitsTicket(t *testing.T) {
+func TestExecuteModRunSubmitsRun(t *testing.T) {
 	var received modsapi.RunSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -56,12 +56,12 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		t.Fatalf("expected 5 stages, got %d", len(received.Stages))
 	}
 	output := buf.String()
-	if !strings.Contains(output, "Mods ticket mods-server-123 submitted") {
+	if !strings.Contains(output, "Mods run mods-server-123 submitted") {
 		t.Fatalf("unexpected output: %s", output)
 	}
 }
 
-func TestExecuteModRunServerAssignsTicket(t *testing.T) {
+func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 	var received modsapi.RunSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&received)

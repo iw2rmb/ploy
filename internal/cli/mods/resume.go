@@ -10,22 +10,22 @@ import (
 	"strings"
 )
 
-// ResumeCommand requests a resume for a Mods ticket via POST /v1/mods/{ticket}/resume.
-// The server resume endpoint requeues eligible jobs for failed or canceled tickets,
+// ResumeCommand requests a resume for a Mods run via POST /v1/mods/{id}/resume.
+// The server resume endpoint requeues eligible jobs for failed or canceled runs,
 // enabling continuation of a previously interrupted workflow.
 type ResumeCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Output  io.Writer
 }
 
-// Run executes POST /v1/mods/{ticket}/resume and handles server responses:
+// Run executes POST /v1/mods/{id}/resume and handles server responses:
 //   - 202 Accepted: resume successfully initiated
-//   - 200 OK: ticket already running (idempotent) or all jobs succeeded
-//   - 404 Not Found: ticket does not exist
-//   - 409 Conflict: ticket state not resumable (e.g., succeeded)
-//   - 400 Bad Request: invalid ticket ID
+//   - 200 OK: run already running (idempotent) or all jobs succeeded
+//   - 404 Not Found: run does not exist
+//   - 409 Conflict: run state not resumable (e.g., succeeded)
+//   - 400 Bad Request: invalid run ID
 func (c ResumeCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("mods resume: http client required")
@@ -33,13 +33,13 @@ func (c ResumeCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods resume: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
-	if ticket == "" {
-		return errors.New("mods resume: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return errors.New("mods resume: run id required")
 	}
 
 	// Build the server resume endpoint URL.
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket), "resume")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "resume")
 	if err != nil {
 		return err
 	}
@@ -63,21 +63,21 @@ func (c ResumeCommand) Run(ctx context.Context) error {
 		// Provide user-friendly error messages based on HTTP status codes.
 		switch resp.StatusCode {
 		case http.StatusNotFound:
-			// Ticket ID does not exist in the control plane.
+			// Run ID does not exist in the control plane.
 			if msg == "" {
-				msg = "ticket not found"
+				msg = "run not found"
 			}
 			return fmt.Errorf("mods resume: %s", msg)
 		case http.StatusConflict:
-			// Ticket state is not resumable (e.g., already succeeded).
+			// Run state is not resumable (e.g., already succeeded).
 			if msg == "" {
-				msg = "ticket cannot be resumed"
+				msg = "run cannot be resumed"
 			}
 			return fmt.Errorf("mods resume: %s", msg)
 		case http.StatusBadRequest:
-			// Invalid ticket ID format.
+			// Invalid run ID format.
 			if msg == "" {
-				msg = "invalid ticket id"
+				msg = "invalid run id"
 			}
 			return fmt.Errorf("mods resume: %s", msg)
 		default:
@@ -89,7 +89,7 @@ func (c ResumeCommand) Run(ctx context.Context) error {
 		}
 	}
 
-	// Success: resume was accepted or ticket is already running (idempotent).
+	// Success: resume was accepted or run is already running (idempotent).
 	if c.Output != nil {
 		_, _ = io.WriteString(c.Output, "Resume requested\n")
 	}

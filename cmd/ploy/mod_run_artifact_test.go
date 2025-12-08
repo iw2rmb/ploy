@@ -16,16 +16,16 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// TestDownloadTicketArtifactsCreatesManifest verifies that artifacts are downloaded
+// TestDownloadRunArtifactsCreatesManifest verifies that artifacts are downloaded
 // and a manifest.json file is created with correct metadata.
-func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
+func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 	t.Parallel()
-	// Create a mock server that handles ticket status and artifact downloads.
+	// Create a mock server that handles run status and artifact downloads.
 	artifactContent := []byte("test artifact content")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
-			// Ticket status endpoint.
+			// Run status endpoint.
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
 					RunID: domaintypes.RunID("test-123"),
@@ -75,9 +75,9 @@ func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	ctx := context.Background()
-	err := downloadTicketArtifacts(ctx, baseURL, server.Client(), "test-123", tmpDir, out)
+	err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test-123", tmpDir, out)
 	if err != nil {
-		t.Fatalf("downloadTicketArtifacts failed: %v", err)
+		t.Fatalf("downloadRunArtifacts failed: %v", err)
 	}
 
 	// Verify manifest.json was created.
@@ -133,14 +133,14 @@ func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
 	}
 }
 
-// TestDownloadTicketArtifactsMultipleStages verifies that artifacts from multiple
+// TestDownloadRunArtifactsMultipleStages verifies that artifacts from multiple
 // stages are all downloaded correctly.
-func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
+func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
-			// Ticket status with multiple stages.
+			// Run status with multiple stages.
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
 					RunID: domaintypes.RunID("test-multi"),
@@ -214,9 +214,9 @@ func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	ctx := context.Background()
-	err := downloadTicketArtifacts(ctx, baseURL, server.Client(), "test-multi", tmpDir, out)
+	err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test-multi", tmpDir, out)
 	if err != nil {
-		t.Fatalf("downloadTicketArtifacts failed: %v", err)
+		t.Fatalf("downloadRunArtifacts failed: %v", err)
 	}
 
 	// Verify manifest contains both artifacts.
@@ -239,9 +239,9 @@ func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
 	}
 }
 
-// TestDownloadTicketArtifactsErrorHandling verifies error handling for various
+// TestDownloadRunArtifactsErrorHandling verifies error handling for various
 // failure scenarios (status fetch failure, artifact not found, etc.).
-func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
+func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -249,11 +249,11 @@ func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
 		wantErrText string
 	}{
 		{
-			name: "ticket status 404",
+			name: "run status 404",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(r.URL.Path, "/v1/mods/") {
 					w.WriteHeader(http.StatusNotFound)
-					_, _ = w.Write([]byte(`{"error":"ticket not found"}`))
+					_, _ = w.Write([]byte(`{"error":"run not found"}`))
 				}
 			},
 			wantErrText: "404",
@@ -292,7 +292,7 @@ func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
 			out := &bytes.Buffer{}
 
 			ctx := context.Background()
-			err := downloadTicketArtifacts(ctx, baseURL, server.Client(), "test", tmpDir, out)
+			err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test", tmpDir, out)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -364,7 +364,7 @@ func TestBuildArtifactFilename(t *testing.T) {
 	}
 }
 
-// TestFetchMRURL verifies MR URL extraction from ticket metadata.
+// TestFetchMRURL verifies MR URL extraction from run metadata.
 func TestFetchMRURL(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -448,8 +448,8 @@ func TestFetchMRURLErrorHandling(t *testing.T) {
 	}
 }
 
-// TestDownloadTicketArtifactsZeroArtifacts writes an empty manifest when no artifacts exist.
-func TestDownloadTicketArtifactsZeroArtifacts(t *testing.T) {
+// TestDownloadRunArtifactsZeroArtifacts writes an empty manifest when no artifacts exist.
+func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v1/mods/") {
@@ -471,7 +471,7 @@ func TestDownloadTicketArtifactsZeroArtifacts(t *testing.T) {
 	baseURL, _ := url.Parse(server.URL)
 	out := &bytes.Buffer{}
 	ctx := context.Background()
-	if err := downloadTicketArtifacts(ctx, baseURL, server.Client(), "t0", tmpDir, out); err != nil {
+	if err := downloadRunArtifacts(ctx, baseURL, server.Client(), "t0", tmpDir, out); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(tmpDir, "manifest.json"))

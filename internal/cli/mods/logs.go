@@ -31,7 +31,7 @@ var ErrInvalidFormat = errors.New("mods: invalid format")
 type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Format  Format
 	Output  io.Writer
 }
@@ -45,8 +45,8 @@ func (c LogsCommand) Run(ctx context.Context) error {
 	if format != FormatStructured && format != FormatRaw {
 		return ErrInvalidFormat
 	}
-	if strings.TrimSpace(c.Ticket) == "" {
-		return errors.New("mods: ticket required")
+	if strings.TrimSpace(c.RunID) == "" {
+		return errors.New("mods: run id required")
 	}
 	if c.BaseURL == nil {
 		return errors.New("mods: base url required")
@@ -56,7 +56,7 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(c.Ticket)), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(c.RunID)), "events")
 	if err != nil {
 		return fmt.Errorf("mods: build endpoint: %w", err)
 	}

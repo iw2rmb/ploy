@@ -13,7 +13,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// SubmitCommand submits a Mods ticket to the control plane.
+// SubmitCommand submits a Mods run to the control plane.
 type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

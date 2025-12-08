@@ -37,7 +37,7 @@ func TestLogsCommandStreamsStructured(t *testing.T) {
 			RetryBackoff: 10 * time.Millisecond,
 		},
 		BaseURL: baseURL,
-		Ticket:  "test",
+		RunID:   "test",
 		Format:  FormatStructured,
 		Output:  buf,
 	}

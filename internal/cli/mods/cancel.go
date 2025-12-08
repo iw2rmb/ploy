@@ -12,16 +12,16 @@ import (
 	"strings"
 )
 
-// CancelCommand requests cancellation for a Mods ticket.
+// CancelCommand requests cancellation for a Mods run.
 type CancelCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Reason  string
 	Output  io.Writer
 }
 
-// Run executes the cancel request (POST /v1/mods/{ticket}/cancel).
+// Run executes the cancel request (POST /v1/mods/{id}/cancel).
 func (c CancelCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("mods cancel: http client required")
@@ -29,11 +29,11 @@ func (c CancelCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods cancel: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
-	if ticket == "" {
-		return errors.New("mods cancel: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return errors.New("mods cancel: run id required")
 	}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket), "cancel")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "cancel")
 	if err != nil {
 		return err
 	}

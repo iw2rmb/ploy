@@ -21,13 +21,13 @@ func TestInspectCommand_Run(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		ticket         modsapi.RunSummary
+		run            modsapi.RunSummary
 		wantSubstrings []string
 		wantMissing    []string
 	}{
 		{
-			name: "basic ticket with MR and gate",
-			ticket: modsapi.RunSummary{
+			name: "basic run with MR and gate",
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("mods-abc123"),
 				State: modsapi.RunStateRunning,
 				Metadata: map[string]string{
@@ -38,14 +38,14 @@ func TestInspectCommand_Run(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			wantSubstrings: []string{
-				"Ticket mods-abc123: running",
+				"Run mods-abc123: running",
 				"MR: https://gitlab.com/org/repo/-/merge_requests/42",
 				"Gate: failed pre-gate duration=567ms",
 			},
 		},
 		{
-			name: "ticket with job graph",
-			ticket: modsapi.RunSummary{
+			name: "run with job graph",
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("mods-def456"),
 				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
@@ -69,7 +69,7 @@ func TestInspectCommand_Run(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			wantSubstrings: []string{
-				"Ticket mods-def456: succeeded",
+				"Run mods-def456: succeeded",
 				"Gate: passed duration=1234ms",
 				"Jobs:",
 				"[1000] 11111111: succeeded",
@@ -78,8 +78,8 @@ func TestInspectCommand_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "ticket with healing jobs at midpoint indices",
-			ticket: modsapi.RunSummary{
+			name: "run with healing jobs at midpoint indices",
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("mods-heal789"),
 				State: modsapi.RunStateRunning,
 				Metadata: map[string]string{
@@ -103,7 +103,7 @@ func TestInspectCommand_Run(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			wantSubstrings: []string{
-				"Ticket mods-heal789: running",
+				"Run mods-heal789: running",
 				"Jobs:",
 				"[1000] aaaaaaaa: failed",
 				"[1500] bbbbbbbb: succeeded",
@@ -111,15 +111,15 @@ func TestInspectCommand_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "ticket without MR or gate",
-			ticket: modsapi.RunSummary{
+			name: "run without MR or gate",
+			run: modsapi.RunSummary{
 				RunID:     domaintypes.RunID("mods-minimal"),
 				State:     modsapi.RunStatePending,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			},
 			wantSubstrings: []string{
-				"Ticket mods-minimal: pending",
+				"Run mods-minimal: pending",
 			},
 			wantMissing: []string{
 				"MR:",
@@ -128,8 +128,8 @@ func TestInspectCommand_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "ticket with empty stages map",
-			ticket: modsapi.RunSummary{
+			name: "run with empty stages map",
+			run: modsapi.RunSummary{
 				RunID:     domaintypes.RunID("mods-empty"),
 				State:     modsapi.RunStateRunning,
 				Stages:    map[string]modsapi.StageStatus{},
@@ -137,7 +137,7 @@ func TestInspectCommand_Run(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			wantSubstrings: []string{
-				"Ticket mods-empty: running",
+				"Run mods-empty: running",
 			},
 			wantMissing: []string{
 				"Jobs:",
@@ -149,9 +149,9 @@ func TestInspectCommand_Run(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Set up mock server returning the test ticket.
+			// Set up mock server returning the test run.
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := modsapi.RunStatusResponse{Ticket: tc.ticket}
+				resp := modsapi.RunStatusResponse{Ticket: tc.run}
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(resp)
 			}))
@@ -166,7 +166,7 @@ func TestInspectCommand_Run(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				Ticket:  string(tc.ticket.RunID),
+				RunID:   string(tc.run.RunID),
 				Output:  &out,
 			}
 
@@ -204,30 +204,30 @@ func TestInspectCommand_Errors(t *testing.T) {
 	}{
 		{
 			name:    "missing client",
-			cmd:     InspectCommand{Ticket: "test"},
+			cmd:     InspectCommand{RunID: "test"},
 			wantErr: "http client required",
 		},
 		{
 			name:    "missing base URL",
-			cmd:     InspectCommand{Client: http.DefaultClient, Ticket: "test"},
+			cmd:     InspectCommand{Client: http.DefaultClient, RunID: "test"},
 			wantErr: "base url required",
 		},
 		{
-			name: "missing ticket",
+			name: "missing run id",
 			cmd: InspectCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
 			},
-			wantErr: "ticket required",
+			wantErr: "run id required",
 		},
 		{
-			name: "empty ticket after trim",
+			name: "empty run id after trim",
 			cmd: InspectCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				Ticket:  "   ",
+				RunID:   "   ",
 			},
-			wantErr: "ticket required",
+			wantErr: "run id required",
 		},
 	}
 
@@ -252,7 +252,7 @@ func TestInspectCommand_HTTPError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("ticket not found"))
+		_, _ = w.Write([]byte("run not found"))
 	}))
 	t.Cleanup(srv.Close)
 
@@ -262,7 +262,7 @@ func TestInspectCommand_HTTPError(t *testing.T) {
 	cmd := InspectCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		Ticket:  "mods-unknown",
+		RunID:   "mods-unknown",
 		Output:  &out,
 	}
 
@@ -270,7 +270,7 @@ func TestInspectCommand_HTTPError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
-	if !strings.Contains(err.Error(), "ticket not found") {
+	if !strings.Contains(err.Error(), "run not found") {
 		t.Errorf("error should contain server message: %v", err)
 	}
 }
@@ -280,7 +280,7 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	t.Parallel()
 
 	// Jobs with out-of-order step indices to verify sorting.
-	ticket := modsapi.RunSummary{
+	run := modsapi.RunSummary{
 		RunID: domaintypes.RunID("mods-sort"),
 		State: modsapi.RunStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
@@ -293,7 +293,7 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := modsapi.RunStatusResponse{Ticket: ticket}
+		resp := modsapi.RunStatusResponse{Ticket: run}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -305,7 +305,7 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	cmd := InspectCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		Ticket:  "mods-sort",
+		RunID:   "mods-sort",
 		Output:  &out,
 	}
 

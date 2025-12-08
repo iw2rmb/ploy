@@ -8,21 +8,22 @@ import (
 	"strings"
 )
 
-// handleModFetch downloads artifacts for an existing Mods ticket into a directory.
+// handleModFetch downloads artifacts for an existing Mods run into a directory.
 func handleModFetch(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod fetch", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	ticket := fs.String("ticket", "", "mods ticket id to fetch artifacts for")
+	// Keep --ticket flag for backward compatibility with existing scripts.
+	ticket := fs.String("ticket", "", "mods run id to fetch artifacts for")
 	dir := fs.String("artifact-dir", "", "directory to download artifacts into")
 	if err := fs.Parse(args); err != nil {
 		printModUsage(stderr)
 		return err
 	}
 
-	tid := strings.TrimSpace(*ticket)
-	if tid == "" {
+	runID := strings.TrimSpace(*ticket)
+	if runID == "" {
 		printModUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
 	outDir := strings.TrimSpace(*dir)
 	if outDir == "" {
@@ -35,5 +36,5 @@ func handleModFetch(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return downloadTicketArtifacts(ctx, base, httpClient, tid, outDir, stderr)
+	return downloadRunArtifacts(ctx, base, httpClient, runID, outDir, stderr)
 }

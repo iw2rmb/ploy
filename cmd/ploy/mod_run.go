@@ -10,7 +10,7 @@ import (
 // handleModRun executes the Mods-specific run command.
 // Routes to batch lifecycle subcommands (list/status/stop/start) and repo
 // subcommands when args[0] matches a known action. Otherwise executes the
-// standard mod run workflow for single-repo ticket submission.
+// standard mod run workflow for single-repo run submission.
 //
 // Batch lifecycle commands:
 //   - list: Lists all batch runs with status and repo counts.
@@ -40,8 +40,8 @@ func handleModRun(args []string, stderr io.Writer) error {
 
 // executeModRun orchestrates the full mod run workflow:
 // 1. Parse CLI flags
-// 2. Build and submit ticket request
-// 3. Follow ticket events (if requested)
+// 2. Build and submit run request
+// 3. Follow run events (if requested)
 // 4. Download artifacts (if requested)
 // 5. Output JSON summary (if requested)
 func executeModRun(args []string, stderr io.Writer) error {
@@ -60,8 +60,8 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Build ticket request from parsed flags.
-	request, err := buildTicketRequest(flags)
+	// Build run request from parsed flags.
+	request, err := buildRunRequest(flags)
 	if err != nil {
 		printModRunUsage(stderr)
 		return err
@@ -84,20 +84,20 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("build spec: %w", err)
 	}
 
-	// Submit ticket to control plane.
-	summary, err := submitTicket(ctx, base, httpClient, request, specPayload)
+	// Submit run to control plane.
+	summary, err := submitRun(ctx, base, httpClient, request, specPayload)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.RunID, summary.State)
+	_, _ = fmt.Fprintf(stderr, "Mods run %s submitted (state: %s)\n", summary.RunID, summary.State)
 
 	// Track states for JSON output.
 	initialState := strings.ToLower(string(summary.State))
 	finalState := ""
 
-	// Follow ticket events if requested.
+	// Follow run events if requested.
 	if *flags.Follow {
-		final, err := followTicketEvents(ctx, base, httpClient, string(summary.RunID), flags, stderr)
+		final, err := followRunEvents(ctx, base, httpClient, string(summary.RunID), flags, stderr)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 		// Download artifacts after successful completion.
 		if artifactDir := strings.TrimSpace(*flags.ArtifactDir); artifactDir != "" {
-			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.RunID), artifactDir, stderr); err != nil {
+			if err := downloadRunArtifacts(ctx, base, httpClient, string(summary.RunID), artifactDir, stderr); err != nil {
 				return err
 			}
 		}

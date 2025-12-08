@@ -14,15 +14,15 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// InspectCommand fetches and prints ticket summary.
+// InspectCommand fetches and prints run summary.
 type InspectCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Output  io.Writer
 }
 
-// Run performs GET /v1/mods/{ticket} and prints a one-line summary.
+// Run performs GET /v1/mods/{id} and prints a one-line summary.
 func (c InspectCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("mods inspect: http client required")
@@ -30,11 +30,11 @@ func (c InspectCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods inspect: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
-	if ticket == "" {
-		return errors.New("mods inspect: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return errors.New("mods inspect: run id required")
 	}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket))
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID))
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		return err
 	}
 	if c.Output != nil {
-		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s\n", strings.TrimSpace(string(payload.Ticket.RunID)), strings.ToLower(string(payload.Ticket.State)))
+		_, _ = fmt.Fprintf(c.Output, "Run %s: %s\n", strings.TrimSpace(string(payload.Ticket.RunID)), strings.ToLower(string(payload.Ticket.State)))
 		if mrURL, ok := payload.Ticket.Metadata["mr_url"]; ok && mrURL != "" {
 			_, _ = fmt.Fprintf(c.Output, "MR: %s\n", mrURL)
 		}
