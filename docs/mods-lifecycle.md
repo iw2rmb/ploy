@@ -755,7 +755,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
     - Run stats (MR URL, gate summary).
-  - Returns `RunStatusResponse` (`modsapi.RunStatusResponse{Ticket: RunSummary}`).
+  - Returns `RunStatusResponse` (`modsapi.RunStatusResponse{Run: RunSummary}`).
 
 - `GET /v1/mods/{id}/events` — SSE event stream for a run.
   - Handler: `getModEventsHandler`.
@@ -915,7 +915,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Parses flags in `cmd/ploy/mod_run_flags.go`.
   - Builds the spec payload in `cmd/ploy/mod_run_spec.go` (handles `env` and
     `env_from_file`).
-  - Constructs `TicketSubmitRequest` with stage definitions in
+  - Constructs `RunSubmitRequest` with stage definitions in
     `cmd/ploy/mod_run_exec.go`.
   - Submits via `internal/cli/mods.SubmitCommand`.
   - Optional `--follow` streams  run events via

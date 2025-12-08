@@ -89,7 +89,7 @@ Role model (bearer token claims):
   - After each healing attempt, the Build Gate is re-run; on pass, the main mod proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods
-  - Gate status visibility: Use `ploy mod inspect <ticket-id>` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`). Also available via `GET /v1/mods/{id}` API in `Metadata["gate_summary"]`.
+  - Gate status visibility: Use `ploy mod inspect <run-id>` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`). Also available via `GET /v1/mods/{id}` API in `Metadata["gate_summary"]`.
 
 ## Healing Container Environment
 
@@ -198,7 +198,7 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 ## E2E Harness
 
 - `ploy mod run` executes Mods against the Ploy control plane; no tenant variable is required.
-- `PLOY_E2E_TICKET_PREFIX` — Optional ticket ID prefix for Mods E2E runs
+- `PLOY_E2E_TICKET_PREFIX` — Optional run ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
   E2E scenarios in place of the default Java sample repo.
@@ -246,7 +246,7 @@ Example usage:
 # Configure once on control plane
 ploy config gitlab set --file gitlab-config.json
 
-# Run with MR on success (server assigns ticket)
+# Run with MR on success (server assigns run ID)
 ploy mod run --mr-success \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \

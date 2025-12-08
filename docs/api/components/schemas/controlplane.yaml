@@ -270,7 +270,7 @@ CreateRunResponse:
     run_id: { type: string, description: "Run ID (KSUID string)" }
   required: [run_id]
 
-# Ticket submission (simplified Mods facade)
+# Run submission (simplified Mods facade)
 RunSubmitRequest:
   type: object
   properties:
@@ -312,7 +312,7 @@ RunStatus:
     finished_at: { type: string, format: date-time, nullable: true }
     metadata:
       description: |
-        Additional ticket metadata. Contains derived failure/cancellation context:
+        Additional run metadata. Contains derived failure/cancellation context:
         - `reason`: Human-readable cancellation reason (set by cancel endpoint)
         - `mr_url`: Merge request URL when available
         - `gate_summary`: Gate health summary from stats
@@ -634,7 +634,7 @@ WorkflowGraph:
   properties:
     run_id:
       type: string
-      description: Ticket/run identifier (KSUID string)
+      description: Run identifier (KSUID string)
     nodes:
       type: object
       description: Map of job IDs to graph nodes

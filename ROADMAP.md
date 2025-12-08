@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts` — JSON compatibility and subject tests updated to `run_id` / run naming.
 
 ## Documentation and OpenAPI
-- [ ] Update docs and OpenAPI to describe runs instead of tickets — eliminate ticket terminology from public docs while keeping endpoints stable.
+- [x] Update docs and OpenAPI to describe runs instead of tickets — eliminate ticket terminology from public docs while keeping endpoints stable.
   - Repository: ploy
   - Component: `docs`, `docs/api`
   - Scope: 
