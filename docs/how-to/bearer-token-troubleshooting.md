@@ -221,7 +221,7 @@ The `ploy node add` command automatically requests a fresh token, so this should
      -H "Authorization: Bearer $PLOY_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
-       "node_id": "123e4567-e89b-12d3-a456-426614174000",
+       "node_id": "aB3xY9",
        "expires_in_minutes": 15
      }'
    ```
@@ -235,17 +235,18 @@ The `ploy node add` command automatically requests a fresh token, so this should
 Ensure the CSR CN is formatted as `node:<node_id>`:
 
 ```bash
-# Correct format
-CN=node:123e4567-e89b-12d3-a456-426614174000
+# Correct format (NanoID(6) - 6 characters from URL-safe alphabet A-Za-z0-9_-)
+CN=node:aB3xY9
 
 # Incorrect formats
-CN=123e4567-e89b-12d3-a456-426614174000  # Missing "node:" prefix
-CN=node-123e4567-e89b-12d3-a456-426614174000  # Wrong separator
+CN=aB3xY9           # Missing "node:" prefix
+CN=node-aB3xY9      # Wrong separator (hyphen instead of colon)
 ```
 
 The `ploy node add` command handles this automatically. If generating CSRs manually, use:
 
 ```bash
+# NODE_ID is a NanoID(6) string (e.g., "aB3xY9")
 openssl req -new -key node.key -out node.csr -subj "/CN=node:$NODE_ID"
 ```
 

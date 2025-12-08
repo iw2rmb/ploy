@@ -41,7 +41,7 @@ get:
     **Example:**
     ```
     event: log
-    data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"a1b2c3d4-...","job_id":"e5f6g7h8-...","mod_type":"mod","step_index":2000}
+    data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","mod_type":"mod","step_index":2000}
     ```
 
     Enriched fields may be empty for events not tied to a specific job or when context is unavailable.

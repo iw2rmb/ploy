@@ -118,7 +118,7 @@ Legend: [ ] todo, [x] done.
   - Tests:
     - Run `go test ./internal/store/...` and fix any tests (`internal/store/claims_state_test.go`, `internal/store/ttlworker/...`) that constructed node IDs as `pgtype.UUID`.
 
-- [ ] Update node agent, bootstrap, and server handlers to use NanoID(6) node identifiers end-to-end — Align `Config.NodeID`, `PLOYD_NODE_ID`, TLS CN, and URL paths with the new format.
+- [x] Update node agent, bootstrap, and server handlers to use NanoID(6) node identifiers end-to-end — Align `Config.NodeID`, `PLOYD_NODE_ID`, TLS CN, and URL paths with the new format.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/deploy/bootstrap_helpers.go, internal/deploy/bootstrap_helpers_test.go, internal/deploy/bootstrap.go, internal/deploy/bootstrap_script.go, internal/deploy/ca_crypto.go, internal/deploy/provision_test.go, internal/nodeagent/heartbeat.go, internal/nodeagent/logstreamer.go, internal/server/handlers/nodes_ack.go, internal/server/handlers/nodes_logs.go, internal/server/handlers/server_runs_complete.go, docs
   - Scope:

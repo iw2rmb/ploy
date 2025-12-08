@@ -184,7 +184,7 @@ curl -X POST https://ploy.example.com/v1/bootstrap/tokens \
   -H "Authorization: Bearer $PLOY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "node_id": "123e4567-e89b-12d3-a456-426614174000",
+    "node_id": "aB3xY9",
     "expires_in_minutes": 15
   }'
 ```
@@ -193,10 +193,13 @@ curl -X POST https://ploy.example.com/v1/bootstrap/tokens \
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "node_id": "123e4567-e89b-12d3-a456-426614174000",
+  "node_id": "aB3xY9",
   "expires_at": "2025-11-19T12:15:00Z"
 }
 ```
+
+**Note:** Node IDs are NanoID(6) strings — 6 characters from the URL-safe alphabet (A-Za-z0-9_-).
+This compact format balances brevity with sufficient uniqueness for typical cluster sizes.
 
 ## Token Security
 
@@ -352,16 +355,18 @@ Create a bootstrap token for node provisioning.
 **Request:**
 ```json
 {
-  "node_id": "123e4567-e89b-12d3-a456-426614174000",
+  "node_id": "aB3xY9",
   "expires_in_minutes": 15
 }
 ```
+
+**Note:** Node IDs are NanoID(6) strings — 6 characters from the URL-safe alphabet (A-Za-z0-9_-).
 
 **Response:**
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "node_id": "123e4567-e89b-12d3-a456-426614174000",
+  "node_id": "aB3xY9",
   "expires_at": "2025-11-19T12:15:00Z"
 }
 ```
