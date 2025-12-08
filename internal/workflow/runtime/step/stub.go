@@ -296,8 +296,9 @@ type Runner struct {
 
 // Request describes a step execution request.
 type Request struct {
-	// TicketID threads the workflow ticket identifier for correlation/labels.
-	TicketID  types.TicketID
+	// RunID threads the workflow run identifier for correlation/labels.
+	// Container labels and telemetry use this value via LabelRunID.
+	RunID     types.RunID
 	Manifest  contracts.StepManifest
 	Workspace string
 	OutDir    string
@@ -387,7 +388,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.Timings.ExecutionDuration = time.Since(executionStart)
 	} else {
 		// Build container spec from manifest and workspace path plus optional /out and /in mounts.
-		spec, err := buildContainerSpec(req.TicketID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
+		spec, err := buildContainerSpec(req.RunID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}
