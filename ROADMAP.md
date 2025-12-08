@@ -142,7 +142,7 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./docs/api/...` or OpenAPI completeness tests — Confirm no missing references and that the spec validates without Build Gate HTTP endpoints.
 
-- [ ] Update narrative docs and env reference — Document single-queue, no-HTTP-gate behavior
+- [x] Update narrative docs and env reference — Document single-queue, no-HTTP-gate behavior
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/build-gate/README.md, docs/mods-lifecycle.md, docs/envs/README.md, tests/e2e/mods/README.md, tests/e2e/mods/scenario-remote-buildgate/*
   - Scope:

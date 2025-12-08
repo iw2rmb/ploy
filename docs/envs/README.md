@@ -94,10 +94,8 @@ Role model (bearer token claims):
 ## Healing Container Environment
 
 The node agent injects the following environment variables into healing containers to support
-Build Gate verification via the repo+diff HTTP API model. Build Gate execution is decoupled
-from Mods execution: healing mods run on the claiming node, but Build Gate validation jobs
-are submitted to the HTTP API and executed by dedicated Build Gate workers. These vars enable
-healing mods to derive the same Git baseline used by the Mods run.
+Build Gate verification. These vars enable healing mods to derive the same Git baseline used
+by the Mods run.
 
 Repo metadata (injected from StartRunRequest):
 - `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Mods run)
@@ -105,18 +103,15 @@ Repo metadata (injected from StartRunRequest):
 - `PLOY_TARGET_REF` — Target Git reference for the run
 - `PLOY_COMMIT_SHA` — Pinned commit SHA when available (may be empty)
 
-Server connection details (for Build Gate HTTP API access):
+Server connection details:
 - `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
 - `PLOY_CA_CERT_PATH` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
 - `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
-- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node). On TLS-disabled
-  HTTP stacks (e.g., `docs/how-to/deploy-locally.md`), the node agent also falls back to reading the
-  worker bearer token from `/etc/ploy/bearer-token` and exposing it as `PLOY_API_TOKEN` inside healing
-  containers so tools can call `POST /v1/buildgate/validate` without extra wiring.
+- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
 
-See `docs/build-gate/README.md` for the complete HTTP Build Gate API contract.
+See `docs/build-gate/README.md` for Build Gate configuration and execution details.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
@@ -192,12 +187,13 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
   for this path. TODO: consider introducing `PLOYD_NODE_CONFIG_PATH` for
   parity with the server's `PLOYD_CONFIG_PATH`.
 - (removed) `PLOY_BUILDGATE_WORKER_ENABLED` — Previously enabled Build Gate worker mode
-  via the HTTP Build Gate API (`/v1/nodes/{id}/buildgate/*`) backed by the dedicated
-  `buildgate_jobs` table. HTTP Build Gate worker mode and the separate queue have been
-  removed in favor of the unified jobs-based pipeline; the server-side Build Gate routes
-  have now been removed entirely and are no longer mounted on the control plane. This
-  variable remains wired in node configuration code but has no effect in the current
-  pipeline. See `docs/build-gate/README.md` and `ROADMAP.md` for historical context.
+  via the HTTP Build Gate API. Removed in favor of the unified jobs pipeline. All nodes
+  now claim work (including gate jobs) from the same `jobs` queue. This variable is no
+  longer consumed by the codebase.
+- (removed) `PLOY_BUILDGATE_MODE` — Previously controlled gate execution mode (`remote-http`
+  vs local Docker). Removed in favor of local Docker-only execution. Gate jobs run as
+  part of the unified jobs pipeline on the claiming node. This variable is no longer
+  consumed by the codebase.
 
 ## E2E Harness
 

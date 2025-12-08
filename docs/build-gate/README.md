@@ -4,245 +4,174 @@ Scope
 - Minimal, stable contract to validate a repository after each Mods stage.
 - Works in Mods and standalone CI.
 
-Status
-- HTTP Build Gate mode and the dedicated `buildgate_jobs` table have been removed.
-- This document describes the historical HTTP Build Gate design; see ROADMAP.md for the current jobs-based gate execution model.
+## Overview: Unified Jobs Pipeline
 
-## Overview: Remote Execution Architecture
+Build Gate validation runs as part of the **unified jobs pipeline**. Gate jobs are
+stored in the `jobs` table alongside mod and healing jobs, and nodes claim work
+from a single FIFO queue ordered by `step_index`. There is no dedicated Build Gate
+queue or separate worker mode—all nodes pull from the same jobs queue.
 
-Build Gate follows a **repo+diff remote execution model**: callers submit validation
-jobs to the control plane, and dedicated Build Gate worker nodes claim, execute, and
-report results. This architecture decouples gate validation from Mods execution,
-enabling horizontal scaling and separation of concerns.
+**Key characteristics:**
+- **Single queue:** Gate jobs (`pre-gate`, `post-gate`, `re-gate`) are stored in the
+  `jobs` table with the same schema as mod jobs.
+- **Docker-based execution:** Gates execute locally on the claiming node via Docker
+  containers. There is no remote HTTP Build Gate mode.
+- **FIFO ordering:** Jobs are claimed in `step_index` order, ensuring sequential
+  execution of pre-gate → mod → post-gate flows.
+- **Workspace semantics:** Gate validation runs against the local workspace on the
+  node. For re-gates after healing, the workspace already contains accumulated changes.
 
-**Primary execution path:**
-1. Mods pre-gate and re-gate (after healing) call the **HTTP Build Gate API**.
-2. The `GateExecutor` adapter in `internal/workflow/runtime/step` abstracts the HTTP
-   call, presenting a unified interface to the node orchestrator.
-3. Build Gate workers claim jobs via `/v1/nodes/{id}/buildgate/claim` and execute
-   validation inside Docker containers.
-4. Workers report results via `/v1/nodes/{id}/buildgate/{job_id}/complete`; the
-   orchestrator receives `BuildGateStageMetadata` through the API response.
+**Removed components (historical):**
+- HTTP Build Gate API (`POST /v1/buildgate/validate`, `/v1/buildgate/jobs/{id}`)
+- Dedicated `buildgate_jobs` table
+- `PLOY_BUILDGATE_MODE` and `PLOY_BUILDGATE_WORKER_ENABLED` environment variables
+- Remote HTTP gate executor and Build Gate worker node designation
 
-**Key benefits:**
-- **Horizontal scaling:** Add Build Gate workers independently of Mods nodes.
-- **Separation of concerns:** Heavy build validation runs on dedicated nodes.
-- **Consistent workspace semantics:** Repo+diff reconstruction ensures reproducible builds.
-- **Multi-VPS support:** Gate and Mods can run on different nodes without shared state.
+## Execution Flow
 
-## Remote Execution Flow
+Gate validation is orchestrated by the node agent as part of the Mods run lifecycle:
 
-The **HTTP Build Gate API** is the canonical execution path for all gate validation.
-Callers submit validation jobs via HTTP; Build Gate worker nodes claim and execute them.
-
-**Code paths (historical HTTP mode):**
-- Server handlers: `internal/server/handlers/buildgate.go`
-- Job storage: unified `jobs` queue in `internal/store/queries/jobs.sql` (the former `buildgate_jobs` table has been removed)
-- Gate executor adapter: `internal/workflow/runtime/step/gate_http.go` (HTTP) and
-  `internal/workflow/runtime/step/gate_factory.go` (mode selection)
-
-**Endpoints:**
-- `POST /v1/buildgate/validate` — Submit a validation job (repo_url + ref + optional diff_patch).
-- `GET /v1/buildgate/jobs/{id}` — Poll job status until completed/failed.
-- `POST /v1/nodes/{id}/buildgate/claim` — Worker nodes claim pending jobs.
-- `POST /v1/nodes/{id}/buildgate/{job_id}/ack` — Acknowledge job start (transition to running).
-- `POST /v1/nodes/{id}/buildgate/{job_id}/complete` — Report job completion with result.
+```
+┌─────────────────────┐     ┌────────────────────┐     ┌───────────────────────┐
+│ Control Plane       │     │ Jobs Queue         │     │ Node Agent            │
+│ (creates jobs)      │────▶│ (jobs table)       │────▶│ (claims & executes)   │
+└─────────────────────┘     └────────────────────┘     └───────────────────────┘
+                                                                │
+                                                                ▼
+                                                       ┌───────────────────────┐
+                                                       │ Docker Gate Executor  │
+                                                       │ (local container)     │
+                                                       └───────────────────────┘
+                                                                │
+                                                                ▼
+                                                       ┌───────────────────────┐
+                                                       │ BuildGateStage        │
+                                                       │ Metadata (pass/fail)  │
+                                                       └───────────────────────┘
+```
 
 **Flow:**
-1. Caller (Mods orchestrator or healing flow) submits `BuildGateValidateRequest` with
-   `repo_url`, `ref`, and optional `diff_patch` (gzipped unified diff for healing flows).
-2. Control plane creates a job row in the unified `jobs` table with status `pending` (historically this used a dedicated `buildgate_jobs` table).
-3. If job completes within `syncWaitTimeout` (30s), result returns synchronously.
-4. Otherwise, caller receives `job_id` with status `pending` for async polling.
-5. Build Gate worker node claims job via `/v1/nodes/{id}/buildgate/claim`.
-6. Worker clones repo at ref, applies diff_patch if present, runs build validation
-   inside a Docker container.
-7. Worker reports completion via `/v1/nodes/{id}/buildgate/{job_id}/complete`.
+1. Control plane creates gate jobs (`pre-gate`, `post-gate`) in the `jobs` table.
+2. Node agent claims the next pending job via `/v1/nodes/{id}/claim`.
+3. For gate jobs, the node executes validation using the Docker gate executor.
+4. Gate runs inside a Docker container with the workspace mounted at `/workspace`.
+5. Results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
+6. Node reports completion via `/v1/nodes/{id}/complete`.
 
-**Characteristics:**
-- Workspace is reconstructed from repo+diff; no local state dependency.
-- Gate execution can run on any eligible Build Gate worker node.
-- Supports multi-VPS deployments where gate and Mods run on different nodes.
-- Job queue enables load distribution across workers.
-- Full gate history (pre-gate + all re-gates) is captured in run stats (`gate.pre_gate`,
-  `gate.re_gates`, `gate.final_gate`) built from `BuildGateStageMetadata` results.
+## Gate Executor
 
-## GateExecutor Adapter
-
-The `GateExecutor` interface (in `internal/workflow/runtime/step`) abstracts gate
-execution for the node orchestrator. The HTTP-backed implementation calls the Build
-Gate API and waits for results:
-
-```
-┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────────┐
-│ Node Orchestr.  │      │ GateExecutor (HTTP) │      │ Control Plane       │
-│ (pre-gate/      │─────▶│                     │─────▶│ POST /buildgate/    │
-│  re-gate)       │      │                     │      │ validate            │
-└─────────────────┘      └─────────────────────┘      └─────────────────────┘
-                                                               │
-                                                               ▼
-                         ┌─────────────────────┐      ┌─────────────────────┐
-                         │ Build Gate Worker   │◀─────│ Job Queue           │
-                         │ (Docker execution)  │      │ (jobs table)        │
-                         └─────────────────────┘      └─────────────────────┘
-                                   │
-                                   ▼
-                         ┌─────────────────────┐
-                         │ BuildGateStage      │
-                         │ Metadata returned   │
-                         └─────────────────────┘
-```
-
-This adapter pattern allows:
-- Mods orchestration code to remain agnostic of execution location.
-- Future execution backends (e.g., Kubernetes jobs) to plug in via the same interface.
-- CLI-visible gate summaries (`ploy mod inspect`) to work unchanged.
-
-## Local Docker Gate (Legacy/Fallback)
-
-For local development or single-node deployments without Build Gate workers, the
-system can fall back to **local docker gate** execution. This runs build validation
-directly on the node agent using a mounted workspace.
+The `GateExecutor` interface (`internal/workflow/runtime/step`) provides a unified
+abstraction for gate validation. The only implementation is the Docker-based executor:
 
 **Code path:** `internal/workflow/runtime/step/gate_docker.go`
 
 **Characteristics:**
 - Workspace is local to the node; no network transfer of code.
-- Gate execution is coupled to the node running the Mods step.
-- Build tools have direct access to the working tree.
-
-**Note:** Local docker gate is not the recommended production path. Use Build Gate
-workers with the HTTP API for scalable, decoupled gate validation.
+- Gate execution runs in a Docker container with the working tree mounted.
+- Build tools have direct access to the workspace.
+- Gate results are captured and returned as `BuildGateStageMetadata`.
 
 See `docs/mods-lifecycle.md` section 1.1 for gate sequence diagrams and healing
 flow details.
 
-### Designating Build Gate Worker Nodes
+## Gate Configuration
 
-Not all nodes need to execute Build Gate jobs. The `buildgate_worker_enabled`
-configuration flag controls whether a node participates in Build Gate job claiming.
+Gates are configured via the mod spec and environment variables on worker nodes.
 
-**Configuration:**
-- YAML config (`/etc/ploy/ployd-node.yaml`):
-  ```yaml
-  buildgate_worker_enabled: true
-  ```
-- Environment variable (takes precedence over YAML):
-  ```bash
-  PLOY_BUILDGATE_WORKER_ENABLED=true
-  ```
-
-**Behavior:**
-- When `buildgate_worker_enabled=true`: The node claims and executes Build Gate
-  jobs via the HTTP Build Gate API endpoints.
-- When `buildgate_worker_enabled=false` (default): The node skips Build Gate
-  job claiming entirely and only processes regular Mods runs.
-
-**Multi-node deployments:**
-In a multi-VPS setup, you can designate specific nodes as Build Gate workers
-while others handle only Mods runs. This enables:
-- Separation of concerns: heavy build validation on dedicated nodes.
-- Resource isolation: Build Gate jobs don't compete with Mods execution.
-- Horizontal scaling: add more Build Gate workers as validation load increases.
-
-Example two-node lab:
-- Node A: `buildgate_worker_enabled=true` — claims Build Gate jobs.
-- Node B: `buildgate_worker_enabled=false` — claims only Mods runs.
-
-Submit a Build Gate job; only Node A logs `claimed buildgate job`.
-Submit a Mods run; either node can claim it.
-
-See `docs/envs/README.md` for the complete environment variable reference.
-
-HTTP Build Gate API
-
-The Build Gate uses a repo+diff validation model: callers provide a Git repository URL and ref as baseline,
-with an optional unified diff patch for healing flows. This avoids transmitting large workspace archives
-over HTTP by leveraging Git for the baseline and sending only the delta.
-
-Endpoint: `POST /v1/buildgate/validate`
-
-Contract: Submit a build validation job using a Git repo+ref baseline, with an optional diff patch for healing flows.
-
-Required fields:
-- `repo_url` — Git repository URL to clone (e.g., `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`).
-- `ref` — Git ref (branch, tag, or commit SHA) to validate (e.g., `e2e/fail-missing-symbol`).
-
-Optional fields:
-- `diff_patch` — Gzipped unified diff (base64-encoded) to apply on top of the cloned repo_url+ref baseline. Enables healing mods to replay changes without shipping full workspace archives.
-- `profile` — Build profile (`auto`, `java`, `java-maven`, `java-gradle`). Defaults to auto-detection.
-- `timeout` — Duration string (e.g., `5m`). Defaults to server-side limit.
-- `limit_memory_bytes`, `limit_cpu_millis`, `limit_disk_space` — Resource limits for the validation job.
-
-Example request payload (repo+diff model):
-
-```json
-{
-  "repo_url": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
-  "ref": "e2e/fail-missing-symbol",
-  "profile": "java-maven",
-  "timeout": "5m",
-  "diff_patch": "<base64(gzip(unified-diff))>"
-}
+**Spec configuration:**
+```yaml
+build_gate:
+  enabled: true
+  profile: auto  # auto, java, java-maven, java-gradle
 ```
 
-Semantics:
-1. The executor clones `repo_url` at `ref`.
-2. If `diff_patch` is non-empty, it decodes and decompresses the payload, then applies the patch via `git apply`.
-3. The build runs against the resulting workspace.
+**Profile detection:**
+- `auto` (default): Detects Maven if `pom.xml` exists; Gradle if `build.gradle(.kts)`
+  exists; otherwise plain `java`.
+- Explicit profiles: `java-maven`, `java-gradle`, `java`.
 
-This model avoids transmitting large workspace archives over HTTP, instead leveraging Git for baseline state and transmitting only the delta.
-
-Response:
-- On success (200): Returns `BuildGateValidateResponse` with `status` (`completed` or `failed`) and `result` object.
-- On accepted (202): Returns `BuildGateValidateResponse` with `job_id` and `status=pending` for async polling via `GET /v1/buildgate/jobs/{id}`.
-- On validation error (400): Missing required fields (`repo_url` or `ref`).
-
-Status polling: Use `GET /v1/buildgate/jobs/{job_id}` to poll job status until `completed` or `failed`.
-
-Inputs
-- Workspace mount: `/workspace` (required, read–write). Contains a shallow Git checkout at `HEAD`.
-- Profile: configurable or auto
-  - Set via gate spec `profile` or env `PLOY_BUILDGATE_PROFILE`.
-  - Allowed explicit values: `java`, `java-maven`, `java-gradle`.
-  - Auto (when unset/unknown): Maven if `/workspace/pom.xml` exists; Gradle if `build.gradle(.kts)` exists; otherwise plain `java`.
-- Optional image override: `PLOY_BUILDGATE_IMAGE`. When set, this image is used regardless of profile.
-  - Deprecated: `PLOY_BUILDGATE_JAVA_IMAGE`, `PLOY_BUILDGATE_GRADLE_IMAGE` language-specific overrides.
-- Limits (optional)
-  - `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES` — memory cap (supports `MiB`, `GiB`, etc.).
-  - `PLOY_BUILDGATE_LIMIT_DISK_SPACE` — disk/quota cap for container writable layer (supports suffixes).
-  - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU in millicores (e.g., `500`, `1500`).
-
-Behavior
-- For `java-maven`: run `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install`.
-- For `java-gradle`: run `gradle -q --stacktrace test -p /workspace`.
-- For `java`: compile all `*.java` under `/workspace` with `javac --release 17` (succeeds when no Java sources are present).
-- The gate does not modify the repo; it validates the current working tree.
-
-Outputs
-- Exit code: `0` = success; non‑zero = error.
-- Logs: combined stdout/stderr captured and truncated to ≤1 MiB; uploaded as `build-gate.log` artifact.
-- Summary: pass/fail flag, duration, optional resource usage (if available from Docker stats).
-- API exposure: gate status is surfaced via `ploy mod inspect <ticket-id>`.
-  - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
-  - Accessible without inspecting raw artifacts via `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
-
-Notes
-- When the container runtime is unavailable, the gate is skipped (no-op) and metadata is empty.
-- Disk limit is driver dependent; if unsupported, container creation may fail early.
-
-Healing Container Environment
-
-Healing containers that need to call the Build Gate HTTP API directly receive the following
-environment variables from the node agent:
-
-- `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
-- `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
-- `PLOY_TARGET_REF` — Target Git reference for the run
-- `PLOY_COMMIT_SHA` — Pinned commit SHA when available
-- `PLOY_SERVER_URL` — Control plane URL for Build Gate HTTP API access
-- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
-- `PLOY_API_TOKEN` — Bearer token for Build Gate API authentication when configured. On TLS-disabled
-  local stacks the node agent may derive this from the worker bearer token file to simplify testing.
+**Environment variables (on worker nodes):**
+- `PLOY_BUILDGATE_IMAGE` — Unified override for the gate container image.
+- `PLOY_BUILDGATE_PROFILE` — Override profile detection.
+- `PLOY_BUILDGATE_JAVA_IMAGE` — (Deprecated) Maven image override.
+- `PLOY_BUILDGATE_GRADLE_IMAGE` — (Deprecated) Gradle image override.
+- Resource limits: `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES`, `PLOY_BUILDGATE_LIMIT_CPU_MILLIS`,
+  `PLOY_BUILDGATE_LIMIT_DISK_SPACE`.
 
 See `docs/envs/README.md` for the complete environment variable reference.
+
+## Inputs
+
+- **Workspace mount:** `/workspace` (required, read-write). Contains the Git checkout.
+- **Profile:** Configurable via spec or auto-detected from workspace markers.
+- **Optional image override:** `PLOY_BUILDGATE_IMAGE` takes precedence over profile defaults.
+- **Resource limits:** Memory, CPU, and disk limits are optional and configurable via
+  environment variables.
+
+## Behavior
+
+Gate validation behavior depends on the detected or configured profile:
+
+| Profile       | Command                                                                                   |
+|---------------|-------------------------------------------------------------------------------------------|
+| `java-maven`  | `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install` |
+| `java-gradle` | `gradle -q --stacktrace test -p /workspace`                                               |
+| `java`        | `javac --release 17` on all `*.java` files (succeeds when no sources present)             |
+
+The gate does not modify the repository; it validates the current working tree.
+
+## Outputs
+
+- **Exit code:** `0` = success; non-zero = failure.
+- **Logs:** Combined stdout/stderr captured and truncated to ≤1 MiB; uploaded as
+  `build-gate.log` artifact.
+- **Summary:** Pass/fail flag, duration, optional resource usage.
+- **API exposure:** Gate status is surfaced via `ploy mod inspect <ticket-id>`.
+  - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
+  - Accessible via `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
+
+## Notes
+
+- When the container runtime is unavailable, the gate is skipped (no-op) and metadata
+  is empty.
+- Disk limit is driver dependent; if unsupported, container creation may fail early.
+
+## Healing Container Environment
+
+Healing containers receive environment variables from the node agent to support
+Build Gate verification. Since gate execution is local (no HTTP API), these variables
+provide repository metadata for healing mods that need Git baseline information.
+
+**Repo metadata (injected from StartRunRequest):**
+- `PLOY_REPO_URL` — Git repository URL for the Mods run.
+- `PLOY_BASE_REF` — Base Git reference (branch or tag).
+- `PLOY_TARGET_REF` — Target Git reference for the run.
+- `PLOY_COMMIT_SHA` — Pinned commit SHA when available.
+
+**Server connection details:**
+- `PLOY_SERVER_URL` — Control plane base URL.
+- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace.
+
+**Cross-phase inputs (mounted at `/in`):**
+- `/in/build-gate.log` — First Build Gate failure log (read-only).
+- `/in/prompt.txt` — Optional prompt file when provided in spec.
+
+See `docs/envs/README.md` for the complete environment variable reference.
+
+## Implementation References
+
+- Gate executor: `internal/workflow/runtime/step/gate_docker.go`
+- Gate+healing orchestration: `internal/nodeagent/execution_healing.go`
+- Run orchestration: `internal/nodeagent/execution_orchestrator.go`
+- Job claiming: `internal/store/queries/jobs.sql` (`ClaimJob` query)
+- Contracts: `internal/workflow/contracts/build_gate_metadata.go`
+
+## Historical Note
+
+Prior to the unified jobs pipeline, Build Gate supported an HTTP remote execution
+mode with dedicated `buildgate_jobs` table and worker designation via
+`PLOY_BUILDGATE_WORKER_ENABLED`. This mode has been removed. All gate execution
+now runs locally on the node claiming the gate job from the unified queue.
+
+See `ROADMAP.md` for migration history and the rationale for collapsing gate
+execution into the jobs pipeline.
