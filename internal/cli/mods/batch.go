@@ -198,7 +198,7 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 type GetBatchStatusCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // UUID of the batch run.
+	BatchID string // ID of the batch run (KSUID string).
 }
 
 // Run executes GET /v1/runs/{id} to fetch batch run details.
@@ -241,7 +241,7 @@ func (c GetBatchStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
 type StopBatchCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // UUID of the batch run to stop.
+	BatchID string // ID of the batch run to stop (KSUID string).
 }
 
 // Run executes POST /v1/runs/{id}/stop to stop the batch run.
@@ -285,7 +285,7 @@ func (c StopBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 type StartBatchCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // UUID of the batch run to start.
+	BatchID string // ID of the batch run to start (KSUID string).
 }
 
 // StartBatchResult contains the result of starting a batch run.
