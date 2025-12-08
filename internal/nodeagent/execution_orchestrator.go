@@ -155,8 +155,9 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	}
 
 	// Run the mod container.
+	// Pass RunID directly for consistent labeling and telemetry.
 	result, runErr := runner.Run(ctx, step.Request{
-		TicketID:  types.TicketID(req.RunID),
+		RunID:     req.RunID,
 		Manifest:  manifest,
 		Workspace: workspace,
 		OutDir:    outDir,
@@ -362,8 +363,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	)
 
 	// Run the healing container.
+	// Pass RunID directly for consistent labeling and telemetry.
 	result, runErr := runner.Run(ctx, step.Request{
-		TicketID:  types.TicketID(req.RunID),
+		RunID:     req.RunID,
 		Manifest:  manifest,
 		Workspace: workspace,
 		OutDir:    outDir,

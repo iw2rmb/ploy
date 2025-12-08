@@ -52,7 +52,6 @@ import (
 	"strings"
 	"time"
 
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -286,8 +285,9 @@ func (r *runController) runGateWithHealing(
 				healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
 
 				// Run the healing mod container.
+				// Pass RunID directly for consistent labeling and telemetry.
 				healResult, healErr := runner.Run(ctx, step.Request{
-					TicketID:  types.TicketID(req.RunID),
+					RunID:     req.RunID,
 					Manifest:  healManifest,
 					Workspace: workspace,
 					OutDir:    outDir,
@@ -520,8 +520,9 @@ func (r *runController) executeWithHealing(
 
 	// Execute main mod container via Runner.Run. Gate is disabled, so this call
 	// will not produce ErrBuildGateFailed — it only runs the container.
+	// Pass RunID directly for consistent labeling and telemetry.
 	result, err := runner.Run(ctx, step.Request{
-		TicketID:  types.TicketID(req.RunID),
+		RunID:     req.RunID,
 		Manifest:  manifestForMainMod,
 		Workspace: workspace,
 		OutDir:    outDir,

@@ -27,6 +27,9 @@ func (m *mockRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte,
 }
 func (m *mockRuntime) Remove(ctx context.Context, handle ContainerHandle) error { return nil }
 
+// TestRunner_Run_SetsRunIDLabel verifies that the container labels include
+// LabelRunID when a RunID is provided in the Request. This enables telemetry
+// and log aggregation systems to correlate containers with workflow runs.
 func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 	rt := &mockRuntime{}
 	runner := Runner{Containers: rt}
@@ -42,7 +45,8 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 		},
 	}
 
-	req := Request{TicketID: types.TicketID(runID), Manifest: manifest, Workspace: "/tmp/workspace"}
+	// Pass RunID directly to step.Request for consistent labeling.
+	req := Request{RunID: runID, Manifest: manifest, Workspace: "/tmp/workspace"}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
@@ -56,6 +60,9 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 	}
 }
 
+// TestRunner_Run_OmitsRunIDLabelWhenEmpty verifies that container labels
+// do not include LabelRunID when no RunID is provided in the Request.
+// This avoids empty or misleading labels in telemetry systems.
 func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
 	rt := &mockRuntime{}
 	runner := Runner{Containers: rt}
@@ -69,7 +76,7 @@ func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
 		},
 	}
 
-	// No TicketID provided
+	// No RunID provided — labels should be empty.
 	req := Request{Manifest: manifest, Workspace: "/tmp/workspace"}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {
@@ -78,10 +85,10 @@ func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
 
 	if rt.captured.Labels != nil {
 		if _, ok := rt.captured.Labels[types.LabelRunID]; ok {
-			t.Fatalf("expected no %q label when TicketID empty", types.LabelRunID)
+			t.Fatalf("expected no %q label when RunID empty", types.LabelRunID)
 		}
 		if len(rt.captured.Labels) != 0 {
-			t.Fatalf("expected labels to be empty when TicketID empty, got %v", rt.captured.Labels)
+			t.Fatalf("expected labels to be empty when RunID empty, got %v", rt.captured.Labels)
 		}
 	}
 }
