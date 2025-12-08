@@ -6,6 +6,8 @@ import (
 )
 
 // Ensure log listing queries have deterministic ordering.
+// Note: ListLogsByRunJobAndBuild and ListLogsByRunJobAndBuildSince removed as part of
+// builds table removal; logs now use job-level grouping only.
 func TestLogsQueries_OrderByChunkThenID(t *testing.T) {
 	t.Parallel()
 
@@ -17,8 +19,6 @@ func TestLogsQueries_OrderByChunkThenID(t *testing.T) {
 		{"ListLogsByRunSince", listLogsByRunSince},
 		{"ListLogsByRunAndJob", listLogsByRunAndJob},
 		{"ListLogsByRunAndJobSince", listLogsByRunAndJobSince},
-		{"ListLogsByRunJobAndBuild", listLogsByRunJobAndBuild},
-		{"ListLogsByRunJobAndBuildSince", listLogsByRunJobAndBuildSince},
 	}
 
 	for _, tc := range cases {

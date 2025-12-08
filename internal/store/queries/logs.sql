@@ -22,19 +22,10 @@ SELECT * FROM logs
 WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunJobAndBuild :many
-SELECT * FROM logs
-WHERE run_id = $1 AND job_id = $2 AND build_id = $3
-ORDER BY chunk_no ASC, id ASC;
-
--- name: ListLogsByRunJobAndBuildSince :many
-SELECT * FROM logs
-WHERE run_id = $1 AND job_id = $2 AND build_id = $3 AND id > $4
-ORDER BY chunk_no ASC, id ASC;
-
 -- name: CreateLog :one
-INSERT INTO logs (run_id, job_id, build_id, chunk_no, data)
-VALUES ($1, $2, $3, $4, $5)
+-- Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
+INSERT INTO logs (run_id, job_id, chunk_no, data)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: DeleteLog :exec

@@ -75,7 +75,9 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 	}
 }
 
-func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
+// TestCreateNodeLogsHandler_WithJobID verifies that job_id is propagated to the store.
+// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
+func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	t.Parallel()
 
 	// Create mock store.
@@ -88,7 +90,7 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	_, err := gzWriter.Write([]byte("hello with build id\n"))
+	_, err := gzWriter.Write([]byte("hello with job id\n"))
 	if err != nil {
 		t.Fatalf("gzip write failed: %v", err)
 	}
@@ -97,14 +99,12 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 	}
 	gzippedData := buf.Bytes()
 
-	// Prepare request payload including build_id.
+	// Prepare request payload including job_id.
 	runID := uuid.New().String()
 	jobID := uuid.New().String()
-	buildID := uuid.New().String()
 	payload := map[string]interface{}{
 		"run_id":   runID,
 		"job_id":   jobID,
-		"build_id": buildID,
 		"chunk_no": 1,
 		"data":     gzippedData,
 	}
@@ -130,15 +130,15 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 		t.Fatalf("status code = %d, want %d; body: %s", w.Code, http.StatusCreated, w.Body.String())
 	}
 
-	// Verify build_id propagated to store.
+	// Verify job_id propagated to store.
 	if !mockStore.logCreated {
 		t.Fatal("log was not created in store")
 	}
-	if mockStore.lastCreateLog.BuildID == nil {
-		t.Fatal("expected BuildID to be set")
+	if mockStore.lastCreateLog.JobID == nil {
+		t.Fatal("expected JobID to be set")
 	}
-	if *mockStore.lastCreateLog.BuildID != buildID {
-		t.Fatalf("BuildID mismatch: got %s, want %s", *mockStore.lastCreateLog.BuildID, buildID)
+	if *mockStore.lastCreateLog.JobID != jobID {
+		t.Fatalf("JobID mismatch: got %s, want %s", *mockStore.lastCreateLog.JobID, jobID)
 	}
 }
 
@@ -341,11 +341,11 @@ func (m *mockStoreForLogs) GetNode(ctx context.Context, id string) (store.Node, 
 func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
 	m.logCreated = true
 	m.lastCreateLog = arg
+	// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 	return store.Log{
 		ID:      1,
 		RunID:   arg.RunID,
 		JobID:   arg.JobID,
-		BuildID: arg.BuildID,
 		ChunkNo: arg.ChunkNo,
 		Data:    arg.Data,
 	}, nil

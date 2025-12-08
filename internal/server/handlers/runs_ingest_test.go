@@ -21,9 +21,10 @@ type mockStoreRunLogs struct {
 	lastCreate store.CreateLogParams
 }
 
+// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParams) (store.Log, error) {
 	m.lastCreate = arg
-	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, BuildID: arg.BuildID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
+	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
 }
 
 func TestCreateRunLogsHandler_Success(t *testing.T) {
@@ -31,8 +32,8 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	h := createRunLogHandler(ms, nil)
 	runID := uuid.New().String()
 	jobID := uuid.New().String()
-	buildID := uuid.New().String()
-	payload := map[string]any{"job_id": jobID, "build_id": buildID, "chunk_no": 2, "data": []byte("hello")}
+	// Note: build_id removed; logs are now grouped at job level only.
+	payload := map[string]any{"job_id": jobID, "chunk_no": 2, "data": []byte("hello")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/logs", bytes.NewReader(b))
 	req.SetPathValue("id", runID)

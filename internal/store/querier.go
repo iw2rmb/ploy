@@ -32,6 +32,7 @@ type Querier interface {
 	// Aggregates run_repos counts by status for a given run.
 	// Used to derive batch-level status (e.g., all succeeded = batch succeeded).
 	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
+	// Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	// Creates a new diff entry associated with a job.
 	// Ordering is determined by the job's step_index.
@@ -39,6 +40,7 @@ type Querier interface {
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
+	// Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
@@ -123,8 +125,6 @@ type Querier interface {
 	ListLogsByRun(ctx context.Context, runID string) ([]Log, error)
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
-	ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error)
-	ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLogsByRunJobAndBuildSinceParams) ([]Log, error)
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)

@@ -16,8 +16,9 @@ import (
 
 // createRunArtifactBundleHandler stores a gzipped artifact bundle for a run using an optional job-scoped association.
 //
-// Run, job, and build IDs are now KSUID-backed strings; no UUID parsing is performed.
+// Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 // IDs are treated as opaque; validation is limited to non-empty checks and existence checks.
+// Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
 func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
@@ -38,11 +39,11 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
+		// Note: build_id removed; artifacts are now grouped at job level only.
 		var req struct {
-			JobID   *string `json:"job_id,omitempty"`
-			BuildID *string `json:"build_id,omitempty"`
-			Name    *string `json:"name"`
-			Bundle  []byte  `json:"bundle"`
+			JobID  *string `json:"job_id,omitempty"`
+			Name   *string `json:"name"`
+			Bundle []byte  `json:"bundle"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			var maxErr *http.MaxBytesError
@@ -62,9 +63,8 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Normalize optional job/build IDs (KSUID strings; no UUID parsing).
+		// Normalize optional job ID (KSUID string; no UUID parsing).
 		jobID := normalizeOptionalID(req.JobID)
-		buildID := normalizeOptionalID(req.BuildID)
 
 		// Validate job belongs to run if provided.
 		if jobID != nil {
@@ -99,13 +99,12 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		// Compute CID and digest for content-addressable storage.
 		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 		params := store.CreateArtifactBundleParams{
-			RunID:   runIDStr,
-			JobID:   jobID,
-			BuildID: buildID,
-			Name:    req.Name,
-			Bundle:  req.Bundle,
-			Cid:     &cid,
-			Digest:  &digest,
+			RunID:  runIDStr,
+			JobID:  jobID,
+			Name:   req.Name,
+			Bundle: req.Bundle,
+			Cid:    &cid,
+			Digest: &digest,
 		}
 		artifact, err := st.CreateArtifactBundle(r.Context(), params)
 		if err != nil {

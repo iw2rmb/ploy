@@ -18,7 +18,8 @@ import (
 // createJobArtifactHandler stores gzipped artifact bundle in artifact_bundles table (≤1 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/artifact
 //
-// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
+// Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
+// Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
 func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
@@ -49,10 +50,10 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		// Decode request body.
+		// Note: build_id removed; artifacts are now grouped at job level only.
 		var req struct {
-			BuildID *string `json:"build_id"` // optional (KSUID string)
-			Name    *string `json:"name"`     // optional logical name
-			Bundle  []byte  `json:"bundle"`   // gzipped tar (raw bytes)
+			Name   *string `json:"name"`   // optional logical name
+			Bundle []byte  `json:"bundle"` // gzipped tar (raw bytes)
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -123,21 +124,17 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Normalize optional build_id (KSUID string).
-		buildID := normalizeOptionalID(req.BuildID)
-
 		// Compute CID and digest for content-addressable storage.
 		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 
 		// Create artifact bundle params using string IDs.
 		params := store.CreateArtifactBundleParams{
-			RunID:   runIDStr,
-			JobID:   &jobIDStr,
-			BuildID: buildID,
-			Name:    req.Name,
-			Bundle:  req.Bundle,
-			Cid:     &cid,
-			Digest:  &digest,
+			RunID:  runIDStr,
+			JobID:  &jobIDStr,
+			Name:   req.Name,
+			Bundle: req.Bundle,
+			Cid:    &cid,
+			Digest: &digest,
 		}
 
 		// Persist artifact bundle to DB.

@@ -163,25 +163,6 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_run_time_idx ON events USING BRIN (time) WITH (pages_per_range=64);
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
--- Builds (timed invocations inside a job, e.g., Maven/Gradle/Bazel)
--- Note: status uses job_status enum; default is 'created' (not 'pending', which is not
--- a valid job_status value). This aligns builds.status with the job_status vocabulary.
--- Note: id is TEXT (KSUID-backed); run_id and job_id are TEXT to match their parent tables.
-CREATE TABLE IF NOT EXISTS builds (
-  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
-  run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id       TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  tool         TEXT,             -- e.g., 'maven', 'gradle', 'npm', 'bazel'
-  command      TEXT,             -- full command line if available
-  status       job_status NOT NULL DEFAULT 'created',
-  started_at   TIMESTAMPTZ,
-  finished_at  TIMESTAMPTZ,
-  duration_ms  BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
-  metrics      JSONB NOT NULL DEFAULT '{}'::jsonb
-);
-CREATE INDEX IF NOT EXISTS builds_run_idx ON builds(run_id);
-CREATE INDEX IF NOT EXISTS builds_job_idx ON builds(job_id);
-
 -- Diffs (per-run, small count)
 -- Each execution job (mod, healing, pre_gate, post_gate) may produce a diff.
 -- Diffs store `job_id` and `run_id` for association; summary JSONB contains:
@@ -200,29 +181,32 @@ CREATE INDEX IF NOT EXISTS diffs_run_idx ON diffs(run_id);
 CREATE INDEX IF NOT EXISTS diffs_job_idx ON diffs(job_id);
 
 -- Logs (append-only)
--- Note: run_id, job_id, and build_id are TEXT (KSUID-backed) to match their parent tables.
+-- Logs are now grouped at the job level only; build_id column removed as part of
+-- the builds table removal (job-level grouping is canonical).
+-- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- logs.id remains BIGSERIAL per ROADMAP.md (unchanged).
 CREATE TABLE IF NOT EXISTS logs (
   id         BIGSERIAL PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  build_id   TEXT REFERENCES builds(id) ON DELETE SET NULL,
   chunk_no   INTEGER NOT NULL,
   data       BYTEA NOT NULL CHECK (octet_length(data) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS logs_run_job_build_chunk_uniq ON logs(run_id, job_id, build_id, chunk_no);
+-- Unique constraint on (run_id, job_id, chunk_no) for job-level log grouping.
+CREATE UNIQUE INDEX IF NOT EXISTS logs_run_job_chunk_uniq ON logs(run_id, job_id, chunk_no);
 CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 
 -- Artifact bundles (zipped tar of changed files or outputs)
--- Note: run_id, job_id, and build_id are TEXT (KSUID-backed) to match their parent tables.
+-- Artifact bundles are now grouped at the job level only; build_id column removed as
+-- part of the builds table removal (job-level grouping is canonical).
+-- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- artifact_bundles.id remains UUID per ROADMAP.md (unchanged).
 CREATE TABLE IF NOT EXISTS artifact_bundles (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  build_id   TEXT REFERENCES builds(id) ON DELETE SET NULL,
   name       TEXT,                -- optional logical name
   bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
   cid        TEXT,                -- content-addressed ID for deduplication
