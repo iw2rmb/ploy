@@ -187,30 +187,6 @@ type mockStore struct {
 	getDiffResult store.Diff
 	getDiffErr    error
 
-	// Buildgate job tracking
-	createBGJobCalled bool
-	createBGJobParam  []byte
-	createBGJobResult store.BuildgateJob
-	createBGJobErr    error
-
-	getBGJobCalled bool
-	getBGJobParam  pgtype.UUID
-	getBGJobResult store.BuildgateJob
-	getBGJobErr    error
-
-	claimBGJobCalled bool
-	claimBGJobParam  *string
-	claimBGJobResult store.BuildgateJob
-	claimBGJobErr    error
-
-	ackBGStartCalled bool
-	ackBGStartParam  pgtype.UUID
-	ackBGStartErr    error
-
-	updateBGCompleteCalled bool
-	updateBGCompleteParams store.UpdateBuildGateJobCompletionParams
-	updateBGCompleteErr    error
-
 	// CreateLog tracking
 	createLogCalled bool
 	createLogParams store.CreateLogParams
@@ -604,53 +580,6 @@ func (m *mockStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, er
 	m.getDiffCalled = true
 	m.getDiffParam = id
 	return m.getDiffResult, m.getDiffErr
-}
-
-// Buildgate job methods
-func (m *mockStore) CreateBuildGateJob(ctx context.Context, payload []byte) (store.BuildgateJob, error) {
-	m.createBGJobCalled = true
-	m.createBGJobParam = payload
-	return m.createBGJobResult, m.createBGJobErr
-}
-
-func (m *mockStore) GetBuildGateJob(ctx context.Context, id pgtype.UUID) (store.BuildgateJob, error) {
-	m.getBGJobCalled = true
-	m.getBGJobParam = id
-	if m.getBGJobErr != nil {
-		return store.BuildgateJob{}, m.getBGJobErr
-	}
-	// Provide a default completed job to satisfy route coverage checks that treat 404 as "not mounted".
-	if !m.getBGJobResult.ID.Valid {
-		return store.BuildgateJob{
-			ID:         id,
-			Status:     store.BuildgateJobStatusCompleted,
-			CreatedAt:  pgtype.Timestamptz{Valid: true},
-			StartedAt:  pgtype.Timestamptz{Valid: true},
-			FinishedAt: pgtype.Timestamptz{Valid: true},
-		}, nil
-	}
-	return m.getBGJobResult, nil
-}
-
-func (m *mockStore) ClaimBuildGateJob(ctx context.Context, nodeID *string) (store.BuildgateJob, error) {
-	m.claimBGJobCalled = true
-	m.claimBGJobParam = nodeID
-	if !m.claimBGJobResult.ID.Valid && m.claimBGJobErr == nil {
-		return store.BuildgateJob{}, pgx.ErrNoRows
-	}
-	return m.claimBGJobResult, m.claimBGJobErr
-}
-
-func (m *mockStore) AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error {
-	m.ackBGStartCalled = true
-	m.ackBGStartParam = id
-	return m.ackBGStartErr
-}
-
-func (m *mockStore) UpdateBuildGateJobCompletion(ctx context.Context, params store.UpdateBuildGateJobCompletionParams) error {
-	m.updateBGCompleteCalled = true
-	m.updateBGCompleteParams = params
-	return m.updateBGCompleteErr
 }
 
 func (m *mockStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {

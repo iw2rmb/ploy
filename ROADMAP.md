@@ -156,4 +156,3 @@ Legend: [ ] todo, [x] done.
       - (removed) `PLOY_BUILDGATE_MODE` — Gate execution always runs as part of the Mods job pipeline; nodes claim work from the unified jobs queue.
       ```
   - Tests: `rg "buildgate_jobs" .` and `rg "PLOY_BUILDGATE_MODE" .` — Expect no remaining mentions outside of historical notes; `go test ./tests/e2e/mods/...` after updating/removing the remote-buildgate scenario.
-
