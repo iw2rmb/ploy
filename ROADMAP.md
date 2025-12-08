@@ -7,7 +7,7 @@ Documentation: `ROADMAP.md`, `docs/mods-lifecycle.md`, `docs/api/OpenAPI.yaml`, 
 Legend: [ ] todo, [x] done.
 
 ## Domain identifiers
-- [ ] Collapse duplicate run identifiers — consolidate on `RunID` and remove `TicketID` in `internal/domain/types/ids.go` — avoids parallel ID types for the same concept.
+- [x] Collapse duplicate run identifiers — consolidate on `RunID` and remove `TicketID` in `internal/domain/types/ids.go` — avoids parallel ID types for the same concept.
   - Repository: ploy
   - Component: `internal/domain/types`
   - Scope: Replace `TicketID` type and methods with `RunID` usage; update tests in `internal/domain/types/ids_test.go` and `internal/domain/types/adapters_test.go` to cover `RunID`.
