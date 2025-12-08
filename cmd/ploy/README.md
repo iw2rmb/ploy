@@ -29,8 +29,6 @@ ploy mod run \
   [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
-ploy knowledge-base ingest --from <fixture.json>
-ploy knowledge-base evaluate --fixture <samples.json>
 ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>
 ```
 
@@ -192,13 +190,6 @@ cannot be resumed since there are no jobs to requeue.
 app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
 hydration and still reports required resources.
-
-`knowledge-base ingest` merges incident fixtures into the workstation catalog
-under `configs/knowledge-base/catalog.json`, enforcing duplicate safeguards and
-preserving schema version ordering. `knowledge-base evaluate` loads curated
-samples, runs them through the advisor with a conservative score floor, and
-prints per-sample match results plus aggregate accuracy so operators can gauge
-classifier drift without leaving the workstation.
 
 `upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH). The CLI always targets the default descriptor at `~/.config/ploy/clusters/default`.
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.

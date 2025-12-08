@@ -34,19 +34,6 @@ func newManifestCmd(stderr io.Writer) *cobra.Command {
 	return manifestCmd
 }
 
-// newKnowledgeBaseCmd creates the cobra command tree for 'ploy knowledge-base' and its subcommands.
-func newKnowledgeBaseCmd(stderr io.Writer) *cobra.Command {
-	kbCmd := &cobra.Command{
-		Use:                "knowledge-base",
-		Short:              "Curate knowledge base fixtures",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleKnowledgeBase(args, stderr)
-		},
-	}
-	return kbCmd
-}
-
 // newTokenCmd creates the cobra command tree for 'ploy token' and its subcommands.
 func newTokenCmd(stderr io.Writer) *cobra.Command {
 	tokenCmd := &cobra.Command{

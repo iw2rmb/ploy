@@ -116,7 +116,7 @@ func (f BuildGateStaticCheckFailure) Validate() error {
 	return nil
 }
 
-// BuildGateLogFinding records a normalized build log finding tied to a knowledge base incident.
+// BuildGateLogFinding records a normalized build log finding used for guidance.
 type BuildGateLogFinding struct {
 	Code     string `json:"code,omitempty"`
 	Severity string `json:"severity"`

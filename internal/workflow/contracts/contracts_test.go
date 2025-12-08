@@ -150,7 +150,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 					Playbooks: []string{"playbook.mods.review"},
 				},
 				Recommendations: []ModsRecommendation{{
-					Source:     "knowledge-base",
+					Source:     "advisor",
 					Message:    "Apply recipe.alpha before llm-exec",
 					Confidence: 0.9,
 				}},
@@ -210,7 +210,7 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 			}},
 		}},
 		LogFindings: []BuildGateLogFinding{{
-			Code:     "kb.git.auth",
+			Code:     "git.auth",
 			Severity: "error",
 			Message:  "Authenticate Git fetch credentials for remote repository access.",
 			Evidence: "fatal: unable to access 'https://example.com/repo'",
@@ -248,7 +248,7 @@ func TestBuildGateMetadataValidateRejectsEmptyFailureMessage(t *testing.T) {
 func TestBuildGateMetadataValidateRejectsInvalidLogFinding(t *testing.T) {
 	meta := BuildGateStageMetadata{
 		LogFindings: []BuildGateLogFinding{{
-			Code:    "kb.git.auth",
+			Code:    "git.auth",
 			Message: "missing severity",
 		}},
 	}
@@ -386,7 +386,7 @@ func TestInMemoryBusAutoTicketFallback(t *testing.T) {
 // TestModsStageMetadataValidateRequiresMessage ensures recommendations require messages.
 func TestModsStageMetadataValidateRequiresMessage(t *testing.T) {
 	meta := ModsStageMetadata{
-		Recommendations: []ModsRecommendation{{Source: "knowledge-base", Message: ""}},
+		Recommendations: []ModsRecommendation{{Source: "advisor", Message: ""}},
 	}
 	if err := meta.Validate(); err == nil {
 		t.Fatal("expected validation error for empty recommendation message")

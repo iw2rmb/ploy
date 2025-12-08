@@ -48,7 +48,6 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  cluster          Manage local cluster descriptors")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
-	_, _ = fmt.Fprintln(w, "  knowledge-base   Curate knowledge base fixtures")
 	_, _ = fmt.Fprintln(w, "  server           Manage control plane server")
 	_, _ = fmt.Fprintln(w, "  node             Manage worker nodes")
 	_, _ = fmt.Fprintln(w, "  rollout          Rolling updates for servers and nodes")

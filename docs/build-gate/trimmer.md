@@ -13,7 +13,7 @@ acts as a no-op for all other tools.
 - Keep **full logs** available for humans and artifacts (for download and
   post-mortem analysis).
 - Provide a **focused failure slice** for machine consumers (e.g. Codex healing,
-  knowledge base incident detection, UI summaries).
+  incident detection, UI summaries).
 - Avoid tool/framework-specific heuristics in the node agent or CLI; keep them
   co-located with gate execution.
 

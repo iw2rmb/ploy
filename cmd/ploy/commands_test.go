@@ -20,19 +20,18 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 	// Verify that all expected commands are registered as subcommands.
 	// The command names should match the "Use" field from each builder function.
 	expectedCommands := []string{
-		"version",        // Built-in version command
-		"mod",            // newModCmd
-		"mods",           // newModsCmd
-		"runs",           // newRunsCmd
-		"upload",         // newUploadCmd
-		"cluster",        // newClusterCmd
-		"config",         // newConfigCmd
-		"manifest",       // newManifestCmd
-		"knowledge-base", // newKnowledgeBaseCmd
-		"server",         // newServerCmd
-		"node",           // newNodeCmd
-		"rollout",        // newRolloutCmd
-		"token",          // newTokenCmd
+		"version",  // Built-in version command
+		"mod",      // newModCmd
+		"mods",     // newModsCmd
+		"runs",     // newRunsCmd
+		"upload",   // newUploadCmd
+		"cluster",  // newClusterCmd
+		"config",   // newConfigCmd
+		"manifest", // newManifestCmd
+		"server",   // newServerCmd
+		"node",     // newNodeCmd
+		"rollout",  // newRolloutCmd
+		"token",    // newTokenCmd
 	}
 
 	// Get all registered subcommands from the root command.
@@ -80,7 +79,6 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},
 		{"newConfigCmd", func(w *bytes.Buffer) *cobra.Command { return newConfigCmd(w) }},
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},
-		{"newKnowledgeBaseCmd", func(w *bytes.Buffer) *cobra.Command { return newKnowledgeBaseCmd(w) }},
 		{"newServerCmd", func(w *bytes.Buffer) *cobra.Command { return newServerCmd(w) }},
 		{"newNodeCmd", func(w *bytes.Buffer) *cobra.Command { return newNodeCmd(w) }},
 		{"newRolloutCmd", func(w *bytes.Buffer) *cobra.Command { return newRolloutCmd(w) }},
