@@ -7,7 +7,7 @@ Documentation: ../auto/ROADMAP.md, AGENTS.md, cmd/ploy/README.md, cmd/ploy/main.
 Legend: [ ] todo, [x] done.
 
 ## Standardize help behavior
-- [ ] Ensure `--help` (and `-h`) works at every command level — Guarantee that `ploy --help`, `ploy <command> --help`, and deeper forms like `ploy cluster rollout --help` print the correct usage and subcommand lists instead of falling back to Cobra’s default or surfacing “unknown subcommand” errors.
+- [x] Ensure `--help` (and `-h`) works at every command level — Guarantee that `ploy --help`, `ploy <command> --help`, and deeper forms like `ploy cluster rollout --help` print the correct usage and subcommand lists instead of falling back to Cobra’s default or surfacing “unknown subcommand” errors.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root + all command routers)
   - Scope:
