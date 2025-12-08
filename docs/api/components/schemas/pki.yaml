@@ -4,8 +4,9 @@ PKISignRequest:
   properties:
     node_id:
       type: string
-      format: uuid
-      description: Node identifier requesting a signed certificate.
+      description: |
+        Node identifier requesting a signed certificate.
+        Node IDs are NanoID(6) strings (6 URL-safe characters).
     csr:
       type: string
       description: |
