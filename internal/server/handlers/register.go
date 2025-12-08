@@ -80,7 +80,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/buildgate/claim", claimBuildGateJobHandler(st), auth.RoleWorker)
 
 	// Job artifact and diff upload endpoints (run-scoped, no node ID)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st), auth.RoleWorker)
@@ -89,12 +88,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/ack", ackBuildGateJobStartHandler(st), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/complete", completeBuildGateJobHandler(st), auth.RoleWorker)
 
-	// Build gate endpoints
-	// Allow both control-plane and worker roles so healing containers running on nodes
-	// can submit validation requests using the node's client certificate.
-	s.HandleFunc("POST /v1/buildgate/validate", validateBuildGateHandler(st), auth.RoleControlPlane, auth.RoleWorker)
-	s.HandleFunc("GET /v1/buildgate/jobs/{id}", getBuildGateJobStatusHandler(st), auth.RoleControlPlane, auth.RoleWorker)
+	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},
+	// POST /v1/nodes/{id}/buildgate/*, etc.) have been removed. Gate execution now runs
+	// as part of the unified jobs queue. See ROADMAP.md for details.
 }

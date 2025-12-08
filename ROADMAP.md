@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store/...` — Expect compilation errors until all references are removed; final run should pass with no references to `buildgate_jobs` or `BuildgateJobStatus`.
 
 ## Remove /v1/buildgate/validate and HTTP Build Gate client
-- [ ] Delete HTTP Build Gate handlers and routes — Make node-run gate the only canonical path
+- [x] Delete HTTP Build Gate handlers and routes — Make node-run gate the only canonical path
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers/buildgate.go, internal/server/handlers/register.go, internal/server/handlers/buildgate_validate_test.go
   - Scope:
