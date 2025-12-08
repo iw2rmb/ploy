@@ -63,10 +63,10 @@ Related env vars are documented in `docs/envs/README.md` (PostgreSQL DSN, PKI, o
 
 ### 1. Deploy the Control-Plane Server
 
-Use `ploy server deploy` to install the control-plane on a VPS:
+Use `ploy cluster deploy` to install the control-plane on a VPS:
 
 ```bash
-dist/ploy server deploy --address <host-or-ip>
+dist/ploy cluster deploy --address <host-or-ip>
 ```
 
 This command:
@@ -135,7 +135,7 @@ To check status:
 To verify connectivity, detection, and the bootstrap plan without changing the host, run:
 
 ```bash
-dist/ploy server deploy --address <host-or-ip> --dry-run
+dist/ploy cluster deploy --address <host-or-ip> --dry-run
 ```
 
 Output includes a clear `DRY RUN` header, whether an existing cluster was detected and reused, certificate subjects for a new deployment, PostgreSQL handling, and the full list of planned steps. The command exits with status 0 and does not modify remote state.
@@ -143,7 +143,7 @@ Output includes a clear `DRY RUN` header, whether an existing cluster was detect
 Example:
 
 ```bash
-dist/ploy server deploy --address 203.0.113.42
+dist/ploy cluster deploy --address 203.0.113.42
 ```
 
 ### 2. Add Worker Nodes
@@ -244,7 +244,7 @@ See `cmd/ploy/README.md` § "Batched Mod Runs" for the full command reference.
 
 ## Reuse Existing Cluster
 
-When redeploying a Ploy server to a host that already contains a cluster, the deploy command automatically detects and reuses the existing cluster CA and server identity. This enables **idempotent** deployments: running `ploy server deploy` multiple times against the same host will not clobber PKI material or cluster identity.
+When redeploying a Ploy server to a host that already contains a cluster, the deploy command automatically detects and reuses the existing cluster CA and server identity. This enables **idempotent** deployments: running `ploy cluster deploy` multiple times against the same host will not clobber PKI material or cluster identity.
 
 ### How Detection Works
 
@@ -400,7 +400,7 @@ If running manually instead of using the automated script:
 
 - Build CLI/binaries locally: `make build` (creates `dist/ploy`, `dist/ployd`, `dist/ployd-linux`, `dist/ployd-node`, `dist/ployd-node-linux`).
 - Deploy server on A (installs PostgreSQL if DSN omitted):
-  - `dist/ploy server deploy --address 45.9.42.212`
+  - `dist/ploy cluster deploy --address 45.9.42.212`
   - The command prints the generated `cluster_id` and persists a local descriptor under `~/.config/ploy/clusters/`.
     - Current default cluster: `cat ~/.config/ploy/clusters/default` → `<cluster-id>`
     - Full descriptor: `~/.config/ploy/clusters/<cluster-id>.json`

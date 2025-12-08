@@ -88,7 +88,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` is not provided):
 
   ```bash
-  dist/ploy server deploy --address <host-or-ip>
+  dist/ploy cluster deploy --address <host-or-ip>
   ```
 
   Notes:

@@ -228,7 +228,7 @@ ploy completion powershell | Out-String | Invoke-Expression
 ```
 
 The completion command is powered by Cobra and provides:
-- Command completion for all subcommands (mod, server, node, etc.)
+- Command completion for all subcommands (mod, cluster, node, etc.)
 - Flag completion for available options
 - Context-aware suggestions based on command hierarchy
 

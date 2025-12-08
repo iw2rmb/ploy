@@ -145,9 +145,9 @@ main() {
 
     # Step 4: Deploy server on A
     log_info "Step 4: Deploying server on A ($SERVER_IP)..."
-    log_info "Running: dist/ploy server deploy --address $SERVER_IP"
+    log_info "Running: dist/ploy cluster deploy --address $SERVER_IP"
 
-    if ! dist/ploy server deploy --address "$SERVER_IP"; then
+    if ! dist/ploy cluster deploy --address "$SERVER_IP"; then
         log_error "Server deployment failed"
         exit 1
     fi

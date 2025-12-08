@@ -33,7 +33,7 @@ Optional: verify versions locally
 
 ## 2) Update the Control‑Plane Server (A)
 
-Use the first‑class rollout command. Do not re‑run `ploy server deploy` for an
+Use the first‑class rollout command. Do not re‑run `ploy cluster deploy` for an
 update (that regenerates PKI).
 
 ```bash
