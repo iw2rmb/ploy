@@ -9,16 +9,13 @@ import (
 func TestIDs_Basics(t *testing.T) {
 	t.Run("zero", func(t *testing.T) {
 		var (
-			a TicketID
-			b RunID
+			// RunID is the canonical run identifier (TicketID is deprecated alias).
+			a RunID
 			d StepID
 			e ClusterID
 			f RunRepoID
 		)
 		if !a.IsZero() || a.String() != "" {
-			t.Fatalf("TicketID zero failed")
-		}
-		if !b.IsZero() || b.String() != "" {
 			t.Fatalf("RunID zero failed")
 		}
 		if !d.IsZero() || d.String() != "" {
@@ -33,10 +30,7 @@ func TestIDs_Basics(t *testing.T) {
 	})
 
 	t.Run("construct_compare", func(t *testing.T) {
-		a1, a2 := TicketID("t1"), TicketID("t1")
-		if a1 != a2 || a1.String() != "t1" {
-			t.Fatalf("TicketID compare/string failed")
-		}
+		// RunID is the canonical run identifier.
 		r1, r2 := RunID("r1"), RunID("r1")
 		if r1 != r2 || r1.String() != "r1" {
 			t.Fatalf("RunID compare/string failed")
@@ -54,42 +48,50 @@ func TestIDs_Basics(t *testing.T) {
 			t.Fatalf("RunRepoID compare/string failed")
 		}
 	})
+
+	t.Run("ticket_alias_compatibility", func(t *testing.T) {
+		// Verify TicketID (deprecated alias) is interchangeable with RunID.
+		var tid TicketID = "t1"
+		var rid RunID = tid // Direct assignment should work since TicketID = RunID.
+		if tid != rid || tid.String() != "t1" {
+			t.Fatalf("TicketID/RunID alias compatibility failed")
+		}
+	})
 }
 
 func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	// Use one representative value for each type.
+	// RunID is now the canonical run identifier (TicketID is a deprecated alias).
 	var (
-		tid  TicketID
 		rid  RunID
 		step StepID
 		cid  ClusterID
 		rrid RunRepoID
 	)
 
-	if err := tid.UnmarshalText([]byte("  T-42  ")); err != nil {
-		t.Fatalf("ticket UnmarshalText: %v", err)
-	}
-	if tid.String() != "T-42" {
-		t.Fatalf("ticket normalize: %q", tid.String())
-	}
-	b, err := json.Marshal(tid)
-	if err != nil {
-		t.Fatalf("ticket marshal: %v", err)
-	}
-	if string(b) != "\"T-42\"" {
-		t.Fatalf("ticket json string expected, got %s", string(b))
-	}
-	var tid2 TicketID
-	if err := json.Unmarshal(b, &tid2); err != nil {
-		t.Fatalf("ticket unmarshal json: %v", err)
-	}
-	if tid2 != tid {
-		t.Fatalf("ticket roundtrip mismatch: %v != %v", tid2, tid)
-	}
-
-	if err := rid.UnmarshalText([]byte(" r-1 ")); err != nil {
+	// Test RunID text/JSON round-trip (covers run identifier serialization).
+	if err := rid.UnmarshalText([]byte("  R-42  ")); err != nil {
 		t.Fatalf("run UnmarshalText: %v", err)
 	}
+	if rid.String() != "R-42" {
+		t.Fatalf("run normalize: %q", rid.String())
+	}
+	b, err := json.Marshal(rid)
+	if err != nil {
+		t.Fatalf("run marshal: %v", err)
+	}
+	if string(b) != "\"R-42\"" {
+		t.Fatalf("run json string expected, got %s", string(b))
+	}
+	var rid2 RunID
+	if err := json.Unmarshal(b, &rid2); err != nil {
+		t.Fatalf("run unmarshal json: %v", err)
+	}
+	if rid2 != rid {
+		t.Fatalf("run roundtrip mismatch: %v != %v", rid2, rid)
+	}
+
+	// Test other ID types.
 	if err := step.UnmarshalText([]byte(" step-1 ")); err != nil {
 		t.Fatalf("step UnmarshalText: %v", err)
 	}
@@ -112,11 +114,12 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 }
 
 func TestIDs_RejectEmpty(t *testing.T) {
+	// Verify all ID types reject empty/whitespace-only values.
+	// Note: TicketID is now an alias for RunID, so only RunID needs testing.
 	tests := []struct {
 		name string
 		fn   func([]byte) error
 	}{
-		{"ticket", func(b []byte) error { var v TicketID; return v.UnmarshalText(b) }},
 		{"run", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }},
 		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
 		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},

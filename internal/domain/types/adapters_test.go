@@ -15,10 +15,11 @@ func TestStringsAdapter(t *testing.T) {
 }
 
 func TestStringPtrAdapter(t *testing.T) {
-	if p := StringPtr(TicketID("")); p != nil {
+	// Test with RunID (canonical run identifier; TicketID is a deprecated alias).
+	if p := StringPtr(RunID("")); p != nil {
 		t.Fatalf("StringPtr(empty) = %#v, want nil", *p)
 	}
-	id := TicketID("abc")
+	id := RunID("abc")
 	p := StringPtr(id)
 	if p == nil || *p != "abc" {
 		t.Fatalf("StringPtr(%q) = %#v, want %q", id, p, "abc")
