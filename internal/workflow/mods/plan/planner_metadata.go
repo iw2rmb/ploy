@@ -8,12 +8,12 @@ import (
 )
 
 // applyAdvisor enriches the Mods stages with advisor metadata when available.
-func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contracts.WorkflowTicket, signals AdviceSignals) {
+func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, run contracts.WorkflowRun, signals AdviceSignals) {
 	advisor := p.opts.Advisor
 	if advisor == nil {
 		return
 	}
-	advice, err := advisor.Advise(ctx, AdviceRequest{Ticket: ticket, Signals: signals})
+	advice, err := advisor.Advise(ctx, AdviceRequest{Run: run, Signals: signals})
 	if err != nil {
 		return
 	}

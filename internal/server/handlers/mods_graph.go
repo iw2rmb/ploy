@@ -15,7 +15,7 @@ import (
 )
 
 // getModGraphHandler returns an HTTP handler that fetches the workflow graph
-// for a Mods ticket by ID.
+// for a Mods run by ID.
 //
 // GET /v1/mods/{id}/graph — Returns WorkflowGraph with jobs as nodes and
 // dependencies derived from step_index ordering.
@@ -44,46 +44,46 @@ import (
 // Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func getModGraphHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the ticket ID from the URL path parameter.
+		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		ticketIDStr := strings.TrimSpace(r.PathValue("id"))
-		if ticketIDStr == "" {
-			http.Error(w, "ticket id is required", http.StatusBadRequest)
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
+			http.Error(w, "run id is required", http.StatusBadRequest)
 			return
 		}
 
 		// Reject obviously invalid IDs before touching the store.
-		if len(ticketIDStr) != 27 {
-			http.Error(w, "invalid ticket id", http.StatusBadRequest)
+		if len(runIDStr) != 27 {
+			http.Error(w, "invalid run id", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the run exists before fetching jobs using string ID directly.
 		// No UUID parsing needed; store accepts KSUID strings.
-		_, err := st.GetRun(r.Context(), ticketIDStr)
+		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "ticket not found", http.StatusNotFound)
+				http.Error(w, "run not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
-			slog.Error("get mod graph: fetch run failed", "ticket_id", ticketIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("get mod graph: fetch run failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
 		// Fetch all jobs for the run, ordered by step_index.
 		// Uses string run ID directly.
-		jobs, err := st.ListJobsByRun(r.Context(), ticketIDStr)
+		jobs, err := st.ListJobsByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("get mod graph: list jobs failed", "ticket_id", ticketIDStr, "err", err)
+			slog.Error("get mod graph: list jobs failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
 		// Build the workflow graph from jobs.
 		// The graph materializes nodes from jobs and computes edges from
 		// step_index ordering. runID is now a string (KSUID).
-		workflowGraph := graph.BuildFromJobs(ticketIDStr, jobs)
+		workflowGraph := graph.BuildFromJobs(runIDStr, jobs)
 
 		// Return the graph as JSON.
 		w.Header().Set("Content-Type", "application/json")
@@ -93,7 +93,7 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Debug("mod graph fetched",
-			"ticket_id", ticketIDStr,
+			"run_id", runIDStr,
 			"node_count", workflowGraph.NodeCount(),
 			"linear", workflowGraph.Linear,
 		)

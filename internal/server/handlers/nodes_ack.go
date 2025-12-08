@@ -124,8 +124,8 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Publish running event to SSE hub.
 		if eventsService != nil {
-			// Use RunID field (formerly TicketID).
-			ticketSummary := modsapi.RunSummary{
+			// Use RunID field to describe the run.
+			runSummary := modsapi.RunSummary{
 				RunID:      domaintypes.RunID(req.RunID.String()),
 				State:      modsapi.RunStateRunning,
 				Repository: run.RepoUrl,
@@ -133,8 +133,8 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 				UpdatedAt:  time.Now().UTC(),
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishRun(r.Context(), req.RunID.String(), ticketSummary); err != nil {
-				slog.Error("ack job start: publish ticket event failed", "ticket_id", req.RunID, "err", err)
+			if err := eventsService.PublishRun(r.Context(), req.RunID.String(), runSummary); err != nil {
+				slog.Error("ack job start: publish run event failed", "run_id", req.RunID, "err", err)
 			}
 		}
 

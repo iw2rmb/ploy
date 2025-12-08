@@ -94,7 +94,7 @@ func TestModsLogsInvalidFormat(t *testing.T) {
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "yaml", "ticket-123"}, buf)
+	err := execute([]string{"mods", "logs", "--format", "yaml", "run-123"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid format")
 	}

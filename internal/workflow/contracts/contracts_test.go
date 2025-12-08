@@ -53,22 +53,22 @@ func TestSubjectsForRunEmptyRunID(t *testing.T) {
 	}
 }
 
-func TestWorkflowTicketValidate(t *testing.T) {
-	ticket := WorkflowTicket{}
-	if err := ticket.Validate(); err == nil {
-		t.Fatal("expected validation error for empty ticket")
+func TestWorkflowRunValidate(t *testing.T) {
+	run := WorkflowRun{}
+	if err := run.Validate(); err == nil {
+		t.Fatal("expected validation error for empty run envelope")
 	}
 
-	valid := WorkflowTicket{
+	valid := WorkflowRun{
 		SchemaVersion: SchemaVersion,
 		RunID:         types.RunID("run-123"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 	}
 	if err := valid.Validate(); err != nil {
-		t.Fatalf("expected valid ticket, got %v", err)
+		t.Fatalf("expected valid run envelope, got %v", err)
 	}
 
-	withRepo := WorkflowTicket{
+	withRepo := WorkflowRun{
 		SchemaVersion: SchemaVersion,
 		RunID:         types.RunID("run-456"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
@@ -79,7 +79,7 @@ func TestWorkflowTicketValidate(t *testing.T) {
 		},
 	}
 	if err := withRepo.Validate(); err != nil {
-		t.Fatalf("expected ticket with repo to validate, got %v", err)
+		t.Fatalf("expected run with repo to validate, got %v", err)
 	}
 
 	badRepo := valid
@@ -309,7 +309,7 @@ func TestModsPlanMetadataValidateRejectsInvalidValues(t *testing.T) {
 
 func TestInMemoryBusRecordsMessages(t *testing.T) {
 	bus := NewInMemoryBus()
-	ticket, err := bus.ClaimRun(context.Background(), "run-123")
+	run, err := bus.ClaimRun(context.Background(), "run-123")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
@@ -317,8 +317,8 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 	if len(bus.ClaimedRuns) != 1 {
 		t.Fatalf("expected claimed run to be recorded")
 	}
-	if ticket.Manifest.Name == "" || ticket.Manifest.Version == "" {
-		t.Fatalf("expected manifest reference to be set, got %+v", ticket.Manifest)
+	if run.Manifest.Name == "" || run.Manifest.Version == "" {
+		t.Fatalf("expected manifest reference to be set, got %+v", run.Manifest)
 	}
 
 	checkpoint := WorkflowCheckpoint{
@@ -354,12 +354,12 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 func TestInMemoryBusAutoRunFallback(t *testing.T) {
 	bus := NewInMemoryBus()
 	bus.EnqueueRun("queued-1")
-	ticket, err := bus.ClaimRun(context.Background(), "")
+	first, err := bus.ClaimRun(context.Background(), "")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
-	if ticket.RunID != "queued-1" {
-		t.Fatalf("expected queued run, got %s", ticket.RunID)
+	if first.RunID != "queued-1" {
+		t.Fatalf("expected queued run, got %s", first.RunID)
 	}
 	if len(bus.ClaimedRuns) != 1 || bus.ClaimedRuns[0] != "queued-1" {
 		t.Fatalf("unexpected claimed runs: %v", bus.ClaimedRuns)

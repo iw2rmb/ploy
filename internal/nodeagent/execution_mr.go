@@ -100,7 +100,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		return "", fmt.Errorf("extract project id: %w", err)
 	}
 
-	// Use a unique source branch per run: ploy-<ticket-id>.
+	// Use a unique source branch per run: ploy-<run-id>.
 	// This avoids MR conflicts on repeated runs regardless of the submitted target ref.
 	sourceBranch := req.TargetRef.String()
 

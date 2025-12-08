@@ -49,7 +49,7 @@ type diffGetResponse struct {
 	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
 }
 
-// listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
+// listRunDiffsHandler returns a JSON list of diffs for a given Mods run (run id).
 // GET /v1/mods/{id}/diffs
 //
 // Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
@@ -58,7 +58,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 		// Run IDs are KSUID strings; treated as opaque identifiers.
 		idStr := strings.TrimSpace(r.PathValue("id"))
 		if idStr == "" {
-			http.Error(w, "ticket id is required", http.StatusBadRequest)
+			http.Error(w, "run id is required", http.StatusBadRequest)
 			return
 		}
 
@@ -66,7 +66,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 		diffs, err := st.ListDiffsByRun(r.Context(), idStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
-			slog.Error("list diffs: query failed", "ticket_id", idStr, "err", err)
+			slog.Error("list diffs: query failed", "run_id", idStr, "err", err)
 			return
 		}
 

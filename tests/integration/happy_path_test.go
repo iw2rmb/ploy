@@ -74,7 +74,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	t.Logf("Created event: id=%d, run_id=%v, level=%s, message=%s", event.ID, event.RunID, event.Level, event.Message)
 
 	// Verify the event was created with expected values.
-	if event.RunID.Bytes != run.ID.Bytes {
+	if event.RunID != run.ID {
 		t.Errorf("Expected event run_id %v, got %v", run.ID, event.RunID)
 	}
 	if event.Level != "info" {
@@ -115,7 +115,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_len=%d", log.ID, log.RunID, log.ChunkNo, len(log.Data))
 
 	// Verify the log was created with expected values.
-	if log.RunID.Bytes != run.ID.Bytes {
+	if log.RunID != run.ID {
 		t.Errorf("Expected log run_id %v, got %v", run.ID, log.RunID)
 	}
 	if log.ChunkNo != 0 {
@@ -144,7 +144,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetchedRun.ID.Bytes != run.ID.Bytes {
+	if fetchedRun.ID != run.ID {
 		t.Errorf("Fetched run ID mismatch: expected %v, got %v", run.ID, fetchedRun.ID)
 	}
 	if fetchedRun.Status != store.RunStatusQueued {

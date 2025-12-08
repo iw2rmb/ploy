@@ -104,7 +104,7 @@ type GraphNode struct {
 // It provides an explicit view of job dependencies materialized from
 // jobs rows using step_index ordering.
 type WorkflowGraph struct {
-	// RunID is the ticket/run identifier (KSUID string).
+	// RunID is the run identifier (KSUID string).
 	RunID string `json:"run_id"`
 
 	// Nodes contains all jobs as graph nodes, keyed by job ID.

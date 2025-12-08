@@ -13,7 +13,7 @@ import (
 //  1. Create nodes from jobs (ID, name, type, status, step_index, etc.)
 //  2. Compute edges by deriving parent/child relationships from step_index order
 //
-// The runID parameter identifies the ticket/run; it's included in the
+// The runID parameter identifies the Mods run; it's included in the
 // graph for context. All jobs should belong to the same run.
 //
 // runID is now a string (KSUID-backed); no UUID conversion needed.

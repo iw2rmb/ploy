@@ -97,7 +97,7 @@ index 1234567..abcdefg 100644
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
 	})
@@ -140,10 +140,10 @@ index 1234567..abcdefg 100644
 		if diffs[0].ID.Bytes != diff.ID.Bytes {
 			t.Errorf("Diff ID mismatch: expected %v, got %v", diff.ID, diffs[0].ID)
 		}
-		if diffs[0].RunID.Bytes != run.ID.Bytes {
+		if diffs[0].RunID != run.ID {
 			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID)
 		}
-		if diffs[0].JobID.Bytes != job.ID.Bytes {
+		if diffs[0].JobID == nil || *diffs[0].JobID != job.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", job.ID, diffs[0].JobID)
 		}
 		if string(diffs[0].Patch) != string(diffPatch) {
@@ -163,7 +163,7 @@ index 1234567..abcdefg 100644
 	if fetchedDiff.ID.Bytes != diff.ID.Bytes {
 		t.Errorf("Fetched diff ID mismatch: expected %v, got %v", diff.ID, fetchedDiff.ID)
 	}
-	if fetchedDiff.RunID.Bytes != run.ID.Bytes {
+	if fetchedDiff.RunID != run.ID {
 		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID)
 	}
 	t.Logf("✓ Individual diff retrieval successful")

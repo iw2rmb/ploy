@@ -13,14 +13,13 @@ import (
 func handleModCancel(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod cancel", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	// Keep --ticket flag for backward compatibility with existing scripts.
-	ticket := fs.String("ticket", "", "mods run id to cancel")
+	runFlag := fs.String("run", "", "mods run id to cancel")
 	reason := fs.String("reason", "", "optional reason for cancellation")
 	if err := fs.Parse(args); err != nil {
 		printModUsage(stderr)
 		return err
 	}
-	if strings.TrimSpace(*ticket) == "" {
+	if strings.TrimSpace(*runFlag) == "" {
 		printModUsage(stderr)
 		return errors.New("run id required")
 	}
@@ -29,7 +28,7 @@ func handleModCancel(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := mods.CancelCommand{BaseURL: base, Client: httpClient, RunID: strings.TrimSpace(*ticket), Reason: strings.TrimSpace(*reason), Output: stderr}
+	cmd := mods.CancelCommand{BaseURL: base, Client: httpClient, RunID: strings.TrimSpace(*runFlag), Reason: strings.TrimSpace(*reason), Output: stderr}
 	return cmd.Run(ctx)
 }
 

@@ -308,25 +308,25 @@ func TestAckJobStart_PublishesEvent(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify a ticket event was published to the hub by checking the snapshot.
+	// Verify a run event was published to the hub by checking the snapshot.
 	snapshot := eventsService.Hub().Snapshot(runID.String())
 	if len(snapshot) == 0 {
-		t.Fatal("expected at least one ticket event to be published")
+		t.Fatal("expected at least one run event to be published")
 	}
 
 	// Verify the event type is "run".
-	foundTicketEvent := false
+	foundRunEvent := false
 	for _, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicketEvent = true
-			// Verify the event contains ticket state information with "running" status.
+			foundRunEvent = true
+			// Verify the event contains run state information with "running" status.
 			if !strings.Contains(string(evt.Data), "running") {
-				t.Errorf("expected ticket event data to contain 'running', got: %s", string(evt.Data))
+				t.Errorf("expected run event data to contain 'running', got: %s", string(evt.Data))
 			}
 			break
 		}
 	}
-	if !foundTicketEvent {
-		t.Error("expected to find a 'ticket' event in the snapshot")
+	if !foundRunEvent {
+		t.Error("expected to find a 'run' event in the snapshot")
 	}
 }

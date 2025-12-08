@@ -20,7 +20,7 @@ import (
 func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	t.Helper()
 
-	ticketID := "mods-follow-test"
+	runID := "mods-follow-test"
 	artifactCID := "bafy-artifact-test"
 
 	// Minimal control-plane emulator.
@@ -32,12 +32,12 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticketID),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateRunning,
 				},
 			})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			// SSE stream: run running -> run succeeded
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -47,7 +47,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			// running
 			_, _ = w.Write([]byte("event: run\n"))
 			data, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
@@ -58,7 +58,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			// succeeded
 			_, _ = w.Write([]byte("event: run\n"))
 			data2, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
@@ -66,11 +66,11 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", ticketID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", runID):
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticketID),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
@@ -145,25 +145,25 @@ func list(dir string) []string {
 }
 
 // TestModRunFollowStreamsUnifiedLogs verifies that mod run --follow renders
-// enriched log events using the shared log printer alongside ticket/stage updates.
+// enriched log events using the shared log printer alongside run/stage updates.
 // This test covers the unified log streaming wired in via ROADMAP line 32.
 func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
-	ticketID := "mods-unified-logs-test"
+	runID := "mods-unified-logs-test"
 
-	// Control-plane emulator that sends ticket, stage, and log events.
+	// Control-plane emulator that sends run, stage, and log events.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			// Accept ticket submission.
+			// Accept run submission.
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticketID),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateRunning,
 				},
 			})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			// SSE stream with run, stage, and log events.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -173,12 +173,12 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 
 			// Run running event.
 			_, _ = w.Write([]byte("event: run\n"))
-			ticketData, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+			runData, _ := json.Marshal(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
-			_, _ = w.Write(ticketData)
+			_, _ = w.Write(runData)
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
@@ -198,12 +198,12 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 
 			// Run succeeded event.
 			_, _ = w.Write([]byte("event: run\n"))
-			ticketData2, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+			runData2, _ := json.Marshal(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
-			_, _ = w.Write(ticketData2)
+			_, _ = w.Write(runData2)
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
@@ -223,7 +223,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 
 	out := buf.String()
 
-	// Verify ticket state messages are present.
+	// Verify run state messages are present.
 	if !strings.Contains(out, "submitted") {
 		t.Errorf("expected submission message, got: %s", out)
 	}
@@ -258,7 +258,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 // TestModRunFollowRawLogFormat verifies that --log-format raw renders logs
 // as message-only (no timestamps or context fields).
 func TestModRunFollowRawLogFormat(t *testing.T) {
-	ticketID := "mods-raw-format-test"
+	runID := "mods-raw-format-test"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -266,12 +266,12 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticketID),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateRunning,
 				},
 			})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {
@@ -280,12 +280,12 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 
 			// Run running.
 			_, _ = w.Write([]byte("event: run\n"))
-			ticketData, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+			runData, _ := json.Marshal(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
-			_, _ = w.Write(ticketData)
+			_, _ = w.Write(runData)
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
@@ -297,12 +297,12 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 
 			// Run succeeded.
 			_, _ = w.Write([]byte("event: run\n"))
-			ticketData2, _ := json.Marshal(modsapi.RunSummary{
-				RunID: domaintypes.RunID(ticketID),
+			runData2, _ := json.Marshal(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
-			_, _ = w.Write(ticketData2)
+			_, _ = w.Write(runData2)
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
@@ -328,7 +328,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 	}
 
 	// In raw mode, enriched context fields should NOT appear in the log output.
-	// Note: They may still appear in ticket/stage output, so check specifically
+	// Note: They may still appear in run/stage output, so check specifically
 	// that the log line itself doesn't have the structured prefix.
 	// The raw line "Raw log line" should appear without "node=" prefix on the same line.
 	lines := strings.Split(out, "\n")

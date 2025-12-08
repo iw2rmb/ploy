@@ -736,14 +736,14 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 // TestGetRunStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
 // exposes step_index for each job based on the job's StepIndex field.
 func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
-	ticketID := uuid.New()
+	runID := uuid.New()
 	now := time.Now()
 
 	// Create mock jobs with step_index field set.
 	// Note: StepIndex is read from the Job struct directly, not from metadata.
 	job0 := store.Job{
 		ID:        types.NewJobID().String(),
-		RunID:     ticketID.String(),
+		RunID:     runID.String(),
 		Name:      "mod-0",
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000, // First mod job
@@ -751,7 +751,7 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	}
 	job1 := store.Job{
 		ID:        types.NewJobID().String(),
-		RunID:     ticketID.String(),
+		RunID:     runID.String(),
 		Name:      "mod-1",
 		Status:    store.JobStatusCreated,
 		StepIndex: 3000, // Second mod job
@@ -760,7 +760,7 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        ticketID.String(),
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusQueued,
 			BaseRef:   "main",
@@ -771,8 +771,8 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	}
 
 	handler := getRunStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
-	req.SetPathValue("id", ticketID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

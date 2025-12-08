@@ -565,7 +565,7 @@ func TestSSEClientWaitForBackoffHonorsContext(t *testing.T) {
 
 // TestSSEClientHighVolumeEnrichedLogs verifies that the SSE client correctly
 // handles a high volume of enriched log events without blocking or dropping.
-// This simulates chatty Mods tickets with verbose build output.
+// This simulates chatty Mods runs with verbose build output.
 func TestSSEClientHighVolumeEnrichedLogs(t *testing.T) {
 	t.Parallel()
 

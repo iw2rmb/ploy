@@ -32,10 +32,10 @@ func (b *InMemoryBus) EnqueueRun(runID string) {
 	b.runs = append(b.runs, runID)
 }
 
-// ClaimRun returns a WorkflowTicket for the provided ID. When the
+// ClaimRun returns a WorkflowRun for the provided ID. When the
 // ID is blank, it pops from the internal queue or generates
 // "run-auto-N". A default manifest is applied when none is set.
-func (b *InMemoryBus) ClaimRun(ctx context.Context, runID string) (WorkflowTicket, error) {
+func (b *InMemoryBus) ClaimRun(ctx context.Context, runID string) (WorkflowRun, error) {
 	_ = ctx
 	trimmed := strings.TrimSpace(runID)
 	if trimmed == "" {
@@ -51,7 +51,7 @@ func (b *InMemoryBus) ClaimRun(ctx context.Context, runID string) (WorkflowTicke
 	if manifest.Name == "" || manifest.Version == "" {
 		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
-	return WorkflowTicket{SchemaVersion: SchemaVersion, RunID: types.RunID(trimmed), Manifest: manifest, Repo: b.Repo}, nil
+	return WorkflowRun{SchemaVersion: SchemaVersion, RunID: types.RunID(trimmed), Manifest: manifest, Repo: b.Repo}, nil
 }
 
 // PublishCheckpoint records a checkpoint in memory only.

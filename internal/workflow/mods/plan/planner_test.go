@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -24,7 +25,7 @@ func TestPlannerPlanWithDefaultsAndAdvisor(t *testing.T) {
 		Recommendations: []AdviceRecommendation{{Source: "kb", Message: "do x", Confidence: 1.2}},
 	}
 	p := NewPlanner(Options{Advisor: stubAdvisor{advice: adv}, PlanTimeout: 1500 * time.Millisecond, MaxParallel: 3})
-	stages, err := p.Plan(context.Background(), PlanInput{Ticket: contracts.WorkflowTicket{}})
+	stages, err := p.Plan(context.Background(), PlanInput{Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-test")}})
 	if err != nil {
 		t.Fatalf("Plan err=%v", err)
 	}

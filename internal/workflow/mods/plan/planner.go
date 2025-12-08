@@ -20,9 +20,9 @@ type Options struct {
 	MaxParallel     int
 }
 
-// PlanInput carries ticket context for planner evaluation.
+// PlanInput carries workflow run context for planner evaluation.
 type PlanInput struct {
-	Ticket  contracts.WorkflowTicket
+	Run     contracts.WorkflowRun
 	Signals AdviceSignals
 }
 
@@ -36,7 +36,7 @@ func NewPlanner(opts Options) Planner {
 	return Planner{opts: applyDefaults(opts)}
 }
 
-// Plan assembles the Mods stage graph for the given ticket.
+// Plan assembles the Mods stage graph for the given run envelope.
 func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
 	plan := []Stage{
 		{Name: StageNamePlan, Kind: StageKindPlan, Lane: p.opts.PlanLane},
@@ -47,7 +47,7 @@ func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
 		{Name: StageNameHuman, Kind: StageKindHuman, Lane: p.opts.HumanLane, Dependencies: []string{StageNameLLMExec}},
 	}
 
-	p.applyAdvisor(ctx, plan, in.Ticket, in.Signals)
+	p.applyAdvisor(ctx, plan, in.Run, in.Signals)
 	p.applyPlannerHints(plan)
 
 	for i := range plan {

@@ -12,15 +12,14 @@ import (
 func handleModFetch(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod fetch", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	// Keep --ticket flag for backward compatibility with existing scripts.
-	ticket := fs.String("ticket", "", "mods run id to fetch artifacts for")
+	runFlag := fs.String("run", "", "mods run id to fetch artifacts for")
 	dir := fs.String("artifact-dir", "", "directory to download artifacts into")
 	if err := fs.Parse(args); err != nil {
 		printModUsage(stderr)
 		return err
 	}
 
-	runID := strings.TrimSpace(*ticket)
+	runID := strings.TrimSpace(*runFlag)
 	if runID == "" {
 		printModUsage(stderr)
 		return errors.New("run id required")

@@ -151,32 +151,32 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		return fmt.Errorf("update run completion: %w", err)
 	}
 
-	// Publish terminal ticket event and done status to SSE hub.
+	// Publish terminal run summary event and done status to the SSE hub.
 	if eventsService != nil {
 		// Map store.RunStatus to modsapi.RunState.
-		var ticketState modsapi.RunState
+		var runState modsapi.RunState
 		switch runStatus {
 		case store.RunStatusSucceeded:
-			ticketState = modsapi.RunStateSucceeded
+			runState = modsapi.RunStateSucceeded
 		case store.RunStatusFailed:
-			ticketState = modsapi.RunStateFailed
+			runState = modsapi.RunStateFailed
 		case store.RunStatusCanceled:
-			ticketState = modsapi.RunStateCancelled
+			runState = modsapi.RunStateCancelled
 		default:
-			ticketState = modsapi.RunStateFailed
+			runState = modsapi.RunStateFailed
 		}
 
 		// Run IDs are now KSUID strings. Use RunID field (formerly TicketID).
-		ticketSummary := modsapi.RunSummary{
+		summary := modsapi.RunSummary{
 			RunID:      domaintypes.RunID(runID),
-			State:      ticketState,
+			State:      runState,
 			Repository: run.RepoUrl,
 			CreatedAt:  run.CreatedAt.Time,
 			UpdatedAt:  time.Now().UTC(),
 			Stages:     make(map[string]modsapi.StageStatus),
 		}
-		if err := eventsService.PublishRun(ctx, runID, ticketSummary); err != nil {
-			slog.Error("complete multi-step run: publish ticket event failed", "run_id", runID, "err", err)
+		if err := eventsService.PublishRun(ctx, runID, summary); err != nil {
+			slog.Error("complete multi-step run: publish run summary event failed", "run_id", runID, "err", err)
 		}
 
 		// Publish done event to signal stream completion.
