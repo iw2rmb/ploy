@@ -525,12 +525,11 @@ CreateDiffRequest:
 
 Log:
   type: object
-  # Note: run_id, job_id, and build_id are now KSUID-backed strings (27 characters).
+  # Note: run_id and job_id are now KSUID-backed strings (27 characters).
   properties:
     id: { type: integer, format: int64 }
     run_id: { type: string, description: "Run ID (KSUID string)" }
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
-    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -551,10 +550,9 @@ NodeCreateLogResponse:
 
 CreateLogRequest:
   type: object
-  # Note: job_id and build_id are now KSUID-backed strings (27 characters).
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
-    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -565,11 +563,10 @@ CreateLogRequest:
 # Request used by node → server log ingestion.
 NodeCreateLogRequest:
   type: object
-  # Note: run_id, job_id, and build_id are now KSUID-backed strings (27 characters).
+  # Note: run_id and job_id are now KSUID-backed strings (27 characters).
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
-    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -579,12 +576,11 @@ NodeCreateLogRequest:
 
 ArtifactBundle:
   type: object
-  # Note: artifact_bundles.id is still UUID, but run_id, job_id, build_id are KSUID strings.
+  # Note: artifact_bundles.id is still UUID, but run_id and job_id are KSUID strings.
   properties:
     id: { type: string, format: uuid, description: "Artifact bundle ID (still UUID)" }
     run_id: { type: string, description: "Run ID (KSUID string)" }
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
-    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string
@@ -595,10 +591,9 @@ ArtifactBundle:
 
 CreateArtifactBundleRequest:
   type: object
-  # Note: job_id and build_id are now KSUID-backed strings (27 characters).
+  # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
-    build_id: { type: string, nullable: true, description: "Build ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string

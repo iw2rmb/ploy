@@ -31,8 +31,6 @@ get:
               run_id: { type: string, description: Run ID (KSUID string) }
               # Job IDs are KSUID strings (27 characters).
               job_id: { type: string, nullable: true, description: Job ID (KSUID string) }
-              # Build IDs are KSUID strings (27 characters).
-              build_id: { type: string, nullable: true, description: Build ID (KSUID string) }
               name: { type: string, nullable: true }
               cid: { type: string }
               digest: { type: string }

@@ -362,7 +362,6 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 					ID:        1,
 					RunID:     arg.RunID,
 					JobID:     arg.JobID,
-					BuildID:   arg.BuildID,
 					ChunkNo:   arg.ChunkNo,
 					Data:      arg.Data,
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -371,7 +370,6 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			params: store.CreateLogParams{
 				RunID:   runID,
 				JobID:   nil,
-				BuildID: nil,
 				ChunkNo: 1,
 				Data:    []byte("test log line"),
 			},
@@ -520,7 +518,6 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				ID:        1,
 				RunID:     arg.RunID,
 				JobID:     arg.JobID,
-				BuildID:   arg.BuildID,
 				ChunkNo:   arg.ChunkNo,
 				Data:      arg.Data,
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -555,7 +552,6 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	params := store.CreateLogParams{
 		RunID:   runID,
 		JobID:   &jobID,
-		BuildID: nil,
 		ChunkNo: 1,
 		Data:    gzippedLog,
 	}
