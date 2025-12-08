@@ -19,16 +19,18 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 
 	// Verify that all expected commands are registered as subcommands.
 	// The command names should match the "Use" field from each builder function.
+	// NOTE: "token" has been removed from the top-level commands.
+	// Token operations are now accessible only via `ploy cluster token`.
+	// See ROADMAP.md line 387 for migration rationale.
 	expectedCommands := []string{
 		"version",  // Built-in version command
 		"mod",      // newModCmd
 		"mods",     // newModsCmd
 		"runs",     // newRunsCmd
 		"upload",   // newUploadCmd
-		"cluster",  // newClusterCmd
+		"cluster",  // newClusterCmd (includes token, node, rollout, deploy)
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
-		"token",    // newTokenCmd
 	}
 
 	// Get all registered subcommands from the root command.
@@ -78,7 +80,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},
 		{"newServerCmd", func(w *bytes.Buffer) *cobra.Command { return newServerCmd(w) }},
 		{"newRolloutCmd", func(w *bytes.Buffer) *cobra.Command { return newRolloutCmd(w) }},
-		{"newTokenCmd", func(w *bytes.Buffer) *cobra.Command { return newTokenCmd(w) }},
+		// NOTE: newTokenCmd removed — token re-rooted under cluster token. See ROADMAP.md line 387.
 	}
 
 	for _, tt := range tests {

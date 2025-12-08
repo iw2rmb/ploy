@@ -39,8 +39,10 @@ func handleToken(args []string, stderr io.Writer) error {
 	}
 }
 
+// printTokenUsage prints the token command usage information.
+// Token operations are accessible via `ploy cluster token`.
 func printTokenUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy token <command>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  create    Create a new API token")
@@ -151,8 +153,9 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	return nil
 }
 
+// printTokenCreateUsage prints the token create subcommand usage information.
 func printTokenCreateUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy token create --role <role> [--description <desc>] [--expires <days>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token create --role <role> [--description <desc>] [--expires <days>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
 	_, _ = fmt.Fprintln(w, "  --role          Token role: cli-admin, control-plane, or worker (required)")
@@ -261,8 +264,9 @@ func handleTokenList(args []string, stderr io.Writer) error {
 	return nil
 }
 
+// printTokenListUsage prints the token list subcommand usage information.
 func printTokenListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy token list")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token list")
 }
 
 // handleTokenRevoke revokes an API token.
@@ -318,6 +322,7 @@ func handleTokenRevoke(args []string, stderr io.Writer) error {
 	return nil
 }
 
+// printTokenRevokeUsage prints the token revoke subcommand usage information.
 func printTokenRevokeUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy token revoke <token-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster token revoke <token-id>")
 }
