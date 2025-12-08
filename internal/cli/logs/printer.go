@@ -33,7 +33,7 @@ type LogRecord struct {
 	// Empty when the source is not node-bound.
 	NodeID string `json:"node_id,omitempty"`
 
-	// JobID is the UUID of the job that produced this log line.
+	// JobID is the ID of the job that produced this log line (KSUID string).
 	// Empty for events not tied to a specific job.
 	JobID string `json:"job_id,omitempty"`
 
