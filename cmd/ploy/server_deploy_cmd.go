@@ -16,6 +16,11 @@ import (
 // Declared in server_deploy_remote.go.
 
 func handleServer(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printServerUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printServerUsage(stderr)
 		return errors.New("server subcommand required")

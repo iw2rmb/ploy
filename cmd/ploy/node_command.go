@@ -21,17 +21,37 @@ import (
 
 // handleNode routes node subcommands.
 func handleNode(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printNodeUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node <command>")
+		printNodeUsage(stderr)
 		return errors.New("node subcommand required")
 	}
 	switch args[0] {
 	case "add":
 		return handleNodeAdd(args[1:], stderr)
 	default:
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node <command>")
+		printNodeUsage(stderr)
 		return fmt.Errorf("unknown node subcommand %q", args[0])
 	}
+}
+
+// printNodeUsage prints the node command usage information.
+// This provides a single, consistent usage output for --help, error paths,
+// and unknown subcommand handling.
+func printNodeUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy node <command>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  add       Add a worker node to the cluster")
+}
+
+// printNodeAddUsage prints usage information for the node add command.
+func printNodeAddUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
 }
 
 // handleNodeAdd validates required flags for adding a worker node.
@@ -61,19 +81,19 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	fs.BoolVar(&dryRun, "dry-run", false, "Validate inputs without performing provisioning")
 
 	if err := fs.Parse(args); err != nil {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
+		printNodeAddUsage(stderr)
 		return err
 	}
 	if fs.NArg() > 0 {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
+		printNodeAddUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	if !clusterID.set || strings.TrimSpace(clusterID.value) == "" {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
+		printNodeAddUsage(stderr)
 		return errors.New("cluster-id is required")
 	}
 	if !address.set || strings.TrimSpace(address.value) == "" {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
+		printNodeAddUsage(stderr)
 		return errors.New("address is required")
 	}
 

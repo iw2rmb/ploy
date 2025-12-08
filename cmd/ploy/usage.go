@@ -72,3 +72,12 @@ func join(parts []string, sep string) string {
 // Minimal helpers for mods/jobs usage output paths.
 func printModsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy mods <command>") }
 func printRunsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy runs <command>") }
+
+// wantsHelp checks whether the given argument list represents a help request.
+// It returns true if the sole argument is "--help" or "-h", which is the
+// pattern used by command routers that manually parse arguments
+// (DisableFlagParsing: true) to detect and respond to help flags before
+// dispatching to subcommands.
+func wantsHelp(args []string) bool {
+	return len(args) == 1 && (args[0] == "--help" || args[0] == "-h")
+}

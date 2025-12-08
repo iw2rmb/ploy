@@ -13,6 +13,11 @@ const manifestSchemaPath = "docs/schemas/integration_manifest.schema.json"
 
 // handleManifest routes manifest subcommands.
 func handleManifest(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printManifestUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printManifestUsage(stderr)
 		return errors.New("manifest subcommand required")

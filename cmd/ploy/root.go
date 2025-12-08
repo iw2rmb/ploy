@@ -79,6 +79,13 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	// Authentication commands
 	root.AddCommand(newTokenCmd(stderr)) // ploy token (create, list, revoke)
 
+	// Override help function so that `ploy --help` and `ploy -h` print our
+	// custom usage output instead of Cobra's default help format.
+	// This ensures consistency between `ploy --help` and `ploy help`.
+	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		printUsage(stderr)
+	})
+
 	// Override help command to preserve existing behavior.
 	// Cobra provides a default help command, but we want to preserve printUsage logic.
 	// We replace the default help with a custom implementation.
