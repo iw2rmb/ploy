@@ -11,9 +11,9 @@ info:
     runs endpoints under `/v1/runs` provide list/inspect/stop semantics.
 
     Type semantics and labels:
-    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings with the same formats (UUIDs for IDs), preserving compatibility.
+    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens, build gate jobs) remain UUID-backed.
     - Protocol values are restricted to `tcp` or `udp` and log levels to `debug|info|warn|error` in code; API fields remain strings.
-    - Runner containers are labeled with `com.ploy.run_id=<ticket UUID>` for correlation. Earlier mislabeling with a step identifier has been corrected.
+    - Runner containers are labeled with `com.ploy.run_id=<run-id>` where `<run-id>` is the ticket/run ID (KSUID string) for correlation. Earlier mislabeling with a step identifier has been corrected.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
