@@ -228,9 +228,15 @@ ploy completion powershell | Out-String | Invoke-Expression
 ```
 
 The completion command is powered by Cobra and provides:
-- Command completion for all subcommands (mod, cluster, node, etc.)
+- Command completion for all subcommands (mod, cluster, config, etc.)
 - Flag completion for available options
 - Context-aware suggestions based on command hierarchy
+
+Note: Cluster management commands (deploy, node, rollout, token) are nested under `ploy cluster`. For example:
+- `ploy cluster deploy` — Deploy control-plane server
+- `ploy cluster node add` — Add worker nodes
+- `ploy cluster rollout server|nodes` — Roll out binary updates
+- `ploy cluster token create|list|revoke` — Manage API tokens
 
 For persistent setup instructions specific to your shell, run:
 ```bash
