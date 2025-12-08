@@ -13,7 +13,8 @@ import (
 func handleModCancel(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod cancel", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	ticket := fs.String("ticket", "", "mods ticket id to cancel")
+	// Keep --ticket flag for backward compatibility with existing scripts.
+	ticket := fs.String("ticket", "", "mods run id to cancel")
 	reason := fs.String("reason", "", "optional reason for cancellation")
 	if err := fs.Parse(args); err != nil {
 		printModUsage(stderr)
@@ -21,14 +22,14 @@ func handleModCancel(args []string, stderr io.Writer) error {
 	}
 	if strings.TrimSpace(*ticket) == "" {
 		printModUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	cmd := mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), Reason: strings.TrimSpace(*reason), Output: stderr}
+	cmd := mods.CancelCommand{BaseURL: base, Client: httpClient, RunID: strings.TrimSpace(*ticket), Reason: strings.TrimSpace(*reason), Output: stderr}
 	return cmd.Run(ctx)
 }
 
@@ -42,15 +43,15 @@ func handleModResume(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
-	ticket := strings.TrimSpace(rest[0])
+	runID := strings.TrimSpace(rest[0])
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	cmd := mods.ResumeCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr}
+	cmd := mods.ResumeCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
 	return cmd.Run(ctx)
 }
 
@@ -64,15 +65,15 @@ func handleModInspect(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
-	ticket := strings.TrimSpace(rest[0])
+	runID := strings.TrimSpace(rest[0])
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	cmd := mods.InspectCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr}
+	cmd := mods.InspectCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
 	return cmd.Run(ctx)
 }
 
@@ -86,15 +87,15 @@ func handleModArtifacts(args []string, stderr io.Writer) error {
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModUsage(stderr)
-		return errors.New("ticket required")
+		return errors.New("run id required")
 	}
-	ticket := strings.TrimSpace(rest[0])
+	runID := strings.TrimSpace(rest[0])
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	cmd := mods.ArtifactsCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr}
+	cmd := mods.ArtifactsCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
 	return cmd.Run(ctx)
 }
 
@@ -103,10 +104,10 @@ func handleModDiffs(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	download := fs.Bool("download", false, "download newest diff and print to stdout (gunzipped)")
 	savePath := fs.String("output", "", "save newest diff to file (gunzipped)")
-	// Allow both orders: flags before or after ticket.
-	var ticketArg string
+	// Allow both orders: flags before or after run id.
+	var runIDArg string
 	if len(args) > 0 && !strings.HasPrefix(strings.TrimSpace(args[0]), "-") {
-		ticketArg = strings.TrimSpace(args[0])
+		runIDArg = strings.TrimSpace(args[0])
 		args = args[1:]
 	}
 	if err := fs.Parse(args); err != nil {
@@ -114,19 +115,19 @@ func handleModDiffs(args []string, stderr io.Writer) error {
 		return err
 	}
 	rest := fs.Args()
-	if ticketArg == "" {
+	if runIDArg == "" {
 		if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 			printModUsage(stderr)
-			return errors.New("ticket required")
+			return errors.New("run id required")
 		}
-		ticketArg = strings.TrimSpace(rest[0])
+		runIDArg = strings.TrimSpace(rest[0])
 	}
-	ticket := ticketArg
+	runID := runIDArg
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	cmd := mods.DiffsCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr, Download: *download, SavePath: strings.TrimSpace(*savePath)}
+	cmd := mods.DiffsCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr, Download: *download, SavePath: strings.TrimSpace(*savePath)}
 	return cmd.Run(ctx)
 }

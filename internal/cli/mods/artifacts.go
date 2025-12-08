@@ -14,15 +14,15 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// ArtifactsCommand lists artifacts attached to a Mods ticket by stage.
+// ArtifactsCommand lists artifacts attached to a Mods run by stage.
 type ArtifactsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Output  io.Writer
 }
 
-// Run performs GET /v1/mods/{ticket} and prints per-stage artifacts.
+// Run performs GET /v1/mods/{id} and prints per-stage artifacts.
 func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("mods artifacts: http client required")
@@ -30,11 +30,11 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods artifacts: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
-	if ticket == "" {
-		return errors.New("mods artifacts: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return errors.New("mods artifacts: run id required")
 	}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket))
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID))
 	if err != nil {
 		return err
 	}

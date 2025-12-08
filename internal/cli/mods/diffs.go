@@ -15,11 +15,11 @@ import (
 	"strings"
 )
 
-// DiffsCommand lists diffs for a Mods ticket and optionally downloads the newest patch.
+// DiffsCommand lists diffs for a Mods run and optionally downloads the newest patch.
 type DiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Ticket  string
+	RunID   string
 	Output  io.Writer
 
 	Download bool   // when true, download newest diff and print to stdout (gunzipped)
@@ -34,9 +34,9 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods diffs: base url required")
 	}
-	ticket := strings.TrimSpace(c.Ticket)
-	if ticket == "" {
-		return errors.New("mods diffs: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return errors.New("mods diffs: run id required")
 	}
 	out := c.Output
 	if out == nil {
@@ -44,7 +44,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 
 	// List diffs
-	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket), "diffs")
+	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "diffs")
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 
 	if len(listing.Diffs) == 0 {
-		return errors.New("mods diffs: no diffs available for this ticket")
+		return errors.New("mods diffs: no diffs available for this run")
 	}
 	// Newest first by API; take first.
 	diffID := strings.TrimSpace(listing.Diffs[0].ID)

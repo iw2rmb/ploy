@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// InspectCommand prints a summary for a specific job scoped by ticket.
+// InspectCommand prints a summary for a specific job scoped by run.
 type InspectCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -62,7 +62,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		id := toString(payload["run_id"])
 		status := toString(payload["status"])
 		step := toString(payload["step_id"]) // may be empty
-		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s step=%s\n", id, status, step)
+		_, _ = fmt.Fprintf(c.Output, "Run %s: %s step=%s\n", id, status, step)
 	}
 	return nil
 }

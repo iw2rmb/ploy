@@ -1,6 +1,6 @@
 // mod_run_artifact.go isolates artifact download and fetching logic.
 //
-// This file contains downloadTicketArtifacts which fetches ticket status
+// This file contains downloadRunArtifacts which fetches run status
 // and downloads referenced artifacts to disk. It generates deterministic
 // filenames, streams bytes without in-memory buffering, and produces a
 // manifest.json for artifact metadata. Artifact download is separated from
@@ -23,15 +23,15 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// downloadTicketArtifacts fetches ticket status and downloads referenced artifacts into dir.
+// downloadRunArtifacts fetches run status and downloads referenced artifacts into dir.
 // It streams bytes to disk (no in‑memory buffering), produces deterministic filenames,
 // and writes a manifest.json with stable, sorted entries for reproducible output.
-func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID, dir string, out io.Writer) error {
+func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.Client, runID, dir string, out io.Writer) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create artifact dir %s: %w", dir, err)
 	}
-	// Fetch ticket status to retrieve artifact CIDs.
-	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(ticketID)))
+	// Fetch run status to retrieve artifact CIDs.
+	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(runID)))
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("fetch ticket status: %w", err)
+		return fmt.Errorf("fetch run status: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -53,7 +53,7 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 			// Treat empty body as an empty status (no artifacts).
 			payload = modsapi.RunStatusResponse{}
 		} else {
-			return fmt.Errorf("decode ticket status: %w", err)
+			return fmt.Errorf("decode run status: %w", err)
 		}
 	}
 	// Collect artifacts via control-plane HTTP endpoint lookups.
@@ -204,10 +204,10 @@ func buildArtifactFilename(stage, name, cid, digest string) string {
 	return fmt.Sprintf("%s_%s_%s.bin", cid, stage, name)
 }
 
-// fetchMRURL loads the ticket status and extracts the MR URL from metadata when present.
+// fetchMRURL loads the run status and extracts the MR URL from metadata when present.
 // Returns empty string if the MR URL is not found or an error occurs.
-func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID string) (string, error) {
-	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(ticketID)))
+func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, runID string) (string, error) {
+	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(runID)))
 	if err != nil {
 		return "", err
 	}

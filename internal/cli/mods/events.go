@@ -14,7 +14,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// EventsPrinter renders ticket and stage updates.
+// EventsPrinter renders run and stage updates.
 type EventsPrinter interface {
 	Run(modsapi.RunSummary)
 	Stage(stage modsapi.StageStatus)
@@ -44,9 +44,9 @@ func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 	_, _ = io.WriteString(p.out, line+"\n")
 }
 
-// EventsCommand streams ticket events until a terminal state is reached.
+// EventsCommand streams run events until a terminal state is reached.
 // When LogPrinter is set, also handles "log" events using the shared log printer
-// for unified log output alongside ticket/stage updates (used by `mod run --follow`).
+// for unified log output alongside run/stage updates (used by `mod run --follow`).
 type EventsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
@@ -63,7 +63,7 @@ type EventsCommand struct {
 
 // Run consumes "run", "stage", and optionally "log" SSE events from /v1/mods/{id}/events.
 // Unknown event types are ignored so the CLI remains forward compatible. Returns the final
-// ticket state. When LogPrinter is set, "log" events are rendered using the shared printer.
+// run state. When LogPrinter is set, "log" events are rendered using the shared printer.
 func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.Client.HTTPClient == nil {
 		return "", errors.New("mods events: http client required")
@@ -71,9 +71,9 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.BaseURL == nil {
 		return "", errors.New("mods events: base url required")
 	}
-	ticket := strings.TrimSpace(c.RunID)
-	if ticket == "" {
-		return "", errors.New("mods events: ticket required")
+	runID := strings.TrimSpace(c.RunID)
+	if runID == "" {
+		return "", errors.New("mods events: run id required")
 	}
 	out := c.Output
 	if out == nil {
@@ -83,7 +83,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if printer == nil {
 		printer = SimplePrinter{out: out}
 	}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(ticket), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "events")
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +93,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		case "run":
 			var t modsapi.RunSummary
 			if err := json.Unmarshal(evt.Data, &t); err != nil {
-				return fmt.Errorf("mods events: decode ticket: %w", err)
+				return fmt.Errorf("mods events: decode run: %w", err)
 			}
 			printer.Run(t)
 			if isTerminalRunState(t.State) {

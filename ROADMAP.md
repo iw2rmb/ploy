@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers` — all Mods handler tests updated to expect `RunID` fields and run-centric wording.
 
 ## CLI and user-facing terminology
-- [ ] Normalise CLI commands and helpers on Run ID terminology — make user-facing text speak about runs, not tickets, without breaking flags.
+- [x] Normalise CLI commands and helpers on Run ID terminology — make user-facing text speak about runs, not tickets, without breaking flags.
   - Repository: ploy
   - Component: `cmd/ploy`, `internal/cli/mods`, `internal/cli/runs`
   - Scope: 

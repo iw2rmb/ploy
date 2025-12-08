@@ -14,7 +14,7 @@ import (
 func TestModsLogsStructuredOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modTicket: "ticket-123",
+		modRunID: "run-123",
 		logEvents: []sseTestEvent{
 			{
 				event: "log",
@@ -39,7 +39,7 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "structured", "ticket-123"}, buf)
+	err := execute([]string{"mods", "logs", "--format", "structured", "run-123"}, buf)
 	if err != nil {
 		t.Fatalf("mods logs: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 func TestModsLogsRawOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modTicket: "ticket-raw",
+		modRunID: "run-raw",
 		logEvents: []sseTestEvent{
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:00Z","stream":"stdout","line":"ready"}`},
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:01Z","stream":"stderr","line":"warn"}`},
@@ -65,7 +65,7 @@ func TestModsLogsRawOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "raw", "ticket-raw"}, buf)
+	err := execute([]string{"mods", "logs", "--format", "raw", "run-raw"}, buf)
 	if err != nil {
 		t.Fatalf("mods logs raw: %v", err)
 	}
@@ -75,17 +75,17 @@ func TestModsLogsRawOutput(t *testing.T) {
 	}
 }
 
-func TestModsLogsRequiresTicket(t *testing.T) {
+func TestModsLogsRequiresRunID(t *testing.T) {
 	t.Helper()
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mods", "logs"}, buf)
 	if err == nil {
-		t.Fatal("expected error when ticket is missing")
+		t.Fatal("expected error when run id is missing")
 	}
-	if !strings.Contains(err.Error(), "ticket") {
-		t.Fatalf("expected ticket error, got %v", err)
+	if !strings.Contains(err.Error(), "run id") {
+		t.Fatalf("expected run id error, got %v", err)
 	}
 }
 
@@ -138,7 +138,7 @@ func TestJobsFollowReconnects(t *testing.T) {
 }
 
 type streamingServerConfig struct {
-	modTicket  string
+	modRunID   string
 	jobID      string
 	logEvents  []sseTestEvent
 	reconnects []streamReconnectPlan
@@ -161,8 +161,8 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 		connectionN int
 	)
 	streamPath := ""
-	if cfg.modTicket != "" {
-		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.modTicket)
+	if cfg.modRunID != "" {
+		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.modRunID)
 	}
 	if cfg.jobID != "" {
 		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.jobID)

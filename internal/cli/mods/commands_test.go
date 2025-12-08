@@ -24,7 +24,7 @@ func newTestLogPrinter(w io.Writer) *logs.Printer {
 }
 
 func TestInspectAndArtifactsCommands(t *testing.T) {
-	ticket := modsapi.RunSummary{
+	run := modsapi.RunSummary{
 		RunID: domaintypes.RunID("t1"),
 		State: modsapi.RunStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
@@ -33,14 +33,14 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: ticket})
+		_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: run})
 	}))
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
 
 	// Inspect prints one-line summary.
 	var out bytes.Buffer
-	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, Ticket: "t1", Output: &out}).Run(context.Background()); err != nil {
+	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, RunID: "t1", Output: &out}).Run(context.Background()); err != nil {
 		t.Fatalf("inspect run: %v", err)
 	}
 	if out.Len() == 0 {
@@ -49,7 +49,7 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 
 	// Artifacts prints per-stage artifacts.
 	out.Reset()
-	if err := (ArtifactsCommand{Client: srv.Client(), BaseURL: base, Ticket: "t1", Output: &out}).Run(context.Background()); err != nil {
+	if err := (ArtifactsCommand{Client: srv.Client(), BaseURL: base, RunID: "t1", Output: &out}).Run(context.Background()); err != nil {
 		t.Fatalf("artifacts run: %v", err)
 	}
 	if out.Len() == 0 {
@@ -61,12 +61,12 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 	// Test that inspect command displays gate summary when present in metadata.
 	tests := []struct {
 		name         string
-		ticket       modsapi.RunSummary
+		run          modsapi.RunSummary
 		wantContains string
 	}{
 		{
 			name: "gate summary present",
-			ticket: modsapi.RunSummary{
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("t-gate-1"),
 				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
@@ -77,7 +77,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 		},
 		{
 			name: "gate summary and MR URL",
-			ticket: modsapi.RunSummary{
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("t-gate-2"),
 				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
@@ -93,7 +93,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			// which prioritizes final_gate over pre_gate. This test ensures the CLI
 			// renders the "failed final-gate ..." format without alteration.
 			name: "final gate failed after mods",
-			ticket: modsapi.RunSummary{
+			run: modsapi.RunSummary{
 				RunID: domaintypes.RunID("t-gate-final-failed"),
 				State: modsapi.RunStateFailed,
 				Metadata: map[string]string{
@@ -104,7 +104,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 		},
 		{
 			name: "no gate summary",
-			ticket: modsapi.RunSummary{
+			run: modsapi.RunSummary{
 				RunID:    domaintypes.RunID("t-no-gate"),
 				State:    modsapi.RunStateSucceeded,
 				Metadata: map[string]string{},
@@ -116,7 +116,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: tt.ticket})
+				_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: tt.run})
 			}))
 			defer srv.Close()
 			base, _ := url.Parse(srv.URL)
@@ -125,7 +125,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: base,
-				Ticket:  string(tt.ticket.RunID),
+				RunID:   string(tt.run.RunID),
 				Output:  &out,
 			}
 			if err := cmd.Run(context.Background()); err != nil {
@@ -173,11 +173,11 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 		t.Fatalf("submit err=%v ticket=%+v", err, sum)
 	}
 	// Cancel
-	if err := (CancelCommand{Client: srv.Client(), BaseURL: base, Ticket: "t2"}).Run(context.Background()); err != nil {
+	if err := (CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
 		t.Fatalf("cancel err=%v", err)
 	}
 	// Resume
-	if err := (ResumeCommand{Client: srv.Client(), BaseURL: base, Ticket: "t2"}).Run(context.Background()); err != nil {
+	if err := (ResumeCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
 		t.Fatalf("resume err=%v", err)
 	}
 }
@@ -245,15 +245,15 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 		t.Fatal("expected submit error")
 	}
 	// Cancel
-	if err := (CancelCommand{Client: srv.Client(), BaseURL: base, Ticket: "t"}).Run(context.Background()); err == nil {
+	if err := (CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
 		t.Fatal("expected cancel error")
 	}
 	// Resume
-	if err := (ResumeCommand{Client: srv.Client(), BaseURL: base, Ticket: "t"}).Run(context.Background()); err == nil {
+	if err := (ResumeCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
 		t.Fatal("expected resume error")
 	}
 	// Inspect
-	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, Ticket: "t"}).Run(context.Background()); err == nil {
+	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
 		t.Fatal("expected inspect error")
 	}
 }

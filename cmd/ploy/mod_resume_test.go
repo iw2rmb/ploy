@@ -154,14 +154,14 @@ func TestModResumeServerError(t *testing.T) {
 	}
 }
 
-// TestModResumeMissingTicket verifies the CLI validates that a ticket argument is required.
-func TestModResumeMissingTicket(t *testing.T) {
+// TestModResumeMissingRunID verifies the CLI validates that a run id argument is required.
+func TestModResumeMissingRunID(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mod", "resume"}, buf)
 	if err == nil {
-		t.Fatal("expected error when ticket is missing")
+		t.Fatal("expected error when run id is missing")
 	}
-	if !strings.Contains(err.Error(), "ticket required") {
-		t.Errorf("expected error to mention 'ticket required', got: %v", err)
+	if !strings.Contains(err.Error(), "run id required") {
+		t.Errorf("expected error to mention 'run id required', got: %v", err)
 	}
 }

@@ -47,9 +47,9 @@ func defaultStageDefinitions() []modsapi.StageDefinition {
 	}
 }
 
-// buildTicketRequest constructs the initial run submission request from CLI flags and defaults.
+// buildRunRequest constructs the initial run submission request from CLI flags and defaults.
 // Repository metadata (base_ref, target_ref, workspace_hint) is attached when provided.
-func buildTicketRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
+func buildRunRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 	repoURL := strings.TrimSpace(*flags.RepoURL)
 	targetRef := strings.TrimSpace(*flags.RepoTargetRef)
 
@@ -74,8 +74,8 @@ func buildTicketRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 	return request, nil
 }
 
-// submitTicket sends the ticket request to the control plane and returns the initial summary.
-func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest, specPayload []byte) (modsapi.RunSummary, error) {
+// submitRun sends the run request to the control plane and returns the initial summary.
+func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest, specPayload []byte) (modsapi.RunSummary, error) {
 	cmd := mods.SubmitCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -85,11 +85,11 @@ func submitTicket(ctx context.Context, base *url.URL, httpClient *http.Client, r
 	return cmd.Run(ctx)
 }
 
-// followTicketEvents streams ticket events until the ticket reaches a terminal state or timeout.
-// Returns the final ticket state and any errors encountered during streaming.
-// When --follow is used, streams both ticket/stage events and enriched log events using the
+// followRunEvents streams run events until the run reaches a terminal state or timeout.
+// Returns the final run state and any errors encountered during streaming.
+// When --follow is used, streams both run/stage events and enriched log events using the
 // shared log printer for a unified, informative view of the Mods execution.
-func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Client, runID string, flags *modRunFlags, stderr io.Writer) (modsapi.RunState, error) {
+func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client, runID string, flags *modRunFlags, stderr io.Writer) (modsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
 	if *flags.CapDuration > 0 {
@@ -104,8 +104,8 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 		logFormat = logs.FormatRaw
 	}
 
-	// Create shared log printer to render enriched log events alongside ticket/stage updates.
-	// This provides a consistent, informative view when following a Mods ticket directly.
+	// Create shared log printer to render enriched log events alongside run/stage updates.
+	// This provides a consistent, informative view when following a Mods run directly.
 	logPrinter := logs.NewPrinter(logFormat, stderr)
 
 	ev := mods.EventsCommand{
@@ -125,16 +125,16 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 		// Handle timeout with optional cancellation.
 		if *flags.CapDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
 			if *flags.CancelOnCap {
-				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
+				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
 				_ = mods.CancelCommand{
 					BaseURL: base,
 					Client:  httpClient,
-					Ticket:  runID,
+					RunID:   runID,
 					Reason:  "cap exceeded",
 					Output:  stderr,
 				}.Run(context.Background())
 			} else {
-				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", flags.CapDuration.String(), runID)
+				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", flags.CapDuration.String(), runID)
 			}
 			return "", nil
 		}
@@ -150,13 +150,13 @@ func followTicketEvents(ctx context.Context, base *url.URL, httpClient *http.Cli
 }
 
 // outputJSONSummary writes a machine-readable JSON summary to stdout when requested.
-// Includes ticket ID, initial and final states, artifact directory, and MR URL (if available).
+// Includes run ID, initial and final states, artifact directory, and MR URL (if available).
 func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID, initialState, finalState string, flags *modRunFlags) error {
-	// Optional: probe MR URL from ticket status metadata.
+	// Optional: probe MR URL from run status metadata.
 	mrURL, _ := fetchMRURL(ctx, base, httpClient, runID)
 
 	type runJSON struct {
-		TicketID    string `json:"run_id"`
+		RunID       string `json:"run_id"`
 		Initial     string `json:"initial_state,omitempty"`
 		Final       string `json:"final_state,omitempty"`
 		ArtifactDir string `json:"artifact_dir,omitempty"`
@@ -164,9 +164,9 @@ func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Clie
 	}
 
 	out := runJSON{
-		TicketID: runID,
-		Initial:  initialState,
-		Final:    finalState,
+		RunID:   runID,
+		Initial: initialState,
+		Final:   finalState,
 	}
 
 	if s := strings.TrimSpace(*flags.ArtifactDir); s != "" {
