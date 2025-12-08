@@ -7,7 +7,7 @@ Documentation: ROADMAP.md, docs/build-gate/README.md, docs/api/OpenAPI.yaml, doc
 Legend: [ ] todo, [x] done.
 
 ## Collapse BuildGate and build tracking into jobs
-- [ ] Model gate/build metadata on jobs — Make `jobs` the single execution primitive for mods and gates
+- [x] Model gate/build metadata on jobs — Make `jobs` the single execution primitive for mods and gates
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/queries/jobs.sql, internal/store/jobs.sql.go, internal/store/models.go, internal/workflow/contracts, internal/workflow/runtime/step
   - Scope:
