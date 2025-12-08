@@ -194,9 +194,9 @@ main() {
     # Step 6: Add node B
     log_info "Step 6: Adding node B ($NODE_B_IP)..."
     SERVER_URL="https://$SERVER_IP:8443"
-    log_info "Running: dist/ploy node add --cluster-id $CLUSTER_ID --address $NODE_B_IP --server-url $SERVER_URL"
+    log_info "Running: dist/ploy cluster node add --cluster-id $CLUSTER_ID --address $NODE_B_IP --server-url $SERVER_URL"
 
-    if ! dist/ploy node add --cluster-id "$CLUSTER_ID" --address "$NODE_B_IP" --server-url "$SERVER_URL"; then
+    if ! dist/ploy cluster node add --cluster-id "$CLUSTER_ID" --address "$NODE_B_IP" --server-url "$SERVER_URL"; then
         log_error "Node B provisioning failed"
         exit 1
     fi
@@ -206,9 +206,9 @@ main() {
 
     # Step 7: Add node C
     log_info "Step 7: Adding node C ($NODE_C_IP)..."
-    log_info "Running: dist/ploy node add --cluster-id $CLUSTER_ID --address $NODE_C_IP --server-url $SERVER_URL"
+    log_info "Running: dist/ploy cluster node add --cluster-id $CLUSTER_ID --address $NODE_C_IP --server-url $SERVER_URL"
 
-    if ! dist/ploy node add --cluster-id "$CLUSTER_ID" --address "$NODE_C_IP" --server-url "$SERVER_URL"; then
+    if ! dist/ploy cluster node add --cluster-id "$CLUSTER_ID" --address "$NODE_C_IP" --server-url "$SERVER_URL"; then
         log_error "Node C provisioning failed"
         exit 1
     fi

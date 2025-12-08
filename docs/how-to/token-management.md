@@ -166,7 +166,7 @@ Bootstrap tokens are managed automatically by the CLI during node provisioning. 
 
 ### How Bootstrap Tokens Work
 
-When you run `ploy node add`:
+When you run `ploy cluster node add`:
 
 1. CLI generates a unique `node_id`
 2. CLI requests a bootstrap token from `POST /v1/bootstrap/tokens`
@@ -280,7 +280,7 @@ Bootstrap tokens are single-use. If node provisioning fails after the token is u
 1. Request a new bootstrap token
 2. Retry the provisioning
 
-The `ploy node add` command handles this automatically by requesting a fresh token for each attempt.
+The `ploy cluster node add` command handles this automatically by requesting a fresh token for each attempt.
 
 ## API Reference
 

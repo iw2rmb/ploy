@@ -31,7 +31,7 @@ Worker nodes require **Docker Engine v29.0 or later** for container execution.
 | Docker API           | v1.44+             | `docker version --format '{{.Server.APIVersion}}'` |
 | Unsupported versions | v28.x and earlier  | API negotiation fails; nodes will not claim jobs |
 
-**Automatic installation**: When `ploy node add` provisions a worker node that lacks Docker, it installs
+**Automatic installation**: When `ploy cluster node add` provisions a worker node that lacks Docker, it installs
 Docker Engine v29 via the official convenience script (`get.docker.com`). Nodes with pre-existing Docker
 installations are **not upgraded** — operators must verify the version before deployment.
 
@@ -148,10 +148,10 @@ dist/ploy cluster deploy --address 203.0.113.42
 
 ### 2. Add Worker Nodes
 
-Use `ploy node add` to register worker nodes with the cluster:
+Use `ploy cluster node add` to register worker nodes with the cluster:
 
 ```bash
-dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<load-balancer-host>
+dist/ploy cluster node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<load-balancer-host>
 ```
 
 This command implements the bootstrap token flow:
@@ -190,8 +190,8 @@ This command implements the bootstrap token flow:
 Example:
 
 ```bash
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://ploy.example.com
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://ploy.example.com
+dist/ploy cluster node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://ploy.example.com
+dist/ploy cluster node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://ploy.example.com
 ```
 
 **Security notes:**
@@ -404,9 +404,9 @@ If running manually instead of using the automated script:
   - The command prints the generated `cluster_id` and persists a local descriptor under `~/.config/ploy/clusters/`.
     - Current default cluster: `cat ~/.config/ploy/clusters/default` → `<cluster-id>`
     - Full descriptor: `~/.config/ploy/clusters/<cluster-id>.json`
-- Add nodes on B and C (replace `<cluster-id>` with the value from the previous step):
-  - `dist/ploy node add --cluster-id <cluster-id> --address 193.242.109.13 --server-url https://45.9.42.212:8443`
-  - `dist/ploy node add --cluster-id <cluster-id> --address 45.130.213.91 --server-url https://45.9.42.212:8443`
+	- Add nodes on B and C (replace `<cluster-id>` with the value from the previous step):
+	  - `dist/ploy cluster node add --cluster-id <cluster-id> --address 193.242.109.13 --server-url https://45.9.42.212:8443`
+	  - `dist/ploy cluster node add --cluster-id <cluster-id> --address 45.130.213.91 --server-url https://45.9.42.212:8443`
 - Smoke test a run (control plane at A on `:8443`):
   - `dist/ploy mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature --follow`
 
