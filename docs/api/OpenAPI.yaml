@@ -5,15 +5,15 @@ info:
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS authentication. Bearer token auth has been removed.
-    Primary endpoints expose the Mods facade under `/v1/mods` (ticket submission,
+    Primary endpoints expose the Mods facade under `/v1/mods` (run submission,
     status, events, and artifact/log/diff uploads). The old `/v1/mods/crud` and
     legacy `/v1/runs/*` read/stream endpoints have been removed; new batch-level
     runs endpoints under `/v1/runs` provide list/inspect/stop semantics.
 
     Type semantics and labels:
-    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
+    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
     - Protocol values are restricted to `tcp` or `udp` and log levels to `debug|info|warn|error` in code; API fields remain strings.
-    - Runner containers are labeled with `com.ploy.run_id=<run-id>` where `<run-id>` is the ticket/run ID (KSUID string) for correlation. Earlier mislabeling with a step identifier has been corrected.
+    - Runner containers are labeled with `com.ploy.run_id=<run-id>` where `<run-id>` is the run ID (KSUID string) for correlation. Earlier mislabeling with a step identifier has been corrected.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -27,7 +27,7 @@ tags:
   - name: Config
     description: Configuration management (GitLab, runtime settings).
   - name: Control
-    description: Core control-plane surfaces (repos, mods ticket lifecycle, runs).
+    description: Core control-plane surfaces (repos, mods run lifecycle, runs).
   - name: Artifacts
     description: Artifact bundles, diffs, and logs stored in PostgreSQL.
 security:
