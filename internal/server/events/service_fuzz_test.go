@@ -10,19 +10,19 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// FuzzPublishTicketRoundTrip ensures arbitrary ticket payloads marshal/unmarshal without panicking
+// FuzzPublishRunRoundTrip ensures arbitrary run payloads marshal/unmarshal without panicking
 // and that the hub stores "run"-typed events. Runs only with `-fuzz`.
-func FuzzPublishTicketRoundTrip(f *testing.F) {
+func FuzzPublishRunRoundTrip(f *testing.F) {
 	svc, err := New(Options{BufferSize: 2, HistorySize: 8})
 	if err != nil {
 		f.Fatalf("new service: %v", err)
 	}
-	// Seed a few interesting values.
+	// Seed a few interesting values. The second parameter is the RunID field value.
 	f.Add(" ", "", uint8(0))
-	f.Add("run-123", "ticket-xyz", uint8(1))
-	f.Add("run-123", "ticket-xyz", uint8(255))
+	f.Add("run-123", "run-xyz", uint8(1))
+	f.Add("run-123", "run-xyz", uint8(255))
 
-	f.Fuzz(func(t *testing.T, runID, ticketID string, stateByte uint8) {
+	f.Fuzz(func(t *testing.T, streamRunID, payloadRunID string, stateByte uint8) {
 		// Map byte to a valid run state.
 		states := []modsapi.RunState{
 			modsapi.RunStatePending,
@@ -33,20 +33,21 @@ func FuzzPublishTicketRoundTrip(f *testing.F) {
 		}
 		state := states[int(stateByte)%len(states)]
 
-		payload := modsapi.RunSummary{TicketID: domaintypes.TicketID(ticketID), State: state}
+		// Build payload using renamed RunID field.
+		payload := modsapi.RunSummary{RunID: domaintypes.RunID(payloadRunID), State: state}
 		ctx := context.Background()
 
-		err := svc.PublishTicket(ctx, runID, payload)
-		if strings.TrimSpace(runID) == "" {
+		err := svc.PublishRun(ctx, streamRunID, payload)
+		if strings.TrimSpace(streamRunID) == "" {
 			if err == nil {
 				t.Fatalf("expected error for empty runID")
 			}
 			return
 		}
 		if err != nil {
-			t.Fatalf("publish ticket: %v", err)
+			t.Fatalf("publish run: %v", err)
 		}
-		snap := svc.Hub().Snapshot(runID)
+		snap := svc.Hub().Snapshot(streamRunID)
 		if len(snap) == 0 {
 			t.Fatalf("expected at least one event in snapshot")
 		}

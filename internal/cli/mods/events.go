@@ -24,7 +24,7 @@ type EventsPrinter interface {
 type SimplePrinter struct{ out io.Writer }
 
 func (p SimplePrinter) Run(t modsapi.RunSummary) {
-	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.TicketID)), strings.ToLower(string(t.State)))
+	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.RunID)), strings.ToLower(string(t.State)))
 }
 func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 	label := strings.TrimSpace(string(s.CurrentJobID))

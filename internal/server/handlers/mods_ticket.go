@@ -141,15 +141,16 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
+			// Use RunID field (formerly TicketID).
 			runSummary := modsapi.RunSummary{
-				TicketID:   domaintypes.TicketID(resp.TicketID),
+				RunID:      domaintypes.RunID(resp.TicketID),
 				State:      modsapi.RunState(run.Status),
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  run.CreatedAt.Time,
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishTicket(r.Context(), resp.TicketID, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), resp.TicketID, runSummary); err != nil {
 				slog.Error("submit run: publish run event failed", "run_id", resp.TicketID, "err", err)
 			}
 		}
@@ -200,9 +201,9 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
 		runState := modsapi.RunStatusFromStore(run.Status)
 
-		// run.ID is now a string (KSUID).
+		// run.ID is now a string (KSUID). Use RunID field (formerly TicketID).
 		summary := modsapi.RunSummary{
-			TicketID:   domaintypes.TicketID(run.ID),
+			RunID:      domaintypes.RunID(run.ID),
 			State:      runState,
 			Submitter:  "",
 			Repository: run.RepoUrl,

@@ -28,8 +28,8 @@ func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
 			// Ticket status endpoint.
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID("test-123"),
-					State:    modsapi.RunStateSucceeded,
+					RunID: domaintypes.RunID("test-123"),
+					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"stage1": {
 							State: modsapi.StageStateSucceeded,
@@ -143,8 +143,8 @@ func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
 			// Ticket status with multiple stages.
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID("test-multi"),
-					State:    modsapi.RunStateSucceeded,
+					RunID: domaintypes.RunID("test-multi"),
+					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {
 							State: modsapi.StageStateSucceeded,
@@ -264,7 +264,7 @@ func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
 				if strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts") {
 					resp := modsapi.RunStatusResponse{
 						Ticket: modsapi.RunSummary{
-							TicketID: domaintypes.TicketID("test"),
+							RunID: domaintypes.RunID("test"),
 							Stages: map[string]modsapi.StageStatus{
 								"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
 							},
@@ -405,7 +405,7 @@ func TestFetchMRURL(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				resp := modsapi.RunStatusResponse{
 					Ticket: modsapi.RunSummary{
-						TicketID: domaintypes.TicketID("test"),
+						RunID:    domaintypes.RunID("test"),
 						Metadata: tt.metadata,
 					},
 				}

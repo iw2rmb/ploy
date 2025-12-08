@@ -66,9 +66,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
-		// Map to modsapi summary type.
+		// Map to modsapi summary type. Use RunID field (formerly TicketID).
 		return modsapi.RunSummary{
-			TicketID:   domaintypes.TicketID(srvResp.TicketID),
+			RunID:      domaintypes.RunID(srvResp.TicketID),
 			State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 			Repository: srvResp.RepoURL,
 			Metadata: map[string]string{
@@ -125,8 +125,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 								if err := json.NewDecoder(resp2.Body).Decode(&srvResp); err != nil {
 									return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 								}
+								// Use RunID field (formerly TicketID).
 								return modsapi.RunSummary{
-									TicketID:   domaintypes.TicketID(srvResp.TicketID),
+									RunID:      domaintypes.RunID(srvResp.TicketID),
 									State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 									Repository: srvResp.RepoURL,
 									Metadata: map[string]string{

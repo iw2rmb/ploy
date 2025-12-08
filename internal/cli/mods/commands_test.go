@@ -25,8 +25,8 @@ func newTestLogPrinter(w io.Writer) *logs.Printer {
 
 func TestInspectAndArtifactsCommands(t *testing.T) {
 	ticket := modsapi.RunSummary{
-		TicketID: domaintypes.TicketID("t1"),
-		State:    modsapi.RunStateSucceeded,
+		RunID: domaintypes.RunID("t1"),
+		State: modsapi.RunStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
 			"build": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
 			"test":  {State: modsapi.StageStateSucceeded},
@@ -67,8 +67,8 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 		{
 			name: "gate summary present",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("t-gate-1"),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID("t-gate-1"),
+				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
 					"gate_summary": "passed duration=1234ms",
 				},
@@ -78,8 +78,8 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 		{
 			name: "gate summary and MR URL",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("t-gate-2"),
-				State:    modsapi.RunStateSucceeded,
+				RunID: domaintypes.RunID("t-gate-2"),
+				State: modsapi.RunStateSucceeded,
 				Metadata: map[string]string{
 					"mr_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
 					"gate_summary": "failed pre-gate duration=567ms",
@@ -94,8 +94,8 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			// renders the "failed final-gate ..." format without alteration.
 			name: "final gate failed after mods",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("t-gate-final-failed"),
-				State:    modsapi.RunStateFailed,
+				RunID: domaintypes.RunID("t-gate-final-failed"),
+				State: modsapi.RunStateFailed,
 				Metadata: map[string]string{
 					"gate_summary": "failed final-gate duration=2345ms",
 				},
@@ -105,7 +105,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 		{
 			name: "no gate summary",
 			ticket: modsapi.RunSummary{
-				TicketID: domaintypes.TicketID("t-no-gate"),
+				RunID:    domaintypes.RunID("t-no-gate"),
 				State:    modsapi.RunStateSucceeded,
 				Metadata: map[string]string{},
 			},
@@ -125,7 +125,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: base,
-				Ticket:  string(tt.ticket.TicketID),
+				Ticket:  string(tt.ticket.RunID),
 				Output:  &out,
 			}
 			if err := cmd.Run(context.Background()); err != nil {
@@ -155,7 +155,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{Ticket: modsapi.RunSummary{TicketID: domaintypes.TicketID("t2"), State: modsapi.RunStatePending}})
+		_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{Ticket: modsapi.RunSummary{RunID: domaintypes.RunID("t2"), State: modsapi.RunStatePending}})
 	})
 	mux.HandleFunc("/v1/mods/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
@@ -168,8 +168,8 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	base, _ := url.Parse(srv.URL)
 
 	// Submit
-	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.RunSubmitRequest{TicketID: domaintypes.TicketID("t2")}}).Run(context.Background())
-	if err != nil || string(sum.TicketID) != "t2" {
+	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.RunSubmitRequest{RunID: domaintypes.RunID("t2")}}).Run(context.Background())
+	if err != nil || string(sum.RunID) != "t2" {
 		t.Fatalf("submit err=%v ticket=%+v", err, sum)
 	}
 	// Cancel
@@ -202,7 +202,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 				}
 				evt := struct {
 					Ticket modsapi.RunSummary `json:"ticket"`
-				}{Ticket: modsapi.RunSummary{TicketID: domaintypes.TicketID("t3"), State: tt.terminalState}}
+				}{Ticket: modsapi.RunSummary{RunID: domaintypes.RunID("t3"), State: tt.terminalState}}
 				b, _ := json.Marshal(evt.Ticket)
 				_, _ = w.Write([]byte("event: run\n"))
 				_, _ = w.Write([]byte("data: "))
@@ -261,7 +261,7 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 func TestSimplePrinterFormats(t *testing.T) {
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
-	p.Run(modsapi.RunSummary{TicketID: domaintypes.TicketID("t1"), State: modsapi.RunStateRunning})
+	p.Run(modsapi.RunSummary{RunID: domaintypes.RunID("t1"), State: modsapi.RunStateRunning})
 	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")

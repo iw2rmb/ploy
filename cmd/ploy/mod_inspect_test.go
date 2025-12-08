@@ -18,8 +18,8 @@ func TestModInspectPrintsSummary(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticket),
-					State:    modsapi.RunStateRunning,
+					RunID: domaintypes.RunID(ticket),
+					State: modsapi.RunStateRunning,
 				},
 			})
 			return
@@ -48,7 +48,7 @@ func TestModInspectShowsMRURL(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticket),
+					RunID:    domaintypes.RunID(ticket),
 					State:    modsapi.RunStateSucceeded,
 					Metadata: map[string]string{"mr_url": mrURL},
 				},
@@ -79,8 +79,8 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					TicketID: domaintypes.TicketID(ticket),
-					State:    modsapi.RunStateSucceeded,
+					RunID: domaintypes.RunID(ticket),
+					State: modsapi.RunStateSucceeded,
 					// No metadata or empty metadata.
 				},
 			}
