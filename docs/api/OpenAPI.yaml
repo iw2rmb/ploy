@@ -11,7 +11,7 @@ info:
     runs endpoints under `/v1/runs` provide list/inspect/stop semantics.
 
     Type semantics and labels:
-    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens, build gate jobs) remain UUID-backed.
+    - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
     - Protocol values are restricted to `tcp` or `udp` and log levels to `debug|info|warn|error` in code; API fields remain strings.
     - Runner containers are labeled with `com.ploy.run_id=<run-id>` where `<run-id>` is the ticket/run ID (KSUID string) for correlation. Earlier mislabeling with a step identifier has been corrected.
 servers:
@@ -122,17 +122,8 @@ paths:
   # Job artifact bundle upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/artifact:
     $ref: './paths/runs_run_id_jobs_job_id_artifact.yaml'
-  # Build Gate service
-  /v1/buildgate/validate:
-    $ref: './paths/buildgate_validate.yaml'
-  /v1/buildgate/jobs/{id}:
-    $ref: './paths/buildgate_jobs_id.yaml'
-  /v1/nodes/{id}/buildgate/claim:
-    $ref: './paths/nodes_id_buildgate_claim.yaml'
-  /v1/nodes/{id}/buildgate/{job_id}/ack:
-    $ref: './paths/nodes_id_buildgate_jobid_ack.yaml'
-  /v1/nodes/{id}/buildgate/{job_id}/complete:
-    $ref: './paths/nodes_id_buildgate_jobid_complete.yaml'
+  # Build Gate HTTP service removed: gate runs as jobs in the Mods pipeline.
+  # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
   # - /v1/config/gitlab (GitLab signer removed)
   # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
@@ -194,17 +185,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Node'
     NodeCreateLogResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeCreateLogResponse'
-    # Build Gate schemas
-    BuildGateValidateRequest:
-      $ref: './components/schemas/controlplane.yaml#/BuildGateValidateRequest'
-    BuildGateValidateResponse:
-      $ref: './components/schemas/controlplane.yaml#/BuildGateValidateResponse'
-    BuildGateJobStatusResponse:
-      $ref: './components/schemas/controlplane.yaml#/BuildGateJobStatusResponse'
-    BuildGateJobCompleteRequest:
-      $ref: './components/schemas/controlplane.yaml#/BuildGateJobCompleteRequest'
-    NodeBuildGateClaimResponse:
-      $ref: './components/schemas/controlplane.yaml#/NodeBuildGateClaimResponse'
+    # Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
+    # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint using NodeClaimResponse.
     # Repo-centric API types
     RepoSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
