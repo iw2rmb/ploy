@@ -28,7 +28,6 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"cluster",  // newClusterCmd
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
-		"node",     // newNodeCmd
 		"rollout",  // newRolloutCmd
 		"token",    // newTokenCmd
 	}
@@ -79,7 +78,6 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		{"newConfigCmd", func(w *bytes.Buffer) *cobra.Command { return newConfigCmd(w) }},
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},
 		{"newServerCmd", func(w *bytes.Buffer) *cobra.Command { return newServerCmd(w) }},
-		{"newNodeCmd", func(w *bytes.Buffer) *cobra.Command { return newNodeCmd(w) }},
 		{"newRolloutCmd", func(w *bytes.Buffer) *cobra.Command { return newRolloutCmd(w) }},
 		{"newTokenCmd", func(w *bytes.Buffer) *cobra.Command { return newTokenCmd(w) }},
 	}
