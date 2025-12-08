@@ -115,13 +115,23 @@ CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE statu
 -- Index for finding run_repos by execution_run_id (for completion callbacks).
 CREATE INDEX IF NOT EXISTS run_repos_execution_run_idx ON run_repos(execution_run_id) WHERE execution_run_id IS NOT NULL;
 
--- Jobs (unified job queue for all execution units: pre-gate, mod, heal, post-gate)
+-- Jobs (unified job queue for all execution units: pre-gate, mod, heal, post-gate, gate, build)
 -- Float step_index enables inserting healing jobs between existing jobs:
 --   pre-gate=1000, mod=2000, post-gate=3000
 --   heal-1 inserted at 1500, re-gate at 1750, etc.
 -- Server-driven scheduling: first job is 'pending', rest are 'created'.
 -- When a job completes, server schedules the next 'created' job.
 -- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
+--
+-- The `meta` column stores structured job metadata as JSONB. The schema is
+-- defined by internal/workflow/contracts.JobMeta with the following shape:
+--   {
+--     "kind": "mod"|"gate"|"build",
+--     "gate": { ... BuildGateStageMetadata ... },   // present when kind="gate"
+--     "build": { "tool": "...", "command": "...", "metrics": {...} }  // present when kind="build"
+--   }
+-- See internal/workflow/contracts.BuildGateStageMetadata for gate metadata fields.
+-- See internal/workflow/contracts.BuildMeta for build metadata fields.
 CREATE TABLE IF NOT EXISTS jobs (
   id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
   run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -135,7 +145,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   started_at   TIMESTAMPTZ,
   finished_at  TIMESTAMPTZ,
   duration_ms  BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
-  meta         JSONB NOT NULL DEFAULT '{}'::jsonb,
+  meta         JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
   UNIQUE (run_id, name)
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
