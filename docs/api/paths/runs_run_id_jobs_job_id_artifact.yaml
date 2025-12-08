@@ -32,11 +32,6 @@ post:
           type: object
           required: [bundle]
           properties:
-            build_id:
-              type: string
-              nullable: true
-              # Build IDs are KSUID strings (27 characters, lexicographically sortable).
-              description: Optional build ID (KSUID string) if artifacts are produced per build
             name:
               type: string
               nullable: true
@@ -54,12 +49,11 @@ post:
             value:
               bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
           named_artifact:
-            summary: Named artifact bundle with build ID
+            summary: Named artifact bundle
             description: |
-              Example including optional name and build_id for artifact tracking.
-              Name can be used to identify the artifact type (e.g., "dist", "coverage").
+              Example including optional name for artifact tracking. Name can be
+              used to identify the artifact type (e.g., "dist", "coverage").
             value:
-              build_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
               name: "dist"
               bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
           size_limit:

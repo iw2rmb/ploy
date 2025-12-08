@@ -29,10 +29,10 @@ ploy mod run \
 	  [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
-ploy upload --run-id <run-id> [--build-id <build-id>] [--name <string>] <path>
+ploy upload --run-id <run-id> [--name <string>] <path>
 ```
 
-Run IDs (`<run-id>`) and build IDs (`<build-id>`) are KSUID-backed strings.
+Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
 Note on `--json` output:

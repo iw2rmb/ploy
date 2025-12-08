@@ -31,12 +31,11 @@ post:
           with_job:
             summary: Log chunk for a specific job
             description: |
-              Example with job_id and build_id included. Demonstrates chunked upload
-              pattern where chunk_no increments for each subsequent chunk.
+              Example with job_id included. Demonstrates chunked upload pattern
+              where chunk_no increments for each subsequent chunk.
             value:
               run_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jR"
               job_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jS"
-              build_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
               chunk_no: 5
               data: "H4sIAAAAAAAA/0vOz0lNzNFQKslIVSjPLMnQL1XQzUtMzlCyUgIEAAD//z3OX5QdAAAA="
           size_limit:
