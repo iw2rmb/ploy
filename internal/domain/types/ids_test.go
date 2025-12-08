@@ -176,27 +176,6 @@ func TestIDGenerators(t *testing.T) {
 		}
 	})
 
-	t.Run("NewBuildID", func(t *testing.T) {
-		// Verify non-empty output with expected KSUID length (27 characters).
-		id := NewBuildID()
-		if id == "" {
-			t.Fatal("NewBuildID returned empty string")
-		}
-		if len(id) != 27 {
-			t.Fatalf("NewBuildID length = %d, want 27", len(id))
-		}
-
-		// Verify multiple calls produce different values.
-		seen := make(map[string]struct{})
-		for i := 0; i < 100; i++ {
-			newID := NewBuildID()
-			if _, exists := seen[newID]; exists {
-				t.Fatalf("NewBuildID produced duplicate ID after %d calls", i)
-			}
-			seen[newID] = struct{}{}
-		}
-	})
-
 	t.Run("NewRunRepoID", func(t *testing.T) {
 		// Verify non-empty output with expected NanoID length (8 characters).
 		id := NewRunRepoID()

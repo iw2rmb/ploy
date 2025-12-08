@@ -27,14 +27,6 @@ func NewJobID() JobID {
 	return JobID(ksuid.New().String())
 }
 
-// NewBuildID generates a new unique build identifier using KSUID.
-// Returns a string rather than a typed BuildID because a dedicated BuildID
-// type does not yet exist. When BuildID is introduced, this function can
-// be updated to return that type.
-func NewBuildID() string {
-	return ksuid.New().String()
-}
-
 // NewRunRepoID generates a new unique RunRepoID using NanoID.
 // Uses an 8-character NanoID with the URL-safe alphabet for compact,
 // human-friendly identifiers suitable for use in URLs and UI displays.

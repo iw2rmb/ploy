@@ -384,7 +384,7 @@ func buildHealingManifestWithStack(req StartRunRequest, mod HealingMod, index in
 			TTL:             types.Duration(time.Hour),
 		},
 		Options: map[string]any{
-			// Allow in-container verification via buildgate API by mounting the host Docker socket.
+			// Allow in-container verification tools that need Docker by mounting the host Docker socket.
 			"mount_docker_socket": true,
 		},
 	}

@@ -66,18 +66,12 @@ func TestAgentLifecycle(t *testing.T) {
 			return
 		}
 
-		// Handle claim endpoint.
+		// Handle claim endpoint (unified jobs queue).
 		if r.URL.Path == "/v1/nodes/test-node/claim" {
 			// Return no work available.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-			return
-		}
-
-		// Handle buildgate claim endpoint.
-		if r.URL.Path == "/v1/nodes/test-node/claim-buildgate" {
-			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
@@ -157,17 +151,11 @@ func TestAgentGracefulShutdown(t *testing.T) {
 			return
 		}
 
-		// Handle claim endpoint.
+		// Handle claim endpoint (unified jobs queue).
 		if r.URL.Path == "/v1/nodes/shutdown-test/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-			return
-		}
-
-		// Handle buildgate claim endpoint.
-		if r.URL.Path == "/v1/nodes/shutdown-test/claim-buildgate" {
-			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
@@ -242,10 +230,6 @@ func TestAgentComponentIntegration(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-			return
-		}
-		if r.URL.Path == "/v1/nodes/integration-test/claim-buildgate" {
-			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -343,10 +327,6 @@ func TestAgentWithTLS(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
 			return
 		}
-		if r.URL.Path == "/v1/nodes/tls-test/claim-buildgate" {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer mockServer.Close()
@@ -425,10 +405,6 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-			return
-		}
-		if r.URL.Path == "/v1/nodes/heartbeat-fail/claim-buildgate" {
-			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
