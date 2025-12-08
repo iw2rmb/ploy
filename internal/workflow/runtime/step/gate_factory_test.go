@@ -14,7 +14,7 @@ func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
 	mockRT := &mockContainerRuntime{}
 
 	// Empty mode should default to local-docker.
-	executor := NewGateExecutor("", mockRT, nil)
+	executor := NewGateExecutor("", mockRT)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor for empty mode")
@@ -38,7 +38,7 @@ func TestNewGateExecutor_ExplicitLocalDocker(t *testing.T) {
 	mockRT := &mockContainerRuntime{}
 
 	// Explicit "local-docker" mode.
-	executor := NewGateExecutor(GateExecutorModeLocalDocker, mockRT, nil)
+	executor := NewGateExecutor(GateExecutorModeLocalDocker, mockRT)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor for local-docker mode")
@@ -54,68 +54,6 @@ func TestNewGateExecutor_ExplicitLocalDocker(t *testing.T) {
 	}
 }
 
-// TestNewGateExecutor_RemoteHTTP verifies "remote-http" mode returns HTTP executor.
-func TestNewGateExecutor_RemoteHTTP(t *testing.T) {
-	t.Parallel()
-
-	fakeHTTP := &fakeBuildGateHTTPClient{
-		ValidateResp: &contracts.BuildGateValidateResponse{
-			JobID:  "test-job",
-			Status: contracts.BuildGateJobStatusCompleted,
-			Result: &contracts.BuildGateStageMetadata{
-				LogDigest: "http-executor-test",
-			},
-		},
-	}
-
-	// Remote HTTP mode with valid client.
-	executor := NewGateExecutor(GateExecutorModeRemoteHTTP, nil, fakeHTTP)
-
-	if executor == nil {
-		t.Fatal("expected non-nil executor for remote-http mode")
-	}
-
-	// Verify it's an HTTPGateExecutor by checking that it calls the fake client.
-	spec := &contracts.StepGateSpec{Enabled: true}
-	result, err := executor.Execute(context.Background(), spec, "/workspace")
-
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	if result.LogDigest != "http-executor-test" {
-		t.Errorf("expected LogDigest 'http-executor-test', got '%s'", result.LogDigest)
-	}
-	if fakeHTTP.ValidateCallCount != 1 {
-		t.Errorf("expected 1 Validate call, got %d", fakeHTTP.ValidateCallCount)
-	}
-}
-
-// TestNewGateExecutor_RemoteHTTP_NilClientFallback verifies fallback to docker when httpClient is nil.
-func TestNewGateExecutor_RemoteHTTP_NilClientFallback(t *testing.T) {
-	t.Parallel()
-
-	mockRT := &mockContainerRuntime{}
-
-	// Remote HTTP mode with nil httpClient should fall back to docker.
-	executor := NewGateExecutor(GateExecutorModeRemoteHTTP, mockRT, nil)
-
-	if executor == nil {
-		t.Fatal("expected non-nil executor for fallback")
-	}
-
-	// Verify it's a dockerGateExecutor (returns nil,nil for nil spec).
-	result, err := executor.Execute(context.Background(), nil, "/workspace")
-	if err != nil {
-		t.Errorf("expected nil error, got: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil result for nil spec (docker fallback), got: %+v", result)
-	}
-}
-
 // TestNewGateExecutor_UnrecognizedModeFallback verifies that unrecognized mode falls back to docker.
 func TestNewGateExecutor_UnrecognizedModeFallback(t *testing.T) {
 	t.Parallel()
@@ -123,7 +61,7 @@ func TestNewGateExecutor_UnrecognizedModeFallback(t *testing.T) {
 	mockRT := &mockContainerRuntime{}
 
 	// Unrecognized mode should fall back to local-docker.
-	executor := NewGateExecutor("invalid-mode", mockRT, nil)
+	executor := NewGateExecutor("invalid-mode", mockRT)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor for fallback")
@@ -144,7 +82,7 @@ func TestNewGateExecutor_NilRuntime(t *testing.T) {
 	t.Parallel()
 
 	// Local-docker mode with nil runtime.
-	executor := NewGateExecutor(GateExecutorModeLocalDocker, nil, nil)
+	executor := NewGateExecutor(GateExecutorModeLocalDocker, nil)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor even with nil runtime")
@@ -163,42 +101,12 @@ func TestNewGateExecutor_NilRuntime(t *testing.T) {
 	}
 }
 
-// TestNewGateExecutor_ModeConstants verifies mode constants are correct.
-func TestNewGateExecutor_ModeConstants(t *testing.T) {
+// TestNewGateExecutor_ModeConstant verifies mode constant is correct.
+func TestNewGateExecutor_ModeConstant(t *testing.T) {
 	t.Parallel()
 
 	if GateExecutorModeLocalDocker != "local-docker" {
 		t.Errorf("GateExecutorModeLocalDocker = '%s', want 'local-docker'", GateExecutorModeLocalDocker)
-	}
-	if GateExecutorModeRemoteHTTP != "remote-http" {
-		t.Errorf("GateExecutorModeRemoteHTTP = '%s', want 'remote-http'", GateExecutorModeRemoteHTTP)
-	}
-}
-
-// TestNewGateExecutorWithLogger_PropagatesLogger verifies logger is propagated to HTTP executor.
-func TestNewGateExecutorWithLogger_PropagatesLogger(t *testing.T) {
-	t.Parallel()
-
-	fakeHTTP := &fakeBuildGateHTTPClient{
-		ValidateResp: &contracts.BuildGateValidateResponse{
-			JobID:  "logger-test",
-			Status: contracts.BuildGateJobStatusCompleted,
-			Result: &contracts.BuildGateStageMetadata{},
-		},
-	}
-
-	// Test with custom logger (nil should use default).
-	executor := NewGateExecutorWithLogger(GateExecutorModeRemoteHTTP, nil, fakeHTTP, nil)
-
-	if executor == nil {
-		t.Fatal("expected non-nil executor")
-	}
-
-	// Verify executor works (logger propagation is internal).
-	spec := &contracts.StepGateSpec{Enabled: true}
-	_, err := executor.Execute(context.Background(), spec, "/workspace")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 
