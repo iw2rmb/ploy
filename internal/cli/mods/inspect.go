@@ -104,7 +104,7 @@ func (c InspectCommand) printJobGraph(stages map[string]modsapi.StageStatus) {
 	_, _ = fmt.Fprintln(c.Output, "Jobs:")
 	for _, j := range jobs {
 		// Format: "  [step_index] job_id: state"
-		// The job_id is truncated to 8 chars for readability (UUID prefix).
+		// The job_id is truncated to 8 chars for readability (KSUID prefix).
 		shortID := j.id
 		if len(shortID) > 8 {
 			shortID = shortID[:8]
