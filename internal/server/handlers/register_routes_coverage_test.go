@@ -95,6 +95,15 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		"/v1/pki/sign":        {},
 		"/v1/pki/sign/client": {},
 		"/v1/pki/sign/admin":  {},
+		// HTTP Build Gate endpoints removed; gate execution now runs as part of
+		// unified jobs queue. These paths remain in OpenAPI for documentation
+		// purposes until the separate "Remove Build Gate HTTP endpoints from OpenAPI"
+		// task is completed. See ROADMAP.md for details.
+		"/v1/buildgate/validate":                     {},
+		"/v1/buildgate/jobs/{id}":                    {},
+		"/v1/nodes/{id}/buildgate/claim":             {},
+		"/v1/nodes/{id}/buildgate/{job_id}/ack":      {},
+		"/v1/nodes/{id}/buildgate/{job_id}/complete": {},
 	}
 
 	for p, item := range paths {
