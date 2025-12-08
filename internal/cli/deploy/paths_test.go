@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +37,17 @@ func TestDefaultPloydBinaryPathFindsAdjacent(t *testing.T) {
 	got, err := DefaultPloydBinaryPath("")
 	if err != nil || got == "" {
 		t.Fatalf("DefaultPloydBinaryPath error=%v path=%q", err, got)
+	}
+}
+
+func TestDefaultPloydBinaryPathErrorMessageMentionsClusterDeploy(t *testing.T) {
+	// Use a synthetic workstation OS to avoid platform-specific candidate paths.
+	// If a ployd binary happens to exist adjacent to the test binary, skip.
+	got, err := DefaultPloydBinaryPath("test-os")
+	if err == nil {
+		t.Skipf("DefaultPloydBinaryPath unexpectedly succeeded with path %q; skipping error message test", got)
+	}
+	if !strings.Contains(err.Error(), "ploy cluster deploy") {
+		t.Fatalf("error message %q does not mention 'ploy cluster deploy'", err.Error())
 	}
 }
