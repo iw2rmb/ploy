@@ -34,7 +34,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store/... ./internal/workflow/...` — Verify `Job.Meta` round-trips gate/build metadata correctly and that existing job claim/scheduling tests still pass.
 
 ## Remove buildgate_jobs table and store APIs
-- [ ] Drop buildgate_jobs from schema and sqlc layer — Avoid separate queue for Build Gate
+- [x] Drop buildgate_jobs from schema and sqlc layer — Avoid separate queue for Build Gate
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store/schema.sql, internal/store/queries/buildgate_jobs.sql, internal/store/buildgate_jobs.sql.go, internal/store/models.go, internal/store/querier.go, internal/store/status_conversion.go, internal/store/status_conversion_test.go
   - Scope:
