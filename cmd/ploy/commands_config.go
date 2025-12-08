@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -60,15 +59,20 @@ func newUploadCmd(stderr io.Writer) *cobra.Command {
 	return uploadCmd
 }
 
-// newClusterCmd creates the cobra command for 'ploy cluster'.
-// This command is not yet implemented.
+// newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.
+// This wires the cluster router into a proper cobra command hierarchy.
+// The cluster command provides a unified namespace for cluster management:
+//   - deploy:  Deploy and configure a control plane server
+//   - node:    Manage worker nodes in a cluster
+//   - rollout: Perform rolling updates for servers and nodes
+//   - token:   Manage API tokens bound to a cluster
 func newClusterCmd(stderr io.Writer) *cobra.Command {
 	clusterCmd := &cobra.Command{
 		Use:                "cluster",
-		Short:              "Manage local cluster descriptors",
+		Short:              "Manage clusters (deploy, nodes, rollout, tokens)",
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("cluster command not yet implemented")
+			return handleCluster(args, stderr)
 		},
 	}
 	return clusterCmd

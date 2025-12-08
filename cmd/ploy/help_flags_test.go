@@ -189,6 +189,62 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectContains: []string{"Usage: ploy upload"},
 			expectNoError:  true,
 		},
+
+		// cluster command --help
+		{
+			name:           "ploy cluster --help",
+			args:           []string{"cluster", "--help"},
+			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "rollout", "token"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy cluster -h",
+			args:           []string{"cluster", "-h"},
+			expectContains: []string{"Usage: ploy cluster"},
+			expectNoError:  true,
+		},
+
+		// cluster node --help (deeper level)
+		{
+			name:           "ploy cluster node --help",
+			args:           []string{"cluster", "node", "--help"},
+			expectContains: []string{"Usage: ploy node", "add"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy cluster node -h",
+			args:           []string{"cluster", "node", "-h"},
+			expectContains: []string{"Usage: ploy node"},
+			expectNoError:  true,
+		},
+
+		// cluster rollout --help (deeper level)
+		{
+			name:           "ploy cluster rollout --help",
+			args:           []string{"cluster", "rollout", "--help"},
+			expectContains: []string{"Usage: ploy rollout", "server", "nodes"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy cluster rollout -h",
+			args:           []string{"cluster", "rollout", "-h"},
+			expectContains: []string{"Usage: ploy rollout"},
+			expectNoError:  true,
+		},
+
+		// cluster token --help (deeper level)
+		{
+			name:           "ploy cluster token --help",
+			args:           []string{"cluster", "token", "--help"},
+			expectContains: []string{"Usage: ploy token", "create", "list", "revoke"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy cluster token -h",
+			args:           []string{"cluster", "token", "-h"},
+			expectContains: []string{"Usage: ploy token"},
+			expectNoError:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -256,6 +312,10 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 		{"manifest", "--help"},
 		{"token", "--help"},
 		{"upload", "--help"},
+		{"cluster", "--help"},
+		{"cluster", "node", "--help"},
+		{"cluster", "rollout", "--help"},
+		{"cluster", "token", "--help"},
 	}
 
 	for _, args := range commands {
