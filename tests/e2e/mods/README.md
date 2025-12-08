@@ -183,7 +183,7 @@ Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
 
 What to expect with the provided E2E images:
-- Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the ticket and can be downloaded via `--artifact-dir`.
+- Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
 
 **Streaming Events and Reconnection**
 
@@ -201,8 +201,8 @@ Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 **Build Gate Status Visibility**
 
 Gate execution results are exposed via:
-- `ploy mod inspect <ticket-id>` — Displays a concise gate summary line: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
-- `GET /v1/mods/{id}` API — Returns gate summary in `Ticket.Metadata["gate_summary"]` for programmatic access.
+- `ploy mod inspect <run-id>` — Displays a concise gate summary line: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
+- `GET /v1/mods/{id}` API — Returns gate summary in `RunStatusResponse.Ticket.Metadata["gate_summary"]` for programmatic access.
 
 This makes gate health visible without requiring raw artifact inspection.
 

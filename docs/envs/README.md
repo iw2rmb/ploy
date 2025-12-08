@@ -198,7 +198,7 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 ## E2E Harness
 
 - `ploy mod run` executes Mods against the Ploy control plane; no tenant variable is required.
-- `PLOY_E2E_TICKET_PREFIX` — Optional run ID prefix for Mods E2E runs
+- `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
   E2E scenarios in place of the default Java sample repo.

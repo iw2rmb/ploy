@@ -30,12 +30,9 @@ type StepManifest struct {
 	Inputs     []StepInput
 	Outputs    []StepOutput
 	Artifacts  []StepArtifact
-	// Gate replaces Shift; when both are present, Gate takes precedence.
-	Gate *StepGateSpec
-	// Deprecated: Shift is accepted for backward compatibility. Prefer Gate.
-	Shift     *StepShiftSpec
-	Resources StepResourceSpec
-	Retention StepRetentionSpec
+	Gate       *StepGateSpec
+	Resources  StepResourceSpec
+	Retention  StepRetentionSpec
 	// Options holds arbitrary run-specific options (e.g., GitLab PAT, MR flags).
 	// Read options via OptionString/OptionBool helpers to avoid scattered type
 	// assertions in callers. This field is not validated and values are never
@@ -74,13 +71,6 @@ type StepOutput struct {
 type StepArtifact struct {
 	Name string
 	Type string
-}
-
-// StepShiftSpec configures SHIFT validation post step execution.
-type StepShiftSpec struct {
-	Enabled bool
-	Profile string
-	Env     map[string]string
 }
 
 // StepGateSpec configures Build Gate validation post step execution.
@@ -245,7 +235,6 @@ func (m StepManifest) Validate() error {
 			return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
 		}
 	}
-	// Validate Gate first (preferred), then fallback to Shift for backward compatibility.
 	if m.Gate != nil {
 		if m.Gate.Enabled || strings.TrimSpace(m.Gate.Profile) != "" {
 			if strings.TrimSpace(m.Gate.Profile) == "" {
@@ -255,19 +244,6 @@ func (m StepManifest) Validate() error {
 				for key := range m.Gate.Env {
 					if !envKeyPattern.MatchString(key) {
 						return fmt.Errorf("gate environment key invalid: %q", key)
-					}
-				}
-			}
-		}
-	} else if m.Shift != nil {
-		if m.Shift.Enabled || strings.TrimSpace(m.Shift.Profile) != "" {
-			if strings.TrimSpace(m.Shift.Profile) == "" {
-				return errors.New("shift profile required when enabled")
-			}
-			if len(m.Shift.Env) > 0 {
-				for key := range m.Shift.Env {
-					if !envKeyPattern.MatchString(key) {
-						return fmt.Errorf("shift environment key invalid: %q", key)
 					}
 				}
 			}

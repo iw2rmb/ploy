@@ -39,10 +39,10 @@ func TestStepManifestValidate(t *testing.T) {
 				DiffCID:   types.CID("bafyoverlay"),
 			},
 		},
-		Shift: &StepShiftSpec{
+		Gate: &StepGateSpec{
 			Profile: "default",
 			Env: map[string]string{
-				"SHIFT_TIMEOUT": "5m",
+				"GATE_TIMEOUT": "5m",
 			},
 		},
 		Retention: StepRetentionSpec{
@@ -136,12 +136,12 @@ func TestStepManifestValidate(t *testing.T) {
 			wantErr: "inputs[0]",
 		},
 		{
-			name: "invalid shift profile",
+			name: "invalid gate profile",
 			mutate: func(m *StepManifest) {
-				m.Shift.Profile = ""
-				m.Shift.Enabled = true
+				m.Gate.Profile = ""
+				m.Gate.Enabled = true
 			},
-			wantErr: "shift",
+			wantErr: "gate profile required",
 		},
 		{
 			name: "invalid digest in hydration diff",
@@ -224,15 +224,18 @@ func cloneManifest(src StepManifest) StepManifest {
 			clone.Env[k] = v
 		}
 	}
-	if src.Shift != nil {
-		shift := *src.Shift
-		if len(src.Shift.Env) > 0 {
-			shift.Env = make(map[string]string, len(src.Shift.Env))
-			for k, v := range src.Shift.Env {
-				shift.Env[k] = v
+	if src.Gate != nil {
+		gate := *src.Gate
+		if len(src.Gate.Env) > 0 {
+			gate.Env = make(map[string]string, len(src.Gate.Env))
+			for k, v := range src.Gate.Env {
+				gate.Env[k] = v
 			}
 		}
-		clone.Shift = &shift
+		if len(src.Gate.DiffPatch) > 0 {
+			gate.DiffPatch = append([]byte(nil), src.Gate.DiffPatch...)
+		}
+		clone.Gate = &gate
 	}
 	return clone
 }

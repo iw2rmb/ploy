@@ -280,7 +280,7 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   echo "3. Re-gate success:"
   echo "   - Review SSE events for 'gate_passed' after healing"
   echo "   - GateSummary should show passing final-gate"
-  echo "   - Command: dist/ploy mod inspect <ticket-id>"
+  echo "   - Command: dist/ploy mod inspect <run-id>"
   echo ""
   echo "4. Multi-step continuation:"
   echo "   - All steps should complete after healing"

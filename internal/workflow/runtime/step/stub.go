@@ -251,8 +251,7 @@ func filterGitDir(diff []byte) []byte {
 //  1. Hydration — Prepare the workspace by fetching repository sources via
 //     WorkspaceHydrator. Errors here abort the run immediately.
 //
-//  2. Pre-mod Build Gate — When Gate is enabled (Manifest.Gate.Enabled or
-//     deprecated Manifest.Shift.Enabled), run static validation on the
+//  2. Pre-mod Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
 //     workspace before executing the mod container. If the gate fails,
 //     Runner.Run returns ErrBuildGateFailed without executing container
 //     stages. The node agent orchestration layer handles healing when
@@ -346,14 +345,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	// Run the Build Gate before executing the mod container to fail fast if the codebase doesn't build.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
-	if gateSpec == nil && req.Manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
-		// Fallback to deprecated Shift for backward compatibility.
-		gateSpec = &contracts.StepGateSpec{
-			Enabled: req.Manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
-			Profile: req.Manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
-			Env:     req.Manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
-		}
-	}
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
 		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
 		if err != nil {
