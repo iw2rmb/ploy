@@ -10,8 +10,8 @@ parameters:
   - in: header
     name: PLOY_NODE_UUID
     required: true
-    schema: { type: string, format: uuid }
-    description: Worker node UUID reporting job completion
+    schema: { type: string }
+    description: Worker node ID (NanoID 6-character string) reporting job completion
 
 post:
   tags: [Control]
@@ -59,7 +59,7 @@ post:
     '400':
       description: |
         Bad Request — possible causes:
-        - Missing or invalid `job_id` path parameter (UUID format)
+        - Missing or invalid `job_id` path parameter
         - Missing `status` or non-terminal status value
         - Malformed `stats` JSON (must be a JSON object)
     '401':
@@ -67,7 +67,7 @@ post:
     '403':
       description: Forbidden — job is not assigned to the authenticated node
     '404':
-      description: Job not found (invalid job UUID)
+      description: Job not found (invalid job ID)
     '409':
       description: |
         Conflict — job not in `running` state. This occurs when:

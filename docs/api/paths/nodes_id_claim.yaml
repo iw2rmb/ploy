@@ -2,8 +2,8 @@ parameters:
   - in: path
     name: id
     required: true
-    schema: { type: string, format: uuid }
-    description: Node UUID
+    schema: { type: string }
+    description: Node ID (NanoID 6-character string)
 post:
   tags: [Control]
   summary: Claim a queued run for execution (node → server)
