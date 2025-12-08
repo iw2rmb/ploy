@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/domain/types` — all tests pass with `RunID`-only API.
 
 ## Workflow runtime and node agent
-- [ ] Thread `RunID` through container execution API instead of `TicketID` — ensures labels and telemetry consistently use run identifiers.
+- [x] Thread `RunID` through container execution API instead of `TicketID` — ensures labels and telemetry consistently use run identifiers.
   - Repository: ploy
   - Component: `internal/workflow/runtime/step`, `internal/nodeagent`
   - Scope: Change `step.Request` field from `TicketID types.TicketID` to `RunID types.RunID`; update `buildContainerSpec` to accept `RunID`; switch node agent calls in `internal/nodeagent/execution_orchestrator.go` to pass `RunID` directly.
