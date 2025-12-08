@@ -21,12 +21,12 @@ const (
 	CheckpointStatusFailed    CheckpointStatus = "failed"
 )
 
-// WorkflowCheckpoint is the envelope published to the per‑ticket checkpoint
+// WorkflowCheckpoint is the envelope published to the per‑run checkpoint
 // subject for each stage transition. Optional `StageMetadata` can include
 // timing and metadata; `Artifacts` may be attached and require metadata.
 type WorkflowCheckpoint struct {
 	SchemaVersion string               `json:"schema_version"`
-	RunID         types.RunID          `json:"ticket_id"`
+	RunID         types.RunID          `json:"run_id"`
 	Stage         StageName            `json:"stage"`
 	Status        CheckpointStatus     `json:"status"`
 	CacheKey      string               `json:"cache_key,omitempty"`
@@ -43,7 +43,7 @@ func (c WorkflowCheckpoint) Validate() error {
 		return fmt.Errorf("schema_version is required")
 	}
 	if c.RunID.IsZero() {
-		return fmt.Errorf("ticket_id is required")
+		return fmt.Errorf("run_id is required")
 	}
 	if strings.TrimSpace(string(c.Stage)) == "" {
 		return fmt.Errorf("stage is required")
@@ -72,12 +72,12 @@ func (c WorkflowCheckpoint) Validate() error {
 	return nil
 }
 
-// Subject returns the per‑ticket checkpoint subject or an empty string when
-// the ticket ID is blank to allow callers to short‑circuit publishing.
+// Subject returns the per‑run checkpoint subject or an empty string when
+// the run ID is blank to allow callers to short‑circuit publishing.
 func (c WorkflowCheckpoint) Subject() string {
-	ticket := strings.TrimSpace(c.RunID.String())
-	if ticket == "" {
+	runID := strings.TrimSpace(c.RunID.String())
+	if runID == "" {
 		return ""
 	}
-	return fmt.Sprintf(checkpointStreamFormat, ticket)
+	return fmt.Sprintf(checkpointStreamFormat, runID)
 }

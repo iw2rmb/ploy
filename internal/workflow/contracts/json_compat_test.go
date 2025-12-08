@@ -32,7 +32,7 @@ func jsonAsInterface(t *testing.T, data []byte) any {
 func TestJSONCompatibility_WorkflowTicket_Golden(t *testing.T) {
 	ticket := WorkflowTicket{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		Repo: RepoMaterialization{
 			URL:           types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
@@ -55,7 +55,7 @@ func TestJSONCompatibility_WorkflowTicket_Golden(t *testing.T) {
 func TestJSONCompatibility_WorkflowCheckpoint_Golden(t *testing.T) {
 	cp := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Stage:         StageName("mods-plan"),
 		Status:        CheckpointStatusPending,
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
@@ -97,7 +97,7 @@ func TestJSONCompatibility_WorkflowCheckpoint_Golden(t *testing.T) {
 func TestJSONCompatibility_WorkflowArtifact_Golden(t *testing.T) {
 	env := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
-		TicketID:      types.TicketID("ticket-123"),
+		RunID:         types.RunID("run-123"),
 		Stage:         StageName("mods-plan"),
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
