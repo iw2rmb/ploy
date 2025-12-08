@@ -53,7 +53,7 @@ ploy config gitlab show
 ### Step 3: Run a Mod with MR creation
 
 Source branch naming
-- Ploy uses the effective target ref as the MR source branch. When you pass `--repo-target-ref`, that value is used directly. When you omit it, the node derives a default of `/mod/<run-id>` using the database run UUID. The base branch remains the one provided via `--repo-base-ref` (commonly `main`).
+- Ploy uses the effective target ref as the MR source branch. When you pass `--repo-target-ref`, that value is used directly. When you omit it, the node derives a default of `/mod/<run-id>` using the run ID (KSUID string). The base branch remains the one provided via `--repo-base-ref` (commonly `main`).
 
 Create an MR on success (capture server-assigned run via JSON):
 ```bash

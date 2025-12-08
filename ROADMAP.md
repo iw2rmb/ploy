@@ -207,7 +207,7 @@ Legend: [ ] todo, [x] done.
      - Tests:
        - Re-run `go test ./docs/api/...` to ensure all path references and schemas are still valid and `TestOpenAPICompleteness` continues to pass.
    
-   - [ ] Update markdown docs to describe KSUID/NanoID IDs instead of UUIDs — Ensure narrative docs match the new ID model.
+   - [x] Update markdown docs to describe KSUID/NanoID IDs instead of UUIDs — Ensure narrative docs match the new ID model.
      - Repository: github.com/iw2rmb/ploy
      - Component: docs/mods-lifecycle.md, docs/envs/README.md, docs/how-to/*
      - Scope:
