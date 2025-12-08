@@ -142,7 +142,6 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	// Disable gate in manifest - mod jobs don't run gates.
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
-	manifest.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear hydration since workspace is already hydrated.
 	if len(manifest.Inputs) > 0 {
@@ -315,7 +314,6 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// Disable gate in manifest - healing jobs don't run gates.
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
-	manifest.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear hydration since workspace is already hydrated.
 	if len(manifest.Inputs) > 0 {

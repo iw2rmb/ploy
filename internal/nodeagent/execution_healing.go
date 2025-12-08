@@ -114,15 +114,7 @@ func (r *runController) runGateWithHealing(
 	gatePhase string, // "pre" or "post"
 	stepIndex int, // C2: step number for healing diff tagging
 ) (*gateRunMetadata, []gateRunMetadata, error) {
-	// Resolve gate spec from manifest (with backward compat for deprecated Shift field).
 	gateSpec := manifest.Gate
-	if gateSpec == nil && manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
-		gateSpec = &contracts.StepGateSpec{
-			Enabled: manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
-			Profile: manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
-			Env:     manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
-		}
-	}
 
 	// If gate is disabled or executor unavailable, return immediately.
 	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
@@ -502,11 +494,10 @@ func (r *runController) executeWithHealing(
 	}
 
 	// Pre-mod gate passed. Clone manifest for main mod execution with gate disabled.
-	// Per ROADMAP.md Phase G: Set Gate.Enabled=false and clear deprecated Shift and
-	// Inputs[i].Hydration entries so Runner.Run performs container execution only.
+	// Per ROADMAP.md Phase G: Set Gate.Enabled=false and clear Inputs[i].Hydration entries
+	// so Runner.Run performs container execution only.
 	manifestForMainMod := manifest
 	manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
-	manifestForMainMod.Shift = nil //nolint:staticcheck // backward compatibility: clear deprecated Shift field
 
 	// Clear Hydration on each input to skip re-hydration (workspace already hydrated by pre-gate).
 	if len(manifestForMainMod.Inputs) > 0 {

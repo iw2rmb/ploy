@@ -46,7 +46,7 @@ TICKET=$(dist/ploy mod run --json \
   --artifact-dir "${ARTIFACT_DIR}" \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
-# Print MR URL if present in ticket metadata.
+# Print MR URL if present in run metadata.
 if [[ -n "${TICKET:-}" ]]; then
   dist/ploy mod inspect "$TICKET" || true
 fi

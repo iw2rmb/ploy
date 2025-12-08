@@ -106,16 +106,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 // runGate executes the build gate and returns the result.
 func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string) (*contracts.BuildGateStageMetadata, error) {
-	// Resolve gate spec from manifest.
 	gateSpec := manifest.Gate
-	if gateSpec == nil && manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
-		gateSpec = &contracts.StepGateSpec{
-			Enabled: manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
-			Profile: manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
-			Env:     manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
-		}
-	}
-
 	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
 		// No gate configured - return success.
 		return &contracts.BuildGateStageMetadata{

@@ -60,7 +60,7 @@ TICKET=$(dist/ploy mod run --json \
 
 if [[ -n "${TICKET:-}" ]]; then
   echo ""
-  echo "Inspecting ticket..."
+  echo "Inspecting run..."
   dist/ploy mod inspect "$TICKET" || true
 fi
 
@@ -84,8 +84,8 @@ if [[ -n "${TICKET:-}" ]]; then
   else
     echo "  Note: Run status: $TICKET_STATUS"
   fi
-else
-  echo "  FAIL: No ticket ID returned"
+  else
+    echo "  FAIL: No run ID returned"
   VALIDATION_FAILED=1
 fi
 

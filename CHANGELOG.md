@@ -2,13 +2,13 @@
 
 ## [2025-10-30] Build Gate: Java Executor Embedded
 
-- Replaced the external SHIFT CLI shell-out with an embedded Java build gate executor
+- Embedded the Java build gate executor in place of the previous CLI shell-out
   (`internal/workflow/buildgate/javaexec`). The executor prefers Gradle/Maven wrappers and
   falls back to a Dockerised Maven image when wrappers are absent.
 - Worker and CLI now wire the BuildGate runner with the Java executor
   (step runner under `internal/workflow/runtime/step`, `cmd/ploy/dependencies_runtime_local.go`).
 - Added a lifecycle checker that probes the configured Maven image presence
-  (`internal/worker/lifecycle/health_buildgate.go`); removed the SHIFT binary env ref from docs.
+  (`internal/worker/lifecycle/health_buildgate.go`); removed the legacy build gate binary env ref from docs.
 - Documentation updated: build gate overview and environment variables
   (`docs/workflow/README.md`, `docs/envs/README.md`).
 - Verification (2025-10-30):
@@ -86,14 +86,10 @@
 
 ## [2025-10-21] Mods Step Runtime Foundations
 
-- Introduced a node-local runtime client (`internal/workflow/runtime/local_client.go`) that adapts
-  `internal/workflow/runtime/step.Runner` to the workflow runner interface, along with a build
-  gate-backed `ShiftClient` (`internal/workflow/runtime/step/shift_client.go`) emitting sanitized
-  diagnostics.
+- Introduced a node-local runtime client that adapts `internal/workflow/runtime/step.Runner` to the
+  workflow runner interface and emits sanitized build gate diagnostics.
 - Extended step manifest requests with workspace context, surfaced build gate metadata on stage
-  checkpoints, and added unit coverage for SHIFT failure propagation and local runtime outcomes
-  (`internal/workflow/runtime/local_client_test.go`,
-  `internal/workflow/runtime/step/shift_client_test.go`).
+  checkpoints, and added unit coverage for build gate failure propagation and local runtime outcomes.
 - Task `docs/tasks/roadmap/02-mod-step-runtime.md` now tracks this foundation and enumerates the
   follow-up wiring required to retire the Grid adapter.
 - Verification (2025-10-21):
@@ -195,7 +191,7 @@
 
 ## [2025-10-05] Mods Grid Restoration (Steps 1–4)
 
-- `ploy mod run` now materialises repositories via `WorkflowTicket.Repo`,
+- `ploy mod run` now materialises repositories via `WorkflowRun.Repo`,
   cloning into a temporary workspace and honouring optional workspace hints
   before Mods stages execute.
 - Mods-specific lanes (`lanes/mods-*.toml`) feed the job composer so
@@ -372,8 +368,8 @@
 
 ## [2025-09-30] JetStream Subject Alignment
 
-- Updated `internal/workflow/contracts` with shared subject constants so ticket
-  claims flow through `webhook.<tenant>.ploy.workflow-ticket` and status polling
+- Updated `internal/workflow/contracts` with shared subject constants so run
+  claims flow through `webhook.<tenant>.ploy.workflow-run` and status polling
   follows `jobs.<run_id>.events`, including whitespace safeguards for derived
   subjects.
 - Refreshed JetStream client tests to cover the new webhook stream wildcard and
@@ -551,7 +547,7 @@
 ## [2025-09-26] Stage Artifact Streams
 
 - Added `contracts.WorkflowArtifact` and JetStream/in-memory events client
-  support so workflow stage artifacts mirror onto `ploy.artifact.<ticket>`
+  support so workflow stage artifacts mirror onto `ploy.artifact.<run_id>`
   alongside checkpoints.
 - Updated the workflow runner to emit artifact envelopes for completed stages,
   propagate publication failures, and surface envelopes in unit tests for cache
@@ -576,7 +572,7 @@
 ## [2025-09-26] Snapshot Metadata Streams
 
 - Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit
-  schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when
+  schema-versioned snapshot metadata envelopes to `ploy.artifact.<run_id>` when
   discovery returns JetStream routes, retaining the in-memory stub for offline
   runs.
 - Updated the CLI snapshot registry loader to wire the JetStream metadata
@@ -634,9 +630,9 @@
 
 ## [2025-09-26] JetStream Client Wiring
 
-- Introduced `internal/workflow/contracts.JetStreamClient` to consume real
-  tickets from `grid.webhook.<tenant>` and publish checkpoints to
-  `ploy.workflow.<ticket>.checkpoints`.
+- Introduced `internal/workflow/contracts.JetStreamClient` to consume real runs
+  from `grid.webhook.<tenant>` and publish checkpoints to
+  `ploy.workflow.<run_id>.checkpoints`.
 - Updated `ploy mod run` to honour discovery-provided JetStream routes by
   dialing JetStream (falling back to the in-memory stub when routes are missing)
   and surfacing connection failures to the caller.
@@ -751,14 +747,13 @@
 - Documented the lane system in `README.md`, `cmd/ploy/README.md`,
   `docs/LANES.md`, and marked roadmap slice `03-lane-engine` complete.
 
-## [2025-09-26] Workflow Runner CLI Stub
 
 - Expanded `internal/workflow/runner` with a default DAG planner, stage
   execution loop, retry handling, temporary workspace management, and error
   propagation for Grid interactions.
 - Added an in-memory Grid client, stage invocation tracking, and extensive unit
   tests lifting runner package coverage to 94.5%.
-- Removed client-provided ticket support in `cmd/ploy` (`--ticket` flag). Tickets are now always server-assigned.
+## [2025-09-26] Workflow Runner CLI Stub
   testable factories, and emit usage/help output across new error paths.
 - Extended CLI tests to cover command dispatch, usage printers, and runner
   wiring; repository-wide `go test -cover ./...` now satisfies ≥60% overall
@@ -770,8 +765,8 @@
 ## [2025-09-25] Event Contract Stub
 
 - Added `internal/workflow/contracts` with schema version `2025-09-25`, subject
-  helpers, and validation logic for workflow tickets and checkpoints.
-- Wired `internal/workflow/runner` to claim tickets, validate payloads, and
+  helpers, and validation logic for workflow runs and checkpoints.
+- Wired `internal/workflow/runner` to claim runs, validate payloads, and
   publish an initial `claimed` checkpoint through a JetStream stub.
 - Updated the CLI to require `--tenant`, bootstrap the in-memory bus, and
   reflect the new behaviour in usage docs.
@@ -779,15 +774,13 @@
   `docs/design/event-contracts/README.md`; roadmap slice `01-event-contracts`
   now marked complete.
 
-## [2025-09-25] Legacy Teardown
 
 - Removed legacy API surface and deployment scaffolding tied to the pre-pivot orchestration stack.
-- Replaced the repo with a CLI-only stub (`ploy mod run`, formerly `ploy workflow run`) that validates
-  ticket input and returns `ErrNotImplemented`.
+## [2025-09-25] Legacy Teardown
 - Added guardrail tests that fail if legacy binaries or imports reappear.
 - Simplified the build system (`Makefile`) to focus on the workflow CLI.
 - Rewrote documentation (`README.md`, `docs/DOCS.md`, `cmd/ploy/README.md`) to
-  describe the Shift architecture and roadmap alignment.
+  describe the workflow architecture and roadmap alignment.
 
 ## [History]
 
@@ -800,3 +793,6 @@ details.
 - Dropped JetStream/NATS client and metadata publisher; SSE is the only streaming surface.
 - Scrubbed remaining Grid/JetStream mentions from CLI help/completions and top‑level docs.
 - Tests updated accordingly; historical entries below may reference Grid/JetStream — they are legacy and no longer applicable to the current codebase.
+- Removed client-provided run identifier support in `cmd/ploy` (`--run` flag). Runs are now always server-assigned.
+- Replaced the repo with a CLI-only stub (`ploy mod run`, formerly `ploy workflow run`) that validates
+  run input and returns `ErrNotImplemented`.

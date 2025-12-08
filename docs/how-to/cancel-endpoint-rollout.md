@@ -36,16 +36,16 @@ In production, the server enforces mTLS at the HTTP layer. Test environments may
 ## Related Operations
 
 The cancel endpoint is **symmetric** with the existing `ploy mod run` workflow:
-- `ploy mod run --follow --cap <duration> --cancel-on-cap` submits a  run, follows events with a timeout, and automatically cancels if the cap is exceeded.
-- `ploy mod cancel -- run <id> [--reason <text>]` directly cancels a  run via the API.
+- `ploy mod run --follow --cap <duration> --cancel-on-cap` submits a run, follows events with a timeout, and automatically cancels if the cap is exceeded.
+- `ploy mod cancel --run <id> [--reason <text>]` directly cancels a run via the API.
 
 A **resume** operation (to restart or retry a canceled  run) is tracked separately and not part of this feature.
 
 ## SSE Integration
 
-The cancel handler publishes a terminal  run event (`state=cancelled`) over SSE when the cancellation succeeds. This ensures:
+The cancel handler publishes a terminal run event (`state=cancelled`) over SSE when the cancellation succeeds. This ensures:
 - `ploy mod run --follow` receives the terminal state and exits cleanly.
-- `ploy mods logs < run-id>` streams show the cancellation event.
+- `ploy mods logs <run-id>` streams show the cancellation event.
 - SSE clients observing `/v1/mods/{id}/events` receive the `cancelled` state.
 
 Optional: The handler may also emit a `PublishStatus(done)` event for stream completion.
@@ -54,7 +54,7 @@ Optional: The handler may also emit a `PublishStatus(done)` event for stream com
 
 ### Smoke Test (Local or Lab)
 
-Run a short-lived  run with automatic cancellation:
+Run a short-lived run with automatic cancellation:
 
 ```bash
 ploy mod run \
@@ -76,17 +76,17 @@ Expected behavior:
 
 ### Manual Cancel
 
-Submit a  run without `--follow`, then cancel it manually:
+Submit a run without `--follow`, then cancel it manually:
 
 ```bash
-# Submit a  run
+# Submit a run
 ploy mod run \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
   --repo-target-ref feature
 
-# Manually cancel the  run
-ploy mod cancel -- run < run-id> --reason "manual intervention"
+# Manually cancel the run
+ploy mod cancel --run <run-id> --reason "manual intervention"
 ```
 
 Expected behavior:
@@ -97,12 +97,12 @@ Expected behavior:
 
 ### Idempotency Test
 
-Cancel the same  run multiple times:
+Cancel the same run multiple times:
 
 ```bash
-ploy mod cancel -- run < run-id>
-ploy mod cancel -- run < run-id>
-ploy mod cancel -- run < run-id>
+ploy mod cancel --run <run-id>
+ploy mod cancel --run <run-id>
+ploy mod cancel --run <run-id>
 ```
 
 Expected behavior:
@@ -130,7 +130,7 @@ ploy mod run repo add \
   batch-to-cancel
 
 # Cancel the entire batch (all run_repos are canceled).
-ploy mod cancel -- run batch-to-cancel --reason "batch aborted"
+ploy mod cancel --run batch-to-cancel --reason "batch aborted"
 ```
 
 Expected behavior:
@@ -146,9 +146,9 @@ See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command refere
 Test the following edge cases:
 - **Invalid run ID**: `POST /v1/mods//cancel` (empty or whitespace-only ID) → `400 Bad Request`.
 - **Missing run**: `POST /v1/mods/nonexistent123/cancel` → `404 Not Found`.
-- **Already succeeded**: Cancel a completed  run → `200 OK`.
-- **Already failed**: Cancel a failed  run → `200 OK`.
-- **Multiple in-flight stages**: Cancel a  run with multiple `running` stages → All stages transition to `canceled`.
+- **Already succeeded**: Cancel a completed run → `200 OK`.
+- **Already failed**: Cancel a failed run → `200 OK`.
+- **Multiple in-flight stages**: Cancel a run with multiple `running` stages → All stages transition to `canceled`.
 
 ## Risks and Mitigations
 
@@ -183,14 +183,14 @@ Test the following edge cases:
 Monitor the following Prometheus metrics (if exposed by the server):
 - `http_requests_total{endpoint="/v1/mods/:id/cancel", status="202"}` — Successful cancellations.
 - `http_requests_total{endpoint="/v1/mods/:id/cancel", status="200"}` — Idempotent cancellations (already terminal).
-- `http_requests_total{endpoint="/v1/mods/:id/cancel", status="404"}` — Missing  runs.
+- `http_requests_total{endpoint="/v1/mods/:id/cancel", status="404"}` — Missing runs.
 
 ### Logs
 
 The server logs (via `slog`) include:
-- `msg="cancel  run"` with `run_id`, `requester`, and `reason` fields.
-- `msg=" run already terminal"` for idempotent requests.
-- `msg=" run not found"` for 404 responses.
+- `msg="cancel run"` with `run_id`, `requester`, and `reason` fields.
+- `msg="run already terminal"` for idempotent requests.
+- `msg="run not found"` for 404 responses.
 
 Query logs with:
 
@@ -200,7 +200,7 @@ journalctl -u ployd.service | grep "cancel  run"
 
 ### Database Queries
 
-Check canceled  runs in PostgreSQL:
+Check canceled runs in PostgreSQL:
 
 ```sql
 SELECT id, state, metadata->>'reason' AS cancel_reason, finished_at

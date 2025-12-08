@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // RunGateOnly executes only the gate validation phase without container execution.
@@ -47,14 +45,6 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 	// RunGateOnly — validate code without running a mod container.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
-	if gateSpec == nil && req.Manifest.Shift != nil { //nolint:staticcheck // backward compatibility: map deprecated Shift to Gate
-		// Fallback to deprecated Shift for backward compatibility.
-		gateSpec = &contracts.StepGateSpec{
-			Enabled: req.Manifest.Shift.Enabled, //nolint:staticcheck // compat field access for deprecated Shift
-			Profile: req.Manifest.Shift.Profile, //nolint:staticcheck // compat field access for deprecated Shift
-			Env:     req.Manifest.Shift.Env,     //nolint:staticcheck // compat field access for deprecated Shift
-		}
-	}
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
 		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
 		if err != nil {
