@@ -52,6 +52,12 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Reject obviously invalid IDs before touching the store.
+		if len(ticketIDStr) != 27 {
+			http.Error(w, "invalid ticket id", http.StatusBadRequest)
+			return
+		}
+
 		// Verify the run exists before fetching jobs using string ID directly.
 		// No UUID parsing needed; store accepts KSUID strings.
 		_, err := st.GetRun(r.Context(), ticketIDStr)

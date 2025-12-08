@@ -97,10 +97,10 @@ type StageStatus struct {
 	StepIndex int `json:"step_index,omitempty"`
 }
 
-// StageMetadata captures job-level metadata stored in jobs.meta JSONB.
-// This metadata enables the control plane to treat a run as an ordered
-// sequence of jobs for multi-step Mods runs (mods[] array in spec). It is
-// serialized directly into jobs.meta JSONB and exposed via GET /v1/mods/{id}.
+// StageMetadata captures job-level metadata for Mods runs.
+// It mirrors information exposed via GET /v1/mods/{id} and is derived from
+// jobs and related artifacts rather than being tied to a specific storage
+// layout for jobs.meta JSONB.
 //
 // Each execution unit (pre_gate, mod, post_gate, heal, re_gate) has a jobs row
 // with mod_type identifying the phase type. Float step_index on the jobs table

@@ -141,6 +141,84 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_WithJobMetaInStats verifies that when stats.job_meta is provided,
+// the handler uses UpdateJobCompletionWithMeta to persist jobs.meta JSONB.
+func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	nodeIDStr := nodeID.String()
+	runID := uuid.New()
+	jobID := uuid.New()
+
+	job := store.Job{
+		ID:        jobID.String(),
+		RunID:     runID.String(),
+		NodeID:    &nodeIDStr,
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	// Embed JobMeta-shaped payload under stats.job_meta.
+	body, _ := json.Marshal(map[string]any{
+		"status":    "succeeded",
+		"exit_code": 0,
+		"stats": map[string]any{
+			"duration_ms": 500,
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"log_digest": "sha256:test",
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID.String())
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID.String(),
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// When job_meta is present, handler should prefer UpdateJobCompletionWithMeta.
+	if !st.updateJobCompletionWithMetaCalled {
+		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
+	}
+
+	// Validate that persisted meta JSON contains the expected kind.
+	var meta map[string]any
+	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+		t.Fatalf("failed to unmarshal persisted meta: %v", err)
+	}
+	if kind, ok := meta["kind"].(string); !ok || kind != "gate" {
+		t.Fatalf("expected meta.kind == \"gate\", got %#v", meta["kind"])
+	}
+}
+
 // TestCompleteJob_MissingJobID returns 400 when job_id is not in the path.
 func TestCompleteJob_MissingJobID(t *testing.T) {
 	t.Parallel()
