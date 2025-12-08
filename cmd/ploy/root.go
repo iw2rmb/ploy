@@ -72,10 +72,10 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
 	// Server and node management commands
-	// NOTE: `ploy server` has been removed as a top-level command.
+	// NOTE: `ploy server` and `ploy node` have been removed as top-level commands.
 	// Server deployment is now accessible only via `ploy cluster deploy`.
-	// See ROADMAP.md line 186 for migration rationale.
-	root.AddCommand(newNodeCmd(stderr))    // ploy node (add)
+	// Node operations are now accessible only via `ploy cluster node`.
+	// See ROADMAP.md lines 186 and 261 for migration rationale.
 	root.AddCommand(newRolloutCmd(stderr)) // ploy rollout (server, nodes)
 
 	// Authentication commands
@@ -112,6 +112,10 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 					// The 'server' command has been re-rooted under 'cluster deploy'.
 					// Point users to the new location for discoverability.
 					printServerUsage(stderr)
+				case "node":
+					// The 'node' command has been re-rooted under 'cluster node'.
+					// Point users to the new location for discoverability.
+					printNodeUsage(stderr)
 				case "rollout":
 					printRolloutUsage(stderr)
 				case "config":

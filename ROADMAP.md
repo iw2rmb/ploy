@@ -258,7 +258,7 @@ Legend: [ ] todo, [x] done.
       - Remove checks that call `dist/ploy server --help` or adjust them to expect a failure with a clear unknown command error.
 
 ## Move node operations under `ploy cluster node`
-- [ ] Change node commands from `ploy node ...` to `ploy cluster node ...` and align usage and docs — Ensure worker node provisioning is consistently accessed via `ploy cluster node` while reusing the existing `handleNode` and `handleNodeAdd` implementations.
+- [x] Change node commands from `ploy node ...` to `ploy cluster node ...` and align usage and docs — Ensure worker node provisioning is consistently accessed via `ploy cluster node` while reusing the existing `handleNode` and `handleNodeAdd` implementations.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root, commands_server.go, node_command.go, server_deploy_run.go), docs, scripts
   - Scope:

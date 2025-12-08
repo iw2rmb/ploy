@@ -318,7 +318,8 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintln(stderr, "  3. Use short-lived tokens for automation")
 	_, _ = fmt.Fprintln(stderr, "")
 	_, _ = fmt.Fprintln(stderr, "Next steps:")
-	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes: ploy node add --address <node-address>\n")
+	// NOTE: Node operations are now accessed via `ploy cluster node` namespace.
+	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes: ploy cluster node add --address <node-address>\n")
 	_, _ = fmt.Fprintln(stderr, "  2. Deploy applications: ploy deploy")
 	_, _ = fmt.Fprintln(stderr, "")
 	_, _ = fmt.Fprintln(stderr, "=================================================================")

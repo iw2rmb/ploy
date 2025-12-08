@@ -23,8 +23,9 @@ func TestHandleNodeRequiresSubcommand(t *testing.T) {
 		t.Fatalf("expected error for missing node subcommand")
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy node") {
-		t.Fatalf("expected node usage output, got: %q", out)
+	// NOTE: Node commands are now accessed via `ploy cluster node` namespace.
+	if !strings.Contains(out, "Usage: ploy cluster node") {
+		t.Fatalf("expected node usage output with cluster prefix, got: %q", out)
 	}
 }
 
