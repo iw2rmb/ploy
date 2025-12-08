@@ -12,7 +12,7 @@ import (
 func TestJSONRoundTrip(t *testing.T) {
 	in := RunSummary{
 		TicketID: domaintypes.TicketID("t-123"),
-		State:    TicketStateRunning,
+		State:    RunStateRunning,
 		Stages: map[string]StageStatus{
 			"s1": {State: StageStateQueued, CurrentJobID: domaintypes.JobID("job-1")},
 		},

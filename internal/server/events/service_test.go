@@ -8,10 +8,10 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -111,7 +111,7 @@ type mockStore struct {
 	store.Querier
 	createEventFunc func(ctx context.Context, arg store.CreateEventParams) (store.Event, error)
 	createLogFunc   func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
-	getJobFunc      func(ctx context.Context, id pgtype.UUID) (store.Job, error)
+	getJobFunc      func(ctx context.Context, id string) (store.Job, error)
 }
 
 func (m *mockStore) CreateEvent(ctx context.Context, arg store.CreateEventParams) (store.Event, error) {
@@ -129,7 +129,7 @@ func (m *mockStore) CreateLog(ctx context.Context, arg store.CreateLogParams) (s
 }
 
 // GetJob returns job metadata for log enrichment.
-func (m *mockStore) GetJob(ctx context.Context, id pgtype.UUID) (store.Job, error) {
+func (m *mockStore) GetJob(ctx context.Context, id string) (store.Job, error) {
 	if m.getJobFunc != nil {
 		return m.getJobFunc(ctx, id)
 	}
@@ -144,12 +144,9 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 
 // TestStorage_CreateAndPublishEvent verifies that events are correctly persisted to the
 // database and published to the SSE hub. It tests successful creation, database
-// errors, and invalid UUID handling.
+// errors, and invalid run ID handling.
 func TestStorage_CreateAndPublishEvent(t *testing.T) {
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
+	runID := "run-events-123"
 
 	tests := []struct {
 		name        string
@@ -173,7 +170,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			},
 			params: store.CreateEventParams{
 				RunID:   runID,
-				JobID:   pgtype.UUID{Valid: false},
+				JobID:   nil,
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   "info",
 				Message: "test event",
@@ -196,7 +193,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			checkEvents: false,
 		},
 		{
-			name: "invalid runID still succeeds DB write",
+			name: "invalid runID still succeeds DB write (no SSE fanout)",
 			storeFunc: func(ctx context.Context, arg store.CreateEventParams) (store.Event, error) {
 				return store.Event{
 					ID:      2,
@@ -206,9 +203,10 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateEventParams{
-				RunID:   pgtype.UUID{Valid: false},
+				// Whitespace-only run ID is treated as invalid for SSE stream.
+				RunID:   "   ",
 				Level:   "warn",
-				Message: "invalid uuid event",
+				Message: "invalid run id event",
 			},
 			wantErr:     false,
 			checkEvents: false,
@@ -247,10 +245,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 
 			// Check if event was published to hub.
 			if tt.checkEvents {
-				streamID := ""
-				if tt.params.RunID.Valid {
-					streamID = uuid.UUID(tt.params.RunID.Bytes).String()
-				}
+				streamID := strings.TrimSpace(tt.params.RunID)
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
@@ -268,10 +263,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 // empty levels default to "info". This ensures consistent level representation
 // in both database storage and SSE streams.
 func TestStorage_LevelNormalization(t *testing.T) {
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
+	runID := "run-level-normalization"
 
 	type testCase struct {
 		inLevel   string
@@ -314,7 +306,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			ctx := context.Background()
 			params := store.CreateEventParams{
 				RunID:   runID,
-				JobID:   pgtype.UUID{Valid: false},
+				JobID:   nil,
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   tc.inLevel,
 				Message: "msg",
@@ -331,7 +323,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			}
 
 			// Verify SSE stream used normalized level in LogRecord.Stream
-			streamID := uuid.UUID(params.RunID.Bytes).String()
+			streamID := strings.TrimSpace(params.RunID)
 			snapshot := svc.Hub().Snapshot(streamID)
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
@@ -352,12 +344,9 @@ func TestStorage_LevelNormalization(t *testing.T) {
 
 // TestStorage_CreateAndPublishLog verifies that log chunks are correctly persisted to
 // the database and published to the SSE hub. It tests successful creation,
-// database errors, and invalid UUID handling for log records.
+// database errors, and invalid run ID handling for log records.
 func TestStorage_CreateAndPublishLog(t *testing.T) {
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
+	runID := "run-logs-123"
 
 	tests := []struct {
 		name        string
@@ -381,8 +370,8 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			},
 			params: store.CreateLogParams{
 				RunID:   runID,
-				JobID:   pgtype.UUID{Valid: false},
-				BuildID: pgtype.UUID{Valid: false},
+				JobID:   nil,
+				BuildID: nil,
 				ChunkNo: 1,
 				Data:    []byte("test log line"),
 			},
@@ -403,7 +392,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			checkEvents: false,
 		},
 		{
-			name: "invalid runID still succeeds DB write",
+			name: "invalid runID still succeeds DB write (no SSE fanout)",
 			storeFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
 				return store.Log{
 					ID:      3,
@@ -413,9 +402,9 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateLogParams{
-				RunID:   pgtype.UUID{Valid: false},
+				RunID:   "   ",
 				ChunkNo: 3,
-				Data:    []byte("invalid uuid log"),
+				Data:    []byte("invalid run id log"),
 			},
 			wantErr:     false,
 			checkEvents: false,
@@ -454,10 +443,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 
 			// Check if log was published to hub.
 			if tt.checkEvents {
-				streamID := ""
-				if tt.params.RunID.Valid {
-					streamID = uuid.UUID(tt.params.RunID.Bytes).String()
-				}
+				streamID := strings.TrimSpace(tt.params.RunID)
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected log event in hub snapshot, got none")
@@ -519,18 +505,9 @@ func gzipData(t *testing.T, data string) []byte {
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	t.Parallel()
 
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
-	jobID := pgtype.UUID{
-		Bytes: [16]byte{16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
-		Valid: true,
-	}
-	nodeID := pgtype.UUID{
-		Bytes: [16]byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99},
-		Valid: true,
-	}
+	runID := "run-log-enrich-123"
+	jobID := "job-log-enrich-123"
+	nodeID := "node-log-enrich-123"
 
 	// Create log data (gzipped, since that's how logs come from nodes).
 	logLine := "Build step completed successfully\n"
@@ -550,8 +527,8 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 			}, nil
 		},
 		// GetJob returns job metadata for enrichment.
-		getJobFunc: func(ctx context.Context, id pgtype.UUID) (store.Job, error) {
-			if id.Bytes != jobID.Bytes {
+		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+			if id != jobID {
 				t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
 			}
 			return store.Job{
@@ -560,7 +537,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				Name:      "build-step",
 				ModType:   "mod",
 				StepIndex: 2000,
-				NodeID:    nodeID,
+				NodeID:    &nodeID,
 			}, nil
 		},
 	}
@@ -577,8 +554,8 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	ctx := context.Background()
 	params := store.CreateLogParams{
 		RunID:   runID,
-		JobID:   jobID,
-		BuildID: pgtype.UUID{Valid: false},
+		JobID:   &jobID,
+		BuildID: nil,
 		ChunkNo: 1,
 		Data:    gzippedLog,
 	}
@@ -589,7 +566,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	// Verify SSE event contains enriched fields.
-	streamID := uuid.UUID(runID.Bytes).String()
+	streamID := strings.TrimSpace(runID)
 	snapshot := svc.Hub().Snapshot(streamID)
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
@@ -605,13 +582,11 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	// Verify enriched fields are present.
-	wantNodeID := uuid.UUID(nodeID.Bytes).String()
-	wantJobID := uuid.UUID(jobID.Bytes).String()
-	if rec.NodeID != wantNodeID {
-		t.Errorf("node_id: got %q, want %q", rec.NodeID, wantNodeID)
+	if rec.NodeID != nodeID {
+		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
 	}
-	if rec.JobID != wantJobID {
-		t.Errorf("job_id: got %q, want %q", rec.JobID, wantJobID)
+	if rec.JobID != jobID {
+		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
 	if rec.ModType != "mod" {
 		t.Errorf("mod_type: got %q, want %q", rec.ModType, "mod")
@@ -626,10 +601,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	t.Parallel()
 
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
+	runID := "run-log-no-job"
 
 	logLine := "System log without job context\n"
 	gzippedLog := gzipData(t, logLine)
@@ -640,12 +612,12 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 			return store.Log{
 				ID:        1,
 				RunID:     arg.RunID,
-				JobID:     arg.JobID, // Invalid UUID.
+				JobID:     arg.JobID, // No job ID.
 				Data:      arg.Data,
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			}, nil
 		},
-		getJobFunc: func(ctx context.Context, id pgtype.UUID) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
 			getJobCalled = true
 			return store.Job{}, nil
 		},
@@ -663,7 +635,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	ctx := context.Background()
 	params := store.CreateLogParams{
 		RunID:   runID,
-		JobID:   pgtype.UUID{Valid: false}, // No job ID.
+		JobID:   nil, // No job ID.
 		ChunkNo: 1,
 		Data:    gzippedLog,
 	}
@@ -679,7 +651,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 
 	// Verify log was still published (without enrichment).
-	streamID := uuid.UUID(runID.Bytes).String()
+	streamID := strings.TrimSpace(runID)
 	snapshot := svc.Hub().Snapshot(streamID)
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
@@ -710,14 +682,8 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	t.Parallel()
 
-	runID := pgtype.UUID{
-		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
-		Valid: true,
-	}
-	jobID := pgtype.UUID{
-		Bytes: [16]byte{16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
-		Valid: true,
-	}
+	runID := "run-log-lookup-fail"
+	jobID := "job-log-lookup-fail"
 
 	logLine := "Log with failing job lookup\n"
 	gzippedLog := gzipData(t, logLine)
@@ -733,7 +699,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 			}, nil
 		},
 		// Simulate job lookup failure.
-		getJobFunc: func(ctx context.Context, id pgtype.UUID) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
 			return store.Job{}, context.DeadlineExceeded
 		},
 	}
@@ -750,7 +716,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	ctx := context.Background()
 	params := store.CreateLogParams{
 		RunID:   runID,
-		JobID:   jobID,
+		JobID:   &jobID,
 		ChunkNo: 1,
 		Data:    gzippedLog,
 	}
@@ -762,7 +728,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	}
 
 	// Verify log was published (without enrichment due to lookup failure).
-	streamID := uuid.UUID(runID.Bytes).String()
+	streamID := strings.TrimSpace(runID)
 	snapshot := svc.Hub().Snapshot(streamID)
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")

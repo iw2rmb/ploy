@@ -83,56 +83,56 @@ func TestStream_PublishTicket(t *testing.T) {
 	tests := []struct {
 		name        string
 		runID       string
-		state       modsapi.TicketState
+		state       modsapi.RunState
 		wantErr     bool
 		checkEvents bool
 	}{
 		{
 			name:        "publish queued ticket",
 			runID:       uuid.New().String(),
-			state:       modsapi.TicketStatePending,
+			state:       modsapi.RunStatePending,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish running ticket",
 			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateRunning,
+			state:       modsapi.RunStateRunning,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish succeeded ticket",
 			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateSucceeded,
+			state:       modsapi.RunStateSucceeded,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish failed ticket",
 			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateFailed,
+			state:       modsapi.RunStateFailed,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish cancelled ticket",
 			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateCancelled,
+			state:       modsapi.RunStateCancelled,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "empty runID returns error",
 			runID:       "",
-			state:       modsapi.TicketStatePending,
+			state:       modsapi.RunStatePending,
 			wantErr:     true,
 			checkEvents: false,
 		},
 		{
 			name:        "whitespace runID returns error",
 			runID:       "  \t  ",
-			state:       modsapi.TicketStatePending,
+			state:       modsapi.RunStatePending,
 			wantErr:     true,
 			checkEvents: false,
 		},
@@ -151,7 +151,7 @@ func TestStream_PublishTicket(t *testing.T) {
 			ctx := context.Background()
 			now := time.Now()
 
-			payload := modsapi.TicketSummary{
+			payload := modsapi.RunSummary{
 				TicketID:   domaintypes.TicketID("test-ticket-123"),
 				State:      tt.state,
 				Submitter:  "test-user",
@@ -190,11 +190,11 @@ func TestStream_PublishTicket(t *testing.T) {
 					t.Fatal("expected ticket event in hub snapshot, got none")
 				}
 				if snapshot[0].Type != "run" {
-					t.Fatalf("expected event type 'ticket', got %s", snapshot[0].Type)
+					t.Fatalf("expected event type 'run', got %s", snapshot[0].Type)
 				}
 
 				// Verify the payload is correctly marshaled.
-				var decodedPayload modsapi.TicketSummary
+				var decodedPayload modsapi.RunSummary
 				if err := json.Unmarshal(snapshot[0].Data, &decodedPayload); err != nil {
 					t.Fatalf("failed to unmarshal ticket payload: %v", err)
 				}
@@ -226,9 +226,9 @@ func TestStream_PublishTicketWithContext(t *testing.T) {
 	}
 
 	runID := uuid.New().String()
-	payload := modsapi.TicketSummary{
+	payload := modsapi.RunSummary{
 		TicketID:  domaintypes.TicketID("test-ticket"),
-		State:     modsapi.TicketStateRunning,
+		State:     modsapi.RunStateRunning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Stages:    map[string]modsapi.StageStatus{},

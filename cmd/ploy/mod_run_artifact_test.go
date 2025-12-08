@@ -26,10 +26,10 @@ func TestDownloadTicketArtifactsCreatesManifest(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
 			// Ticket status endpoint.
-			resp := modsapi.TicketStatusResponse{
-				Ticket: modsapi.TicketSummary{
+			resp := modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID("test-123"),
-					State:    modsapi.TicketStateSucceeded,
+					State:    modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"stage1": {
 							State: modsapi.StageStateSucceeded,
@@ -141,10 +141,10 @@ func TestDownloadTicketArtifactsMultipleStages(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
 			// Ticket status with multiple stages.
-			resp := modsapi.TicketStatusResponse{
-				Ticket: modsapi.TicketSummary{
+			resp := modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID("test-multi"),
-					State:    modsapi.TicketStateSucceeded,
+					State:    modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {
 							State: modsapi.StageStateSucceeded,
@@ -262,8 +262,8 @@ func TestDownloadTicketArtifactsErrorHandling(t *testing.T) {
 			name: "artifact CID not found",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts") {
-					resp := modsapi.TicketStatusResponse{
-						Ticket: modsapi.TicketSummary{
+					resp := modsapi.RunStatusResponse{
+						Ticket: modsapi.RunSummary{
 							TicketID: domaintypes.TicketID("test"),
 							Stages: map[string]modsapi.StageStatus{
 								"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
@@ -403,8 +403,8 @@ func TestFetchMRURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := modsapi.TicketStatusResponse{
-					Ticket: modsapi.TicketSummary{
+				resp := modsapi.RunStatusResponse{
+					Ticket: modsapi.RunSummary{
 						TicketID: domaintypes.TicketID("test"),
 						Metadata: tt.metadata,
 					},
@@ -453,8 +453,8 @@ func TestDownloadTicketArtifactsZeroArtifacts(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v1/mods/") {
-			resp := modsapi.TicketStatusResponse{
-				Ticket: modsapi.TicketSummary{Stages: map[string]modsapi.StageStatus{
+			resp := modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{Stages: map[string]modsapi.StageStatus{
 					"stage0": {Artifacts: map[string]string{}},
 				}},
 			}

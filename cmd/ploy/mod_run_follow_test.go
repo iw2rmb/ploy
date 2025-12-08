@@ -27,29 +27,40 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			var req modsapi.TicketSubmitRequest
+			var req modsapi.RunSubmitRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateRunning}})
+			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
+				Ticket: modsapi.RunSummary{
+					TicketID: domaintypes.TicketID(ticketID),
+					State:    modsapi.RunStateRunning,
+				},
+			})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
-			// SSE stream: ticket running -> ticket succeeded
+			// SSE stream: run running -> run succeeded
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {
 				t.Fatalf("no flusher")
 			}
 			// running
-			_, _ = w.Write([]byte("event: ticket\n"))
-			data, _ := json.Marshal(modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateRunning})
+			_, _ = w.Write([]byte("event: run\n"))
+			data, _ := json.Marshal(modsapi.RunSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.RunStateRunning,
+			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data)
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 			time.Sleep(5 * time.Millisecond)
 			// succeeded
-			_, _ = w.Write([]byte("event: ticket\n"))
-			data2, _ := json.Marshal(modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateSucceeded})
+			_, _ = w.Write([]byte("event: run\n"))
+			data2, _ := json.Marshal(modsapi.RunSummary{
+				TicketID: domaintypes.TicketID(ticketID),
+				State:    modsapi.RunStateSucceeded,
+			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data2)
 			_, _ = w.Write([]byte("\n\n"))
@@ -57,13 +68,15 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", ticketID):
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{
-				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.TicketStateSucceeded,
-				Stages: map[string]modsapi.StageStatus{
-					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
+			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
+					TicketID: domaintypes.TicketID(ticketID),
+					State:    modsapi.RunStateSucceeded,
+					Stages: map[string]modsapi.StageStatus{
+						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
+					},
 				},
-			}})
+			})
 
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/artifacts":
 			if q := r.URL.Query().Get("cid"); q != artifactCID {
@@ -143,26 +156,26 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
 			// Accept ticket submission.
 			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{
-				Ticket: modsapi.TicketSummary{
+			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.TicketStateRunning,
+					State:    modsapi.RunStateRunning,
 				},
 			})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
-			// SSE stream with ticket, stage, and log events.
+			// SSE stream with run, stage, and log events.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {
 				t.Fatalf("no flusher")
 			}
 
-			// Ticket running event.
-			_, _ = w.Write([]byte("event: ticket\n"))
-			ticketData, _ := json.Marshal(modsapi.TicketSummary{
+			// Run running event.
+			_, _ = w.Write([]byte("event: run\n"))
+			ticketData, _ := json.Marshal(modsapi.RunSummary{
 				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.TicketStateRunning,
+				State:    modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData)
@@ -183,11 +196,11 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 
 			time.Sleep(5 * time.Millisecond)
 
-			// Ticket succeeded event.
-			_, _ = w.Write([]byte("event: ticket\n"))
-			ticketData2, _ := json.Marshal(modsapi.TicketSummary{
+			// Run succeeded event.
+			_, _ = w.Write([]byte("event: run\n"))
+			ticketData2, _ := json.Marshal(modsapi.RunSummary{
 				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.TicketStateSucceeded,
+				State:    modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData2)
@@ -251,10 +264,10 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
 			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{
-				Ticket: modsapi.TicketSummary{
+			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID(ticketID),
-					State:    modsapi.TicketStateRunning,
+					State:    modsapi.RunStateRunning,
 				},
 			})
 
@@ -265,11 +278,11 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 				t.Fatalf("no flusher")
 			}
 
-			// Ticket running.
-			_, _ = w.Write([]byte("event: ticket\n"))
-			ticketData, _ := json.Marshal(modsapi.TicketSummary{
+			// Run running.
+			_, _ = w.Write([]byte("event: run\n"))
+			ticketData, _ := json.Marshal(modsapi.RunSummary{
 				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.TicketStateRunning,
+				State:    modsapi.RunStateRunning,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData)
@@ -282,11 +295,11 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
 			fl.Flush()
 
-			// Ticket succeeded.
-			_, _ = w.Write([]byte("event: ticket\n"))
-			ticketData2, _ := json.Marshal(modsapi.TicketSummary{
+			// Run succeeded.
+			_, _ = w.Write([]byte("event: run\n"))
+			ticketData2, _ := json.Marshal(modsapi.RunSummary{
 				TicketID: domaintypes.TicketID(ticketID),
-				State:    modsapi.TicketStateSucceeded,
+				State:    modsapi.RunStateSucceeded,
 			})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(ticketData2)

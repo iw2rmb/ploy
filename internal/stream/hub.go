@@ -122,7 +122,7 @@ func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint Retent
 // Event types emitted by the hub are:
 //   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, ModType, StepIndex}
 //   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
-//   - "run": api.TicketSummary snapshot
+//   - "run": api.RunSummary snapshot
 //   - "done": Status {Status: "done"} sentinel for stream completion.
 func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status) error {
 	if err := h.publish(ctx, streamID, "done", status); err != nil {

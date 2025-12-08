@@ -14,7 +14,7 @@ import (
 )
 
 func TestExecuteModRunSubmitsTicket(t *testing.T) {
-	var received modsapi.TicketSubmitRequest
+	var received modsapi.RunSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
@@ -25,8 +25,13 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		// Server assigns the ticket id.
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("mods-server-123"), State: modsapi.TicketStatePending}}
+		// Server assigns the run id.
+		resp := modsapi.RunSubmitResponse{
+			Ticket: modsapi.RunSummary{
+				TicketID: domaintypes.TicketID("mods-server-123"),
+				State:    modsapi.RunStatePending,
+			},
+		}
 		w.WriteHeader(http.StatusAccepted)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			t.Fatalf("encode response: %v", err)
@@ -57,10 +62,15 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 }
 
 func TestExecuteModRunServerAssignsTicket(t *testing.T) {
-	var received modsapi.TicketSubmitRequest
+	var received modsapi.RunSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("mods-abc123"), State: modsapi.TicketStatePending}}
+		resp := modsapi.RunSubmitResponse{
+			Ticket: modsapi.RunSummary{
+				TicketID: domaintypes.TicketID("mods-abc123"),
+				State:    modsapi.RunStatePending,
+			},
+		}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
