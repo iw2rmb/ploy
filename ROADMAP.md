@@ -384,7 +384,7 @@ Legend: [ ] todo, [x] done.
       - Swap `dist/ploy rollout ...` invocations for `dist/ploy cluster rollout ...` and adapt `grep` patterns accordingly.
 
 ## Move token management under `ploy cluster token`
-- [ ] Change token commands from `ploy token ...` to `ploy cluster token ...` and keep usage, flags, and HTTP behavior unchanged — Ensure token lifecycle operations are reachable only via the cluster namespace while preserving request structure to the control‑plane API.
+- [x] Change token commands from `ploy token ...` to `ploy cluster token ...` and keep usage, flags, and HTTP behavior unchanged — Ensure token lifecycle operations are reachable only via the cluster namespace while preserving request structure to the control‑plane API.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (root, commands_config.go, token_commands.go), docs, scripts
   - Scope:
