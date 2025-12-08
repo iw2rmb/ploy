@@ -8,7 +8,7 @@ Core Commands:
   mods             Observe Mods execution (logs, events)
   runs             Inspect and follow individual runs
   upload           Upload artifact bundle to a run (HTTPS)
-  cluster          Manage local cluster descriptors
+  cluster          Manage clusters (deploy, nodes, rollout, tokens)
   config           Inspect or update cluster configuration
   manifest         Inspect and validate integration manifests
   server           Manage control plane server
