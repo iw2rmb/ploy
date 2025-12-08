@@ -100,14 +100,14 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect POST /v1/runs/{id}/repos
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
 			called = true
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			resp := runRepoResponse{
-				ID:        "repo-uuid-456",
-				RunID:     "batch-uuid-123",
+				ID:        "a1b2c3d4",
+				RunID:     "2NxO0FEXAMPLE4Rn",
 				RepoURL:   receivedBody["repo_url"],
 				BaseRef:   receivedBody["base_ref"],
 				TargetRef: receivedBody["target_ref"],
@@ -131,7 +131,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
 		"--target-ref", "feature-branch",
-		"batch-uuid-123",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo add error: %v", err)
@@ -157,13 +157,13 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect DELETE /v1/runs/{id}/repos/{repo_id}
-		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456" {
+		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4" {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			resp := runRepoResponse{
-				ID:        "repo-uuid-456",
-				RunID:     "batch-uuid-123",
+				ID:        "a1b2c3d4",
+				RunID:     "2NxO0FEXAMPLE4Rn",
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
@@ -184,8 +184,8 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	// Note: Flags must come before the positional run-name argument for flag parsing.
 	err := execute([]string{
 		"mod", "run", "repo", "remove",
-		"--repo-id", "repo-uuid-456",
-		"batch-uuid-123",
+		"--repo-id", "a1b2c3d4",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo remove error: %v", err)
@@ -203,14 +203,14 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect POST /v1/runs/{id}/repos/{repo_id}/restart
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
 			called = true
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			resp := runRepoResponse{
-				ID:        "repo-uuid-456",
-				RunID:     "batch-uuid-123",
+				ID:        "a1b2c3d4",
+				RunID:     "2NxO0FEXAMPLE4Rn",
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch-v2",
@@ -231,9 +231,9 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	// Note: Flags must come before the positional run-name argument for flag parsing.
 	err := execute([]string{
 		"mod", "run", "repo", "restart",
-		"--repo-id", "repo-uuid-456",
+		"--repo-id", "a1b2c3d4",
 		"--target-ref", "feature-branch-v2",
-		"batch-uuid-123",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)
@@ -254,14 +254,14 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect GET /v1/runs/{id}/repos
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/batch-uuid-123/repos" {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			repos := []runRepoResponse{
 				{
-					ID:        "repo-uuid-1",
-					RunID:     "batch-uuid-123",
+					ID:        "e5f6g7h8",
+					RunID:     "2NxO0FEXAMPLE4Rn",
 					RepoURL:   "https://github.com/org/repo1.git",
 					BaseRef:   "main",
 					TargetRef: "feature-1",
@@ -270,8 +270,8 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 					CreatedAt: time.Now(),
 				},
 				{
-					ID:        "repo-uuid-2",
-					RunID:     "batch-uuid-123",
+					ID:        "i9j0k1l2",
+					RunID:     "2NxO0FEXAMPLE4Rn",
 					RepoURL:   "https://github.com/org/repo2.git",
 					BaseRef:   "main",
 					TargetRef: "feature-2",
@@ -293,7 +293,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "run", "repo", "status", "batch-uuid-123"}, buf)
+	err := execute([]string{"mod", "run", "repo", "status", "2NxO0FEXAMPLE4Rn"}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo status error: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestModRunRepoStatusEmptyBatch(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoAddServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
 			http.Error(w, "run not found", http.StatusNotFound)
 			return
 		}
@@ -353,7 +353,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
 		"--target-ref", "feature-branch",
-		"batch-uuid-123",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
@@ -372,7 +372,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRemoveServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456" {
+		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4" {
 			http.Error(w, "repo not found", http.StatusNotFound)
 			return
 		}
@@ -385,8 +385,8 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{
 		"mod", "run", "repo", "remove",
-		"--repo-id", "repo-uuid-456",
-		"batch-uuid-123",
+		"--repo-id", "a1b2c3d4",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
@@ -400,7 +400,7 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRestartServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
 			// Conflict: cannot restart a non-terminal repo.
 			http.Error(w, "can only restart repos in terminal state", http.StatusConflict)
 			return
@@ -414,8 +414,8 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{
 		"mod", "run", "repo", "restart",
-		"--repo-id", "repo-uuid-456",
-		"batch-uuid-123",
+		"--repo-id", "a1b2c3d4",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 409 response")
@@ -455,13 +455,13 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			resp := runRepoResponse{
-				ID:        "repo-uuid-456",
-				RunID:     "batch-uuid-123",
+				ID:        "a1b2c3d4",
+				RunID:     "2NxO0FEXAMPLE4Rn",
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-branch",
@@ -481,9 +481,9 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{
 		"mod", "run", "repo", "restart",
-		"--repo-id", "repo-uuid-456",
+		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
-		"batch-uuid-123",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)
@@ -501,13 +501,13 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-uuid-123/repos/repo-uuid-456/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			resp := runRepoResponse{
-				ID:        "repo-uuid-456",
-				RunID:     "batch-uuid-123",
+				ID:        "a1b2c3d4",
+				RunID:     "2NxO0FEXAMPLE4Rn",
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-v2",
@@ -527,10 +527,10 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{
 		"mod", "run", "repo", "restart",
-		"--repo-id", "repo-uuid-456",
+		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
 		"--target-ref", "feature-v2",
-		"batch-uuid-123",
+		"2NxO0FEXAMPLE4Rn",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)
