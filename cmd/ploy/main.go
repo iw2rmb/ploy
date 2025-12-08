@@ -45,7 +45,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  mods             Observe Mods execution (logs, events)")
 	_, _ = fmt.Fprintln(w, "  runs             Inspect and follow individual runs")
 	_, _ = fmt.Fprintln(w, "  upload           Upload artifact bundle to a run (HTTPS)")
-	_, _ = fmt.Fprintln(w, "  cluster          Manage local cluster descriptors")
+	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, rollout, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
 	_, _ = fmt.Fprintln(w, "  server           Manage control plane server")
