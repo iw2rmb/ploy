@@ -11,10 +11,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// FuzzCancelTicket_Body exercises the cancel handler against arbitrary bodies
+// FuzzCancelRun_Body exercises the cancel handler against arbitrary bodies
 // to ensure robust JSON decoding and path parameter handling. This target is
 // fast and deterministic; it does not hit external services.
-func FuzzCancelTicket_Body(f *testing.F) {
+func FuzzCancelRun_Body(f *testing.F) {
 	// Seed with representative bodies.
 	f.Add([]byte(""), true)
 	f.Add([]byte("{}"), true)
@@ -37,7 +37,7 @@ func FuzzCancelTicket_Body(f *testing.F) {
 			idStr = "not-a-uuid"
 		}
 
-		handler := cancelTicketHandler(st, nil)
+		handler := cancelRunHandler(st, nil)
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+idStr+"/cancel", bytes.NewReader(body))
 		req.SetPathValue("id", idStr)

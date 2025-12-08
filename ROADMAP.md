@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/mods/api ./internal/stream ./internal/server/events` — fuzz tests and stream tests still pass with renamed methods and fields.
 
 ## Mods control plane handlers
-- [ ] Rename Mods HTTP handlers and summaries to run-centric naming — remove ticket language from server-facing API while preserving routes.
+- [x] Rename Mods HTTP handlers and summaries to run-centric naming — remove ticket language from server-facing API while preserving routes.
   - Repository: ploy
   - Component: `internal/server/handlers`
   - Scope: In `mods_ticket.go`, rename `submitTicketHandler` → `submitRunHandler`, `getTicketStatusHandler` → `getRunStatusHandler`; construct `modsapi.RunSummary` with `RunID` instead of `TicketID`. In `mods_cancel.go` and `mods_resume.go`, populate `RunSummary.RunID` and update log messages/comments to refer to runs.

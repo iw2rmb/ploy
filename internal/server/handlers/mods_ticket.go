@@ -28,10 +28,10 @@ import (
 // repo/spec,  run status as mods-style RunSummary, and stage/run_step
 // materialization for single- and multi-step runs.
 
-// submitTicketHandler returns an HTTP handler that submits a new run (mods run).
+// submitRunHandler returns an HTTP handler that submits a new run (mods run).
 // POST /v1/mods — Accepts RunSubmitRequest, returns RunSummary (run_id is a KSUID string).
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
-func submitTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+func submitRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body with domain types for VCS fields.
 		// JSON unmarshaling will automatically validate repo URL scheme and non-empty refs.
@@ -126,13 +126,13 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Use typed status (store.RunStatus) instead of string cast for type safety;
 		// JSON encoder will serialize the underlying string value.
 		resp := struct {
-			TicketID  string          `json:"run_id"`
+			RunID     string          `json:"run_id"`
 			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
 			RepoURL   string          `json:"repo_url"`
 			BaseRef   string          `json:"base_ref"`
 			TargetRef string          `json:"target_ref"`
 		}{
-			TicketID:  run.ID, // run.ID is now a string (KSUID).
+			RunID:     run.ID, // run.ID is now a string (KSUID).
 			Status:    run.Status,
 			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
@@ -141,17 +141,17 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
-			// Use RunID field (formerly TicketID).
+			// Construct RunSummary with RunID for SSE event publishing.
 			runSummary := modsapi.RunSummary{
-				RunID:      domaintypes.RunID(resp.TicketID),
+				RunID:      domaintypes.RunID(resp.RunID),
 				State:      modsapi.RunState(run.Status),
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  run.CreatedAt.Time,
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishRun(r.Context(), resp.TicketID, runSummary); err != nil {
-				slog.Error("submit run: publish run event failed", "run_id", resp.TicketID, "err", err)
+			if err := eventsService.PublishRun(r.Context(), resp.RunID, runSummary); err != nil {
+				slog.Error("submit run: publish run event failed", "run_id", resp.RunID, "err", err)
 			}
 		}
 
@@ -162,7 +162,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		slog.Info("run submitted",
-			"run_id", resp.TicketID,
+			"run_id", resp.RunID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
@@ -171,11 +171,11 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 	}
 }
 
-// getTicketStatusHandler returns an HTTP handler that fetches run (run) status by ID.
+// getRunStatusHandler returns an HTTP handler that fetches run status by ID.
 // GET /v1/mods/{id} — Returns RunSummary by run ID (KSUID string).
 //
 // Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
-func getTicketStatusHandler(st store.Store) http.HandlerFunc {
+func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
@@ -201,7 +201,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
 		runState := modsapi.RunStatusFromStore(run.Status)
 
-		// run.ID is now a string (KSUID). Use RunID field (formerly TicketID).
+		// run.ID is now a string (KSUID). Construct RunSummary with RunID.
 		summary := modsapi.RunSummary{
 			RunID:      domaintypes.RunID(run.ID),
 			State:      runState,

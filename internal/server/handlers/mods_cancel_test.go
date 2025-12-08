@@ -15,8 +15,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestCancelTicket_Success transitions a non-terminal run to canceled and updates jobs.
-func TestCancelTicket_Success(t *testing.T) {
+// TestCancelRun_Success transitions a non-terminal run to canceled and updates jobs.
+func TestCancelRun_Success(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -30,7 +30,7 @@ func TestCancelTicket_Success(t *testing.T) {
 		},
 	}
 
-	handler := cancelTicketHandler(st, nil)
+	handler := cancelRunHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]string{"reason": "user requested"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", bytes.NewReader(body))
@@ -54,8 +54,8 @@ func TestCancelTicket_Success(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_Idempotent verifies 200 when already terminal.
-func TestCancelTicket_Idempotent(t *testing.T) {
+// TestCancelRun_Idempotent verifies 200 when already terminal.
+func TestCancelRun_Idempotent(t *testing.T) {
 	tests := []struct {
 		name      string
 		runStatus store.RunStatus
@@ -78,7 +78,7 @@ func TestCancelTicket_Idempotent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			id := uuid.New()
 			st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: tt.runStatus}}
-			handler := cancelTicketHandler(st, nil)
+			handler := cancelRunHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
 			req.SetPathValue("id", id.String())
 			rr := httptest.NewRecorder()
@@ -93,9 +93,9 @@ func TestCancelTicket_Idempotent(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_BadID_And_NotFound verifies rejection of invalid IDs and not found handling.
+// TestCancelRun_BadID_And_NotFound verifies rejection of invalid IDs and not found handling.
 // Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
-func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
+func TestCancelRun_BadID_And_NotFound(t *testing.T) {
 	tests := []struct {
 		name       string
 		id         string
@@ -133,7 +133,7 @@ func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := cancelTicketHandler(tt.mockStore, nil)
+			handler := cancelRunHandler(tt.mockStore, nil)
 			urlID := tt.urlID
 			if urlID == "" {
 				urlID = tt.id
@@ -152,8 +152,8 @@ func TestCancelTicket_BadID_And_NotFound(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_SSEPublish verifies that the handler publishes ticket and status events.
-func TestCancelTicket_SSEPublish(t *testing.T) {
+// TestCancelRun_SSEPublish verifies that the handler publishes ticket and status events.
+func TestCancelRun_SSEPublish(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -170,7 +170,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 
-	handler := cancelTicketHandler(st, eventsService)
+	handler := cancelRunHandler(st, eventsService)
 
 	body, _ := json.Marshal(map[string]string{"reason": "user requested"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", bytes.NewReader(body))
@@ -245,9 +245,9 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_OnlyPendingRunningStagesUpdated ensures only pending|running jobs
+// TestCancelRun_OnlyPendingRunningStagesUpdated ensures only pending|running jobs
 // are transitioned to canceled and terminal jobs are left untouched.
-func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
+func TestCancelRun_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	id := uuid.New()
 	now := time.Now()
 	pendingID := uuid.New().String()
@@ -268,7 +268,7 @@ func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 			stgPending, stgRunning, stgSucceeded, stgFailed, stgCanceled,
 		},
 	}
-	handler := cancelTicketHandler(st, nil)
+	handler := cancelRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
 	req.SetPathValue("id", id.String())
@@ -300,8 +300,8 @@ func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_NoStages verifies behavior when run has no jobs.
-func TestCancelTicket_NoStages(t *testing.T) {
+// TestCancelRun_NoStages verifies behavior when run has no jobs.
+func TestCancelRun_NoStages(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -312,7 +312,7 @@ func TestCancelTicket_NoStages(t *testing.T) {
 		},
 		listJobsByRunResult: []store.Job{},
 	}
-	handler := cancelTicketHandler(st, nil)
+	handler := cancelRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
 	req.SetPathValue("id", id.String())
@@ -330,8 +330,8 @@ func TestCancelTicket_NoStages(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_JSONBodyVariations tests different request body formats.
-func TestCancelTicket_JSONBodyVariations(t *testing.T) {
+// TestCancelRun_JSONBodyVariations tests different request body formats.
+func TestCancelRun_JSONBodyVariations(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
@@ -381,7 +381,7 @@ func TestCancelTicket_JSONBodyVariations(t *testing.T) {
 				},
 				listJobsByRunResult: []store.Job{},
 			}
-			handler := cancelTicketHandler(st, nil)
+			handler := cancelRunHandler(st, nil)
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", bytes.NewReader([]byte(tt.body)))
 			req.SetPathValue("id", id.String())
@@ -396,8 +396,8 @@ func TestCancelTicket_JSONBodyVariations(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_StageDuration verifies duration calculation for jobs.
-func TestCancelTicket_StageDuration(t *testing.T) {
+// TestCancelRun_StageDuration verifies duration calculation for jobs.
+func TestCancelRun_StageDuration(t *testing.T) {
 	tests := []struct {
 		name            string
 		startedAt       pgtype.Timestamptz
@@ -434,7 +434,7 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 					},
 				},
 			}
-			handler := cancelTicketHandler(st, nil)
+			handler := cancelRunHandler(st, nil)
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
 			req.SetPathValue("id", id.String())
