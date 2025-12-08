@@ -28,7 +28,6 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"cluster",  // newClusterCmd
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
-		"rollout",  // newRolloutCmd
 		"token",    // newTokenCmd
 	}
 
@@ -157,7 +156,7 @@ func TestRootCmdPreservesExistingBehavior(t *testing.T) {
 // documentation examples stay accurate when the CLI structure changes.
 //
 // The test validates:
-// - Root help includes all expected commands (mod, server, node, etc.)
+// - Root help includes all expected commands (mod, cluster, etc.)
 // - The completion command is documented and functional
 // - Help format matches cobra conventions
 // - Key commands have proper Short descriptions
@@ -182,9 +181,13 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 				"Ploy CLI v2",
 				"Core Commands:",
 				"mod",
-				"server",
-				"node",
-				"rollout",
+				"mods",
+				"runs",
+				"upload",
+				"cluster",
+				"config",
+				"manifest",
+				"token",
 			},
 			mustContainAll: true,
 			description:    "Root help must list all top-level commands",
