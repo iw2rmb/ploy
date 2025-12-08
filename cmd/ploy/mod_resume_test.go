@@ -106,11 +106,13 @@ func TestModResumeConflict(t *testing.T) {
 }
 
 // TestModResumeBadRequest verifies the CLI returns an error for invalid ticket ID format.
+// Note: IDs are now KSUID strings (not UUIDs); the server returns a generic "invalid id" message.
 func TestModResumeBadRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/mods/") {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte("invalid id: invalid uuid"))
+			// Server returns "invalid id" for malformed run IDs (KSUID strings).
+			_, _ = w.Write([]byte("invalid id: malformed run identifier"))
 			return
 		}
 		http.NotFound(w, r)
@@ -119,7 +121,8 @@ func TestModResumeBadRequest(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "not-a-uuid"}, buf)
+	// Use a clearly invalid ID format for testing error handling.
+	err := execute([]string{"mod", "resume", "bad-id"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid ticket id")
 	}
