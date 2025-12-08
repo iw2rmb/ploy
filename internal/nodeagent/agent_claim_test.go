@@ -20,16 +20,12 @@ func TestClaimLoop(t *testing.T) {
 	var mu sync.Mutex
 	var calls []string
 
-	// Create test server.
+	// Create test server for the unified claim queue.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			// No buildgate jobs available in this test.
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/test-node/claim":
 			calls = append(calls, "claim")
 			// Return a run to claim.
@@ -135,15 +131,11 @@ func TestClaimLoopNoWork(t *testing.T) {
 	t.Parallel()
 
 	callCount := 0
+	// Server for unified claim queue; returns 204 No Content (no work available).
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/nodes/test-node/claim" {
 			callCount++
 			// Return 204 No Content (no work available).
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		if r.URL.Path == "/v1/nodes/test-node/buildgate/claim" {
-			// Always no buildgate jobs for this test.
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -209,6 +201,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 	var intervals []time.Duration
 	var lastCall time.Time
 
+	// Server for unified claim queue; returns 204 No Content to trigger backoff.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -221,10 +214,6 @@ func TestClaimLoopBackoff(t *testing.T) {
 			lastCall = now
 
 			// Return 204 No Content to trigger backoff.
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		if r.URL.Path == "/v1/nodes/test-node/buildgate/claim" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -299,15 +288,12 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	var lastCall time.Time
 	callCount := 0
 
+	// Server for unified claim queue; returns 204 for first 3 calls then success.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			// First few loops: no buildgate jobs; let run claim proceed.
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/test-node/claim":
 			now := time.Now()
 			if !lastCall.IsZero() {
@@ -426,14 +412,12 @@ func TestClaimLoopAckFailure(t *testing.T) {
 	var mu sync.Mutex
 	ackCalled := false
 
+	// Server for unified claim queue; ack returns failure.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/test-node/claim":
 			resp := ClaimResponse{
 				ID:        types.RunID("run-456"),
@@ -527,13 +511,9 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// HTTP test server that returns a single claim and accepts ack.
+	// HTTP test server for unified claim queue.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			// No buildgate jobs for this mapping test.
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/test-node/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
@@ -620,15 +600,12 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// HTTP test server that returns a step-level claim and accepts ack.
+	// HTTP test server for unified claim queue with step-level claim.
 	var ackPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/test-node/claim":
-			// Return step-level claim with step_index=1.
+			// Return step-level claim with step_index.
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
 		case "/v1/nodes/test-node/ack":
@@ -751,12 +728,9 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// ===== Simulate Node 1 claiming step 0 =====
+	// ===== Simulate Node 1 claiming step 0 from unified queue =====
 	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/node-1/buildgate/claim":
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/node-1/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim0)
@@ -804,12 +778,9 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		t.Errorf("node-1: RunID=%q want %q", mock1.lastStart.RunID, runID)
 	}
 
-	// ===== Simulate Node 2 claiming step 1 =====
+	// ===== Simulate Node 2 claiming step 1 from unified queue =====
 	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/node-2/buildgate/claim":
-			w.WriteHeader(http.StatusNoContent)
-			return
 		case "/v1/nodes/node-2/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim1)

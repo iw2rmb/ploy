@@ -8,15 +8,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
-// ClaimManager periodically polls the server for work and executes claimed runs.
-// Contains configuration, HTTP client, run controller, and buildgate executor.
-// Manages backoff state for polling intervals when no work is available.
+// ClaimManager periodically polls the server for work and executes claimed jobs.
+// Nodes claim from a single unified jobs queue (FIFO by step_index); there is no
+// separate Build Gate queue or claim path.
+// Contains configuration, HTTP client, run controller, and backoff state for
+// polling intervals when no work is available.
 type ClaimManager struct {
-	cfg           Config
-	client        *http.Client
-	controller    RunController
-	buildgateExec *BuildGateExecutor
-	backoff       *backoff.StatefulBackoff
+	cfg        Config
+	client     *http.Client
+	controller RunController
+	backoff    *backoff.StatefulBackoff
 }
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
@@ -40,23 +41,22 @@ type ClaimResponse struct {
 	Spec      json.RawMessage `json:"spec,omitempty"`
 }
 
-// NewClaimManager constructs a claim manager with HTTP client and buildgate executor.
-// Initializes backoff parameters for the claim loop polling interval.
+// NewClaimManager constructs a claim manager for the unified jobs queue.
+// Nodes claim jobs from a single queue (FIFO by step_index); there is no
+// separate Build Gate queue. Initializes backoff parameters for the claim
+// loop polling interval.
 func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error) {
 	// Don't create HTTP client yet - defer until after bootstrap runs.
 	// Client will be lazily initialized on first claim attempt.
-
-	buildgateExec := NewBuildGateExecutor(cfg)
 
 	// Initialize shared backoff policy for claim loop polling.
 	// Uses 250ms initial interval, 5s max cap matching previous behavior.
 	backoffPolicy := backoff.ClaimLoopPolicy()
 
 	return &ClaimManager{
-		cfg:           cfg,
-		client:        nil, // Will be initialized lazily
-		controller:    controller,
-		buildgateExec: buildgateExec,
-		backoff:       backoff.NewStatefulBackoff(backoffPolicy),
+		cfg:        cfg,
+		client:     nil, // Will be initialized lazily
+		controller: controller,
+		backoff:    backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }

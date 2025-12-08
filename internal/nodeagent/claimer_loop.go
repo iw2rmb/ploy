@@ -1,10 +1,11 @@
 // claimer_loop.go contains the claim loop orchestration and backoff logic.
 //
-// This file owns the Start method that continuously polls for work (runs or
-// buildgate jobs) with exponential backoff. Backoff increases when no work
-// is available or on errors, and resets when work is successfully claimed.
-// Work claiming prioritizes buildgate jobs before regular runs. Isolating
-// loop mechanics from claim/execution details simplifies backoff testing.
+// This file owns the Start method that continuously polls for work (jobs)
+// with exponential backoff. Backoff increases when no work is available or
+// on errors, and resets when work is successfully claimed.
+// Nodes claim from a single unified jobs queue (FIFO by step_index); there
+// is no separate Build Gate queue or claim path. Isolating loop mechanics
+// from claim/execution details simplifies backoff testing.
 package nodeagent
 
 import (
@@ -22,8 +23,9 @@ import (
 )
 
 // Start begins the claim loop.
-// Continuously polls for work (runs or buildgate jobs) using a ticker with exponential backoff.
+// Continuously polls for work (jobs) using a ticker with exponential backoff.
 // Backoff increases when no work is available or on errors, resets when work is successfully claimed.
+// Nodes claim from a single unified jobs queue (FIFO by step_index).
 func (c *ClaimManager) Start(ctx context.Context) error {
 	// Initialize ticker with the initial backoff interval from shared policy.
 	ticker := time.NewTicker(c.backoff.GetDuration())
@@ -34,8 +36,8 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			// Attempt to claim and execute work (runs or buildgate jobs).
-			claimed, err := c.claimWork(ctx)
+			// Attempt to claim and execute a job from the unified queue.
+			claimed, err := c.claimAndExecute(ctx)
 			// Handle claim result: error, success, or no work available.
 			switch {
 			case err != nil:
@@ -56,45 +58,21 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 	}
 }
 
-// claimWork attempts to claim either a run or a buildgate job.
-// Tries buildgate jobs first (lighter weight), then falls back to runs.
-// Build Gate job claiming is gated by cfg.BuildGateWorkerEnabled; when false,
-// only regular run claims are attempted.
-// Returns true if work was claimed, false if no work is available.
-func (c *ClaimManager) claimWork(ctx context.Context) (bool, error) {
-	// Only attempt Build Gate job claim when the worker flag is enabled.
-	// Nodes with BuildGateWorkerEnabled=false skip straight to run claims.
-	if c.cfg.BuildGateWorkerEnabled {
-		claimedBuildGate, err := c.claimAndExecuteBuildGateJob(ctx)
-		if err != nil {
-			return false, fmt.Errorf("claim buildgate job: %w", err)
-		}
-		if claimedBuildGate {
-			return true, nil
-		}
-	}
-
-	// Try claiming a run (always attempted regardless of worker flag).
-	claimedRun, err := c.claimAndExecute(ctx)
-	if err != nil {
-		return false, fmt.Errorf("claim run: %w", err)
-	}
-
-	return claimedRun, nil
-}
-
-// claimAndExecute attempts to claim a run and execute it.
-// Returns true if a run was claimed, false if no work is available (204).
+// claimAndExecute attempts to claim a job from the unified queue and execute it.
+// Jobs are claimed FIFO by step_index from a single queue — there is no separate
+// Build Gate queue or claim path. All job types (pre-gate, mod, heal, re-gate,
+// post-gate) are consumed from the same queue.
+// Returns true if a job was claimed, false if no work is available (204).
 //
 // Flow:
-//  1. POST /v1/nodes/{id}/claim to attempt claiming a run.
-//  2. If 204 returned, no runs are available; return false.
-//  3. If 200 returned, decode claim response and run metadata.
-//  4. Ack run start (transition run to "running" state).
+//  1. POST /v1/nodes/{id}/claim to attempt claiming a job.
+//  2. If 204 returned, no jobs are available; return false.
+//  3. If 200 returned, decode claim response and job metadata.
+//  4. Ack job start (transition job to "running" state).
 //  5. Parse spec into options and environment variables.
-//  6. Invoke controller to start run execution.
+//  6. Invoke controller to start job execution.
 //
-// Note: Returns true if a run was claimed (even if ack/execution fails),
+// Note: Returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Lazy initialization: create HTTP client if not yet initialized.
@@ -141,7 +119,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("decode claim response: %w", err)
 	}
 
-	slog.Info("claimed run", "run_id", claim.ID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
+	slog.Info("claimed job", "run_id", claim.ID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
 
 	// Send ack before execution.
 	// Include job_id to acknowledge the specific job being executed.

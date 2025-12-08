@@ -28,12 +28,6 @@ type Config struct {
 
 	// Heartbeat configuration.
 	Heartbeat HeartbeatConfig `yaml:"heartbeat"`
-
-	// BuildGateWorkerEnabled controls whether this node participates in
-	// Build Gate job execution. When true, the node will claim and execute
-	// Build Gate jobs from the control plane. Defaults to false.
-	// Can be overridden by the PLOY_BUILDGATE_WORKER_ENABLED environment variable.
-	BuildGateWorkerEnabled bool `yaml:"buildgate_worker_enabled"`
 }
 
 // HTTPConfig specifies HTTP listener and TLS settings for the node agent.
@@ -113,25 +107,7 @@ func LoadConfig(path string) (Config, error) {
 		cfg.Heartbeat.Timeout = 10 * time.Second
 	}
 
-	// Apply environment variable override for BuildGateWorkerEnabled.
-	// The env var takes precedence over the YAML config value when set.
-	if envVal := os.Getenv("PLOY_BUILDGATE_WORKER_ENABLED"); envVal != "" {
-		// Accept "true", "1", "yes" (case-insensitive) as enabled; anything else is false.
-		cfg.BuildGateWorkerEnabled = parseBoolEnv(envVal)
-	}
-
 	return cfg, nil
-}
-
-// parseBoolEnv parses a boolean environment variable value.
-// Returns true for "true", "1", "yes" (case-insensitive); false otherwise.
-func parseBoolEnv(val string) bool {
-	switch val {
-	case "true", "TRUE", "True", "1", "yes", "YES", "Yes":
-		return true
-	default:
-		return false
-	}
 }
 
 func (c Config) validate() error {
