@@ -670,7 +670,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 
 - `TicketSummary` (in `internal/mods/api/types.go`) is the wire type returned by
   `GET /v1/mods/{id}` and streamed on SSE:
-  - ` run_id` — run UUID.
+  - `run_id` — run ID (KSUID string, 27 characters).
   - `state` —  run lifecycle state (`pending`, `running`, `succeeded`,
     `failed`, `cancelled`).
   - `repository` — repo URL for this run.
@@ -680,9 +680,9 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `mr_url` (if MR was created)
     - `gate_summary` (Build Gate result)
     - `reason` (terminal error reason when available).
-  - `stages` — map keyed by **job UUID** (`jobs.id`), value is `StageStatus`.
+  - `stages` — map keyed by **job ID** (`jobs.id`, KSUID string), value is `StageStatus`.
     Note: The `stages` field name is retained for API backward compatibility,
-    but each entry represents a `jobs` table row. The map key is the job's UUID.
+    but each entry represents a `jobs` table row. The map key is the job's ID (KSUID string).
 
 - `StageStatus`:
   - `state` — job lifecycle state (mirrors `jobs.status`).
@@ -694,7 +694,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 - **Jobs** (`jobs` table)
   - Created by the control plane when a run is submitted via `POST /v1/mods`.
   - Each job row has:
-    - `id` — job UUID (used as key in `TicketSummary.stages`).
+    - `id` — job ID (KSUID string, used as key in `TicketSummary.stages`).
     - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
     - `step_index` — float for ordering (e.g., 1000, 2000, 3000).
   - `status` — job state (`created`, `pending`, `running`, `succeeded`,
@@ -804,7 +804,7 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/nodes/{id}/buildgate/*` — claim/ack/complete Build Gate jobs.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
-`PLOY_NODE_UUID` header set to the node's ID (NanoID 6-character string). The
+`PLOY_NODE_ID` header set to the node's ID (NanoID 6-character string). The
 control plane uses this header to validate job ownership and attribute
 artifacts/diffs to the correct node.
 
@@ -964,7 +964,7 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 | Field        | Type   | Description                                                            |
 |--------------|--------|------------------------------------------------------------------------|
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
-| `job_id`     | string | UUID of the job that produced this log line                            |
+| `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
 | `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
 | `step_index` | int    | Float index of the job within the pipeline (e.g., 1000, 2000)          |
 

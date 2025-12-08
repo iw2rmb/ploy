@@ -144,8 +144,8 @@ See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command refere
 ### Edge Cases
 
 Test the following edge cases:
-- **Invalid UUID**: `POST /v1/mods/not-a-uuid/cancel` → `400 Bad Request`.
-- **Missing  run**: `POST /v1/mods/00000000-0000-0000-0000-000000000000/cancel` → `404 Not Found`.
+- **Invalid run ID**: `POST /v1/mods//cancel` (empty or whitespace-only ID) → `400 Bad Request`.
+- **Missing run**: `POST /v1/mods/nonexistent123/cancel` → `404 Not Found`.
 - **Already succeeded**: Cancel a completed  run → `200 OK`.
 - **Already failed**: Cancel a failed  run → `200 OK`.
 - **Multiple in-flight stages**: Cancel a  run with multiple `running` stages → All stages transition to `canceled`.
