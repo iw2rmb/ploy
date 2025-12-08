@@ -112,7 +112,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store/...` — Ensure all log/artifact bundle paths compile and tests using `build_id` are updated or removed.
 
 ## Simplify node queueing to single jobs queue
-- [ ] Ensure nodes claim from jobs only (FIFO by step_index) — Remove Build Gate-specific claim paths
+- [x] Ensure nodes claim from jobs only (FIFO by step_index) — Remove Build Gate-specific claim paths
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers/nodes_claim.go, internal/store/queries/jobs.sql, internal/store/jobs.sql.go, internal/store/claims_state_test.go, internal/store/runs.sql.go
   - Scope:
