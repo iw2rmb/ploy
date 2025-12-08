@@ -191,13 +191,13 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
   CLI flag `--config`. There is currently no environment variable override
   for this path. TODO: consider introducing `PLOYD_NODE_CONFIG_PATH` for
   parity with the server's `PLOYD_CONFIG_PATH`.
-- `PLOY_BUILDGATE_WORKER_ENABLED` — When set to `true`, `1`, or `yes` (case-insensitive),
-  the node participates in Build Gate job execution via the HTTP Build Gate API
-  (`POST /v1/nodes/{id}/buildgate/claim` → ack → execute → complete). When the
-  environment variable is set, it takes precedence over the YAML config value
-  `buildgate_worker_enabled`. Defaults to `false` (node does not claim Build Gate
-  jobs). Configure in systemd drop-in or via `environment:` in `ployd-node.yaml`.
-  See `docs/build-gate/README.md` for multi-node deployment patterns.
+- (removed) `PLOY_BUILDGATE_WORKER_ENABLED` — Previously enabled Build Gate worker mode
+  via the HTTP Build Gate API (`/v1/nodes/{id}/buildgate/*`) backed by the dedicated
+  `buildgate_jobs` table. HTTP Build Gate worker mode and the separate queue have been
+  removed in favor of the unified jobs-based pipeline; the server-side Build Gate routes
+  now return `410 Gone` and no longer schedule gate work via a separate queue. This
+  variable remains wired in node configuration code but has no effect in the current
+  pipeline. See `docs/build-gate/README.md` and `ROADMAP.md` for historical context.
 
 ## E2E Harness
 

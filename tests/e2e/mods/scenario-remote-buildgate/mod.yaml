@@ -3,9 +3,9 @@
 # This spec is designed to test PLOY_BUILDGATE_MODE=remote-http where Build Gate
 # jobs are routed through the HTTP API and executed by dedicated worker nodes.
 #
-# Key differences from local-docker mode:
+# Key differences from local-docker mode (historical HTTP Build Gate design):
 # 1. Gate execution is delegated to remote Build Gate workers via HTTP API.
-# 2. Gate jobs appear in buildgate_jobs table with node assignments.
+# 2. Gate jobs appear in the unified jobs table with node assignments (historically buildgate_jobs).
 # 3. Gates can run on different VPS nodes than the mods steps.
 # 4. Repo+diff semantics: remote workers clone repo+ref and apply diff_patch.
 #
@@ -52,9 +52,9 @@ mod:
 ################################################################################
 # BUILD GATE: Remote execution via HTTP API
 ################################################################################
-# When PLOY_BUILDGATE_MODE=remote-http is set on worker nodes:
+# When PLOY_BUILDGATE_MODE=remote-http is set on worker nodes (historical HTTP Build Gate design):
 # 1. Gate requests are submitted via POST /v1/buildgate/validate.
-# 2. Jobs enter buildgate_jobs table as "pending".
+# 2. Jobs enter the unified jobs table as "pending" (historically buildgate_jobs).
 # 3. Build Gate workers claim jobs via /v1/nodes/{id}/buildgate/claim.
 # 4. Workers execute gate and report results back.
 # 5. Original node receives pass/fail status via polling.
@@ -110,7 +110,7 @@ mr_on_success: true
 # When running this scenario with PLOY_BUILDGATE_MODE=remote-http, verify:
 #
 # 1. Build Gate job routing:
-#    - Check buildgate_jobs table: SELECT * FROM buildgate_jobs ORDER BY created_at DESC LIMIT 5;
+#    - Check jobs table: SELECT * FROM jobs ORDER BY created_at DESC LIMIT 5;
 #    - Jobs should have status transitions: pending -> claimed -> running -> passed/failed
 #    - node_id column shows which Build Gate worker executed each job
 #
@@ -132,7 +132,7 @@ mr_on_success: true
 #
 # 5. Observable behaviors in remote-http mode:
 #    - Longer gate latency (HTTP round-trip + job queue wait)
-#    - buildgate_jobs records in database
+#    - job records present in the unified jobs table (historically buildgate_jobs)
 #    - "remote-http" gate mode logged by node agent
 #    - Gate worker logs show container execution
 #
