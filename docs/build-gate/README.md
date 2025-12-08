@@ -4,6 +4,10 @@ Scope
 - Minimal, stable contract to validate a repository after each Mods stage.
 - Works in Mods and standalone CI.
 
+Status
+- HTTP Build Gate mode and the dedicated `buildgate_jobs` table have been removed.
+- This document describes the historical HTTP Build Gate design; see ROADMAP.md for the current jobs-based gate execution model.
+
 ## Overview: Remote Execution Architecture
 
 Build Gate follows a **repo+diff remote execution model**: callers submit validation
@@ -31,9 +35,9 @@ enabling horizontal scaling and separation of concerns.
 The **HTTP Build Gate API** is the canonical execution path for all gate validation.
 Callers submit validation jobs via HTTP; Build Gate worker nodes claim and execute them.
 
-**Code paths:**
-- Server handlers: `internal/server/handlers/handlers_buildgate.go`
-- Job storage: `internal/store/buildgate_jobs.sql.go`
+**Code paths (historical HTTP mode):**
+- Server handlers: `internal/server/handlers/buildgate.go`
+- Job storage: unified `jobs` queue in `internal/store/queries/jobs.sql` (the former `buildgate_jobs` table has been removed)
 - Gate executor adapter: `internal/workflow/runtime/step/gate_http.go` (HTTP) and
   `internal/workflow/runtime/step/gate_factory.go` (mode selection)
 
@@ -47,7 +51,7 @@ Callers submit validation jobs via HTTP; Build Gate worker nodes claim and execu
 **Flow:**
 1. Caller (Mods orchestrator or healing flow) submits `BuildGateValidateRequest` with
    `repo_url`, `ref`, and optional `diff_patch` (gzipped unified diff for healing flows).
-2. Control plane creates a `buildgate_jobs` row with status `pending`.
+2. Control plane creates a job row in the unified `jobs` table with status `pending` (historically this used a dedicated `buildgate_jobs` table).
 3. If job completes within `syncWaitTimeout` (30s), result returns synchronously.
 4. Otherwise, caller receives `job_id` with status `pending` for async polling.
 5. Build Gate worker node claims job via `/v1/nodes/{id}/buildgate/claim`.
@@ -79,7 +83,7 @@ Gate API and waits for results:
                                                                ▼
                          ┌─────────────────────┐      ┌─────────────────────┐
                          │ Build Gate Worker   │◀─────│ Job Queue           │
-                         │ (Docker execution)  │      │ (buildgate_jobs)    │
+                         │ (Docker execution)  │      │ (jobs table)        │
                          └─────────────────────┘      └─────────────────────┘
                                    │
                                    ▼

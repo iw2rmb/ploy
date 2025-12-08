@@ -267,10 +267,10 @@ E2E validation for Build Gate execution in remote-http mode where gate jobs are
 routed through the HTTP API and executed by dedicated Build Gate worker nodes:
   - `PLOY_BUILDGATE_MODE=remote-http bash tests/e2e/mods/scenario-remote-buildgate/run.sh`
 
-This scenario validates:
+This scenario validates (historical HTTP Build Gate mode; the dedicated `buildgate_jobs` table has been removed in favor of the unified `jobs` queue):
 - HTTP-based gate routing: gates submitted via `/v1/buildgate/validate` instead of local docker.
 - Multi-VPS gate execution: gate jobs can run on different nodes than mods steps.
-- Job lifecycle: jobs transition through pending → claimed → running → passed/failed in `buildgate_jobs` table.
+- Job lifecycle: jobs transition through pending → claimed → running → passed/failed in the unified `jobs` table.
 - Repo+diff semantics: re-gates after healing include `diff_patch` for remote workspace reconstruction.
 - Healing flow compatibility: Codex workspace diff handshake works identically in remote-http mode.
 
@@ -292,11 +292,11 @@ Comparison with local-docker mode:
 - Only observable difference: gate execution location and latency.
 - Run `scenario-orw-fail` without `PLOY_BUILDGATE_MODE` for baseline comparison.
 
-Validation checklist (manual verification via DB/logs):
+Validation checklist (manual verification via DB/logs; table name updated to unified jobs queue):
 ```sql
--- Check Build Gate job routing:
+-- Check Build Gate job routing (historical HTTP mode):
 SELECT id, status, node_id, created_at, started_at, finished_at
-FROM buildgate_jobs
+FROM jobs
 ORDER BY created_at DESC
 LIMIT 10;
 ```

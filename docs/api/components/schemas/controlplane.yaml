@@ -355,7 +355,7 @@ BuildGateValidateRequest:
 BuildGateValidateResponse:
   type: object
   description: Returns result when ready; otherwise JobID for polling.
-  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
+  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
   properties:
     job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
@@ -368,7 +368,7 @@ BuildGateValidateResponse:
 
 BuildGateJobStatusResponse:
   type: object
-  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
+  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
   properties:
     job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
@@ -392,7 +392,7 @@ BuildGateJobCompleteRequest:
 
 NodeBuildGateClaimResponse:
   type: object
-  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
+  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
   properties:
     job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     request:

@@ -4,9 +4,9 @@
 # This script validates Build Gate execution in remote-http mode where gate jobs
 # are queued via the HTTP API and executed by dedicated Build Gate worker nodes.
 #
-# Key validations:
+# Key validations (historical HTTP Build Gate design; the dedicated buildgate_jobs table has been removed in favor of the unified jobs queue):
 # 1. PLOY_BUILDGATE_MODE=remote-http routes gates through HTTP API (not local docker)
-# 2. Gate jobs appear in buildgate_jobs table with status transitions
+# 2. Gate jobs appear in the unified jobs table with status transitions
 # 3. Gates can execute on different nodes than the mods steps
 # 4. Repo+diff semantics remain correct for healing scenarios
 # 5. Multi-step runs with healing produce consistent results across execution modes
@@ -171,11 +171,11 @@ echo ""
 echo "Validation checklist for remote Build Gate mode:"
 echo ""
 
-echo "1. Build Gate job routing (verify via DB or logs):"
-echo "   - Check buildgate_jobs table for job records."
+echo "1. Build Gate job routing (verify via DB or logs; table name updated to unified jobs queue):"
+echo "   - Check jobs table for job records."
 echo "   - Verify jobs have node_id set (claimed by Build Gate worker)."
 echo "   - Status transitions: pending -> claimed -> running -> passed/failed."
-echo "   - SQL: SELECT id, status, node_id, created_at, finished_at FROM buildgate_jobs ORDER BY created_at DESC LIMIT 10;"
+echo "   - SQL: SELECT id, status, node_id, created_at, finished_at FROM jobs ORDER BY created_at DESC LIMIT 10;"
 echo ""
 
 echo "2. Multi-VPS gate execution:"
