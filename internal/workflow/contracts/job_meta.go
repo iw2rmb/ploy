@@ -117,6 +117,10 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal job meta: %w", err)
 	}
+	// For backward compatibility, tolerate payloads that omit kind for mod jobs.
+	if m.Kind == "" {
+		m.Kind = JobKindMod
+	}
 	return &m, nil
 }
 

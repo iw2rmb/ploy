@@ -13,12 +13,12 @@ import (
 
 func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	t.Helper()
-	ticket := "ticket-artifacts"
+	runID := "run-artifacts"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticket),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateSucceeded,
 					Stages: map[string]modsapi.StageStatus{
 						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
@@ -34,7 +34,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "artifacts", ticket}, buf)
+	err := execute([]string{"mod", "artifacts", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod artifacts error: %v", err)
 	}

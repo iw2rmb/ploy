@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
@@ -20,7 +21,7 @@ func TestPlannerBuildsModsStageGraph_Integration(t *testing.T) {
 		HumanLane:       "mods-human",
 	})
 	stages, err := planner.Plan(context.Background(), plan.PlanInput{
-		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
+		Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-123")},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
@@ -54,7 +55,7 @@ func TestPlannerAnnotatesMetadataFromAdvisor(t *testing.T) {
 		Recommendations: []plan.AdviceRecommendation{{Source: "advisor", Message: "Apply recipe.alpha first", Confidence: 0.91}, {Source: "advisor", Message: "Queue review if diff size > 500", Confidence: 1.4}, {Source: "advisor", Message: " ", Confidence: -0.5}},
 	}}
 	p := plan.NewPlanner(plan.Options{Advisor: advisor})
-	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-knowledge"}})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-knowledge")}})
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
@@ -74,7 +75,7 @@ func TestPlannerAnnotatesMetadataFromAdvisor(t *testing.T) {
 func TestPlannerFallsBackWhenAdvisorErrors(t *testing.T) {
 	errAdv := &stubAdvisor{err: errors.New("advisor unavailable")}
 	p := plan.NewPlanner(plan.Options{Advisor: errAdv})
-	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-fallback"}})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-fallback")}})
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestPlannerExposesExecutionHints(t *testing.T) {
 	opts := plan.Options{}
 	setOptionsHints(t, &opts, 90*time.Second, 3)
 	p := plan.NewPlanner(opts)
-	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-hints"}})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-hints")}})
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
@@ -118,7 +119,14 @@ func TestPlannerIntegratesKnowledgeBaseAdvisor(t *testing.T) {
 		},
 	}}
 	p := plan.NewPlanner(plan.Options{Advisor: advisor})
-	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-1", Manifest: contracts.ManifestReference{Name: "repo", Version: "1.0.0"}}, Signals: plan.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}}})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{
+		Run: contracts.WorkflowRun{
+			SchemaVersion: contracts.SchemaVersion,
+			RunID:         types.RunID("KB-1"),
+			Manifest:      contracts.ManifestReference{Name: "repo", Version: "1.0.0"},
+		},
+		Signals: plan.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
+	})
 	if err != nil {
 		t.Fatalf("plan kb: %v", err)
 	}

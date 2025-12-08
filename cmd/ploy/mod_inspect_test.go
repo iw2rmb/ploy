@@ -13,12 +13,12 @@ import (
 
 func TestModInspectPrintsSummary(t *testing.T) {
 	t.Helper()
-	ticket := "ticket-11"
+	runID := "run-11"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
 			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticket),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateRunning,
 				},
 			})
@@ -30,25 +30,25 @@ func TestModInspectPrintsSummary(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", ticket}, buf)
+	err := execute([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}
 	out := buf.String()
-	if out == "" || !bytes.Contains([]byte(out), []byte(ticket)) {
-		t.Fatalf("expected summary output to include ticket id; got %q", out)
+	if out == "" || !bytes.Contains([]byte(out), []byte(runID)) {
+		t.Fatalf("expected summary output to include run id; got %q", out)
 	}
 }
 
 func TestModInspectShowsMRURL(t *testing.T) {
 	t.Helper()
-	ticket := "ticket-mr-123"
+	runID := "run-mr-123"
 	mrURL := "https://gitlab.com/example/repo/-/merge_requests/42"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					RunID:    domaintypes.RunID(ticket),
+					RunID:    domaintypes.RunID(runID),
 					State:    modsapi.RunStateSucceeded,
 					Metadata: map[string]string{"mr_url": mrURL},
 				},
@@ -62,7 +62,7 @@ func TestModInspectShowsMRURL(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", ticket}, buf)
+	err := execute([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}
@@ -74,12 +74,12 @@ func TestModInspectShowsMRURL(t *testing.T) {
 
 func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 	t.Helper()
-	ticket := "ticket-no-mr"
+	runID := "run-no-mr"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
 			resp := modsapi.RunStatusResponse{
 				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(ticket),
+					RunID: domaintypes.RunID(runID),
 					State: modsapi.RunStateSucceeded,
 					// No metadata or empty metadata.
 				},
@@ -93,7 +93,7 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", ticket}, buf)
+	err := execute([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}

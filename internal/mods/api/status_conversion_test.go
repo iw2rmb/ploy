@@ -197,7 +197,7 @@ func TestRoundTripConversion(t *testing.T) {
 		}
 	})
 
-	t.Run("ticket status round trip", func(t *testing.T) {
+	t.Run("run status round trip", func(t *testing.T) {
 		t.Parallel()
 		// Running, succeeded, failed, and canceled should round-trip cleanly
 		roundTripStatuses := []store.RunStatus{
@@ -211,7 +211,7 @@ func TestRoundTripConversion(t *testing.T) {
 			apiState := RunStatusFromStore(orig)
 			backToStore := RunStatusToStore(apiState)
 			if backToStore != orig {
-				t.Errorf("Ticket status round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
+				t.Errorf("Run status round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
 			}
 		}
 

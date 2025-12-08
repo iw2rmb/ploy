@@ -29,8 +29,8 @@ func jsonAsInterface(t *testing.T, data []byte) any {
 	return v
 }
 
-func TestJSONCompatibility_WorkflowTicket_Golden(t *testing.T) {
-	ticket := WorkflowTicket{
+func TestJSONCompatibility_WorkflowRun_Golden(t *testing.T) {
+	run := WorkflowRun{
 		SchemaVersion: SchemaVersion,
 		RunID:         types.RunID("run-123"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
@@ -42,13 +42,13 @@ func TestJSONCompatibility_WorkflowTicket_Golden(t *testing.T) {
 			WorkspaceHint: "ws",
 		},
 	}
-	got, err := json.Marshal(ticket)
+	got, err := json.Marshal(run)
 	if err != nil {
-		t.Fatalf("marshal ticket: %v", err)
+		t.Fatalf("marshal run envelope: %v", err)
 	}
-	want := loadGolden(t, "ticket_golden.json")
+	want := loadGolden(t, "run_golden.json")
 	if !reflect.DeepEqual(jsonAsInterface(t, got), jsonAsInterface(t, want)) {
-		t.Fatalf("ticket json mismatch\n got: %s\nwant: %s", got, want)
+		t.Fatalf("run json mismatch\n got: %s\nwant: %s", got, want)
 	}
 }
 

@@ -164,7 +164,7 @@ index abc1234..def5678 100644
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   jobMain.ID,
+		JobID:   &jobMain.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
 	})
@@ -313,7 +313,7 @@ index abc1234..def5678 100644
 		t.Errorf("Expected 1 diff, got %d", len(diffs))
 	}
 	if len(diffs) >= 1 {
-		if diffs[0].JobID.Bytes != jobMain.ID.Bytes {
+		if diffs[0].JobID == nil || *diffs[0].JobID != jobMain.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", jobMain.ID, diffs[0].JobID)
 		}
 		if string(diffs[0].Patch) != string(diffPatch) {
@@ -422,7 +422,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// Create step 0 mod diff.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
 		Summary: step0ModSummary,
 	})
@@ -434,7 +434,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// Create step 0 healing diff with same step_index.
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x02},
 		Summary: step0HealSummary,
 	})
@@ -446,7 +446,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// Create step 1 mod diff.
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x03},
 		Summary: step1ModSummary,
 	})
@@ -458,7 +458,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x04},
 		Summary: step1Heal1Summary,
 	})
@@ -469,7 +469,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		JobID:   job.ID,
+		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x05},
 		Summary: step1Heal2Summary,
 	})

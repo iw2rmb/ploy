@@ -342,7 +342,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 }
 
 // TestCompleteRun_PublishesEvents verifies that completing a run publishes both
-// a terminal ticket event and a done status event.
+// a terminal run summary event and a done status event.
 func TestCompleteRun_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
@@ -400,18 +400,18 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	// Verify events were published to the hub by checking the snapshot.
 	snapshot := eventsService.Hub().Snapshot(runID.String())
 	if len(snapshot) < 2 {
-		t.Fatalf("expected at least 2 events (ticket + done), got %d", len(snapshot))
+		t.Fatalf("expected at least 2 events (run + done), got %d", len(snapshot))
 	}
 
-	// Verify we have both a ticket event and a done event.
-	foundTicketEvent := false
+	// Verify we have both a run summary event and a done event.
+	foundRunEvent := false
 	foundDoneEvent := false
 	for _, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicketEvent = true
+			foundRunEvent = true
 			// Verify the event contains "succeeded" status.
 			if !strings.Contains(string(evt.Data), "succeeded") {
-				t.Errorf("expected ticket event data to contain 'succeeded', got: %s", string(evt.Data))
+				t.Errorf("expected run event data to contain 'succeeded', got: %s", string(evt.Data))
 			}
 		}
 		if evt.Type == "done" {
@@ -422,8 +422,8 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 			}
 		}
 	}
-	if !foundTicketEvent {
-		t.Error("expected to find a 'ticket' event in the snapshot")
+	if !foundRunEvent {
+		t.Error("expected to find a 'run' event in the snapshot")
 	}
 	if !foundDoneEvent {
 		t.Error("expected to find a 'done' event in the snapshot")

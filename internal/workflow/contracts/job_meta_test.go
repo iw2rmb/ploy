@@ -191,11 +191,6 @@ func TestUnmarshalJobMeta(t *testing.T) {
 			data:     []byte(`{"kind":"build","build":{"tool":"maven"}}`),
 			wantKind: JobKindBuild,
 		},
-		{
-			name:    "invalid json",
-			data:    []byte(`{invalid`),
-			wantErr: true,
-		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

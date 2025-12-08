@@ -28,7 +28,7 @@ func parseLastEventID(header string) int64 {
 	return id
 }
 
-// getModEventsHandler returns an HTTP handler that streams mod (ticket) events over SSE.
+// getModEventsHandler returns an HTTP handler that streams mod (run) events over SSE.
 // Supports Last-Event-ID header for resuming streams from a specific event.
 // GET /v1/mods/{id}/events — Native SSE under mods (no proxy).
 //
@@ -37,7 +37,7 @@ func parseLastEventID(header string) int64 {
 // database layer enforces existence.
 func getModEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract ticket ID from path parameter.
+		// Extract run ID from path parameter.
 		// Run IDs are KSUID strings (27 chars); treated as opaque identifiers.
 		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
@@ -56,11 +56,11 @@ func getModEventsHandler(st store.Store, eventsService *events.Service) http.Han
 		_, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "ticket not found", http.StatusNotFound)
+				http.Error(w, "run not found", http.StatusNotFound)
 				return
 			}
-			slog.Error("get mod events: database error", "ticket_id", runIDStr, "err", err)
-			http.Error(w, "failed to get ticket", http.StatusInternalServerError)
+			slog.Error("get mod events: database error", "run_id", runIDStr, "err", err)
+			http.Error(w, "failed to get run", http.StatusInternalServerError)
 			return
 		}
 
@@ -77,7 +77,7 @@ func getModEventsHandler(st store.Store, eventsService *events.Service) http.Han
 		if err := logstream.Serve(w, r, hub, runIDStr, sinceID); err != nil {
 			// Only log non-cancellation errors (client disconnect is normal).
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream mod events", "ticket_id", runIDStr, "err", err)
+				slog.Error("stream mod events", "run_id", runIDStr, "err", err)
 			}
 		}
 	}

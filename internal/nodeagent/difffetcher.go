@@ -69,7 +69,7 @@ type diffListResponse struct {
 	Diffs []diffListItem `json:"diffs"`
 }
 
-// ListRunDiffs fetches the list of diffs for a given run (ticket) from the control plane.
+// ListRunDiffs fetches the list of diffs for a given run from the control plane.
 // Returns the list of diff metadata items ordered by step_index, then created_at (as per the API).
 //
 // GET /v1/mods/{id}/diffs

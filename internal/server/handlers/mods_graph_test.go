@@ -15,12 +15,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/graph"
 )
 
-// testTicketIDKSUID is a synthetic KSUID-like ID (27 characters) used for tests.
-const testTicketIDKSUID = "123456789012345678901234567"
-
 // TestGetModGraphHandler_Success verifies successful graph retrieval.
 func TestGetModGraphHandler_Success(t *testing.T) {
-	runID := testTicketIDKSUID
+	runID := testRunIDKSUID
 	job1ID := uuid.New()
 	job2ID := uuid.New()
 	job3ID := uuid.New()
@@ -153,7 +150,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 
 // TestGetModGraphHandler_WithHealing verifies graph with healing jobs.
 func TestGetModGraphHandler_WithHealing(t *testing.T) {
-	runID := testTicketIDKSUID
+	runID := testRunIDKSUID
 	preGateID := uuid.New()
 	heal1ID := uuid.New()
 	reGateID := uuid.New()
@@ -217,17 +214,17 @@ func TestGetModGraphHandler_WithHealing(t *testing.T) {
 	}
 }
 
-// TestGetModGraphHandler_TicketNotFound verifies 404 for nonexistent ticket.
-func TestGetModGraphHandler_TicketNotFound(t *testing.T) {
+// TestGetModGraphHandler_RunNotFound verifies 404 for nonexistent run.
+func TestGetModGraphHandler_RunNotFound(t *testing.T) {
 	st := &mockStore{
 		getRunErr: pgx.ErrNoRows,
 	}
 
 	handler := getModGraphHandler(st)
 
-	ticketID := testTicketIDKSUID
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID+"/graph", nil)
-	req.SetPathValue("id", ticketID)
+	runID := testRunIDKSUID
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/graph", nil)
+	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -237,8 +234,8 @@ func TestGetModGraphHandler_TicketNotFound(t *testing.T) {
 	}
 }
 
-// TestGetModGraphHandler_InvalidTicketID verifies 400 for invalid UUID.
-func TestGetModGraphHandler_InvalidTicketID(t *testing.T) {
+// TestGetModGraphHandler_InvalidRunID verifies 400 for invalid ID format.
+func TestGetModGraphHandler_InvalidRunID(t *testing.T) {
 	st := &mockStore{}
 	handler := getModGraphHandler(st)
 
@@ -253,8 +250,8 @@ func TestGetModGraphHandler_InvalidTicketID(t *testing.T) {
 	}
 }
 
-// TestGetModGraphHandler_MissingTicketID verifies 400 when ID is empty.
-func TestGetModGraphHandler_MissingTicketID(t *testing.T) {
+// TestGetModGraphHandler_MissingRunID verifies 400 when ID is empty.
+func TestGetModGraphHandler_MissingRunID(t *testing.T) {
 	st := &mockStore{}
 	handler := getModGraphHandler(st)
 
@@ -269,9 +266,9 @@ func TestGetModGraphHandler_MissingTicketID(t *testing.T) {
 	}
 }
 
-// TestGetModGraphHandler_EmptyJobs verifies graph for ticket with no jobs.
+// TestGetModGraphHandler_EmptyJobs verifies graph for run with no jobs.
 func TestGetModGraphHandler_EmptyJobs(t *testing.T) {
-	runID := testTicketIDKSUID
+	runID := testRunIDKSUID
 	now := time.Now()
 
 	st := &mockStore{

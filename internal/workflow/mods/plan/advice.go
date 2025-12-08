@@ -11,9 +11,9 @@ type Advisor interface {
 	Advise(ctx context.Context, req AdviceRequest) (Advice, error)
 }
 
-// AdviceRequest wraps the workflow ticket passed to the advisor.
+// AdviceRequest wraps the workflow run envelope passed to the advisor.
 type AdviceRequest struct {
-	Ticket  contracts.WorkflowTicket
+	Run     contracts.WorkflowRun
 	Signals AdviceSignals
 }
 

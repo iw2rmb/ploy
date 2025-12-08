@@ -6,7 +6,7 @@ import (
 )
 
 // SchemaVersion identifies the JSON envelope version used by workflow
-// tickets, checkpoints, and artifact messages. It must be included in all
+// run envelopes, checkpoints, and artifact messages. It must be included in all
 // published envelopes so consumers can validate and evolve parsers safely.
 const SchemaVersion = "2025-09-27.1"
 

@@ -55,11 +55,15 @@ type RunSubmitRequest struct {
 }
 
 // RunSubmitResponse returns the persisted run summary after submission.
+// The field name Ticket and json:"ticket" envelope are retained for
+// backward compatibility; it wraps a run-centric RunSummary.
 type RunSubmitResponse struct {
 	Ticket RunSummary `json:"ticket"`
 }
 
 // RunStatusResponse returns the current run summary.
+// The Ticket field wraps a RunSummary under the json:"ticket" key for
+// backward compatibility with existing clients.
 type RunStatusResponse struct {
 	Ticket RunSummary `json:"ticket"`
 }

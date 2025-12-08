@@ -170,7 +170,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	// Submit
 	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.RunSubmitRequest{RunID: domaintypes.RunID("t2")}}).Run(context.Background())
 	if err != nil || string(sum.RunID) != "t2" {
-		t.Fatalf("submit err=%v ticket=%+v", err, sum)
+		t.Fatalf("submit err=%v run=%+v", err, sum)
 	}
 	// Cancel
 	if err := (CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
@@ -194,7 +194,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// SSE server emits a terminal ticket event.
+			// SSE server emits a terminal run event.
 			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
 				if f, ok := w.(http.Flusher); ok {
@@ -369,7 +369,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 }
 
 // TestEventsCommandWithoutLogPrinter verifies backward compatibility: when
-// LogPrinter is nil, log events are ignored and only ticket/stage events are processed.
+// LogPrinter is nil, log events are ignored and only run/stage events are processed.
 func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	t.Parallel()
 
@@ -381,7 +381,7 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 		}
 		fl.Flush()
 
-		// Send ticket, log, and ticket events.
+		// Send run, log, and run events.
 		events := []string{
 			"event: run\ndata: {\"run_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
 			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
@@ -421,6 +421,6 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	}
 	// Ticket state should still appear via SimplePrinter.
 	if !bytes.Contains([]byte(out), []byte("t-nolog")) {
-		t.Errorf("ticket ID should appear in output, got: %s", out)
+		t.Errorf("run ID should appear in output, got: %s", out)
 	}
 }

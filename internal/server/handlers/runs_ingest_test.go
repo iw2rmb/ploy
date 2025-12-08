@@ -182,7 +182,7 @@ func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
 	}
 }
 
-// Ensure 404 is returned when the ticket (run) does not exist.
+// Ensure 404 is returned when the run does not exist.
 type mockStoreRunArtifactsNotFound struct {
 	store.Store
 }
