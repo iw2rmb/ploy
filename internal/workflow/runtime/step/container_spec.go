@@ -77,7 +77,7 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 		}
 	}
 
-	// Optional: mount TLS certificates for buildgate API access
+	// Optional: mount TLS certificates for control-plane API access from containers
 	if caCertPath, ok := manifest.OptionString("ploy_ca_cert_path"); ok && caCertPath != "" {
 		if fi, err := os.Stat(caCertPath); err == nil && !fi.IsDir() {
 			mounts = append(mounts, ContainerMount{Source: caCertPath, Target: "/etc/ploy/certs/ca.crt", ReadOnly: true})

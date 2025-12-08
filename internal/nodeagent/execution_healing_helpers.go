@@ -144,7 +144,7 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.Ru
 // and applying the patch when needed.
 //
 // Returns:
-//   - Gzipped diff bytes (ready for BuildGateValidateRequest.DiffPatch).
+//   - Gzipped diff bytes (suitable for repo+diff-style consumers).
 //   - nil if workspace has no changes or diff generation fails (logs warning but continues).
 func computeGzippedDiff(ctx context.Context, workspace string) []byte {
 	// Generate unified diff of all workspace changes relative to HEAD.
