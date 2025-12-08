@@ -33,18 +33,9 @@ func newManifestCmd(stderr io.Writer) *cobra.Command {
 	return manifestCmd
 }
 
-// newTokenCmd creates the cobra command tree for 'ploy token' and its subcommands.
-func newTokenCmd(stderr io.Writer) *cobra.Command {
-	tokenCmd := &cobra.Command{
-		Use:                "token",
-		Short:              "Manage API tokens for authentication",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleToken(args, stderr)
-		},
-	}
-	return tokenCmd
-}
+// NOTE: newTokenCmd has been removed. Token operations are now accessible only via `ploy cluster token`.
+// The handleToken function is invoked directly from handleCluster when the "token" subcommand is used.
+// See ROADMAP.md line 387 for migration rationale.
 
 // newUploadCmd creates the cobra command for 'ploy upload'.
 func newUploadCmd(stderr io.Writer) *cobra.Command {

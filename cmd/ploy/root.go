@@ -71,15 +71,13 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
 	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
-	// Server and node management commands
-	// NOTE: `ploy server`, `ploy node`, and `ploy rollout` have been removed as top-level commands.
+	// Server, node, rollout, and token management commands
+	// NOTE: `ploy server`, `ploy node`, `ploy rollout`, and `ploy token` have been removed as top-level commands.
 	// Server deployment is now accessible only via `ploy cluster deploy`.
 	// Node operations are now accessible only via `ploy cluster node`.
 	// Rollout operations are now accessible only via `ploy cluster rollout`.
-	// See ROADMAP.md lines 186, 261, and 309 for migration rationale.
-
-	// Authentication commands
-	root.AddCommand(newTokenCmd(stderr)) // ploy token (create, list, revoke)
+	// Token operations are now accessible only via `ploy cluster token`.
+	// See ROADMAP.md lines 186, 261, 309, and 387 for migration rationale.
 
 	// Override help function so that `ploy --help` and `ploy -h` print our
 	// custom usage output instead of Cobra's default help format.
@@ -121,6 +119,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 				case "config":
 					printConfigUsage(stderr)
 				case "token":
+					// The 'token' command has been re-rooted under 'cluster token'.
+					// Point users to the new location for discoverability.
 					printTokenUsage(stderr)
 				default:
 					printUsage(stderr)

@@ -191,9 +191,10 @@ main() {
 JSON
   ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
 
-  log "Smoke testing CLI token list (optional)..."
+  log "Smoke testing CLI cluster token list (optional)..."
+  # NOTE: Token operations are now accessible only via `ploy cluster token`.
   if [[ -x "./dist/ploy" ]]; then
-    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy token list || true
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy cluster token list || true
   fi
 
   log "Local Ploy cluster is up."

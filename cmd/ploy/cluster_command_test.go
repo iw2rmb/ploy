@@ -168,6 +168,7 @@ func TestClusterRolloutHelp(t *testing.T) {
 }
 
 // TestClusterTokenHelp verifies that "cluster token --help" works correctly.
+// NOTE: Token operations are now accessible only via `ploy cluster token`.
 func TestClusterTokenHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleCluster([]string{"token", "--help"}, buf)
@@ -177,10 +178,10 @@ func TestClusterTokenHelp(t *testing.T) {
 		t.Fatalf("expected no error for cluster token --help, got %v", err)
 	}
 
-	// Should print token usage.
+	// Should print token usage with cluster prefix.
 	output := buf.String()
-	if !strings.Contains(output, "Usage: ploy token") {
-		t.Fatalf("expected token usage, got %q", output)
+	if !strings.Contains(output, "Usage: ploy cluster token") {
+		t.Fatalf("expected cluster token usage, got %q", output)
 	}
 }
 
