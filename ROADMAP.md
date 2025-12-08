@@ -183,7 +183,7 @@ Legend: [ ] todo, [x] done.
   - Tests:
     - Run `go test ./docs/api/...` (notably `docs/api/verify_openapi_test.go`) and fix any failures caused by schema shape changes.
 
-- [ ] Align OpenAPI path parameter formats and error descriptions with KSUID/NanoID identifiers — Remove UUID-specific validation language from paths that now accept opaque string IDs.
+- [x] Align OpenAPI path parameter formats and error descriptions with KSUID/NanoID identifiers — Remove UUID-specific validation language from paths that now accept opaque string IDs.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/api/paths/*.yaml
   - Scope:
