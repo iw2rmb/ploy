@@ -99,7 +99,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Add worker nodes to the cluster:
 
   ```bash
-  dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
+  dist/ploy cluster node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
   ```
 
 - Submit a Mods run and follow events:

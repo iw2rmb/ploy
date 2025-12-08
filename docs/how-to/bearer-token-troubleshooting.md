@@ -189,7 +189,7 @@ Check:
 
 **Solution**:
 
-The `ploy node add` command automatically requests a fresh token, so this should be rare. If provisioning takes longer than 15 minutes:
+The `ploy cluster node add` command automatically requests a fresh token, so this should be rare. If provisioning takes longer than 15 minutes:
 
 1. Increase the bootstrap token lifetime (requires server config change):
    ```yaml
@@ -204,7 +204,7 @@ The `ploy node add` command automatically requests a fresh token, so this should
    systemctl restart ployd.service
    ```
 
-3. Retry `ploy node add`.
+3. Retry `ploy cluster node add`.
 
 #### "bootstrap token already used"
 
@@ -243,7 +243,7 @@ CN=aB3xY9           # Missing "node:" prefix
 CN=node-aB3xY9      # Wrong separator (hyphen instead of colon)
 ```
 
-The `ploy node add` command handles this automatically. If generating CSRs manually, use:
+The `ploy cluster node add` command handles this automatically. If generating CSRs manually, use:
 
 ```bash
 # NODE_ID is a NanoID(6) string (e.g., "aB3xY9")
@@ -500,7 +500,7 @@ Nodes still use certificates after bootstrap, but the provisioning flow changes:
 4. Node exchanges token for certificate
 5. Node uses certificate for subsequent requests
 
-No code changes needed if using `ploy node add`.
+No code changes needed if using `ploy cluster node add`.
 
 ## Related Documentation
 

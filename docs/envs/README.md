@@ -347,7 +347,7 @@ the config file are treated as unset unless the environment variable is actually
 ## Bootstrap Script
 
 These environment variables are used internally by the bootstrap script generated during
-`ploy cluster deploy` and `ploy node add` flows. They are not required for day‑to‑day CLI
+`ploy cluster deploy` and `ploy cluster node add` flows. They are not required for day‑to‑day CLI
 usage but are documented here for completeness.
 
 - `PLOY_BOOTSTRAP_VERSION` — Version string exported at the top of generated bootstrap scripts
@@ -372,7 +372,7 @@ usage but are documented here for completeness.
   so containers (e.g., `mods-codex`) can reach the control-plane service by its Docker network
   hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
   network is used (no behavior change for non-Docker/VPS deployments).
-- `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
+- `PLOY_SERVER_URL` — Control-plane base URL used by `ploy cluster node add` bootstrap to populate
   `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
   Additionally, healing containers may consume this variable to call
   the Build Gate HTTP API directly during the fail→heal→re‑gate workflow. The CLI
