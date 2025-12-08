@@ -28,8 +28,15 @@ RunBatchDerivedStatus:
 
 Repo:
   type: object
+  # Note: This schema is used for API modeling; there is no dedicated `repos` table
+  # in the database. The `id` field is an opaque string identifier assigned by the
+  # caller or derived from the repo URL; no specific format (UUID, KSUID) is enforced.
   properties:
-    id: { type: string, format: uuid }
+    id:
+      type: string
+      description: |
+        Opaque repository identifier. No specific format enforced; treat as
+        an opaque string (e.g., URL-derived hash or caller-assigned key).
     url: { type: string }
     branch: { type: string, nullable: true }
     commit_sha: { type: string, nullable: true }
@@ -122,12 +129,13 @@ RunRepo:
     Repo entry within a batch run, backed by the `run_repos` table.
     Represents a single repository's execution state within the batch,
     tracking refs, status, attempt count, and timing information.
-    Note: run_id is now a KSUID-backed string (27 characters).
+    Note: id is NanoID(8), run_id is KSUID (27 characters).
   properties:
     id:
       type: string
-      format: uuid
-      description: Unique repo entry ID within the batch (still UUID).
+      description: |
+        Unique repo entry ID within the batch (NanoID 8-character string).
+        Generated via types.NewRunRepoID() using a URL-safe alphabet.
     run_id:
       type: string
       description: Parent batch run ID (KSUID string).
@@ -347,9 +355,9 @@ BuildGateValidateRequest:
 BuildGateValidateResponse:
   type: object
   description: Returns result when ready; otherwise JobID for polling.
-  # Note: job_id is now a KSUID-backed string (27 characters).
+  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
   properties:
-    job_id: { type: string, description: "Job ID (KSUID string)" }
+    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
     result:
       description: Present only for completed jobs.
@@ -360,9 +368,9 @@ BuildGateValidateResponse:
 
 BuildGateJobStatusResponse:
   type: object
-  # Note: job_id is now a KSUID-backed string (27 characters).
+  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
   properties:
-    job_id: { type: string, description: "Job ID (KSUID string)" }
+    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     status: { type: string, enum: [pending, claimed, running, completed, failed] }
     result:
       type: object
@@ -384,9 +392,9 @@ BuildGateJobCompleteRequest:
 
 NodeBuildGateClaimResponse:
   type: object
-  # Note: job_id is now a KSUID-backed string (27 characters).
+  # Note: job_id references buildgate_jobs.id which remains UUID-backed.
   properties:
-    job_id: { type: string, description: "Job ID (KSUID string)" }
+    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
     request:
       $ref: '#/BuildGateValidateRequest'
     status: { type: string, enum: [claimed] }
