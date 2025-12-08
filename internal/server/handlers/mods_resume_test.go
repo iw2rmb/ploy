@@ -161,7 +161,7 @@ func TestResumeRun_SucceededConflict(t *testing.T) {
 	}
 }
 
-// TestResumeRun_BadID_And_NotFound tests error handling for invalid IDs and missing tickets.
+// TestResumeRun_BadID_And_NotFound tests error handling for invalid IDs and missing runs.
 // Run IDs are now KSUID strings; only empty/whitespace IDs are rejected as invalid.
 func TestResumeRun_BadID_And_NotFound(t *testing.T) {
 	t.Parallel()
@@ -188,7 +188,7 @@ func TestResumeRun_BadID_And_NotFound(t *testing.T) {
 			wantBody:   "id path parameter is required",
 		},
 		{
-			name:       "ticket not found",
+			name:       "run not found",
 			id:         uuid.New().String(),
 			mockStore:  &mockStore{getRunErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
@@ -305,7 +305,7 @@ func TestResumeRun_MultipleFailedJobs(t *testing.T) {
 	}
 }
 
-// TestResumeRun_SSEPublish verifies that resume publishes ticket events.
+// TestResumeRun_SSEPublish verifies that resume publishes run events.
 func TestResumeRun_SSEPublish(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
@@ -339,19 +339,19 @@ func TestResumeRun_SSEPublish(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ticket event was published.
+	// Verify run event was published.
 	snapshot := eventsService.Hub().Snapshot(id.String())
 	if len(snapshot) == 0 {
-		t.Fatal("expected at least 1 ticket event in snapshot")
+		t.Fatal("expected at least 1 run event in snapshot")
 	}
-	foundTicket := false
+	foundRun := false
 	for _, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicket = true
+			foundRun = true
 		}
 	}
-	if !foundTicket {
-		t.Fatal("expected ticket event in snapshot")
+	if !foundRun {
+		t.Fatal("expected run event in snapshot")
 	}
 }
 
@@ -503,22 +503,22 @@ func TestResumeRun_SSEPublishWithResumeMetadata(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ticket event was published with resume metadata.
+	// Verify run event was published with resume metadata.
 	snapshot := eventsService.Hub().Snapshot(id.String())
 	if len(snapshot) == 0 {
-		t.Fatal("expected at least 1 ticket event in snapshot")
+		t.Fatal("expected at least 1 run event in snapshot")
 	}
-	// The event should be a ticket type. The metadata includes resume_count and last_resumed_at.
+	// The event should be a run type. The metadata includes resume_count and last_resumed_at.
 	// Since we re-fetch the run after UpdateRunResume (which the mock doesn't actually update),
 	// the stats from getRunResult are used. The test verifies the plumbing works.
-	foundTicket := false
+	foundRun := false
 	for _, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicket = true
+			foundRun = true
 		}
 	}
-	if !foundTicket {
-		t.Fatal("expected ticket event in snapshot")
+	if !foundRun {
+		t.Fatal("expected run event in snapshot")
 	}
 }
 
