@@ -415,10 +415,12 @@ NodeClaimResponse:
     job_name:
       type: string
       description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
-    job_meta:
-      type: object
-      additionalProperties: true
-      description: Job metadata (mod_type, mod_image, etc.)
+    mod_type:
+      type: string
+      description: Job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`)
+    mod_image:
+      type: string
+      description: Container image for this job (may be empty for non-container jobs)
     repo_url: { type: string }
     status: { type: string }
     node_id: { type: string, description: "Node ID (NanoID 6-character string)" }

@@ -383,21 +383,22 @@ When a Build Gate fails before the main mod runs, the node agent can execute a h
 sequence configured via the `build_gate_healing` block in the spec. This enables automated
 repair of build failures using tools like Codex or other LLM-based workflows.
 
-**How it works:**
-1. The node submits a Build Gate validation job via the HTTP Build Gate API.
-2. A Build Gate worker node claims the job, executes docker validation, and reports results.
-3. If the gate fails and `build_gate_healing` is configured, the node executes each healing
-   step in sequence (mods under `build_gate_healing.mods[]`).
-4. After all healing steps complete, the gate is re-run via the HTTP API. If it passes, the
-   main mod proceeds.
-5. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
-6. If the gate still fails after exhausting retries, the run terminates with status `failed`
+**How it works (jobs-based gate model):**
+1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `re_gate` phases)
+   and are claimed by nodes via `/v1/nodes/{id}/claim`.
+2. If the pre-gate job fails and `build_gate_healing` is configured, the node executes each
+   healing step in sequence (mods under `build_gate_healing.mods[]`) against the same
+   workspace and Build Gate logs.
+3. After all healing steps complete, a `re_gate` job runs as another job in the queue. If it
+   passes, the main mod proceeds.
+4. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
+5. If the gate still fails after exhausting retries, the run terminates with status `failed`
    and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
 
-**Execution location decoupling:**
-Gate execution runs on dedicated Build Gate worker nodes (configured via
-`buildgate_worker_enabled=true`), decoupled from the node executing the Mods step. This
-enables horizontal scaling of gate validation without affecting Mods node capacity.
+**Execution path:**
+Gate and healing steps are executed by the same nodeagent process that runs Mods jobs. Gate
+jobs are regular jobs in the unified queue; there is no separate HTTP Build Gate worker
+mode and no `buildgate_worker_enabled` toggle.
 
 **CLI-visible gate summaries:**
 Gate results are surfaced via `ploy mod inspect <run-id>` in the same format regardless
@@ -405,9 +406,9 @@ of execution location:
 - `Gate: passed duration=1234ms`
 - `Gate: failed pre-gate duration=567ms`
 
-The underlying execution may run on a remote Build Gate worker, but the CLI output and
-`Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses remain unchanged. The
-`GateExecutor` adapter abstracts remote execution, ensuring consistent gate status
+Gate jobs may run on any node that claims them from the unified queue, but the CLI output
+and `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses remain unchanged. The
+gate executor logic abstracts execution location, ensuring consistent gate status
 reporting.
 
 **Spec format:**
