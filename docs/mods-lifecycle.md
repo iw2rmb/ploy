@@ -668,7 +668,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 
 ### 2.1 Run summary (`internal/mods/api`)
 
-- `TicketSummary` (in `internal/mods/api/types.go`) is the wire type returned by
+- `RunSummary` (in `internal/mods/api/types.go`) is the wire type returned by
   `GET /v1/mods/{id}` and streamed on SSE:
   - `run_id` — run ID (KSUID string, 27 characters).
   - `state` —  run lifecycle state (`pending`, `running`, `succeeded`,
@@ -694,7 +694,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 - **Jobs** (`jobs` table)
   - Created by the control plane when a run is submitted via `POST /v1/mods`.
   - Each job row has:
-    - `id` — job ID (KSUID string, used as key in `TicketSummary.stages`).
+    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
     - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
     - `step_index` — float for ordering (e.g., 1000, 2000, 3000).
   - `status` — job state (`created`, `pending`, `running`, `succeeded`,
@@ -752,7 +752,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - Creates a `runs` row with `status=queued`.
     - Creates `jobs` rows from the spec (pre-gate, mod, post-gate).
     - Jobs use float step_index for ordering (1000, 2000, 3000).
-    - Publishes an initial `TicketSummary` snapshot to SSE via
+    - Publishes an initial `RunSummary` snapshot to SSE via
       `events.Service.PublishTicket`.
 
 - `GET /v1/mods/{id}` —  run status.
@@ -762,13 +762,13 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
     - Run stats (MR URL, gate summary).
-  - Returns `TicketStatusResponse` (`modsapi.TicketStatusResponse{Run: TicketSummary}`).
+  - Returns `RunStatusResponse` (`modsapi.RunStatusResponse{Ticket: RunSummary}`).
 
 - `GET /v1/mods/{id}/events` — SSE event stream for a  run.
   - Handler: `getModEventsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
-    - `event:  run`, data: `TicketSummary`.
+    - `event:  run`, data: `RunSummary`.
     - `event: retention`, data: `RetentionHint`.
     - `event: done`, data: `Status {status:"done"}` sentinel.
   - Supports `Last-Event-ID` for resumption.
@@ -778,7 +778,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
   - Behaviour:
     - Transitions run to `canceled`, updates jobs in `pending|running` to
       `canceled`.
-    - Publishes a final `TicketSummary` with `state=cancelled`.
+    - Publishes a final `RunSummary` with `state=cancelled`.
     - Emits a terminal `done` status on the stream.
 
 - `GET /v1/mods/{id}/diffs` and `GET /v1/diffs/{id}` — diff list and download.
@@ -820,12 +820,12 @@ artifacts/diffs to the correct node.
 
 For a spec without `mods[]` (single `mod` or legacy top-level image):
 
-1. CLI (`ploy mod run`) builds a `TicketSubmitRequest` in
+1. CLI (`ploy mod run`) builds a `RunSubmitRequest` in
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
-2. CLI submits to `POST /v1/mods`. The control plane:
+   2. CLI submits to `POST /v1/mods`. The control plane:
    - Creates jobs (pre-gate, mod, post-gate) with float step_index.
-   - Publishes an initial `TicketSummary`.
+   - Publishes an initial `RunSummary`.
 3. A node:
    - Claims jobs sequentially via `/v1/nodes/{id}/claim` (ClaimJob enforces
      dependency: only returns a job when all prior jobs succeeded/skipped).
@@ -834,7 +834,7 @@ For a spec without `mods[]` (single `mod` or legacy top-level image):
      - Executes the job (gate check or mod container).
      - Generates diffs with `DiffGenerator` and uploads them.
      - Completes the job via `/v1/nodes/{id}/complete`.
-4. Control plane updates  run status and emits a final ` run` snapshot plus
+4. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
 ### 4.2 Multi-step runs (`mods[]`) and rehydration
@@ -941,7 +941,7 @@ implement a minimal SSE protocol used by the Mods endpoints.
 
 - `"log"` — Enriched `LogRecord` with execution context (see below).
 - `"retention"` — `RetentionHint {retained, ttl, expires_at, bundle_cid}`.
-- `" run"` — `mods/api.TicketSummary`.
+- `" run"` — `mods/api.RunSummary`.
 - `"done"` — `Status {status:"done"}` sentinel; the stream is finished and the
   hub closes subscribers.
 

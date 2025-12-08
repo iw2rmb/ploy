@@ -16,7 +16,12 @@ func TestModInspectPrintsSummary(t *testing.T) {
 	ticket := "ticket-11"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
-			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticket), State: modsapi.TicketStateRunning}})
+			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
+					TicketID: domaintypes.TicketID(ticket),
+					State:    modsapi.RunStateRunning,
+				},
+			})
 			return
 		}
 		http.NotFound(w, r)
@@ -41,10 +46,10 @@ func TestModInspectShowsMRURL(t *testing.T) {
 	mrURL := "https://gitlab.com/example/repo/-/merge_requests/42"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
-			resp := modsapi.TicketStatusResponse{
-				Ticket: modsapi.TicketSummary{
+			resp := modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID(ticket),
-					State:    modsapi.TicketStateSucceeded,
+					State:    modsapi.RunStateSucceeded,
 					Metadata: map[string]string{"mr_url": mrURL},
 				},
 			}
@@ -72,10 +77,10 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 	ticket := "ticket-no-mr"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
-			resp := modsapi.TicketStatusResponse{
-				Ticket: modsapi.TicketSummary{
+			resp := modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
 					TicketID: domaintypes.TicketID(ticket),
-					State:    modsapi.TicketStateSucceeded,
+					State:    modsapi.RunStateSucceeded,
 					// No metadata or empty metadata.
 				},
 			}

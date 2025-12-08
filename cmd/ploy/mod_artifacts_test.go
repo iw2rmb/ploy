@@ -16,14 +16,16 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	ticket := "ticket-artifacts"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
-			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{
-				TicketID: domaintypes.TicketID(ticket),
-				State:    modsapi.TicketStateSucceeded,
-				Stages: map[string]modsapi.StageStatus{
-					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
-					"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
+			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
+				Ticket: modsapi.RunSummary{
+					TicketID: domaintypes.TicketID(ticket),
+					State:    modsapi.RunStateSucceeded,
+					Stages: map[string]modsapi.StageStatus{
+						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
+						"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
+					},
 				},
-			}})
+			})
 			return
 		}
 		http.NotFound(w, r)

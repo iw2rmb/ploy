@@ -434,7 +434,7 @@ for end-to-end usage with `mods-codex`.
 ## Job Graph and DAG State
 
 Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
-surfaces via `GET /v1/mods/{id}` in `TicketSummary.Stages` and through the
+surfaces via `GET /v1/mods/{id}` in `RunSummary.stages` and through the
 `ploy mod inspect` command. Each job has a `step_index` for execution ordering
 and optional metadata identifying the job phase.
 
@@ -477,7 +477,7 @@ dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
 
 **API response:**
 
-The `GET /v1/mods/{id}` endpoint returns `TicketSummary` with:
+The `GET /v1/mods/{id}` endpoint returns `RunSummary` with:
 - `stages` — Map of job ID (KSUID string) to `StageStatus` (state, step_index, attempts)
 - `metadata["gate_summary"]` — Human-readable gate result
 - `metadata["mr_url"]` — Merge request URL if created

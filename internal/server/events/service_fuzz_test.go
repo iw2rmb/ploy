@@ -23,17 +23,17 @@ func FuzzPublishTicketRoundTrip(f *testing.F) {
 	f.Add("run-123", "ticket-xyz", uint8(255))
 
 	f.Fuzz(func(t *testing.T, runID, ticketID string, stateByte uint8) {
-		// Map byte to a valid ticket state.
-		states := []modsapi.TicketState{
-			modsapi.TicketStatePending,
-			modsapi.TicketStateRunning,
-			modsapi.TicketStateSucceeded,
-			modsapi.TicketStateFailed,
-			modsapi.TicketStateCancelled,
+		// Map byte to a valid run state.
+		states := []modsapi.RunState{
+			modsapi.RunStatePending,
+			modsapi.RunStateRunning,
+			modsapi.RunStateSucceeded,
+			modsapi.RunStateFailed,
+			modsapi.RunStateCancelled,
 		}
 		state := states[int(stateByte)%len(states)]
 
-		payload := modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: state}
+		payload := modsapi.RunSummary{TicketID: domaintypes.TicketID(ticketID), State: state}
 		ctx := context.Background()
 
 		err := svc.PublishTicket(ctx, runID, payload)
@@ -53,7 +53,7 @@ func FuzzPublishTicketRoundTrip(f *testing.F) {
 		if got := strings.ToLower(snap[0].Type); got != "run" {
 			t.Fatalf("unexpected event type: %s", got)
 		}
-		var out modsapi.TicketSummary
+		var out modsapi.RunSummary
 		if err := json.Unmarshal(snap[0].Data, &out); err != nil {
 			t.Fatalf("unmarshal: %v", err)
 		}
