@@ -152,7 +152,7 @@ func TestCancelRun_BadID_And_NotFound(t *testing.T) {
 	}
 }
 
-// TestCancelRun_SSEPublish verifies that the handler publishes ticket and status events.
+// TestCancelRun_SSEPublish verifies that the handler publishes run and status events.
 func TestCancelRun_SSEPublish(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
@@ -184,33 +184,33 @@ func TestCancelRun_SSEPublish(t *testing.T) {
 		t.Fatalf("expected 202, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify that ticket and done status events were published via SSE.
+	// Verify that run and done status events were published via SSE.
 	snapshot := eventsService.Hub().Snapshot(id.String())
 	if len(snapshot) < 2 {
-		t.Fatalf("expected at least 2 events (ticket + done status), got %d", len(snapshot))
+		t.Fatalf("expected at least 2 events (run + done status), got %d", len(snapshot))
 	}
 
-	// Ticket should be observed before the terminal done event to ensure
+	// Run event should be observed before the terminal done event to ensure
 	// followers see the terminal state before the stream closes.
-	ticketIdx := -1
+	runIdx := -1
 	doneIdx := -1
-	foundTicket := false
+	foundRun := false
 	foundDone := false
 	for i, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicket = true
-			if ticketIdx < 0 {
-				ticketIdx = i
+			foundRun = true
+			if runIdx < 0 {
+				runIdx = i
 			}
-			// Verify ticket state is canceled and reason is present.
-			var ticketData map[string]interface{}
-			if err := json.Unmarshal(evt.Data, &ticketData); err != nil {
-				t.Fatalf("failed to unmarshal ticket data: %v", err)
+			// Verify run state is canceled and reason is present.
+			var runData map[string]interface{}
+			if err := json.Unmarshal(evt.Data, &runData); err != nil {
+				t.Fatalf("failed to unmarshal run data: %v", err)
 			}
-			if state, ok := ticketData["state"].(string); !ok || state != "cancelled" {
-				t.Fatalf("expected ticket state 'cancelled', got %v", ticketData["state"])
+			if state, ok := runData["state"].(string); !ok || state != "cancelled" {
+				t.Fatalf("expected run state 'cancelled', got %v", runData["state"])
 			}
-			if metadata, ok := ticketData["metadata"].(map[string]interface{}); ok {
+			if metadata, ok := runData["metadata"].(map[string]interface{}); ok {
 				if reason, ok := metadata["reason"].(string); !ok || reason != "user requested" {
 					t.Fatalf("expected reason 'user requested', got %v", reason)
 				}
@@ -234,14 +234,14 @@ func TestCancelRun_SSEPublish(t *testing.T) {
 		}
 	}
 
-	if !foundTicket {
-		t.Fatal("expected ticket event in snapshot")
+	if !foundRun {
+		t.Fatal("expected run event in snapshot")
 	}
 	if !foundDone {
 		t.Fatal("expected done status event in snapshot")
 	}
-	if ticketIdx < 0 || doneIdx <= ticketIdx {
-		t.Fatalf("expected ticket to precede done (ticketIdx=%d, doneIdx=%d)", ticketIdx, doneIdx)
+	if runIdx < 0 || doneIdx <= runIdx {
+		t.Fatalf("expected run to precede done (runIdx=%d, doneIdx=%d)", runIdx, doneIdx)
 	}
 }
 
