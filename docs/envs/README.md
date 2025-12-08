@@ -195,7 +195,7 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
   via the HTTP Build Gate API (`/v1/nodes/{id}/buildgate/*`) backed by the dedicated
   `buildgate_jobs` table. HTTP Build Gate worker mode and the separate queue have been
   removed in favor of the unified jobs-based pipeline; the server-side Build Gate routes
-  now return `410 Gone` and no longer schedule gate work via a separate queue. This
+  have now been removed entirely and are no longer mounted on the control plane. This
   variable remains wired in node configuration code but has no effect in the current
   pipeline. See `docs/build-gate/README.md` and `ROADMAP.md` for historical context.
 
