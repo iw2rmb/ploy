@@ -70,9 +70,9 @@ Check:
    ```
 
 2. If the token is missing, create a new one:
-   ```bash
-   # If you have existing admin access
-   ploy token create --role cli-admin --expires 365d
+  ```bash
+  # If you have existing admin access
+   ploy cluster token create --role cli-admin --expires 365
 
    # Otherwise, contact your cluster admin or bootstrap a new token
    ```
@@ -113,8 +113,8 @@ Check:
 3. If the server's `PLOY_AUTH_SECRET` changed, all existing tokens are invalid. Create a new token using the updated secret or contact your cluster admin.
 
 4. Generate a fresh token:
-   ```bash
-   ploy token create --role cli-admin --expires 365d --description "Replacement token"
+  ```bash
+   ploy cluster token create --role cli-admin --expires 365 --description "Replacement token"
    ```
 
 ### 401 Unauthorized: "token expired"
@@ -132,26 +132,26 @@ Check:
 
 2. Create a new token:
    ```bash
-   ploy token create --role cli-admin --expires 365d --description "Renewed token"
+   ploy cluster token create --role cli-admin --expires 365 --description "Renewed token"
    ```
 
 3. Update the descriptor with the new token.
 
 ### 401 Unauthorized: "token revoked"
 
-**Cause**: Token was manually revoked via `ploy token revoke`.
+**Cause**: Token was manually revoked via `ploy cluster token revoke`.
 
 **Solution**:
 
 1. Verify the token is revoked:
-   ```bash
-   ploy token list
+  ```bash
+   ploy cluster token list
    # Check if your token ID appears with a revoked_at timestamp
    ```
 
 2. Create a new token:
-   ```bash
-   ploy token create --role cli-admin --expires 365d --description "Replacement token"
+  ```bash
+   ploy cluster token create --role cli-admin --expires 365 --description "Replacement token"
    ```
 
 3. Update the descriptor with the new token.
@@ -168,15 +168,15 @@ Check:
 **Solution**:
 
 1. Check your token's role:
-   ```bash
-   ploy token list
+  ```bash
+   ploy cluster token list
    # Find your token ID and check the Role column
    ```
 
 2. If you need admin access, create a `cli-admin` token:
-   ```bash
+  ```bash
    # Requires existing cli-admin access
-   ploy token create --role cli-admin --expires 365d --description "Admin token"
+   ploy cluster token create --role cli-admin --expires 365 --description "Admin token"
    ```
 
 3. If you don't have admin access, contact your cluster administrator.
@@ -391,13 +391,13 @@ sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
 
 **Action**:
 1. Revoke the compromised token immediately:
-   ```bash
-   ploy token revoke <token-id>
+  ```bash
+   ploy cluster token revoke <token-id>
    ```
 
 2. Check `last_used_at` to see if it was used:
-   ```bash
-   ploy token list | grep <token-id>
+  ```bash
+   ploy cluster token list | grep <token-id>
    ```
 
 3. Review server logs for suspicious activity:

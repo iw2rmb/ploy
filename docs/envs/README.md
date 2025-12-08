@@ -46,7 +46,7 @@ defaults change, or components adopt additional configuration.
   descriptor storage. Falls back to `~/.config/ploy` when both are unset.
 
 Local cluster descriptors (written under `~/.config/ploy/clusters/`) now use bearer token authentication:
-- `token` — Bearer token for authenticating with the control plane. Generate using `ploy token create`.
+- `token` — Bearer token for authenticating with the control plane. Generate using `ploy cluster token create`.
 
 Role model (bearer token claims):
 

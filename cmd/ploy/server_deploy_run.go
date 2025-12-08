@@ -313,7 +313,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintln(stderr, "You can now use 'ploy' commands to interact with the cluster.")
 	_, _ = fmt.Fprintln(stderr, "")
 	_, _ = fmt.Fprintln(stderr, "Security recommendations:")
-	_, _ = fmt.Fprintln(stderr, "  1. Create additional admin tokens: ploy token create --role cli-admin")
+	_, _ = fmt.Fprintln(stderr, "  1. Create additional admin tokens: ploy cluster token create --role cli-admin")
 	_, _ = fmt.Fprintln(stderr, "  2. Revoke the initial token after creating new ones")
 	_, _ = fmt.Fprintln(stderr, "  3. Use short-lived tokens for automation")
 	_, _ = fmt.Fprintln(stderr, "")
