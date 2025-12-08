@@ -121,7 +121,7 @@ func TestLogStreamer_WithCustomHook(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "run-123", "")
@@ -155,7 +155,7 @@ func TestLogStreamer_HookError(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "run-456", "")
@@ -188,7 +188,7 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "run-789-nil", "")
@@ -210,7 +210,7 @@ func TestLogStreamer_DefaultHook(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "run-789", "")
@@ -242,7 +242,7 @@ func TestLogStreamer_SetHook(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "run-abc", "")
@@ -289,7 +289,7 @@ func BenchmarkNoOpLogHook(b *testing.B) {
 func BenchmarkLogStreamer_WithNoOpHook(b *testing.B) {
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "00000000-0000-0000-0000-000000000001",
+		NodeID:    "aB3xY9",
 	}
 
 	ls := NewLogStreamer(cfg, "bench-run", "")

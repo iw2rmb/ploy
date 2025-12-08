@@ -177,6 +177,59 @@ func TestHandleNodeAddDryRun(t *testing.T) {
 	}
 }
 
+func TestRunNodeAddGeneratesNanoIDNodeID(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-node-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0o755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0o600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	cfg := nodeAddConfig{
+		ClusterID:       "test-cluster",
+		Address:         "10.0.0.10",
+		ServerURL:       "https://10.0.0.5:8443",
+		User:            "testuser",
+		IdentityFile:    identityPath,
+		PloydNodeBinary: binPath,
+		SSHPort:         22,
+		DryRun:          true,
+	}
+
+	buf := &bytes.Buffer{}
+	if err := runNodeAdd(cfg, buf); err != nil {
+		t.Fatalf("runNodeAdd (dry-run) error: %v", err)
+	}
+
+	output := buf.String()
+	var nodeID string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		const prefix = "Generated node ID:"
+		if strings.HasPrefix(line, prefix) {
+			nodeID = strings.TrimSpace(strings.TrimPrefix(line, prefix))
+			break
+		}
+	}
+	if nodeID == "" {
+		t.Fatalf("expected Generated node ID line in output; got: %q", output)
+	}
+
+	if len(nodeID) != 6 {
+		t.Fatalf("node ID %q length = %d, want 6", nodeID, len(nodeID))
+	}
+
+	const nanoIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
+	for _, c := range nodeID {
+		if !strings.ContainsRune(nanoIDAlphabet, c) {
+			t.Fatalf("node ID %q contains invalid character %q; expected URL-safe NanoID alphabet", nodeID, c)
+		}
+	}
+}
+
 func TestSignNodeCSR_Success(t *testing.T) {
 	t.Parallel()
 	// Arrange a fake PKI sign endpoint

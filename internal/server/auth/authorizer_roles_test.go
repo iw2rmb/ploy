@@ -45,10 +45,10 @@ func TestExtractRoleFromCertOUAndCN(t *testing.T) {
 	if got := extractRole(cert); got != RoleControlPlane {
 		t.Fatalf("extractRole CN fallback got %q", got)
 	}
-	// New: nodes identify via CN prefix "node:<uuid>"
-	cert = &x509.Certificate{Subject: pkix.Name{CommonName: "node:56d2f9f7-e15d-4a36-9a20-9b3ce0798fb8"}}
+	// New: nodes identify via CN prefix "node:<node_id>"
+	cert = &x509.Certificate{Subject: pkix.Name{CommonName: "node:aB3xY9"}}
 	if got := extractRole(cert); got != RoleWorker {
-		t.Fatalf("extractRole CN node:<uuid> expected worker, got %q", got)
+		t.Fatalf("extractRole CN node:<node_id> expected worker, got %q", got)
 	}
 	if got := extractRole(nil); got != "" {
 		t.Fatalf("extractRole nil cert got %q", got)

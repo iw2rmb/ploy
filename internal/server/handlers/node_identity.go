@@ -1,5 +1,5 @@
 package handlers
 
-// nodeUUIDHeader is the HTTP header key that carries the node's UUID on all
-// mutating requests from worker nodes to the control plane.
+// nodeUUIDHeader is the HTTP header key that carries the worker node's ID
+// (NanoID 6-character string) on mutating requests to the control plane.
 const nodeUUIDHeader = "PLOY_NODE_UUID"

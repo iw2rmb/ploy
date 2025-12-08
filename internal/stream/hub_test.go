@@ -349,7 +349,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Timestamp: "2025-10-22T12:00:00Z",
 				Stream:    "stdout",
 				Line:      "hello world",
-				NodeID:    "node-abc123",
+				NodeID:    "aB3xY9",
 				JobID:     "job-def456",
 				ModType:   "mod",
 				StepIndex: 2,
@@ -358,7 +358,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"timestamp":  "2025-10-22T12:00:00Z",
 				"stream":     "stdout",
 				"line":       "hello world",
-				"node_id":    "node-abc123",
+				"node_id":    "aB3xY9",
 				"job_id":     "job-def456",
 				"mod_type":   "mod",
 				"step_index": float64(2), // JSON numbers decode as float64
@@ -384,14 +384,14 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Timestamp: "2025-10-22T12:00:02Z",
 				Stream:    "stdout",
 				Line:      "partial context",
-				NodeID:    "node-xyz",
+				NodeID:    "Z9yX3b",
 				StepIndex: 0, // zero value, should be omitted
 			},
 			want: map[string]any{
 				"timestamp": "2025-10-22T12:00:02Z",
 				"stream":    "stdout",
 				"line":      "partial context",
-				"node_id":   "node-xyz",
+				"node_id":   "Z9yX3b",
 				// job_id, mod_type, step_index (0) should be absent
 			},
 		},
@@ -450,7 +450,7 @@ func TestPublishTicketTypedPayload(t *testing.T) {
 	// Construct a typed RunSummary payload.
 	ticket := api.RunSummary{
 		TicketID: "ticket-123",
-		State:    api.TicketStateRunning,
+		State:    api.RunStateRunning,
 		Stages:   make(map[string]api.StageStatus),
 	}
 
@@ -507,7 +507,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 		Timestamp: "2025-12-01T10:00:00.000000Z",
 		Stream:    "stdout",
 		Line:      "Build step completed: compiling module org.example.service",
-		NodeID:    "aabbccdd-eeff-0011-2233-445566778899",
+		NodeID:    "aB3xY9",
 		JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
 		ModType:   "mod",
 		StepIndex: 2000,

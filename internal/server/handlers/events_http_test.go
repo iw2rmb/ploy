@@ -205,7 +205,7 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Stream:    "stdout",
 		Line:      "enriched line",
-		NodeID:    "node-abc123",
+		NodeID:    "aB3xY9",
 		JobID:     "job-def456",
 		ModType:   "mod",
 		StepIndex: 2000,
@@ -247,8 +247,8 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 		t.Fatalf("unmarshal enriched log payload: %v", err)
 	}
 
-	if got := payload["node_id"]; got != "node-abc123" {
-		t.Errorf("node_id = %v, want %q", got, "node-abc123")
+	if got := payload["node_id"]; got != "aB3xY9" {
+		t.Errorf("node_id = %v, want %q", got, "aB3xY9")
 	}
 	if got := payload["job_id"]; got != "job-def456" {
 		t.Errorf("job_id = %v, want %q", got, "job-def456")

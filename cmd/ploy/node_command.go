@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
@@ -145,7 +144,10 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydNodeBinaryPath)
 
 	// Generate node ID
-	nodeID := uuid.New().String()
+	nodeID, err := deploy.GenerateNodeID()
+	if err != nil {
+		return fmt.Errorf("node add: generate node ID: %w", err)
+	}
 	_, _ = fmt.Fprintf(stderr, "Generated node ID: %s\n", nodeID)
 
 	serverURL := strings.TrimSpace(cfg.ServerURL)

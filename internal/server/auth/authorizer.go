@@ -234,7 +234,7 @@ func extractRole(cert *x509.Certificate) Role {
 	}
 	if cn := strings.TrimSpace(cert.Subject.CommonName); cn != "" {
 		roleStr := cn
-		// Prefer colon used by nodes (e.g., "node:<uuid>")
+		// Prefer colon used by nodes (e.g., "node:<node_id>")
 		if idx := strings.Index(cn, ":"); idx > 0 {
 			roleStr = cn[:idx]
 		} else if idx := strings.Index(cn, "-"); idx > 0 {
