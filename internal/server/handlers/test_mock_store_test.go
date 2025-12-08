@@ -164,6 +164,11 @@ type mockStore struct {
 	updateJobCompletionParams store.UpdateJobCompletionParams
 	updateJobCompletionErr    error
 
+	// UpdateJobCompletionWithMeta tracking
+	updateJobCompletionWithMetaCalled bool
+	updateJobCompletionWithMetaParams store.UpdateJobCompletionWithMetaParams
+	updateJobCompletionWithMetaErr    error
+
 	// ScheduleNextJob tracking
 	scheduleNextJobCalled bool
 	scheduleNextJobParam  string
@@ -568,6 +573,12 @@ func (m *mockStore) UpdateJobCompletion(ctx context.Context, params store.Update
 	m.updateJobCompletionCalled = true
 	m.updateJobCompletionParams = params
 	return m.updateJobCompletionErr
+}
+
+func (m *mockStore) UpdateJobCompletionWithMeta(ctx context.Context, params store.UpdateJobCompletionWithMetaParams) error {
+	m.updateJobCompletionWithMetaCalled = true
+	m.updateJobCompletionWithMetaParams = params
+	return m.updateJobCompletionWithMetaErr
 }
 
 func (m *mockStore) ScheduleNextJob(ctx context.Context, runID string) (store.Job, error) {

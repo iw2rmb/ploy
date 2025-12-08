@@ -411,3 +411,36 @@ func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
 		t.Errorf("round-trip stack = %q, want %q", got, contracts.ModStackJavaGradle)
 	}
 }
+
+// TestBuildGateJobStats_IncludesJobMeta verifies that gate job stats embed
+// JobMeta so that jobs.meta can carry structured gate metadata.
+func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
+	t.Parallel()
+
+	rc := &runController{cfg: Config{}}
+
+	gateMeta := &contracts.BuildGateStageMetadata{
+		LogDigest: "sha256:test",
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "maven", Passed: true},
+		},
+	}
+
+	stats := rc.buildGateJobStats(gateMeta, 250*time.Millisecond)
+
+	raw, ok := stats["job_meta"]
+	if !ok {
+		t.Fatalf("expected job_meta key in gate stats, got %#v", stats)
+	}
+
+	meta, ok := raw.(*contracts.JobMeta)
+	if !ok {
+		t.Fatalf("job_meta has type %T, want *contracts.JobMeta", raw)
+	}
+	if meta.Kind != contracts.JobKindGate {
+		t.Fatalf("job_meta.Kind = %q, want %q", meta.Kind, contracts.JobKindGate)
+	}
+	if meta.Gate == nil || meta.Gate.LogDigest != "sha256:test" {
+		t.Fatalf("job_meta.Gate.LogDigest = %#v, want sha256:test", meta.Gate)
+	}
+}

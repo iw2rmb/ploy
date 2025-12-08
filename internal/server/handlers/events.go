@@ -32,8 +32,9 @@ func parseLastEventID(header string) int64 {
 // Supports Last-Event-ID header for resuming streams from a specific event.
 // GET /v1/mods/{id}/events — Native SSE under mods (no proxy).
 //
-// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
-// Validation is limited to non-empty check; the database layer rejects invalid IDs.
+// Run IDs are now KSUID-backed strings (27 characters). We perform a cheap
+// length check to reject obviously invalid IDs before hitting the store; the
+// database layer enforces existence.
 func getModEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract ticket ID from path parameter.
@@ -41,6 +42,12 @@ func getModEventsHandler(st store.Store, eventsService *events.Service) http.Han
 		runIDStr := strings.TrimSpace(r.PathValue("id"))
 		if runIDStr == "" {
 			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Reject obviously invalid IDs to avoid hanging SSE streams on garbage.
+		if len(runIDStr) != 27 {
+			http.Error(w, "invalid id", http.StatusBadRequest)
 			return
 		}
 

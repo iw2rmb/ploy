@@ -89,6 +89,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Validate stats field if provided (must be a valid JSON object).
 		statsBytes := []byte("{}")
+		var jobMetaBytes []byte
 		if len(req.Stats) > 0 {
 			if !json.Valid(req.Stats) {
 				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
@@ -99,11 +100,25 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				http.Error(w, "invalid stats JSON", http.StatusBadRequest)
 				return
 			}
-			if _, ok := tmp.(map[string]any); !ok {
+			obj, ok := tmp.(map[string]any)
+			if !ok {
 				http.Error(w, "stats must be a JSON object", http.StatusBadRequest)
 				return
 			}
 			statsBytes = req.Stats
+
+			// Extract optional job_meta payload from stats so gate/build metadata
+			// can be persisted in jobs.meta JSONB.
+			if rawMeta, ok := obj["job_meta"]; ok && rawMeta != nil {
+				metaBytes, err := json.Marshal(rawMeta)
+				if err != nil {
+					http.Error(w, "stats.job_meta must be JSON-serializable", http.StatusBadRequest)
+					return
+				}
+				if len(metaBytes) > 0 && string(metaBytes) != "{}" && string(metaBytes) != "null" {
+					jobMetaBytes = metaBytes
+				}
+			}
 		}
 
 		// Look up the job by job_id using string ID directly.
@@ -160,11 +175,21 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Transition job status to terminal state.
 		// Sets finished_at timestamp, duration_ms, and exit_code.
-		err = st.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
-			ID:       job.ID,
-			Status:   jobStatus,
-			ExitCode: req.ExitCode,
-		})
+		// When job_meta is present in stats, persist it into jobs.meta JSONB.
+		if len(jobMetaBytes) > 0 {
+			err = st.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
+				ID:       job.ID,
+				Status:   jobStatus,
+				ExitCode: req.ExitCode,
+				Meta:     jobMetaBytes,
+			})
+		} else {
+			err = st.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
+				ID:       job.ID,
+				Status:   jobStatus,
+				ExitCode: req.ExitCode,
+			})
+		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to complete job: %v", err), http.StatusInternalServerError)
 			slog.Error("complete job: update failed",

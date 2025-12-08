@@ -272,6 +272,10 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 			"passed":      passed,
 			"duration_ms": duration.Milliseconds(),
 		}
+
+		// Attach structured job metadata so the control plane can persist
+		// gate results in jobs.meta JSONB.
+		stats["job_meta"] = contracts.NewGateJobMeta(gateResult)
 	}
 
 	return stats
