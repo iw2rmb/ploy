@@ -269,7 +269,7 @@ ploy mod run --mr-success \
 ## Control Plane
 
 - (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and mTLS materials from
-  the cached cluster descriptor created during `ploy server deploy`.
+  the cached cluster descriptor created during `ploy cluster deploy`.
 
 ### Server (Control Plane)
 
@@ -277,7 +277,7 @@ ploy mod run --mr-success \
   There is no environment variable; set this in `ployd.yaml` under `http.listen`.
 - `metrics.listen` (config YAML) — Address for Prometheus metrics endpoint. Default `:9100`.
   There is no environment variable; set this in `ployd.yaml` under `metrics.listen`.
-- `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy server deploy`).
+- `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy cluster deploy`).
   Currently set by bootstrap but not yet persisted or loaded by the server runtime.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — PEM-encoded server TLS certificate and key
   used by the bootstrap script to write files at `/etc/ploy/pki/server.crt` and
@@ -334,7 +334,7 @@ Precedence at server startup:
 
 - `PLOY_POSTGRES_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
-  When `ploy server deploy` runs without `--postgresql-dsn`, the bootstrap installs
+  When `ploy cluster deploy` runs without `--postgresql-dsn`, the bootstrap installs
   PostgreSQL on the VPS and derives a password‑based TCP DSN suitable for the
   root‑run `ployd` service, e.g.: `host=127.0.0.1 port=5432 user=ploy password=ploy dbname=ploy sslmode=disable`.
   The server no longer recognizes `PLOY_SERVER_PG_DSN`.
@@ -347,7 +347,7 @@ the config file are treated as unset unless the environment variable is actually
 ## Bootstrap Script
 
 These environment variables are used internally by the bootstrap script generated during
-`ploy server deploy` and `ploy node add` flows. They are not required for day‑to‑day CLI
+`ploy cluster deploy` and `ploy node add` flows. They are not required for day‑to‑day CLI
 usage but are documented here for completeness.
 
 - `PLOY_BOOTSTRAP_VERSION` — Version string exported at the top of generated bootstrap scripts

@@ -207,4 +207,4 @@ See `docs/how-to/token-management.md` for detailed token management guide.
 
 ---
 
-This local setup is for development only. For VPS deployment, use `dist/ploy server deploy` and `dist/ploy node add` as documented in `docs/how-to/deploy-a-cluster.md`.
+This local setup is for development only. For VPS deployment, use `dist/ploy cluster deploy` and `dist/ploy node add` as documented in `docs/how-to/deploy-a-cluster.md`.
