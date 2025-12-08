@@ -322,83 +322,10 @@ RunStatus:
         type: string
   required: [run_id, status, repo_url, base_ref, target_ref, created_at]
 
-# Build Gate — client requests and responses
-BuildGateValidateRequest:
-  type: object
-  description: |
-    Submit a build validation job. Requires repo_url and ref for Git-based
-    validation using the repo+diff model.
-
-    Optionally, callers may supply diff_patch (gzipped unified diff, base64-encoded)
-    to apply on top of the cloned repo_url+ref baseline. This enables healing flows
-    to replay changes without shipping full workspace archives.
-  properties:
-    repo_url: { type: string, description: Git repository URL to clone (required) }
-    ref: { type: string, description: Git ref (branch, tag, or commit SHA) to validate (required) }
-    diff_patch:
-      type: string
-      format: byte
-      nullable: true
-      description: |
-        Gzipped unified diff (base64-encoded) to apply on top of the cloned
-        repo_url+ref baseline. Used by healing mods to verify changes without
-        transmitting full workspace archives. If non-empty, the executor clones
-        repo_url at ref, then applies the decoded/decompressed patch via
-        "git apply" before running the build.
-    profile: { type: string, description: Gate profile (e.g., auto, java), nullable: true }
-    timeout: { type: string, description: Duration string (e.g., 5m), nullable: true }
-    limit_memory_bytes: { type: integer, format: int64, nullable: true }
-    limit_cpu_millis: { type: integer, format: int64, nullable: true }
-    limit_disk_space: { type: integer, format: int64, nullable: true }
-  required: [repo_url, ref]
-
-BuildGateValidateResponse:
-  type: object
-  description: Returns result when ready; otherwise JobID for polling.
-  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
-  properties:
-    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
-    status: { type: string, enum: [pending, claimed, running, completed, failed] }
-    result:
-      description: Present only for completed jobs.
-      type: object
-      additionalProperties: true
-      nullable: true
-  required: [job_id, status]
-
-BuildGateJobStatusResponse:
-  type: object
-  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
-  properties:
-    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
-    status: { type: string, enum: [pending, claimed, running, completed, failed] }
-    result:
-      type: object
-      additionalProperties: true
-      nullable: true
-    error: { type: string, nullable: true }
-    created_at: { type: string, format: date-time }
-    started_at: { type: string, format: date-time, nullable: true }
-    finished_at: { type: string, format: date-time, nullable: true }
-  required: [job_id, status, created_at]
-
-BuildGateJobCompleteRequest:
-  type: object
-  properties:
-    status: { type: string, enum: [completed, failed] }
-    result: { type: object, additionalProperties: true, nullable: true }
-    error: { type: string, nullable: true }
-  required: [status]
-
-NodeBuildGateClaimResponse:
-  type: object
-  # Note: historically job_id referenced buildgate_jobs.id (UUID); the dedicated table has been removed.
-  properties:
-    job_id: { type: string, format: uuid, description: "Build Gate job ID (UUID)" }
-    request:
-      $ref: '#/BuildGateValidateRequest'
-    status: { type: string, enum: [claimed] }
-  required: [job_id, request, status]
+# Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
+# Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
+# The buildgate_jobs table and related HTTP endpoints have been removed;
+# all gate execution now uses the jobs table with mod_type='pre_gate'|'re_gate'|'post_gate'.
 
 # Response returned by POST /v1/nodes/{id}/claim
 # Schema aligned with claimJobHandler response — exposes job-centric fields.

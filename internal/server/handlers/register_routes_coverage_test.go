@@ -91,19 +91,14 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		return rr.Code
 	}
 
+	// allowedMissing contains paths that are documented in OpenAPI but not mounted
+	// in RegisterRoutes (typically PKI endpoints that are mounted separately).
+	// HTTP Build Gate endpoints have been removed from both OpenAPI and code;
+	// gate execution now runs as part of unified jobs queue.
 	allowedMissing := map[string]struct{}{
 		"/v1/pki/sign":        {},
 		"/v1/pki/sign/client": {},
 		"/v1/pki/sign/admin":  {},
-		// HTTP Build Gate endpoints removed; gate execution now runs as part of
-		// unified jobs queue. These paths remain in OpenAPI for documentation
-		// purposes until the separate "Remove Build Gate HTTP endpoints from OpenAPI"
-		// task is completed. See ROADMAP.md for details.
-		"/v1/buildgate/validate":                     {},
-		"/v1/buildgate/jobs/{id}":                    {},
-		"/v1/nodes/{id}/buildgate/claim":             {},
-		"/v1/nodes/{id}/buildgate/{job_id}/ack":      {},
-		"/v1/nodes/{id}/buildgate/{job_id}/complete": {},
 	}
 
 	for p, item := range paths {

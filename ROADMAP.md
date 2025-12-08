@@ -128,7 +128,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers/... ./internal/store/...` — Verify claim behavior remains FIFO by `step_index` and Build Gate-specific claim tests are removed.
 
 ## Update OpenAPI and docs to remove HTTP Build Gate API
-- [ ] Remove Build Gate HTTP endpoints from OpenAPI — Reflect jobs-only gate model
+- [x] Remove Build Gate HTTP endpoints from OpenAPI — Reflect jobs-only gate model
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/api/OpenAPI.yaml, docs/api/components/schemas/controlplane.yaml, docs/api/paths/*
   - Scope:
