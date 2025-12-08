@@ -22,7 +22,7 @@ func TestBuildContainerSpec_InMountReadOnly(t *testing.T) {
 		}},
 	}
 
-	spec, err := buildContainerSpec(types.TicketID("ticket-in"), manifest, "/tmp/ws", "", "/tmp/in")
+	spec, err := buildContainerSpec(types.RunID("run-in"), manifest, "/tmp/ws", "", "/tmp/in")
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
