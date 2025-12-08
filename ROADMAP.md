@@ -452,7 +452,7 @@ Legend: [ ] todo, [x] done.
     - Adjust docs smoke checks (`scripts/deploy-locally.sh`, etc.) that currently run `./dist/ploy token list` so they call `./dist/ploy cluster token list` instead.
 
 ## Update root help, golden files, and docs to reflect new hierarchy
-- [ ] Refresh root help output, golden files, and documentation to describe the new `ploy cluster`‑centric hierarchy — Align user‑visible help and docs with the re‑routed commands, removing references to the old top‑level `server`, `node`, `rollout`, and `token` commands.
+- [x] Refresh root help output, golden files, and documentation to describe the new `ploy cluster`‑centric hierarchy — Align user‑visible help and docs with the re‑routed commands, removing references to the old top‑level `server`, `node`, `rollout`, and `token` commands.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (main.go, root.go, testdata), README, docs, scripts
   - Scope:
