@@ -129,7 +129,7 @@ VALUES (
 
 Use the `TOKEN` value as the admin token in the following steps.
 
-**Note**: In production (and once this token exists), use `ploy token create` / `ploy token revoke` for ongoing token management.
+**Note**: In production (and once this token exists), use `ploy cluster token create` / `ploy cluster token revoke` for ongoing token management.
 
 ## 5) Verify
 
@@ -186,7 +186,7 @@ docker compose -f local/docker-compose.yml down -v
   - Node: `docker compose -f local/docker-compose.yml logs -f node`
   - Database: `docker compose -f local/docker-compose.yml logs -f db`
 - **Apple Silicon**: `platform: linux/amd64` is set; if you rebuild binaries for arm64, remove the platform pin.
-- **Token management**: Use `ploy token list`, `ploy token create`, and `ploy token revoke` commands after setting up the CLI descriptor.
+- **Token management**: Use `ploy cluster token list`, `ploy cluster token create`, and `ploy cluster token revoke` commands after setting up the CLI descriptor.
 
 ## Token Management
 
@@ -194,13 +194,13 @@ After setting up the CLI (step 6), you can manage tokens:
 
 ```bash
 # List all tokens
-./dist/ploy token list
+./dist/ploy cluster token list
 
 # Create a new token for CI/CD
-./dist/ploy token create --role control-plane --expires 90d --description "CI/CD pipeline"
+./dist/ploy cluster token create --role control-plane --expires 90 --description "CI/CD pipeline"
 
 # Revoke a token
-./dist/ploy token revoke <token-id>
+./dist/ploy cluster token revoke <token-id>
 ```
 
 See `docs/how-to/token-management.md` for detailed token management guide.

@@ -592,7 +592,7 @@ Legacy endpoint notice:
   - `cluster_id` — Cluster identifier
   - `ssh_identity_path` — Path to SSH key for node provisioning (optional)
 - **HTTPS Termination**: In production, a load balancer terminates HTTPS and forwards plain HTTP to ployd on `127.0.0.1:8080`.
-- **Token Management**: Use `ploy token create`, `ploy token list`, and `ploy token revoke` commands to manage API tokens. See `docs/how-to/token-management.md` for details.
+- **Token Management**: Use `ploy cluster token create`, `ploy cluster token list`, and `ploy cluster token revoke` commands to manage API tokens. See `docs/how-to/token-management.md` for details.
 
 ## Appendix: Environment Variables
 

@@ -189,7 +189,6 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 				"cluster",
 				"config",
 				"manifest",
-				"token",
 			},
 			mustContainAll: true,
 			description:    "Root help must list all top-level commands",

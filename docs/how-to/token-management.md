@@ -45,17 +45,17 @@ Ploy supports three roles:
 
 ### Create a Token
 
-Create a new API token with the `ploy token create` command:
+Create a new API token with the `ploy cluster token create` command:
 
 ```bash
 # Create a token for CI/CD with control-plane access
-ploy token create --role control-plane --expires 90d --description "CI/CD pipeline"
+ploy cluster token create --role control-plane --expires 90 --description "CI/CD pipeline"
 
 # Create an admin token
-ploy token create --role cli-admin --expires 365d --description "Admin workstation"
+ploy cluster token create --role cli-admin --expires 365 --description "Admin workstation"
 
 # Create a short-lived token for testing
-ploy token create --role control-plane --expires 1d --description "Temporary test token"
+ploy cluster token create --role control-plane --expires 1 --description "Temporary test token"
 ```
 
 **Output:**
@@ -79,7 +79,7 @@ Store this token in a secure location (e.g., password manager, CI/CD secrets).
 View all API tokens in the cluster:
 
 ```bash
-ploy token list
+ploy cluster token list
 ```
 
 **Output:**
@@ -97,7 +97,7 @@ ghi789       control-plane    Dev team access       2025-11-01T10:00:00Z     202
 Revoke a token to immediately invalidate it:
 
 ```bash
-ploy token revoke abc123
+ploy cluster token revoke abc123
 ```
 
 **Output:**
@@ -110,7 +110,7 @@ Any requests using this token will now fail with a 401 Unauthorized error.
 You can also add a confirmation prompt:
 
 ```bash
-ploy token revoke abc123 --confirm
+ploy cluster token revoke abc123 --confirm
 ```
 
 **Revocation is immediate**: All in-flight requests using the revoked token will fail after the current request completes.
@@ -243,7 +243,7 @@ ORDER BY issued_at DESC;
 Your token has exceeded its `expires_at` timestamp. Create a new token:
 
 ```bash
-ploy token create --role cli-admin --expires 365d --description "Replacement token"
+ploy cluster token create --role cli-admin --expires 365 --description "Replacement token"
 ```
 
 Update your cluster descriptor with the new token.
