@@ -189,6 +189,54 @@ func TestSchemaFilesValid(t *testing.T) {
 	}
 }
 
+// TestPKISignRequestNodeIDShape ensures PKISignRequest.node_id matches node ID semantics
+// and is not documented as a UUID.
+func TestPKISignRequestNodeIDShape(t *testing.T) {
+	path := filepath.Join(".", "components", "schemas", "pki.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+
+	var content map[string]interface{}
+	if err := yaml.Unmarshal(data, &content); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+
+	rawSchema, ok := content["PKISignRequest"]
+	if !ok {
+		t.Fatalf("PKISignRequest schema not found in %s", path)
+	}
+
+	schema, ok := rawSchema.(map[string]interface{})
+	if !ok {
+		t.Fatalf("PKISignRequest schema has unexpected type %T", rawSchema)
+	}
+
+	props, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("PKISignRequest.properties has unexpected type %T", schema["properties"])
+	}
+
+	rawNodeID, ok := props["node_id"]
+	if !ok {
+		t.Fatalf("PKISignRequest.properties.node_id not found")
+	}
+
+	nodeID, ok := rawNodeID.(map[string]interface{})
+	if !ok {
+		t.Fatalf("PKISignRequest.properties.node_id has unexpected type %T", rawNodeID)
+	}
+
+	if typ, _ := nodeID["type"].(string); typ != "string" {
+		t.Fatalf("PKISignRequest.node_id.type = %q, want %q", typ, "string")
+	}
+
+	if format, ok := nodeID["format"]; ok {
+		t.Fatalf("PKISignRequest.node_id.format = %v, want no explicit format (NanoID string, not UUID)", format)
+	}
+}
+
 // TestPathFilesExist verifies that all path files referenced in OpenAPI.yaml exist.
 func TestPathFilesExist(t *testing.T) {
 	specPath := filepath.Join(".", "OpenAPI.yaml")
