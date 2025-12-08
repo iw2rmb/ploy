@@ -157,7 +157,7 @@ dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url
 This command implements the bootstrap token flow:
 
 **CLI-side actions:**
-- Generates a unique `node_id` (UUID).
+- Generates a unique `node_id` (NanoID(6) string; 6 characters from URL-safe alphabet A-Za-z0-9_-).
 - Requests a short-lived bootstrap token from the server (`POST /v1/bootstrap/tokens`).
 - Copies the `ployd-node` binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd-node` (mode 0755).
 - Writes the bootstrap token securely to `/run/ploy/bootstrap-token` (mode 600) on the remote host.
@@ -177,7 +177,7 @@ This command implements the bootstrap token flow:
 **Installed configuration:**
 - Writes node configuration to `/etc/ploy/ployd-node.yaml` with the following structure:
   - `server_url: <load-balancer-url>` (HTTPS)
-  - `node_id: <generated-uuid>`
+  - `node_id: <generated-nanoid-6>`
   - `cluster_id: <cluster-id>`
   - `http.listen: :8444`
   - `heartbeat.interval: 30s`, `heartbeat.timeout: 10s`

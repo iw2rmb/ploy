@@ -5,8 +5,8 @@ parameters:
   - in: path
     name: id
     required: true
-    schema: { type: string, format: uuid }
-    description: Node UUID
+    schema: { type: string }
+    description: Node ID (NanoID 6-character string)
 
 post:
   tags: [Control]
@@ -70,7 +70,7 @@ post:
     '400':
       description: |
         Bad Request — possible causes:
-        - Missing or invalid `id` path parameter (node UUID)
+        - Missing or invalid `id` path parameter (node ID)
         - Missing or invalid `run_id` (UUID format)
         - Missing or invalid `job_id` (UUID format)
         - Missing `status` or non-terminal status value
@@ -81,7 +81,7 @@ post:
     '404':
       description: |
         Not Found — possible causes:
-        - Node not found (invalid node UUID)
+        - Node not found (invalid node ID)
         - Run not found (invalid run UUID)
         - Job not found (invalid job UUID)
     '409':
