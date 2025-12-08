@@ -6,20 +6,22 @@ parameters:
     description: Node ID (NanoID 6-character string)
 post:
   tags: [Control]
-  summary: Claim a queued run for execution (node → server)
+  summary: Claim a pending job from the unified jobs queue (node → server)
   description: |
-    Nodes poll this endpoint to claim a single queued run. The server performs
-    an atomic assignment using `FOR UPDATE SKIP LOCKED` and returns the run
-    details if available. When no runs are available, the server returns `204 No Content`.
+    Nodes poll this endpoint to claim the next pending job for execution. The
+    server performs an atomic assignment using `FOR UPDATE SKIP LOCKED` over the
+    unified `jobs` queue (FIFO by `step_index`) and returns job + parent run
+    details when work is available. When no jobs are available, the server
+    returns `204 No Content`.
   responses:
     '200':
-      description: Run successfully claimed and assigned to the node
+      description: Job successfully claimed and assigned to the node
       content:
         application/json:
           schema:
             $ref: '../OpenAPI.yaml#/components/schemas/NodeClaimResponse'
     '204':
-      description: No queued runs available to claim
+      description: No pending jobs available to claim
     '400':
       description: Bad Request (invalid node ID)
     '404':

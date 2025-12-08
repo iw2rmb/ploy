@@ -794,14 +794,19 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 Nodeagents use `/v1/nodes/*` to execute work:
 
 - `POST /v1/nodes/{id}/heartbeat` — report node liveness.
-- `POST /v1/nodes/{id}/claim` — claim a queued job (returns job with all prior
-  jobs succeeded/skipped).
-- `POST /v1/nodes/{id}/ack` — confirm job start.
+- `POST /v1/nodes/{id}/claim` — claim the next pending job from the unified
+  jobs queue (FIFO by `step_index`; returns the claimed job plus parent run
+  metadata).
+- `POST /v1/nodes/{id}/ack` — confirm job start (transitions the parent run to
+  `running` when still queued).
 - `POST /v1/nodes/{id}/complete` — report final status and stats for a job.
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.
 - `POST /v1/runs/{run_id}/jobs/{job_id}/diff` — upload per-job diffs.
 - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact` — upload per-job artifacts.
-- `POST /v1/nodes/{id}/buildgate/*` — claim/ack/complete Build Gate jobs.
+- Legacy HTTP Build Gate endpoints (`/v1/nodes/{id}/buildgate/*`) have been
+  removed; gate execution now runs as jobs in the unified queue claimed via
+  `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for the historical
+  HTTP design.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 `PLOY_NODE_UUID` header set to the node's ID (NanoID(6) string). The
