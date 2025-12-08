@@ -148,89 +148,89 @@ Legend: [ ] todo, [x] done.
       - `internal/deploy/provision_and_workstation_test.go`, `internal/worker/lifecycle/cache_test.go`, `internal/server/handlers/worker_logs_test.go`, `internal/stream/hub_test.go`, and any others asserting full UUID node IDs.
     - Run `go test ./internal/deploy/... ./internal/nodeagent/... ./internal/server/handlers/...` and fix failing assertions and URL expectations.
 
-   ## KSUID/NanoID docs, CLI, and OpenAPI alignment
-   - [x] Update CLI help and README text to treat IDs as opaque KSUID/NanoID strings — Remove UUID-specific wording from CLI surfaces.
-     - Repository: github.com/iw2rmb/ploy
-     - Component: cmd/ploy/upload_command.go, cmd/ploy/mod_run_repo.go, cmd/ploy/README.md
-     - Scope:
-       - Replace `UUID` wording in flag help and usage for `--run-id` / `--build-id` in `cmd/ploy/upload_command.go` with neutral descriptions (e.g., "Run identifier", "Build identifier") that do not specify UUID shape.
-       - In `cmd/ploy/mod_run_repo.go`, change examples and flag descriptions from `--repo-id <repo-uuid>` / "Repo UUID" to `--repo-id <repo-id>` and describe repo IDs as short string identifiers (NanoID(8) semantics).
-       - In `cmd/ploy/README.md`, update examples and narrative text:
-         - Replace `ploy upload --run-id <uuid> [--build-id <uuid>] ...` with wording that uses `<run-id>` / `<build-id>` and explicitly notes these are KSUID-backed strings.
-         - Replace `--repo-id <repo-uuid>` placeholders with `--repo-id <repo-id>` and mention that repo IDs are NanoID(8) strings.
-     - Tests:
-       - Run `go test ./cmd/ploy/...` and fix any assertions that expect `uuid` / `repo-uuid` strings in usage output.
-   
-   - [x] Align OpenAPI component schemas with KSUID/NanoID and UUID split — Ensure schema types match the actual DB and handler behavior.
-     - Repository: github.com/iw2rmb/ploy
-     - Component: docs/api/components/schemas/controlplane.yaml
-     - Scope:
-       - Update `RunRepo` schema so:
-         - `id` is documented as a NanoID(8) string (no `format: uuid`; describe length/character set instead).
-         - `run_id` is documented as a KSUID-backed string (27 characters), consistent with `runs.id`.
-       - Update `Repo` schema to treat `id` as an opaque string or remove the field if no concrete backing ID exists in the control plane (avoid `format: uuid` unless there is a UUID column).
-       - For run/job/build IDs in component schemas (`Run`, `RunSummary`, `RunStatus`, `Stage`, `RunTiming`, `Log`, `NodeClaimResponse`, etc.):
-         - Ensure `run_id` / `id` / `job_id` / `build_id` are plain `string` fields with descriptions like "Run ID (KSUID string)" / "Job ID (KSUID string)" / "Build ID (KSUID string)" and do not use `format: uuid`.
-       - For `Diff` and `ArtifactBundle` schemas:
-         - Keep `id` as `format: uuid` (diff/artifact IDs remain UUID).
-         - Change `run_id`, `job_id`, `build_id` fields to plain strings with KSUID descriptions, matching `internal/store/schema.sql`.
-       - For node-related schemas (`Node`, `NodeClaimResponse` and any others with `node_id`):
-         - Document `node_id` as a NanoID(6) string (no `format: uuid`; describe length and URL-safe alphabet).
-       - For Build Gate schemas (`BuildGateValidateResponse`, `BuildGateJobStatusResponse`, `NodeBuildGateClaimResponse`):
-         - Align `job_id` documentation with actual behavior for `buildgate_jobs.id` (currently UUID-backed); either:
-           - Document `job_id` as a UUID string, or
-           - If `buildgate_jobs.id` is later migrated to KSUID, update the schema and handlers together and reflect that here.
-     - Tests:
-       - Run `go test ./docs/api/...` (notably `docs/api/verify_openapi_test.go`) and fix any failures caused by schema shape changes.
-   
-   - [x] Align OpenAPI path parameter formats and error descriptions with KSUID/NanoID identifiers — Remove UUID-specific validation language from paths that now accept opaque string IDs.
-     - Repository: github.com/iw2rmb/ploy
-     - Component: docs/api/paths/*.yaml
-     - Scope:
-       - Mods endpoints (`mods.yaml`, `mods_id.yaml`, `mods_id_cancel.yaml`, `mods_id_graph.yaml`, `mods_id_events.yaml`, `mods_id_logs.yaml`, `mods_id_diffs.yaml`, `mods_id_artifact_bundles.yaml`):
-         - Change path parameter `id` from `format: uuid` to plain `string` and update descriptions to "Run ID (KSUID string)".
-         - Update 400 error descriptions from "invalid UUID" to wording that matches current validation (e.g., "missing or empty run id").
-       - Runs/batch endpoints (`runs_id.yaml`, `runs_id_stop.yaml`, `runs_id_repos.yaml`, `runs_id_repos_repo_id.yaml`, `runs_id_repos_repo_id_restart.yaml`):
-         - For `id` path parameters, drop `format: uuid`, describe as KSUID string.
-         - For `repo_id` path parameters, drop `format: uuid`, describe as "Repo ID (NanoID 8-character string)".
-       - Node endpoints (`nodes_id_heartbeat.yaml`, `nodes_id_logs.yaml`, `nodes_id_events.yaml`, `nodes_id_complete.yaml`, `nodes_id_ack.yaml`, `nodes_id_buildgate_claim.yaml`, `nodes_id_buildgate_jobid_ack.yaml`, `nodes_id_buildgate_jobid_complete.yaml`):
-         - Change path parameter `id` from `format: uuid` to plain `string` described as NanoID(6).
-         - Update error descriptions that mention "invalid run/job UUID" or "invalid node UUID" to neutral messages (e.g., "node not found", "id path parameter is required").
-       - Job-scoped artifact/diff endpoints (`runs_run_id_jobs_job_id_artifact.yaml`, `runs_run_id_jobs_job_id_diff.yaml`):
-         - Treat `run_id` / `job_id` path parameters as plain strings described as KSUID strings (no `format: uuid`).
-         - Keep only the diff/artifact IDs as `format: uuid` in response schemas.
-       - Artifact and Diff fetch endpoints (`artifacts_id.yaml`, `diffs_id.yaml`):
-         - Keep path param `id` as `format: uuid` (artifact/diff UUID).
-         - Update response fields `run_id`, `job_id`, `build_id` to plain `string` with KSUID descriptions, and adjust any "Run ID (UUID)" wording accordingly.
-       - Job-completion endpoint (`jobs_job_id_complete.yaml`):
-         - Change `job_id` path parameter from `format: uuid` to plain `string` described as "Job ID (KSUID string)".
-     - Tests:
-       - Re-run `go test ./docs/api/...` to ensure all path references and schemas are still valid and `TestOpenAPICompleteness` continues to pass.
-   
-   - [x] Update markdown docs to describe KSUID/NanoID IDs instead of UUIDs — Ensure narrative docs match the new ID model.
-     - Repository: github.com/iw2rmb/ploy
-     - Component: docs/mods-lifecycle.md, docs/envs/README.md, docs/how-to/*
-     - Scope:
-       - In `docs/mods-lifecycle.md`:
-         - Replace references to "run UUID" / "job UUID" with "run ID (KSUID string)" / "job ID (KSUID string)".
-         - Update descriptions of `TicketSummary.stages` to say map keys are job IDs (KSUID strings), not UUIDs.
-         - Update examples for `mod run repo` to use `--repo-id <repo-id>` and mention NanoID(8) semantics.
-       - In `docs/envs/README.md` and `docs/how-to/create-mr.md`:
-         - Replace "database run UUID" wording in branch derivation with "run ID (KSUID string)" and explain that `/mod/<run-id>` uses the KSUID run identifier.
-       - In `docs/how-to/update-a-cluster.md` and any other how-to docs that show `--repo-id <repo-uuid>`:
-         - Change placeholders to `--repo-id <repo-id>` and, where helpful, note that repo IDs are short NanoID(8) strings.
-     - Tests:
-       - Run `rg "UUID" docs` and ensure remaining UUID mentions are limited to:
-         - IDs that are intentionally still UUIDs (`diffs.id`, `artifact_bundles.id`, `api_tokens.id`, `bootstrap_tokens.id`, `buildgate_jobs.id`), or
-         - Historical notes that explicitly call out the prior UUID-based design.
-   
-   - [x] Clean up in-code comments that still describe run/job/repo IDs as UUIDs — Keep comments consistent with the KSUID/NanoID implementation.
-     - Repository: github.com/iw2rmb/ploy
-     - Component: internal/mods/api/types.go, docs/api/paths/*.yaml (inline descriptions), any handlers mentioning "job UUID"/"run UUID" in comments.
-     - Scope:
-       - In `internal/mods/api/types.go`, update comments for `RunSummary` and `StageStatus`:
-         - Replace "ticket run_id — run UUID" and "Stages is keyed by job UUID" with descriptions using "run ID (KSUID string)" and "job ID (KSUID string)".
-       - In server handlers and docs where comments still say "job UUID"/"run UUID":
-         - Normalize wording to "job ID"/"run ID" and, where helpful, note KSUID/NanoID where IDs are generated by helpers.
-     - Tests:
-       - Run `go test ./internal/mods/... ./internal/server/...` to ensure no behavior changes were introduced and comments remain in sync with the code.
+## KSUID/NanoID docs, CLI, and OpenAPI alignment
+- [ ] Update CLI help and README text to treat IDs as opaque KSUID/NanoID strings — Remove UUID-specific wording from CLI surfaces.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: cmd/ploy/upload_command.go, cmd/ploy/mod_run_repo.go, cmd/ploy/README.md
+  - Scope:
+    - Replace `UUID` wording in flag help and usage for `--run-id` / `--build-id` in `cmd/ploy/upload_command.go` with neutral descriptions (e.g., "Run identifier", "Build identifier") that do not specify UUID shape.
+    - In `cmd/ploy/mod_run_repo.go`, change examples and flag descriptions from `--repo-id <repo-uuid>` / "Repo UUID" to `--repo-id <repo-id>` and describe repo IDs as short string identifiers (NanoID(8) semantics).
+    - In `cmd/ploy/README.md`, update examples and narrative text:
+      - Replace `ploy upload --run-id <uuid> [--build-id <uuid>] ...` with wording that uses `<run-id>` / `<build-id>` and explicitly notes these are KSUID-backed strings.
+      - Replace `--repo-id <repo-uuid>` placeholders with `--repo-id <repo-id>` and mention that repo IDs are NanoID(8) strings.
+  - Tests:
+    - Run `go test ./cmd/ploy/...` and fix any assertions that expect `uuid` / `repo-uuid` strings in usage output.
+
+- [ ] Align OpenAPI component schemas with KSUID/NanoID and UUID split — Ensure schema types match the actual DB and handler behavior.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docs/api/components/schemas/controlplane.yaml
+  - Scope:
+    - Update `RunRepo` schema so:
+      - `id` is documented as a NanoID(8) string (no `format: uuid`; describe length/character set instead).
+      - `run_id` is documented as a KSUID-backed string (27 characters), consistent with `runs.id`.
+    - Update `Repo` schema to treat `id` as an opaque string or remove the field if no concrete backing ID exists in the control plane (avoid `format: uuid` unless there is a UUID column).
+    - For run/job/build IDs in component schemas (`Run`, `RunSummary`, `RunStatus`, `Stage`, `RunTiming`, `Log`, `NodeClaimResponse`, etc.):
+      - Ensure `run_id` / `id` / `job_id` / `build_id` are plain `string` fields with descriptions like "Run ID (KSUID string)" / "Job ID (KSUID string)" / "Build ID (KSUID string)" and do not use `format: uuid`.
+    - For `Diff` and `ArtifactBundle` schemas:
+      - Keep `id` as `format: uuid` (diff/artifact IDs remain UUID).
+      - Change `run_id`, `job_id`, `build_id` fields to plain strings with KSUID descriptions, matching `internal/store/schema.sql`.
+    - For node-related schemas (`Node`, `NodeClaimResponse` and any others with `node_id`):
+      - Document `node_id` as a NanoID(6) string (no `format: uuid`; describe length and URL-safe alphabet).
+    - For Build Gate schemas (`BuildGateValidateResponse`, `BuildGateJobStatusResponse`, `NodeBuildGateClaimResponse`):
+      - Align `job_id` documentation with actual behavior for `buildgate_jobs.id` (currently UUID-backed); either:
+        - Document `job_id` as a UUID string, or
+        - If `buildgate_jobs.id` is later migrated to KSUID, update the schema and handlers together and reflect that here.
+  - Tests:
+    - Run `go test ./docs/api/...` (notably `docs/api/verify_openapi_test.go`) and fix any failures caused by schema shape changes.
+
+- [ ] Align OpenAPI path parameter formats and error descriptions with KSUID/NanoID identifiers — Remove UUID-specific validation language from paths that now accept opaque string IDs.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docs/api/paths/*.yaml
+  - Scope:
+    - Mods endpoints (`mods.yaml`, `mods_id.yaml`, `mods_id_cancel.yaml`, `mods_id_graph.yaml`, `mods_id_events.yaml`, `mods_id_logs.yaml`, `mods_id_diffs.yaml`, `mods_id_artifact_bundles.yaml`):
+      - Change path parameter `id` from `format: uuid` to plain `string` and update descriptions to "Run ID (KSUID string)".
+      - Update 400 error descriptions from "invalid UUID" to wording that matches current validation (e.g., "missing or empty run id").
+    - Runs/batch endpoints (`runs_id.yaml`, `runs_id_stop.yaml`, `runs_id_repos.yaml`, `runs_id_repos_repo_id.yaml`, `runs_id_repos_repo_id_restart.yaml`):
+      - For `id` path parameters, drop `format: uuid`, describe as KSUID string.
+      - For `repo_id` path parameters, drop `format: uuid`, describe as "Repo ID (NanoID 8-character string)".
+    - Node endpoints (`nodes_id_heartbeat.yaml`, `nodes_id_logs.yaml`, `nodes_id_events.yaml`, `nodes_id_complete.yaml`, `nodes_id_ack.yaml`, `nodes_id_buildgate_claim.yaml`, `nodes_id_buildgate_jobid_ack.yaml`, `nodes_id_buildgate_jobid_complete.yaml`):
+      - Change path parameter `id` from `format: uuid` to plain `string` described as NanoID(6).
+      - Update error descriptions that mention "invalid run/job UUID" or "invalid node UUID" to neutral messages (e.g., "node not found", "id path parameter is required").
+    - Job-scoped artifact/diff endpoints (`runs_run_id_jobs_job_id_artifact.yaml`, `runs_run_id_jobs_job_id_diff.yaml`):
+      - Treat `run_id` / `job_id` path parameters as plain strings described as KSUID strings (no `format: uuid`).
+      - Keep only the diff/artifact IDs as `format: uuid` in response schemas.
+    - Artifact and Diff fetch endpoints (`artifacts_id.yaml`, `diffs_id.yaml`):
+      - Keep path param `id` as `format: uuid` (artifact/diff UUID).
+      - Update response fields `run_id`, `job_id`, `build_id` to plain `string` with KSUID descriptions, and adjust any "Run ID (UUID)" wording accordingly.
+    - Job-completion endpoint (`jobs_job_id_complete.yaml`):
+      - Change `job_id` path parameter from `format: uuid` to plain `string` described as "Job ID (KSUID string)".
+  - Tests:
+    - Re-run `go test ./docs/api/...` to ensure all path references and schemas are still valid and `TestOpenAPICompleteness` continues to pass.
+
+- [ ] Update markdown docs to describe KSUID/NanoID IDs instead of UUIDs — Ensure narrative docs match the new ID model.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docs/mods-lifecycle.md, docs/envs/README.md, docs/how-to/*
+  - Scope:
+    - In `docs/mods-lifecycle.md`:
+      - Replace references to "run UUID" / "job UUID" with "run ID (KSUID string)" / "job ID (KSUID string)".
+      - Update descriptions of `TicketSummary.stages` to say map keys are job IDs (KSUID strings), not UUIDs.
+      - Update examples for `mod run repo` to use `--repo-id <repo-id>` and mention NanoID(8) semantics.
+    - In `docs/envs/README.md` and `docs/how-to/create-mr.md`:
+      - Replace "database run UUID" wording in branch derivation with "run ID (KSUID string)" and explain that `/mod/<run-id>` uses the KSUID run identifier.
+    - In `docs/how-to/update-a-cluster.md` and any other how-to docs that show `--repo-id <repo-uuid>`:
+      - Change placeholders to `--repo-id <repo-id>` and, where helpful, note that repo IDs are short NanoID(8) strings.
+  - Tests:
+    - Run `rg "UUID" docs` and ensure remaining UUID mentions are limited to:
+      - IDs that are intentionally still UUIDs (`diffs.id`, `artifact_bundles.id`, `api_tokens.id`, `bootstrap_tokens.id`, `buildgate_jobs.id`), or
+      - Historical notes that explicitly call out the prior UUID-based design.
+
+- [ ] Clean up in-code comments that still describe run/job/repo IDs as UUIDs — Keep comments consistent with the KSUID/NanoID implementation.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: internal/mods/api/types.go, docs/api/paths/*.yaml (inline descriptions), any handlers mentioning "job UUID"/"run UUID" in comments.
+  - Scope:
+    - In `internal/mods/api/types.go`, update comments for `RunSummary` and `StageStatus`:
+      - Replace "ticket run_id — run UUID" and "Stages is keyed by job UUID" with descriptions using "run ID (KSUID string)" and "job ID (KSUID string)".
+    - In server handlers and docs where comments still say "job UUID"/"run UUID":
+      - Normalize wording to "job ID"/"run ID" and, where helpful, note KSUID/NanoID where IDs are generated by helpers.
+  - Tests:
+    - Run `go test ./internal/mods/... ./internal/server/...` to ensure no behavior changes were introduced and comments remain in sync with the code.
