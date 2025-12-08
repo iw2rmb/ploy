@@ -38,6 +38,12 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	if stderr == nil {
 		stderr = io.Discard
 	}
+	// Handle --help and -h flags explicitly to print cluster-scoped usage.
+	// This ensures `ploy cluster deploy --help` prints usage and exits cleanly.
+	if wantsHelp(args) {
+		printServerDeployUsage(stderr)
+		return nil
+	}
 	fs := flag.NewFlagSet("server deploy", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
@@ -117,10 +123,23 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	return runServerDeploy(serverCfg, stderr)
 }
 
+// printServerUsage prints usage for the server router level.
+// NOTE: The server command has been re-rooted under `ploy cluster deploy`.
+// This usage is now only shown if the user somehow invokes the legacy
+// handleServer path (kept for internal reuse/test purposes). In normal
+// operation, users should see cluster-scoped usage from printClusterUsage.
 func printServerUsage(w io.Writer) {
-	printCommandUsage(w, "server")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy [--address <host-or-ip>] [flags]")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  deploy   Deploy and configure a control plane server")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Note: 'ploy server' has been removed. Use 'ploy cluster deploy' instead.")
 }
 
+// printServerDeployUsage prints usage for the deploy subcommand.
+// This is displayed when flag parsing fails or required flags are missing.
+// The usage now references the cluster-scoped path (`ploy cluster deploy`).
 func printServerDeployUsage(w io.Writer) {
-	printCommandUsage(w, "server", "deploy")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy --address <host-or-ip> [flags]")
 }

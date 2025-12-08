@@ -78,17 +78,21 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectNoError:  true,
 		},
 
-		// server command --help
+		// NOTE: `ploy server` has been removed as a top-level command.
+		// Server deployment is now accessible only via `ploy cluster deploy`.
+		// The server tests have been replaced with cluster deploy tests below.
+
+		// cluster deploy --help (replaces ploy server --help)
 		{
-			name:           "ploy server --help",
-			args:           []string{"server", "--help"},
-			expectContains: []string{"Usage: ploy server", "deploy"},
+			name:           "ploy cluster deploy --help",
+			args:           []string{"cluster", "deploy", "--help"},
+			expectContains: []string{"Usage: ploy cluster deploy"},
 			expectNoError:  true,
 		},
 		{
-			name:           "ploy server -h",
-			args:           []string{"server", "-h"},
-			expectContains: []string{"Usage: ploy server"},
+			name:           "ploy cluster deploy -h",
+			args:           []string{"cluster", "deploy", "-h"},
+			expectContains: []string{"Usage: ploy cluster deploy"},
 			expectNoError:  true,
 		},
 
@@ -299,12 +303,14 @@ func TestWantsHelpFunction(t *testing.T) {
 
 // TestHelpFlagNoUnknownSubcommandError verifies that --help does not trigger
 // "unknown subcommand" errors that would be confusing to users.
+// NOTE: `ploy server` has been removed as a top-level command.
+// Server deployment is now only accessible via `ploy cluster deploy`.
 func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mod", "--help"},
 		{"mods", "--help"},
 		{"runs", "--help"},
-		{"server", "--help"},
+		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
 		{"node", "--help"},
 		{"rollout", "--help"},
 		{"config", "--help"},
@@ -313,6 +319,7 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 		{"token", "--help"},
 		{"upload", "--help"},
 		{"cluster", "--help"},
+		{"cluster", "deploy", "--help"}, // Replaces ploy server --help
 		{"cluster", "node", "--help"},
 		{"cluster", "rollout", "--help"},
 		{"cluster", "token", "--help"},
