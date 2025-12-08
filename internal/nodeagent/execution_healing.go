@@ -95,9 +95,10 @@ import (
 //
 // ## Repo+Diff Verification Model
 //
-// Healing verification uses the same repo+diff semantics as the HTTP Build Gate API:
-// the workspace contains repo_url+ref plus accumulated healing modifications.
-// This is semantically equivalent to POST /v1/buildgate/validate with diff_patch.
+// Healing verification uses a repo+diff model consistent with the Docker-based gate:
+// the workspace contains repo_url+ref plus accumulated healing modifications. The
+// GateExecutor validates this workspace directly, and DiffPatch is derived from it
+// for telemetry and potential future distributed gate scenarios.
 //
 // ## Configuration
 //

@@ -19,9 +19,8 @@ import (
 // detailed observability reporting of gate performance across pre-gate and re-gate phases.
 //
 // This structure is used to maintain a complete history of all gate executions,
-// ensuring consistency between HTTP Build Gate API behavior and Docker gate behavior.
-// Both execution paths produce equivalent BuildGateStageMetadata that can be
-// compared and audited.
+// providing a canonical record of BuildGateStageMetadata for telemetry, debugging,
+// and audit across pre-gate and re-gate phases.
 type gateRunMetadata struct {
 	// Metadata contains the full BuildGateStageMetadata from the gate execution,
 	// including StaticChecks, LogFindings, LogsText, LogDigest, and Resources.
@@ -40,7 +39,6 @@ type gateRunMetadata struct {
 // This ensures that:
 //   - The node agent always re-runs the gate after healing (not relying on in-container checks)
 //   - All gate results are captured for telemetry and debugging
-//   - Gate behavior is consistent whether using HTTP Build Gate API or Docker gate
 type executionResult struct {
 	step.Result
 	// PreGate captures the initial gate run metadata (if gate was executed).
@@ -138,10 +136,12 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.Ru
 }
 
 // computeGzippedDiff generates a unified git diff of workspace changes and compresses it.
-// Used by HTTP-based re-gates to send accumulated healing changes to remote Build Gate workers.
+// It captures accumulated healing changes so gate re-execution can reason about the same
+// repo+diff workspace model used by the Docker-based gate executor.
 //
 // The diff captures all changes relative to the initial repo_url+ref clone (HEAD), enabling
-// remote workers to reconstruct workspace state by cloning repo_url+ref and applying the patch.
+// future distributed gate workers to reconstruct workspace state by cloning repo_url+ref
+// and applying the patch when needed.
 //
 // Returns:
 //   - Gzipped diff bytes (ready for BuildGateValidateRequest.DiffPatch).
@@ -156,8 +156,9 @@ func computeGzippedDiff(ctx context.Context, workspace string) []byte {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Log warning but don't fail re-gate — HTTP executor will use repo_url+ref baseline.
-		slog.Warn("failed to generate diff for HTTP re-gate",
+		// Log warning but don't fail re-gate — the gate executor will fall back to validating
+		// the repo_url+ref baseline without an explicit diff patch.
+		slog.Warn("failed to generate diff for gate re-execution",
 			"workspace", workspace,
 			"error", err,
 			"stderr", strings.TrimSpace(stderr.String()),
@@ -167,7 +168,7 @@ func computeGzippedDiff(ctx context.Context, workspace string) []byte {
 
 	diffBytes := stdout.Bytes()
 	if len(diffBytes) == 0 {
-		// No changes in workspace; HTTP gate will validate baseline.
+		// No changes in workspace; gate executor will validate baseline.
 		return nil
 	}
 
@@ -175,15 +176,15 @@ func computeGzippedDiff(ctx context.Context, workspace string) []byte {
 	var gzBuf bytes.Buffer
 	gzWriter := gzip.NewWriter(&gzBuf)
 	if _, err := gzWriter.Write(diffBytes); err != nil {
-		slog.Warn("failed to gzip diff for HTTP re-gate", "workspace", workspace, "error", err)
+		slog.Warn("failed to gzip diff for gate re-execution", "workspace", workspace, "error", err)
 		return nil
 	}
 	if err := gzWriter.Close(); err != nil {
-		slog.Warn("failed to close gzip writer for HTTP re-gate", "workspace", workspace, "error", err)
+		slog.Warn("failed to close gzip writer for gate re-execution", "workspace", workspace, "error", err)
 		return nil
 	}
 
-	slog.Debug("computed gzipped diff for HTTP re-gate",
+	slog.Debug("computed gzipped diff for gate re-execution",
 		"workspace", workspace,
 		"raw_size", len(diffBytes),
 		"gzipped_size", gzBuf.Len(),
