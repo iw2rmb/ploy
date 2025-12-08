@@ -25,15 +25,15 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/bootstrap/tokens", createBootstrapTokenHandler(st, tokenSecret), auth.RoleControlPlane, auth.RoleCLIAdmin)
 	s.HandleFunc("POST /v1/pki/bootstrap", bootstrapCertificateHandler(st, tokenSecret), auth.RoleWorker)
 
-	// Mods ticket submission (new simplified API)
-	s.HandleFunc("POST /v1/mods", submitTicketHandler(st, eventsService), auth.RoleControlPlane)
+	// Mods run submission (simplified API for single-repo runs).
+	s.HandleFunc("POST /v1/mods", submitRunHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
-	// Mods ticket cancellation
-	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelTicketHandler(st, eventsService), auth.RoleControlPlane)
-	// Mods ticket resume (for failed/canceled tickets)
-	s.HandleFunc("POST /v1/mods/{id}/resume", resumeTicketHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/{id}", getRunStatusHandler(st), auth.RoleControlPlane)
+	// Mods run cancellation.
+	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelRunHandler(st, eventsService), auth.RoleControlPlane)
+	// Mods run resume (for failed/canceled runs).
+	s.HandleFunc("POST /v1/mods/{id}/resume", resumeRunHandler(st, eventsService), auth.RoleControlPlane)
 	// Diffs listing and download (Worker role for multi-node rehydration C2, ControlPlane for CLI access)
 	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)

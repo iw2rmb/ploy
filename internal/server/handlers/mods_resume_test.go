@@ -13,8 +13,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestResumeTicket_FailedRun verifies that a failed run can be resumed.
-func TestResumeTicket_FailedRun(t *testing.T) {
+// TestResumeRun_FailedRun verifies that a failed run can be resumed.
+func TestResumeRun_FailedRun(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	jobID := uuid.New()
@@ -37,7 +37,7 @@ func TestResumeTicket_FailedRun(t *testing.T) {
 		},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -75,8 +75,8 @@ func TestResumeTicket_FailedRun(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_CanceledRun verifies that a canceled run can be resumed.
-func TestResumeTicket_CanceledRun(t *testing.T) {
+// TestResumeRun_CanceledRun verifies that a canceled run can be resumed.
+func TestResumeRun_CanceledRun(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{
@@ -92,7 +92,7 @@ func TestResumeTicket_CanceledRun(t *testing.T) {
 		},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -108,8 +108,8 @@ func TestResumeTicket_CanceledRun(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_Idempotent_AlreadyRunning verifies 200 when run is already in progress.
-func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
+// TestResumeRun_Idempotent_AlreadyRunning verifies 200 when run is already in progress.
+func TestResumeRun_Idempotent_AlreadyRunning(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -125,7 +125,7 @@ func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
 			t.Parallel()
 			id := uuid.New()
 			st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: tt.runStatus}}
-			handler := resumeTicketHandler(st, nil)
+			handler := resumeRunHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 			req.SetPathValue("id", id.String())
 			rr := httptest.NewRecorder()
@@ -140,13 +140,13 @@ func TestResumeTicket_Idempotent_AlreadyRunning(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_SucceededConflict verifies 409 when trying to resume a succeeded run.
+// TestResumeRun_SucceededConflict verifies 409 when trying to resume a succeeded run.
 // This tests resumability invariant 2: succeeded runs cannot be resumed.
-func TestResumeTicket_SucceededConflict(t *testing.T) {
+func TestResumeRun_SucceededConflict(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: store.RunStatusSucceeded}}
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
 	rr := httptest.NewRecorder()
@@ -161,9 +161,9 @@ func TestResumeTicket_SucceededConflict(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_BadID_And_NotFound tests error handling for invalid IDs and missing tickets.
+// TestResumeRun_BadID_And_NotFound tests error handling for invalid IDs and missing tickets.
 // Run IDs are now KSUID strings; only empty/whitespace IDs are rejected as invalid.
-func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
+func TestResumeRun_BadID_And_NotFound(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -199,7 +199,7 @@ func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			handler := resumeTicketHandler(tt.mockStore, nil)
+			handler := resumeRunHandler(tt.mockStore, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/placeholder/resume", nil)
 			req.SetPathValue("id", tt.id)
 			rr := httptest.NewRecorder()
@@ -214,8 +214,8 @@ func TestResumeTicket_BadID_And_NotFound(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_PartiallySucceeded resumes a run where some jobs succeeded and one failed.
-func TestResumeTicket_PartiallySucceeded(t *testing.T) {
+// TestResumeRun_PartiallySucceeded resumes a run where some jobs succeeded and one failed.
+func TestResumeRun_PartiallySucceeded(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	successJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
@@ -233,7 +233,7 @@ func TestResumeTicket_PartiallySucceeded(t *testing.T) {
 		listJobsByRunResult: []store.Job{successJob, failedJob, createdJob},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -258,8 +258,8 @@ func TestResumeTicket_PartiallySucceeded(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_MultipleFailedJobs verifies correct ordering when multiple jobs need reset.
-func TestResumeTicket_MultipleFailedJobs(t *testing.T) {
+// TestResumeRun_MultipleFailedJobs verifies correct ordering when multiple jobs need reset.
+func TestResumeRun_MultipleFailedJobs(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	job1 := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
@@ -277,7 +277,7 @@ func TestResumeTicket_MultipleFailedJobs(t *testing.T) {
 		listJobsByRunResult: []store.Job{job1, job2, job3},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -305,8 +305,8 @@ func TestResumeTicket_MultipleFailedJobs(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_SSEPublish verifies that resume publishes ticket events.
-func TestResumeTicket_SSEPublish(t *testing.T) {
+// TestResumeRun_SSEPublish verifies that resume publishes ticket events.
+func TestResumeRun_SSEPublish(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{
@@ -327,7 +327,7 @@ func TestResumeTicket_SSEPublish(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 
-	handler := resumeTicketHandler(st, eventsService)
+	handler := resumeRunHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -355,8 +355,8 @@ func TestResumeTicket_SSEPublish(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_IdempotentWhenPendingJobExists verifies 200 OK when a pending job already exists.
-func TestResumeTicket_IdempotentWhenPendingJobExists(t *testing.T) {
+// TestResumeRun_IdempotentWhenPendingJobExists verifies 200 OK when a pending job already exists.
+func TestResumeRun_IdempotentWhenPendingJobExists(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{
@@ -372,7 +372,7 @@ func TestResumeTicket_IdempotentWhenPendingJobExists(t *testing.T) {
 		},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -389,8 +389,8 @@ func TestResumeTicket_IdempotentWhenPendingJobExists(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_AllJobsSucceeded verifies 200 OK when all jobs are already succeeded.
-func TestResumeTicket_AllJobsSucceeded(t *testing.T) {
+// TestResumeRun_AllJobsSucceeded verifies 200 OK when all jobs are already succeeded.
+func TestResumeRun_AllJobsSucceeded(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{
@@ -407,7 +407,7 @@ func TestResumeTicket_AllJobsSucceeded(t *testing.T) {
 		},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -424,8 +424,8 @@ func TestResumeTicket_AllJobsSucceeded(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_UpdateRunResumeCalled verifies that UpdateRunResume is called to track resume metadata.
-func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
+// TestResumeRun_UpdateRunResumeCalled verifies that UpdateRunResume is called to track resume metadata.
+func TestResumeRun_UpdateRunResumeCalled(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	st := &mockStore{
@@ -443,7 +443,7 @@ func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
 		},
 	}
 
-	handler := resumeTicketHandler(st, nil)
+	handler := resumeRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -464,8 +464,8 @@ func TestResumeTicket_UpdateRunResumeCalled(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_SSEPublishWithResumeMetadata verifies that resume events include resume metadata.
-func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
+// TestResumeRun_SSEPublishWithResumeMetadata verifies that resume events include resume metadata.
+func TestResumeRun_SSEPublishWithResumeMetadata(t *testing.T) {
 	t.Parallel()
 	id := uuid.New()
 	// Simulate a run that has already been resumed once (stats contain resume_count=1).
@@ -491,7 +491,7 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 
-	handler := resumeTicketHandler(st, eventsService)
+	handler := resumeRunHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 	req.SetPathValue("id", id.String())
@@ -522,10 +522,10 @@ func TestResumeTicket_SSEPublishWithResumeMetadata(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_ResumabilityInvariants is a table-driven test verifying all resumability
+// TestResumeRun_ResumabilityInvariants is a table-driven test verifying all resumability
 // invariants with their expected HTTP status codes and error message formats.
 // This directly tests the requirements from D4: guard against unsafe or confusing resumes.
-func TestResumeTicket_ResumabilityInvariants(t *testing.T) {
+func TestResumeRun_ResumabilityInvariants(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -591,7 +591,7 @@ func TestResumeTicket_ResumabilityInvariants(t *testing.T) {
 				listJobsByRunResult: jobs,
 			}
 
-			handler := resumeTicketHandler(st, nil)
+			handler := resumeRunHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 			req.SetPathValue("id", id.String())
 			rr := httptest.NewRecorder()
@@ -647,9 +647,9 @@ func TestCheckResumability_Unit(t *testing.T) {
 	}
 }
 
-// TestResumeTicket_JobLevelInvariants verifies that already-succeeded jobs are preserved
+// TestResumeRun_JobLevelInvariants verifies that already-succeeded jobs are preserved
 // during resume (invariant 4) and pending/running jobs trigger idempotent behavior (invariant 5).
-func TestResumeTicket_JobLevelInvariants(t *testing.T) {
+func TestResumeRun_JobLevelInvariants(t *testing.T) {
 	t.Parallel()
 
 	t.Run("invariant 4: succeeded jobs preserved", func(t *testing.T) {
@@ -671,7 +671,7 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 			},
 		}
 
-		handler := resumeTicketHandler(st, nil)
+		handler := resumeRunHandler(st, nil)
 		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 		req.SetPathValue("id", id.String())
 		rr := httptest.NewRecorder()
@@ -709,7 +709,7 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 			},
 		}
 
-		handler := resumeTicketHandler(st, nil)
+		handler := resumeRunHandler(st, nil)
 		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 		req.SetPathValue("id", id.String())
 		rr := httptest.NewRecorder()
@@ -741,7 +741,7 @@ func TestResumeTicket_JobLevelInvariants(t *testing.T) {
 			},
 		}
 
-		handler := resumeTicketHandler(st, nil)
+		handler := resumeRunHandler(st, nil)
 		req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
 		req.SetPathValue("id", id.String())
 		rr := httptest.NewRecorder()

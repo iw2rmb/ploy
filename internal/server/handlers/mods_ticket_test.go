@@ -29,8 +29,8 @@ func newTestEventsService() *events.Service {
 	return svc
 }
 
-// TestSubmitTicketHandlerSuccess verifies successful ticket submission.
-func TestSubmitTicketHandlerSuccess(t *testing.T) {
+// TestSubmitRunHandlerSuccess verifies successful run submission.
+func TestSubmitRunHandlerSuccess(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
@@ -46,7 +46,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -64,7 +64,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 	}
 
 	var resp struct {
-		TicketID  string `json:"run_id"`
+		RunID     string `json:"run_id"`
 		Status    string `json:"status"`
 		RepoURL   string `json:"repo_url"`
 		BaseRef   string `json:"base_ref"`
@@ -74,8 +74,8 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if resp.TicketID != runID.String() {
-		t.Errorf("expected ticket_id %s, got %s", runID.String(), resp.TicketID)
+	if resp.RunID != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), resp.RunID)
 	}
 	if resp.Status != "queued" {
 		t.Errorf("expected status queued, got %s", resp.Status)
@@ -95,12 +95,12 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerMissingFields verifies validation of required fields.
+// TestSubmitRunHandlerMissingFields verifies validation of required fields.
 // Domain types now validate at JSON unmarshal time, rejecting empty/invalid values.
 // Note: target_ref is optional in the handler; omitted target_ref is allowed.
-func TestSubmitTicketHandlerMissingFields(t *testing.T) {
+func TestSubmitRunHandlerMissingFields(t *testing.T) {
 	st := &mockStore{}
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	cases := []struct {
 		name string
@@ -136,10 +136,10 @@ func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerInvalidJSON verifies rejection of malformed JSON.
-func TestSubmitTicketHandlerInvalidJSON(t *testing.T) {
+// TestSubmitRunHandlerInvalidJSON verifies rejection of malformed JSON.
+func TestSubmitRunHandlerInvalidJSON(t *testing.T) {
 	st := &mockStore{}
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods", strings.NewReader("{invalid json"))
 	rr := httptest.NewRecorder()
@@ -154,10 +154,10 @@ func TestSubmitTicketHandlerInvalidJSON(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerInvalidRepoURL verifies domain type validation for repo URLs.
-func TestSubmitTicketHandlerInvalidRepoURL(t *testing.T) {
+// TestSubmitRunHandlerInvalidRepoURL verifies domain type validation for repo URLs.
+func TestSubmitRunHandlerInvalidRepoURL(t *testing.T) {
 	st := &mockStore{}
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	cases := []struct {
 		name    string
@@ -192,8 +192,8 @@ func TestSubmitTicketHandlerInvalidRepoURL(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerWithOptionalFields verifies optional fields are handled correctly.
-func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
+// TestSubmitRunHandlerWithOptionalFields verifies optional fields are handled correctly.
+func TestSubmitRunHandlerWithOptionalFields(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 	commitSha := "abc1234567890"
@@ -214,7 +214,7 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -255,16 +255,16 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerSuccess verifies successful retrieval of ticket status.
-func TestGetTicketStatusHandlerSuccess(t *testing.T) {
-	ticketID := uuid.New()
+// TestGetRunStatusHandlerSuccess verifies successful retrieval of run status.
+func TestGetRunStatusHandlerSuccess(t *testing.T) {
+	runID := uuid.New()
 	now := time.Now()
 
 	nodeID := uuid.New()
 	nodeIDStr := nodeID.String()
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        ticketID.String(),
+			ID:        runID.String(),
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusRunning,
 			BaseRef:   "main",
@@ -275,9 +275,9 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 		},
 	}
 
-	handler := getTicketStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
-	req.SetPathValue("id", ticketID.String())
+	handler := getRunStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -291,9 +291,9 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	// Use RunID field (formerly TicketID).
-	if string(resp.Ticket.RunID) != ticketID.String() {
-		t.Errorf("expected run_id %s, got %s", ticketID.String(), string(resp.Ticket.RunID))
+	// Verify RunID field is correctly populated.
+	if string(resp.Ticket.RunID) != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), string(resp.Ticket.RunID))
 	}
 	if resp.Ticket.State != modsapi.RunStateRunning {
 		t.Errorf("expected status running, got %s", resp.Ticket.State)
@@ -316,17 +316,17 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerNotFound verifies 404 when ticket doesn't exist.
-func TestGetTicketStatusHandlerNotFound(t *testing.T) {
-	ticketID := uuid.New()
+// TestGetRunStatusHandlerNotFound verifies 404 when run doesn't exist.
+func TestGetRunStatusHandlerNotFound(t *testing.T) {
+	runID := uuid.New()
 
 	st := &mockStore{
 		getRunErr: pgx.ErrNoRows,
 	}
 
-	handler := getTicketStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
-	req.SetPathValue("id", ticketID.String())
+	handler := getRunStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -343,12 +343,12 @@ func TestGetTicketStatusHandlerNotFound(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerEmptyID verifies 400 when ticket ID is empty.
+// TestGetRunStatusHandlerEmptyID verifies 400 when run ID is empty.
 // Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
 // Note: "not-a-uuid" is now a valid KSUID string ID, so this test only checks empty ID.
-func TestGetTicketStatusHandlerEmptyID(t *testing.T) {
+func TestGetRunStatusHandlerEmptyID(t *testing.T) {
 	st := &mockStore{}
-	handler := getTicketStatusHandler(st)
+	handler := getRunStatusHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/", nil)
 	req.SetPathValue("id", "")
@@ -365,9 +365,9 @@ func TestGetTicketStatusHandlerEmptyID(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerWithOptionalFields verifies optional fields are serialized correctly.
-func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
-	ticketID := uuid.New()
+// TestGetRunStatusHandlerWithOptionalFields verifies optional fields are serialized correctly.
+func TestGetRunStatusHandlerWithOptionalFields(t *testing.T) {
+	runID := uuid.New()
 	now := time.Now()
 	commitSha := "abc1234567890"
 	// Include MR URL under runs.stats.metadata to verify surfacing in response metadata.
@@ -375,7 +375,7 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:         ticketID.String(),
+			ID:         runID.String(),
 			RepoUrl:    "https://github.com/user/repo.git",
 			Status:     store.RunStatusFailed,
 			BaseRef:    "main",
@@ -388,9 +388,9 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 		},
 	}
 
-	handler := getTicketStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
-	req.SetPathValue("id", ticketID.String())
+	handler := getRunStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -414,8 +414,8 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	// FinishedAt not exposed directly; rely on state only.
 }
 
-// TestSubmitTicketHandlerPublishesEvent verifies that submitting a ticket publishes a queued event.
-func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
+// TestSubmitRunHandlerPublishesEvent verifies that submitting a run publishes a queued event.
+func TestSubmitRunHandlerPublishesEvent(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
@@ -432,7 +432,7 @@ func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
 	}
 
 	eventsService := newTestEventsService()
-	handler := submitTicketHandler(st, eventsService)
+	handler := submitRunHandler(st, eventsService)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -449,32 +449,32 @@ func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify a ticket event was published to the hub by checking the snapshot.
+	// Verify a run event was published to the hub by checking the snapshot.
 	snapshot := eventsService.Hub().Snapshot(runID.String())
 	if len(snapshot) == 0 {
-		t.Fatal("expected at least one ticket event to be published")
+		t.Fatal("expected at least one run event to be published")
 	}
 
 	// Verify the event type is "run".
-	foundTicketEvent := false
+	foundRunEvent := false
 	for _, evt := range snapshot {
 		if evt.Type == "run" {
-			foundTicketEvent = true
-			// Verify the event contains ticket state information.
+			foundRunEvent = true
+			// Verify the event contains run state information.
 			if !strings.Contains(string(evt.Data), "queued") {
-				t.Errorf("expected ticket event data to contain 'queued', got: %s", string(evt.Data))
+				t.Errorf("expected run event data to contain 'queued', got: %s", string(evt.Data))
 			}
 			break
 		}
 	}
-	if !foundTicketEvent {
-		t.Error("expected to find a 'ticket' event in the snapshot")
+	if !foundRunEvent {
+		t.Error("expected to find a 'run' event in the snapshot")
 	}
 }
 
-// TestSubmitTicketHandlerMultiStepCreatesMultipleStages verifies that submitting
+// TestSubmitRunHandlerMultiStepCreatesMultipleStages verifies that submitting
 // a multi-step spec (with mods[] array) creates one job per mod.
-func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
+func TestSubmitRunHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
@@ -490,7 +490,7 @@ func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -540,9 +540,9 @@ func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerSingleStepCreatesThreeJobs verifies that submitting
+// TestSubmitRunHandlerSingleStepCreatesThreeJobs verifies that submitting
 // a single-step spec creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
-func TestSubmitTicketHandlerSingleStepCreatesThreeJobs(t *testing.T) {
+func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 	cases := []struct {
 		name      string
 		spec      map[string]interface{}
@@ -583,7 +583,7 @@ func TestSubmitTicketHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 				},
 			}
 
-			handler := submitTicketHandler(st, nil)
+			handler := submitRunHandler(st, nil)
 
 			reqBody := map[string]interface{}{
 				"repo_url":   "https://github.com/user/repo.git",
@@ -619,10 +619,10 @@ func TestSubmitTicketHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerMultiStepNoRunSteps verifies that submitting
+// TestSubmitRunHandlerMultiStepNoRunSteps verifies that submitting
 // a multi-step spec (with mods[] array) creates jobs but NOT run_steps.
 // Run steps have been replaced by jobs in the new architecture.
-func TestSubmitTicketHandlerMultiStepNoRunSteps(t *testing.T) {
+func TestSubmitRunHandlerMultiStepNoRunSteps(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
@@ -638,7 +638,7 @@ func TestSubmitTicketHandlerMultiStepNoRunSteps(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st, nil)
+	handler := submitRunHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -668,9 +668,9 @@ func TestSubmitTicketHandlerMultiStepNoRunSteps(t *testing.T) {
 	}
 }
 
-// TestSubmitTicketHandlerSingleStep verifies that submitting
+// TestSubmitRunHandlerSingleStep verifies that submitting
 // a single-step spec (with mod section or legacy top-level) creates a single job.
-func TestSubmitTicketHandlerSingleStep(t *testing.T) {
+func TestSubmitRunHandlerSingleStep(t *testing.T) {
 	cases := []struct {
 		name string
 		spec map[string]interface{}
@@ -707,7 +707,7 @@ func TestSubmitTicketHandlerSingleStep(t *testing.T) {
 				},
 			}
 
-			handler := submitTicketHandler(st, nil)
+			handler := submitRunHandler(st, nil)
 
 			reqBody := map[string]interface{}{
 				"repo_url":   "https://github.com/user/repo.git",
@@ -733,9 +733,9 @@ func TestSubmitTicketHandlerSingleStep(t *testing.T) {
 	}
 }
 
-// TestGetTicketStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
+// TestGetRunStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
 // exposes step_index for each job based on the job's StepIndex field.
-func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
+func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	ticketID := uuid.New()
 	now := time.Now()
 
@@ -770,7 +770,7 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 		listJobsByRunResult: []store.Job{job0, job1},
 	}
 
-	handler := getTicketStatusHandler(st)
+	handler := getRunStatusHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
 	req.SetPathValue("id", ticketID.String())
 	rr := httptest.NewRecorder()

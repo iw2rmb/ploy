@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// FuzzSubmitTicketHandler ensures the ticket submission handler is resilient to
+// FuzzSubmitRunHandler ensures the run submission handler is resilient to
 // arbitrary inputs and does not panic. It only exercises the decoding/validation
 // path with a nil-backed mock store; success is not required.
-func FuzzSubmitTicketHandler(f *testing.F) {
+func FuzzSubmitRunHandler(f *testing.F) {
 	st := &mockStore{}
-	h := submitTicketHandler(st, nil)
+	h := submitRunHandler(st, nil)
 
 	// Seed with a few typical cases.
 	seeds := [][]byte{
