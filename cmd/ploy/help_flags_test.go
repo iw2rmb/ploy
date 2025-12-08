@@ -26,7 +26,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy --help",
 			args:           []string{"--help"},
-			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "server", "node", "rollout", "token"},
+			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "cluster", "node", "rollout", "token"},
 			expectNoError:  true,
 		},
 		{

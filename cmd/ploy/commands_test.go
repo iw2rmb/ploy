@@ -28,7 +28,6 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"cluster",  // newClusterCmd
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
-		"server",   // newServerCmd
 		"node",     // newNodeCmd
 		"rollout",  // newRolloutCmd
 		"token",    // newTokenCmd
