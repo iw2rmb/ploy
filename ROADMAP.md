@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/runtime/step ./internal/nodeagent/...` — label tests (`labels_test.go`) still assert `LabelRunID` is set from `RunID`.
 
 ## Mods API types and events
-- [ ] Rename Mods API fields from TicketID to RunID — align type names with `run_id` JSON fields.
+- [x] Rename Mods API fields from TicketID to RunID — align type names with `run_id` JSON fields.
   - Repository: ploy
   - Component: `internal/mods/api`, `internal/server/events`, `internal/stream`
   - Scope: In `internal/mods/api/types.go`, change `RunSummary.TicketID domaintypes.TicketID` to `RunID domaintypes.RunID`; update `RunSubmitRequest` to use `RunID` or drop the field when unused; rename `PublishTicket` to `PublishRun` in `internal/stream/hub.go` and `internal/server/events/service.go`, updating all callers.
