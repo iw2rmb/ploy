@@ -22,6 +22,13 @@ func handleUpload(args []string, stderr io.Writer) error {
 	if stderr == nil {
 		stderr = io.Discard
 	}
+
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printUploadUsage(stderr)
+		return nil
+	}
+
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	// Flags

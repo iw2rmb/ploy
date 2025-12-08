@@ -175,6 +175,20 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectContains: []string{"Usage: ploy token"},
 			expectNoError:  true,
 		},
+
+		// upload command --help
+		{
+			name:           "ploy upload --help",
+			args:           []string{"upload", "--help"},
+			expectContains: []string{"Usage: ploy upload"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy upload -h",
+			args:           []string{"upload", "-h"},
+			expectContains: []string{"Usage: ploy upload"},
+			expectNoError:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -241,6 +255,7 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 		{"config", "gitlab", "--help"},
 		{"manifest", "--help"},
 		{"token", "--help"},
+		{"upload", "--help"},
 	}
 
 	for _, args := range commands {
