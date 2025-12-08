@@ -6,11 +6,18 @@ package types
 
 import "encoding"
 
-// TicketID identifies a workflow ticket.
-type TicketID string
-
-// RunID identifies a run instance.
+// RunID identifies a run instance (workflow execution).
+// This is the canonical identifier for workflow runs, consolidating
+// the previous TicketID and RunID types into a single type.
 type RunID string
+
+// TicketID is a deprecated alias for RunID.
+// Use RunID directly for all new code. This alias exists only for
+// backward compatibility during the migration from ticket to run terminology.
+//
+// Deprecated: Use RunID instead. This alias will be removed once all
+// callers have been migrated (see ROADMAP.md tasks).
+type TicketID = RunID
 
 // StepID identifies a step within a stage.
 type StepID string
@@ -32,12 +39,6 @@ type RunRepoID string
 // StepIndex identifies a step's position within a job execution sequence.
 // It is a zero-based index representing the order of execution.
 type StepIndex float64
-
-// String returns the underlying string value.
-func (v TicketID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v TicketID) IsZero() bool { return IsEmpty(string(v)) }
 
 // String returns the underlying string value.
 func (v RunID) String() string { return string(v) }
@@ -102,16 +103,9 @@ func unmarshalIDText[S ~string](dst *S, b []byte) error {
 	return nil
 }
 
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*TicketID)(nil)
-
-func (v TicketID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *TicketID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
-func (v TicketID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *TicketID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
+// RunID implements encoding.TextMarshaler and encoding.TextUnmarshaler
+// for text-based serialization (normalizes and rejects empty values).
+// Note: TicketID is a type alias for RunID and shares these methods.
 var _ interface {
 	encoding.TextMarshaler
 	encoding.TextUnmarshaler
