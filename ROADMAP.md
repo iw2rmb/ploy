@@ -224,7 +224,7 @@ Legend: [ ] todo, [x] done.
          - IDs that are intentionally still UUIDs (`diffs.id`, `artifact_bundles.id`, `api_tokens.id`, `bootstrap_tokens.id`, `buildgate_jobs.id`), or
          - Historical notes that explicitly call out the prior UUID-based design.
    
-   - [ ] Clean up in-code comments that still describe run/job/repo IDs as UUIDs — Keep comments consistent with the KSUID/NanoID implementation.
+   - [x] Clean up in-code comments that still describe run/job/repo IDs as UUIDs — Keep comments consistent with the KSUID/NanoID implementation.
      - Repository: github.com/iw2rmb/ploy
      - Component: internal/mods/api/types.go, docs/api/paths/*.yaml (inline descriptions), any handlers mentioning "job UUID"/"run UUID" in comments.
      - Scope:
