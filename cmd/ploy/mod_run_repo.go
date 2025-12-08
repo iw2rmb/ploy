@@ -61,10 +61,11 @@ func printModRunRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  restart   Restart a repo within a batch run")
 	_, _ = fmt.Fprintln(w, "  status    Show repos and their statuses within a batch run")
 	_, _ = fmt.Fprintln(w, "")
+	// Examples use neutral <repo-id> placeholder since repo IDs are NanoID(8) strings, not UUIDs.
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy mod run repo add --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature <run-name>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove --repo-id <repo-uuid> <run-name>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart --repo-id <repo-uuid> <run-name>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove --repo-id <repo-id> <run-name>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart --repo-id <repo-id> <run-name>")
 	_, _ = fmt.Fprintln(w, "  ploy mod run repo status <run-name>")
 }
 
@@ -126,7 +127,8 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo remove", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	repoID := fs.String("repo-id", "", "Repo UUID to remove")
+	// Repo IDs are NanoID(8) strings; use neutral "identifier" wording.
+	repoID := fs.String("repo-id", "", "Repo identifier to remove")
 
 	if err := fs.Parse(args); err != nil {
 		printModRunRepoUsage(stderr)
@@ -168,7 +170,8 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo restart", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	repoID := fs.String("repo-id", "", "Repo UUID to restart")
+	// Repo IDs are NanoID(8) strings; use neutral "identifier" wording.
+	repoID := fs.String("repo-id", "", "Repo identifier to restart")
 	baseRef := fs.String("base-ref", "", "Optional new base ref")
 	targetRef := fs.String("target-ref", "", "Optional new target ref")
 

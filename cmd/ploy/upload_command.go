@@ -25,8 +25,10 @@ func handleUpload(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	// Flags
-	runID := fs.String("run-id", "", "Run identifier to attach the artifact bundle to (UUID)")
-	buildID := fs.String("build-id", "", "Optional build identifier (UUID)")
+	// Flag help uses neutral "identifier" wording since run/build IDs are KSUID strings,
+	// not UUIDs. Treat them as opaque string identifiers.
+	runID := fs.String("run-id", "", "Run identifier to attach the artifact bundle to")
+	buildID := fs.String("build-id", "", "Optional build identifier")
 	name := fs.String("name", "", "Optional artifact name override (defaults to filename)")
 	if err := fs.Parse(args); err != nil {
 		printUploadUsage(stderr)
@@ -112,8 +114,10 @@ func handleUpload(args []string, stderr io.Writer) error {
 	return nil
 }
 
+// printUploadUsage renders help for the upload command. Placeholders use neutral
+// <run-id> / <build-id> wording since IDs are KSUID strings (not UUIDs).
 func printUploadUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy upload --run-id <run-id> [--build-id <build-id>] [--name <string>] <path>")
 }
 
 // report command removed: server provides no GET route for artifact bundles.

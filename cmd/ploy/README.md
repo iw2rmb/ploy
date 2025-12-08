@@ -29,7 +29,7 @@ ploy mod run \
   [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
-ploy upload --run-id <uuid> [--build-id <uuid>] [--name <string>] <path>
+ploy upload --run-id <run-id> [--build-id <build-id>] [--name <string>] <path>
 ```
 
 Note on `--json` output:
@@ -135,8 +135,9 @@ If a repository job fails or needs reprocessing with a different branch, use
 
 ```bash
 # Restart repo-a with a hotfix branch (use repo-id from `mod run repo status`).
+# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mod run repo restart \
-  --repo-id <repo-uuid> \
+  --repo-id <repo-id> \
   --target-ref hotfix \
   my-batch
 ```
@@ -148,8 +149,9 @@ This re-queues the repository under the same batch without recreating the run.
 To remove a repository from an in-progress batch (e.g., if it was added by mistake):
 
 ```bash
+# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mod run repo remove \
-  --repo-id <repo-uuid> \
+  --repo-id <repo-id> \
   my-batch
 ```
 
@@ -260,7 +262,7 @@ ploy completion <shell> --help
   (`build_gate_healing`), and GitLab MR settings. See `docs/schemas/mod.example.yaml`
   for the full schema and `tests/e2e/mods/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `/mod/<run-id>` (using the database run UUID) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
+  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `/mod/<run-id>` (using the run ID, a KSUID string) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
@@ -294,8 +296,8 @@ enriched fields for execution context:
 | `timestamp`  | string | RFC 3339 timestamp when the log line was captured                 |
 | `stream`     | string | Output stream (`stdout` or `stderr`)                              |
 | `line`       | string | Log message content                                               |
-| `node_id`    | string | UUID of the execution node (optional)                             |
-| `job_id`     | string | UUID of the job (optional)                                        |
+| `node_id`    | string | Execution node identifier (NanoID string, optional)               |
+| `job_id`     | string | Job identifier (KSUID string, optional)                           |
 | `mod_type`   | string | Step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate` (opt)|
 | `step_index` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
 
@@ -473,7 +475,7 @@ dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
 **API response:**
 
 The `GET /v1/mods/{id}` endpoint returns `TicketSummary` with:
-- `stages` — Map of job UUID to `StageStatus` (state, step_index, attempts)
+- `stages` — Map of job ID (KSUID string) to `StageStatus` (state, step_index, attempts)
 - `metadata["gate_summary"]` — Human-readable gate result
 - `metadata["mr_url"]` — Merge request URL if created
 
