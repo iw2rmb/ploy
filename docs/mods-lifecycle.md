@@ -6,7 +6,7 @@ checkpoint notes in the repository.
 
 ## 1. Core Concepts
 
-- **Run** — A Mods run submitted to the control plane. Tickets are stored as
+- **Run** — A Mods run submitted to the control plane. Runs are stored as
   `runs` rows in PostgreSQL and exposed via the `/v1/mods` API.
 - **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
   `post-gate`). Jobs are stored as `jobs` rows.
@@ -738,9 +738,9 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 
 ### 3.1 Mods endpoints (`internal/server/handlers`)
 
-- `POST /v1/mods` — submit a Mods  run.
+- `POST /v1/mods` — submit a Mods run.
   - Simplified shape: `{repo_url, base_ref, target_ref, commit_sha?, spec?, created_by?}`.
-  - Handler: `submitTicketHandler`.
+  - Handler: `submitRunHandler`.
   - Behaviour:
     - Creates a `runs` row with `status=queued`.
     - Creates `jobs` rows from the spec (pre-gate, mod, post-gate).
@@ -748,8 +748,8 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - Publishes an initial `RunSummary` snapshot to SSE via
       `events.Service.PublishRun`.
 
-- `GET /v1/mods/{id}` —  run status.
-  - Handler: `getTicketStatusHandler`.
+- `GET /v1/mods/{id}` — run status.
+  - Handler: `getRunStatusHandler`.
   - Aggregates:
     - `runs` row.
     - `jobs` rows (including `meta` JSONB with job metadata).
@@ -757,7 +757,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - Run stats (MR URL, gate summary).
   - Returns `RunStatusResponse` (`modsapi.RunStatusResponse{Ticket: RunSummary}`).
 
-- `GET /v1/mods/{id}/events` — SSE event stream for a  run.
+- `GET /v1/mods/{id}/events` — SSE event stream for a run.
   - Handler: `getModEventsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
@@ -766,8 +766,8 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `event: done`, data: `Status {status:"done"}` sentinel.
   - Supports `Last-Event-ID` for resumption.
 
-- `POST /v1/mods/{id}/cancel` — cancel a  run.
-  - Handler: `cancelTicketHandler`.
+- `POST /v1/mods/{id}/cancel` — cancel a run.
+  - Handler: `cancelRunHandler`.
   - Behaviour:
     - Transitions run to `canceled`, updates jobs in `pending|running` to
       `canceled`.
