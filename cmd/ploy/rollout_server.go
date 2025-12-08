@@ -21,6 +21,11 @@ var rolloutServerHost = executeRolloutServer
 var rolloutRunner deploy.Runner
 
 func handleRollout(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printRolloutUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printRolloutUsage(stderr)
 		return errors.New("rollout subcommand required")

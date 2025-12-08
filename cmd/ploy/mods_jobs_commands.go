@@ -15,6 +15,11 @@ import (
 )
 
 func handleMods(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printModsUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printModsUsage(stderr)
 		return errors.New("mods subcommand required")
@@ -96,6 +101,11 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 }
 
 func handleRuns(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printRunsUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printRunsUsage(stderr)
 		return errors.New("runs subcommand required")

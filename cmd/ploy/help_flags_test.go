@@ -1,0 +1,289 @@
+package main
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
+
+// TestHelpFlagsAtAllLevels verifies that --help and -h flags work correctly
+// at every command level, printing the correct usage and subcommand lists
+// instead of falling back to Cobra's default or surfacing "unknown subcommand" errors.
+//
+// This test covers the ROADMAP.md requirement:
+// "Ensure `--help` (and `-h`) works at every command level — Guarantee that
+// `ploy --help`, `ploy <command> --help`, and deeper forms like
+// `ploy cluster rollout --help` print the correct usage and subcommand lists
+// instead of falling back to Cobra's default or surfacing "unknown subcommand" errors."
+func TestHelpFlagsAtAllLevels(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectContains []string // Strings that must be present in output
+		expectNoError  bool     // Whether the command should succeed (return nil)
+	}{
+		// Root level --help
+		{
+			name:           "ploy --help",
+			args:           []string{"--help"},
+			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "server", "node", "rollout", "token"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy -h",
+			args:           []string{"-h"},
+			expectContains: []string{"Ploy CLI v2", "Core Commands:"},
+			expectNoError:  true,
+		},
+
+		// mod command --help
+		{
+			name:           "ploy mod --help",
+			args:           []string{"mod", "--help"},
+			expectContains: []string{"Usage: ploy mod", "run", "cancel", "resume", "inspect"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy mod -h",
+			args:           []string{"mod", "-h"},
+			expectContains: []string{"Usage: ploy mod"},
+			expectNoError:  true,
+		},
+
+		// mods command --help
+		{
+			name:           "ploy mods --help",
+			args:           []string{"mods", "--help"},
+			expectContains: []string{"Usage: ploy mods"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy mods -h",
+			args:           []string{"mods", "-h"},
+			expectContains: []string{"Usage: ploy mods"},
+			expectNoError:  true,
+		},
+
+		// runs command --help
+		{
+			name:           "ploy runs --help",
+			args:           []string{"runs", "--help"},
+			expectContains: []string{"Usage: ploy runs"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy runs -h",
+			args:           []string{"runs", "-h"},
+			expectContains: []string{"Usage: ploy runs"},
+			expectNoError:  true,
+		},
+
+		// server command --help
+		{
+			name:           "ploy server --help",
+			args:           []string{"server", "--help"},
+			expectContains: []string{"Usage: ploy server", "deploy"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy server -h",
+			args:           []string{"server", "-h"},
+			expectContains: []string{"Usage: ploy server"},
+			expectNoError:  true,
+		},
+
+		// node command --help
+		{
+			name:           "ploy node --help",
+			args:           []string{"node", "--help"},
+			expectContains: []string{"Usage: ploy node", "add"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy node -h",
+			args:           []string{"node", "-h"},
+			expectContains: []string{"Usage: ploy node"},
+			expectNoError:  true,
+		},
+
+		// rollout command --help
+		{
+			name:           "ploy rollout --help",
+			args:           []string{"rollout", "--help"},
+			expectContains: []string{"Usage: ploy rollout", "server", "nodes"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy rollout -h",
+			args:           []string{"rollout", "-h"},
+			expectContains: []string{"Usage: ploy rollout"},
+			expectNoError:  true,
+		},
+
+		// config command --help
+		{
+			name:           "ploy config --help",
+			args:           []string{"config", "--help"},
+			expectContains: []string{"Usage: ploy config", "gitlab"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy config -h",
+			args:           []string{"config", "-h"},
+			expectContains: []string{"Usage: ploy config"},
+			expectNoError:  true,
+		},
+
+		// config gitlab --help (deeper level)
+		{
+			name:           "ploy config gitlab --help",
+			args:           []string{"config", "gitlab", "--help"},
+			expectContains: []string{"Usage: ploy config gitlab", "show", "set", "validate"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy config gitlab -h",
+			args:           []string{"config", "gitlab", "-h"},
+			expectContains: []string{"Usage: ploy config gitlab"},
+			expectNoError:  true,
+		},
+
+		// manifest command --help
+		{
+			name:           "ploy manifest --help",
+			args:           []string{"manifest", "--help"},
+			expectContains: []string{"Usage: ploy manifest", "schema", "validate"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy manifest -h",
+			args:           []string{"manifest", "-h"},
+			expectContains: []string{"Usage: ploy manifest"},
+			expectNoError:  true,
+		},
+
+		// token command --help
+		{
+			name:           "ploy token --help",
+			args:           []string{"token", "--help"},
+			expectContains: []string{"Usage: ploy token", "create", "list", "revoke"},
+			expectNoError:  true,
+		},
+		{
+			name:           "ploy token -h",
+			args:           []string{"token", "-h"},
+			expectContains: []string{"Usage: ploy token"},
+			expectNoError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := execute(tt.args, buf)
+
+			// Check error expectation
+			if tt.expectNoError && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+
+			// Check output contains expected strings
+			output := buf.String()
+			for _, expected := range tt.expectContains {
+				if !strings.Contains(output, expected) {
+					t.Errorf("expected output to contain %q, got:\n%s", expected, output)
+				}
+			}
+		})
+	}
+}
+
+// TestWantsHelpFunction tests the wantsHelp helper function.
+func TestWantsHelpFunction(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{name: "single --help", args: []string{"--help"}, expected: true},
+		{name: "single -h", args: []string{"-h"}, expected: true},
+		{name: "empty args", args: []string{}, expected: false},
+		{name: "nil args", args: nil, expected: false},
+		{name: "subcommand only", args: []string{"deploy"}, expected: false},
+		{name: "--help with extra arg", args: []string{"--help", "extra"}, expected: false},
+		{name: "-h with extra arg", args: []string{"-h", "extra"}, expected: false},
+		{name: "subcommand then --help", args: []string{"deploy", "--help"}, expected: false},
+		{name: "--Help (wrong case)", args: []string{"--Help"}, expected: false},
+		{name: "-H (wrong case)", args: []string{"-H"}, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wantsHelp(tt.args)
+			if result != tt.expected {
+				t.Errorf("wantsHelp(%v) = %v, expected %v", tt.args, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestHelpFlagNoUnknownSubcommandError verifies that --help does not trigger
+// "unknown subcommand" errors that would be confusing to users.
+func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
+	commands := [][]string{
+		{"mod", "--help"},
+		{"mods", "--help"},
+		{"runs", "--help"},
+		{"server", "--help"},
+		{"node", "--help"},
+		{"rollout", "--help"},
+		{"config", "--help"},
+		{"config", "gitlab", "--help"},
+		{"manifest", "--help"},
+		{"token", "--help"},
+	}
+
+	for _, args := range commands {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := execute(args, buf)
+
+			// Should not return an error
+			if err != nil {
+				t.Errorf("expected no error for %v, got: %v", args, err)
+			}
+
+			// Output should NOT contain "unknown" or "subcommand" error messages
+			output := buf.String()
+			if strings.Contains(strings.ToLower(output), "unknown") && strings.Contains(strings.ToLower(output), "subcommand") {
+				t.Errorf("output should not contain 'unknown subcommand' for help flag, got:\n%s", output)
+			}
+		})
+	}
+}
+
+// TestRootHelpConsistency verifies that ploy --help and ploy help produce
+// identical output, ensuring consistency in the CLI help system.
+func TestRootHelpConsistency(t *testing.T) {
+	// Get output from ploy --help
+	helpFlagBuf := &bytes.Buffer{}
+	errHelpFlag := execute([]string{"--help"}, helpFlagBuf)
+
+	// Get output from ploy help
+	helpCmdBuf := &bytes.Buffer{}
+	errHelpCmd := execute([]string{"help"}, helpCmdBuf)
+
+	// Both should succeed
+	if errHelpFlag != nil {
+		t.Errorf("ploy --help failed: %v", errHelpFlag)
+	}
+	if errHelpCmd != nil {
+		t.Errorf("ploy help failed: %v", errHelpCmd)
+	}
+
+	// Output should be identical
+	if helpFlagBuf.String() != helpCmdBuf.String() {
+		t.Errorf("ploy --help and ploy help produce different output:\n--help:\n%s\nhelp:\n%s",
+			helpFlagBuf.String(), helpCmdBuf.String())
+	}
+}

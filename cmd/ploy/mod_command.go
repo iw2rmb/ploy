@@ -8,6 +8,11 @@ import (
 
 // handleMod routes Mods subcommands to their implementations.
 func handleMod(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printModUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printModUsage(stderr)
 		return errors.New("mod subcommand required")

@@ -16,6 +16,11 @@ import (
 
 // handleConfig routes config subcommands.
 func handleConfig(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printConfigUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printConfigUsage(stderr)
 		return errors.New("config subcommand required")
@@ -38,6 +43,11 @@ func printConfigUsage(w io.Writer) {
 
 // handleConfigGitLab routes gitlab subcommands.
 func handleConfigGitLab(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printConfigGitLabUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printConfigGitLabUsage(stderr)
 		return errors.New("gitlab subcommand required")

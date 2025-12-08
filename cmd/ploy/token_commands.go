@@ -17,6 +17,11 @@ import (
 
 // handleToken routes token subcommands.
 func handleToken(args []string, stderr io.Writer) error {
+	// Handle --help and -h flags to print usage and exit cleanly.
+	if wantsHelp(args) {
+		printTokenUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printTokenUsage(stderr)
 		return errors.New("token subcommand required")
