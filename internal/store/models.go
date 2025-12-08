@@ -12,51 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type BuildgateJobStatus string
-
-const (
-	BuildgateJobStatusPending   BuildgateJobStatus = "pending"
-	BuildgateJobStatusClaimed   BuildgateJobStatus = "claimed"
-	BuildgateJobStatusRunning   BuildgateJobStatus = "running"
-	BuildgateJobStatusCompleted BuildgateJobStatus = "completed"
-	BuildgateJobStatusFailed    BuildgateJobStatus = "failed"
-)
-
-func (e *BuildgateJobStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = BuildgateJobStatus(s)
-	case string:
-		*e = BuildgateJobStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for BuildgateJobStatus: %T", src)
-	}
-	return nil
-}
-
-type NullBuildgateJobStatus struct {
-	BuildgateJobStatus BuildgateJobStatus `json:"buildgate_job_status"`
-	Valid              bool               `json:"valid"` // Valid is true if BuildgateJobStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullBuildgateJobStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.BuildgateJobStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.BuildgateJobStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullBuildgateJobStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.BuildgateJobStatus), nil
-}
-
 type JobStatus string
 
 const (
@@ -248,18 +203,6 @@ type Build struct {
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 	DurationMs int64              `json:"duration_ms"`
 	Metrics    []byte             `json:"metrics"`
-}
-
-type BuildgateJob struct {
-	ID             pgtype.UUID        `json:"id"`
-	RequestPayload []byte             `json:"request_payload"`
-	Status         BuildgateJobStatus `json:"status"`
-	NodeID         *string            `json:"node_id"`
-	Result         []byte             `json:"result"`
-	Error          *string            `json:"error"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
 }
 
 type Diff struct {

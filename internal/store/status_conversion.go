@@ -91,19 +91,6 @@ func ValidateRunStatus(status string) (RunStatus, error) {
 	}
 }
 
-// ValidateBuildgateJobStatus validates that a string is a valid BuildgateJobStatus value.
-// Returns the typed status if valid, otherwise returns an error.
-func ValidateBuildgateJobStatus(status string) (BuildgateJobStatus, error) {
-	s := BuildgateJobStatus(status)
-	switch s {
-	case BuildgateJobStatusPending, BuildgateJobStatusClaimed, BuildgateJobStatusRunning,
-		BuildgateJobStatusCompleted, BuildgateJobStatusFailed:
-		return s, nil
-	default:
-		return "", fmt.Errorf("invalid buildgate job status: %q (expected: pending, claimed, running, completed, failed)", status)
-	}
-}
-
 // ValidateRunRepoStatus validates that a string is a valid RunRepoStatus value.
 // Returns the typed status if valid, otherwise returns an error.
 // RunRepoStatus tracks per-repo execution state within a batched run.

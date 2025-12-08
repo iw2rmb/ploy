@@ -11,14 +11,12 @@ import (
 )
 
 type Querier interface {
-	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
 	// Transitions run status to 'running' when execution starts.
 	// Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
 	// the first job starts execution.
 	AckRunStart(ctx context.Context, id string) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
-	ClaimBuildGateJob(ctx context.Context, nodeID *string) (BuildgateJob, error)
 	// Atomically claim the next pending job for a node (single unified queue).
 	// Jobs are ordered by step_index; no special handling for gate vs mod jobs.
 	// Server-driven scheduling: only 'pending' jobs are claimable.
@@ -35,7 +33,6 @@ type Querier interface {
 	// Used to derive batch-level status (e.g., all succeeded = batch succeeded).
 	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
-	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
 	// Creates a new diff entry associated with a job.
 	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
@@ -76,7 +73,6 @@ type Querier interface {
 	GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error)
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
-	GetBuildGateJob(ctx context.Context, id pgtype.UUID) (BuildgateJob, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetJob(ctx context.Context, id string) (Job, error)
@@ -133,7 +129,6 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
-	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
 	// Lists all pending repos for a run (batch), ordered by creation time.
 	// Used by the batch orchestrator to find repos ready to start execution.
 	ListPendingRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
@@ -156,7 +151,6 @@ type Querier interface {
 	SetRunRepoExecutionRun(ctx context.Context, arg SetRunRepoExecutionRunParams) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
-	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
 	// Updates a job's terminal status, exit code, and timing.
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	// Updates a job's terminal status, exit code, timing, and meta in one operation.

@@ -3,21 +3,23 @@ package contracts
 import (
 	"fmt"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// BuildGateJobStatus is an alias for the canonical store.BuildgateJobStatus type.
-// This eliminates duplication and ensures consistency across workflow contracts and database layer.
-type BuildGateJobStatus = store.BuildgateJobStatus
+// BuildGateJobStatus represents the status of a Build Gate job.
+// Note: The buildgate_jobs table has been removed from the schema (see ROADMAP.md).
+// Gate validation now runs as part of the unified jobs queue. This type is retained
+// for backward compatibility with existing HTTP Build Gate API responses until the
+// HTTP Build Gate handlers are fully removed.
+type BuildGateJobStatus string
 
-// Re-export constants for backward compatibility at API boundaries.
+// BuildGateJobStatus constants for HTTP Build Gate API responses.
+// These will be removed when the HTTP Build Gate handlers are deleted.
 const (
-	BuildGateJobStatusPending   = store.BuildgateJobStatusPending
-	BuildGateJobStatusClaimed   = store.BuildgateJobStatusClaimed
-	BuildGateJobStatusRunning   = store.BuildgateJobStatusRunning
-	BuildGateJobStatusCompleted = store.BuildgateJobStatusCompleted
-	BuildGateJobStatusFailed    = store.BuildgateJobStatusFailed
+	BuildGateJobStatusPending   BuildGateJobStatus = "pending"
+	BuildGateJobStatusClaimed   BuildGateJobStatus = "claimed"
+	BuildGateJobStatusRunning   BuildGateJobStatus = "running"
+	BuildGateJobStatusCompleted BuildGateJobStatus = "completed"
+	BuildGateJobStatusFailed    BuildGateJobStatus = "failed"
 )
 
 // BuildGateValidateRequest is the request payload for POST /v1/buildgate/validate.

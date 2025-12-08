@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
+
+// testRunIDKSUID is a synthetic KSUID-like ID (27 characters) used for tests.
+const testRunIDKSUID = "123456789012345678901234567"
 
 func TestGetModEventsHandler_TicketNotFound(t *testing.T) {
 	t.Parallel()
@@ -25,7 +27,7 @@ func TestGetModEventsHandler_TicketNotFound(t *testing.T) {
 	st := &mockStore{getRunErr: pgx.ErrNoRows}
 	h := getModEventsHandler(st, eventsService)
 
-	runID := uuid.New().String()
+	runID := testRunIDKSUID
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/events", nil)
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
@@ -74,7 +76,7 @@ func TestGetModEventsHandler_DatabaseError(t *testing.T) {
 	st := &mockStore{getRunErr: pgx.ErrTxClosed}
 	h := getModEventsHandler(st, eventsService)
 
-	runID := uuid.New().String()
+	runID := testRunIDKSUID
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/events", nil)
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
@@ -91,12 +93,12 @@ func TestGetModEventsHandler_Success(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
-	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
+	runID := testRunIDKSUID
+	st := &mockStore{getRunResult: store.Run{ID: runID}}
 	h := getModEventsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/events", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/events", nil)
+	req.SetPathValue("id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	done := make(chan struct{})
@@ -108,8 +110,8 @@ func TestGetModEventsHandler_Success(t *testing.T) {
 	// Allow subscription to establish
 	time.Sleep(25 * time.Millisecond)
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "hello"})
-	_ = hub.PublishStatus(ctx, runID.String(), logstream.Status{Status: "completed"})
+	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "hello"})
+	_ = hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"})
 
 	select {
 	case <-done:
@@ -130,16 +132,16 @@ func TestGetModEventsHandler_Resume(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
-	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
+	runID := testRunIDKSUID
+	st := &mockStore{getRunResult: store.Run{ID: runID}}
 	h := getModEventsHandler(st, eventsService)
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
+	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/events", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/events", nil)
+	req.SetPathValue("id", runID)
 	req.Header.Set("Last-Event-ID", "1")
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
@@ -151,8 +153,8 @@ func TestGetModEventsHandler_Resume(t *testing.T) {
 
 	// Allow subscription to establish, then publish id=2 and done
 	time.Sleep(25 * time.Millisecond)
-	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "second"})
-	_ = hub.PublishStatus(ctx, runID.String(), logstream.Status{Status: "completed"})
+	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "second"})
+	_ = hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"})
 
 	select {
 	case <-done:
@@ -183,12 +185,12 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 	}
 	hub := eventsService.Hub()
 
-	runID := uuid.New()
-	st := &mockStore{getRunResult: store.Run{ID: runID.String()}}
+	runID := testRunIDKSUID
+	st := &mockStore{getRunResult: store.Run{ID: runID}}
 	h := getModEventsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/events", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/events", nil)
+	req.SetPathValue("id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	done := make(chan struct{})
@@ -210,10 +212,10 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 		ModType:   "mod",
 		StepIndex: 2000,
 	}
-	if err := hub.PublishLog(ctx, runID.String(), enriched); err != nil {
+	if err := hub.PublishLog(ctx, runID, enriched); err != nil {
 		t.Fatalf("publish enriched log: %v", err)
 	}
-	if err := hub.PublishStatus(ctx, runID.String(), logstream.Status{Status: "completed"}); err != nil {
+	if err := hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
 	}
 
