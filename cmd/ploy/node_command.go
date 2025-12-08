@@ -42,16 +42,21 @@ func handleNode(args []string, stderr io.Writer) error {
 // printNodeUsage prints the node command usage information.
 // This provides a single, consistent usage output for --help, error paths,
 // and unknown subcommand handling.
+//
+// NOTE: Node commands are now accessed via `ploy cluster node` instead of the
+// former `ploy node`. This reflects the restructuring of cluster management
+// operations under a unified `ploy cluster` namespace.
 func printNodeUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy node <command>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  add       Add a worker node to the cluster")
 }
 
 // printNodeAddUsage prints usage information for the node add command.
+// NOTE: Node add is now accessed via `ploy cluster node add`.
 func printNodeAddUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy cluster node add --cluster-id <id> --address <ip> --server-url <url>")
 }
 
 // handleNodeAdd validates required flags for adding a worker node.
