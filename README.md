@@ -26,7 +26,7 @@ For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This READ
 **Docs You'll Want**
 - Overview & quick start: this `README.md`.
 - Deployment: `docs/how-to/deploy-a-cluster.md`.
-- Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy rollout`).
+- Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy cluster rollout`).
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
 - Environment variables: `docs/envs/README.md`.
 - Mods lifecycle and SSE events: `docs/mods-lifecycle.md`.

@@ -6,8 +6,8 @@ set -euo pipefail
 # Usage:
 #   scripts/ploy-lab.sh <ploy args...>
 # Examples:
-#   scripts/ploy-lab.sh rollout server --address 45.9.42.212 --binary dist/ployd-linux --user root
-#   scripts/ploy-lab.sh rollout nodes --all --binary dist/ployd-node-linux --user root
+#   scripts/ploy-lab.sh cluster rollout server --address 45.9.42.212 --binary dist/ployd-linux --user root
+#   scripts/ploy-lab.sh cluster rollout nodes --all --binary dist/ployd-node-linux --user root
 #   scripts/ploy-lab.sh mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature/x --follow
 #
 # The script sets PLOY_CONTROL_PLANE_URL to the lab server URL and delegates to
