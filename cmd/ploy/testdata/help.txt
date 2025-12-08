@@ -11,8 +11,6 @@ Core Commands:
   cluster          Manage clusters (deploy, nodes, rollout, tokens)
   config           Inspect or update cluster configuration
   manifest         Inspect and validate integration manifests
-  node             Manage worker nodes
-  rollout          Rolling updates for servers and nodes
   token            Manage API tokens for authentication
 
 Use 'ploy help <command>' for detailed command help.

@@ -150,6 +150,7 @@ func TestClusterNodeHelp(t *testing.T) {
 }
 
 // TestClusterRolloutHelp verifies that "cluster rollout --help" works correctly.
+// NOTE: Rollout is now accessible only via `ploy cluster rollout`.
 func TestClusterRolloutHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleCluster([]string{"rollout", "--help"}, buf)
@@ -159,10 +160,10 @@ func TestClusterRolloutHelp(t *testing.T) {
 		t.Fatalf("expected no error for cluster rollout --help, got %v", err)
 	}
 
-	// Should print rollout usage.
+	// Should print cluster rollout usage.
 	output := buf.String()
-	if !strings.Contains(output, "Usage: ploy rollout") {
-		t.Fatalf("expected rollout usage, got %q", output)
+	if !strings.Contains(output, "Usage: ploy cluster rollout") {
+		t.Fatalf("expected cluster rollout usage, got %q", output)
 	}
 }
 
