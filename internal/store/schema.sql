@@ -18,10 +18,6 @@ CREATE TYPE job_status AS ENUM (
   'created', 'pending', 'running', 'succeeded', 'failed', 'skipped', 'canceled'
 );
 
-CREATE TYPE buildgate_job_status AS ENUM (
-  'pending', 'claimed', 'running', 'completed', 'failed'
-);
-
 -- RunRepoStatus tracks per-repo execution state within a batched run.
 -- Mirrors job_status without 'created' since repos enter as 'pending'.
 CREATE TYPE run_repo_status AS ENUM (
@@ -251,20 +247,6 @@ CREATE TABLE IF NOT EXISTS node_metrics (
 );
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
-
--- Build Gate Jobs (async gate validation jobs)
-CREATE TABLE IF NOT EXISTS buildgate_jobs (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-  status          buildgate_job_status NOT NULL DEFAULT 'pending',
-  node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id.
-  result          JSONB,
-  error           TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at      TIMESTAMPTZ,
-  finished_at     TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS buildgate_jobs_status_idx ON buildgate_jobs(status) WHERE status = 'pending';
 
 -- API Tokens (bearer tokens for API access)
 CREATE TABLE IF NOT EXISTS api_tokens (

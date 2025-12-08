@@ -15,9 +15,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/graph"
 )
 
+// testTicketIDKSUID is a synthetic KSUID-like ID (27 characters) used for tests.
+const testTicketIDKSUID = "123456789012345678901234567"
+
 // TestGetModGraphHandler_Success verifies successful graph retrieval.
 func TestGetModGraphHandler_Success(t *testing.T) {
-	runID := uuid.New()
+	runID := testTicketIDKSUID
 	job1ID := uuid.New()
 	job2ID := uuid.New()
 	job3ID := uuid.New()
@@ -25,7 +28,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        runID.String(),
+			ID:        runID,
 			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusRunning,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -33,7 +36,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 		listJobsByRunResult: []store.Job{
 			{
 				ID:        job1ID.String(),
-				RunID:     runID.String(),
+				RunID:     runID,
 				Name:      "pre-gate",
 				Status:    store.JobStatusSucceeded,
 				ModType:   "pre_gate",
@@ -41,7 +44,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 			},
 			{
 				ID:        job2ID.String(),
-				RunID:     runID.String(),
+				RunID:     runID,
 				Name:      "mod-0",
 				Status:    store.JobStatusRunning,
 				ModType:   "mod",
@@ -50,7 +53,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 			},
 			{
 				ID:        job3ID.String(),
-				RunID:     runID.String(),
+				RunID:     runID,
 				Name:      "post-gate",
 				Status:    store.JobStatusCreated,
 				ModType:   "post_gate",
@@ -61,8 +64,8 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 
 	handler := getModGraphHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/graph", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/graph", nil)
+	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -78,8 +81,8 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 	}
 
 	// Verify run ID.
-	if result.RunID != runID.String() {
-		t.Errorf("RunID = %q, want %q", result.RunID, runID.String())
+	if result.RunID != runID {
+		t.Errorf("RunID = %q, want %q", result.RunID, runID)
 	}
 
 	// Verify 3 nodes.
@@ -150,7 +153,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 
 // TestGetModGraphHandler_WithHealing verifies graph with healing jobs.
 func TestGetModGraphHandler_WithHealing(t *testing.T) {
-	runID := uuid.New()
+	runID := testTicketIDKSUID
 	preGateID := uuid.New()
 	heal1ID := uuid.New()
 	reGateID := uuid.New()
@@ -160,23 +163,23 @@ func TestGetModGraphHandler_WithHealing(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        runID.String(),
+			ID:        runID,
 			Status:    store.RunStatusRunning,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: preGateID.String(), RunID: runID.String(), Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
-			{ID: heal1ID.String(), RunID: runID.String(), Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
-			{ID: reGateID.String(), RunID: runID.String(), Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
-			{ID: mod0ID.String(), RunID: runID.String(), Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
-			{ID: postGateID.String(), RunID: runID.String(), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
+			{ID: preGateID.String(), RunID: runID, Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
+			{ID: heal1ID.String(), RunID: runID, Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
+			{ID: reGateID.String(), RunID: runID, Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
+			{ID: mod0ID.String(), RunID: runID, Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
+			{ID: postGateID.String(), RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 		},
 	}
 
 	handler := getModGraphHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/graph", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/graph", nil)
+	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -222,7 +225,7 @@ func TestGetModGraphHandler_TicketNotFound(t *testing.T) {
 
 	handler := getModGraphHandler(st)
 
-	ticketID := uuid.New().String()
+	ticketID := testTicketIDKSUID
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID+"/graph", nil)
 	req.SetPathValue("id", ticketID)
 	rr := httptest.NewRecorder()
@@ -268,12 +271,12 @@ func TestGetModGraphHandler_MissingTicketID(t *testing.T) {
 
 // TestGetModGraphHandler_EmptyJobs verifies graph for ticket with no jobs.
 func TestGetModGraphHandler_EmptyJobs(t *testing.T) {
-	runID := uuid.New()
+	runID := testTicketIDKSUID
 	now := time.Now()
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        runID.String(),
+			ID:        runID,
 			Status:    store.RunStatusQueued,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
@@ -282,8 +285,8 @@ func TestGetModGraphHandler_EmptyJobs(t *testing.T) {
 
 	handler := getModGraphHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/graph", nil)
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID+"/graph", nil)
+	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

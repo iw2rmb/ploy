@@ -178,44 +178,6 @@ func TestValidateRunStatus(t *testing.T) {
 	}
 }
 
-// TestValidateBuildgateJobStatus verifies that ValidateBuildgateJobStatus correctly validates
-// canonical store.BuildgateJobStatus values.
-func TestValidateBuildgateJobStatus(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		input   string
-		want    BuildgateJobStatus
-		wantErr bool
-	}{
-		{name: "pending", input: "pending", want: BuildgateJobStatusPending, wantErr: false},
-		{name: "claimed", input: "claimed", want: BuildgateJobStatusClaimed, wantErr: false},
-		{name: "running", input: "running", want: BuildgateJobStatusRunning, wantErr: false},
-		{name: "completed", input: "completed", want: BuildgateJobStatusCompleted, wantErr: false},
-		{name: "failed", input: "failed", want: BuildgateJobStatusFailed, wantErr: false},
-
-		// Invalid cases
-		{name: "unknown", input: "unknown", want: "", wantErr: true},
-		{name: "empty", input: "", want: "", wantErr: true},
-		{name: "succeeded", input: "succeeded", want: "", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := ValidateBuildgateJobStatus(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateBuildgateJobStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("ValidateBuildgateJobStatus(%q) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestValidateRunRepoStatus verifies that ValidateRunRepoStatus correctly validates
 // canonical store.RunRepoStatus values for per-repo execution state in batched runs.
 func TestValidateRunRepoStatus(t *testing.T) {
