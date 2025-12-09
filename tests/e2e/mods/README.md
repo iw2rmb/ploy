@@ -55,7 +55,7 @@ Example spec:
 The `--spec` flag accepts a YAML or JSON file defining:
 - **Main mod configuration** (`image`, `command`, `env`, `env_from_file`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.profile`)
-- **Healing sequence** (`build_gate_healing.retries`, `build_gate_healing.mods[]`)
+- **Healing configuration** (`build_gate_healing.retries`, `build_gate_healing.strategies[].mods[]`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
 
 CLI flags override spec values when both are present. For example:
@@ -68,8 +68,8 @@ This uses `mod.yaml` as the base but overrides the image and PAT.
 
 When `build_gate_healing` is configured in the spec:
 1. The node runs the Build Gate before the main mod.
-2. If the gate fails, each healing mod in `build_gate_healing.mods[]` runs in sequence.
-3. After all healing steps, the gate is re-run. If it passes, the main mod proceeds.
+2. If the gate fails, each healing strategy under `build_gate_healing.strategies[]` executes its `mods[]` in sequence.
+3. After a strategy's healing mods complete, the gate is re-run for that strategy. If it passes, the main mod proceeds.
 4. The loop retries up to `build_gate_healing.retries` times (default: 1).
 5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
 
@@ -141,23 +141,25 @@ shipping full workspace archives over HTTP:
 
 2. Optionally call the Build Gate HTTP API directly (for non-Codex healers) using the injected `PLOY_*` env vars if you need mid-healing verification.
 
-Example healing spec block (Codex workspace diff handshake):
+Example healing spec block (Codex workspace diff handshake, single strategy):
 ```yaml
 build_gate_healing:
   retries: 1
-  mods:
-    - image: docker.io/you/mods-codex:latest
-      env:
-        CODEX_PROMPT: |-
-          Rules:
-          - Use /workspace and /in/build-gate.log to understand the compile error.
-          - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, stop editing and end the session.
+  strategies:
+    - name: codex-heal
+      mods:
+        - image: docker.io/you/mods-codex:latest
+          env:
+            CODEX_PROMPT: |-
+              Rules:
+              - Use /workspace and /in/build-gate.log to understand the compile error.
+              - Edit files under /workspace as needed to fix the error.
+              - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-          Task:
-          Fix the compilation error described in /in/build-gate.log.
-      env_from_file:
-        CODEX_AUTH_JSON: ~/.codex/auth.json
+              Task:
+              Fix the compilation error described in /in/build-gate.log.
+          env_from_file:
+            CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
 See `docs/schemas/mod.example.yaml` for the full spec schema.
@@ -215,7 +217,7 @@ This makes gate health visible without requiring raw artifact inspection.
 
 **How This Maps From the Legacy E2E**
 
-- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The current implementation reuses the same Build Gate logic via the unified jobs pipeline instead of a separate HTTP Build Gate API.
+- The legacy suite used two flows. With the current spec, the fail→heal path is explicit under `build_gate_healing.strategies[].mods[]` (here `mods-codex`). The current implementation reuses the same Build Gate logic via the unified jobs pipeline instead of a separate HTTP Build Gate API.
 
 **Troubleshooting**
 
