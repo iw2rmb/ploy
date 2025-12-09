@@ -817,9 +817,13 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
-				"mods": []any{
-					// Non-Codex healer image.
-					map[string]any{"image": "standard-healer:v1"},
+				"strategies": []any{
+					map[string]any{
+						// Non-Codex healer image.
+						"mods": []any{
+							map[string]any{"image": "standard-healer:v1"},
+						},
+					},
 				},
 			},
 		},
@@ -922,8 +926,12 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
-					map[string]any{"image": "heal:latest"},
+				"strategies": []any{
+					map[string]any{
+						"mods": []any{
+							map[string]any{"image": "heal:latest"},
+						},
+					},
 				},
 			},
 		},

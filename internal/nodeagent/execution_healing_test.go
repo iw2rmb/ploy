@@ -123,9 +123,13 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
+				"strategies": []any{
 					map[string]any{
-						"image": "test/healer-final-gate:latest",
+						"mods": []any{
+							map[string]any{
+								"image": "test/healer-final-gate:latest",
+							},
+						},
 					},
 				},
 			},
@@ -289,11 +293,15 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
+				"strategies": []any{
 					map[string]any{
-						"image": "test/healer:latest",
-						"env": map[string]any{
-							"HEAL_TASK": "fix-build",
+						"mods": []any{
+							map[string]any{
+								"image": "test/healer:latest",
+								"env": map[string]any{
+									"HEAL_TASK": "fix-build",
+								},
+							},
 						},
 					},
 				},
@@ -443,9 +451,13 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
+				"strategies": []any{
 					map[string]any{
-						"image": "test/healer:latest",
+						"mods": []any{
+							map[string]any{
+								"image": "test/healer:latest",
+							},
+						},
 					},
 				},
 			},
@@ -879,8 +891,12 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
-				"mods": []any{
-					map[string]any{"image": "healer:latest"},
+				"strategies": []any{
+					map[string]any{
+						"mods": []any{
+							map[string]any{"image": "healer:latest"},
+						},
+					},
 				},
 			},
 		},

@@ -276,7 +276,7 @@ compatibility with universal images.
 
 ### Image specification forms
 
-The `image` field (top-level, in `mods[]`, and in `build_gate_healing.mods[]`) accepts two forms:
+The `image` field (top-level, in `mods[]`, and in `build_gate_healing.strategies[].mods[]`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
