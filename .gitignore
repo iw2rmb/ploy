@@ -73,4 +73,6 @@ local/auth-secret.txt
 local/cli
 
 /ploy
+/ployd
+/ployd-node
 roadmap/

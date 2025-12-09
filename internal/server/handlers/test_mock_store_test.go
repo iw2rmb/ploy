@@ -317,6 +317,24 @@ type mockStore struct {
 	listRunsForRepoParams store.ListRunsForRepoParams
 	listRunsForRepoResult []store.ListRunsForRepoRow
 	listRunsForRepoErr    error
+
+	// Global Env tracking (config_env table — ROADMAP.md line 47)
+	listGlobalEnvCalled bool
+	listGlobalEnvResult []store.ConfigEnv
+	listGlobalEnvErr    error
+
+	getGlobalEnvCalled bool
+	getGlobalEnvParam  string
+	getGlobalEnvResult store.ConfigEnv
+	getGlobalEnvErr    error
+
+	upsertGlobalEnvCalled bool
+	upsertGlobalEnvParams store.UpsertGlobalEnvParams
+	upsertGlobalEnvErr    error
+
+	deleteGlobalEnvCalled bool
+	deleteGlobalEnvParam  string
+	deleteGlobalEnvErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -746,4 +764,29 @@ func (m *mockStore) ListRunsForRepo(ctx context.Context, arg store.ListRunsForRe
 	m.listRunsForRepoCalled = true
 	m.listRunsForRepoParams = arg
 	return m.listRunsForRepoResult, m.listRunsForRepoErr
+}
+
+// Global Env methods (config_env table)
+
+func (m *mockStore) ListGlobalEnv(ctx context.Context) ([]store.ConfigEnv, error) {
+	m.listGlobalEnvCalled = true
+	return m.listGlobalEnvResult, m.listGlobalEnvErr
+}
+
+func (m *mockStore) GetGlobalEnv(ctx context.Context, key string) (store.ConfigEnv, error) {
+	m.getGlobalEnvCalled = true
+	m.getGlobalEnvParam = key
+	return m.getGlobalEnvResult, m.getGlobalEnvErr
+}
+
+func (m *mockStore) UpsertGlobalEnv(ctx context.Context, params store.UpsertGlobalEnvParams) error {
+	m.upsertGlobalEnvCalled = true
+	m.upsertGlobalEnvParams = params
+	return m.upsertGlobalEnvErr
+}
+
+func (m *mockStore) DeleteGlobalEnv(ctx context.Context, key string) error {
+	m.deleteGlobalEnvCalled = true
+	m.deleteGlobalEnvParam = key
+	return m.deleteGlobalEnvErr
 }

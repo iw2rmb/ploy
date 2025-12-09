@@ -13,7 +13,7 @@ import (
 // on arbitrary inputs and responds with either 200 (valid JSON)
 // or 400 (invalid JSON). The handler must not leak secrets in errors.
 func FuzzPutGitLabConfig_NoPanic(f *testing.F) {
-	holder := NewConfigHolder(config.GitLabConfig{})
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 	// Seed with a few valid and invalid payloads.
 	f.Add([]byte(`{"domain":"https://gitlab.com","token":"glpat-seed"}`))
 	f.Add([]byte(`{}`))
