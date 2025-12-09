@@ -110,7 +110,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // 2. Resolve env_from_file references in:
 //   - top-level env (canonical single-step format)
 //   - mods[] (multi-step format)
-//   - build_gate_healing.mods[] (healing steps)
+//   - build_gate_healing.strategies[].mods[] (healing steps)
 //
 // 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
 //
@@ -157,13 +157,23 @@ func buildSpecPayload(
 		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
-	// Resolve env_from_file references in build_gate_healing.mods[] if present
+	// Resolve env_from_file references in build_gate_healing.strategies[].mods[] if present.
 	if healing, ok := base["build_gate_healing"].(map[string]any); ok {
-		if mods, ok := healing["mods"].([]any); ok {
-			for i, m := range mods {
-				if modEntry, ok := m.(map[string]any); ok {
-					if err := resolveEnvFromFileInPlace(modEntry); err != nil {
-						return nil, fmt.Errorf("resolve env from file (build_gate_healing.mods[%d]): %w", i, err)
+		if strategies, ok := healing["strategies"].([]any); ok {
+			for si, s := range strategies {
+				stratMap, ok := s.(map[string]any)
+				if !ok {
+					continue
+				}
+				mods, ok := stratMap["mods"].([]any)
+				if !ok {
+					continue
+				}
+				for mi, m := range mods {
+					if modEntry, ok := m.(map[string]any); ok {
+						if err := resolveEnvFromFileInPlace(modEntry); err != nil {
+							return nil, fmt.Errorf("resolve env from file (build_gate_healing.strategies[%d].mods[%d]): %w", si, mi, err)
+						}
 					}
 				}
 			}

@@ -325,7 +325,7 @@ env:
 		}
 	})
 
-	t.Run("env_from_file in build_gate_healing.mods[]", func(t *testing.T) {
+	t.Run("env_from_file in build_gate_healing.strategies[].mods[]", func(t *testing.T) {
 		healingAuthFile := filepath.Join(tmpDir, "healing-auth.json")
 		healingAuthContent := `{"healing":"token"}`
 		if err := os.WriteFile(healingAuthFile, []byte(healingAuthContent), 0o644); err != nil {
@@ -336,12 +336,14 @@ env:
 		specContent := `
 build_gate_healing:
   retries: 1
-  mods:
-    - image: docker.io/test/healer:latest
-      env:
-        HEALER_KEY: literal
-      env_from_file:
-        HEALER_AUTH: ` + healingAuthFile + `
+  strategies:
+    - name: codex-heal
+      mods:
+        - image: docker.io/test/healer:latest
+          env:
+            HEALER_KEY: literal
+          env_from_file:
+            HEALER_AUTH: ` + healingAuthFile + `
 `
 		if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 			t.Fatalf("write spec file: %v", err)
@@ -357,14 +359,22 @@ build_gate_healing:
 			t.Fatalf("unmarshal payload: %v", err)
 		}
 
-		// Navigate to build_gate_healing.mods[0]
+		// Navigate to build_gate_healing.strategies[0].mods[0]
 		healing, ok := result["build_gate_healing"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected build_gate_healing in result")
 		}
-		mods, ok := healing["mods"].([]any)
+		strategies, ok := healing["strategies"].([]any)
+		if !ok || len(strategies) != 1 {
+			t.Fatalf("expected build_gate_healing.strategies array with 1 element")
+		}
+		strat0, ok := strategies[0].(map[string]any)
+		if !ok {
+			t.Fatalf("expected first strategy to be a map")
+		}
+		mods, ok := strat0["mods"].([]any)
 		if !ok || len(mods) != 1 {
-			t.Fatalf("expected build_gate_healing.mods array with 1 element")
+			t.Fatalf("expected build_gate_healing.strategies[0].mods array with 1 element")
 		}
 		mod0, ok := mods[0].(map[string]any)
 		if !ok {

@@ -101,9 +101,12 @@ import (
 //
 // ## Configuration
 //
-// Healing configuration is specified via build_gate_healing option in req.Options:
+// Healing configuration is specified via build_gate_healing option in req.Options
+// using the canonical multi-strategy schema:
 //   - retries (int): maximum number of healing attempts (default: 1)
-//   - mods ([]map): list of healing mod specs (image, command, env)
+//   - strategies ([]map): list of healing strategies, each with:
+//   - name (string, optional): strategy identifier (e.g., "codex-ai")
+//   - mods ([]map): healing mod specs (image, command, env, retain_container)
 func (r *runController) runGateWithHealing(
 	ctx context.Context,
 	runner step.Runner,

@@ -24,8 +24,10 @@ env:
 retain_container: true
 build_gate_healing:
   retries: 1
-  mods:
-    - image: docker.io/test/healer:latest
+  strategies:
+    - name: codex-heal
+      mods:
+        - image: docker.io/test/healer:latest
 gitlab_domain: gitlab.example.com
 mr_on_success: true
 `
@@ -87,7 +89,7 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
   },
   "build_gate_healing": {
     "retries": 2,
-    "mods": []
+    "strategies": []
   }
 }`
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
@@ -263,8 +265,8 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 }
 
 // TestBuildSpecPayloadContainsBuildGateHealing verifies that complex nested
-// structures (like build_gate_healing with retries, mods array) are correctly
-// parsed from YAML and preserved in the payload.
+// structures (like build_gate_healing with retries and strategies[].mods[]) are
+// correctly parsed from YAML and preserved in the payload.
 func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	// Test that build_gate_healing is preserved when present in spec
 	tmpDir := t.TempDir()
@@ -272,12 +274,14 @@ func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	specContent := `
 build_gate_healing:
   retries: 2
-  mods:
-    - image: docker.io/test/healer:latest
-      command: "heal.sh"
-      env:
-        HEALING_MODE: auto
-      retain_container: false
+  strategies:
+    - name: healer-branch
+      mods:
+        - image: docker.io/test/healer:latest
+          command: "heal.sh"
+          env:
+            HEALING_MODE: auto
+          retain_container: false
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -304,10 +308,21 @@ build_gate_healing:
 		t.Errorf("expected build_gate_healing.retries=2, got %v", healing["retries"])
 	}
 
-	// Verify mods array
-	mods, ok := healing["mods"].([]any)
+	// Verify strategies array
+	strategies, ok := healing["strategies"].([]any)
+	if !ok || len(strategies) != 1 {
+		t.Fatalf("expected build_gate_healing.strategies array with 1 element, got %v", healing["strategies"])
+	}
+
+	// Verify first strategy and its mods array
+	strat0, ok := strategies[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first strategy to be a map, got %T", strategies[0])
+	}
+
+	mods, ok := strat0["mods"].([]any)
 	if !ok || len(mods) != 1 {
-		t.Fatalf("expected build_gate_healing.mods array with 1 element, got %v", healing["mods"])
+		t.Fatalf("expected build_gate_healing.strategies[0].mods array with 1 element, got %v", strat0["mods"])
 	}
 
 	// Verify first mod entry
