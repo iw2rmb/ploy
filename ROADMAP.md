@@ -7,7 +7,7 @@ Documentation: ../auto/ROADMAP.md, roadmap/ksuid.md, internal/nodeagent/claimer.
 Legend: [ ] todo, [x] done.
 
 ## Nodeagent ClaimResponse field rename
-- [ ] Rename `ClaimResponse.ID` to `ClaimResponse.RunID` in nodeagent — Make the run identifier explicit at the type level without changing the JSON schema.
+- [x] Rename `ClaimResponse.ID` to `ClaimResponse.RunID` in nodeagent — Make the run identifier explicit at the type level without changing the JSON schema.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/nodeagent/claimer.go
   - Scope:
