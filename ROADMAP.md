@@ -1,343 +1,176 @@
-# ploy config env global integration
+# Run ID field naming consistency (RunID vs ID on claim responses)
 
-Scope: Introduce a unified `ploy config env` surface and control-plane storage for global environment variables (GitLab domain/PAT, CA cert bundles, Codex auth JSON, OpenAI API keys). Ensure these globals are injected into all relevant jobs (mods, healing, gate workers) in a consistent way and consumed by official images (e.g., mod-codex, ORW, build-gate images).
+Scope: Standardize run identifier field names in nodeagent and claim-related server responses by renaming `ID` to `RunID` (while keeping the JSON wire format as `\"id\"`). This improves type clarity in the codebase, makes it explicit where a value is a run identifier, and aligns with the type system work around KSUID-backed IDs without changing the API contract.
 
-Documentation: /Users/vk/@iw2rmb/auto/ROADMAP.md, ROADMAP.md, cmd/ploy/README.md, docs/envs/README.md, docs/mods-lifecycle.md, docs/api/OpenAPI.yaml, internal/server/config, internal/server/handlers/config_gitlab.go, internal/server/handlers/nodes_claim.go, internal/server/handlers/spec_utils.go, internal/nodeagent/claimer_spec.go, internal/nodeagent/manifest.go, internal/workflow/runtime/step/gate_docker.go, docker/mods/mod-codex/mod-codex.sh, docker/mods/orw-maven/orw-maven.sh, docker/mods/orw-gradle/orw-gradle.sh.
+Documentation: ../auto/ROADMAP.md, roadmap/ksuid.md, internal/nodeagent/claimer.go, internal/nodeagent/claimer_loop.go, internal/nodeagent/agent_claim_test.go, internal/server/handlers/nodes_claim.go, docs/api/components/schemas/controlplane.yaml (NodeClaimResponse), docs/api/OpenAPI.yaml, docs/api/paths/nodes_id_claim.yaml.
 
 Legend: [ ] todo, [x] done.
 
-## Server Storage & Wiring
-- [x] Add `config_env` table and wire into server config load — Persist global env entries (including secrets) in the control-plane database with scope metadata.
+## Nodeagent ClaimResponse field rename
+- [ ] Rename `ClaimResponse.ID` to `ClaimResponse.RunID` in nodeagent — Make the run identifier explicit at the type level without changing the JSON schema.
   - Repository: github.com/iw2rmb/ploy
-  - Component: internal/store (migrations + store API), internal/server/config
+  - Component: internal/nodeagent/claimer.go
   - Scope:
-    - Add a new migration to create table `config_env` with columns: `key TEXT PRIMARY KEY`, `value TEXT NOT NULL`, `scope TEXT NOT NULL`, `secret BOOLEAN NOT NULL DEFAULT true`, `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Use `scope` for selection semantics (e.g., `mods`, `heal`, `gate`, `all`) and `secret` to control redaction at the CLI/HTTP layer.
-    - Extend `internal/store` with a small CRUD interface for global envs, e.g.:
-      ```go
-      type GlobalEnv struct {
-        Key     string
-        Value   string
-        Scope   string
-        Secret  bool
-        Updated time.Time
-      }
-
-      type Store interface {
-        ListGlobalEnv(ctx context.Context) ([]GlobalEnv, error)
-        GetGlobalEnv(ctx context.Context, key string) (GlobalEnv, error)
-        UpsertGlobalEnv(ctx context.Context, env GlobalEnv) error
-        DeleteGlobalEnv(ctx context.Context, key string) error
-      }
-      ```
-    - Keep GitLab YAML config (`cfg.GitLab`) for backward compatibility; global env storage is additive and can later supersede inline GitLab config when desired.
+    - Change the struct definition in `internal/nodeagent/claimer.go` from:
+      - `ID types.RunID \`json:\"id\"\` // Run ID`
+      - to `RunID types.RunID \`json:\"id\"\` // Run ID`.
+    - Ensure any comments above/beside the struct still clearly describe this field as the run ID for the claimed job.
   - Snippets:
-    - Migration table sketch:
-      ```sql
-      CREATE TABLE config_env (
-        key         TEXT PRIMARY KEY,
-        value       TEXT NOT NULL,
-        scope       TEXT NOT NULL,
-        secret      BOOLEAN NOT NULL DEFAULT TRUE,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-      ```
-  - Tests: Add store-level unit tests to verify CRUD semantics against a test database or pgxpool mock — expect round-trip of `GlobalEnv` entries and primary-key enforcement on `key`.
+    - `type ClaimResponse struct {`
+    - `    RunID types.RunID \`json:\"id\"\` // Run ID`
+    - `    JobID types.JobID \`json:\"job_id\"\` // Claimed job ID`
+    - `    // ...`
+    - `}`
+  - Tests:
+    - Run `go test ./internal/nodeagent/...` — All nodeagent tests compile and pass after the rename.
 
-## ConfigHolder & Config Env HTTP API
-- [x] Extend ConfigHolder and register `/v1/config/env` endpoints — Provide in-memory access to global env entries and a typed HTTP surface used by the CLI.
+## Update nodeagent claim handling call sites
+- [ ] Replace uses of `claim.ID` with `claim.RunID` in the claim loop and related helpers — Keep behavior identical while improving readability.
   - Repository: github.com/iw2rmb/ploy
-  - Component: internal/server/handlers, cmd/ployd/server.go
+  - Component: internal/nodeagent/claimer_loop.go
   - Scope:
-    - Extend `internal/server/handlers/config_gitlab.go`’s `ConfigHolder` or introduce a sibling struct to track both GitLab settings and global env map:
-      ```go
-      type GlobalEnvVar struct {
-        Value  string
-        Scope  string
-        Secret bool
-      }
-
-      type ConfigHolder struct {
-        mu        sync.RWMutex
-        gitlab    config.GitLabConfig
-        globalEnv map[string]GlobalEnvVar
-      }
-      ```
-    - Initialize `ConfigHolder` in `cmd/ployd/server.go` with GitLab config (existing) plus a `map[string]GlobalEnvVar` loaded from `store.ListGlobalEnv(ctx)` at startup.
-    - Add methods:
-      ```go
-      func (h *ConfigHolder) GetGlobalEnv() map[string]GlobalEnvVar
-      func (h *ConfigHolder) GetGlobalEnvVar(key string) (GlobalEnvVar, bool)
-      func (h *ConfigHolder) SetGlobalEnvVar(key string, v GlobalEnvVar)
-      func (h *ConfigHolder) DeleteGlobalEnvVar(key string)
-      ```
-    - Implement new handlers under `internal/server/handlers`, e.g. `config_env.go`:
-      - `GET /v1/config/env` → list keys with scope/secret flags, no values for secrets.
-      - `GET /v1/config/env/{key}` → return one entry (value included; rely on mTLS + admin role).
-      - `PUT /v1/config/env/{key}` → upsert value/scope/secret and update `ConfigHolder` + `store.UpsertGlobalEnv`.
-      - `DELETE /v1/config/env/{key}` → delete from store and `ConfigHolder`.
-    - Wire endpoints in `RegisterRoutes` (Config tag) with same auth model as GitLab config.
+    - In the claim loop, update logging and function calls:
+      - `slog.Info(\"claimed job\", \"run_id\", claim.ID, ...)` → `claim.RunID`.
+      - `if err := c.ackRun(ctx, claim.ID.String(), claim.JobID.String());` → pass `claim.RunID.String()`.
+    - In the derived target-ref defaulting logic, replace the `/mod/<run-id>` formatting input:
+      - `targetRef = fmt.Sprintf(\"/mod/%s\", claim.ID)` → `fmt.Sprintf(\"/mod/%s\", claim.RunID)`.
+    - In the `StartRunRequest` construction, assign:
+      - `RunID: claim.RunID` instead of `RunID: claim.ID`.
   - Snippets:
-    - Example response shape:
-      ```json
-      {
-        "key": "CA_CERTS_PEM_BUNDLE",
-        "value": "-----BEGIN CERTIFICATE-----\n...",
-        "scope": "all",
-        "secret": true
-      }
-      ```
-  - Tests: Add `config_env_authz_test.go` to assert only cli-admin can access these endpoints and `config_env_test.go` to verify round-trip between HTTP, `ConfigHolder`, and `store` — expect that PUT then GET returns identical JSON payload (modulo redaction in list view).
+    - `targetRef := strings.TrimSpace(claim.TargetRef)`
+    - `if targetRef == \"\" {`
+    - `    targetRef = fmt.Sprintf(\"/mod/%s\", claim.RunID)`
+    - `}`
+  - Tests:
+    - Run `go test ./internal/nodeagent/...` — Verify `TestClaimLoop_MapsClaimToStartRunRequest` and related tests still pass and that logs/tests reference `RunID` consistently.
 
-## CLI Surface: `ploy config env`
-- [x] Add `ploy config env` subcommands — Provide a single CLI entrypoint for managing all global env vars (GitLab, CA bundles, Codex auth JSON, OpenAI keys).
+## Adjust nodeagent tests constructing ClaimResponse
+- [ ] Update ClaimResponse initializers in nodeagent tests to use `RunID` — Keep test data aligned with the new field name.
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy
+  - Component: internal/nodeagent/agent_claim_test.go, internal/nodeagent/agent_test.go, internal/nodeagent/claimer_loop_test.go
   - Scope:
-    - Extend `handleConfig` in `cmd/ploy/config_command.go`:
-      ```go
-      func handleConfig(args []string, stderr io.Writer) error {
-        // ...
-        switch args[0] {
-        case "gitlab":
-          return handleConfigGitLab(args[1:], stderr)
-        case "env":
-          return handleConfigEnv(args[1:], stderr)
-        default:
-          // ...
-        }
-      }
-      ```
-    - Implement `handleConfigEnv(args []string, stderr io.Writer) error` and usage helpers in a new file `cmd/ploy/config_env_command.go` with subcommands:
-      - `ploy config env list`
-      - `ploy config env show --key <NAME> [--raw]`
-      - `ploy config env set --key <NAME> (--value <STRING> | --file <PATH>) [--scope mods|heal|gate|all] [--secret=true|false]`
-      - `ploy config env unset --key <NAME>`
-    - Use the same HTTP resolution helper as GitLab config (`resolveControlPlaneHTTP`) and the new `/v1/config/env*` routes.
-    - For secret values, default `--secret=true` and redact output in `list`/`show` unless `--raw` is explicitly passed.
+    - Replace struct literals that set `ID: types.RunID(\"...\")` with `RunID: types.RunID(\"...\")`.
+    - Search for any direct references to `claim.ID` or `ClaimResponse{ID:` in tests and update them to `claim.RunID` / `ClaimResponse{RunID:`.
+    - Keep JSON expectations unchanged (the serialized field name remains `\"id\"`), only adjust Go-side field names.
   - Snippets:
-    - Flag parsing sketch:
-      ```go
-      fs := flag.NewFlagSet("config env set", flag.ContinueOnError)
-      var key, value, file, scope string
-      var secret bool
-      fs.StringVar(&key, "key", "", "Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)")
-      fs.StringVar(&value, "value", "", "Inline value (mutually exclusive with --file)")
-      fs.StringVar(&file, "file", "", "Path to file containing value")
-      fs.StringVar(&scope, "scope", "all", "Scope: mods, heal, gate, all")
-      fs.BoolVar(&secret, "secret", true, "Mark value as secret (redacted by default)")
-      ```
-  - Tests: Add `cmd/ploy/config_env_command_flags_test.go` to cover flag/usage errors and `cmd/ploy/config_env_command_files_test.go` to exercise list/show/set/unset flows against a fake HTTP server — expect correct HTTP methods/paths and redaction behavior for secrets.
+    - `claim := ClaimResponse{`
+    - `    RunID: types.RunID(\"2NxO0FEXAMPLE4Rn\"),`
+    - `    JobID: types.JobID(\"2NxO0FEXAMPLE4Jb\"),`
+    - `    // ...`
+    - `}`
+  - Tests:
+    - Run `go test ./internal/nodeagent/...` — Confirm no tests rely on the old `ID` identifier and that JSON round-trips still work as before.
 
-## Spec Merge on Job Claim
-- [x] Merge global env into job spec env on claim — Ensure every job spec carries the right global env vars before it reaches the node agent.
+## Server claim response struct symmetry (optional)
+- [ ] Rename the inline `ID` field to `RunID` in the server claim response struct — Align server-side naming with nodeagent while preserving the JSON schema.
   - Repository: github.com/iw2rmb/ploy
-  - Component: internal/server/handlers
+  - Component: internal/server/handlers/nodes_claim.go
   - Scope:
-    - Extend `internal/server/handlers/spec_utils.go` with:
-      ```go
-      func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType string) json.RawMessage {
-        if len(env) == 0 {
-          return spec
-        }
-        var m map[string]any
-        if len(spec) > 0 && json.Valid(spec) {
-          _ = json.Unmarshal(spec, &m)
-        }
-        if m == nil {
-          m = map[string]any{}
-        }
-        em, _ := m["env"].(map[string]any)
-        if em == nil {
-          em = map[string]any{}
-        }
-        for k, v := range env {
-          if !scopeMatches(jobType, v.Scope) {
-            continue
-          }
-          if _, exists := em[k]; exists {
-            continue // per-run env wins over global
-          }
-          em[k] = v.Value
-        }
-        m["env"] = em
-        b, _ := json.Marshal(m)
-        return json.RawMessage(b)
-      }
-      ```
-    - In `buildAndSendJobClaimResponse` (`internal/server/handlers/nodes_claim.go`), after `mergeGitLabConfigIntoSpec`, call:
-      ```go
-      mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
-      ```
-      so that claimed jobs always include `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `OPENAI_API_KEY`, etc. when configured.
-    - Implement `scopeMatches(jobType, scope string) bool` to map scopes like `mods`, `heal`, `gate`, `all` to job types (`mod`, `heal`, `pre_gate`, `re_gate`, `post_gate`).
+    - In `buildAndSendJobClaimResponse`, change the response struct field:
+      - From `ID string \`json:\"id\"\` // Run ID`
+      - To `RunID string \`json:\"id\"\` // Run ID`.
+    - Adjust struct initialization to set `RunID: run.ID` instead of `ID: run.ID`.
+    - Ensure logging or other call sites that deserialize the claim use the existing `NodeClaimResponse` schema; no changes to JSON field names are required.
   - Snippets:
-    - Minimal scope matcher:
-      ```go
-      func scopeMatches(jobType, scope string) bool {
-        switch scope {
-        case "all":
-          return true
-        case "mods":
-          return jobType == "mod" || jobType == "post_gate"
-        case "heal":
-          return jobType == "heal" || jobType == "re_gate"
-        case "gate":
-          return jobType == "pre_gate" || jobType == "re_gate" || jobType == "post_gate"
-        default:
-          return false
-        }
-      }
-      ```
-  - Tests: Add `internal/server/handlers/spec_utils_global_env_test.go` to cover merge semantics (per-run env override, scope filtering, empty spec) and extend `server_runs_claim_test.go` to assert that a claimed job contains merged `env["CA_CERTS_PEM_BUNDLE"]` / `env["CODEX_AUTH_JSON"]` when the holder is pre-populated.
+    - `resp := struct {`
+    - `    RunID string \`json:\"id\"\` // Run ID`
+    - `    JobID string \`json:\"job_id\"\``
+    - `    // ...`
+    - `}{`
+    - `    RunID: run.ID,`
+    - `    JobID: job.ID,`
+    - `    // ...`
+    - `}`
+  - Tests:
+    - Run `go test ./internal/server/handlers -run Claim` — Verify claim handler tests still pass and response JSON remains shaped as `{\"id\": ..., \"job_id\": ...}`.
 
-## Node Agent Propagation
-- [x] Keep env propagation from spec → StartRunRequest → manifests generic — Confirm that global env vars injected into specs arrive intact in containers and gate jobs.
+## Docs and schema validation check
+- [ ] Re-verify that docs and OpenAPI already describe `id` as Run ID — Confirm no further changes are needed after internal renames.
   - Repository: github.com/iw2rmb/ploy
-  - Component: internal/nodeagent
+  - Component: docs/api/components/schemas/controlplane.yaml, docs/api/OpenAPI.yaml, docs/api/paths/nodes_id_claim.yaml, docs/build-gate/README.md, docs/mods-lifecycle.md, cmd/ploy/README.md
   - Scope:
-    - Verify `parseSpec` in `internal/nodeagent/claimer_spec.go` already populates `env` from `m["env"].(map[string]any)`; no new keys are needed for global env.
-    - Confirm `StartRunRequest` (`internal/nodeagent/handlers.go`) keeps `Env map[string]string` and callers do not filter keys.
-    - Ensure `buildManifestFromRequestWithStack` (`internal/nodeagent/manifest.go`) copies `req.Env` into `manifest.Env` exactly once per step:
-      ```go
-      env := make(map[string]string, len(req.Env))
-      for k, v := range req.Env {
-        env[k] = v
-      }
-      // ... merge step-specific env where applicable
-      ```
-    - For gate jobs, ensure `buildGateManifestFromRequest` preserves `Env` from `StartRunRequest` and that gate executors pass `Gate.Env` through unchanged.
+    - Confirm `NodeClaimResponse.id` is documented as “Run ID (parent run of the claimed job, KSUID string)” and does not need renaming, since the JSON field name stays `id`.
+    - Scan docs for references to `claim.id` vs `claim.run_id` in narrative examples; update prose to use `run_id` terminology where appropriate while keeping JSON examples stable.
+    - Ensure there is no mismatch between the Go field name (`RunID`) and the documented JSON key (`id`) in examples and path descriptions.
   - Snippets:
-    - Example `Env` copy:
-      ```go
-      env := make(map[string]string, len(req.Env))
-      for k, v := range req.Env {
-        env[k] = v
-      }
-      manifest.Env = env
-      ```
-  - Tests: Extend `internal/nodeagent/claimer_gitlab_config_test.go` or add `claimer_global_env_test.go` to assert that when spec includes `env: { "CODEX_AUTH_JSON": "..." }`, the resulting `StartRunRequest.Env` passes through to manifests and that gate manifests also expose the same key when built via `buildGateManifestFromRequest`.
+    - `NodeClaimResponse:` block in `docs/api/components/schemas/controlplane.yaml` showing `id` as the run identifier.
+  - Tests:
+    - Run `go test ./docs/api/...` (including `docs/api/verify_openapi_test.go`) — Expect no schema changes, only verification that documentation remains consistent with the existing wire format.
 
-## Container Runtime & Gate Integration
-- [x] Ensure container specs pass env through to Docker — Confirm that the Docker runtime receives all env keys from manifests, ready for image-level startup hooks to consume.
+## Replace primitives with domaintypes IDs in control-plane and CLI
+- [ ] Migrate control-plane and CLI structs from `string` IDs to `domaintypes` newtypes — Use `RunID`, `JobID`, `NodeID`, `ClusterID`, and `RunRepoID` instead of raw `string` where values are stable identifiers.
   - Repository: github.com/iw2rmb/ploy
-  - Component: internal/workflow/runtime/step
+  - Components: `internal/server`, `internal/cli`, `internal/deploy`, `internal/nodeagent`, `internal/worker`, `cmd/ploy`
   - Scope:
-    - In `internal/workflow/runtime/step/container_spec.go`, verify `ContainerSpec.Env` is populated from the manifest without filtering:
-      ```go
-      return ContainerSpec{
-        Image:      manifest.Image,
-        Command:    append([]string{}, manifest.Command...),
-        WorkingDir: wd,
-        Env:        manifest.Env,
-        // ...
-      }, nil
-      ```
-    - In `gate_docker.go`, change the executor to use `spec.Env` when creating the gate container:
-      ```go
-      env := map[string]string{}
-      for k, v := range spec.Env {
-        env[k] = v
-      }
-      specC := ContainerSpec{
-        Image:            image,
-        Command:          cmd,
-        WorkingDir:       "/workspace",
-        Mounts:           mounts,
-        Env:              env,
-        LimitMemoryBytes: limitMem,
-        // ...
-      }
-      ```
-    - Confirm Docker runtime (`container_docker.go`) already converts `ContainerSpec.Env` into the moby API’s `Env: []string{"KEY=value"}` list.
-  - Snippets:
-    - Env wiring inside Docker runtime:
-      ```go
-      envList := make([]string, 0, len(spec.Env))
-      for k, v := range spec.Env {
-        envList = append(envList, fmt.Sprintf("%s=%s", k, v))
-      }
-      config.Env = envList
-      ```
-  - Tests: Extend `internal/workflow/runtime/step/container_docker_test.go` or add a focused test to assert that when `ContainerSpec.Env["CA_CERTS_PEM_BUNDLE"]` is set, the mock docker client sees an entry `CA_CERTS_PEM_BUNDLE=...` in `ContainerCreateOptions.Config.Env`.
+    - For run identifiers:
+      - Replace `RunID string` fields in control-plane handlers and CLI types with `RunID domaintypes.RunID` where the field represents a Mods run identifier and the JSON tag is already `json:"run_id"` or equivalent.
+      - Focus first on handwritten structs (handlers and CLI request/response types), not sqlc-generated store models.
+      - Representative hotspots:
+        - `internal/server/handlers/diffs.go` (`diffGetResponse.RunID`).
+        - `internal/server/handlers/artifacts_download.go` response structs using `run_id`.
+        - `internal/server/handlers/nodes_logs.go`, `internal/server/handlers/nodes_events.go` structs with `RunID string`.
+        - `internal/cli/mods/{diffs.go,artifacts.go,resume.go,cancel.go,inspect.go,logs.go,events.go}` where request/response types expose `run_id`.
+        - `cmd/ploy/mod_run_exec.go`, `cmd/ploy/mod_run_repo.go`, `cmd/ploy/mod_run_batch_test.go` helper structs that wrap run identifiers in `string`.
+      - Keep wire format unchanged by preserving existing JSON tags:
+        - Example: `RunID domaintypes.RunID \`json:"run_id"\`` in place of `RunID string \`json:"run_id"\``.
+    - For job identifiers:
+      - Replace `JobID string` fields in control-plane and CLI types with `JobID domaintypes.JobID` where the field identifies a job and the JSON tag is `json:"job_id"`.
+      - Focus areas:
+        - `internal/server/handlers/diffs.go` (`diffItem.JobID`).
+        - `internal/server/events/service.go` payload structs carrying job IDs.
+        - `internal/server/handlers/nodes_claim.go` claim response and request shapes with `job_id`.
+        - `internal/cli/runs/{inspect.go,follow.go}`, `internal/cli/mods/diffs.go`, `internal/cli/logs/printer.go`, and `internal/cli/transfer/client.go` where IDs are treated as opaque job identifiers.
+      - Preserve JSON tags and semantics; only change the Go field type.
+    - For cluster and node identifiers:
+      - Replace `ClusterID string` with `ClusterID domaintypes.ClusterID` for fields representing cluster descriptors, keeping JSON/YAML tags stable:
+        - `internal/deploy/{detect.go,workstation_config.go,ca_rotation_types.go,bootstrap_types.go}`.
+        - `internal/nodeagent/config.go` (`ClusterID string \`yaml:"cluster_id"\`` → `domaintypes.ClusterID`).
+        - `cmd/ploy/node_command.go` and `internal/server/config/types.go` where `cluster_id` identifies a cluster.
+      - Replace `NodeID string` with `NodeID domaintypes.NodeID` in:
+        - `internal/nodeagent/config.go`, `internal/nodeagent/heartbeat.go`, and `internal/server/handlers/bootstrap.go`.
+        - `internal/worker/lifecycle/{collector.go,types.go}`, `internal/server/events/service.go`, and `internal/stream/hub.go`.
+        - CLI types that carry node IDs, such as `internal/cli/logs/printer.go`, `internal/cli/transfer/client.go`, and `cmd/ploy/node_command.go`.
+      - Maintain JSON/YAML tags (e.g., `json:"node_id"`, `yaml:"node_id"`); only update types.
+    - For batched run repositories:
+      - Introduce `domaintypes.RunRepoID` in handler- and CLI-level code that references per-repo IDs in batched runs while keeping store/sqlc models as `string`:
+        - `internal/server/handlers/runs_batch_types.go` and `internal/server/handlers/runs_batch_http.go` when dealing with repo IDs returned from `store.RunRepo`.
+        - CLI side structs for batch status where repo IDs are currently plain `string`.
+      - Convert between `RunRepoID` and `string` at boundaries:
+        - `id domaintypes.RunRepoID` ↔ `string(id)` when calling store methods.
+  - Tests:
+    - For each package touched, run focused tests before and after type changes:
+      - `go test ./internal/server/handlers -run '(Diffs|Artifacts|Nodes|RunsBatch)'`
+      - `go test ./internal/server/events ./internal/stream`
+      - `go test ./internal/cli/... ./cmd/ploy`
+      - `go test ./internal/deploy/... ./internal/nodeagent/... ./internal/worker/...`
+    - Confirm that there are no JSON schema or OpenAPI changes (wire types remain strings) by running `go test ./docs/api`.
 
-## Image Startup Hooks (Codex, ORW, Build Gate)
-- [x] Implement startup use of global env in official images — Make sure Codex and build-gate images actually consume `CODEX_AUTH_JSON` and `CA_CERTS_PEM_BUNDLE` injected via the global config.
+## Remove TicketID alias and migrate remaining call sites to RunID
+- [ ] Eliminate `TicketID` alias from `internal/domain/types` and replace residual Ticket-based terminology with `RunID` usage — finish the migration so `RunID` is the only domain type for Mods run identifiers.
   - Repository: github.com/iw2rmb/ploy
-  - Component: docker/mods/*, internal/workflow/runtime/step/gate_docker.go
+  - Component: `internal/domain/types`, `internal/cli/mods`, `internal/server`, docs
   - Scope:
-    - Codex:
-      - In `docker/mods/mod-codex/mod-codex.sh`, treat global `CODEX_AUTH_JSON` exactly as today (the script already writes it into `/root/.codex/auth.json` when set). No new behavior is required beyond ensuring the env is present via global config.
-      - Optionally, add a short comment near the auth section to note that `CODEX_AUTH_JSON` may come from `ploy config env`.
-    - CA bundles for build-gate:
-      - In `gate_docker.go`, prepend a CA-install preamble to the Maven/Gradle/Java scripts so that `CA_CERTS_PEM_BUNDLE` is honored inside gate containers:
-        ```bash
-        if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
-          pem_file="$(mktemp)"
-          printf '%s\n' "${CA_CERTS_PEM_BUNDLE}" > "${pem_file}"
-          pem_dir="$(mktemp -d)"
-          awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="${pem_dir}" "${pem_file}"
-          if command -v update-ca-certificates >/dev/null 2>&1; then
-            sys_ca_dir="/usr/local/share/ca-certificates/ploy"
-            mkdir -p "$sys_ca_dir"
-            cp "${pem_dir}"/*.crt "$sys_ca_dir"/ || true
-            update-ca-certificates >/dev/null 2>&1 || true
-          fi
-          # Optionally import into Java cacerts with keytool when available
-        fi
-        ```
-      - Embed this into the shell commands built by `chooseMaven`, `chooseGradle`, and `chooseJava` before invoking `mvn`, `gradle`, or `javac`.
-    - ORW images:
-      - `docker/mods/orw-maven/orw-maven.sh` and `docker/mods/orw-gradle/orw-gradle.sh` already support `CA_CERTS_PEM_BUNDLE`; verify behavior and keep it consistent with the gate preamble.
-  - Snippets:
-    - Example Go-embedded script (simplified):
-      ```go
-      script := `set -e
-if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
-  # ... install bundle ...
-fi
-mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install
-`
-      cmd = []string{"/bin/sh", "-lc", script}
-      ```
-  - Tests: Add integration-style tests for `gate_docker` that set `spec.Env["CA_CERTS_PEM_BUNDLE"]` and verify via logs or a dummy `update-ca-certificates`/`keytool` stub that the preamble runs; for Codex and ORW images, rely on existing smoke tests plus a small self-test that asserts no error when `CA_CERTS_PEM_BUNDLE` / `CODEX_AUTH_JSON` are present.
-
-## Documentation & OpenAPI
-- [x] Document global config env and align OpenAPI — Make the new `config env` surface and global env semantics discoverable and consistent across docs.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: docs, docs/api
-  - Scope:
-    - Update `cmd/ploy/README.md`:
-      - Add `config env` to the CLI command list with examples:
-        ```bash
-        ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
-        ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
-        ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
-        ```
-    - Extend `docs/envs/README.md`:
-      - Introduce a “Global Env Configuration” section describing how `config env` maps into job `env` and which keys are consumed by official images:
-        - `CA_CERTS_PEM_BUNDLE` → ORW mods, build-gate, custom mods.
-        - `CODEX_AUTH_JSON` → `mod-codex`.
-        - `OPENAI_API_KEY` → any future OpenAI-integrated mods.
-    - Update `docs/mods-lifecycle.md` to mention that server-injected env now includes these global keys for mods/healing/gate phases.
-    - Extend `docs/api/OpenAPI.yaml`:
-      - Add `/v1/config/env` and `/v1/config/env/{key}` under the Config tag, referencing new path docs (e.g., `docs/api/paths/config_env.yaml`).
-      - Define schemas for `GlobalEnvVar` and list responses in `docs/api/components/schemas/config.yaml` or an equivalent component file.
-  - Snippets:
-    - Example OpenAPI path stub:
-      ```yaml
-      /v1/config/env:
-        get:
-          tags: [Config]
-          summary: List global environment variables
-          responses:
-            '200':
-              description: Global env list
-              content:
-                application/json:
-                  schema:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/GlobalEnvVar'
-      ```
-  - Tests: Run existing OpenAPI validation tests (if present) and `make test` to ensure documentation references and schemas remain in sync with the code.
-
+    - In `internal/domain/types/ids.go`:
+      - Remove `type TicketID = RunID` and all Ticket-specific comments.
+      - Update any references in comments to state that `RunID` is the canonical run identifier, with no alias.
+    - In `internal/domain/types/ids_test.go` and `internal/domain/types/adapters_test.go`:
+      - Delete the `ticket_alias_compatibility` subtest and any tests that mention `TicketID` explicitly.
+      - Ensure all remaining tests refer only to `RunID` for run identifier behavior.
+    - In CLI Mods helpers:
+      - Replace internal structs that still speak about `TicketID` with `RunID`:
+        - `internal/cli/mods/submit.go`: anonymous responses that expose `TicketID string \`json:"run_id"\`` should be renamed to `RunID string \`json:"run_id"\``; mapping to `modsapi.RunSummary` should use `domaintypes.RunID(resp.RunID)`.
+        - `internal/cli/mods/batch.go`: change helper response fields and uses of `srvResp.TicketID` to `srvResp.RunID`.
+        - `internal/cli/mods/events.go`: remove `TicketID` field aliases and operate on `RunID` naming only.
+      - Keep JSON `run_id` field names unchanged for all wire types.
+    - In control-plane tests and handlers:
+      - Search for `TicketID` in `internal/server`:
+        - Update any comments like “formerly TicketID” to historical notes that can be removed once alias is gone, or drop them if no longer needed.
+        - Ensure events and completion handlers refer only to `RunID` in comments and variables.
+    - Documentation cleanup:
+      - In `roadmap/ticket-id.md`, mark the alias removal step as complete or note that the alias no longer exists once this work lands.
+      - Scan `docs/mods-lifecycle.md`, `docs/api/OpenAPI.yaml`, and `docs/api/components/schemas/controlplane.yaml` for remaining “TicketID” references and replace them with “RunID”/“run id” terminology where they describe type names (not wire fields).
+  - Tests:
+    - `go test ./internal/domain/types`
+    - `go test ./internal/cli/mods/... ./cmd/ploy`
+    - `go test ./internal/server/...`
+    - `go test ./docs/api`
