@@ -57,7 +57,7 @@ func TestModRunBatchRouting(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
-			err := execute(tc.args, &buf)
+			err := executeCmd(tc.args, &buf)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -155,7 +155,7 @@ func TestModRunBatchListCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "list", "--limit", "10", "--offset", "5"}, &buf)
+	err := executeCmd([]string{"mod", "run", "list", "--limit", "10", "--offset", "5"}, &buf)
 	if err != nil {
 		t.Fatalf("mod run list error: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestModRunBatchStatusCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "status", "batch-123"}, &buf)
+	err := executeCmd([]string{"mod", "run", "status", "batch-123"}, &buf)
 	if err != nil {
 		t.Fatalf("mod run status error: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestModRunBatchStopCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "stop", "batch-456"}, &buf)
+	err := executeCmd([]string{"mod", "run", "stop", "batch-456"}, &buf)
 	if err != nil {
 		t.Fatalf("mod run stop error: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestModRunBatchStartCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "start", "batch-789"}, &buf)
+	err := executeCmd([]string{"mod", "run", "start", "batch-789"}, &buf)
 	if err != nil {
 		t.Fatalf("mod run start error: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestModRunBatchListEmptyResult(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "list"}, &buf)
+	err := executeCmd([]string{"mod", "run", "list"}, &buf)
 	if err != nil {
 		t.Fatalf("mod run list error: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestModRunBatchListInvalidLimit(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
-			err := execute(tc.args, &buf)
+			err := executeCmd(tc.args, &buf)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -457,7 +457,7 @@ func TestModRunBatchStatusNotFound(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := execute([]string{"mod", "run", "status", "nonexistent"}, &buf)
+	err := executeCmd([]string{"mod", "run", "status", "nonexistent"}, &buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}

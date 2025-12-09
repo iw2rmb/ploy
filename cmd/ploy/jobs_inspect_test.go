@@ -21,12 +21,12 @@ func TestJobsInspectRequiresArgsAndPrintsSummary(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	// Missing args
-	if err := execute([]string{"runs", "inspect"}, &bytes.Buffer{}); err == nil {
+	if err := executeCmd([]string{"runs", "inspect"}, &bytes.Buffer{}); err == nil {
 		t.Fatal("expected error when args missing")
 	}
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"runs", "inspect", "job-55"}, buf)
+	err := executeCmd([]string{"runs", "inspect", "job-55"}, buf)
 	if err != nil {
 		t.Fatalf("runs inspect error: %v", err)
 	}

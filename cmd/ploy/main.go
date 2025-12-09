@@ -55,12 +55,3 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
 }
-
-// execute provides backward compatibility for existing tests.
-// It wraps the cobra root command execution with the old function signature.
-// This allows existing tests to continue working without modification.
-func execute(args []string, stderr io.Writer) error {
-	rootCmd := newRootCmd(stderr)
-	rootCmd.SetArgs(args)
-	return rootCmd.Execute()
-}

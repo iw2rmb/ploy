@@ -25,7 +25,7 @@ func TestModResumeCallsControlPlane(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "run-9"}, buf)
+	err := executeCmd([]string{"mod", "resume", "run-9"}, buf)
 	if err != nil {
 		t.Fatalf("mod resume error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestModResumeIdempotent(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "running-run"}, buf)
+	err := executeCmd([]string{"mod", "resume", "running-run"}, buf)
 	if err != nil {
 		t.Fatalf("mod resume should succeed on 200 OK: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestModResumeNotFound(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "nonexistent"}, buf)
+	err := executeCmd([]string{"mod", "resume", "nonexistent"}, buf)
 	if err == nil {
 		t.Fatal("expected error for nonexistent run")
 	}
@@ -96,7 +96,7 @@ func TestModResumeConflict(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "succeeded-run"}, buf)
+	err := executeCmd([]string{"mod", "resume", "succeeded-run"}, buf)
 	if err == nil {
 		t.Fatal("expected error for non-resumable run")
 	}
@@ -122,7 +122,7 @@ func TestModResumeBadRequest(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
 	// Use a clearly invalid ID format for testing error handling.
-	err := execute([]string{"mod", "resume", "bad-id"}, buf)
+	err := executeCmd([]string{"mod", "resume", "bad-id"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid run id")
 	}
@@ -145,7 +145,7 @@ func TestModResumeServerError(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume", "run-err"}, buf)
+	err := executeCmd([]string{"mod", "resume", "run-err"}, buf)
 	if err == nil {
 		t.Fatal("expected error for server error")
 	}
@@ -157,7 +157,7 @@ func TestModResumeServerError(t *testing.T) {
 // TestModResumeMissingRunID verifies the CLI validates that a run id argument is required.
 func TestModResumeMissingRunID(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "resume"}, buf)
+	err := executeCmd([]string{"mod", "resume"}, buf)
 	if err == nil {
 		t.Fatal("expected error when run id is missing")
 	}

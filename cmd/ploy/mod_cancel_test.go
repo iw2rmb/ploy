@@ -23,7 +23,7 @@ func TestModCancelCallsControlPlane(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "cancel", "--run", "run-7", "--reason", "cleanup"}, buf)
+	err := executeCmd([]string{"mod", "cancel", "--run", "run-7", "--reason", "cleanup"}, buf)
 	if err != nil {
 		t.Fatalf("mod cancel error: %v", err)
 	}

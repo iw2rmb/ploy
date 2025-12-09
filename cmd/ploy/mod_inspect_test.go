@@ -29,7 +29,7 @@ func TestModInspectPrintsSummary(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", runID}, buf)
+	err := executeCmd([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestModInspectShowsMRURL(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", runID}, buf)
+	err := executeCmd([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "inspect", runID}, buf)
+	err := executeCmd([]string{"mod", "inspect", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod inspect error: %v", err)
 	}

@@ -2,11 +2,28 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// executeCmd is a test helper that creates a root cobra command, sets the provided
+// arguments, and executes it. This provides the canonical CLI entrypoint for tests,
+// replacing the legacy execute() function from main.go.
+//
+// Usage:
+//
+//	buf := &bytes.Buffer{}
+//	err := executeCmd([]string{"mod", "run", "status", "batch-123"}, buf)
+//
+// The stderr parameter receives all CLI output (both success and error messages).
+func executeCmd(args []string, stderr io.Writer) error {
+	rootCmd := newRootCmd(stderr)
+	rootCmd.SetArgs(args)
+	return rootCmd.Execute()
+}
 
 // TestExecuteHelpMatchesGolden verifies that "ploy help" produces the expected golden output.
 // Cobra routes "help" through the custom help command we defined in root.go.

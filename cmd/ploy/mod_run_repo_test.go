@@ -76,7 +76,7 @@ func TestModRunRepoRouting(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			buf := &bytes.Buffer{}
-			err := execute(tc.args, buf)
+			err := executeCmd(tc.args, buf)
 			if err == nil {
 				t.Fatalf("expected error, got nil")
 			}
@@ -121,7 +121,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-name argument for flag parsing.
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "add",
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
@@ -177,7 +177,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-name argument for flag parsing.
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "remove",
 		"--repo-id", "a1b2c3d4",
 		"2NxO0FEXAMPLE4Rn",
@@ -224,7 +224,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-name argument for flag parsing.
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"--target-ref", "feature-branch-v2",
@@ -288,7 +288,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "run", "repo", "status", "2NxO0FEXAMPLE4Rn"}, buf)
+	err := executeCmd([]string{"mod", "run", "repo", "status", "2NxO0FEXAMPLE4Rn"}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo status error: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestModRunRepoStatusEmptyBatch(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "run", "repo", "status", "empty-batch"}, buf)
+	err := executeCmd([]string{"mod", "run", "repo", "status", "empty-batch"}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo status error: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-name argument for flag parsing.
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "add",
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
@@ -378,7 +378,7 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "remove",
 		"--repo-id", "a1b2c3d4",
 		"2NxO0FEXAMPLE4Rn",
@@ -407,7 +407,7 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"2NxO0FEXAMPLE4Rn",
@@ -435,7 +435,7 @@ func TestModRunRepoStatusServerError(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "run", "repo", "status", "unknown-batch"}, buf)
+	err := executeCmd([]string{"mod", "run", "repo", "status", "unknown-batch"}, buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
@@ -474,7 +474,7 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
@@ -520,7 +520,7 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{
+	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
