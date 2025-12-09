@@ -29,13 +29,12 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
 			var req modsapi.RunSubmitRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
-			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateRunning,
-				},
-			})
+			// Server returns 201 Created with canonical submit response.
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(struct {
+				RunID  string `json:"run_id"`
+				Status string `json:"status"`
+			}{RunID: runID, Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			// SSE stream: run running -> run succeeded
@@ -67,14 +66,13 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			fl.Flush()
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", runID):
+			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateSucceeded,
-					Stages: map[string]modsapi.StageStatus{
-						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
-					},
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateSucceeded,
+				Stages: map[string]modsapi.StageStatus{
+					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
 				},
 			})
 
@@ -154,14 +152,12 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			// Accept run submission.
-			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateRunning,
-				},
-			})
+			// Server returns 201 Created with canonical submit response.
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(struct {
+				RunID  string `json:"run_id"`
+				Status string `json:"status"`
+			}{RunID: runID, Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			// SSE stream with run, stage, and log events.
@@ -263,13 +259,12 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateRunning,
-				},
-			})
+			// Server returns 201 Created with canonical submit response.
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(struct {
+				RunID  string `json:"run_id"`
+				Status string `json:"status"`
+			}{RunID: runID, Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
 			w.Header().Set("Content-Type", "text/event-stream")

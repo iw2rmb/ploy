@@ -149,11 +149,11 @@ func TestInspectCommand_Run(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Set up mock server returning the test run.
+			// Set up mock server returning the test run (RunSummary directly, no wrapper).
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := modsapi.RunStatusResponse{Ticket: tc.run}
 				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(resp)
+				// Return RunSummary directly — the canonical response shape.
+				_ = json.NewEncoder(w).Encode(tc.run)
 			}))
 			t.Cleanup(srv.Close)
 
@@ -293,9 +293,9 @@ func TestInspectCommand_JobGraphSorting(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := modsapi.RunStatusResponse{Ticket: run}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		// Return RunSummary directly — the canonical response shape.
+		_ = json.NewEncoder(w).Encode(run)
 	}))
 	t.Cleanup(srv.Close)
 

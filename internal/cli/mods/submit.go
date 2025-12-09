@@ -24,6 +24,7 @@ type SubmitCommand struct {
 }
 
 // Run executes the submission against the control plane endpoint.
+// POST /v1/mods returns 201 with a canonical submit response (run_id, status, repo_url, etc.).
 func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if c.Client == nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: http client required")
@@ -32,12 +33,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: base url required")
 	}
 	// Control-plane submission endpoint: POST /v1/mods
-	// Keep request shape compatible with existing server/tests (modsapi.RunSubmitRequest).
-	// The server may introduce a simplified 201 flow, but we continue to send the
-	// canonical request for backward compatibility and map 201 responses below.
 	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
 
-	// Marshal the canonical submit request as-is.
+	// Marshal the canonical submit request.
 	payload, err := json.Marshal(c.Request)
 	if err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: marshal request: %w", err)
@@ -54,10 +52,10 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	switch resp.StatusCode {
-	case http.StatusCreated: // 201 — server simplified summary
+	// Server returns 201 Created with the canonical submit response.
+	if resp.StatusCode == http.StatusCreated {
 		var srvResp struct {
-			RunID     string `json:"run_id"` // Run ID returned from server
+			RunID     string `json:"run_id"`
 			Status    string `json:"status"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
@@ -66,7 +64,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
-		// Map to modsapi summary type.
+		// Map to modsapi.RunSummary.
 		return modsapi.RunSummary{
 			RunID:      domaintypes.RunID(srvResp.RunID),
 			State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
@@ -77,79 +75,16 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 			},
 			Stages: make(map[string]modsapi.StageStatus),
 		}, nil
-	case http.StatusAccepted: // 202 — legacy/alternate response shape still supported
-		var submitResp modsapi.RunSubmitResponse
-		if err := json.NewDecoder(resp.Body).Decode(&submitResp); err != nil {
-			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
-		}
-		return submitResp.Ticket, nil
-	default:
-		// Fallback: some servers expect a simplified payload (repo_url/base_ref/target_ref).
-		// If the first attempt failed with a client error OR when a Spec is present,
-		// try the simplified shape once including Spec when provided.
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 || len(c.Spec) > 0 {
-			// Drain body to allow connection reuse.
-			_ = json.NewDecoder(resp.Body).Decode(&struct{}{})
-
-			// Build simplified payload from the canonical request fields if available.
-			repoURL := strings.TrimSpace(c.Request.Repository)
-			baseRef := strings.TrimSpace(c.Request.Metadata["repo_base_ref"])
-			targetRef := strings.TrimSpace(c.Request.Metadata["repo_target_ref"])
-			if repoURL != "" && baseRef != "" && targetRef != "" {
-				var specPtr *json.RawMessage
-				if len(c.Spec) > 0 {
-					jr := json.RawMessage(append([]byte(nil), c.Spec...))
-					specPtr = &jr
-				}
-				simple := struct {
-					RepoURL   string           `json:"repo_url"`
-					BaseRef   string           `json:"base_ref"`
-					TargetRef string           `json:"target_ref"`
-					Spec      *json.RawMessage `json:"spec,omitempty"`
-				}{RepoURL: repoURL, BaseRef: baseRef, TargetRef: targetRef, Spec: specPtr}
-				payload2, err2 := json.Marshal(simple)
-				if err2 == nil {
-					req2, err2 := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload2))
-					if err2 == nil {
-						req2.Header.Set("Content-Type", "application/json")
-						if resp2, err2 := c.Client.Do(req2); err2 == nil {
-							defer func() { _ = resp2.Body.Close() }()
-							if resp2.StatusCode == http.StatusCreated {
-								var srvResp struct {
-									RunID     string `json:"run_id"` // Run ID returned from server
-									Status    string `json:"status"`
-									RepoURL   string `json:"repo_url"`
-									BaseRef   string `json:"base_ref"`
-									TargetRef string `json:"target_ref"`
-								}
-								if err := json.NewDecoder(resp2.Body).Decode(&srvResp); err != nil {
-									return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
-								}
-								return modsapi.RunSummary{
-									RunID:      domaintypes.RunID(srvResp.RunID),
-									State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
-									Repository: srvResp.RepoURL,
-									Metadata: map[string]string{
-										"repo_base_ref":   srvResp.BaseRef,
-										"repo_target_ref": srvResp.TargetRef,
-									},
-									Stages: make(map[string]modsapi.StageStatus),
-								}, nil
-							}
-						}
-					}
-				}
-			}
-		}
-
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		_ = json.NewDecoder(resp.Body).Decode(&apiErr)
-		message := strings.TrimSpace(apiErr.Error)
-		if message == "" {
-			message = resp.Status
-		}
-		return modsapi.RunSummary{}, fmt.Errorf("mods submit: %s", message)
 	}
+
+	// Handle error responses.
+	var apiErr struct {
+		Error string `json:"error"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&apiErr)
+	message := strings.TrimSpace(apiErr.Error)
+	if message == "" {
+		message = resp.Status
+	}
+	return modsapi.RunSummary{}, fmt.Errorf("mods submit: %s", message)
 }

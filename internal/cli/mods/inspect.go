@@ -56,20 +56,21 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("mods inspect: %s", msg)
 	}
-	var payload modsapi.RunStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var summary modsapi.RunSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		return err
 	}
 	if c.Output != nil {
-		_, _ = fmt.Fprintf(c.Output, "Run %s: %s\n", strings.TrimSpace(string(payload.Ticket.RunID)), strings.ToLower(string(payload.Ticket.State)))
-		if mrURL, ok := payload.Ticket.Metadata["mr_url"]; ok && mrURL != "" {
+		_, _ = fmt.Fprintf(c.Output, "Run %s: %s\n", strings.TrimSpace(string(summary.RunID)), strings.ToLower(string(summary.State)))
+		if mrURL, ok := summary.Metadata["mr_url"]; ok && mrURL != "" {
 			_, _ = fmt.Fprintf(c.Output, "MR: %s\n", mrURL)
 		}
 		// Display build gate summary when available for quick gate health visibility.
 		// The gate_summary reflects the final (post-mod) gate result when mods were executed,
 		// or the pre-mod gate result if no mods ran. This ensures users see the authoritative
 		// gate status at run completion. See stats.GateSummary() for priority logic.
-		if gateSummary, ok := payload.Ticket.Metadata["gate_summary"]; ok && gateSummary != "" {
+		if gateSummary, ok := summary.Metadata["gate_summary"]; ok && gateSummary != "" {
 			_, _ = fmt.Fprintf(c.Output, "Gate: %s\n", gateSummary)
 		}
 		// Display job-level DAG state for visibility into gate/heal/re-gate workflow steps.
@@ -77,7 +78,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		//   pre-gate → mod-0 → post-gate
 		//             │
 		//             └─(fail)→ heal → re-gate → mod-0
-		c.printJobGraph(payload.Ticket.Stages)
+		c.printJobGraph(summary.Stages)
 	}
 	return nil
 }

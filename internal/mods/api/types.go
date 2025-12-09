@@ -54,23 +54,12 @@ type RunSubmitRequest struct {
 	Stages     []StageDefinition `json:"stages"`
 }
 
-// RunSubmitResponse returns the persisted run summary after submission.
-// The field name Ticket and json:"ticket" envelope are retained for
-// backward compatibility; it wraps a run-centric RunSummary.
-type RunSubmitResponse struct {
-	Ticket RunSummary `json:"ticket"`
-}
-
-// RunStatusResponse returns the current run summary.
-// The Ticket field wraps a RunSummary under the json:"ticket" key for
-// backward compatibility with existing clients.
-type RunStatusResponse struct {
-	Ticket RunSummary `json:"ticket"`
-}
-
+// RunSummary is the canonical response type for both POST /v1/mods (submit)
+// and GET /v1/mods/{id} (status). No wrapper types are used — the JSON shape
+// is RunSummary directly (run_id, state, stages, etc.).
+//
 // RunSummary summarises run lifecycle state and associated stages.
-// The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON
-// to maintain wire format compatibility with existing clients.
+// The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON.
 type RunSummary struct {
 	RunID      domaintypes.RunID `json:"run_id"`
 	State      RunState          `json:"state"`
@@ -80,14 +69,13 @@ type RunSummary struct {
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	// Stages is keyed by job ID (KSUID string from jobs.id). Each entry represents
-	// a row from the `jobs` table. The field name "stages" is retained for API
-	// backward compatibility. Use StageStatus.StepIndex (mirrors jobs.step_index)
+	// a row from the `jobs` table. Use StageStatus.StepIndex (mirrors jobs.step_index)
 	// for ordered step sequencing.
 	Stages map[string]StageStatus `json:"stages"`
 }
 
-// StageStatus summarises the execution state for a job (called "stage" for API
-// backward compatibility). Each StageStatus maps to a row in the `jobs` table.
+// StageStatus summarises the execution state for a job.
+// Each StageStatus maps to a row in the `jobs` table.
 type StageStatus struct {
 	State       StageState `json:"state"`
 	Attempts    int        `json:"attempts"`

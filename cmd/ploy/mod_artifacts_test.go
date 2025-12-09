@@ -16,14 +16,13 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	runID := "run-artifacts"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
-			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateSucceeded,
-					Stages: map[string]modsapi.StageStatus{
-						"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
-						"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
-					},
+			// Return RunSummary directly — the canonical response shape.
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateSucceeded,
+				Stages: map[string]modsapi.StageStatus{
+					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
+					"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
 				},
 			})
 			return

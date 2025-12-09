@@ -202,7 +202,7 @@ Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 
 Gate execution results are exposed via:
 - `ploy mod inspect <run-id>` — Displays a concise gate summary line: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
-- `GET /v1/mods/{id}` API — Returns gate summary in `RunStatusResponse.Ticket.Metadata["gate_summary"]` for programmatic access.
+- `GET /v1/mods/{id}` API — Returns gate summary in `RunSummary.Metadata["gate_summary"]` for programmatic access.
 
 This makes gate health visible without requiring raw artifact inspection.
 

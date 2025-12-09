@@ -16,11 +16,10 @@ func TestModInspectPrintsSummary(t *testing.T) {
 	runID := "run-11"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
-			_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateRunning,
-				},
+			// Return RunSummary directly — the canonical response shape.
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateRunning,
 			})
 			return
 		}
@@ -46,14 +45,12 @@ func TestModInspectShowsMRURL(t *testing.T) {
 	mrURL := "https://gitlab.com/example/repo/-/merge_requests/42"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
-			resp := modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID:    domaintypes.RunID(runID),
-					State:    modsapi.RunStateSucceeded,
-					Metadata: map[string]string{"mr_url": mrURL},
-				},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
+			// Return RunSummary directly — the canonical response shape.
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID:    domaintypes.RunID(runID),
+				State:    modsapi.RunStateSucceeded,
+				Metadata: map[string]string{"mr_url": mrURL},
+			})
 			return
 		}
 		http.NotFound(w, r)
@@ -77,14 +74,12 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 	runID := "run-no-mr"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
-			resp := modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID(runID),
-					State: modsapi.RunStateSucceeded,
-					// No metadata or empty metadata.
-				},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
+			// Return RunSummary directly — the canonical response shape.
+			// No metadata or empty metadata.
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateSucceeded,
+			})
 			return
 		}
 		http.NotFound(w, r)

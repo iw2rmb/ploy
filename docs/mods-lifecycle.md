@@ -755,7 +755,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
     - Run stats (MR URL, gate summary).
-  - Returns `RunStatusResponse` (Go type `modsapi.RunStatusResponse` wrapping a `RunSummary` payload; the JSON wrapper field name remains `ticket` for backward compatibility even though it carries run state).
+  - Returns `RunSummary` directly (Go type `modsapi.RunSummary`); the canonical JSON shape for run state.
 
 - `GET /v1/mods/{id}/events` — SSE event stream for a run.
   - Handler: `getModEventsHandler`.

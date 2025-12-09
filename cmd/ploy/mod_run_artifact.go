@@ -47,11 +47,12 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)
 	}
-	var payload modsapi.RunStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var summary modsapi.RunSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		if errors.Is(err, io.EOF) {
 			// Treat empty body as an empty status (no artifacts).
-			payload = modsapi.RunStatusResponse{}
+			summary = modsapi.RunSummary{}
 		} else {
 			return fmt.Errorf("decode run status: %w", err)
 		}
@@ -70,13 +71,13 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 	var downloaded int
 
 	// Deterministic iteration: sort stages and artifact names for stable manifests.
-	stageIDs := make([]string, 0, len(payload.Ticket.Stages))
-	for id := range payload.Ticket.Stages {
+	stageIDs := make([]string, 0, len(summary.Stages))
+	for id := range summary.Stages {
 		stageIDs = append(stageIDs, id)
 	}
 	sort.Strings(stageIDs)
 	for _, stageID := range stageIDs {
-		st := payload.Ticket.Stages[stageID]
+		st := summary.Stages[stageID]
 		names := make([]string, 0, len(st.Artifacts))
 		for n := range st.Artifacts {
 			names = append(names, n)
@@ -223,12 +224,13 @@ func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, run
 	if resp.StatusCode != http.StatusOK {
 		return "", controlPlaneHTTPError(resp)
 	}
-	var payload modsapi.RunStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var summary modsapi.RunSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		return "", err
 	}
-	if payload.Ticket.Metadata != nil {
-		if v, ok := payload.Ticket.Metadata["mr_url"]; ok && strings.TrimSpace(v) != "" {
+	if summary.Metadata != nil {
+		if v, ok := summary.Metadata["mr_url"]; ok && strings.TrimSpace(v) != "" {
 			return strings.TrimSpace(v), nil
 		}
 	}

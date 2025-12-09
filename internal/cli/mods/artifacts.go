@@ -56,8 +56,9 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("mods artifacts: %s", msg)
 	}
-	var payload modsapi.RunStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var summary modsapi.RunSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		return err
 	}
 	if c.Output == nil {
@@ -65,12 +66,12 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	}
 	// Stable iteration order by stage id (map key = job ID, KSUID string).
 	var stageIDs []string
-	for id := range payload.Ticket.Stages {
+	for id := range summary.Stages {
 		stageIDs = append(stageIDs, id)
 	}
 	sort.Strings(stageIDs)
 	for _, id := range stageIDs {
-		st := payload.Ticket.Stages[id]
+		st := summary.Stages[id]
 		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(id))
 		if len(st.Artifacts) == 0 {
 			continue
