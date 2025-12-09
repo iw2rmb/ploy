@@ -191,6 +191,14 @@ type BootstrapToken struct {
 	IssuedBy     *string            `json:"issued_by"`
 }
 
+type ConfigEnv struct {
+	Key       string             `json:"key"`
+	Value     string             `json:"value"`
+	Scope     string             `json:"scope"`
+	Secret    bool               `json:"secret"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     string             `json:"run_id"`
