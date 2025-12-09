@@ -96,12 +96,13 @@ Legend: [ ] todo, [x] done.
   - Snippets: Delete fields and methods that exist solely to mirror raw map[string]any into RunOptions.
   - Tests: go test ./internal/nodeagent/... — RunOptions and manifest tests must pass with typed-only options.
 
-- [ ] Make manifest builders require explicit stack where appropriate — Avoid relying on “unknown” for BC.
+- [x] Make manifest builders require explicit stack where appropriate — Avoid relying on "unknown" for BC.
   - Repository: ploy
   - Component: internal/nodeagent/manifest.go, internal/workflow/contracts/mod_image.go.
-  - Scope: Collapse buildManifestFromRequest wrapper into buildManifestFromRequestWithStack where callers can provide a concrete stack. For callers that truly cannot know the stack, document and keep the “unknown” path explicitly rather than labeling it as backward compatibility. Update tests to call the stack-aware builder directly.
+  - Scope: Collapse buildManifestFromRequest wrapper into buildManifestFromRequestWithStack where callers can provide a concrete stack. For callers that truly cannot know the stack, document and keep the "unknown" path explicitly rather than labeling it as backward compatibility. Update tests to call the stack-aware builder directly.
   - Snippets: Replace calls to buildManifestFromRequest with buildManifestFromRequestWithStack and explicit contracts.ModStack values.
   - Tests: go test ./internal/nodeagent/... ./internal/workflow/contracts/... — Manifest tests must pass with explicit stack handling.
+  - Done: Collapsed buildManifestFromRequest and buildHealingManifest to require explicit stack parameter. Removed wrapper functions and updated all callers to pass explicit contracts.ModStack values. Gate jobs use ModStackUnknown since stack detection hasn't occurred. Production callers use detected stack from lifecycle cache. Tests pass explicit ModStackUnknown to document intentional unknown stack context.
 
 - [ ] Tighten JobMeta JSON handling; treat legacy shapes as invalid if acceptable — Enforce structured metadata going forward.
   - Repository: ploy
