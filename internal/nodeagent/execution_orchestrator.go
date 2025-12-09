@@ -94,17 +94,13 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// when absent, defaults to 0 (single-step or legacy behavior).
 	typedOpts := parseRunOptions(req.Options)
 	stepIdx := 0
-	if len(typedOpts.Steps) > 0 {
-		if mi, ok := req.Options["mod_index"].(int); ok && mi >= 0 && mi < len(typedOpts.Steps) {
-			stepIdx = mi
-		} else if mf, ok := req.Options["mod_index"].(float64); ok {
-			mi := int(mf)
-			if mi >= 0 && mi < len(typedOpts.Steps) {
-				stepIdx = mi
-			} else {
-				slog.Warn("mod_index out of range for steps",
-					"run_id", req.RunID, "mod_index", mi, "steps_len", len(typedOpts.Steps))
-			}
+	if len(typedOpts.Steps) > 0 && typedOpts.ModIndexSet {
+		// Use typed ModIndex from RunOptions (already parsed from raw map).
+		if typedOpts.ModIndex >= 0 && typedOpts.ModIndex < len(typedOpts.Steps) {
+			stepIdx = typedOpts.ModIndex
+		} else {
+			slog.Warn("mod_index out of range for steps",
+				"run_id", req.RunID, "mod_index", typedOpts.ModIndex, "steps_len", len(typedOpts.Steps))
 		}
 	}
 	manifest, err := buildManifestFromRequestWithStack(req, typedOpts, stepIdx, stack)
@@ -173,8 +169,8 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
 	}
 
-	// Upload configured artifacts.
-	r.uploadConfiguredArtifacts(ctx, req, manifest, workspace)
+	// Upload configured artifacts using typed RunOptions.
+	r.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
 
 	// Build stats.
 	stats := types.RunStats{

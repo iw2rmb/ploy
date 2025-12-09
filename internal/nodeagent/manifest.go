@@ -180,11 +180,11 @@ func buildManifestFromRequestWithStack(req StartRunRequest, typedOpts RunOptions
 		mergedOpts["gitlab_domain"] = domain
 	}
 	// Include MR flags in options only when explicitly set (not just default false).
-	// We check the raw options map to distinguish between "not set" and "set to false".
-	if _, hasMRSuccess := req.Options["mr_on_success"]; hasMRSuccess {
+	// Use typed MRFlagsPresent to distinguish between "not set" and "set to false".
+	if typedOpts.MRFlagsPresent.MROnSuccessSet {
 		mergedOpts["mr_on_success"] = typedOpts.MRWiring.MROnSuccess
 	}
-	if _, hasMRFail := req.Options["mr_on_fail"]; hasMRFail {
+	if typedOpts.MRFlagsPresent.MROnFailSet {
 		mergedOpts["mr_on_fail"] = typedOpts.MRWiring.MROnFail
 	}
 	if !typedOpts.ServerMetadata.JobID.IsZero() {

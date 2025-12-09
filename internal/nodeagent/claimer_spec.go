@@ -46,10 +46,15 @@ func stringValue(s *string) string {
 // to top-level when missing) is no longer supported. Specs must use one of the
 // canonical shapes above.
 //
+// ## Return Values
+//
 // Returns:
-//   - opts: map[string]any containing flattened options (preserved for raw JSON access).
+//   - opts: map[string]any containing flattened options. This is an internal
+//     intermediate representation used to bridge JSON parsing and typed options.
+//     Callers should use typedOpts for all option access.
 //   - env: map[string]string containing merged environment variables.
 //   - typedOpts: RunOptions with typed accessors for all understood option keys.
+//     This is the canonical source of truth; prefer typed fields over raw map access.
 //
 // If the spec is empty or invalid JSON, returns empty maps and zero RunOptions.
 func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOptions) {
@@ -187,8 +192,9 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	}
 
 	// Parse typed options from the flattened opts map.
-	// This provides type-safe accessors for all understood option keys while
-	// preserving the raw map for backward compatibility and wire-level JSON access.
+	// RunOptions is the canonical source of truth; all consumers should use
+	// typed fields instead of raw map access. The raw map is an internal
+	// intermediate representation for bridging JSON parsing.
 	typedOpts = parseRunOptions(opts)
 
 	return opts, env, typedOpts

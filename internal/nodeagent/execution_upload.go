@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -104,38 +103,25 @@ func (r *runController) uploadDiffArtifact(ctx context.Context, runID types.RunI
 	}
 }
 
-// uploadConfiguredArtifacts uploads artifact bundles specified in the artifact_paths option.
+// uploadConfiguredArtifacts uploads artifact bundles specified in the typed RunOptions.
 // It resolves paths relative to the workspace, validates they exist, and bundles them
-// with the configured artifact_name. Paths are accepted as either []any (from JSON deserialization)
-// or []string (from programmatic callers).
+// with the configured artifact_name from the manifest options.
 //
 // Missing paths generate warnings but do not fail the upload operation.
-func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, workspace string) {
-	// Accept either []any (from JSON) or []string (programmatic callers).
+func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace string) {
+	// Use typed Artifacts.Paths from RunOptions (already parsed by parseRunOptions).
+	if len(typedOpts.Artifacts.Paths) == 0 {
+		return
+	}
+
+	// Resolve workspace-relative paths and validate existence.
 	var paths []string
-	switch v := req.Options["artifact_paths"].(type) {
-	case []any:
-		for _, p := range v {
-			if s, ok := p.(string); ok && s != "" {
-				fullPath := filepath.Join(workspace, s)
-				if _, err := os.Stat(fullPath); err == nil {
-					paths = append(paths, fullPath)
-				} else {
-					slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
-				}
-			}
-		}
-	case []string:
-		for _, s := range v {
-			if strings.TrimSpace(s) == "" {
-				continue
-			}
-			fullPath := filepath.Join(workspace, s)
-			if _, err := os.Stat(fullPath); err == nil {
-				paths = append(paths, fullPath)
-			} else {
-				slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
-			}
+	for _, p := range typedOpts.Artifacts.Paths {
+		fullPath := filepath.Join(workspace, p)
+		if _, err := os.Stat(fullPath); err == nil {
+			paths = append(paths, fullPath)
+		} else {
+			slog.Warn("artifact path not found", "run_id", req.RunID, "path", p)
 		}
 	}
 
@@ -149,7 +135,8 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 		return
 	}
 
-	artifactName, _ := manifest.OptionString("artifact_name")
+	// Use typed artifact name from RunOptions.
+	artifactName := typedOpts.Artifacts.Name
 
 	if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID, req.JobID, paths, artifactName); err != nil {
 		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)

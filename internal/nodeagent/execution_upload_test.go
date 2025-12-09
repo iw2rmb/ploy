@@ -206,13 +206,21 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			req := StartRunRequest{
-				RunID: types.RunID("test-run-123"),
-				JobID: "test-job-id",
-				Options: map[string]interface{}{
-					"artifact_paths": tt.artifactPaths,
-				},
+			// Build StartRunRequest with artifact_paths in Options for parseRunOptions.
+			opts := map[string]any{}
+			if tt.artifactPaths != nil {
+				opts["artifact_paths"] = tt.artifactPaths
 			}
+			opts["artifact_name"] = "test-artifact"
+
+			req := StartRunRequest{
+				RunID:   types.RunID("test-run-123"),
+				JobID:   "test-job-id",
+				Options: opts,
+			}
+
+			// Parse options into typed RunOptions.
+			typedOpts := parseRunOptions(req.Options)
 
 			manifest := contracts.StepManifest{
 				Image:   "test-image",
@@ -223,9 +231,9 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 				},
 			}
 
-			// Execute upload.
+			// Execute upload with typed RunOptions.
 			ctx := context.Background()
-			controller.uploadConfiguredArtifacts(ctx, req, manifest, workspace)
+			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
 
 			// Verify upload call.
 			if uploadCalled != tt.wantUpload {
