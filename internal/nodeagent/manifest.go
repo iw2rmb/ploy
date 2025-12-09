@@ -11,8 +11,7 @@ import (
 )
 
 // buildManifestFromRequest converts a StartRunRequest into a StepManifest.
-// The function accepts typed RunOptions to reduce map[string]any casts while
-// preserving backward compatibility with the raw Options map for wire-level access.
+// The function accepts typed RunOptions for type-safe access to spec configuration.
 //
 // For multi-step runs (when typedOpts.Steps is non-empty), stepIndex selects which
 // mod step to build a manifest for. For single-step runs, stepIndex is ignored and
@@ -21,13 +20,14 @@ import (
 //
 // ## Stack-Aware Image Resolution
 //
-// The Image field in StepMod and ExecutionOptions supports both universal images
-// (string) and stack-specific images (map keyed by stack). This function resolves
+// The Image field in StepMod and ExecutionOptions supports both canonical forms:
+// universal images (string) and stack-specific images (map). This function resolves
 // the image using contracts.ModStackUnknown as the default stack. For full stack
 // detection, use buildManifestFromRequestWithStack which accepts an explicit stack.
 func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int) (contracts.StepManifest, error) {
 	// Delegate to the stack-aware version with "unknown" as the default stack.
-	// This preserves backward compatibility for callers that don't have stack info.
+	// Callers without stack info use this entry point; stack-specific callers
+	// should use buildManifestFromRequestWithStack directly.
 	return buildManifestFromRequestWithStack(req, typedOpts, stepIndex, contracts.ModStackUnknown)
 }
 
@@ -292,6 +292,7 @@ func isCodexHealingImage(image string) bool {
 //
 // ## Stack-Aware Image Resolution
 //
+// HealingMod.Image supports both canonical forms (universal string and stack map).
 // This function uses contracts.ModStackUnknown as the default stack for image
 // resolution. For explicit stack support, use buildHealingManifestWithStack.
 func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string) (contracts.StepManifest, error) {

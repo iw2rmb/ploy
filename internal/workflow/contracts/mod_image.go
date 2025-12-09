@@ -1,9 +1,14 @@
 // mod_image.go provides stack-aware image resolution for Mods specs.
 //
-// This file implements the ModImage type that supports both universal images
-// (a single string) and stack-specific images (a map keyed by stack name).
-// The type preserves backward compatibility with existing single-string specs
-// while enabling new stack-aware image selection based on Build Gate detection.
+// This file implements the ModImage type that supports two canonical forms:
+//   - Universal image (string): A single image used for all build stacks.
+//   - Stack-specific image (map): Different images per detected build stack.
+//
+// Both forms are intentionally supported as first-class citizens of the Mods
+// spec schema. The dual-form design enables:
+//   - Simple configurations using a single image string for stack-agnostic mods.
+//   - Optimized configurations using stack-specific images for tools like Maven
+//     or Gradle that benefit from dedicated container environments.
 //
 // ## Stack Resolution Rules
 //
@@ -50,22 +55,23 @@ const (
 	ModStackDefault ModStack = "default"
 )
 
-// ModImage represents a mod container image specification that supports both
-// universal images (single string) and stack-specific images (map by stack).
+// ModImage represents a mod container image specification supporting two
+// canonical forms: universal images (single string) and stack-specific images
+// (map by stack). Both forms are first-class schema options.
 //
 // YAML/JSON Examples:
 //
-//	# Universal image (string form):
+//	# Universal image (string form) — used for all stacks:
 //	image: docker.io/user/mods-openrewrite:latest
 //
-//	# Stack-specific images (map form):
+//	# Stack-specific images (map form) — per-stack optimization:
 //	image:
 //	  default: docker.io/user/mods-openrewrite:latest
 //	  java-maven: docker.io/user/mods-orw-maven:latest
 //	  java-gradle: docker.io/user/mods-orw-gradle:latest
 type ModImage struct {
 	// Universal holds the image when specified as a single string.
-	// When non-empty, this image is used for all stacks (backward compatible).
+	// When non-empty, this image is used regardless of detected stack.
 	Universal string
 
 	// ByStack holds stack-specific images when image is specified as a map.
@@ -133,7 +139,10 @@ func (m ModImage) ResolveImage(stack ModStack) (string, error) {
 }
 
 // ParseModImage parses an image specification from an untyped value.
-// Accepts either a string (universal image) or map[string]any (stack map).
+// Both canonical forms are accepted:
+//   - string: Parsed as a universal image (used for all stacks).
+//   - map[string]any or map[string]string: Parsed as stack-specific images.
+//
 // Returns an empty ModImage for nil input without error.
 func ParseModImage(v any) (ModImage, error) {
 	if v == nil {
