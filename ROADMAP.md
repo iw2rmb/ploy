@@ -59,7 +59,7 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Log ingestion and SSE tests must pass with the events service required.
 
 ## Spec, healing, and image compatibility
-- [ ] Tighten Mods spec parsing to a single canonical shape — Stop supporting legacy single-mod `mod` fallbacks.
+- [x] Tighten Mods spec parsing to a single canonical shape — Stop supporting legacy single-mod `mod` fallbacks.
   - Repository: ploy
   - Component: internal/nodeagent/claimer_spec.go, internal/nodeagent/claimer_spec_test.go, cmd/ploy/mod_run_spec_parsing_test.go.
   - Scope: In parseSpec, remove fallbacks that treat `mod` as a legacy single-mod spec when top-level fields are missing. Define and implement a canonical spec structure (e.g., multi-step `mods[]` plus structured healing config) and require it. Update tests that currently assert mixed legacy behavior.
