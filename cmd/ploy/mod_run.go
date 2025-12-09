@@ -67,25 +67,9 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Load spec from file (if provided) and merge with CLI overrides.
-	// CLI flags take precedence over spec file values.
-	specPayload, err := buildSpecPayload(
-		strings.TrimSpace(*flags.SpecFile),
-		*flags.ModEnvs,
-		strings.TrimSpace(*flags.ModImage),
-		*flags.Retain,
-		strings.TrimSpace(*flags.ModCommand),
-		strings.TrimSpace(*flags.GitLabPAT),
-		strings.TrimSpace(*flags.GitLabDomain),
-		*flags.MRSuccess,
-		*flags.MRFail,
-	)
-	if err != nil {
-		return fmt.Errorf("build spec: %w", err)
-	}
-
-	// Submit run to control plane.
-	summary, err := submitRun(ctx, base, httpClient, request, specPayload)
+	// Submit run to control plane using canonical 201 Created contract.
+	// The server creates the run directly from the RunSubmitRequest.
+	summary, err := submitRun(ctx, base, httpClient, request)
 	if err != nil {
 		return err
 	}

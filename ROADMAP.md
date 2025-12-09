@@ -22,7 +22,7 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./docs/... (if any doc validation) + manual review; ensure docs/api/verify_openapi_test.go still passes.
 
 ## Mods submit flow (CLI ↔ server)
-- [ ] Remove dual response handling (201 vs 202) and simplified fallback payload from Mods submit CLI — Use a single canonical submit contract.
+- [x] Remove dual response handling (201 vs 202) and simplified fallback payload from Mods submit CLI — Use a single canonical submit contract.
   - Repository: ploy
   - Component: internal/cli/mods (submit.go), cmd/ploy (mods commands).
   - Scope: In internal/cli/mods/submit.go, drop the 202 path that decodes modsapi.RunSubmitResponse and the second POST that sends simplified `{repo_url,base_ref,target_ref,spec}`. Keep only the canonical request+response path (e.g., 201 with a single summary type). Update cmd/ploy tests that assert 202 or dual behavior.

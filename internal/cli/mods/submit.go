@@ -14,17 +14,18 @@ import (
 )
 
 // SubmitCommand submits a Mods run to the control plane.
+// The command uses a single canonical submit contract: POST /v1/mods returns
+// 201 Created with a RunSummary response containing run_id, state, and metadata.
 type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	Request modsapi.RunSubmitRequest
-	// Spec, when non-empty, is forwarded to the simplified submit payload
-	// for servers that accept repo_url/base_ref/target_ref (+optional spec).
-	Spec []byte
 }
 
 // Run executes the submission against the control plane endpoint.
-// POST /v1/mods returns 201 with a canonical submit response (run_id, status, repo_url, etc.).
+// POST /v1/mods returns 201 Created with a canonical RunSummary response.
+// This is the single canonical submit contract — no fallback to 202 or alternative
+// payload shapes. Error responses return an error with the server message.
 func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if c.Client == nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: http client required")
