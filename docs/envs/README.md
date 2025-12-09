@@ -388,6 +388,97 @@ Primary reuse behavior:
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
 
+## Global Env Configuration
+
+The control plane supports centralized global environment variables that are automatically injected
+into job containers based on scope rules. This enables cluster-wide configuration of credentials,
+CA bundles, and API keys without embedding them in every spec file.
+
+### Configuration via CLI
+
+Use the `ploy config env` subcommands to manage global environment variables:
+
+```bash
+# Set a CA certificate bundle (injected into all job types)
+ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
+
+# Set Codex auth credentials (injected only into mod and post_gate jobs)
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
+
+# Set OpenAI API key (injected into all jobs)
+ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
+
+# List configured variables (secret values redacted)
+ploy config env list
+
+# Show a specific variable (use --raw to reveal secret values)
+ploy config env show --key OPENAI_API_KEY --raw
+
+# Delete a variable
+ploy config env unset --key OLD_VAR
+```
+
+### Scope Semantics
+
+The `scope` parameter controls which job types receive each variable:
+
+| Scope | Job Types | Use Case |
+|-------|-----------|----------|
+| `all` | Every job type (mod, heal, pre_gate, re_gate, post_gate) | Credentials needed everywhere (CA certs, API keys) |
+| `mods` | `mod`, `post_gate` | Credentials for code modification phases |
+| `heal` | `heal`, `re_gate` | Credentials specific to healing/retry phases |
+| `gate` | `pre_gate`, `re_gate`, `post_gate` | Credentials for gate execution phases |
+
+### Injection Flow
+
+1. **Storage**: Variables are persisted in the `config_env` table and cached in the
+   control-plane's `ConfigHolder` at startup.
+2. **Claim-time merge**: When a node claims a job via `/v1/nodes/{id}/claim`, the server
+   calls `mergeGlobalEnvIntoSpec()` to inject matching global env vars into the job's spec.
+3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
+   in the spec are never overwritten by global env.
+4. **Container injection**: The node agent propagates the merged `env` map to the
+   container runtime, which sets them in the running container.
+
+### Common Variables Consumed by Official Images
+
+| Variable | Consumer | Description |
+|----------|----------|-------------|
+| `CA_CERTS_PEM_BUNDLE` | ORW mods, build-gate, custom mods | PEM-encoded CA certificates installed into the container's trust store |
+| `CODEX_AUTH_JSON` | `mod-codex` | JSON credentials written to `/root/.codex/auth.json` at container startup |
+| `OPENAI_API_KEY` | Future OpenAI-integrated mods | API key for LLM operations |
+
+### How Official Images Consume These Variables
+
+**Codex images (`mod-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
+present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
+
+**Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:
+1. Writes `CA_CERTS_PEM_BUNDLE` to a temp file
+2. Splits the bundle into individual `.crt` files
+3. Copies them to `/usr/local/share/ca-certificates/ploy/`
+4. Runs `update-ca-certificates` (on Debian/Ubuntu images)
+5. Optionally imports into Java cacerts via `keytool` when available
+
+**ORW images (`orw-maven`, `orw-gradle`)**: Similar CA bundle handling as build-gate, ensuring
+OpenRewrite can fetch dependencies from internal artifact repositories.
+
+### Security Considerations
+
+- **Secrets flag**: Variables marked with `--secret=true` (the default) are redacted in
+  `ploy config env list` output to prevent accidental exposure.
+- **mTLS protection**: The `/v1/config/env` endpoints require mTLS with `cli-admin` role.
+- **In-memory caching**: The control plane caches global env in memory; values are loaded
+  from the database at startup and updated on each `set`/`unset` operation.
+
+### API Reference
+
+See `docs/api/OpenAPI.yaml` paths:
+- `GET /v1/config/env` — List all global env entries (secrets redacted)
+- `GET /v1/config/env/{key}` — Get single entry (full value for admins)
+- `PUT /v1/config/env/{key}` — Create or update an entry
+- `DELETE /v1/config/env/{key}` — Delete an entry
+
 ## Legacy (Removed November 2025)
 
 The following variables are **no longer consumed** by the codebase after the Postgres/mTLS pivot:

@@ -1,0 +1,104 @@
+# Config API schemas
+#
+# These schemas define the types used by the /v1/config/* endpoints for
+# managing control-plane configuration (global env, GitLab settings, etc.).
+
+# GlobalEnvScope represents the allowed scope values that control which
+# job types receive a global environment variable.
+GlobalEnvScope:
+  type: string
+  description: |
+    Scope that controls which job types receive this variable.
+    - `all` — Inject into every job type (mod, heal, pre_gate, re_gate, post_gate)
+    - `mods` — Inject into `mod` and `post_gate` jobs (code modification phases)
+    - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
+    - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate phases)
+  enum: [all, mods, heal, gate]
+  example: "all"
+
+# GlobalEnvListItem represents an entry in the GET /v1/config/env list response.
+# For entries marked as secret, the value is omitted to prevent accidental exposure.
+GlobalEnvListItem:
+  type: object
+  description: |
+    A global environment variable entry as returned in list responses.
+    Secret values are omitted (redacted) in list views.
+  properties:
+    key:
+      type: string
+      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE).
+      example: "CA_CERTS_PEM_BUNDLE"
+    value:
+      type: string
+      description: |
+        Environment variable value. Present only for non-secret entries;
+        omitted for secrets in list responses.
+      example: "myvalue"
+    scope:
+      $ref: '#/GlobalEnvScope'
+    secret:
+      type: boolean
+      description: |
+        Whether this variable should be treated as secret. Secret entries
+        are redacted (value omitted) in list responses.
+      example: true
+  required:
+    - key
+    - scope
+    - secret
+
+# GlobalEnvVar represents a full global environment variable entry including
+# the value. Used in GET /v1/config/env/{key} and PUT responses.
+GlobalEnvVar:
+  type: object
+  description: |
+    A global environment variable entry with full value. Returned by single-entry
+    GET and PUT responses. The value is always included since these endpoints are
+    admin-only and protected by mTLS.
+  properties:
+    key:
+      type: string
+      description: Environment variable key.
+      example: "CA_CERTS_PEM_BUNDLE"
+    value:
+      type: string
+      description: Environment variable value (full, not redacted).
+      example: "-----BEGIN CERTIFICATE-----\nMIIC..."
+    scope:
+      $ref: '#/GlobalEnvScope'
+    secret:
+      type: boolean
+      description: Whether this variable should be treated as secret.
+      example: true
+  required:
+    - key
+    - value
+    - scope
+    - secret
+
+# GlobalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
+GlobalEnvPutRequest:
+  type: object
+  description: |
+    Request body for creating or updating a global environment variable.
+    The key is specified in the URL path; the body contains value, scope,
+    and secret flag.
+  properties:
+    value:
+      type: string
+      description: |
+        Environment variable value. For file-based content (certificates, JSON
+        credentials), the CLI reads the file and sends the content as this value.
+      example: "sk-..."
+    scope:
+      $ref: '#/GlobalEnvScope'
+      default: "all"
+    secret:
+      type: boolean
+      description: |
+        Whether this variable should be treated as secret. Defaults to true
+        when omitted. Secret variables are redacted in list responses.
+      default: true
+      example: true
+  required:
+    - value

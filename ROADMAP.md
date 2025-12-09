@@ -302,7 +302,7 @@ mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml cl
   - Tests: Add integration-style tests for `gate_docker` that set `spec.Env["CA_CERTS_PEM_BUNDLE"]` and verify via logs or a dummy `update-ca-certificates`/`keytool` stub that the preamble runs; for Codex and ORW images, rely on existing smoke tests plus a small self-test that asserts no error when `CA_CERTS_PEM_BUNDLE` / `CODEX_AUTH_JSON` are present.
 
 ## Documentation & OpenAPI
-- [ ] Document global config env and align OpenAPI — Make the new `config env` surface and global env semantics discoverable and consistent across docs.
+- [x] Document global config env and align OpenAPI — Make the new `config env` surface and global env semantics discoverable and consistent across docs.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs, docs/api
   - Scope:
