@@ -261,7 +261,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `internal/workflow/runtime/step/container_docker_test.go` or add a focused test to assert that when `ContainerSpec.Env["CA_CERTS_PEM_BUNDLE"]` is set, the mock docker client sees an entry `CA_CERTS_PEM_BUNDLE=...` in `ContainerCreateOptions.Config.Env`.
 
 ## Image Startup Hooks (Codex, ORW, Build Gate)
-- [ ] Implement startup use of global env in official images — Make sure Codex and build-gate images actually consume `CODEX_AUTH_JSON` and `CA_CERTS_PEM_BUNDLE` injected via the global config.
+- [x] Implement startup use of global env in official images — Make sure Codex and build-gate images actually consume `CODEX_AUTH_JSON` and `CA_CERTS_PEM_BUNDLE` injected via the global config.
   - Repository: github.com/iw2rmb/ploy
   - Component: docker/mods/*, internal/workflow/runtime/step/gate_docker.go
   - Scope:

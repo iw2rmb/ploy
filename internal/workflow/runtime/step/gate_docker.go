@@ -122,7 +122,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		// Use --ff (fail-fast) to stop on the first failing module and run a full
 		// `clean install` so compilation and tests are validated together.
 		// Diagnostic guidance: switch to -X (drop -q) only for deep investigations.
-		cmd = []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"}
+		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
+		script := caPreambleScript() + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
+		cmd = []string{"/bin/sh", "-lc", script}
 	}
 	chooseGradle := func() {
 		if image == "" {
@@ -131,7 +133,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		tool = "gradle"
 		// Include --stacktrace for error stack traces (similar to Maven -e). Keep -q to reduce noise.
 		// Run Gradle tests for the workspace project and let Gradle's default failure semantics apply.
-		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace test -p /workspace"}
+		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
+		script := caPreambleScript() + "gradle -q --stacktrace test -p /workspace"
+		cmd = []string{"/bin/sh", "-lc", script}
 	}
 	chooseJava := func() {
 		if image == "" {
@@ -139,7 +143,8 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 		tool = "java"
 		// Compile all Java sources if present; succeed if none found.
-		script := `set -e
+		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
+		script := caPreambleScript() + `set -e
 tmpdir=$(mktemp -d)
 find /workspace -type f -name "*.java" > "$tmpdir/sources.list" || true
 if [ -s "$tmpdir/sources.list" ]; then
@@ -341,6 +346,48 @@ func defaultString(v, def string) string {
 }
 
 func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimSpace(s), 10, 64) }
+
+// caPreambleScript returns a shell preamble that installs CA certificates from the
+// CA_CERTS_PEM_BUNDLE environment variable into the system trust store and Java
+// cacerts keystore. This enables build-gate containers to trust corporate proxies
+// and private registries when the global config provides a CA bundle.
+//
+// The preamble:
+// 1. Splits CA_CERTS_PEM_BUNDLE into individual PEM files
+// 2. Installs them into /usr/local/share/ca-certificates and runs update-ca-certificates
+// 3. Imports each cert into the Java cacerts keystore via keytool (if available)
+//
+// This preamble is prepended to Maven, Gradle, and plain Java build commands so that
+// custom CA certificates injected via `ploy config env set --key CA_CERTS_PEM_BUNDLE ...`
+// are honored inside gate containers.
+func caPreambleScript() string {
+	return `# --- CA bundle injection preamble (ploy global config) ---
+if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
+  pem_file="$(mktemp)"
+  printf '%s\n' "${CA_CERTS_PEM_BUNDLE}" > "${pem_file}"
+  pem_dir="$(mktemp -d)"
+  # Split bundle into individual cert files: cert1.crt, cert2.crt, ...
+  awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="${pem_dir}" "${pem_file}"
+  # Update system CA store if update-ca-certificates is available
+  if command -v update-ca-certificates >/dev/null 2>&1; then
+    sys_ca_dir="/usr/local/share/ca-certificates/ploy-gate"
+    mkdir -p "$sys_ca_dir"
+    cp "${pem_dir}"/*.crt "$sys_ca_dir"/ 2>/dev/null || true
+    update-ca-certificates >/dev/null 2>&1 || true
+  fi
+  # Import into Java cacerts keystore if keytool is available
+  if command -v keytool >/dev/null 2>&1; then
+    for cert_path in "${pem_dir}"/*.crt; do
+      [ -f "$cert_path" ] || continue
+      base="$(basename "${cert_path}" .crt)"
+      alias="ploy_gate_pem_${base}"
+      keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "${alias}" -file "${cert_path}" >/dev/null 2>&1 || true
+    done
+  fi
+fi
+# --- End CA bundle preamble ---
+`
+}
 
 func sha256Hex(b []byte) string {
 	h := sha256.Sum256(b)
