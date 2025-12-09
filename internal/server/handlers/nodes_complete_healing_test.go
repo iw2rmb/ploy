@@ -11,7 +11,7 @@ import (
 
 // TestMaybeCreateHealingJobs_SecondAttemptUsesModType verifies that healing
 // retries are counted using the jobs.mod_type column so that subsequent
-// attempts receive incremented attempt numbers (heal-2-0, re-gate-2, ...),
+// attempts receive incremented attempt numbers (heal-branch-0-2-0, re-gate-branch-0-2, ...),
 // avoiding duplicate job names on re-gate failure.
 func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 	t.Parallel()
@@ -20,12 +20,18 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	runID := domaintypes.NewRunID().String()
 
-	// build_gate_healing with a single healing mod and retries=3
+	// build_gate_healing with a single strategy containing one healing mod and retries=3.
+	// Uses canonical strategies[] schema (legacy mods[] at top level is no longer supported).
 	spec := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(3),
-			"mods": []any{
-				map[string]any{"image": "heal:latest"},
+			"strategies": []any{
+				map[string]any{
+					// Unnamed strategy defaults to "branch-0".
+					"mods": []any{
+						map[string]any{"image": "heal:latest"},
+					},
+				},
 			},
 		},
 	}
@@ -36,8 +42,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	// Jobs for a run where:
 	// - pre-gate (1000) failed previously
-	// - heal-1-0 (1333.33) succeeded
-	// - re-gate-1 (1666.66) has just failed (failedStepIndex)
+	// - heal-branch-0-1-0 (1333.33) succeeded (first attempt)
+	// - re-gate-branch-0-1 (1666.66) has just failed (failedStepIndex)
 	// - mod-0/post-gate are still created
 	reGateStepIndex := 1666.6666666666665
 	jobs := []store.Job{
@@ -53,7 +59,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		{
 			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
-			Name:      "heal-1-0",
+			Name:      "heal-branch-0-1-0",
 			Status:    store.JobStatusSucceeded,
 			ModType:   "heal",
 			StepIndex: 1333.3333333333333,
@@ -62,7 +68,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		{
 			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
-			Name:      "re-gate-1",
+			Name:      "re-gate-branch-0-1",
 			Status:    store.JobStatusFailed,
 			ModType:   "re_gate",
 			StepIndex: reGateStepIndex,
@@ -101,10 +107,10 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	// With one existing "heal" job and one healing mod configured, the second
-	// invocation should use attempt=2 and create:
-	//   - heal-2-0 (pending)
-	//   - re-gate-2 (created)
+	// With one existing "heal" job and one healing mod configured in a single strategy,
+	// the second invocation should use attempt=2 and create:
+	//   - heal-branch-0-2-0 (pending)
+	//   - re-gate-branch-0-2 (created)
 	if st.createJobCallCount != 2 {
 		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", st.createJobCallCount)
 	}
@@ -113,16 +119,16 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 	}
 
 	healJob := st.createJobParams[0]
-	if healJob.Name != "heal-2-0" {
-		t.Fatalf("expected first healing job name heal-2-0, got %q", healJob.Name)
+	if healJob.Name != "heal-branch-0-2-0" {
+		t.Fatalf("expected first healing job name heal-branch-0-2-0, got %q", healJob.Name)
 	}
 	if healJob.ModType != "heal" {
 		t.Fatalf("expected heal job ModType=heal, got %q", healJob.ModType)
 	}
 
 	reGateJob := st.createJobParams[1]
-	if reGateJob.Name != "re-gate-2" {
-		t.Fatalf("expected re-gate job name re-gate-2, got %q", reGateJob.Name)
+	if reGateJob.Name != "re-gate-branch-0-2" {
+		t.Fatalf("expected re-gate job name re-gate-branch-0-2, got %q", reGateJob.Name)
 	}
 	if reGateJob.ModType != "re_gate" {
 		t.Fatalf("expected re-gate job ModType=re_gate, got %q", reGateJob.ModType)
@@ -272,22 +278,28 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 	}
 }
 
-// TestMaybeCreateHealingJobs_SingleStrategyMods verifies behavior for specs
-// that use build_gate_healing.mods[] without strategies[] (single-strategy form).
-func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
+// TestMaybeCreateHealingJobs_SingleStrategyWithMultipleMods verifies behavior for specs
+// that use a single strategy containing multiple mods (canonical strategies[] schema).
+func TestMaybeCreateHealingJobs_SingleStrategyWithMultipleMods(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 
 	runID := domaintypes.NewRunID().String()
 
-	// Single-strategy spec (mods at top level, no strategies array).
+	// Single strategy with multiple mods (uses canonical strategies[] schema).
+	// Legacy mods[] at top level is no longer supported.
 	spec := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(2),
-			"mods": []any{
-				map[string]any{"image": "heal-a:latest"},
-				map[string]any{"image": "heal-b:latest"},
+			"strategies": []any{
+				map[string]any{
+					// Unnamed strategy defaults to "branch-0".
+					"mods": []any{
+						map[string]any{"image": "heal-a:latest"},
+						map[string]any{"image": "heal-b:latest"},
+					},
+				},
 			},
 		},
 	}
@@ -331,13 +343,13 @@ func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	// Single-strategy behavior: 2 healing mods + 1 re-gate = 3 jobs.
+	// Single strategy with 2 mods: 2 healing jobs + 1 re-gate = 3 jobs.
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected 3 CreateJob calls (2 heal + 1 re-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify job naming (heal-1-0, heal-1-1, re-gate-1).
-	expectedNames := []string{"heal-1-0", "heal-1-1", "re-gate-1"}
+	// Verify job naming (heal-branch-0-1-0, heal-branch-0-1-1, re-gate-branch-0-1).
+	expectedNames := []string{"heal-branch-0-1-0", "heal-branch-0-1-1", "re-gate-branch-0-1"}
 	for i, expected := range expectedNames {
 		if st.createJobParams[i].Name != expected {
 			t.Fatalf("expected job[%d] name=%q, got %q", i, expected, st.createJobParams[i].Name)
@@ -346,16 +358,16 @@ func TestMaybeCreateHealingJobs_SingleStrategyMods(t *testing.T) {
 
 	// First healing job is pending, others are created.
 	if st.createJobParams[0].Status != store.JobStatusPending {
-		t.Fatalf("expected heal-1-0 to be pending, got %s", st.createJobParams[0].Status)
+		t.Fatalf("expected heal-branch-0-1-0 to be pending, got %s", st.createJobParams[0].Status)
 	}
 	if st.createJobParams[1].Status != store.JobStatusCreated {
-		t.Fatalf("expected heal-1-1 to be created, got %s", st.createJobParams[1].Status)
+		t.Fatalf("expected heal-branch-0-1-1 to be created, got %s", st.createJobParams[1].Status)
 	}
 	if st.createJobParams[2].Status != store.JobStatusCreated {
-		t.Fatalf("expected re-gate-1 to be created, got %s", st.createJobParams[2].Status)
+		t.Fatalf("expected re-gate-branch-0-1 to be created, got %s", st.createJobParams[2].Status)
 	}
 
-	// Verify step_index order (sequential, not branched).
+	// Verify step_index order (sequential within the single branch).
 	for i := 1; i < len(st.createJobParams); i++ {
 		if st.createJobParams[i].StepIndex <= st.createJobParams[i-1].StepIndex {
 			t.Fatalf("step_index should increase: job[%d]=%f, job[%d]=%f",
@@ -621,7 +633,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 }
 
 // TestCancelLoserBranches_NoLosersWhenSingleBranch verifies that winner selection
-// with a single branch (legacy behavior) doesn't cancel anything extra.
+// with a single branch doesn't cancel anything extra.
 func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 	t.Parallel()
 
@@ -629,7 +641,8 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 
 	runID := domaintypes.NewRunID().String()
 
-	// Single-branch legacy healing: only one re-gate, so no losers to cancel.
+	// Single-branch healing (using canonical strategies[] schema with one strategy):
+	// only one re-gate, so no losers to cancel.
 	winnerJobID := domaintypes.NewJobID().String()
 	jobs := []store.Job{
 		{
@@ -643,7 +656,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 		{
 			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
-			Name:      "heal-1-0",
+			Name:      "heal-branch-0-1-0",
 			Status:    store.JobStatusSucceeded,
 			ModType:   "heal",
 			StepIndex: 1333,
@@ -651,7 +664,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 		{
 			ID:        winnerJobID,
 			RunID:     runID,
-			Name:      "re-gate-1",
+			Name:      "re-gate-branch-0-1",
 			Status:    store.JobStatusSucceeded,
 			ModType:   "re_gate",
 			StepIndex: 1666,
@@ -666,7 +679,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 		},
 	}
 
-	winnerJob := jobs[2] // re-gate-1
+	winnerJob := jobs[2] // re-gate-branch-0-1
 
 	st := &mockStore{
 		listJobsByRunResult: jobs,
@@ -676,7 +689,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
-	// No jobs should be canceled (heal-1-0 is already succeeded, winner is the only re-gate).
+	// No jobs should be canceled (heal-branch-0-1-0 is already succeeded, winner is the only re-gate).
 	if len(st.updateJobStatusCalls) != 0 {
 		t.Fatalf("expected 0 UpdateJobStatus calls (no losers), got %d", len(st.updateJobStatusCalls))
 	}
@@ -930,8 +943,8 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 	}
 }
 
-// TestParseHealingStrategies verifies strategy parsing for both single-strategy
-// (mods[] only) and multi-strategy (strategies[]) forms.
+// TestParseHealingStrategies verifies strategy parsing for the canonical
+// multi-strategy (strategies[]) form. Legacy mods[] at top level is no longer supported.
 func TestParseHealingStrategies(t *testing.T) {
 	t.Parallel()
 
@@ -943,16 +956,15 @@ func TestParseHealingStrategies(t *testing.T) {
 		wantFirstModsLen int
 	}{
 		{
-			name: "mods-only form",
+			// Legacy mods-only form is no longer supported; returns 0 strategies.
+			name: "legacy mods-only form not supported",
 			config: map[string]any{
 				"mods": []any{
 					map[string]any{"image": "heal:latest"},
 					map[string]any{"image": "heal2:latest"},
 				},
 			},
-			wantStrategies:   1,
-			wantFirstName:    "", // Unnamed strategy for mods-only form.
-			wantFirstModsLen: 2,
+			wantStrategies: 0, // No strategies returned (legacy form ignored).
 		},
 		{
 			name: "multi-strategy form",
@@ -973,7 +985,8 @@ func TestParseHealingStrategies(t *testing.T) {
 			wantFirstModsLen: 1,
 		},
 		{
-			name: "strategies takes precedence over mods",
+			// strategies[] is the only supported form; mods[] at top level is ignored.
+			name: "strategies used, mods at top level ignored",
 			config: map[string]any{
 				"mods": []any{map[string]any{"image": "legacy:latest"}},
 				"strategies": []any{
@@ -993,7 +1006,8 @@ func TestParseHealingStrategies(t *testing.T) {
 			wantStrategies: 0,
 		},
 		{
-			name:           "empty mods",
+			// Legacy mods[] at top level is ignored; returns 0 strategies.
+			name:           "empty mods at top level ignored",
 			config:         map[string]any{"mods": []any{}},
 			wantStrategies: 0,
 		},
@@ -1009,6 +1023,23 @@ func TestParseHealingStrategies(t *testing.T) {
 			wantStrategies:   1,
 			wantFirstName:    "",
 			wantFirstModsLen: 1,
+		},
+		{
+			name: "single strategy with multiple mods",
+			config: map[string]any{
+				"strategies": []any{
+					map[string]any{
+						"name": "sequential-fix",
+						"mods": []any{
+							map[string]any{"image": "analyze:latest"},
+							map[string]any{"image": "fix:latest"},
+						},
+					},
+				},
+			},
+			wantStrategies:   1,
+			wantFirstName:    "sequential-fix",
+			wantFirstModsLen: 2,
 		},
 	}
 

@@ -135,21 +135,10 @@ post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
 - `ploy mod inspect < run-id>` output as `Gate: passed|failed ...`.
 
-### Multi-strategy healing
+### Healing configuration
 
-The healing configuration supports two forms:
+The healing configuration requires the canonical `strategies[]` schema:
 
-**Single-strategy (mods form)** — A flat `mods` list executed sequentially:
-```yaml
-build_gate_healing:
-  retries: 1
-  mods:
-    - image: docker.io/user/mods-codex:latest
-      command: mod-codex --input /workspace --out /out
-```
-
-**Multi-strategy (branching form)** — Multiple named strategies that can be
-executed in parallel by the control plane:
 ```yaml
 build_gate_healing:
   retries: 2
@@ -164,9 +153,24 @@ build_gate_healing:
           command: apply-known-fixes.sh
 ```
 
-When using the single-strategy `mods` form, it is internally normalized to a single
-unnamed strategy, preserving existing behavior. If both `mods` and `strategies`
-are present, `strategies` takes precedence.
+Each strategy defines a named healing branch with its own `mods[]` list. The
+control plane creates parallel branches for each strategy, and the first branch
+whose re-gate passes wins.
+
+**Single-strategy example** — For a single healing approach, use one strategy:
+```yaml
+build_gate_healing:
+  retries: 1
+  strategies:
+    - name: codex-fix
+      mods:
+        - image: docker.io/user/mods-codex:latest
+          command: mod-codex --input /workspace --out /out
+```
+
+**Note:** Legacy single-strategy form (`build_gate_healing.mods[]` at top level)
+is no longer supported. All healing configurations must use the `strategies[]`
+schema.
 
 #### Multi-strategy semantics
 
