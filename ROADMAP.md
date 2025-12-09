@@ -89,7 +89,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Add `config_env_authz_test.go` to assert only cli-admin can access these endpoints and `config_env_test.go` to verify round-trip between HTTP, `ConfigHolder`, and `store` — expect that PUT then GET returns identical JSON payload (modulo redaction in list view).
 
 ## CLI Surface: `ploy config env`
-- [ ] Add `ploy config env` subcommands — Provide a single CLI entrypoint for managing all global env vars (GitLab, CA bundles, Codex auth JSON, OpenAI keys).
+- [x] Add `ploy config env` subcommands — Provide a single CLI entrypoint for managing all global env vars (GitLab, CA bundles, Codex auth JSON, OpenAI keys).
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy
   - Scope:
