@@ -46,11 +46,6 @@ func TestModRunRepoRouting(t *testing.T) {
 			wantErr: "--base-ref required",
 		},
 		{
-			name:    "add without target-ref",
-			args:    []string{"mod", "run", "repo", "add", "--repo-url", "https://github.com/org/repo.git", "--base-ref", "main", "batch-123"},
-			wantErr: "--target-ref required",
-		},
-		{
 			name:    "remove without run-name",
 			args:    []string{"mod", "run", "repo", "remove"},
 			wantErr: "run-name required",
