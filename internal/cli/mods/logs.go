@@ -14,17 +14,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Format controls log rendering style. Re-exported from internal/cli/logs
-// for backward compatibility with existing callers.
-type Format = logs.Format
-
-const (
-	// FormatStructured includes timestamp, stream labels, and execution context.
-	FormatStructured Format = logs.FormatStructured
-	// FormatRaw prints log lines as-is (message only).
-	FormatRaw Format = logs.FormatRaw
-)
-
 // ErrInvalidFormat indicates an unsupported format value.
 var ErrInvalidFormat = errors.New("mods: invalid format")
 
@@ -33,7 +22,7 @@ type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	Format  Format
+	Format  logs.Format // Use canonical logs.Format directly.
 	Output  io.Writer
 }
 
@@ -41,9 +30,10 @@ type LogsCommand struct {
 func (c LogsCommand) Run(ctx context.Context) error {
 	format := c.Format
 	if format == "" {
-		format = FormatStructured
+		format = logs.FormatStructured
 	}
-	if format != FormatStructured && format != FormatRaw {
+	// Validate format against canonical logs.Format constants.
+	if format != logs.FormatStructured && format != logs.FormatRaw {
 		return ErrInvalidFormat
 	}
 	if c.RunID.IsZero() {

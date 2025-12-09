@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
 
@@ -46,7 +47,7 @@ func TestFollowCommandReconnects(t *testing.T) {
 		},
 		BaseURL: baseURL,
 		JobID:   "job-1",
-		Format:  FormatStructured,
+		Format:  logs.FormatStructured, // Use canonical logs.Format directly.
 		Output:  buf,
 	}
 	if err := cmd.Run(context.Background()); err != nil {

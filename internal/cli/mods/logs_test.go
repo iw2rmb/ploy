@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
 
@@ -37,7 +38,7 @@ func TestLogsCommandStreamsStructured(t *testing.T) {
 		},
 		BaseURL: baseURL,
 		RunID:   "test",
-		Format:  FormatStructured,
+		Format:  logs.FormatStructured, // Use canonical logs.Format directly.
 		Output:  buf,
 	}
 	if err := cmd.Run(context.Background()); err != nil {

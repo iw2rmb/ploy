@@ -121,12 +121,13 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./cmd/ploy/... — CLI tests must pass without deprecated flags.
   - Done: Removed `--retry-wait` flag from mod_run_flags.go, mods_jobs_commands.go (handleModsLogs and handleRunsFollow), mod_command.go usage summary, and testdata/help_mod.txt. Updated cmd/ploy/README.md to remove BC mentions and document that backoff is now handled by the shared SSE backoff policy. Removed RetryBackoff field from stream.Client struct and updated related tests. All CLI tests pass.
 
-- [ ] Drop CLI type aliases kept solely for backward compatibility — Use canonical types directly.
+- [x] Drop CLI type aliases kept solely for backward compatibility — Use canonical types directly.
   - Repository: ploy
-  - Component: internal/cli/runs/follow.go, internal/cli/mods/logs.go.
+  - Component: internal/cli/runs/follow.go, internal/cli/mods/logs.go, cmd/ploy/mods_jobs_commands.go.
   - Scope: Remove `type Format = logs.Format` re-exports when no longer needed as a public API. Update any external or internal callers to import and use logs.Format directly (if any remain).
   - Snippets: Replace usages of runs.Format/mods.Format with logs.Format where necessary.
   - Tests: go test ./internal/cli/... — Logs/follow tests must pass with direct use of logs.Format.
+  - Done: Removed type aliases (`type Format = logs.Format`) and re-exported constants (`FormatStructured`, `FormatRaw`) from internal/cli/runs/follow.go and internal/cli/mods/logs.go. Struct fields now use `logs.Format` directly. Updated cmd/ploy/mods_jobs_commands.go to import and use logs.Format constants directly instead of package-level re-exports. Updated all tests in internal/cli/runs and internal/cli/mods to use logs.FormatStructured and logs.FormatRaw directly. ErrInvalidFormat errors remain package-specific for proper error context.
 
 - [ ] Remove execute helper in main.go once tests are updated — Keep a single CLI entrypoint.
   - Repository: ploy

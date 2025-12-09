@@ -14,17 +14,17 @@ func TestPrintLogFormats(t *testing.T) {
 
 	rec := logs.LogRecord{Timestamp: "2025-01-01T00:00:00Z", Stream: "stderr", Line: "hello\n"}
 
-	// Raw format: message only
+	// Raw format: message only — use canonical logs.FormatRaw directly.
 	var b bytes.Buffer
-	printer := logs.NewPrinter(FormatRaw, &b)
+	printer := logs.NewPrinter(logs.FormatRaw, &b)
 	printer.PrintLog(rec)
 	if got := b.String(); got != "hello\n" {
 		t.Fatalf("raw got %q, want %q", got, "hello\n")
 	}
 
-	// Structured format: timestamp stream message
+	// Structured format: timestamp stream message — use canonical logs.FormatStructured.
 	b.Reset()
-	printer = logs.NewPrinter(FormatStructured, &b)
+	printer = logs.NewPrinter(logs.FormatStructured, &b)
 	printer.PrintLog(rec)
 	if got := b.String(); got != "2025-01-01T00:00:00Z stderr hello\n" {
 		t.Fatalf("structured got %q", got)
@@ -43,7 +43,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 	t.Parallel()
 
 	var b bytes.Buffer
-	printer := logs.NewPrinter(FormatStructured, &b)
+	printer := logs.NewPrinter(logs.FormatStructured, &b)
 
 	// No hint recorded => no output
 	printer.PrintRetentionSummary()
@@ -53,7 +53,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 
 	// Retained with all fields
 	b.Reset()
-	printer = logs.NewPrinter(FormatStructured, &b)
+	printer = logs.NewPrinter(logs.FormatStructured, &b)
 	printer.RecordRetention(logs.RetentionHint{Retained: true, TTL: "24h", Expires: "2025-01-02", Bundle: "cid"})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
@@ -62,7 +62,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 
 	// Retained with ttl only
 	b.Reset()
-	printer = logs.NewPrinter(FormatStructured, &b)
+	printer = logs.NewPrinter(logs.FormatStructured, &b)
 	printer.RecordRetention(logs.RetentionHint{Retained: true, TTL: "24h"})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
@@ -71,7 +71,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 
 	// Retained minimal
 	b.Reset()
-	printer = logs.NewPrinter(FormatStructured, &b)
+	printer = logs.NewPrinter(logs.FormatStructured, &b)
 	printer.RecordRetention(logs.RetentionHint{Retained: true})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
@@ -80,7 +80,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 
 	// Not retained
 	b.Reset()
-	printer = logs.NewPrinter(FormatStructured, &b)
+	printer = logs.NewPrinter(logs.FormatStructured, &b)
 	printer.RecordRetention(logs.RetentionHint{})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
