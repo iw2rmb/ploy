@@ -1,176 +1,134 @@
-# Run ID field naming consistency (RunID vs ID on claim responses)
+# Remove backward compatibility code
 
-Scope: Standardize run identifier field names in nodeagent and claim-related server responses by renaming `ID` to `RunID` (while keeping the JSON wire format as `\"id\"`). This improves type clarity in the codebase, makes it explicit where a value is a run identifier, and aligns with the type system work around KSUID-backed IDs without changing the API contract.
+Scope: Remove backward‑compatibility shims in CLI, control plane, nodeagent, workflow, and docs. Simplify contracts to a single canonical shape per surface (Mods API, endpoints, specs) assuming fresh redeploys only.
 
-Documentation: ../auto/ROADMAP.md, roadmap/ksuid.md, internal/nodeagent/claimer.go, internal/nodeagent/claimer_loop.go, internal/nodeagent/agent_claim_test.go, internal/server/handlers/nodes_claim.go, docs/api/components/schemas/controlplane.yaml (NodeClaimResponse), docs/api/OpenAPI.yaml, docs/api/paths/nodes_id_claim.yaml.
+Documentation: AGENTS.md, docs/mods-lifecycle.md, docs/api/OpenAPI.yaml, cmd/ploy/README.md, internal/mods/api/types.go, internal/server/handlers/*, internal/nodeagent/*, internal/workflow/contracts/*, internal/cli/*.
 
 Legend: [ ] todo, [x] done.
 
-## Nodeagent ClaimResponse field rename
-- [x] Rename `ClaimResponse.ID` to `ClaimResponse.RunID` in nodeagent — Make the run identifier explicit at the type level without changing the JSON schema.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: internal/nodeagent/claimer.go
-  - Scope:
-    - Change the struct definition in `internal/nodeagent/claimer.go` from:
-      - `ID types.RunID \`json:\"id\"\` // Run ID`
-      - to `RunID types.RunID \`json:\"id\"\` // Run ID`.
-    - Ensure any comments above/beside the struct still clearly describe this field as the run ID for the claimed job.
-  - Snippets:
-    - `type ClaimResponse struct {`
-    - `    RunID types.RunID \`json:\"id\"\` // Run ID`
-    - `    JobID types.JobID \`json:\"job_id\"\` // Claimed job ID`
-    - `    // ...`
-    - `}`
-  - Tests:
-    - Run `go test ./internal/nodeagent/...` — All nodeagent tests compile and pass after the rename.
+## Mods API wire contracts
+- [ ] Collapse Mods API responses to a single canonical type (no `ticket` wrapper, no legacy field names) — Ensure GET/POST /v1/mods return one consistent JSON schema.
+  - Repository: ploy
+  - Component: internal/mods/api, internal/server/handlers (mods_ticket.go), internal/cli/mods, cmd/ploy/mods_*.
+  - Scope: Replace `RunSubmitResponse`, `RunStatusResponse`, and `Ticket` wrapper usage in internal/mods/api/types.go and handler responses in internal/server/handlers/mods_ticket.go. Update callers in internal/cli/mods and tests in cmd/ploy/* and internal/server/handlers/* to use the new canonical type. Remove comments and docs that reference “backward compatibility” for `ticket` / `stages` naming.
+  - Snippets: Encode `modsapi.RunSummary` (or a new canonical struct) directly from handlers instead of `modsapi.RunStatusResponse{Ticket: summary}`.
+  - Tests: go test ./internal/mods/... ./internal/server/handlers/... ./cmd/ploy/... — All existing Mods status/submit tests must pass with updated types and response shapes.
 
-## Update nodeagent claim handling call sites
-- [x] Replace uses of `claim.ID` with `claim.RunID` in the claim loop and related helpers — Keep behavior identical while improving readability.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: internal/nodeagent/claimer_loop.go
-  - Scope:
-    - In the claim loop, update logging and function calls:
-      - `slog.Info(\"claimed job\", \"run_id\", claim.ID, ...)` → `claim.RunID`.
-      - `if err := c.ackRun(ctx, claim.ID.String(), claim.JobID.String());` → pass `claim.RunID.String()`.
-    - In the derived target-ref defaulting logic, replace the `/mod/<run-id>` formatting input:
-      - `targetRef = fmt.Sprintf(\"/mod/%s\", claim.ID)` → `fmt.Sprintf(\"/mod/%s\", claim.RunID)`.
-    - In the `StartRunRequest` construction, assign:
-      - `RunID: claim.RunID` instead of `RunID: claim.ID`.
-  - Snippets:
-    - `targetRef := strings.TrimSpace(claim.TargetRef)`
-    - `if targetRef == \"\" {`
-    - `    targetRef = fmt.Sprintf(\"/mod/%s\", claim.RunID)`
-    - `}`
-  - Tests:
-    - Run `go test ./internal/nodeagent/...` — Verify `TestClaimLoop_MapsClaimToStartRunRequest` and related tests still pass and that logs/tests reference `RunID` consistently.
+- [ ] Decide and document the canonical Mods run status schema in OpenAPI/docs — Keep wire contracts discoverable and stable.
+  - Repository: ploy
+  - Component: docs/api, docs/mods-lifecycle.md.
+  - Scope: Update docs/api/OpenAPI.yaml and docs/mods-lifecycle.md to describe the new response shape for Mods submit/status and SSE events (no `ticket` wrapper, clarified `stages` semantics or a new field name if changed). Remove notes about “retained for API backward compatibility”.
+  - Snippets: N/A (documentation only).
+  - Tests: go test ./docs/... (if any doc validation) + manual review; ensure docs/api/verify_openapi_test.go still passes.
 
-## Adjust nodeagent tests constructing ClaimResponse
-- [x] Update ClaimResponse initializers in nodeagent tests to use `RunID` — Keep test data aligned with the new field name.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: internal/nodeagent/agent_claim_test.go, internal/nodeagent/agent_test.go, internal/nodeagent/claimer_loop_test.go
-  - Scope:
-    - Replace struct literals that set `ID: types.RunID(\"...\")` with `RunID: types.RunID(\"...\")`.
-    - Search for any direct references to `claim.ID` or `ClaimResponse{ID:` in tests and update them to `claim.RunID` / `ClaimResponse{RunID:`.
-    - Keep JSON expectations unchanged (the serialized field name remains `\"id\"`), only adjust Go-side field names.
-  - Snippets:
-    - `claim := ClaimResponse{`
-    - `    RunID: types.RunID(\"2NxO0FEXAMPLE4Rn\"),`
-    - `    JobID: types.JobID(\"2NxO0FEXAMPLE4Jb\"),`
-    - `    // ...`
-    - `}`
-  - Tests:
-    - Run `go test ./internal/nodeagent/...` — Confirm no tests rely on the old `ID` identifier and that JSON round-trips still work as before.
+## Mods submit flow (CLI ↔ server)
+- [ ] Remove dual response handling (201 vs 202) and simplified fallback payload from Mods submit CLI — Use a single canonical submit contract.
+  - Repository: ploy
+  - Component: internal/cli/mods (submit.go), cmd/ploy (mods commands).
+  - Scope: In internal/cli/mods/submit.go, drop the 202 path that decodes modsapi.RunSubmitResponse and the second POST that sends simplified `{repo_url,base_ref,target_ref,spec}`. Keep only the canonical request+response path (e.g., 201 with a single summary type). Update cmd/ploy tests that assert 202 or dual behavior.
+  - Snippets: Replace the switch on resp.StatusCode with a single case for the canonical status and error handling for all others.
+  - Tests: go test ./internal/cli/mods/... ./cmd/ploy/... — Submit tests must pass with a single response path.
 
-## Server claim response struct symmetry (optional)
-- [x] Rename the inline `ID` field to `RunID` in the server claim response struct — Align server-side naming with nodeagent while preserving the JSON schema.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: internal/server/handlers/nodes_claim.go
-  - Scope:
-    - In `buildAndSendJobClaimResponse`, change the response struct field:
-      - From `ID string \`json:\"id\"\` // Run ID`
-      - To `RunID string \`json:\"id\"\` // Run ID`.
-    - Adjust struct initialization to set `RunID: run.ID` instead of `ID: run.ID`.
-    - Ensure logging or other call sites that deserialize the claim use the existing `NodeClaimResponse` schema; no changes to JSON field names are required.
-  - Snippets:
-    - `resp := struct {`
-    - `    RunID string \`json:\"id\"\` // Run ID`
-    - `    JobID string \`json:\"job_id\"\``
-    - `    // ...`
-    - `}{`
-    - `    RunID: run.ID,`
-    - `    JobID: job.ID,`
-    - `    // ...`
-    - `}`
-  - Tests:
-    - Run `go test ./internal/server/handlers -run Claim` — Verify claim handler tests still pass and response JSON remains shaped as `{\"id\": ..., \"job_id\": ...}`.
+- [ ] Align server Mods submit handler with the canonical CLI contract — Avoid supporting legacy response shapes.
+  - Repository: ploy
+  - Component: internal/server/handlers (mods_ticket.go and related).
+  - Scope: Ensure POST /v1/mods always returns the chosen canonical status code and JSON shape. Remove any code that builds or accepts legacy submit responses tied to modsapi.RunSubmitResponse or other legacy envelopes.
+  - Snippets: N/A (implementation detail is handler-specific).
+  - Tests: go test ./internal/server/handlers/... — Mods submit handler tests must only reference the canonical contract.
 
-## Docs and schema validation check
-- [x] Re-verify that docs and OpenAPI already describe `id` as Run ID — Confirm no further changes are needed after internal renames.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: docs/api/components/schemas/controlplane.yaml, docs/api/OpenAPI.yaml, docs/api/paths/nodes_id_claim.yaml, docs/build-gate/README.md, docs/mods-lifecycle.md, cmd/ploy/README.md
-  - Scope:
-    - Confirm `NodeClaimResponse.id` is documented as “Run ID (parent run of the claimed job, KSUID string)” and does not need renaming, since the JSON field name stays `id`.
-    - Scan docs for references to `claim.id` vs `claim.run_id` in narrative examples; update prose to use `run_id` terminology where appropriate while keeping JSON examples stable.
-    - Ensure there is no mismatch between the Go field name (`RunID`) and the documented JSON key (`id`) in examples and path descriptions.
-  - Snippets:
-    - `NodeClaimResponse:` block in `docs/api/components/schemas/controlplane.yaml` showing `id` as the run identifier.
-  - Tests:
-    - Run `go test ./docs/api/...` (including `docs/api/verify_openapi_test.go`) — Expect no schema changes, only verification that documentation remains consistent with the existing wire format.
+## Node vs job completion / ack / logs
+- [ ] Remove node-based completion endpoint when job-level completion is canonical — Simplify node → server contract to /v1/jobs/{job_id}/complete only.
+  - Repository: ploy
+  - Component: internal/server/handlers (nodes_complete.go, jobs_complete.go), internal/nodeagent (statusuploader.go), router registration.
+  - Scope: Verify that internal/nodeagent/statusuploader.go only uses /v1/jobs/{job_id}/complete. Remove completeRunHandler and its route from internal/server/handlers/nodes_complete.go and the router wiring if unused. Delete tests that depend on /v1/nodes/{id}/complete.
+  - Snippets: N/A (mostly deletions and route changes).
+  - Tests: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodeagent and completion tests must pass using only the job-level endpoint.
 
-## Replace primitives with domaintypes IDs in control-plane and CLI
-- [x] Migrate control-plane and CLI structs from `string` IDs to `domaintypes` newtypes — Use `RunID`, `JobID`, `NodeID`, `ClusterID`, and `RunRepoID` instead of raw `string` where values are stable identifiers.
-  - Repository: github.com/iw2rmb/ploy
-  - Components: `internal/server`, `internal/cli`, `internal/deploy`, `internal/nodeagent`, `internal/worker`, `cmd/ploy`
-  - Scope:
-    - For run identifiers:
-      - Replace `RunID string` fields in control-plane handlers and CLI types with `RunID domaintypes.RunID` where the field represents a Mods run identifier and the JSON tag is already `json:"run_id"` or equivalent.
-      - Focus first on handwritten structs (handlers and CLI request/response types), not sqlc-generated store models.
-      - Representative hotspots:
-        - `internal/server/handlers/diffs.go` (`diffGetResponse.RunID`).
-        - `internal/server/handlers/artifacts_download.go` response structs using `run_id`.
-        - `internal/server/handlers/nodes_logs.go`, `internal/server/handlers/nodes_events.go` structs with `RunID string`.
-        - `internal/cli/mods/{diffs.go,artifacts.go,resume.go,cancel.go,inspect.go,logs.go,events.go}` where request/response types expose `run_id`.
-        - `cmd/ploy/mod_run_exec.go`, `cmd/ploy/mod_run_repo.go`, `cmd/ploy/mod_run_batch_test.go` helper structs that wrap run identifiers in `string`.
-      - Keep wire format unchanged by preserving existing JSON tags:
-        - Example: `RunID domaintypes.RunID \`json:"run_id"\`` in place of `RunID string \`json:"run_id"\``.
-    - For job identifiers:
-      - Replace `JobID string` fields in control-plane and CLI types with `JobID domaintypes.JobID` where the field identifies a job and the JSON tag is `json:"job_id"`.
-      - Focus areas:
-        - `internal/server/handlers/diffs.go` (`diffItem.JobID`).
-        - `internal/server/events/service.go` payload structs carrying job IDs.
-        - `internal/server/handlers/nodes_claim.go` claim response and request shapes with `job_id`.
-        - `internal/cli/runs/{inspect.go,follow.go}`, `internal/cli/mods/diffs.go`, `internal/cli/logs/printer.go`, and `internal/cli/transfer/client.go` where IDs are treated as opaque job identifiers.
-      - Preserve JSON tags and semantics; only change the Go field type.
-    - For cluster and node identifiers:
-      - Replace `ClusterID string` with `ClusterID domaintypes.ClusterID` for fields representing cluster descriptors, keeping JSON/YAML tags stable:
-        - `internal/deploy/{detect.go,workstation_config.go,ca_rotation_types.go,bootstrap_types.go}`.
-        - `internal/nodeagent/config.go` (`ClusterID string \`yaml:"cluster_id"\`` → `domaintypes.ClusterID`).
-        - `cmd/ploy/node_command.go` and `internal/server/config/types.go` where `cluster_id` identifies a cluster.
-      - Replace `NodeID string` with `NodeID domaintypes.NodeID` in:
-        - `internal/nodeagent/config.go`, `internal/nodeagent/heartbeat.go`, and `internal/server/handlers/bootstrap.go`.
-        - `internal/worker/lifecycle/{collector.go,types.go}`, `internal/server/events/service.go`, and `internal/stream/hub.go`.
-        - CLI types that carry node IDs, such as `internal/cli/logs/printer.go`, `internal/cli/transfer/client.go`, and `cmd/ploy/node_command.go`.
-      - Maintain JSON/YAML tags (e.g., `json:"node_id"`, `yaml:"node_id"`); only update types.
-    - For batched run repositories:
-      - Introduce `domaintypes.RunRepoID` in handler- and CLI-level code that references per-repo IDs in batched runs while keeping store/sqlc models as `string`:
-        - `internal/server/handlers/runs_batch_types.go` and `internal/server/handlers/runs_batch_http.go` when dealing with repo IDs returned from `store.RunRepo`.
-        - CLI side structs for batch status where repo IDs are currently plain `string`.
-      - Convert between `RunRepoID` and `string` at boundaries:
-        - `id domaintypes.RunRepoID` ↔ `string(id)` when calling store methods.
-  - Tests:
-    - For each package touched, run focused tests before and after type changes:
-      - `go test ./internal/server/handlers -run '(Diffs|Artifacts|Nodes|RunsBatch)'`
-      - `go test ./internal/server/events ./internal/stream`
-      - `go test ./internal/cli/... ./cmd/ploy`
-      - `go test ./internal/deploy/... ./internal/nodeagent/... ./internal/worker/...`
-    - Confirm that there are no JSON schema or OpenAPI changes (wire types remain strings) by running `go test ./docs/api`.
+- [ ] Remove ackRunStart backward-compatibility handler or narrow its role — Let claim/completion paths drive run status and events.
+  - Repository: ploy
+  - Component: internal/server/handlers/nodes_ack.go, internal/server/events, any nodeagent callers.
+  - Scope: Confirm whether any nodeagent or CLI code still calls /v1/nodes/{id}/runs/ack. If not needed, remove ackRunStartHandler, its route, and tests. If SSE “run started” events are still required, emit them from claim logic or completion instead of a separate ack endpoint.
+  - Snippets: N/A (handler deletion or simplification).
+  - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Run lifecycle and SSE tests must pass without the ack endpoint.
 
-## Remove TicketID alias and migrate remaining call sites to RunID
-- [x] Eliminate `TicketID` alias from `internal/domain/types` and replace residual Ticket-based terminology with `RunID` usage — finish the migration so `RunID` is the only domain type for Mods run identifiers.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: `internal/domain/types`, `internal/cli/mods`, `internal/server`, docs
-  - Scope:
-    - In `internal/domain/types/ids.go`:
-      - Remove `type TicketID = RunID` and all Ticket-specific comments.
-      - Update any references in comments to state that `RunID` is the canonical run identifier, with no alias.
-    - In `internal/domain/types/ids_test.go` and `internal/domain/types/adapters_test.go`:
-      - Delete the `ticket_alias_compatibility` subtest and any tests that mention `TicketID` explicitly.
-      - Ensure all remaining tests refer only to `RunID` for run identifier behavior.
-    - In CLI Mods helpers:
-      - Replace internal structs that still speak about `TicketID` with `RunID`:
-        - `internal/cli/mods/submit.go`: anonymous responses that expose `TicketID string \`json:"run_id"\`` should be renamed to `RunID string \`json:"run_id"\``; mapping to `modsapi.RunSummary` should use `domaintypes.RunID(resp.RunID)`.
-        - `internal/cli/mods/batch.go`: change helper response fields and uses of `srvResp.TicketID` to `srvResp.RunID`.
-        - `internal/cli/mods/events.go`: remove `TicketID` field aliases and operate on `RunID` naming only.
-      - Keep JSON `run_id` field names unchanged for all wire types.
-    - In control-plane tests and handlers:
-      - Search for `TicketID` in `internal/server`:
-        - Update any comments like “formerly TicketID” to historical notes that can be removed once alias is gone, or drop them if no longer needed.
-        - Ensure events and completion handlers refer only to `RunID` in comments and variables.
-    - Documentation cleanup:
-      - In `roadmap/ticket-id.md`, mark the alias removal step as complete or note that the alias no longer exists once this work lands.
-      - Scan `docs/mods-lifecycle.md`, `docs/api/OpenAPI.yaml`, and `docs/api/components/schemas/controlplane.yaml` for remaining “TicketID” references and replace them with “RunID”/“run id” terminology where they describe type names (not wire fields).
-  - Tests:
-    - `go test ./internal/domain/types`
-    - `go test ./internal/cli/mods/... ./cmd/ploy`
-    - `go test ./internal/server/...`
-    - `go test ./docs/api`
+- [ ] Make events service mandatory for logs; remove direct store write fallbacks — Use a single logging path.
+  - Repository: ploy
+  - Component: internal/server/handlers (nodes_logs.go, runs_logs.go), internal/server/events.
+  - Scope: In createNodeLogsHandler and run logs handler, drop the `eventsService == nil` branches; require eventsService and always call CreateAndPublishLog. Update server wiring to always construct events.Service. Delete or adjust tests that exercised the direct st.CreateLog fallback.
+  - Snippets: Replace conditional eventService usage with a single call to eventsService.CreateAndPublishLog.
+  - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Log ingestion and SSE tests must pass with the events service required.
+
+## Spec, healing, and image compatibility
+- [ ] Tighten Mods spec parsing to a single canonical shape — Stop supporting legacy single-mod `mod` fallbacks.
+  - Repository: ploy
+  - Component: internal/nodeagent/claimer_spec.go, internal/nodeagent/claimer_spec_test.go, cmd/ploy/mod_run_spec_parsing_test.go.
+  - Scope: In parseSpec, remove fallbacks that treat `mod` as a legacy single-mod spec when top-level fields are missing. Define and implement a canonical spec structure (e.g., multi-step `mods[]` plus structured healing config) and require it. Update tests that currently assert mixed legacy behavior.
+  - Snippets: Simplify parseSpec to handle only the canonical schema; delete branches that copy from `mod.*` into top-level fields for BC.
+  - Tests: go test ./internal/nodeagent/... ./cmd/ploy/... — Spec parsing tests must reflect only the canonical shape.
+
+- [ ] Drop single-strategy healing fallback in maybeCreateHealingJobs — Require new healing configuration structure.
+  - Repository: ploy
+  - Component: internal/server/handlers/nodes_complete_healing.go.
+  - Scope: Remove the block that converts top-level `mods[]` into a single unnamed healing strategy “for backward compatibility.” Require callers to provide healing strategies via the new `build_gate_healing` schema. Update tests that depend on the single-strategy fallback.
+  - Snippets: Delete the `fallback to single-strategy form (mods[] at top level)` code path.
+  - Tests: go test ./internal/server/handlers/... — Healing behavior tests must configure healing explicitly via the canonical schema.
+
+- [ ] Re-evaluate ModImage dual-form handling (string vs map) — Optionally narrow accepted forms if desired.
+  - Repository: ploy
+  - Component: internal/workflow/contracts/mod_image.go, internal/nodeagent/manifest.go, internal/workflow/runtime/*.
+  - Scope: Decide whether both universal string and stack-map forms remain supported. If narrowing, update ParseModImage and related code to accept only the chosen canonical form, and adjust manifest builders and tests accordingly. If keeping both, leave as-is (no-op step).
+  - Snippets: N/A unless narrowing; then simplify ParseModImage to a single form.
+  - Tests: go test ./internal/workflow/contracts/... ./internal/nodeagent/... — Image resolution tests must match the chosen contract.
+
+## Worker lifecycle / status snapshots
+- [ ] Remove map-based status accessors in lifecycle cache — Use typed NodeStatus everywhere.
+  - Repository: ploy
+  - Component: internal/worker/lifecycle/cache.go, internal/worker/lifecycle/types.go, status providers/consumers.
+  - Scope: Find all callers of Cache.LatestStatusMap and migrate them to use Cache.LatestStatus and NodeStatus directly. Once all callers are updated, remove LatestStatusMap and any map-based SnapshotSource shims. Keep ToMap only if it is still used for JSON output; otherwise consider simplifying its shape.
+  - Snippets: Replace usages of LatestStatusMap with typed accessors on NodeStatus.
+  - Tests: go test ./internal/worker/... — Worker lifecycle and status reporting tests must pass without map-based helpers.
+
+## Nodeagent options and manifest BC
+- [ ] Remove raw options map round-trip when typed RunOptions is sufficient — Reduce duplicate state.
+  - Repository: ploy
+  - Component: internal/nodeagent/run_options.go, internal/nodeagent/run_options_test.go, internal/nodeagent/manifest.go.
+  - Scope: Audit how RunOptions and the raw options map are used. If all consumers can operate on RunOptions, remove the need to preserve the raw map “for backward compatibility” and update tests that assert its presence. Simplify manifest and step builders to use only typed fields.
+  - Snippets: Delete fields and methods that exist solely to mirror raw map[string]any into RunOptions.
+  - Tests: go test ./internal/nodeagent/... — RunOptions and manifest tests must pass with typed-only options.
+
+- [ ] Make manifest builders require explicit stack where appropriate — Avoid relying on “unknown” for BC.
+  - Repository: ploy
+  - Component: internal/nodeagent/manifest.go, internal/workflow/contracts/mod_image.go.
+  - Scope: Collapse buildManifestFromRequest wrapper into buildManifestFromRequestWithStack where callers can provide a concrete stack. For callers that truly cannot know the stack, document and keep the “unknown” path explicitly rather than labeling it as backward compatibility. Update tests to call the stack-aware builder directly.
+  - Snippets: Replace calls to buildManifestFromRequest with buildManifestFromRequestWithStack and explicit contracts.ModStack values.
+  - Tests: go test ./internal/nodeagent/... ./internal/workflow/contracts/... — Manifest tests must pass with explicit stack handling.
+
+- [ ] Tighten JobMeta JSON handling; treat legacy shapes as invalid if acceptable — Enforce structured metadata going forward.
+  - Repository: ploy
+  - Component: internal/workflow/contracts/job_meta.go.
+  - Scope: In UnmarshalJobMeta, reconsider “backward compatibility” behavior for empty `{}`/`null` and missing `kind`. If acceptable, change logic to require non-empty kind and return an error for invalid payloads (or handle them via explicit migration). Update tests accordingly.
+  - Snippets: Replace defaulting `m.Kind = JobKindMod` with validation and error handling.
+  - Tests: go test ./internal/workflow/contracts/... — Job meta tests must reflect the stricter expectations.
+
+## CLI surface and tests
+- [ ] Remove deprecated CLI flags and BC mentions from docs — Simplify user-facing interface.
+  - Repository: ploy
+  - Component: cmd/ploy, cmd/ploy/README.md, relevant cobra command files.
+  - Scope: Remove deprecated flags like `--retry-wait` where the README says “preserved for backward compatibility,” and update command help/usage strings. Adjust tests that rely on deprecated flags.
+  - Snippets: Delete flag declarations and update usage examples in cmd/ploy/README.md.
+  - Tests: go test ./cmd/ploy/... — CLI tests must pass without deprecated flags.
+
+- [ ] Drop CLI type aliases kept solely for backward compatibility — Use canonical types directly.
+  - Repository: ploy
+  - Component: internal/cli/runs/follow.go, internal/cli/mods/logs.go.
+  - Scope: Remove `type Format = logs.Format` re-exports when no longer needed as a public API. Update any external or internal callers to import and use logs.Format directly (if any remain).
+  - Snippets: Replace usages of runs.Format/mods.Format with logs.Format where necessary.
+  - Tests: go test ./internal/cli/... — Logs/follow tests must pass with direct use of logs.Format.
+
+- [ ] Remove execute helper in main.go once tests are updated — Keep a single CLI entrypoint.
+  - Repository: ploy
+  - Component: cmd/ploy/main.go, cmd/ploy tests.
+  - Scope: Update tests that depend on execute(args, stderr) to instead construct and execute newRootCmd directly. After tests are updated, delete execute and its comment about backward compatibility.
+  - Snippets: Replace test calls to execute with rootCmd := newRootCmd(...); rootCmd.SetArgs(...); rootCmd.Execute().
+  - Tests: go test ./cmd/ploy/... — All CLI tests must pass without execute.
+
