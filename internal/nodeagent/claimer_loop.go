@@ -119,11 +119,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("decode claim response: %w", err)
 	}
 
-	slog.Info("claimed job", "run_id", claim.ID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
+	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
 
 	// Send ack before execution.
 	// Include job_id to acknowledge the specific job being executed.
-	if err := c.ackRun(ctx, claim.ID.String(), claim.JobID.String()); err != nil {
+	if err := c.ackRun(ctx, claim.RunID.String(), claim.JobID.String()); err != nil {
 		return true, fmt.Errorf("ack run: %w", err)
 	}
 
@@ -135,11 +135,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// /mod/<run-id> so MR branch and PLOY_TARGET_REF have a deterministic name.
 	targetRef := strings.TrimSpace(claim.TargetRef)
 	if targetRef == "" {
-		targetRef = fmt.Sprintf("/mod/%s", claim.ID)
+		targetRef = fmt.Sprintf("/mod/%s", claim.RunID)
 	}
 
 	startReq := StartRunRequest{
-		RunID:     claim.ID,    // Already types.RunID from ClaimResponse
+		RunID:     claim.RunID, // Already types.RunID from ClaimResponse
 		JobID:     claim.JobID, // Already types.JobID from ClaimResponse
 		RepoURL:   types.RepoURL(claim.RepoURL),
 		BaseRef:   types.GitRef(claim.BaseRef),

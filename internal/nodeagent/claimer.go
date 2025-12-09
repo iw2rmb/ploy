@@ -23,8 +23,10 @@ type ClaimManager struct {
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
 // Returned by the server when a job is successfully claimed and assigned to this node.
 // Contains the run metadata plus the claimed job's ID and name.
+// Note: The RunID field uses json:"id" to maintain wire compatibility with the
+// existing API schema while providing type clarity in Go code.
 type ClaimResponse struct {
-	ID        types.RunID     `json:"id"`         // Run ID
+	RunID     types.RunID     `json:"id"`         // Run ID (KSUID identifying the parent run)
 	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
 	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 	ModType   string          `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
