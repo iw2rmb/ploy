@@ -48,7 +48,9 @@ if [[ -n "$auth_file" ]]; then
   install -m 600 "$auth_file" /root/.codex/auth.json
 fi
 
-# Auth via env content
+# Auth via env content.
+# Note: CODEX_AUTH_JSON may be injected via `ploy config env set --key CODEX_AUTH_JSON ...`
+# and propagated through the global config mechanism. See ROADMAP.md for details.
 if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
   umask 077
   printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json
