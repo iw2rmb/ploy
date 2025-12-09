@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // Ensures job_id and artifact_name options are propagated into manifest.Options
@@ -19,7 +20,8 @@ func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 		},
 	}
 
-	m, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	m, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}

@@ -127,7 +127,8 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			manifest, err := buildHealingManifest(tc.req, tc.mod, 0, "")
+			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+			manifest, err := buildHealingManifest(tc.req, tc.mod, 0, "", contracts.ModStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -176,7 +177,8 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		Env:   originalEnv,
 	}
 
-	_, err := buildHealingManifest(req, mod, 0, "")
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	_, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -209,7 +211,8 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 		Env:   nil, // explicitly nil
 	}
 
-	manifest, err := buildHealingManifest(req, mod, 0, "")
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -255,7 +258,8 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := buildHealingManifest(req, tc.mod, 0, "")
+			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+			_, err := buildHealingManifest(req, tc.mod, 0, "", contracts.ModStackUnknown)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -366,7 +370,8 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			manifest, err := buildHealingManifest(req, tc.mod, 0, tc.codexSession)
+			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+			manifest, err := buildHealingManifest(req, tc.mod, 0, tc.codexSession, contracts.ModStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -404,7 +409,8 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 		},
 	}
 
-	manifest, err := buildHealingManifest(req, mod, 0, "session-id-123")
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, mod, 0, "session-id-123", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}

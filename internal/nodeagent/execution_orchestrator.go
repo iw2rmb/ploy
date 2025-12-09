@@ -103,7 +103,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 				"run_id", req.RunID, "mod_index", typedOpts.ModIndex, "steps_len", len(typedOpts.Steps))
 		}
 	}
-	manifest, err := buildManifestFromRequestWithStack(req, typedOpts, stepIdx, stack)
+	manifest, err := buildManifestFromRequest(req, typedOpts, stepIdx, stack)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -255,11 +255,11 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		strategies := typedOpts.Healing.NormalizedStrategies()
 		if len(strategies) > 0 {
 			healMod, healIndex := selectHealingModForJob(req, typedOpts.Healing)
-			manifest, err = buildHealingManifestWithStack(req, healMod, healIndex, "", stack)
+			manifest, err = buildHealingManifest(req, healMod, healIndex, "", stack)
 		}
 	}
 	if manifest.Image == "" {
-		manifest, err = buildManifestFromRequestWithStack(req, typedOpts, 0, stack)
+		manifest, err = buildManifestFromRequest(req, typedOpts, 0, stack)
 	}
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)

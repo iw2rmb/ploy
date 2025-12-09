@@ -18,64 +18,19 @@ import (
 // Execution options are used. This enables step-by-step execution where each step
 // runs gate+mod with its own image/command/env configuration.
 //
-// ## Stack-Aware Image Resolution
+// ## Stack Parameter
 //
-// The Image field in StepMod and ExecutionOptions supports both canonical forms:
-// universal images (string) and stack-specific images (map). This function resolves
-// the image using contracts.ModStackUnknown as the default stack. For full stack
-// detection, use buildManifestFromRequestWithStack which accepts an explicit stack.
-func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int) (contracts.StepManifest, error) {
-	// Delegate to the stack-aware version with "unknown" as the default stack.
-	// Callers without stack info use this entry point; stack-specific callers
-	// should use buildManifestFromRequestWithStack directly.
-	return buildManifestFromRequestWithStack(req, typedOpts, stepIndex, contracts.ModStackUnknown)
-}
-
-// buildGateManifestFromRequest builds a StepManifest for gate jobs (pre_gate,
-// post_gate, re_gate) using only the gate configuration and repo metadata.
+// The stack parameter is used to resolve stack-specific images when the image field
+// is a map (e.g., different images for java-maven vs java-gradle). Stack values
+// typically come from Build Gate detection:
+//   - contracts.ModStackJavaMaven: Maven project detected (pom.xml present)
+//   - contracts.ModStackJavaGradle: Gradle project detected (build.gradle present)
+//   - contracts.ModStackJava: Generic Java (no specific build tool)
+//   - contracts.ModStackUnknown: No recognized stack markers or stack not yet detected
 //
-// Gate jobs must not depend on stack-aware mod images from Execution.Image or
-// mods[].image. Stack detection happens inside the Build Gate itself, and the
-// resulting stack is persisted for later Mods/healing jobs. To avoid resolving
-// stack-specific image maps with an "unknown" stack (which would fail when no
-// default key is present), this helper:
-//
-//   - Clears Steps so multi-step mods[] configuration is ignored.
-//   - Clears Execution.Image and Execution.Command so the default ubuntu image
-//     and placeholder command are used.
-//
-// This keeps gate manifest image resolution independent of mods[] image maps
-// while preserving Gate profile, repo metadata, and MR wiring options.
-func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
-	// Shallow copy to avoid mutating caller's RunOptions.
-	sanitized := typedOpts
-
-	// Ignore per-step mods configuration for gate jobs; gate execution does not
-	// run the Mods containers and should not depend on mods[].image.
-	sanitized.Steps = nil
-
-	// Ignore stack-aware Execution.Image and custom commands for gate jobs.
-	// Gate containers are selected by the Gate executor based on profile and
-	// workspace detection, not by the Mods execution image.
-	sanitized.Execution.Image = contracts.ModImage{}
-	sanitized.Execution.Command = ExecutionCommand{}
-
-	// Delegate to the standard manifest builder with sanitized options.
-	return buildManifestFromRequest(req, sanitized, 0)
-}
-
-// buildManifestFromRequestWithStack converts a StartRunRequest into a StepManifest
-// with explicit stack-aware image resolution. The stack parameter is used to
-// resolve stack-specific images when the image field is a map.
-//
-// Stack values typically come from Build Gate detection:
-//   - "java-maven": Maven project detected (pom.xml present)
-//   - "java-gradle": Gradle project detected (build.gradle present)
-//   - "java": Generic Java (no specific build tool)
-//   - "unknown": No recognized stack markers
-//
-// For universal images (string form), the stack is ignored.
-func buildManifestFromRequestWithStack(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.ModStack) (contracts.StepManifest, error) {
+// Callers should pass the explicit stack when available. For gate jobs (where stack
+// is not yet detected), pass contracts.ModStackUnknown explicitly.
+func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.ModStack) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -251,6 +206,44 @@ func buildManifestFromRequestWithStack(req StartRunRequest, typedOpts RunOptions
 	return manifest, nil
 }
 
+// buildGateManifestFromRequest builds a StepManifest for gate jobs (pre_gate,
+// post_gate, re_gate) using only the gate configuration and repo metadata.
+//
+// Gate jobs must not depend on stack-aware mod images from Execution.Image or
+// mods[].image. Stack detection happens inside the Build Gate itself, and the
+// resulting stack is persisted for later Mods/healing jobs. To avoid resolving
+// stack-specific image maps with an "unknown" stack (which would fail when no
+// default key is present), this helper:
+//
+//   - Clears Steps so multi-step mods[] configuration is ignored.
+//   - Clears Execution.Image and Execution.Command so the default ubuntu image
+//     and placeholder command are used.
+//
+// This keeps gate manifest image resolution independent of mods[] image maps
+// while preserving Gate profile, repo metadata, and MR wiring options.
+//
+// Gate jobs explicitly use contracts.ModStackUnknown since stack detection has
+// not yet occurred. The Build Gate will determine the actual stack (e.g.,
+// java-maven, java-gradle) which is then persisted for subsequent mod/healing jobs.
+func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
+	// Shallow copy to avoid mutating caller's RunOptions.
+	sanitized := typedOpts
+
+	// Ignore per-step mods configuration for gate jobs; gate execution does not
+	// run the Mods containers and should not depend on mods[].image.
+	sanitized.Steps = nil
+
+	// Ignore stack-aware Execution.Image and custom commands for gate jobs.
+	// Gate containers are selected by the Gate executor based on profile and
+	// workspace detection, not by the Mods execution image.
+	sanitized.Execution.Image = contracts.ModImage{}
+	sanitized.Execution.Command = ExecutionCommand{}
+
+	// Delegate to the standard manifest builder with sanitized options.
+	// Pass ModStackUnknown explicitly since gate jobs run before stack detection.
+	return buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)
+}
+
 // isCodexHealingImage returns true if the image name indicates a Codex-based
 // healing mod container. This enables automatic session resume for Codex healers.
 //
@@ -290,21 +283,20 @@ func isCodexHealingImage(image string) bool {
 // These env vars enable healing mods to call the Build Gate HTTP API with the same
 // repo+ref baseline used by the initial Build Gate check.
 //
-// ## Stack-Aware Image Resolution
+// ## Stack Parameter
 //
 // HealingMod.Image supports both canonical forms (universal string and stack map).
-// This function uses contracts.ModStackUnknown as the default stack for image
-// resolution. For explicit stack support, use buildHealingManifestWithStack.
-func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string) (contracts.StepManifest, error) {
-	return buildHealingManifestWithStack(req, mod, index, codexSession, contracts.ModStackUnknown)
-}
-
-// buildHealingManifestWithStack constructs a StepManifest from a typed HealingMod
-// with explicit stack-aware image resolution.
+// The stack parameter is used to resolve stack-specific images when the image field
+// is a map. Stack values typically come from Build Gate detection:
+//   - contracts.ModStackJavaMaven: Maven project detected (pom.xml present)
+//   - contracts.ModStackJavaGradle: Gradle project detected (build.gradle present)
+//   - contracts.ModStackJava: Generic Java (no specific build tool)
+//   - contracts.ModStackUnknown: No recognized stack markers or stack not yet detected
 //
-// The stack parameter is used to resolve stack-specific images when the image
-// field is a map. For universal images (string form), the stack is ignored.
-func buildHealingManifestWithStack(req StartRunRequest, mod HealingMod, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+// Callers should pass the explicit stack when available. For healing during inline
+// gate-heal-regate loops (where stack may not be persisted yet), pass
+// contracts.ModStackUnknown explicitly.
+func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
 	// Validate and resolve the image field. ModImage can be:
 	//   - Universal string: returned directly
 	//   - Stack map: resolved using the provided stack with default fallback
