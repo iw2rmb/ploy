@@ -108,9 +108,22 @@ func TestMarshalJobMeta(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "nil meta returns empty object",
-			meta: nil,
-			want: "{}",
+			name:    "nil meta returns error",
+			meta:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "invalid kind returns error",
+			meta:    &JobMeta{Kind: ""},
+			wantErr: true,
+		},
+		{
+			name: "gate metadata on mod job returns error",
+			meta: &JobMeta{
+				Kind: JobKindMod,
+				Gate: &BuildGateStageMetadata{},
+			},
+			wantErr: true,
 		},
 		{
 			name: "mod job",
@@ -146,7 +159,7 @@ func TestMarshalJobMeta(t *testing.T) {
 				t.Errorf("MarshalJobMeta() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
-			if string(got) != tc.want {
+			if !tc.wantErr && string(got) != tc.want {
 				t.Errorf("MarshalJobMeta() = %s, want %s", got, tc.want)
 			}
 		})
@@ -158,24 +171,45 @@ func TestUnmarshalJobMeta(t *testing.T) {
 		name     string
 		data     []byte
 		wantKind JobKind
-		wantNil  bool
 		wantErr  bool
 	}{
+		// Legacy shapes are now rejected - structured metadata is required.
 		{
-			name:    "empty bytes returns nil",
+			name:    "empty bytes returns error",
 			data:    []byte{},
-			wantNil: true,
+			wantErr: true,
 		},
 		{
-			name:    "empty object returns nil",
+			name:    "empty object returns error",
 			data:    []byte("{}"),
-			wantNil: true,
+			wantErr: true,
 		},
 		{
-			name:    "null returns nil",
+			name:    "null returns error",
 			data:    []byte("null"),
-			wantNil: true,
+			wantErr: true,
 		},
+		{
+			name:    "missing kind field returns error",
+			data:    []byte(`{"gate":{"log_digest":"sha256:abc"}}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid kind returns error",
+			data:    []byte(`{"kind":"unknown"}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid json returns error",
+			data:    []byte(`{invalid json`),
+			wantErr: true,
+		},
+		{
+			name:    "gate metadata on mod job returns error",
+			data:    []byte(`{"kind":"mod","gate":{"log_digest":"sha256:abc"}}`),
+			wantErr: true,
+		},
+		// Valid structured metadata.
 		{
 			name:     "mod job",
 			data:     []byte(`{"kind":"mod"}`),
@@ -199,9 +233,10 @@ func TestUnmarshalJobMeta(t *testing.T) {
 				t.Errorf("UnmarshalJobMeta() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
-			if tc.wantNil {
-				if got != nil {
-					t.Errorf("UnmarshalJobMeta() = %v, want nil", got)
+			if tc.wantErr {
+				// Verify error message is descriptive for debugging.
+				if err != nil && len(err.Error()) < 10 {
+					t.Errorf("UnmarshalJobMeta() error message too short: %v", err)
 				}
 				return
 			}
