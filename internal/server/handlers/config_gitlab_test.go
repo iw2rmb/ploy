@@ -16,7 +16,7 @@ func TestConfigGitLabGetReturnsCurrentConfig(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{
 		Domain: "https://gitlab.example.com",
 		Token:  "test-token-123",
-	})
+	}, nil)
 
 	handler := getGitLabConfigHandler(holder)
 	req := httptest.NewRequest(http.MethodGet, "/v1/config/gitlab", nil)
@@ -50,7 +50,7 @@ func TestConfigGitLabPutUpdatesConfig(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{
 		Domain: "https://gitlab.example.com",
 		Token:  "old-token",
-	})
+	}, nil)
 
 	reqBody := map[string]string{
 		"domain": "https://gitlab.new.com",
@@ -100,7 +100,7 @@ func TestConfigGitLabPutUpdatesConfig(t *testing.T) {
 // TestConfigGitLabPutInvalidJSON verifies that PUT /v1/config/gitlab
 // returns 400 Bad Request when the request body is not valid JSON.
 func TestConfigGitLabPutInvalidJSON(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{})
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putGitLabConfigHandler(holder)
 	req := httptest.NewRequest(http.MethodPut, "/v1/config/gitlab", bytes.NewReader([]byte("not json")))
@@ -140,7 +140,7 @@ func TestConfigGitLabRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			holder := NewConfigHolder(config.GitLabConfig{})
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 			// PUT the configuration.
 			reqBody := map[string]string{

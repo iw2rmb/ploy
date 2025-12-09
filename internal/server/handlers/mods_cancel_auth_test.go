@@ -33,7 +33,7 @@ func TestCancelTicket_Authorization(t *testing.T) {
 		if err != nil {
 			t.Fatalf("http server: %v", err)
 		}
-		RegisterRoutes(srv, st, ev, NewConfigHolder(config.GitLabConfig{}), "test-secret")
+		RegisterRoutes(srv, st, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
 		return srv
 	}
 

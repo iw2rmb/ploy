@@ -44,7 +44,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Add store-level unit tests to verify CRUD semantics against a test database or pgxpool mock — expect round-trip of `GlobalEnv` entries and primary-key enforcement on `key`.
 
 ## ConfigHolder & Config Env HTTP API
-- [ ] Extend ConfigHolder and register `/v1/config/env` endpoints — Provide in-memory access to global env entries and a typed HTTP surface used by the CLI.
+- [x] Extend ConfigHolder and register `/v1/config/env` endpoints — Provide in-memory access to global env entries and a typed HTTP surface used by the CLI.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers, cmd/ployd/server.go
   - Scope:

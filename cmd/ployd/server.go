@@ -126,8 +126,31 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("create http server: %w", err)
 	}
 
+	// Load global environment variables from the store for ConfigHolder initialization.
+	// These are global env entries (CA bundles, Codex auth, API keys) persisted in
+	// the config_env table (ROADMAP.md line 10-44).
+	var globalEnvEntries []store.ConfigEnv
+	if st != nil {
+		globalEnvEntries, err = st.ListGlobalEnv(ctx)
+		if err != nil {
+			// Log but do not fail — global env is additive; server can run without it.
+			slog.Warn("failed to load global env from store, continuing with empty map", "err", err)
+			globalEnvEntries = nil
+		}
+	}
+	// Convert store entries to ConfigHolder's in-memory map.
+	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(globalEnvEntries))
+	for _, e := range globalEnvEntries {
+		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
+			Value:  e.Value,
+			Scope:  e.Scope,
+			Secret: e.Secret,
+		}
+	}
+	slog.Info("loaded global env entries from store", "count", len(globalEnvMap))
+
 	// Initialize config holder for runtime configuration access.
-	configHolder := handlers.NewConfigHolder(cfg.GitLab)
+	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
 
 	// Register HTTP routes.
 	handlers.RegisterRoutes(httpSrv, st, eventsService, configHolder, tokenSecret)

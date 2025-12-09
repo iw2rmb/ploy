@@ -12,9 +12,15 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Health
 	s.HandleFunc("/health", healthHandler)
 
-	// Config
+	// Config — GitLab
 	s.HandleFunc("GET /v1/config/gitlab", getGitLabConfigHandler(configHolder), auth.RoleCLIAdmin)
 	s.HandleFunc("PUT /v1/config/gitlab", putGitLabConfigHandler(configHolder), auth.RoleCLIAdmin)
+
+	// Config — Global Env (ROADMAP.md line 47: /v1/config/env endpoints)
+	s.HandleFunc("GET /v1/config/env", listGlobalEnvHandler(configHolder), auth.RoleCLIAdmin)
+	s.HandleFunc("GET /v1/config/env/{key}", getGlobalEnvHandler(configHolder), auth.RoleCLIAdmin)
+	s.HandleFunc("PUT /v1/config/env/{key}", putGlobalEnvHandler(configHolder, st), auth.RoleCLIAdmin)
+	s.HandleFunc("DELETE /v1/config/env/{key}", deleteGlobalEnvHandler(configHolder, st), auth.RoleCLIAdmin)
 
 	// Token management
 	s.HandleFunc("POST /v1/tokens", createAPITokenHandler(st, tokenSecret), auth.RoleCLIAdmin)
