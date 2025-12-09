@@ -85,7 +85,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/server/handlers -run Claim` — Verify claim handler tests still pass and response JSON remains shaped as `{\"id\": ..., \"job_id\": ...}`.
 
 ## Docs and schema validation check
-- [ ] Re-verify that docs and OpenAPI already describe `id` as Run ID — Confirm no further changes are needed after internal renames.
+- [x] Re-verify that docs and OpenAPI already describe `id` as Run ID — Confirm no further changes are needed after internal renames.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs/api/components/schemas/controlplane.yaml, docs/api/OpenAPI.yaml, docs/api/paths/nodes_id_claim.yaml, docs/build-gate/README.md, docs/mods-lifecycle.md, cmd/ploy/README.md
   - Scope:
