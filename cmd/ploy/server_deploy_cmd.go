@@ -15,25 +15,6 @@ import (
 // detectRunner allows tests to inject a mock runner for cluster detection.
 // Declared in server_deploy_remote.go.
 
-func handleServer(args []string, stderr io.Writer) error {
-	// Handle --help and -h flags to print usage and exit cleanly.
-	if wantsHelp(args) {
-		printServerUsage(stderr)
-		return nil
-	}
-	if len(args) == 0 {
-		printServerUsage(stderr)
-		return errors.New("server subcommand required")
-	}
-	switch args[0] {
-	case "deploy":
-		return handleServerDeploy(args[1:], stderr)
-	default:
-		printServerUsage(stderr)
-		return fmt.Errorf("unknown server subcommand %q", args[0])
-	}
-}
-
 func handleServerDeploy(args []string, stderr io.Writer) error {
 	if stderr == nil {
 		stderr = io.Discard
@@ -121,20 +102,6 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	}
 
 	return runServerDeploy(serverCfg, stderr)
-}
-
-// printServerUsage prints usage for the server router level.
-// NOTE: The server command has been re-rooted under `ploy cluster deploy`.
-// This usage is now only shown if the user somehow invokes the legacy
-// handleServer path (kept for internal reuse/test purposes). In normal
-// operation, users should see cluster-scoped usage from printClusterUsage.
-func printServerUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy [--address <host-or-ip>] [flags]")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  deploy   Deploy and configure a control plane server")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Note: 'ploy server' has been removed. Use 'ploy cluster deploy' instead.")
 }
 
 // printServerDeployUsage prints usage for the deploy subcommand.

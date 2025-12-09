@@ -10,7 +10,7 @@ import (
 
 // TestCommandsWiredIntoRoot verifies that all command builders are properly
 // wired into the root cobra command tree. This test ensures that the refactored
-// command structure (using newModCmd, newServerCmd, etc.) properly integrates
+// command structure (using newModCmd, newClusterCmd, etc.) properly integrates
 // with the root command.
 func TestCommandsWiredIntoRoot(t *testing.T) {
 	// Create root command with stderr buffer to capture output.
@@ -78,9 +78,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},
 		{"newConfigCmd", func(w *bytes.Buffer) *cobra.Command { return newConfigCmd(w) }},
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},
-		{"newServerCmd", func(w *bytes.Buffer) *cobra.Command { return newServerCmd(w) }},
-		{"newRolloutCmd", func(w *bytes.Buffer) *cobra.Command { return newRolloutCmd(w) }},
-		// NOTE: newTokenCmd removed — token re-rooted under cluster token. See ROADMAP.md line 387.
+		// NOTE: legacy newServerCmd/newRolloutCmd/newTokenCmd builders have been removed.
 	}
 
 	for _, tt := range tests {

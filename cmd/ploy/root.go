@@ -56,7 +56,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	}
 
 	// Subcommands: wire existing handlers into cobra commands.
-	// Commands are structured via dedicated builder functions (newModCmd, newServerCmd, etc.)
+	// Commands are structured via dedicated builder functions (newModCmd, newClusterCmd, etc.)
 	// that encapsulate command hierarchy and preserve existing business logic.
 	// Each builder function creates a cobra command tree with proper subcommand structure.
 
@@ -97,9 +97,6 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 				printUsage(stderr)
 			} else {
 				// Dispatch to existing help handlers for subcommands.
-				// NOTE: Commands 'server', 'node', 'rollout', and 'token' have been
-				// re-rooted under 'ploy cluster'. Help requests for these legacy
-				// command names are redirected to the cluster-scoped usage helpers.
 				switch args[0] {
 				case "mod":
 					printModUsage(stderr)
@@ -109,20 +106,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 					printRunsUsage(stderr)
 				case "cluster":
 					printClusterUsage(stderr)
-				case "server":
-					// Legacy: 'ploy server' → 'ploy cluster deploy'
-					printServerUsage(stderr)
-				case "node":
-					// Legacy: 'ploy node' → 'ploy cluster node'
-					printNodeUsage(stderr)
-				case "rollout":
-					// Legacy: 'ploy rollout' → 'ploy cluster rollout'
-					printRolloutUsage(stderr)
 				case "config":
 					printConfigUsage(stderr)
-				case "token":
-					// Legacy: 'ploy token' → 'ploy cluster token'
-					printTokenUsage(stderr)
 				default:
 					printUsage(stderr)
 				}

@@ -1,509 +1,343 @@
-# ploy CLI help & cluster command restructuring
+# ploy config env global integration
 
-Scope: Restructure the CLI command surface to introduce a first‑class `ploy cluster` namespace, move server/node/rollout/token operations under it, and standardize `--help` behavior at every command level while keeping existing business logic and control‑plane interactions intact.
+Scope: Introduce a unified `ploy config env` surface and control-plane storage for global environment variables (GitLab domain/PAT, CA cert bundles, Codex auth JSON, OpenAI API keys). Ensure these globals are injected into all relevant jobs (mods, healing, gate workers) in a consistent way and consumed by official images (e.g., mod-codex, ORW, build-gate images).
 
-Documentation: ../auto/ROADMAP.md, AGENTS.md, cmd/ploy/README.md, cmd/ploy/main.go, cmd/ploy/root.go, cmd/ploy/usage.go, cmd/ploy/commands_config.go, cmd/ploy/commands_server.go, cmd/ploy/mod_command.go, cmd/ploy/mods_jobs_commands.go, cmd/ploy/config_command.go, cmd/ploy/manifest_command.go, cmd/ploy/server_deploy_cmd.go, cmd/ploy/node_command.go, cmd/ploy/rollout_server.go, cmd/ploy/rollout_nodes_cmd.go, cmd/ploy/token_commands.go, cmd/ploy/testdata/help.txt, cmd/ploy/server_cmd_usage_test.go, cmd/ploy/node_command_test.go, cmd/ploy/rollout_server_test.go, cmd/ploy/rollout_nodes_args_validation_test.go, tests/smoke_tests.sh, README.md, docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md, docs/envs/README.md, docs/how-to/deploy-locally.md, docs/how-to/token-management.md, docs/how-to/bearer-token-troubleshooting.md.
+Documentation: /Users/vk/@iw2rmb/auto/ROADMAP.md, ROADMAP.md, cmd/ploy/README.md, docs/envs/README.md, docs/mods-lifecycle.md, docs/api/OpenAPI.yaml, internal/server/config, internal/server/handlers/config_gitlab.go, internal/server/handlers/nodes_claim.go, internal/server/handlers/spec_utils.go, internal/nodeagent/claimer_spec.go, internal/nodeagent/manifest.go, internal/workflow/runtime/step/gate_docker.go, docker/mods/mod-codex/mod-codex.sh, docker/mods/orw-maven/orw-maven.sh, docker/mods/orw-gradle/orw-gradle.sh.
 
 Legend: [ ] todo, [x] done.
 
-## Standardize help behavior
-- [x] Ensure `--help` (and `-h`) works at every command level — Guarantee that `ploy --help`, `ploy <command> --help`, and deeper forms like `ploy cluster rollout --help` print the correct usage and subcommand lists instead of falling back to Cobra’s default or surfacing “unknown subcommand” errors.
+## Server Storage & Wiring
+- [ ] Add `config_env` table and wire into server config load — Persist global env entries (including secrets) in the control-plane database with scope metadata.
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root + all command routers)
+  - Component: internal/store (migrations + store API), internal/server/config
   - Scope:
-    - Root help:
-      - In `cmd/ploy/root.go`, set an explicit help function so that `ploy --help` mirrors `ploy help` and uses the existing `printUsage` helper:
-        ```go
-        func newRootCmd(stderr io.Writer) *cobra.Command {
-          root := &cobra.Command{
-            Use:           "ploy",
-            Short:         "Ploy CLI v2",
-            Long:          "Ploy CLI v2 — control plane and node management",
-            SilenceUsage:  true,
-            SilenceErrors: true,
-          }
-
-          root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-            printUsage(stderr)
-          })
-          // existing version wiring and subcommands...
-          return root
-        }
-        ```
-      - Keep `printUsage` as the single source of truth for top‑level help text (`cmd/ploy/main.go:printUsage`) and ensure `cmd/ploy/testdata/help.txt` matches it exactly.
-    - Router‑level `--help` handling:
-      - For every manual router that currently uses `DisableFlagParsing: true` and does its own `args[0]` switch, add an early check for `--help` and `-h` that prints the appropriate usage then exits cleanly:
-        - `handleMod` (`cmd/ploy/mod_command.go`)
-        - `handleMods`, `handleRuns` (`cmd/ploy/mods_jobs_commands.go`)
-        - `handleConfig`, `handleConfigGitLab` (`cmd/ploy/config_command.go`)
-        - `handleManifest` (`cmd/ploy/manifest_command.go`)
-        - `handleServer` (`cmd/ploy/server_deploy_cmd.go`)
-        - `handleNode` (`cmd/ploy/node_command.go`)
-        - `handleRollout`, `handleRolloutServer`, `handleRolloutNodes` (`cmd/ploy/rollout_server.go`, `cmd/ploy/rollout_nodes_cmd.go`)
-        - `handleToken` (`cmd/ploy/token_commands.go`)
-      - Use a consistent pattern:
-        ```go
-        func handleServer(args []string, stderr io.Writer) error {
-          if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-            printServerUsage(stderr)
-            return nil
-          }
-          if len(args) == 0 {
-            printServerUsage(stderr)
-            return errors.New("server subcommand required")
-          }
-          switch args[0] {
-          case "deploy":
-            return handleServerDeploy(args[1:], stderr)
-          default:
-            printServerUsage(stderr)
-            return fmt.Errorf("unknown server subcommand %q", args[0])
-          }
-        }
-        ```
-      - For routers using plain `fmt.Fprintln` today (for example `handleNode`), introduce small usage helpers (`printNodeUsage`, `printModsUsage`, `printRunsUsage`, `printTokenUsage`) where necessary so that `--help` and error paths share a single, consistent usage output.
-    - Usage helpers:
-      - Extend or reuse `printCommandUsage` (`cmd/ploy/usage.go`) for commands that belong in its switch:
-        - Keep existing cases like `"mod"`, `"server"`, `"rollout"`, `"manifest"`, `"config"`, `"knowledge-base"`.
-        - After the cluster refactor (later steps), add a `"cluster"` case that lists new subcommands (`deploy`, `node`, `rollout`, `token`), but for now focus on wiring `--help` to existing helpers.
-  - Snippets:
-    - Reusable `--help` guard:
+    - Add a new migration to create table `config_env` with columns: `key TEXT PRIMARY KEY`, `value TEXT NOT NULL`, `scope TEXT NOT NULL`, `secret BOOLEAN NOT NULL DEFAULT true`, `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Use `scope` for selection semantics (e.g., `mods`, `heal`, `gate`, `all`) and `secret` to control redaction at the CLI/HTTP layer.
+    - Extend `internal/store` with a small CRUD interface for global envs, e.g.:
       ```go
-      func wantsHelp(args []string) bool {
-        return len(args) == 1 && (args[0] == "--help" || args[0] == "-h")
+      type GlobalEnv struct {
+        Key     string
+        Value   string
+        Scope   string
+        Secret  bool
+        Updated time.Time
+      }
+
+      type Store interface {
+        ListGlobalEnv(ctx context.Context) ([]GlobalEnv, error)
+        GetGlobalEnv(ctx context.Context, key string) (GlobalEnv, error)
+        UpsertGlobalEnv(ctx context.Context, env GlobalEnv) error
+        DeleteGlobalEnv(ctx context.Context, key string) error
       }
       ```
-      and then:
+    - Keep GitLab YAML config (`cfg.GitLab`) for backward compatibility; global env storage is additive and can later supersede inline GitLab config when desired.
+  - Snippets:
+    - Migration table sketch:
+      ```sql
+      CREATE TABLE config_env (
+        key         TEXT PRIMARY KEY,
+        value       TEXT NOT NULL,
+        scope       TEXT NOT NULL,
+        secret      BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      ```
+  - Tests: Add store-level unit tests to verify CRUD semantics against a test database or pgxpool mock — expect round-trip of `GlobalEnv` entries and primary-key enforcement on `key`.
+
+## ConfigHolder & Config Env HTTP API
+- [ ] Extend ConfigHolder and register `/v1/config/env` endpoints — Provide in-memory access to global env entries and a typed HTTP surface used by the CLI.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: internal/server/handlers, cmd/ployd/server.go
+  - Scope:
+    - Extend `internal/server/handlers/config_gitlab.go`’s `ConfigHolder` or introduce a sibling struct to track both GitLab settings and global env map:
       ```go
-      if wantsHelp(args) {
-        printConfigUsage(stderr)
-        return nil
+      type GlobalEnvVar struct {
+        Value  string
+        Scope  string
+        Secret bool
+      }
+
+      type ConfigHolder struct {
+        mu        sync.RWMutex
+        gitlab    config.GitLabConfig
+        globalEnv map[string]GlobalEnvVar
       }
       ```
-  - Tests:
-    - Add new table‑driven tests in `cmd/ploy/commands_test.go` (or a new `cmd/ploy/help_flags_test.go`) that:
-      - Invoke `execute([]string{"--help"}, buf)` and assert that `buf.String()` contains `"Ploy CLI v2"` and `Core Commands:`.
-      - Invoke `execute([]string{"server", "--help"}, buf)` and ensure the output contains `"Usage: ploy server"` and the `deploy` subcommand line.
-      - Similarly cover `mod`, `config`, `manifest`, `node`, `rollout`, and `token`.
-    - Keep `TestExecuteHelpMatchesGolden` and its golden file (`cmd/ploy/testdata/help.txt`) aligned after any formatting changes to root help.
-
-## Introduce first‑class `ploy cluster` router
-- [x] Implement a real `ploy cluster` command that owns deploy/node/rollout/token — Replace the stub `cluster` entrypoint with a proper router that delegates to existing server/node/rollout/token handlers while defining the new hierarchy (`ploy cluster deploy`, `ploy cluster node`, `ploy cluster rollout`, `ploy cluster token`).
-  - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root + cluster + existing handlers)
-  - Scope:
-    - Replace the stub `newClusterCmd` in `cmd/ploy/commands_config.go`:
-      - Today it returns a command that always fails with `"cluster command not yet implemented"`.
-      - Introduce a dedicated router that preserves the legacy handlers but under the `cluster` namespace:
-        ```go
-        // cluster_command.go
-        package main
-
-        import (
-          "errors"
-          "fmt"
-          "io"
-        )
-
-        func handleCluster(args []string, stderr io.Writer) error {
-          if len(args) == 0 {
-            printClusterUsage(stderr)
-            return errors.New("cluster subcommand required")
-          }
-          switch args[0] {
-          case "deploy":
-            return handleServerDeploy(args[1:], stderr)
-          case "node":
-            return handleNode(args[1:], stderr)
-          case "rollout":
-            return handleRollout(args[1:], stderr)
-          case "token":
-            return handleToken(args[1:], stderr)
-          default:
-            printClusterUsage(stderr)
-            return fmt.Errorf("unknown cluster subcommand %q", args[0])
-          }
-        }
-        ```
-        ```go
-        // commands_config.go
-        func newClusterCmd(stderr io.Writer) *cobra.Command {
-          clusterCmd := &cobra.Command{
-            Use:                "cluster",
-            Short:              "Manage clusters (deploy, nodes, rollout, tokens)",
-            DisableFlagParsing: true,
-            RunE: func(cmd *cobra.Command, args []string) error {
-              return handleCluster(args, stderr)
-            },
-          }
-          return clusterCmd
-        }
-        ```
-      - Make `handleCluster` honor `--help` / `-h` using the same pattern as other routers:
-        ```go
-        if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-          printClusterUsage(stderr)
-          return nil
-        }
-        ```
-    - Define cluster usage helper:
-      - Add `printClusterUsage` in a small helper file (for example `cmd/ploy/usage_cluster.go`) to keep usage strings centralized:
-        ```go
-        func printClusterUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster <command>")
-          _, _ = fmt.Fprintln(w, "")
-          _, _ = fmt.Fprintln(w, "Commands:")
-          _, _ = fmt.Fprintln(w, "  deploy   Deploy and configure a control plane server")
-          _, _ = fmt.Fprintln(w, "  node     Manage worker nodes in a cluster")
-          _, _ = fmt.Fprintln(w, "  rollout  Perform rolling updates for servers and nodes")
-          _, _ = fmt.Fprintln(w, "  token    Manage API tokens bound to a cluster")
-        }
-        ```
-      - Later steps will update usage strings under server/node/rollout/token to reference `ploy cluster ...`, but the router can be introduced first while the old paths still exist.
-    - Wire into root command:
-      - In `cmd/ploy/root.go`, keep `root.AddCommand(newClusterCmd(stderr))` in place; do **not** change ordering to avoid unnecessary churn in the main help output.
-  - Snippets:
-    - Minimal test harness for `handleCluster`:
+    - Initialize `ConfigHolder` in `cmd/ployd/server.go` with GitLab config (existing) plus a `map[string]GlobalEnvVar` loaded from `store.ListGlobalEnv(ctx)` at startup.
+    - Add methods:
       ```go
-      func TestHandleClusterRequiresSubcommand(t *testing.T) {
-        buf := &bytes.Buffer{}
-        err := handleCluster(nil, buf)
-        if err == nil || !strings.Contains(err.Error(), "cluster subcommand required") {
-          t.Fatalf("expected cluster subcommand error, got %v", err)
-        }
-        if !strings.Contains(buf.String(), "Usage: ploy cluster") {
-          t.Fatalf("expected cluster usage, got %q", buf.String())
-        }
+      func (h *ConfigHolder) GetGlobalEnv() map[string]GlobalEnvVar
+      func (h *ConfigHolder) GetGlobalEnvVar(key string) (GlobalEnvVar, bool)
+      func (h *ConfigHolder) SetGlobalEnvVar(key string, v GlobalEnvVar)
+      func (h *ConfigHolder) DeleteGlobalEnvVar(key string)
+      ```
+    - Implement new handlers under `internal/server/handlers`, e.g. `config_env.go`:
+      - `GET /v1/config/env` → list keys with scope/secret flags, no values for secrets.
+      - `GET /v1/config/env/{key}` → return one entry (value included; rely on mTLS + admin role).
+      - `PUT /v1/config/env/{key}` → upsert value/scope/secret and update `ConfigHolder` + `store.UpsertGlobalEnv`.
+      - `DELETE /v1/config/env/{key}` → delete from store and `ConfigHolder`.
+    - Wire endpoints in `RegisterRoutes` (Config tag) with same auth model as GitLab config.
+  - Snippets:
+    - Example response shape:
+      ```json
+      {
+        "key": "CA_CERTS_PEM_BUNDLE",
+        "value": "-----BEGIN CERTIFICATE-----\n...",
+        "scope": "all",
+        "secret": true
       }
       ```
-  - Tests:
-    - Add `cmd/ploy/cluster_command_test.go`:
-      - Verify `handleCluster([]string{"deploy"}, buf)` delegates to `handleServerDeploy` (can be validated by stubbing `handleServerDeploy` behind a function variable).
-      - Verify `handleCluster([]string{"node", "--help"}, buf)` prints `"Usage: ploy cluster node"` once later steps adjust `handleNode` usage strings.
-    - Update `cmd/ploy/testdata/help.txt` (later step) so that the `cluster` line reflects its broader scope and no longer describes only “local cluster descriptors”.
+  - Tests: Add `config_env_authz_test.go` to assert only cli-admin can access these endpoints and `config_env_test.go` to verify round-trip between HTTP, `ConfigHolder`, and `store` — expect that PUT then GET returns identical JSON payload (modulo redaction in list view).
 
-## Move server deployment under `ploy cluster deploy`
-- [x] Re‑root server deployment as `ploy cluster deploy` and stop exposing `ploy server` as a top‑level command — Route server deploy logic through the cluster router while keeping the underlying implementation and validation behavior unchanged.
+## CLI Surface: `ploy config env`
+- [ ] Add `ploy config env` subcommands — Provide a single CLI entrypoint for managing all global env vars (GitLab, CA bundles, Codex auth JSON, OpenAI keys).
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root, commands_server.go, server_deploy_cmd.go, testdata)
+  - Component: cmd/ploy
   - Scope:
-    - Remove top‑level `server` command from root:
-      - In `cmd/ploy/root.go`, delete or comment out the line:
-        ```go
-        root.AddCommand(newServerCmd(stderr))  // ploy server (deploy)
-        ```
-      - Ensure that only the `cluster` command is responsible for reaching `handleServerDeploy` via `handleCluster`.
-    - Keep `newServerCmd` for internal reuse (optional):
-      - If existing tests or smoke scripts exercise `newServerCmd` directly, keep the function in `cmd/ploy/commands_server.go` but treat it as an internal builder used only in tests or by future code.
-      - Otherwise, you may inline the behavior in `handleCluster` and mark `newServerCmd` for future removal.
-    - Update usage helpers to reference `ploy cluster deploy`:
-      - In `cmd/ploy/server_deploy_cmd.go`, change:
-        ```go
-        func printServerUsage(w io.Writer) {
-          printCommandUsage(w, "server")
-        }
-
-        func printServerDeployUsage(w io.Writer) {
-          printCommandUsage(w, "server", "deploy")
-        }
-        ```
-        to explicit cluster‑scoped strings to avoid confusing users with the old `server` namespace:
-        ```go
-        func printServerUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy [--address <host-or-ip>] [flags]")
-          _, _ = fmt.Fprintln(w, "")
-          _, _ = fmt.Fprintln(w, "Commands:")
-          _, _ = fmt.Fprintln(w, "  deploy   Deploy and configure a control plane server")
-        }
-
-        func printServerDeployUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy --address <host-or-ip> [flags]")
-        }
-        ```
-      - Ensure `handleServer`’s argument validation continues to call `printServerDeployUsage` on parse errors and missing address, but now those messages talk about `ploy cluster deploy`.
-    - Adjust the custom help dispatcher:
-      - In `cmd/ploy/root.go`, the custom `help` command currently includes:
-        ```go
-        case "server":
-          printServerUsage(stderr)
-        case "rollout":
-          printRolloutUsage(stderr)
-        case "config":
-          printConfigUsage(stderr)
-        case "token":
-          printTokenUsage(stderr)
-        ```
-      - Update this to point `help cluster` to the new `printClusterUsage` and remove or repurpose the `server` entry:
-        ```go
-        case "cluster":
-          printClusterUsage(stderr)
-        case "config":
-          printConfigUsage(stderr)
-        ```
-      - Optionally keep `case "server": printServerUsage(stderr)` temporarily if you want `ploy help server` to remain a hint pointing at the new `cluster` surface; otherwise, drop it to avoid suggesting a non‑existent top‑level command.
-  - Snippets:
-    - Smoke command after migration:
-      ```bash
-      dist/ploy cluster deploy --address <host-or-ip>
-      ```
-  - Tests:
-    - Update `cmd/ploy/server_cmd_usage_test.go`:
-      - Replace any expectations on `"Usage: ploy server"` with `"Usage: ploy cluster deploy"` (or the new clustered usage strings).
-    - Extend smoke tests in `tests/smoke_tests.sh`:
-      - Update the server help check to:
-        ```bash
-        "dist/ploy cluster --help 2>&1 | grep -q 'Usage: ploy cluster'" \
-        "dist/ploy cluster deploy --help 2>&1 | grep -q 'Usage: ploy cluster deploy'" \
-        ```
-      - Remove checks that call `dist/ploy server --help` or adjust them to expect a failure with a clear unknown command error.
-
-## Move node operations under `ploy cluster node`
-- [x] Change node commands from `ploy node ...` to `ploy cluster node ...` and align usage and docs — Ensure worker node provisioning is consistently accessed via `ploy cluster node` while reusing the existing `handleNode` and `handleNodeAdd` implementations.
-  - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root, commands_server.go, node_command.go, server_deploy_run.go), docs, scripts
-  - Scope:
-    - Remove top‑level `node` command from root:
-      - In `cmd/ploy/root.go`, delete:
-        ```go
-        root.AddCommand(newNodeCmd(stderr))    // ploy node (add)
-        ```
-      - This ensures that node operations are only reachable through `ploy cluster node`.
-    - Delegate node routing from `cluster`:
-      - Confirm `handleCluster` routes `"node"` to `handleNode`:
-        ```go
-        case "node":
-          return handleNode(args[1:], stderr)
-        ```
-    - Update node usage strings to mention the cluster prefix:
-      - In `cmd/ploy/node_command.go`, replace all occurrences of `"Usage: ploy node ..."` with `"Usage: ploy cluster node ..."`:
-        ```go
-        if len(args) == 0 {
-          _, _ = fmt.Fprintln(stderr, "Usage: ploy cluster node <command>")
-          return errors.New("node subcommand required")
-        }
+    - Extend `handleConfig` in `cmd/ploy/config_command.go`:
+      ```go
+      func handleConfig(args []string, stderr io.Writer) error {
         // ...
-        _, _ = fmt.Fprintln(stderr, "Usage: ploy cluster node add --cluster-id <id> --address <ip> --server-url <url>")
-        ```
-      - Optionally factor these into a `printNodeUsage` helper so `--help`, unknown subcommands, and validation errors all share identical output.
-    - Fix references in server deploy guidance:
-      - In `cmd/ploy/server_deploy_run.go`, update the printed guidance after successful server bootstrap:
-        ```go
-        _, _ = fmt.Fprintf(stderr, "  1. Add worker nodes: ploy cluster node add --cluster-id <cluster-id> --address <node-address> --server-url %s\n", serverURL)
-        ```
-      - Keep the rest of the message intact to preserve expectations from existing docs and tests.
-  - Snippets:
-    - Expected CLI usage after change:
-      ```bash
-      dist/ploy cluster node add \
-        --cluster-id <cluster-id> \
-        --address <host-or-ip> \
-        --server-url https://<server-host>:8443
+        switch args[0] {
+        case "gitlab":
+          return handleConfigGitLab(args[1:], stderr)
+        case "env":
+          return handleConfigEnv(args[1:], stderr)
+        default:
+          // ...
+        }
+      }
       ```
-  - Tests:
-    - Update `cmd/ploy/node_command_test.go`:
-      - Replace assertions on `"Usage: ploy node"` with `"Usage: ploy cluster node"`.
-      - Confirm that calling `handleNode` with no args still yields a clear error and the updated usage string.
-    - Adjust any tests that look for the old `ploy node add` usage lines in stderr.
+    - Implement `handleConfigEnv(args []string, stderr io.Writer) error` and usage helpers in a new file `cmd/ploy/config_env_command.go` with subcommands:
+      - `ploy config env list`
+      - `ploy config env show --key <NAME> [--raw]`
+      - `ploy config env set --key <NAME> (--value <STRING> | --file <PATH>) [--scope mods|heal|gate|all] [--secret=true|false]`
+      - `ploy config env unset --key <NAME>`
+    - Use the same HTTP resolution helper as GitLab config (`resolveControlPlaneHTTP`) and the new `/v1/config/env*` routes.
+    - For secret values, default `--secret=true` and redact output in `list`/`show` unless `--raw` is explicitly passed.
+  - Snippets:
+    - Flag parsing sketch:
+      ```go
+      fs := flag.NewFlagSet("config env set", flag.ContinueOnError)
+      var key, value, file, scope string
+      var secret bool
+      fs.StringVar(&key, "key", "", "Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)")
+      fs.StringVar(&value, "value", "", "Inline value (mutually exclusive with --file)")
+      fs.StringVar(&file, "file", "", "Path to file containing value")
+      fs.StringVar(&scope, "scope", "all", "Scope: mods, heal, gate, all")
+      fs.BoolVar(&secret, "secret", true, "Mark value as secret (redacted by default)")
+      ```
+  - Tests: Add `cmd/ploy/config_env_command_flags_test.go` to cover flag/usage errors and `cmd/ploy/config_env_command_files_test.go` to exercise list/show/set/unset flows against a fake HTTP server — expect correct HTTP methods/paths and redaction behavior for secrets.
 
-## Move rollout operations under `ploy cluster rollout`
-- [x] Change rollout commands from `ploy rollout ...` to `ploy cluster rollout ...` and update usage helpers — Move server and node rollout into the cluster namespace while preserving their flag surfaces and dry‑run behavior.
+## Spec Merge on Job Claim
+- [ ] Merge global env into job spec env on claim — Ensure every job spec carries the right global env vars before it reaches the node agent.
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root, commands_server.go, rollout_server.go, rollout_nodes_cmd.go), docs, scripts
+  - Component: internal/server/handlers
   - Scope:
-    - Remove top‑level `rollout` command from root:
-      - In `cmd/ploy/root.go`, delete:
-        ```go
-        root.AddCommand(newRolloutCmd(stderr)) // ploy rollout (server, nodes)
-        ```
-      - Ensure rollout is reachable via `handleCluster`:
-        ```go
-        case "rollout":
-          return handleRollout(args[1:], stderr)
-        ```
-    - Update rollout usage helpers to use clustered paths:
-      - In `cmd/ploy/rollout_server.go`, change:
-        ```go
-        func printRolloutUsage(w io.Writer) {
-          printCommandUsage(w, "rollout")
+    - Extend `internal/server/handlers/spec_utils.go` with:
+      ```go
+      func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType string) json.RawMessage {
+        if len(env) == 0 {
+          return spec
         }
-
-        func printRolloutServerUsage(w io.Writer) {
-          printCommandUsage(w, "rollout", "server")
+        var m map[string]any
+        if len(spec) > 0 && json.Valid(spec) {
+          _ = json.Unmarshal(spec, &m)
         }
-        ```
-        to explicit text for the new hierarchy:
-        ```go
-        func printRolloutUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout <command>")
-          _, _ = fmt.Fprintln(w, "")
-          _, _ = fmt.Fprintln(w, "Commands:")
-          _, _ = fmt.Fprintln(w, "  server   Roll out a new binary to a control plane server")
-          _, _ = fmt.Fprintln(w, "  nodes    Roll out a new binary to worker nodes (batched)")
+        if m == nil {
+          m = map[string]any{}
         }
-
-        func printRolloutServerUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout server --address <host-or-ip> [flags]")
+        em, _ := m["env"].(map[string]any)
+        if em == nil {
+          em = map[string]any{}
         }
-        ```
-      - In `cmd/ploy/rollout_nodes_cmd.go`, change:
-        ```go
-        func printRolloutNodesUsage(w io.Writer) {
-          printCommandUsage(w, "rollout", "nodes")
+        for k, v := range env {
+          if !scopeMatches(jobType, v.Scope) {
+            continue
+          }
+          if _, exists := em[k]; exists {
+            continue // per-run env wins over global
+          }
+          em[k] = v.Value
         }
-        ```
-        to:
-        ```go
-        func printRolloutNodesUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster rollout nodes [--all | --selector <pattern>] [flags]")
-        }
-        ```
-    - Make `handleRollout` support `--help`:
-      - At the top of `handleRollout`, add:
-        ```go
-        if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-          printRolloutUsage(stderr)
-          return nil
-        }
-        ```
-  - Snippets:
-    - Updated CLI examples to reflect new paths:
-      ```bash
-      # Roll out server binary
-      dist/ploy cluster rollout server --address 45.9.42.212 --binary dist/ployd-linux
-
-      # Roll out node binary to all nodes
-      dist/ploy cluster rollout nodes --all --binary dist/ployd-node-linux
+        m["env"] = em
+        b, _ := json.Marshal(m)
+        return json.RawMessage(b)
+      }
       ```
-  - Tests:
-    - Update `cmd/ploy/rollout_server_test.go`:
-      - Replace `"Usage: ploy rollout"` with `"Usage: ploy cluster rollout"` where appropriate.
-      - Replace `"Usage: ploy rollout server"` with `"Usage: ploy cluster rollout server"`.
-    - Update `cmd/ploy/rollout_nodes_args_validation_test.go`:
-      - Expect `"Usage: ploy cluster rollout nodes"` when required flags are missing or invalid.
-    - Update `tests/smoke_tests.sh` rollout checks:
-      - Swap `dist/ploy rollout ...` invocations for `dist/ploy cluster rollout ...` and adapt `grep` patterns accordingly.
+    - In `buildAndSendJobClaimResponse` (`internal/server/handlers/nodes_claim.go`), after `mergeGitLabConfigIntoSpec`, call:
+      ```go
+      mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
+      ```
+      so that claimed jobs always include `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `OPENAI_API_KEY`, etc. when configured.
+    - Implement `scopeMatches(jobType, scope string) bool` to map scopes like `mods`, `heal`, `gate`, `all` to job types (`mod`, `heal`, `pre_gate`, `re_gate`, `post_gate`).
+  - Snippets:
+    - Minimal scope matcher:
+      ```go
+      func scopeMatches(jobType, scope string) bool {
+        switch scope {
+        case "all":
+          return true
+        case "mods":
+          return jobType == "mod" || jobType == "post_gate"
+        case "heal":
+          return jobType == "heal" || jobType == "re_gate"
+        case "gate":
+          return jobType == "pre_gate" || jobType == "re_gate" || jobType == "post_gate"
+        default:
+          return false
+        }
+      }
+      ```
+  - Tests: Add `internal/server/handlers/spec_utils_global_env_test.go` to cover merge semantics (per-run env override, scope filtering, empty spec) and extend `server_runs_claim_test.go` to assert that a claimed job contains merged `env["CA_CERTS_PEM_BUNDLE"]` / `env["CODEX_AUTH_JSON"]` when the holder is pre-populated.
 
-## Move token management under `ploy cluster token`
-- [x] Change token commands from `ploy token ...` to `ploy cluster token ...` and keep usage, flags, and HTTP behavior unchanged — Ensure token lifecycle operations are reachable only via the cluster namespace while preserving request structure to the control‑plane API.
+## Node Agent Propagation
+- [ ] Keep env propagation from spec → StartRunRequest → manifests generic — Confirm that global env vars injected into specs arrive intact in containers and gate jobs.
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (root, commands_config.go, token_commands.go), docs, scripts
+  - Component: internal/nodeagent
   - Scope:
-    - Remove top‑level `token` command from root:
-      - In `cmd/ploy/root.go`, delete:
-        ```go
-        root.AddCommand(newTokenCmd(stderr)) // ploy token (create, list, revoke)
-        ```
-      - Confirm `handleCluster` routes `"token"` into `handleToken`:
-        ```go
-        case "token":
-          return handleToken(args[1:], stderr)
-        ```
-    - Update token usage helpers to reference `ploy cluster token`:
-      - In `cmd/ploy/token_commands.go`, adjust all `Usage:` lines:
-        ```go
-        func printTokenUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster token <command>")
-          _, _ = fmt.Fprintln(w, "")
-          _, _ = fmt.Fprintln(w, "Commands:")
-          _, _ = fmt.Fprintln(w, "  create    Create a new API token")
-          _, _ = fmt.Fprintln(w, "  list      List all API tokens")
-          _, _ = fmt.Fprintln(w, "  revoke    Revoke an API token")
-        }
-
-        func printTokenCreateUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster token create --role <role> [--description <desc>] [--expires <days>]")
-          // existing flags description...
-        }
-
-        func printTokenListUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster token list")
-        }
-
-        func printTokenRevokeUsage(w io.Writer) {
-          _, _ = fmt.Fprintln(w, "Usage: ploy cluster token revoke <token-id>")
-        }
-        ```
-      - Ensure `handleToken` uses `printTokenUsage`, `printTokenCreateUsage`, `printTokenListUsage`, and `printTokenRevokeUsage` consistently on parse errors and missing arguments.
-    - Honor `--help` at the token level:
-      - At the top of `handleToken`, add:
-        ```go
-        if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-          printTokenUsage(stderr)
-          return nil
-        }
-        ```
-  - Snippets:
-    - Example token commands after migration:
-      ```bash
-      # Create a control-plane token for CI
-      ploy cluster token create \
-        --role control-plane \
-        --expires 90 \
-        --description "CI/CD pipeline"
-
-      # List tokens
-      ploy cluster token list
-
-      # Revoke a token
-      ploy cluster token revoke <token-id>
+    - Verify `parseSpec` in `internal/nodeagent/claimer_spec.go` already populates `env` from `m["env"].(map[string]any)`; no new keys are needed for global env.
+    - Confirm `StartRunRequest` (`internal/nodeagent/handlers.go`) keeps `Env map[string]string` and callers do not filter keys.
+    - Ensure `buildManifestFromRequestWithStack` (`internal/nodeagent/manifest.go`) copies `req.Env` into `manifest.Env` exactly once per step:
+      ```go
+      env := make(map[string]string, len(req.Env))
+      for k, v := range req.Env {
+        env[k] = v
+      }
+      // ... merge step-specific env where applicable
       ```
-  - Tests:
-    - Update any token usage tests under `cmd/ploy` to look for `ploy cluster token` prefixes instead of `ploy token`.
-    - Adjust docs smoke checks (`scripts/deploy-locally.sh`, etc.) that currently run `./dist/ploy token list` so they call `./dist/ploy cluster token list` instead.
+    - For gate jobs, ensure `buildGateManifestFromRequest` preserves `Env` from `StartRunRequest` and that gate executors pass `Gate.Env` through unchanged.
+  - Snippets:
+    - Example `Env` copy:
+      ```go
+      env := make(map[string]string, len(req.Env))
+      for k, v := range req.Env {
+        env[k] = v
+      }
+      manifest.Env = env
+      ```
+  - Tests: Extend `internal/nodeagent/claimer_gitlab_config_test.go` or add `claimer_global_env_test.go` to assert that when spec includes `env: { "CODEX_AUTH_JSON": "..." }`, the resulting `StartRunRequest.Env` passes through to manifests and that gate manifests also expose the same key when built via `buildGateManifestFromRequest`.
 
-## Update root help, golden files, and docs to reflect new hierarchy
-- [x] Refresh root help output, golden files, and documentation to describe the new `ploy cluster`‑centric hierarchy — Align user‑visible help and docs with the re‑routed commands, removing references to the old top‑level `server`, `node`, `rollout`, and `token` commands.
+## Container Runtime & Gate Integration
+- [ ] Ensure container specs pass env through to Docker — Confirm that the Docker runtime receives all env keys from manifests, ready for image-level startup hooks to consume.
   - Repository: github.com/iw2rmb/ploy
-  - Component: cmd/ploy (main.go, root.go, testdata), README, docs, scripts
+  - Component: internal/workflow/runtime/step
   - Scope:
-    - Update root help text:
-      - In `cmd/ploy/main.go:printUsage`, change the core commands section to remove `server`, `node`, `rollout`, `token` as top‑level entries and expand the `cluster` line to mention its broader scope:
-        ```go
-        _, _ = fmt.Fprintln(w, "Core Commands:")
-        _, _ = fmt.Fprintln(w, "  mod              Plan and run Mods workflows")
-        _, _ = fmt.Fprintln(w, "  mods             Observe Mods execution (logs, events)")
-        _, _ = fmt.Fprintln(w, "  runs             Inspect and follow individual runs")
-        _, _ = fmt.Fprintln(w, "  upload           Upload artifact bundle to a run (HTTPS)")
-        _, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, rollout, tokens)")
-        _, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
-        _, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
-        _, _ = fmt.Fprintln(w, "  knowledge-base   Curate knowledge base fixtures")
-        ```
-      - Ensure the ordering of commands remains stable to avoid unnecessary diffs in help tests and docs.
-    - Regenerate help golden:
-      - Update `cmd/ploy/testdata/help.txt` to match the new `printUsage` output exactly (no trailing spaces, consistent blank lines).
-      - Run `go test ./cmd/ploy -run TestExecuteHelpMatchesGolden` once dependencies compile; fix any remaining differences reported in the golden diff.
-    - Adjust the custom `help` command switch in `cmd/ploy/root.go`:
-      - Route `help cluster` to `printClusterUsage`.
-      - Consider adding `help cluster rollout`, `help cluster node`, etc., by calling the appropriate usage helpers if you want to preserve the old `help rollout` semantics under the new namespace; otherwise, rely on `ploy cluster rollout --help`.
-    - Update README and how‑to docs:
-      - In `README.md` and `cmd/ploy/README.md`, update examples to:
-        - Use `dist/ploy cluster deploy --address ...` instead of `dist/ploy server deploy`.
-        - Use `dist/ploy cluster node add ...` instead of `dist/ploy node add`.
-        - Use `dist/ploy cluster rollout server|nodes ...` instead of `dist/ploy rollout ...`.
-        - Use `ploy cluster token create|list|revoke` instead of `ploy token ...`.
-      - In `docs/how-to/deploy-a-cluster.md`, `docs/how-to/update-a-cluster.md`, `docs/envs/README.md`, `docs/how-to/deploy-locally.md`, `docs/how-to/token-management.md`, and `docs/how-to/bearer-token-troubleshooting.md`, perform a targeted search‑and‑replace of the old command forms with the new cluster‑scoped equivalents, keeping surrounding narrative and flag descriptions unchanged.
-    - Update scripts:
-      - In `scripts/vps-lab-walkthrough.sh`, update:
-        - `dist/ploy server deploy ...` → `dist/ploy cluster deploy ...`
-        - `dist/ploy node add ...` → `dist/ploy cluster node add ...`
-        - `dist/ploy rollout ...` → `dist/ploy cluster rollout ...`
-      - In `scripts/deploy-locally.sh`, update token commands to `dist/ploy cluster token ...`.
-      - In `tests/smoke_tests.sh`, update smoke invocations and `grep` patterns to reflect the new help/usage strings.
-  - Snippets:
-    - Example updated quickstart snippet for README:
-      ```bash
-      # Deploy control-plane server
-      dist/ploy cluster deploy --address <host-or-ip>
-
-      # Add worker nodes
-      dist/ploy cluster node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
-
-      # Roll out new binaries
-      dist/ploy cluster rollout server --address <host-or-ip> --binary dist/ployd-linux
-      dist/ploy cluster rollout nodes --all --binary dist/ployd-node-linux
+    - In `internal/workflow/runtime/step/container_spec.go`, verify `ContainerSpec.Env` is populated from the manifest without filtering:
+      ```go
+      return ContainerSpec{
+        Image:      manifest.Image,
+        Command:    append([]string{}, manifest.Command...),
+        WorkingDir: wd,
+        Env:        manifest.Env,
+        // ...
+      }, nil
       ```
-  - Tests:
-    - After code and docs updates, run `make test` (or at least `go test ./cmd/ploy/...`) to ensure the CLI tests, help goldens, and usage tests pass with the new hierarchy.
-    - Manually invoke `dist/ploy --help`, `dist/ploy cluster --help`, `dist/ploy cluster deploy --help`, `dist/ploy cluster node --help`, `dist/ploy cluster rollout --help`, and `dist/ploy cluster token --help` in a development environment to validate that help text is clear, complete, and free of references to the removed top‑level commands.
+    - In `gate_docker.go`, change the executor to use `spec.Env` when creating the gate container:
+      ```go
+      env := map[string]string{}
+      for k, v := range spec.Env {
+        env[k] = v
+      }
+      specC := ContainerSpec{
+        Image:            image,
+        Command:          cmd,
+        WorkingDir:       "/workspace",
+        Mounts:           mounts,
+        Env:              env,
+        LimitMemoryBytes: limitMem,
+        // ...
+      }
+      ```
+    - Confirm Docker runtime (`container_docker.go`) already converts `ContainerSpec.Env` into the moby API’s `Env: []string{"KEY=value"}` list.
+  - Snippets:
+    - Env wiring inside Docker runtime:
+      ```go
+      envList := make([]string, 0, len(spec.Env))
+      for k, v := range spec.Env {
+        envList = append(envList, fmt.Sprintf("%s=%s", k, v))
+      }
+      config.Env = envList
+      ```
+  - Tests: Extend `internal/workflow/runtime/step/container_docker_test.go` or add a focused test to assert that when `ContainerSpec.Env["CA_CERTS_PEM_BUNDLE"]` is set, the mock docker client sees an entry `CA_CERTS_PEM_BUNDLE=...` in `ContainerCreateOptions.Config.Env`.
+
+## Image Startup Hooks (Codex, ORW, Build Gate)
+- [ ] Implement startup use of global env in official images — Make sure Codex and build-gate images actually consume `CODEX_AUTH_JSON` and `CA_CERTS_PEM_BUNDLE` injected via the global config.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docker/mods/*, internal/workflow/runtime/step/gate_docker.go
+  - Scope:
+    - Codex:
+      - In `docker/mods/mod-codex/mod-codex.sh`, treat global `CODEX_AUTH_JSON` exactly as today (the script already writes it into `/root/.codex/auth.json` when set). No new behavior is required beyond ensuring the env is present via global config.
+      - Optionally, add a short comment near the auth section to note that `CODEX_AUTH_JSON` may come from `ploy config env`.
+    - CA bundles for build-gate:
+      - In `gate_docker.go`, prepend a CA-install preamble to the Maven/Gradle/Java scripts so that `CA_CERTS_PEM_BUNDLE` is honored inside gate containers:
+        ```bash
+        if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
+          pem_file="$(mktemp)"
+          printf '%s\n' "${CA_CERTS_PEM_BUNDLE}" > "${pem_file}"
+          pem_dir="$(mktemp -d)"
+          awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="${pem_dir}" "${pem_file}"
+          if command -v update-ca-certificates >/dev/null 2>&1; then
+            sys_ca_dir="/usr/local/share/ca-certificates/ploy"
+            mkdir -p "$sys_ca_dir"
+            cp "${pem_dir}"/*.crt "$sys_ca_dir"/ || true
+            update-ca-certificates >/dev/null 2>&1 || true
+          fi
+          # Optionally import into Java cacerts with keytool when available
+        fi
+        ```
+      - Embed this into the shell commands built by `chooseMaven`, `chooseGradle`, and `chooseJava` before invoking `mvn`, `gradle`, or `javac`.
+    - ORW images:
+      - `docker/mods/orw-maven/orw-maven.sh` and `docker/mods/orw-gradle/orw-gradle.sh` already support `CA_CERTS_PEM_BUNDLE`; verify behavior and keep it consistent with the gate preamble.
+  - Snippets:
+    - Example Go-embedded script (simplified):
+      ```go
+      script := `set -e
+if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
+  # ... install bundle ...
+fi
+mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install
+`
+      cmd = []string{"/bin/sh", "-lc", script}
+      ```
+  - Tests: Add integration-style tests for `gate_docker` that set `spec.Env["CA_CERTS_PEM_BUNDLE"]` and verify via logs or a dummy `update-ca-certificates`/`keytool` stub that the preamble runs; for Codex and ORW images, rely on existing smoke tests plus a small self-test that asserts no error when `CA_CERTS_PEM_BUNDLE` / `CODEX_AUTH_JSON` are present.
+
+## Documentation & OpenAPI
+- [ ] Document global config env and align OpenAPI — Make the new `config env` surface and global env semantics discoverable and consistent across docs.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docs, docs/api
+  - Scope:
+    - Update `cmd/ploy/README.md`:
+      - Add `config env` to the CLI command list with examples:
+        ```bash
+        ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
+        ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
+        ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
+        ```
+    - Extend `docs/envs/README.md`:
+      - Introduce a “Global Env Configuration” section describing how `config env` maps into job `env` and which keys are consumed by official images:
+        - `CA_CERTS_PEM_BUNDLE` → ORW mods, build-gate, custom mods.
+        - `CODEX_AUTH_JSON` → `mod-codex`.
+        - `OPENAI_API_KEY` → any future OpenAI-integrated mods.
+    - Update `docs/mods-lifecycle.md` to mention that server-injected env now includes these global keys for mods/healing/gate phases.
+    - Extend `docs/api/OpenAPI.yaml`:
+      - Add `/v1/config/env` and `/v1/config/env/{key}` under the Config tag, referencing new path docs (e.g., `docs/api/paths/config_env.yaml`).
+      - Define schemas for `GlobalEnvVar` and list responses in `docs/api/components/schemas/config.yaml` or an equivalent component file.
+  - Snippets:
+    - Example OpenAPI path stub:
+      ```yaml
+      /v1/config/env:
+        get:
+          tags: [Config]
+          summary: List global environment variables
+          responses:
+            '200':
+              description: Global env list
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GlobalEnvVar'
+      ```
+  - Tests: Run existing OpenAPI validation tests (if present) and `make test` to ensure documentation references and schemas remain in sync with the code.
 
