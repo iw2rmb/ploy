@@ -270,9 +270,9 @@ Key invariants:
 ## 1.2 Stack-Aware Image Selection
 
 Mods supports stack-aware image selection, allowing different container images to be
-used based on the detected build stack. This enables optimized images for specific
-build tools (e.g., dedicated Maven or Gradle images) while maintaining backward
-compatibility with universal images.
+used based on the detected build stack. The image field accepts two canonical forms:
+universal images (string) for simple configurations, and stack-specific images (map)
+for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images).
 
 ### Image specification forms
 
