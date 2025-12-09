@@ -73,12 +73,12 @@ Legend: [ ] todo, [x] done.
   - Snippets: Delete the `fallback to single-strategy form (mods[] at top level)` code path.
   - Tests: go test ./internal/server/handlers/... — Healing behavior tests must configure healing explicitly via the canonical schema.
 
-- [ ] Re-evaluate ModImage dual-form handling (string vs map) — Optionally narrow accepted forms if desired.
+- [x] Re-evaluate ModImage dual-form handling (string vs map) — Decision: Keep both forms as canonical.
   - Repository: ploy
-  - Component: internal/workflow/contracts/mod_image.go, internal/nodeagent/manifest.go, internal/workflow/runtime/*.
-  - Scope: Decide whether both universal string and stack-map forms remain supported. If narrowing, update ParseModImage and related code to accept only the chosen canonical form, and adjust manifest builders and tests accordingly. If keeping both, leave as-is (no-op step).
-  - Snippets: N/A unless narrowing; then simplify ParseModImage to a single form.
-  - Tests: go test ./internal/workflow/contracts/... ./internal/nodeagent/... — Image resolution tests must match the chosen contract.
+  - Component: internal/workflow/contracts/mod_image.go, internal/nodeagent/manifest.go, docs/mods-lifecycle.md.
+  - Scope: Evaluated whether both universal string and stack-map forms should remain supported. Decision: **Keep both forms**. The dual-form design is intentional polymorphism (not backward compatibility) serving distinct use cases — universal images for simple configs, stack maps for per-tool optimization.
+  - Changes: Updated comments in mod_image.go, manifest.go, and docs/mods-lifecycle.md to clarify both forms are first-class canonical schema options (removed "backward compatibility" language that implied one form was legacy).
+  - Tests: go test ./internal/workflow/contracts/... ./internal/nodeagent/... — Image resolution tests confirm both forms work correctly.
 
 ## Worker lifecycle / status snapshots
 - [ ] Remove map-based status accessors in lifecycle cache — Use typed NodeStatus everywhere.
