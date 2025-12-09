@@ -25,7 +25,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/nodeagent/...` — All nodeagent tests compile and pass after the rename.
 
 ## Update nodeagent claim handling call sites
-- [ ] Replace uses of `claim.ID` with `claim.RunID` in the claim loop and related helpers — Keep behavior identical while improving readability.
+- [x] Replace uses of `claim.ID` with `claim.RunID` in the claim loop and related helpers — Keep behavior identical while improving readability.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/nodeagent/claimer_loop.go
   - Scope:
