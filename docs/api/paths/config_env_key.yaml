@@ -1,45 +1,34 @@
 get:
   tags: [Config]
   summary: Get global environment variable
+  operationId: getGlobalEnv
   description: |
     Returns a single global environment variable entry identified by its key.
     The response includes the value even for secret entries; callers must use
     mTLS with cli-admin role.
+
+    Use this endpoint to retrieve the full value of a secret variable that is
+    redacted in the list response.
   parameters:
     - in: path
       name: key
       required: true
       schema:
         type: string
-      description: Environment variable key.
+      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON).
+      example: CA_CERTS_PEM_BUNDLE
   responses:
     '200':
       description: OK
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              key:
-                type: string
-                description: Environment variable key.
-              value:
-                type: string
-                description: Environment variable value.
-              scope:
-                type: string
-                description: >
-                  Scope that controls which jobs see this variable.
-                  One of: all, mods, heal, gate.
-                enum: [all, mods, heal, gate]
-              secret:
-                type: boolean
-                description: Whether this variable should be treated as secret.
-            required:
-              - key
-              - value
-              - scope
-              - secret
+            $ref: '../components/schemas/config.yaml#/GlobalEnvVar'
+          example:
+            key: "CA_CERTS_PEM_BUNDLE"
+            value: "-----BEGIN CERTIFICATE-----\nMIIC..."
+            scope: "all"
+            secret: true
     '400':
       description: Bad request (missing key path parameter)
     '401':
@@ -54,10 +43,19 @@ get:
 put:
   tags: [Config]
   summary: Upsert global environment variable
+  operationId: upsertGlobalEnv
   description: |
     Creates or updates a global environment variable entry. The value is stored
     persistently in the config_env table and cached in memory via the config
     holder. If the key already exists, the entry is updated.
+
+    **Common use cases:**
+    - `CA_CERTS_PEM_BUNDLE` with scope `all` — PEM-encoded CA certificates
+      installed into container trust stores.
+    - `CODEX_AUTH_JSON` with scope `mods` — Codex credentials written to
+      `/root/.codex/auth.json` by mod-codex images.
+    - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated mods.
+
     Requires mTLS with cli-admin role.
   parameters:
     - in: path
@@ -66,57 +64,39 @@ put:
       schema:
         type: string
       description: Environment variable key.
+      example: OPENAI_API_KEY
   requestBody:
     required: true
     content:
       application/json:
         schema:
-          type: object
-          properties:
+          $ref: '../components/schemas/config.yaml#/GlobalEnvPutRequest'
+        examples:
+          api_key:
+            summary: Set an API key
             value:
-              type: string
-              description: Environment variable value.
-            scope:
-              type: string
-              description: >
-                Scope that controls which jobs see this variable.
-                One of: all, mods, heal, gate. Defaults to "all" when omitted.
-              enum: [all, mods, heal, gate]
-            secret:
-              type: boolean
-              description: >
-                Whether this variable should be treated as secret. Defaults to
-                true when omitted.
-          required:
-            - value
+              value: "sk-..."
+              scope: "all"
+              secret: true
+          ca_bundle:
+            summary: Set a CA certificate bundle
+            value:
+              value: "-----BEGIN CERTIFICATE-----\nMIIC..."
+              scope: "all"
+              secret: true
+          non_secret:
+            summary: Set a non-secret variable
+            value:
+              value: "myvalue"
+              scope: "mods"
+              secret: false
   responses:
     '200':
       description: OK
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              key:
-                type: string
-                description: Environment variable key.
-              value:
-                type: string
-                description: Environment variable value.
-              scope:
-                type: string
-                description: >
-                  Scope that controls which jobs see this variable.
-                  One of: all, mods, heal, gate.
-                enum: [all, mods, heal, gate]
-              secret:
-                type: boolean
-                description: Whether this variable should be treated as secret.
-            required:
-              - key
-              - value
-              - scope
-              - secret
+            $ref: '../components/schemas/config.yaml#/GlobalEnvVar'
     '400':
       description: Bad request (invalid JSON or invalid scope)
     '401':
@@ -129,9 +109,12 @@ put:
 delete:
   tags: [Config]
   summary: Delete global environment variable
+  operationId: deleteGlobalEnv
   description: |
     Deletes a global environment variable entry from the persistent store and
-    from the in-memory config holder.
+    from the in-memory config holder. This is an idempotent operation; deleting
+    a non-existent key does not return an error.
+
     Requires mTLS with cli-admin role.
   parameters:
     - in: path
@@ -140,9 +123,10 @@ delete:
       schema:
         type: string
       description: Environment variable key.
+      example: OLD_VAR
   responses:
     '204':
-      description: Deleted
+      description: Deleted (or already absent)
     '400':
       description: Bad request (missing key path parameter)
     '401':

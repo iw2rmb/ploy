@@ -891,6 +891,17 @@ Mods container images are standard OCI images with the following expectations:
       - `mod` section,
       - each `mods[]` entry,
       - `build_gate_healing.mods[]`.
+  - **Global env injection**: The control plane injects server-configured global
+    environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
+    env vars are filtered by scope (`all`, `mods`, `heal`, `gate`) to match job types:
+    - `all` → injected into every job
+    - `mods` → `mod` and `post_gate` jobs
+    - `heal` → `heal` and `re_gate` jobs
+    - `gate` → `pre_gate`, `re_gate`, and `post_gate` jobs
+  - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
+    keys are never overwritten.
+  - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `OPENAI_API_KEY`.
+    See `docs/envs/README.md` § "Global Env Configuration" for full details.
 
 - **Execution**
   - Entry point should read/modify the repo under `/workspace`.

@@ -149,6 +149,15 @@ components:
       $ref: './components/schemas/pki.yaml#/PKIAdminSignRequest'
     PKIClientSignRequest:
       $ref: './components/schemas/pki.yaml#/PKIClientSignRequest'
+    # Config schemas (global env, GitLab settings)
+    GlobalEnvScope:
+      $ref: './components/schemas/config.yaml#/GlobalEnvScope'
+    GlobalEnvListItem:
+      $ref: './components/schemas/config.yaml#/GlobalEnvListItem'
+    GlobalEnvVar:
+      $ref: './components/schemas/config.yaml#/GlobalEnvVar'
+    GlobalEnvPutRequest:
+      $ref: './components/schemas/config.yaml#/GlobalEnvPutRequest'
     # Control-plane schemas
     Error:
       $ref: './components/schemas/common.yaml#/Error'

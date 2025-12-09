@@ -346,6 +346,61 @@ ploy runs follow <run-id>
 
 See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.
 
+## Global Environment Configuration
+
+The `ploy config env` commands manage global environment variables that are automatically
+injected into job containers across the cluster. This provides a centralized way to configure
+credentials, CA bundles, and other shared settings without embedding them in every spec file.
+
+### Key Concepts
+
+**Scopes** control which job types receive each variable:
+- `all` — Inject into every job type (mods, healing, gates)
+- `mods` — Inject into `mod` and `post_gate` jobs (code modification phases)
+- `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
+- `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate execution phases)
+
+**Secrets** are redacted in list/show output by default. Use `--raw` with `show` to reveal the
+full value.
+
+**Precedence**: Per-run env vars (in spec files or CLI flags) take precedence over global env.
+Existing keys in the spec are never overwritten by global config.
+
+### Commands
+
+```bash
+# List all global environment variables (secret values redacted)
+ploy config env list
+
+# Show a specific variable (use --raw to reveal secret values)
+ploy config env show --key CA_CERTS_PEM_BUNDLE
+ploy config env show --key OPENAI_API_KEY --raw
+
+# Set a variable from a file (common for certs and JSON credentials)
+ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
+
+# Set a variable with an inline value
+ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
+
+# Set a non-secret variable (visible in list output)
+ploy config env set --key CUSTOM_VAR --value myvalue --scope all --secret=false
+
+# Delete a variable
+ploy config env unset --key OLD_VAR
+```
+
+### Common Variables
+
+| Variable | Description | Recommended Scope |
+|----------|-------------|-------------------|
+| `CA_CERTS_PEM_BUNDLE` | PEM-encoded CA certificates for TLS trust | `all` |
+| `CODEX_AUTH_JSON` | Codex authentication credentials | `mods` |
+| `OPENAI_API_KEY` | OpenAI API key for LLM-integrated mods | `all` |
+
+See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
+`docs/mods-lifecycle.md` for how these variables flow into job containers.
+
 ## GitLab MR Integration
 
 The GitLab merge request client uses `gitlab.com/gitlab-org/api/client-go` for typed API interactions and integrates with the shared backoff policy for resilient operation.
