@@ -181,6 +181,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RunSubmitRequest'
     RunSummary:
       $ref: './components/schemas/controlplane.yaml#/RunSummary'
+    StageStatus:
+      $ref: './components/schemas/controlplane.yaml#/StageStatus'
     NodeClaimResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
     Event:

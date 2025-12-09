@@ -14,7 +14,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: Encode `modsapi.RunSummary` (or a new canonical struct) directly from handlers instead of `modsapi.RunStatusResponse{Ticket: summary}`.
   - Tests: go test ./internal/mods/... ./internal/server/handlers/... ./cmd/ploy/... — All existing Mods status/submit tests must pass with updated types and response shapes.
 
-- [ ] Decide and document the canonical Mods run status schema in OpenAPI/docs — Keep wire contracts discoverable and stable.
+- [x] Decide and document the canonical Mods run status schema in OpenAPI/docs — Keep wire contracts discoverable and stable.
   - Repository: ploy
   - Component: docs/api, docs/mods-lifecycle.md.
   - Scope: Update docs/api/OpenAPI.yaml and docs/mods-lifecycle.md to describe the new response shape for Mods submit/status and SSE events (no `ticket` wrapper, clarified `stages` semantics or a new field name if changed). Remove notes about “retained for API backward compatibility”.

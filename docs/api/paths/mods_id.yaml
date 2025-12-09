@@ -1,39 +1,81 @@
+# GET /v1/mods/{id} — Get Mods run status
+#
+# Canonical response: RunSummary (no wrapper types).
+# See docs/api/components/schemas/controlplane.yaml#/RunSummary for schema.
 get:
   tags: [Control]
   summary: Get Mods run status
   description: |
-    Return the current status of a Mods run identified by its `run_id`
-    (KSUID string). The response includes status, derived failure/gate metadata,
-    repo details, refs, optional commit SHA, and timestamps.
+    Return the current status of a Mods run identified by its `run_id` (KSUID string).
+
+    **Response contract**:
+    - Returns `RunSummary` directly (no wrapper types).
+    - Aggregates run state, jobs state (via `stages`), artifacts, and metadata.
+    - `stages` is a map keyed by job ID (KSUID string), not job name.
+    - Use `step_index` within each `StageStatus` for ordering jobs.
+
+    **Response includes**:
+    - `run_id`, `state`: Run identifier and lifecycle state.
+    - `repository`: Git repository URL.
+    - `metadata`: Derived context (refs, node_id, gate_summary, reason, mr_url).
+    - `stages`: Map of job IDs to `StageStatus` objects.
+    - `created_at`, `updated_at`: Timestamps (RFC 3339).
+
+    **Example response**:
+    ```json
+    {
+      "run_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+      "state": "running",
+      "repository": "https://github.com/org/repo.git",
+      "metadata": {
+        "repo_base_ref": "main",
+        "repo_target_ref": "feature-branch",
+        "node_id": "aB3xY9"
+      },
+      "created_at": "2025-01-15T10:00:00Z",
+      "updated_at": "2025-01-15T10:05:00Z",
+      "stages": {
+        "2NQPoBfVkc8dFmGAQqJnUwMu9jS": {
+          "state": "succeeded",
+          "step_index": 1000
+        },
+        "2NQPoBfVkc8dFmGAQqJnUwMu9jT": {
+          "state": "running",
+          "step_index": 2000
+        }
+      }
+    }
+    ```
+
+    See `docs/mods-lifecycle.md` § 2.1 for the complete data model reference.
   parameters:
     - in: path
       name: id
       required: true
       schema:
         type: string
-      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
-      description: Run ID (KSUID string)
+      description: Run ID (KSUID string, 27 characters).
   responses:
     '200':
-      description: OK
+      description: OK — run status retrieved successfully.
       content:
         application/json:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunSummary'
     '400':
-      description: Bad request (missing or empty run id)
+      description: Bad request — missing or empty run ID.
       content:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '404':
-      description: Run not found
+      description: Run not found — no run exists with the given ID.
       content:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '500':
-      description: Server error
+      description: Internal server error.
       content:
         application/json:
           schema:
