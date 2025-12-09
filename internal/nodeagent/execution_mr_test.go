@@ -111,8 +111,9 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 	}
 
 	// Verify push options.
-	if fakeP.opts.TargetRef != "ploy-t-123" {
-		t.Fatalf("push target ref = %q, want ploy-t-123", fakeP.opts.TargetRef)
+	wantBranch := req.TargetRef.String()
+	if fakeP.opts.TargetRef != wantBranch {
+		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
 	}
 	if fakeP.opts.RemoteURL != "https://gitlab.example.com/acme/proj.git" {
 		t.Fatalf("push remote = %q, want https://gitlab.example.com/acme/proj.git", fakeP.opts.RemoteURL)
@@ -125,8 +126,8 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 	if fakeMR.req.ProjectID != "acme%2Fproj" {
 		t.Fatalf("mr project_id = %q, want acme%%2Fproj", fakeMR.req.ProjectID)
 	}
-	if fakeMR.req.SourceBranch != "ploy-t-123" || fakeMR.req.TargetBranch != "main" {
-		t.Fatalf("mr branches = %q -> %q, want ploy-t-123 -> main", fakeMR.req.SourceBranch, fakeMR.req.TargetBranch)
+	if fakeMR.req.SourceBranch != wantBranch || fakeMR.req.TargetBranch != req.BaseRef.String() {
+		t.Fatalf("mr branches = %q -> %q, want %q -> %q", fakeMR.req.SourceBranch, fakeMR.req.TargetBranch, wantBranch, req.BaseRef.String())
 	}
 }
 
