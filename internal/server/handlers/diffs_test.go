@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -47,7 +48,7 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	if item.ID != diffID.String() {
 		t.Errorf("id=%q, want %q", item.ID, diffID.String())
 	}
-	if item.JobID != jobID.String() {
+	if item.JobID != domaintypes.JobID(jobID.String()) { // Compare with domain type
 		t.Errorf("job_id=%q, want %q", item.JobID, jobID.String())
 	}
 	if !item.CreatedAt.Equal(createdAt) {
@@ -122,10 +123,11 @@ func TestGetDiff_Metadata(t *testing.T) {
 	if resp.ID != diffID.String() {
 		t.Errorf("id=%q, want %q", resp.ID, diffID.String())
 	}
-	if resp.RunID != runID.String() {
+	if resp.RunID != domaintypes.RunID(runID.String()) { // Compare with domain type
 		t.Errorf("run_id=%q, want %q", resp.RunID, runID.String())
 	}
-	if resp.JobID == nil || *resp.JobID != jobID.String() {
+	expectedJobID := domaintypes.JobID(jobID.String()) // Create expected domain type
+	if resp.JobID == nil || *resp.JobID != expectedJobID {
 		t.Errorf("job_id=%v, want %q", resp.JobID, jobID.String())
 	}
 	if !resp.CreatedAt.Equal(createdAt) {

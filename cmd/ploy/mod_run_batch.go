@@ -21,6 +21,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRunList implements `ploy mod run list [--limit N] [--offset N]`.
@@ -132,7 +133,7 @@ func handleModRunStatus(args []string, stderr io.Writer) error {
 	cmd := mods.GetBatchStatusCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		BatchID: batchID,
+		BatchID: domaintypes.RunID(batchID), // Convert to domain type
 	}
 
 	batch, err := cmd.Run(ctx)
@@ -213,7 +214,7 @@ func handleModRunStop(args []string, stderr io.Writer) error {
 	cmd := mods.StopBatchCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		BatchID: batchID,
+		BatchID: domaintypes.RunID(batchID), // Convert to domain type
 	}
 
 	batch, err := cmd.Run(ctx)
@@ -265,7 +266,7 @@ func handleModRunStart(args []string, stderr io.Writer) error {
 	cmd := mods.StartBatchCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		BatchID: batchID,
+		BatchID: domaintypes.RunID(batchID), // Convert to domain type
 	}
 
 	result, err := cmd.Run(ctx)

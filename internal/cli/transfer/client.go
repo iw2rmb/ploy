@@ -12,6 +12,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Client wraps HTTP access to the control-plane transfer endpoints.
@@ -21,33 +23,36 @@ type Client struct {
 }
 
 // UploadSlotRequest reserves an upload slot for a job.
+// Uses domain types (JobID, NodeID) for type-safe identification.
 type UploadSlotRequest struct {
-	JobID  string `json:"job_id"`
-	Stage  string `json:"stage,omitempty"`
-	Kind   string `json:"kind"`
-	NodeID string `json:"node_id"`
-	Size   int64  `json:"size,omitempty"`
-	Digest string `json:"digest,omitempty"`
+	JobID  domaintypes.JobID  `json:"job_id"` // Job ID (KSUID-backed)
+	Stage  string             `json:"stage,omitempty"`
+	Kind   string             `json:"kind"`
+	NodeID domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	Size   int64              `json:"size,omitempty"`
+	Digest string             `json:"digest,omitempty"`
 }
 
 // DownloadSlotRequest reserves a download slot for a job artifact.
+// Uses domain types (JobID, NodeID) for type-safe identification.
 type DownloadSlotRequest struct {
-	JobID      string `json:"job_id"`
-	Kind       string `json:"kind,omitempty"`
-	ArtifactID string `json:"artifact_id,omitempty"`
-	NodeID     string `json:"node_id,omitempty"`
+	JobID      domaintypes.JobID  `json:"job_id"` // Job ID (KSUID-backed)
+	Kind       string             `json:"kind,omitempty"`
+	ArtifactID string             `json:"artifact_id,omitempty"`
+	NodeID     domaintypes.NodeID `json:"node_id,omitempty"` // Node ID (NanoID-backed, optional)
 }
 
 // Slot describes a reserved transfer slot.
+// Uses domain types (JobID, NodeID) for type-safe identification.
 type Slot struct {
-	ID         string    `json:"slot_id"`
-	Kind       string    `json:"kind"`
-	JobID      string    `json:"job_id"`
-	NodeID     string    `json:"node_id"`
-	RemotePath string    `json:"remote_path"`
-	MaxSize    int64     `json:"max_size"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	Digest     string    `json:"digest,omitempty"`
+	ID         string             `json:"slot_id"`
+	Kind       string             `json:"kind"`
+	JobID      domaintypes.JobID  `json:"job_id"`  // Job ID (KSUID-backed)
+	NodeID     domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	RemotePath string             `json:"remote_path"`
+	MaxSize    int64              `json:"max_size"`
+	ExpiresAt  time.Time          `json:"expires_at"`
+	Digest     string             `json:"digest,omitempty"`
 }
 
 // CommitRequest finalises a slot after the transfer completes.

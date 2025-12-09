@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // RunBootstrap orchestrates remote installation via SSH and finalises PKI metadata locally.
@@ -29,16 +30,18 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	}
 	opts.Address = address
 
-	clusterID := strings.TrimSpace(opts.ClusterID)
-	if clusterID == "" {
-		clusterID = strings.TrimSpace(opts.DescriptorID)
+	// Use domain type's String() and IsZero() methods for validation.
+	clusterIDStr := opts.ClusterID.String()
+	if opts.ClusterID.IsZero() {
+		clusterIDStr = strings.TrimSpace(opts.DescriptorID)
 	}
-	opts.ClusterID = clusterID
+	opts.ClusterID = domaintypes.ClusterID(clusterIDStr)
 
-	nodeID := strings.TrimSpace(opts.NodeID)
-	if nodeID == "" {
-		nodeID = "control"
+	nodeIDStr := opts.NodeID.String()
+	if opts.NodeID.IsZero() {
+		nodeIDStr = "control"
 	}
+	nodeID := nodeIDStr
 
 	nodeAddress := strings.TrimSpace(opts.NodeAddress)
 	if nodeAddress == "" {
@@ -78,8 +81,8 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	envVars["PLOYD_CACHE_HOME"] = "/var/cache/ploy"
 
 	scriptArgs := make([]string, 0, 8)
-	if clusterID != "" {
-		scriptArgs = append(scriptArgs, "--cluster-id", clusterID)
+	if clusterIDStr != "" {
+		scriptArgs = append(scriptArgs, "--cluster-id", clusterIDStr)
 	}
 	if nodeID != "" {
 		scriptArgs = append(scriptArgs, "--node-id", nodeID)

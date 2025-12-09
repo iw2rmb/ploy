@@ -10,6 +10,8 @@ import (
 	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -52,9 +54,10 @@ type Snapshot struct {
 }
 
 // Collector gathers node lifecycle data for status endpoints and heartbeats.
+// Uses domain type (NodeID) for type-safe identification.
 type Collector struct {
 	role             string
-	nodeID           string
+	nodeID           domaintypes.NodeID // Node ID (NanoID-backed)
 	hostname         func() (string, error)
 	docker           HealthChecker
 	gate             HealthChecker
@@ -81,7 +84,7 @@ func NewCollector(opts Options) *Collector {
 	}
 	return &Collector{
 		role:          strings.TrimSpace(opts.Role),
-		nodeID:        strings.TrimSpace(opts.NodeID),
+		nodeID:        domaintypes.NodeID(strings.TrimSpace(opts.NodeID)), // Convert string to domain type
 		hostname:      hostFn,
 		docker:        opts.Docker,
 		gate:          opts.Gate,

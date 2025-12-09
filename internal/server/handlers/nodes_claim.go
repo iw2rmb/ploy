@@ -128,16 +128,18 @@ func buildAndSendJobClaimResponse(
 	// Per-run env vars in spec take precedence over global env.
 	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
 
+	// Response uses domain types for type-safe API output.
+	// RunID uses JSON key "id" for wire compatibility with existing clients.
 	resp := struct {
-		RunID     string                `json:"id"`         // Run ID (KSUID); JSON key stays "id" for wire compatibility
-		JobID     string                `json:"job_id"`     // Job ID
+		RunID     domaintypes.RunID     `json:"id"`         // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 		ModType   string                `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
 		ModImage  string                `json:"mod_image"`  // Container image for mod/heal jobs
 		StepIndex domaintypes.StepIndex `json:"step_index"` // Job ordering index
 		RepoURL   string                `json:"repo_url"`
 		Status    store.RunStatus       `json:"status"`
-		NodeID    string                `json:"node_id"`
+		NodeID    domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
 		BaseRef   string                `json:"base_ref"`
 		TargetRef string                `json:"target_ref"`
 		CommitSha *string               `json:"commit_sha,omitempty"`
@@ -145,15 +147,15 @@ func buildAndSendJobClaimResponse(
 		CreatedAt string                `json:"created_at"`
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
-		RunID:     run.ID, // Run IDs are KSUID strings.
-		JobID:     job.ID, // Job IDs are KSUID strings.
+		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
+		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
 		ModType:   job.ModType,
 		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
-		NodeID:    stringPtrOrEmpty(job.NodeID), // Node IDs are NanoID strings (nullable).
+		NodeID:    domaintypes.NodeID(stringPtrOrEmpty(job.NodeID)), // Convert to domain type
 		BaseRef:   run.BaseRef,
 		TargetRef: run.TargetRef,
 		CommitSha: run.CommitSha,

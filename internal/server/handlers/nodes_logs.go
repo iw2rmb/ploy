@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -46,11 +47,12 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		// Decode request body.
 		// Note: build_id removed; logs are now grouped at job level only.
+		// Uses domain types (RunID, JobID) for type-safe request parsing.
 		var req struct {
-			RunID   string  `json:"run_id"`
-			JobID   *string `json:"job_id,omitempty"`
-			ChunkNo int32   `json:"chunk_no"`
-			Data    []byte  `json:"data"`
+			RunID   domaintypes.RunID  `json:"run_id"`           // Run ID (KSUID-backed)
+			JobID   *domaintypes.JobID `json:"job_id,omitempty"` // Job ID (KSUID-backed, optional)
+			ChunkNo int32              `json:"chunk_no"`
+			Data    []byte             `json:"data"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -64,8 +66,8 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		// Validate run_id is present.
-		if strings.TrimSpace(req.RunID) == "" {
+		// Validate run_id is present using domain type's IsZero method.
+		if req.RunID.IsZero() {
 			http.Error(w, "run_id is required", http.StatusBadRequest)
 			return
 		}
@@ -95,16 +97,17 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		// Parse job_id if provided.
+		// Parse job_id if provided; convert domain type to string for store.
 		var jobID *string
-		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			jobIDStr := strings.TrimSpace(*req.JobID)
-			jobID = &jobIDStr
+		if req.JobID != nil && !req.JobID.IsZero() {
+			s := req.JobID.String()
+			jobID = &s
 		}
 
 		// Store the gzipped log chunk in the database.
+		// Convert domain type to string for store layer.
 		params := store.CreateLogParams{
-			RunID:   req.RunID,
+			RunID:   req.RunID.String(), // Convert domain type to string
 			JobID:   jobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,

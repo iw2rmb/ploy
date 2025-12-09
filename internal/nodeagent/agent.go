@@ -136,9 +136,9 @@ func (a *Agent) bootstrap(ctx context.Context) error {
 	}
 	bootstrapToken := strings.TrimSpace(string(tokenBytes))
 
-	// Generate private key and CSR
+	// Generate private key and CSR (convert domain types to strings for pki package)
 	slog.Info("generating private key and CSR")
-	keyBundle, csrPEM, err := pki.GenerateNodeCSR(a.cfg.NodeID, a.cfg.ClusterID, "")
+	keyBundle, csrPEM, err := pki.GenerateNodeCSR(a.cfg.NodeID.String(), a.cfg.ClusterID.String(), "")
 	if err != nil {
 		return fmt.Errorf("generate CSR: %w", err)
 	}
@@ -224,8 +224,8 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
-		if a.cfg.NodeID != "" {
-			req.Header.Set("PLOY_NODE_UUID", a.cfg.NodeID)
+		if !a.cfg.NodeID.IsZero() {
+			req.Header.Set("PLOY_NODE_UUID", a.cfg.NodeID.String())
 		}
 
 		resp, err := client.Do(req)

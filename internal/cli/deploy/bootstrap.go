@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 var (
@@ -116,8 +117,8 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	opts.ClusterID = strings.TrimSpace(cfg.ClusterID)
-	opts.NodeID = strings.TrimSpace(cfg.NodeID)
+	opts.ClusterID = domaintypes.ClusterID(strings.TrimSpace(cfg.ClusterID)) // Convert to domain type
+	opts.NodeID = domaintypes.NodeID(strings.TrimSpace(cfg.NodeID))          // Convert to domain type
 	opts.NodeAddress = strings.TrimSpace(cfg.NodeAddress)
 	opts.Primary = cfg.Primary
 	return runner(ctx, opts)

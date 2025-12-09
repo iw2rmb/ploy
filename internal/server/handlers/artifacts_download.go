@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -111,24 +112,27 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Return artifact metadata as JSON.
 		// Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
+		// Uses domain types (RunID, JobID) for type-safe API output.
 		type artifactDetail struct {
-			ID        string  `json:"id"`
-			RunID     string  `json:"run_id"`
-			JobID     *string `json:"job_id,omitempty"`
-			Name      *string `json:"name,omitempty"`
-			CID       string  `json:"cid"`
-			Digest    string  `json:"digest"`
-			Size      int64   `json:"size"`
-			CreatedAt string  `json:"created_at"`
+			ID        string             `json:"id"`
+			RunID     domaintypes.RunID  `json:"run_id"`           // Run ID (KSUID-backed)
+			JobID     *domaintypes.JobID `json:"job_id,omitempty"` // Job ID (KSUID-backed, optional)
+			Name      *string            `json:"name,omitempty"`
+			CID       string             `json:"cid"`
+			Digest    string             `json:"digest"`
+			Size      int64              `json:"size"`
+			CreatedAt string             `json:"created_at"`
 		}
-		// bundle.ID is still pgtype.UUID; run_id and job_id are now strings.
+		// bundle.ID is still pgtype.UUID; run_id and job_id are now KSUID strings.
+		// Convert to domain types for type-safe API response.
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
-			RunID: bundle.RunID, // run_id is now a string (KSUID)
+			RunID: domaintypes.RunID(bundle.RunID), // Convert to domain type
 			Size:  int64(len(bundle.Bundle)),
 		}
 		if bundle.JobID != nil && *bundle.JobID != "" {
-			detail.JobID = bundle.JobID
+			jobID := domaintypes.JobID(*bundle.JobID)
+			detail.JobID = &jobID
 		}
 		if bundle.Name != nil {
 			detail.Name = bundle.Name
