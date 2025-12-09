@@ -50,7 +50,46 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	}
 }
 
-func TestParseSpec_FlattensModAndBuildGate(t *testing.T) {
+// TestParseSpec_CanonicalSingleStepFormat verifies that parseSpec correctly extracts
+// top-level fields for single-step runs. This is the canonical shape for single-step
+// specs (replacing the legacy "mod" object format).
+func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
+	// Canonical single-step format: top-level image, command, env, retain_container.
+	specJSON := `{
+        "image": "docker.io/test/mod:latest",
+        "retain_container": true,
+        "env": {"A":"1","B":"2"},
+        "command": ["/bin/sh","-c","echo hi"],
+        "build_gate": {"enabled": false, "profile": "java-maven"}
+    }`
+	var raw json.RawMessage = []byte(specJSON)
+	opts, env, _ := parseSpec(raw)
+
+	// Verify top-level fields are extracted.
+	if opts["image"] != "docker.io/test/mod:latest" {
+		t.Fatalf("image not extracted: %v", opts["image"])
+	}
+	if rc, _ := opts["retain_container"].(bool); !rc {
+		t.Fatalf("retain_container not extracted")
+	}
+	if env["A"] != "1" || env["B"] != "2" {
+		t.Fatalf("env not extracted: %+v", env)
+	}
+
+	// Verify build_gate is flattened.
+	if en, ok := opts["build_gate_enabled"].(bool); !ok || en != false {
+		t.Fatalf("build_gate_enabled not flattened: %v", opts["build_gate_enabled"])
+	}
+	if pr, ok := opts["build_gate_profile"].(string); !ok || pr != "java-maven" {
+		t.Fatalf("build_gate_profile not flattened: %v", opts["build_gate_profile"])
+	}
+}
+
+// TestParseSpec_LegacyModObjectIgnored verifies that the legacy "mod" object format
+// is no longer processed by parseSpec. Specs using "mod" must be migrated to
+// canonical shapes (top-level fields for single-step, mods[] for multi-step).
+func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
+	// Legacy format: nested "mod" object (no longer supported).
 	specJSON := `{
         "mod": {
             "image": "docker.io/test/mod:latest",
@@ -62,15 +101,20 @@ func TestParseSpec_FlattensModAndBuildGate(t *testing.T) {
     }`
 	var raw json.RawMessage = []byte(specJSON)
 	opts, env, _ := parseSpec(raw)
-	if opts["image"] != "docker.io/test/mod:latest" {
-		t.Fatalf("image not flattened: %v", opts["image"])
+
+	// Verify that "mod" object fields are NOT extracted to top-level.
+	// The legacy fallback has been removed; specs must use canonical shapes.
+	if _, hasImage := opts["image"]; hasImage {
+		t.Fatalf("expected image not to be extracted from legacy mod object")
 	}
-	if rc, _ := opts["retain_container"].(bool); !rc {
-		t.Fatalf("retain_container not flattened")
+	if _, hasRetain := opts["retain_container"]; hasRetain {
+		t.Fatalf("expected retain_container not to be extracted from legacy mod object")
 	}
-	if env["A"] != "1" || env["B"] != "2" {
-		t.Fatalf("env not flattened: %+v", env)
+	if len(env) > 0 {
+		t.Fatalf("expected env to be empty (mod.env should not be merged), got: %+v", env)
 	}
+
+	// build_gate should still be flattened (it's a top-level field, not part of mod).
 	if en, ok := opts["build_gate_enabled"].(bool); !ok || en != false {
 		t.Fatalf("build_gate_enabled not flattened: %v", opts["build_gate_enabled"])
 	}
