@@ -156,12 +156,18 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		// Server returns 201 Created with canonical submit response.
+		// Server returns 201 Created with canonical RunSummary response.
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(struct {
-			RunID  string `json:"run_id"`
-			Status string `json:"status"`
-		}{RunID: "t2", Status: "pending"})
+		_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+			RunID:      domaintypes.RunID("t2"),
+			State:      modsapi.RunStatePending,
+			Repository: "https://example.com/repo.git",
+			Metadata: map[string]string{
+				"repo_base_ref":   "main",
+				"repo_target_ref": "feature",
+			},
+			Stages: make(map[string]modsapi.StageStatus),
+		})
 	})
 	mux.HandleFunc("/v1/mods/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)

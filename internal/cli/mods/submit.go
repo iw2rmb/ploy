@@ -52,29 +52,15 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Server returns 201 Created with the canonical submit response.
+	// Server returns 201 Created with the canonical RunSummary response.
 	if resp.StatusCode == http.StatusCreated {
-		var srvResp struct {
-			RunID     string `json:"run_id"`
-			Status    string `json:"status"`
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
+		var summary modsapi.RunSummary
+		if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
-		// Map to modsapi.RunSummary.
-		return modsapi.RunSummary{
-			RunID:      domaintypes.RunID(srvResp.RunID),
-			State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
-			Repository: srvResp.RepoURL,
-			Metadata: map[string]string{
-				"repo_base_ref":   srvResp.BaseRef,
-				"repo_target_ref": srvResp.TargetRef,
-			},
-			Stages: make(map[string]modsapi.StageStatus),
-		}, nil
+		// Ensure RunID is normalised to the domain type.
+		summary.RunID = domaintypes.RunID(strings.TrimSpace(string(summary.RunID)))
+		return summary, nil
 	}
 
 	// Handle error responses.

@@ -62,31 +62,26 @@ func TestSubmitRunHandlerSuccess(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp struct {
-		RunID     string `json:"run_id"`
-		Status    string `json:"status"`
-		RepoURL   string `json:"repo_url"`
-		BaseRef   string `json:"base_ref"`
-		TargetRef string `json:"target_ref"`
-	}
+	// Decode RunSummary directly — POST /v1/mods returns the canonical type.
+	var resp modsapi.RunSummary
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if resp.RunID != runID.String() {
-		t.Errorf("expected run_id %s, got %s", runID.String(), resp.RunID)
+	if string(resp.RunID) != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), string(resp.RunID))
 	}
-	if resp.Status != "queued" {
-		t.Errorf("expected status queued, got %s", resp.Status)
+	if resp.State != modsapi.RunStatePending {
+		t.Errorf("expected state pending, got %s", resp.State)
 	}
-	if resp.RepoURL != "https://github.com/user/repo.git" {
-		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.RepoURL)
+	if resp.Repository != "https://github.com/user/repo.git" {
+		t.Errorf("expected repository https://github.com/user/repo.git, got %s", resp.Repository)
 	}
-	if resp.BaseRef != "main" {
-		t.Errorf("expected base_ref main, got %s", resp.BaseRef)
+	if resp.Metadata["repo_base_ref"] != "main" {
+		t.Errorf("expected metadata[repo_base_ref] main, got %s", resp.Metadata["repo_base_ref"])
 	}
-	if resp.TargetRef != "feature" {
-		t.Errorf("expected target_ref feature, got %s", resp.TargetRef)
+	if resp.Metadata["repo_target_ref"] != "feature" {
+		t.Errorf("expected metadata[repo_target_ref] feature, got %s", resp.Metadata["repo_target_ref"])
 	}
 
 	if !st.createRunCalled {
@@ -462,8 +457,8 @@ func TestSubmitRunHandlerPublishesEvent(t *testing.T) {
 		if evt.Type == "run" {
 			foundRunEvent = true
 			// Verify the event contains run state information.
-			if !strings.Contains(string(evt.Data), "queued") {
-				t.Errorf("expected run event data to contain 'queued', got: %s", string(evt.Data))
+			if !strings.Contains(string(evt.Data), "\"state\":\"pending\"") {
+				t.Errorf("expected run event data to contain state \"pending\", got: %s", string(evt.Data))
 			}
 			break
 		}

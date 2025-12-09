@@ -145,7 +145,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"CreateRunResponse",
 		"RunSubmitRequest",
 		"RunSummary",
-		"RunStatus",
 		"NodeClaimResponse",
 		"Event",
 		"Stage",

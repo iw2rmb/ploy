@@ -284,43 +284,76 @@ RunSubmitRequest:
 
 RunSummary:
   type: object
+  # Canonical Mods run schema used by POST /v1/mods (submit),
+  # GET /v1/mods/{id} (status), and SSE `run` events.
   # Note: run_id is now a KSUID-backed string (27 characters).
   properties:
-    run_id: { type: string, description: "Run ID (KSUID string)" }
-    status: { type: string }
-    repo_url: { type: string }
-    base_ref: { type: string }
-    target_ref: { type: string }
-  required: [run_id, status, repo_url, base_ref, target_ref]
-
-# Detailed status returned by GET /v1/mods/{id}
-# Note: The `reason` field was removed to prevent schema drift from the DB model.
-# Failure context is derived from job `stats.exit_code` and `metadata`. Cancellation
-# reasons are stored in `metadata.reason` by the cancel endpoint.
-# Note: run_id is now a KSUID-backed string (27 characters).
-RunStatus:
-  type: object
-  properties:
-    run_id: { type: string, description: "Run ID (KSUID string)" }
-    status: { type: string }
-    repo_url: { type: string }
-    base_ref: { type: string }
-    target_ref: { type: string }
-    commit_sha: { type: string, nullable: true }
-    created_at: { type: string, format: date-time }
-    started_at: { type: string, format: date-time, nullable: true }
-    finished_at: { type: string, format: date-time, nullable: true }
+    run_id:
+      type: string
+      description: "Run ID (KSUID string)"
+    state:
+      type: string
+      description: Run lifecycle state (`pending`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`).
+    submitter:
+      type: string
+      description: "Optional submitter identifier"
+      nullable: true
+    repository:
+      type: string
+      description: "Repository URL for this run"
     metadata:
       description: |
-        Additional run metadata. Contains derived failure/cancellation context:
-        - `reason`: Human-readable cancellation reason (set by cancel endpoint)
-        - `mr_url`: Merge request URL when available
-        - `gate_summary`: Gate health summary from stats
-        - `node_id`: Claiming node identifier
+        Additional run metadata. Contains derived failure/cancellation context and diagnostics:
+        - `repo_base_ref`, `repo_target_ref`: Git refs used for this run.
+        - `mr_url`: Merge request URL when available.
+        - `gate_summary`: Gate health summary from stats.
+        - `node_id`: Claiming node identifier.
+        - `resume_count`, `last_resumed_at`: Resume history when present.
       type: object
       additionalProperties:
         type: string
-  required: [run_id, status, repo_url, base_ref, target_ref, created_at]
+    created_at:
+      type: string
+      format: date-time
+      description: "Run creation timestamp"
+    updated_at:
+      type: string
+      format: date-time
+      description: "Timestamp of the latest status update"
+    stages:
+      description: |
+        Map keyed by job ID (`jobs.id`, KSUID string). Each value is a StageStatus summarising
+        job execution state and artifacts. The key is the job's ID (KSUID string).
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          state:
+            type: string
+            description: Stage lifecycle state (`pending`, `queued`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`).
+          attempts:
+            type: integer
+            format: int32
+          max_attempts:
+            type: integer
+            format: int32
+          current_job_id:
+            type: string
+            nullable: true
+            description: "Execution job ID (KSUID string) when applicable"
+          artifacts:
+            type: object
+            additionalProperties:
+              type: string
+            description: "Map of artifact logical names to bundle CIDs"
+          last_error:
+            type: string
+            description: "Last error message when the stage failed"
+          step_index:
+            type: integer
+            format: int32
+            description: "Float index from jobs.step_index, exposed as integer for API consumers"
+  required: [run_id, state, repository, created_at, updated_at, stages]
 
 # Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.

@@ -662,7 +662,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 ### 2.1 Run summary (`internal/mods/api`)
 
 - `RunSummary` (in `internal/mods/api/types.go`) is the wire type returned by
-  `GET /v1/mods/{id}` and streamed on SSE:
+  `POST /v1/mods` (submit), `GET /v1/mods/{id}` (status), and streamed on SSE:
   - `run_id` — run ID (KSUID string, 27 characters).
   - `state` —  run lifecycle state (`pending`, `running`, `succeeded`,
     `failed`, `cancelled`).
@@ -674,8 +674,7 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
     - `gate_summary` (Build Gate result)
     - `reason` (terminal error reason when available).
   - `stages` — map keyed by **job ID** (`jobs.id`, KSUID string), value is `StageStatus`.
-    Note: The `stages` field name is retained for API backward compatibility,
-    but each entry represents a `jobs` table row. The map key is the job's ID (KSUID string).
+    Each entry represents a `jobs` table row; the map key is the job's ID (KSUID string).
 
 - `StageStatus`:
   - `state` — job lifecycle state (mirrors `jobs.status`).

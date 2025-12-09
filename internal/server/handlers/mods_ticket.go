@@ -122,51 +122,43 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			return
 		}
 
-		// Build response with RunSummary (run_id is a KSUID string).
-		// Use typed status (store.RunStatus) instead of string cast for type safety;
-		// JSON encoder will serialize the underlying string value.
-		resp := struct {
-			RunID     domaintypes.RunID `json:"run_id"`
-			Status    store.RunStatus   `json:"status"` // Typed status instead of string cast
-			RepoURL   string            `json:"repo_url"`
-			BaseRef   string            `json:"base_ref"`
-			TargetRef string            `json:"target_ref"`
-		}{
-			RunID:     domaintypes.RunID(run.ID), // run.ID is now a string (KSUID).
-			Status:    run.Status,
-			RepoURL:   run.RepoUrl,
-			BaseRef:   run.BaseRef,
-			TargetRef: run.TargetRef,
+		// Build canonical RunSummary response (run_id is a KSUID string).
+		// Both POST /v1/mods and GET /v1/mods/{id} return this shape.
+		summary := modsapi.RunSummary{
+			RunID:      domaintypes.RunID(run.ID),
+			State:      modsapi.RunStatusFromStore(run.Status),
+			Submitter:  "",
+			Repository: run.RepoUrl,
+			Metadata: map[string]string{
+				"repo_base_ref":   run.BaseRef,
+				"repo_target_ref": run.TargetRef,
+			},
+			CreatedAt: timeOrZero(run.CreatedAt),
+			UpdatedAt: timeOrZero(run.CreatedAt),
+			Stages:    make(map[string]modsapi.StageStatus),
 		}
 
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
-			// Construct RunSummary with RunID for SSE event publishing.
-			runSummary := modsapi.RunSummary{
-				RunID:      resp.RunID,
-				State:      modsapi.RunState(run.Status),
-				Repository: run.RepoUrl,
-				CreatedAt:  run.CreatedAt.Time,
-				UpdatedAt:  run.CreatedAt.Time,
-				Stages:     make(map[string]modsapi.StageStatus),
-			}
-			if err := eventsService.PublishRun(r.Context(), resp.RunID.String(), runSummary); err != nil {
-				slog.Error("submit run: publish run event failed", "run_id", resp.RunID, "err", err)
+			// Publish the same RunSummary used for the HTTP response.
+			if err := eventsService.PublishRun(r.Context(), summary.RunID.String(), summary); err != nil {
+				slog.Error("submit run: publish run event failed", "run_id", summary.RunID, "err", err)
 			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		// Encode RunSummary directly — canonical schema for POST /v1/mods.
+		if err := json.NewEncoder(w).Encode(summary); err != nil {
 			slog.Error("submit run: encode response failed", "err", err)
 		}
 
 		slog.Info("run submitted",
-			"run_id", resp.RunID,
+			"run_id", summary.RunID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
-			"status", "queued",
+			"state", summary.State,
 		)
 	}
 }
