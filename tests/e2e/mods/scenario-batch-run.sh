@@ -71,14 +71,13 @@ check_ploy
 echo "[1/5] Creating batch run: ${BATCH_NAME}"
 SPEC_FILE="${ARTIFACT_DIR}/batch-spec.yaml"
 cat > "${SPEC_FILE}" <<'EOF'
-mod:
-  image: alpine:3.20
-  command: |
-    echo "[batch-e2e] Starting repo processing"
-    echo "Repo: $PLOY_REPO_URL"
-    echo "Branch: $PLOY_TARGET_REF"
-    sleep 2
-    echo "[batch-e2e] Done"
+image: alpine:3.20
+command: |
+  echo "[batch-e2e] Starting repo processing"
+  echo "Repo: $PLOY_REPO_URL"
+  echo "Branch: $PLOY_TARGET_REF"
+  sleep 2
+  echo "[batch-e2e] Done"
 EOF
 
 # Create the batch run using mod run with a spec file.

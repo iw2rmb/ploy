@@ -5,57 +5,57 @@ apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
-# SINGLE-STEP MOD (default, backward-compatible)
+# SINGLE-STEP MOD (canonical)
 ################################################################################
-# Main mod container to run against the hydrated repository at /workspace.
-# This is the traditional single-mod format. For multi-step workflows, use the
+# Main container to run against the hydrated repository at /workspace.
+# Single-step specs use top-level fields. For multi-step workflows, use the
 # mods[] array instead (see MULTI-STEP section below).
-mod:
-  # Required: image that performs the transformation (e.g., OpenRewrite).
-  #
-  # The `image` field accepts two forms:
-  #
-  # 1. **Universal image (string)** — A single image used for all stacks:
-  #    image: docker.io/your-dh-user/mods-openrewrite:latest
-  #
-  # 2. **Stack-specific images (map)** — Different images per Build Gate stack:
-  #    image:
-  #      default: docker.io/your-dh-user/mods-openrewrite:latest
-  #      java-maven: docker.io/your-dh-user/mods-orw-maven:latest
-  #      java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
-  #
-  # Stack Resolution Rules (for map form):
-  #   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
-  #      that image is selected.
-  #   2. Default fallback: If no exact match exists, the "default" key is used.
-  #   3. Error: If neither the stack key nor "default" is present, the run fails
-  #      with a clear error message.
-  #
-  # Recognized Stack Names (from Build Gate detection):
-  #   - "java-maven"  — Maven-based Java projects (pom.xml detected)
-  #   - "java-gradle" — Gradle-based Java projects (build.gradle detected)
-  #   - "java"        — Generic Java projects (no build tool detected)
-  #   - "unknown"     — No recognized stack markers found
-  #   - "default"     — Fallback key for unrecognized stacks
-  #
-  # The universal string form is backward compatible and ignores stack detection.
-  image: docker.io/your-dh-user/mods-openrewrite:latest
-  # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
-  # command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
-  # Environment variables passed into the mod container
-  #   - use `env` for literal values
-  #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
-  env:
-    RECIPE_GROUP: org.openrewrite.recipe
-    RECIPE_ARTIFACT: rewrite-migrate-java
-    RECIPE_VERSION: "3.20.0"
-    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-    MAVEN_PLUGIN_VERSION: "6.18.0"
-  env_from_file:
-    # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
-    # CODEX_AUTH_JSON: ~/.codex/auth.json
-  # Retain container for debugging (disabled by default)
-  retain_container: false
+
+# Required: image that performs the transformation (e.g., OpenRewrite).
+#
+# The `image` field accepts two forms:
+#
+# 1. **Universal image (string)** — A single image used for all stacks:
+#    image: docker.io/your-dh-user/mods-openrewrite:latest
+#
+# 2. **Stack-specific images (map)** — Different images per Build Gate stack:
+#    image:
+#      default: docker.io/your-dh-user/mods-openrewrite:latest
+#      java-maven: docker.io/your-dh-user/mods-orw-maven:latest
+#      java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
+#
+# Stack Resolution Rules (for map form):
+#   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
+#      that image is selected.
+#   2. Default fallback: If no exact match exists, the "default" key is used.
+#   3. Error: If neither the stack key nor "default" is present, the run fails
+#      with a clear error message.
+#
+# Recognized Stack Names (from Build Gate detection):
+#   - "java-maven"  — Maven-based Java projects (pom.xml detected)
+#   - "java-gradle" — Gradle-based Java projects (build.gradle detected)
+#   - "java"        — Generic Java projects (no build tool detected)
+#   - "unknown"     — No recognized stack markers found
+#   - "default"     — Fallback key for unrecognized stacks
+#
+# The universal string form ignores stack detection and always uses the same image.
+image: docker.io/your-dh-user/mods-openrewrite:latest
+# Optional: override command; when omitted, image CMD/ENTRYPOINT is used
+# command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
+# Environment variables passed into the mod container
+#   - use `env` for literal values
+#   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
+env:
+  RECIPE_GROUP: org.openrewrite.recipe
+  RECIPE_ARTIFACT: rewrite-migrate-java
+  RECIPE_VERSION: "3.20.0"
+  RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+  MAVEN_PLUGIN_VERSION: "6.18.0"
+env_from_file:
+  # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
+  # CODEX_AUTH_JSON: ~/.codex/auth.json
+# Retain container for debugging (disabled by default)
+retain_container: false
 
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
@@ -224,18 +224,18 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy mod run --spec mod.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
 #
-# - The agent honors: mod.image, mod.command, mod.env, mod.retain_container,
+# - The agent honors: image, command, env, retain_container,
 #   mods[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (profile), and build_gate_healing.* (retries, mods).
 #
-# - Single-mod vs multi-step:
-#   * Single-mod: Use the `mod` section for one transformation.
+# - Single-step vs multi-step:
+#   * Single-step: Use top-level fields for one transformation.
 #   * Multi-step: Use the `mods[]` array for sequential transformations.
 #   * Both formats share the same global build_gate and build_gate_healing policy.
 #
 # - Stack-aware image selection:
-#   * The `image` field (in mod, mods[], and build_gate_healing.mods[]) accepts
-#     either a string (universal image) or a map (stack-specific images).
+#   * The `image` field (top-level, in mods[], and in build_gate_healing.mods[])
+#     accepts either a string (universal image) or a map (stack-specific images).
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.
 #   * Resolution order: exact stack match → "default" key → error.

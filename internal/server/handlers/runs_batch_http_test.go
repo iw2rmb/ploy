@@ -1129,7 +1129,7 @@ func TestStartRunHandler(t *testing.T) {
 		ID:        sampleBatchRunID,
 		Name:      ptrString("test-batch"),
 		RepoUrl:   "https://github.com/example/batch.git",
-		Spec:      []byte(`{"mod":{"image":"test-image"}}`),
+		Spec:      []byte(`{"image":"test-image"}`),
 		Status:    store.RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature",
