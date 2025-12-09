@@ -146,7 +146,7 @@ Legend: [ ] todo, [x] done.
     - Confirm that there are no JSON schema or OpenAPI changes (wire types remain strings) by running `go test ./docs/api`.
 
 ## Remove TicketID alias and migrate remaining call sites to RunID
-- [ ] Eliminate `TicketID` alias from `internal/domain/types` and replace residual Ticket-based terminology with `RunID` usage — finish the migration so `RunID` is the only domain type for Mods run identifiers.
+- [x] Eliminate `TicketID` alias from `internal/domain/types` and replace residual Ticket-based terminology with `RunID` usage — finish the migration so `RunID` is the only domain type for Mods run identifiers.
   - Repository: github.com/iw2rmb/ploy
   - Component: `internal/domain/types`, `internal/cli/mods`, `internal/server`, docs
   - Scope:

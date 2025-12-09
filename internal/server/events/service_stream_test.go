@@ -151,7 +151,6 @@ func TestStream_PublishRun(t *testing.T) {
 			ctx := context.Background()
 			now := time.Now()
 
-			// Build payload using renamed RunID field instead of TicketID.
 			payload := modsapi.RunSummary{
 				RunID:      domaintypes.RunID("test-run-123"),
 				State:      tt.state,
@@ -171,7 +170,6 @@ func TestStream_PublishRun(t *testing.T) {
 				},
 			}
 
-			// Call renamed PublishRun method.
 			err = svc.PublishRun(ctx, tt.runID, payload)
 
 			if tt.wantErr {
@@ -201,7 +199,7 @@ func TestStream_PublishRun(t *testing.T) {
 					t.Fatalf("failed to unmarshal run payload: %v", err)
 				}
 
-				// Verify RunID field (renamed from TicketID).
+				// Verify RunID field is correctly marshaled.
 				if decodedPayload.RunID != payload.RunID {
 					t.Fatalf("expected run ID %s, got %s", payload.RunID, decodedPayload.RunID)
 				}
@@ -229,7 +227,6 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 	}
 
 	runID := uuid.New().String()
-	// Build payload using renamed RunID field instead of TicketID.
 	payload := modsapi.RunSummary{
 		RunID:     domaintypes.RunID("test-run"),
 		State:     modsapi.RunStateRunning,

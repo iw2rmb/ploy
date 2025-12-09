@@ -9,7 +9,6 @@ import (
 func TestIDs_Basics(t *testing.T) {
 	t.Run("zero", func(t *testing.T) {
 		var (
-			// RunID is the canonical run identifier (TicketID is deprecated alias).
 			a RunID
 			d StepID
 			e ClusterID
@@ -30,7 +29,6 @@ func TestIDs_Basics(t *testing.T) {
 	})
 
 	t.Run("construct_compare", func(t *testing.T) {
-		// RunID is the canonical run identifier.
 		r1, r2 := RunID("r1"), RunID("r1")
 		if r1 != r2 || r1.String() != "r1" {
 			t.Fatalf("RunID compare/string failed")
@@ -49,19 +47,10 @@ func TestIDs_Basics(t *testing.T) {
 		}
 	})
 
-	t.Run("ticket_alias_compatibility", func(t *testing.T) {
-		// Verify TicketID (deprecated alias) is interchangeable with RunID.
-		var tid TicketID = "t1"
-		var rid RunID = tid // Direct assignment should work since TicketID = RunID.
-		if tid != rid || tid.String() != "t1" {
-			t.Fatalf("TicketID/RunID alias compatibility failed")
-		}
-	})
 }
 
 func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	// Use one representative value for each type.
-	// RunID is now the canonical run identifier (TicketID is a deprecated alias).
 	var (
 		rid  RunID
 		step StepID
@@ -115,7 +104,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 
 func TestIDs_RejectEmpty(t *testing.T) {
 	// Verify all ID types reject empty/whitespace-only values.
-	// Note: TicketID is now an alias for RunID, so only RunID needs testing.
 	tests := []struct {
 		name string
 		fn   func([]byte) error
