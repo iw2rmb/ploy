@@ -7,7 +7,7 @@ Documentation: /Users/vk/@iw2rmb/auto/ROADMAP.md, ROADMAP.md, cmd/ploy/README.md
 Legend: [ ] todo, [x] done.
 
 ## Server Storage & Wiring
-- [ ] Add `config_env` table and wire into server config load — Persist global env entries (including secrets) in the control-plane database with scope metadata.
+- [x] Add `config_env` table and wire into server config load — Persist global env entries (including secrets) in the control-plane database with scope metadata.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/store (migrations + store API), internal/server/config
   - Scope:
