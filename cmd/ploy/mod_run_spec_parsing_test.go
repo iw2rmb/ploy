@@ -10,17 +10,18 @@ import (
 
 // TestBuildSpecPayloadFromYAML verifies that buildSpecPayload correctly parses
 // a YAML spec file and produces the expected JSON payload structure.
+// Uses the canonical single-step format with top-level fields.
 func TestBuildSpecPayloadFromYAML(t *testing.T) {
-	// Create a temporary YAML spec file
+	// Create a temporary YAML spec file using canonical single-step format.
+	// Note: The legacy "mod" object format is deprecated; use top-level fields.
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
-mod:
-  image: docker.io/test/mod:latest
-  env:
-    KEY1: value1
-    KEY2: value2
-  retain_container: true
+image: docker.io/test/mod:latest
+env:
+  KEY1: value1
+  KEY2: value2
+retain_container: true
 build_gate_healing:
   retries: 1
   mods:
@@ -47,13 +48,19 @@ mr_on_success: true
 		t.Errorf("expected build_gate_healing in payload")
 	}
 
-	// Verify mod settings
-	if mod, ok := result["mod"].(map[string]any); ok {
-		if img, ok := mod["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-			t.Errorf("expected mod.image=docker.io/test/mod:latest, got %v", mod["image"])
+	// Verify top-level settings (canonical single-step format).
+	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected image=docker.io/test/mod:latest, got %v", result["image"])
+	}
+	if env, ok := result["env"].(map[string]any); ok {
+		if env["KEY1"] != "value1" || env["KEY2"] != "value2" {
+			t.Errorf("expected env with KEY1/KEY2, got %v", env)
 		}
 	} else {
-		t.Errorf("expected mod in payload")
+		t.Errorf("expected env in payload")
+	}
+	if retain, ok := result["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
 	}
 
 	// Verify gitlab_domain
@@ -108,15 +115,15 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 }
 
 // TestBuildSpecPayloadCommand_MergesWithoutCLI verifies that when a spec defines
-// mod.command and no --mod-command CLI flag is passed, the spec command is preserved.
+// command and no --mod-command CLI flag is passed, the spec command is preserved.
+// Uses canonical single-step format with top-level fields.
 func TestBuildSpecPayloadCommand_MergesWithoutCLI(t *testing.T) {
-	// Spec defines mod.command; CLI does not pass --mod-command.
+	// Spec defines top-level command; CLI does not pass --mod-command.
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
-mod:
-  image: docker.io/test/mod:latest
-  command: ["/bin/sh", "-lc", "echo hi"]
+image: docker.io/test/mod:latest
+command: ["/bin/sh", "-lc", "echo hi"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
@@ -129,25 +136,22 @@ mod:
 	if err := json.Unmarshal(payload, &out); err != nil {
 		t.Fatalf("json: %v", err)
 	}
-	mod, ok := out["mod"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected mod section")
-	}
-	cmd, ok := mod["command"].([]any)
+	// Verify top-level command is preserved (canonical format).
+	cmd, ok := out["command"].([]any)
 	if !ok || len(cmd) != 3 || cmd[0] != "/bin/sh" || cmd[1] != "-lc" || cmd[2] != "echo hi" {
-		t.Fatalf("expected command array preserved, got %v", mod["command"])
+		t.Fatalf("expected command array preserved at top-level, got %v", out["command"])
 	}
 }
 
 // TestBuildSpecPayloadCommand_CLIOverridesJSON verifies that a CLI-provided
 // JSON array command overrides the spec-defined command.
+// Uses canonical single-step format with top-level fields.
 func TestBuildSpecPayloadCommand_CLIOverridesJSON(t *testing.T) {
-	// Spec defines command; CLI provides JSON array to override.
+	// Spec defines top-level command; CLI provides JSON array to override.
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
-mod:
-  command: ["echo", "spec"]
+command: ["echo", "spec"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
@@ -160,13 +164,10 @@ mod:
 	if err := json.Unmarshal(payload, &out); err != nil {
 		t.Fatalf("json: %v", err)
 	}
-	mod, ok := out["mod"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected mod section")
-	}
-	cmd, ok := mod["command"].([]any)
+	// Verify top-level command is overridden by CLI (canonical format).
+	cmd, ok := out["command"].([]any)
 	if !ok || len(cmd) != 2 || cmd[0] != "echo" || cmd[1] != "cli" {
-		t.Fatalf("expected command overridden to [echo cli], got %v", mod["command"])
+		t.Fatalf("expected command overridden to [echo cli] at top-level, got %v", out["command"])
 	}
 }
 
@@ -483,20 +484,19 @@ mods:
 	}
 }
 
-// TestBuildSpecPayload_SingleModFlowUnchanged verifies that single-mod specs
-// (using "mod" field) continue to work as before, ensuring backward compatibility.
-// CLI overrides apply to single-mod format but not to multi-step mods[] format.
-func TestBuildSpecPayload_SingleModFlowUnchanged(t *testing.T) {
+// TestBuildSpecPayload_CanonicalSingleStepWithOverrides verifies that single-step specs
+// using the canonical format (top-level fields) work with CLI overrides.
+// CLI overrides apply to single-step format but not to multi-step mods[] format.
+func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
 	t.Parallel()
 
-	// Test single-mod format with CLI overrides.
+	// Test canonical single-step format with CLI overrides.
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "single.yaml")
 	specContent := `
-mod:
-  image: docker.io/test/base:v1
-  env:
-    BASE_KEY: base_value
+image: docker.io/test/base:v1
+env:
+  BASE_KEY: base_value
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -523,37 +523,32 @@ mod:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify CLI overrides are applied to mod section (single-mod format).
-	mod, ok := result["mod"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected mod section in payload")
-	}
-
+	// Verify CLI overrides are applied at top-level (canonical single-step format).
 	// Image override applied.
-	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/override:v2" {
-		t.Errorf("expected mod.image=docker.io/test/override:v2, got %v", mod["image"])
+	if img, ok := result["image"].(string); !ok || img != "docker.io/test/override:v2" {
+		t.Errorf("expected image=docker.io/test/override:v2, got %v", result["image"])
 	}
 
 	// Retain override applied.
-	if retain, ok := mod["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected mod.retain_container=true, got %v", mod["retain_container"])
+	if retain, ok := result["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
 	}
 
 	// Env merged (CLI + spec).
-	env, ok := mod["env"].(map[string]any)
+	env, ok := result["env"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mod.env to be present")
+		t.Fatalf("expected env to be present")
 	}
 	if base, ok := env["BASE_KEY"].(string); !ok || base != "base_value" {
-		t.Errorf("expected mod.env.BASE_KEY=base_value, got %v", env["BASE_KEY"])
+		t.Errorf("expected env.BASE_KEY=base_value, got %v", env["BASE_KEY"])
 	}
 	if cli, ok := env["CLI_KEY"].(string); !ok || cli != "cli_value" {
-		t.Errorf("expected mod.env.CLI_KEY=cli_value, got %v", env["CLI_KEY"])
+		t.Errorf("expected env.CLI_KEY=cli_value, got %v", env["CLI_KEY"])
 	}
 
-	// Verify mods[] is NOT present (single-mod format).
+	// Verify mods[] is NOT present (single-step format).
 	if _, exists := result["mods"]; exists {
-		t.Errorf("expected mods[] to be absent in single-mod format")
+		t.Errorf("expected mods[] to be absent in single-step format")
 	}
 }
 

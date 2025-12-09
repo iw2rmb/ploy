@@ -314,18 +314,18 @@ func TestParseSpec_ModIndexPropagatesToOptions(t *testing.T) {
 	}
 }
 
-// TestParseSpec_ModImageMap_PopulatesExecutionImage verifies that a single-step
-// spec using mod.image as a stack-aware map is parsed into Execution.Image.
-func TestParseSpec_ModImageMap_PopulatesExecutionImage(t *testing.T) {
+// TestParseSpec_ImageMap_PopulatesExecutionImage verifies that a single-step
+// spec using top-level image as a stack-aware map is parsed into Execution.Image.
+// Uses the canonical single-step format with top-level image field.
+func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	t.Parallel()
 
+	// Canonical single-step format: top-level image field (stack-aware map).
 	specJSON := `{
-		"mod": {
-			"image": {
-				"default": "docker.io/user/mods-orw:latest",
-				"java-maven": "docker.io/user/mods-orw-maven:latest",
-				"java-gradle": "docker.io/user/mods-orw-gradle:latest"
-			}
+		"image": {
+			"default": "docker.io/user/mods-orw:latest",
+			"java-maven": "docker.io/user/mods-orw-maven:latest",
+			"java-gradle": "docker.io/user/mods-orw-gradle:latest"
 		}
 	}`
 

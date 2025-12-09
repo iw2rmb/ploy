@@ -20,20 +20,31 @@ func stringValue(s *string) string {
 }
 
 // parseSpec splits a spec JSON payload into options and environment maps.
-// The spec is expected to contain fields like "image", "command", "env", "mod",
-// "build_gate", and other configuration values. This function extracts and flattens
-// nested structures according to the following rules:
+// The spec is expected to contain fields like "image", "command", "env",
+// "build_gate", "mods", and other configuration values. This function extracts
+// and flattens nested structures according to the following rules:
 //
 //   - Top-level fields like "image", "command", "env" are extracted directly.
-//   - The "mod" object provides fallback values: if a top-level field is missing,
-//     the corresponding "mod" field is used instead. Top-level always takes precedence.
-//   - Environment variables from both top-level "env" and "mod.env" are merged,
-//     with top-level "env" winning on conflict.
 //   - The "build_gate" object is flattened into "build_gate_enabled" and
 //     "build_gate_profile" options for manifest builder consumption.
 //   - Server-injected metadata like "job_id", "gitlab_pat", "gitlab_domain",
 //     "mr_on_success", and "mr_on_fail" are passed through as-is.
 //   - The "build_gate_healing" block is preserved in options to support heal → re-gate loops.
+//   - For multi-step runs, the "mods[]" array is preserved for step-by-step execution.
+//
+// ## Canonical Spec Shapes
+//
+// Single-step runs use top-level fields:
+//
+//	{"image": "...", "command": "...", "env": {...}, "build_gate": {...}}
+//
+// Multi-step runs use the mods[] array:
+//
+//	{"mods": [{...}, {...}], "build_gate": {...}, "build_gate_healing": {...}}
+//
+// The legacy "mod" object fallback (where mod.image, mod.command, etc. were copied
+// to top-level when missing) is no longer supported. Specs must use one of the
+// canonical shapes above.
 //
 // Returns:
 //   - opts: map[string]any containing flattened options (preserved for raw JSON access).
@@ -141,63 +152,11 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 		}
 	}
 
-	// Flatten nested mod.* into options/env (top-level values take precedence).
-	if mod, ok := m["mod"].(map[string]any); ok {
-		// image
-		if _, present := opts["image"]; !present {
-			if v, ok := mod["image"]; ok && v != nil {
-				switch img := v.(type) {
-				case string:
-					if img != "" {
-						opts["image"] = img
-					}
-				case map[string]any:
-					if len(img) > 0 {
-						opts["image"] = img
-					}
-				case map[string]string:
-					if len(img) > 0 {
-						opts["image"] = img
-					}
-				}
-			}
-		}
-		// command (string or array)
-		if _, present := opts["command"]; !present {
-			switch v := mod["command"].(type) {
-			case []any:
-				out := make([]string, 0, len(v))
-				for _, e := range v {
-					if s, ok := e.(string); ok {
-						out = append(out, s)
-					}
-				}
-				if len(out) > 0 {
-					opts["command"] = out
-				}
-			case string:
-				if s := v; s != "" {
-					opts["command"] = s
-				}
-			}
-		}
-		// retain_container
-		if _, present := opts["retain_container"]; !present {
-			if b, ok := mod["retain_container"].(bool); ok {
-				opts["retain_container"] = b
-			}
-		}
-		// env merge (top-level env wins on conflict)
-		if em, ok := mod["env"].(map[string]any); ok {
-			for k, v := range em {
-				if s, ok := v.(string); ok {
-					if _, exists := env[k]; !exists {
-						env[k] = s
-					}
-				}
-			}
-		}
-	}
+	// NOTE: Legacy "mod" object fallback has been removed. Specs must use either:
+	// - Top-level fields (image, command, env, etc.) for single-step runs, OR
+	// - The mods[] array for multi-step runs.
+	// The "mod" object (e.g., {"mod": {"image": "...", "env": {...}}}) is no longer
+	// processed; such specs must be migrated to the canonical shapes above.
 
 	// Flatten build_gate.enabled/profile for manifest builder to honor.
 	if bg, ok := m["build_gate"].(map[string]any); ok {
