@@ -191,7 +191,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Add `internal/server/handlers/spec_utils_global_env_test.go` to cover merge semantics (per-run env override, scope filtering, empty spec) and extend `server_runs_claim_test.go` to assert that a claimed job contains merged `env["CA_CERTS_PEM_BUNDLE"]` / `env["CODEX_AUTH_JSON"]` when the holder is pre-populated.
 
 ## Node Agent Propagation
-- [ ] Keep env propagation from spec → StartRunRequest → manifests generic — Confirm that global env vars injected into specs arrive intact in containers and gate jobs.
+- [x] Keep env propagation from spec → StartRunRequest → manifests generic — Confirm that global env vars injected into specs arrive intact in containers and gate jobs.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/nodeagent
   - Scope:
