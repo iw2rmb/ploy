@@ -44,7 +44,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: N/A (mostly deletions and route changes).
   - Tests: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodeagent and completion tests must pass using only the job-level endpoint.
 
-- [ ] Remove ackRunStart backward-compatibility handler or narrow its role — Let claim/completion paths drive run status and events.
+- [x] Remove ackRunStart backward-compatibility handler or narrow its role — Let claim/completion paths drive run status and events.
   - Repository: ploy
   - Component: internal/server/handlers/nodes_ack.go, internal/server/events, any nodeagent callers.
   - Scope: Confirm whether any nodeagent or CLI code still calls /v1/nodes/{id}/runs/ack. If not needed, remove ackRunStartHandler, its route, and tests. If SSE “run started” events are still required, emit them from claim logic or completion instead of a separate ack endpoint.

@@ -85,11 +85,12 @@ paths:
   /v1/nodes/{id}/undrain:
     $ref: './paths/nodes_id_undrain.yaml'
   # Node claim endpoint (pull-based work assignment)
+  # Note: claimJobHandler now publishes SSE "running" events when the run
+  # transitions from 'queued' to 'running'. No separate ack endpoint is needed.
   /v1/nodes/{id}/claim:
     $ref: './paths/nodes_id_claim.yaml'
-  # Node run-start acknowledgement endpoint
-  /v1/nodes/{id}/ack:
-    $ref: './paths/nodes_id_ack.yaml'
+  # NOTE: The ack endpoint (/v1/nodes/{id}/ack) has been removed. Run status
+  # transitions and SSE events are now handled in claimJobHandler.
   # NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
   # Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 
