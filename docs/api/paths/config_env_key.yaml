@@ -1,0 +1,154 @@
+get:
+  tags: [Config]
+  summary: Get global environment variable
+  description: |
+    Returns a single global environment variable entry identified by its key.
+    The response includes the value even for secret entries; callers must use
+    mTLS with cli-admin role.
+  parameters:
+    - in: path
+      name: key
+      required: true
+      schema:
+        type: string
+      description: Environment variable key.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Environment variable key.
+              value:
+                type: string
+                description: Environment variable value.
+              scope:
+                type: string
+                description: >
+                  Scope that controls which jobs see this variable.
+                  One of: all, mods, heal, gate.
+                enum: [all, mods, heal, gate]
+              secret:
+                type: boolean
+                description: Whether this variable should be treated as secret.
+            required:
+              - key
+              - value
+              - scope
+              - secret
+    '400':
+      description: Bad request (missing key path parameter)
+    '401':
+      description: Unauthorized (missing or invalid mTLS client certificate)
+    '403':
+      description: Forbidden (requires cli-admin role)
+    '404':
+      description: Global environment variable not found
+    '500':
+      description: Server error
+
+put:
+  tags: [Config]
+  summary: Upsert global environment variable
+  description: |
+    Creates or updates a global environment variable entry. The value is stored
+    persistently in the config_env table and cached in memory via the config
+    holder. If the key already exists, the entry is updated.
+    Requires mTLS with cli-admin role.
+  parameters:
+    - in: path
+      name: key
+      required: true
+      schema:
+        type: string
+      description: Environment variable key.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Environment variable value.
+            scope:
+              type: string
+              description: >
+                Scope that controls which jobs see this variable.
+                One of: all, mods, heal, gate. Defaults to "all" when omitted.
+              enum: [all, mods, heal, gate]
+            secret:
+              type: boolean
+              description: >
+                Whether this variable should be treated as secret. Defaults to
+                true when omitted.
+          required:
+            - value
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Environment variable key.
+              value:
+                type: string
+                description: Environment variable value.
+              scope:
+                type: string
+                description: >
+                  Scope that controls which jobs see this variable.
+                  One of: all, mods, heal, gate.
+                enum: [all, mods, heal, gate]
+              secret:
+                type: boolean
+                description: Whether this variable should be treated as secret.
+            required:
+              - key
+              - value
+              - scope
+              - secret
+    '400':
+      description: Bad request (invalid JSON or invalid scope)
+    '401':
+      description: Unauthorized (missing or invalid mTLS client certificate)
+    '403':
+      description: Forbidden (requires cli-admin role)
+    '500':
+      description: Server error
+
+delete:
+  tags: [Config]
+  summary: Delete global environment variable
+  description: |
+    Deletes a global environment variable entry from the persistent store and
+    from the in-memory config holder.
+    Requires mTLS with cli-admin role.
+  parameters:
+    - in: path
+      name: key
+      required: true
+      schema:
+        type: string
+      description: Environment variable key.
+  responses:
+    '204':
+      description: Deleted
+    '400':
+      description: Bad request (missing key path parameter)
+    '401':
+      description: Unauthorized (missing or invalid mTLS client certificate)
+    '403':
+      description: Forbidden (requires cli-admin role)
+    '500':
+      description: Server error
+
