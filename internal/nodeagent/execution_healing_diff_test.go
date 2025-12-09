@@ -107,9 +107,14 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
+				"strategies": []any{
 					map[string]any{
-						"image": "test/codex-healer:latest",
+						"name": "codex-heal",
+						"mods": []any{
+							map[string]any{
+								"image": "test/codex-healer:latest",
+							},
+						},
 					},
 				},
 			},
