@@ -45,7 +45,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/nodeagent/...` — Verify `TestClaimLoop_MapsClaimToStartRunRequest` and related tests still pass and that logs/tests reference `RunID` consistently.
 
 ## Adjust nodeagent tests constructing ClaimResponse
-- [ ] Update ClaimResponse initializers in nodeagent tests to use `RunID` — Keep test data aligned with the new field name.
+- [x] Update ClaimResponse initializers in nodeagent tests to use `RunID` — Keep test data aligned with the new field name.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/nodeagent/agent_claim_test.go, internal/nodeagent/agent_test.go, internal/nodeagent/claimer_loop_test.go
   - Scope:
