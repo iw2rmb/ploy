@@ -36,6 +36,10 @@ paths:
   # Config endpoints
   /v1/config/gitlab:
     $ref: './paths/config_gitlab.yaml'
+  /v1/config/env:
+    $ref: './paths/config_env.yaml'
+  /v1/config/env/{key}:
+    $ref: './paths/config_env_key.yaml'
   # PKI endpoints
   /v1/pki/sign:
     $ref: './paths/pki_sign.yaml'
@@ -125,7 +129,6 @@ paths:
   # Build Gate HTTP service removed: gate runs as jobs in the Mods pipeline.
   # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
-  # - /v1/config/gitlab (GitLab signer removed)
   # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
 components:
   securitySchemes:
