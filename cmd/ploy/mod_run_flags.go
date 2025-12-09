@@ -46,7 +46,6 @@ type modRunFlags struct {
 	CapDuration *time.Duration
 	CancelOnCap *bool
 	MaxRetries  *int
-	RetryWait   *time.Duration
 	LogFormat   *string // Log output format: "structured" or "raw"
 
 	// Artifact and output
@@ -88,7 +87,6 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	flags.CapDuration = fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
 	flags.CancelOnCap = fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the run if the cap is exceeded")
 	flags.MaxRetries = fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
-	flags.RetryWait = fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
 	flags.LogFormat = fs.String("log-format", "structured", "log output format: structured (default, with context) or raw (message only)")
 
 	// Artifact and output
@@ -117,5 +115,5 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 
 // printModRunUsage writes usage information for the mod run command to the provided writer.
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N]")
 }

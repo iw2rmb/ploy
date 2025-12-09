@@ -70,5 +70,4 @@ func printModRunFlagsSummary(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir>       Download final artifacts")
 	_, _ = fmt.Fprintln(w, "  --json                     Print JSON summary")
 	_, _ = fmt.Fprintln(w, "  --max-retries N            Max reconnect attempts for event stream")
-	_, _ = fmt.Fprintln(w, "  --retry-wait D             Wait between event stream reconnects")
 }

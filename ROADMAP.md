@@ -113,12 +113,13 @@ Legend: [ ] todo, [x] done.
   - Done: MarshalJobMeta now returns error for nil input and validates metadata before marshaling. UnmarshalJobMeta now rejects empty bytes, `{}`, `null`, missing `kind` field, and invalid kind values. Tests updated to expect errors for legacy shapes and verify descriptive error messages.
 
 ## CLI surface and tests
-- [ ] Remove deprecated CLI flags and BC mentions from docs — Simplify user-facing interface.
+- [x] Remove deprecated CLI flags and BC mentions from docs — Simplify user-facing interface.
   - Repository: ploy
   - Component: cmd/ploy, cmd/ploy/README.md, relevant cobra command files.
-  - Scope: Remove deprecated flags like `--retry-wait` where the README says “preserved for backward compatibility,” and update command help/usage strings. Adjust tests that rely on deprecated flags.
+  - Scope: Remove deprecated flags like `--retry-wait` where the README says "preserved for backward compatibility," and update command help/usage strings. Adjust tests that rely on deprecated flags.
   - Snippets: Delete flag declarations and update usage examples in cmd/ploy/README.md.
   - Tests: go test ./cmd/ploy/... — CLI tests must pass without deprecated flags.
+  - Done: Removed `--retry-wait` flag from mod_run_flags.go, mods_jobs_commands.go (handleModsLogs and handleRunsFollow), mod_command.go usage summary, and testdata/help_mod.txt. Updated cmd/ploy/README.md to remove BC mentions and document that backoff is now handled by the shared SSE backoff policy. Removed RetryBackoff field from stream.Client struct and updated related tests. All CLI tests pass.
 
 - [ ] Drop CLI type aliases kept solely for backward compatibility — Use canonical types directly.
   - Repository: ploy

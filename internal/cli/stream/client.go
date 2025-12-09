@@ -19,11 +19,10 @@ var ErrDone = errors.New("stream: done")
 
 // Client streams server-sent events with reconnection semantics.
 type Client struct {
-	HTTPClient   *http.Client
-	MaxRetries   int           // -1 for unlimited retries
-	RetryBackoff time.Duration // deprecated: wait between reconnect attempts (use backoff policy instead)
-	IdleTimeout  time.Duration // optional: cancel stream if no events for this duration
-	Logger       *slog.Logger  // optional: logger for backoff and reconnect events
+	HTTPClient  *http.Client
+	MaxRetries  int           // -1 for unlimited retries
+	IdleTimeout time.Duration // optional: cancel stream if no events for this duration
+	Logger      *slog.Logger  // optional: logger for backoff and reconnect events
 }
 
 // Event represents a server-sent event frame.
@@ -46,14 +45,11 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 	}
 
 	// Use shared backoff policy for exponential reconnect delays with jitter.
+	// The SSEStreamPolicy provides sensible defaults: 250ms initial interval, 2x multiplier with jitter, capped at 30s.
 	policy := backoff.SSEStreamPolicy()
 	// If client specifies MaxRetries, apply it to the policy; -1 means unlimited.
 	if c.MaxRetries >= 0 {
 		policy.MaxAttempts = c.MaxRetries
-	}
-	// If client specifies a legacy RetryBackoff, use it as InitialInterval; otherwise use policy default.
-	if c.RetryBackoff > 0 {
-		policy.InitialInterval = c.RetryBackoff
 	}
 
 	// Create a stateful backoff manager to track exponential backoff state across reconnects.
