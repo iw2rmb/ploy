@@ -130,7 +130,7 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 				_ = mods.CancelCommand{
 					BaseURL: base,
 					Client:  httpClient,
-					RunID:   runID,
+					RunID:   domaintypes.RunID(runID),
 					Reason:  "cap exceeded",
 					Output:  stderr,
 				}.Run(context.Background())
@@ -152,16 +152,16 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 
 // outputJSONSummary writes a machine-readable JSON summary to stdout when requested.
 // Includes run ID, initial and final states, artifact directory, and MR URL (if available).
-func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID, initialState, finalState string, flags *modRunFlags) error {
+func outputJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *modRunFlags) error {
 	// Optional: probe MR URL from run status metadata.
-	mrURL, _ := fetchMRURL(ctx, base, httpClient, runID)
+	mrURL, _ := fetchMRURL(ctx, base, httpClient, runID.String())
 
 	type runJSON struct {
-		RunID       string `json:"run_id"`
-		Initial     string `json:"initial_state,omitempty"`
-		Final       string `json:"final_state,omitempty"`
-		ArtifactDir string `json:"artifact_dir,omitempty"`
-		MRURL       string `json:"mr_url,omitempty"`
+		RunID       domaintypes.RunID `json:"run_id"`
+		Initial     string            `json:"initial_state,omitempty"`
+		Final       string            `json:"final_state,omitempty"`
+		ArtifactDir string            `json:"artifact_dir,omitempty"`
+		MRURL       string            `json:"mr_url,omitempty"`
 	}
 
 	out := runJSON{

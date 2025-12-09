@@ -104,7 +104,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	}
 
 	nodeCfg := nodeAddConfig{
-		ClusterID:       clusterID.value,
+		ClusterID:       domaintypes.ClusterID(strings.TrimSpace(clusterID.value)),
 		Address:         address.value,
 		ServerURL:       serverURL.value,
 		User:            userFlag.value,
@@ -118,7 +118,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 }
 
 type nodeAddConfig struct {
-	ClusterID       string
+	ClusterID       domaintypes.ClusterID
 	Address         string
 	ServerURL       string
 	User            string
@@ -162,7 +162,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		_, _ = fmt.Fprintln(stderr, "[DRY RUN] Validating node add configuration...")
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Adding node to cluster %s\n", cfg.ClusterID)
+	_, _ = fmt.Fprintf(stderr, "Adding node to cluster %s\n", cfg.ClusterID.String())
 	_, _ = fmt.Fprintf(stderr, "  Node Address: %s\n", cfg.Address)
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
 	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
@@ -213,7 +213,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 
 	// Prepare environment variables for bootstrap script
 	scriptEnv := map[string]string{
-		"CLUSTER_ID":           cfg.ClusterID,
+		"CLUSTER_ID":           cfg.ClusterID.String(),
 		"NODE_ID":              nodeID,
 		"NODE_ADDRESS":         cfg.Address,
 		"BOOTSTRAP_PRIMARY":    "false",
@@ -236,7 +236,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		Stdout:          os.Stdout,
 		Stderr:          stderr,
 		ScriptEnv:       scriptEnv,
-		ScriptArgs:      []string{"--cluster-id", cfg.ClusterID, "--node-id", nodeID, "--node-address", cfg.Address},
+		ScriptArgs:      []string{"--cluster-id", cfg.ClusterID.String(), "--node-id", nodeID, "--node-address", cfg.Address},
 		ServiceChecks:   []string{"ployd-node"},
 	}
 
@@ -398,9 +398,9 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 	}
 
 	var result struct {
-		Token     string    `json:"token"`
-		NodeID    string    `json:"node_id"`
-		ExpiresAt time.Time `json:"expires_at"`
+		Token     string             `json:"token"`
+		NodeID    domaintypes.NodeID `json:"node_id"`
+		ExpiresAt time.Time          `json:"expires_at"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", time.Time{}, fmt.Errorf("decode response: %w", err)

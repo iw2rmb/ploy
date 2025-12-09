@@ -9,13 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // InspectCommand prints a summary for a specific job scoped by run.
 type InspectCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	JobID   string
+	JobID   domaintypes.JobID
 	Output  io.Writer
 }
 
@@ -27,10 +29,10 @@ func (c InspectCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("runs inspect: base url required")
 	}
-	job := strings.TrimSpace(c.JobID)
-	if job == "" {
+	if c.JobID.IsZero() {
 		return errors.New("runs inspect: run id required")
 	}
+	job := c.JobID.String()
 	endpoint, err := url.Parse(c.BaseURL.String())
 	if err != nil {
 		return err

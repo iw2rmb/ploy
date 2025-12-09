@@ -94,7 +94,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		case err != nil:
 			_, _ = fmt.Fprintf(stderr, "Warning: failed to detect existing cluster: %v\n", err)
 		case detection.Found && detection.ClusterID != "":
-			clusterID = detection.ClusterID
+			clusterID = detection.ClusterID.String()
 			reusingCluster = true
 			_, _ = fmt.Fprintf(stderr, "Found existing cluster: %s (reusing CA and server certificate)\n", clusterID)
 		case detection.Found:

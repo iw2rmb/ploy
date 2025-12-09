@@ -14,7 +14,12 @@
 // build time using the detected stack from Build Gate.
 package nodeagent
 
-import "github.com/iw2rmb/ploy/internal/workflow/contracts"
+import (
+	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
 
 // RunOptions holds all typed configuration options for a run execution.
 // It aggregates build gate configuration, healing policy, MR creation wiring,
@@ -238,7 +243,7 @@ type ArtifactOptions struct {
 type ServerMetadataOptions struct {
 	// JobID is the server-provided job identifier for upload correlation.
 	// This value is used to associate artifacts and status updates with a job.
-	JobID string
+	JobID domaintypes.JobID
 }
 
 // StepMod describes a single mod step in a multi-step run (mods[] array).
@@ -362,7 +367,9 @@ func parseRunOptions(opts map[string]any) RunOptions {
 
 	// Parse server metadata.
 	if jobID, ok := opts["job_id"].(string); ok {
-		runOpts.ServerMetadata.JobID = jobID
+		if trimmed := strings.TrimSpace(jobID); trimmed != "" {
+			runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
+		}
 	}
 
 	// Parse multi-step mods array for sequential execution.

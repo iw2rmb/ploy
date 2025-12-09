@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 // HTTPConfig configures the HTTP server.
 type HTTPConfig struct {
@@ -34,17 +38,17 @@ type AdminConfig struct {
 
 // ControlPlaneConfig configures the control-plane integration.
 type ControlPlaneConfig struct {
-	Endpoint               string        `yaml:"endpoint"`
-	NodeID                 string        `yaml:"node_id"`
-	CAPath                 string        `yaml:"ca"`
-	Certificate            string        `yaml:"certificate"`
-	Key                    string        `yaml:"key"`
-	HeartbeatInterval      time.Duration `yaml:"heartbeat_interval"`
-	AssignmentPollInterval time.Duration `yaml:"assignment_poll_interval"`
-	StatusPublishInterval  time.Duration `yaml:"status_publish_interval"`
-	AssignmentBatchSize    int           `yaml:"assignment_batch_size"`
-	MaxBackoff             time.Duration `yaml:"max_backoff"`
-	InitialBackoff         time.Duration `yaml:"initial_backoff"`
+	Endpoint               string             `yaml:"endpoint"`
+	NodeID                 domaintypes.NodeID `yaml:"node_id"`
+	CAPath                 string             `yaml:"ca"`
+	Certificate            string             `yaml:"certificate"`
+	Key                    string             `yaml:"key"`
+	HeartbeatInterval      time.Duration      `yaml:"heartbeat_interval"`
+	AssignmentPollInterval time.Duration      `yaml:"assignment_poll_interval"`
+	StatusPublishInterval  time.Duration      `yaml:"status_publish_interval"`
+	AssignmentBatchSize    int                `yaml:"assignment_batch_size"`
+	MaxBackoff             time.Duration      `yaml:"max_backoff"`
+	InitialBackoff         time.Duration      `yaml:"initial_backoff"`
 	// Legacy endpoint fields removed; server exposes fixed routes.
 }
 

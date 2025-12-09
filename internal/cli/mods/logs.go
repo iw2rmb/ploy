@@ -11,6 +11,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Format controls log rendering style. Re-exported from internal/cli/logs
@@ -31,7 +32,7 @@ var ErrInvalidFormat = errors.New("mods: invalid format")
 type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID
 	Format  Format
 	Output  io.Writer
 }
@@ -45,7 +46,7 @@ func (c LogsCommand) Run(ctx context.Context) error {
 	if format != FormatStructured && format != FormatRaw {
 		return ErrInvalidFormat
 	}
-	if strings.TrimSpace(c.RunID) == "" {
+	if c.RunID.IsZero() {
 		return errors.New("mods: run id required")
 	}
 	if c.BaseURL == nil {
@@ -56,7 +57,7 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(c.RunID)), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID.String()), "events")
 	if err != nil {
 		return fmt.Errorf("mods: build endpoint: %w", err)
 	}

@@ -277,8 +277,8 @@ MIIBkTCCATegAwIBAgIQYoYxqvs=
 			if got.Found != tt.wantFound {
 				t.Errorf("DetectExisting() Found = %v, want %v", got.Found, tt.wantFound)
 			}
-			if got.ClusterID != tt.wantClusterID {
-				t.Errorf("DetectExisting() ClusterID = %q, want %q", got.ClusterID, tt.wantClusterID)
+			if got.ClusterID.String() != tt.wantClusterID {
+				t.Errorf("DetectExisting() ClusterID = %q, want %q", got.ClusterID.String(), tt.wantClusterID)
 			}
 		})
 	}

@@ -187,8 +187,8 @@ func buildManifestFromRequestWithStack(req StartRunRequest, typedOpts RunOptions
 	if _, hasMRFail := req.Options["mr_on_fail"]; hasMRFail {
 		mergedOpts["mr_on_fail"] = typedOpts.MRWiring.MROnFail
 	}
-	if jid := strings.TrimSpace(typedOpts.ServerMetadata.JobID); jid != "" {
-		mergedOpts["job_id"] = jid
+	if !typedOpts.ServerMetadata.JobID.IsZero() {
+		mergedOpts["job_id"] = typedOpts.ServerMetadata.JobID.String()
 	}
 	if aname := strings.TrimSpace(typedOpts.Artifacts.Name); aname != "" {
 		mergedOpts["artifact_name"] = aname

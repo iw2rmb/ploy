@@ -661,10 +661,10 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 
 	// Enriched fields should be empty.
-	if rec.NodeID != "" {
+	if !rec.NodeID.IsZero() {
 		t.Errorf("node_id should be empty, got %q", rec.NodeID)
 	}
-	if rec.JobID != "" {
+	if !rec.JobID.IsZero() {
 		t.Errorf("job_id should be empty, got %q", rec.JobID)
 	}
 	if rec.ModType != "" {
@@ -738,7 +738,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	}
 
 	// Enriched fields should be empty due to lookup failure.
-	if rec.NodeID != "" {
+	if !rec.NodeID.IsZero() {
 		t.Errorf("node_id should be empty after lookup failure, got %q", rec.NodeID)
 	}
 }

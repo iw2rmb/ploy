@@ -126,13 +126,13 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		// Use typed status (store.RunStatus) instead of string cast for type safety;
 		// JSON encoder will serialize the underlying string value.
 		resp := struct {
-			RunID     string          `json:"run_id"`
-			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
-			RepoURL   string          `json:"repo_url"`
-			BaseRef   string          `json:"base_ref"`
-			TargetRef string          `json:"target_ref"`
+			RunID     domaintypes.RunID `json:"run_id"`
+			Status    store.RunStatus   `json:"status"` // Typed status instead of string cast
+			RepoURL   string            `json:"repo_url"`
+			BaseRef   string            `json:"base_ref"`
+			TargetRef string            `json:"target_ref"`
 		}{
-			RunID:     run.ID, // run.ID is now a string (KSUID).
+			RunID:     domaintypes.RunID(run.ID), // run.ID is now a string (KSUID).
 			Status:    run.Status,
 			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
@@ -143,14 +143,14 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		if eventsService != nil {
 			// Construct RunSummary with RunID for SSE event publishing.
 			runSummary := modsapi.RunSummary{
-				RunID:      domaintypes.RunID(resp.RunID),
+				RunID:      resp.RunID,
 				State:      modsapi.RunState(run.Status),
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  run.CreatedAt.Time,
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishRun(r.Context(), resp.RunID, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), resp.RunID.String(), runSummary); err != nil {
 				slog.Error("submit run: publish run event failed", "run_id", resp.RunID, "err", err)
 			}
 		}

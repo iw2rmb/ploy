@@ -7,12 +7,14 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // DetectionResult holds information about an existing cluster detected on a target host.
 type DetectionResult struct {
 	Found     bool
-	ClusterID string
+	ClusterID domaintypes.ClusterID
 }
 
 // DetectExisting probes the target host for an existing ploy cluster installation.
@@ -85,7 +87,7 @@ func DetectExisting(ctx context.Context, runner Runner, opts ProvisionOptions) (
 	cn := strings.TrimSpace(cnOut.String())
 	clusterID := extractClusterIDFromCN(cn)
 
-	return DetectionResult{Found: true, ClusterID: clusterID}, nil
+	return DetectionResult{Found: true, ClusterID: domaintypes.ClusterID(clusterID)}, nil
 }
 
 // extractClusterIDFromCN parses the CN to extract the cluster ID.

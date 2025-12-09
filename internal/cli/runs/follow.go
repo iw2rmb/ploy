@@ -11,6 +11,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Format controls job log rendering. Re-exported from internal/cli/logs
@@ -31,7 +32,7 @@ var ErrInvalidFormat = errors.New("jobs: invalid format")
 type FollowCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	JobID   string
+	JobID   domaintypes.JobID
 	Format  Format
 	Output  io.Writer
 }
@@ -45,7 +46,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 	if format != FormatStructured && format != FormatRaw {
 		return ErrInvalidFormat
 	}
-	if strings.TrimSpace(c.JobID) == "" {
+	if c.JobID.IsZero() {
 		return errors.New("jobs: job id required")
 	}
 	if c.BaseURL == nil {
@@ -56,7 +57,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(c.JobID)), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.JobID.String()), "events")
 	if err != nil {
 		return fmt.Errorf("jobs: build endpoint: %w", err)
 	}

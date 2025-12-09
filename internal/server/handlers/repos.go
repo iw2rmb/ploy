@@ -37,15 +37,15 @@ type RepoSummary struct {
 // RepoRunSummary represents a run for a specific repository.
 // Used in the GET /v1/repos/{repo_id}/runs response.
 type RepoRunSummary struct {
-	RunID      string     `json:"run_id"`
-	Name       *string    `json:"name,omitempty"`
-	RunStatus  string     `json:"run_status"`
-	RepoStatus string     `json:"repo_status"`
-	BaseRef    string     `json:"base_ref"`
-	TargetRef  string     `json:"target_ref"`
-	Attempt    int32      `json:"attempt"`
-	StartedAt  *time.Time `json:"started_at,omitempty"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID `json:"run_id"`
+	Name       *string           `json:"name,omitempty"`
+	RunStatus  string            `json:"run_status"`
+	RepoStatus string            `json:"repo_status"`
+	BaseRef    string            `json:"base_ref"`
+	TargetRef  string            `json:"target_ref"`
+	Attempt    int32             `json:"attempt"`
+	StartedAt  *time.Time        `json:"started_at,omitempty"`
+	FinishedAt *time.Time        `json:"finished_at,omitempty"`
 }
 
 // -------------------------------------------------------------------------
@@ -180,7 +180,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:      run.RunID,
+				RunID:      domaintypes.RunID(run.RunID),
 				Name:       run.Name,
 				RunStatus:  string(run.RunStatus),
 				RepoStatus: string(run.RepoStatus),

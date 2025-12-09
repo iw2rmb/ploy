@@ -212,8 +212,8 @@ func TestParseRunOptions_ServerMetadata(t *testing.T) {
 
 	runOpts := parseRunOptions(opts)
 
-	if runOpts.ServerMetadata.JobID != "job-abc-123" {
-		t.Errorf("expected job_id=job-abc-123, got %q", runOpts.ServerMetadata.JobID)
+	if runOpts.ServerMetadata.JobID.String() != "job-abc-123" {
+		t.Errorf("expected job_id=job-abc-123, got %q", runOpts.ServerMetadata.JobID.String())
 	}
 }
 
@@ -284,8 +284,8 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	if !typedOpts.MRWiring.MROnSuccess {
 		t.Errorf("expected typed mr_on_success=true")
 	}
-	if typedOpts.ServerMetadata.JobID != "job-xyz" {
-		t.Errorf("expected typed job_id=job-xyz, got %q", typedOpts.ServerMetadata.JobID)
+	if typedOpts.ServerMetadata.JobID.String() != "job-xyz" {
+		t.Errorf("expected typed job_id=job-xyz, got %q", typedOpts.ServerMetadata.JobID.String())
 	}
 }
 
