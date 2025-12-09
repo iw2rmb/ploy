@@ -297,7 +297,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 
 	var receivedPayload map[string]interface{}
 	jobID := types.JobID("test-job-id-uuid")
-	nodeID := "ignored-node-id"
+	nodeID := types.NodeID("ignored-node-id") // Convert to domain type
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -310,8 +310,8 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 			t.Errorf("expected Content-Type application/json, got %s", ct)
 		}
-		if got := r.Header.Get("PLOY_NODE_UUID"); got != nodeID {
-			t.Errorf("expected PLOY_NODE_UUID=%s, got %s", nodeID, got)
+		if got := r.Header.Get("PLOY_NODE_UUID"); got != nodeID.String() { // Use String() for comparison
+			t.Errorf("expected PLOY_NODE_UUID=%s, got %s", nodeID.String(), got)
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {

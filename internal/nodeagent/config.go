@@ -6,10 +6,12 @@ import (
 	"os"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"gopkg.in/yaml.v3"
 )
 
 // Config holds node agent configuration.
+// Uses domain types (NodeID, ClusterID) for type-safe identification.
 type Config struct {
 	// HTTP configuration for the node agent API server.
 	HTTP HTTPConfig `yaml:"http"`
@@ -17,11 +19,11 @@ type Config struct {
 	// Server URL for the control-plane server.
 	ServerURL string `yaml:"server_url"`
 
-	// NodeID identifies this node.
-	NodeID string `yaml:"node_id"`
+	// NodeID identifies this node (NanoID-backed).
+	NodeID domaintypes.NodeID `yaml:"node_id"`
 
 	// ClusterID identifies the cluster this node belongs to.
-	ClusterID string `yaml:"cluster_id"`
+	ClusterID domaintypes.ClusterID `yaml:"cluster_id"`
 
 	// Concurrency defines the maximum number of concurrent runs.
 	Concurrency int `yaml:"concurrency"`
@@ -114,11 +116,12 @@ func (c Config) validate() error {
 	if c.ServerURL == "" {
 		return errors.New("server_url is required")
 	}
-	if c.NodeID == "" {
+	// Use domain type's IsZero method for validation.
+	if c.NodeID.IsZero() {
 		return errors.New("node_id is required")
 	}
 	if c.HTTP.TLS.Enabled {
-		if c.ClusterID == "" {
+		if c.ClusterID.IsZero() {
 			return errors.New("cluster_id is required when TLS is enabled")
 		}
 		if c.HTTP.TLS.CertPath == "" {

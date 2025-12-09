@@ -14,6 +14,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // leafProfile describes SANs for leaf certificates.
@@ -140,7 +142,7 @@ func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certifi
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 	return LeafCertificate{
-		NodeID:          nodeID,
+		NodeID:          domaintypes.NodeID(nodeID), // Convert to domain type
 		Usage:           role,
 		Version:         buildVersion(now),
 		ParentVersion:   ca.Version,

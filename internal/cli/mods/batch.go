@@ -17,22 +17,25 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // BatchSummary represents a batch run summary from the control-plane.
 // It mirrors the server's RunBatchSummary type for CLI consumption.
+// Uses domain type (RunID) for type-safe identification.
 type BatchSummary struct {
-	ID         string         `json:"id"`
-	Name       *string        `json:"name,omitempty"`
-	Status     string         `json:"status"`
-	RepoURL    string         `json:"repo_url"`
-	BaseRef    string         `json:"base_ref"`
-	TargetRef  string         `json:"target_ref"`
-	CreatedBy  *string        `json:"created_by,omitempty"`
-	CreatedAt  time.Time      `json:"created_at"`
-	StartedAt  *time.Time     `json:"started_at,omitempty"`
-	FinishedAt *time.Time     `json:"finished_at,omitempty"`
-	Counts     *RunRepoCounts `json:"repo_counts,omitempty"`
+	ID         domaintypes.RunID `json:"id"` // Run ID (KSUID-backed)
+	Name       *string           `json:"name,omitempty"`
+	Status     string            `json:"status"`
+	RepoURL    string            `json:"repo_url"`
+	BaseRef    string            `json:"base_ref"`
+	TargetRef  string            `json:"target_ref"`
+	CreatedBy  *string           `json:"created_by,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	StartedAt  *time.Time        `json:"started_at,omitempty"`
+	FinishedAt *time.Time        `json:"finished_at,omitempty"`
+	Counts     *RunRepoCounts    `json:"repo_counts,omitempty"`
 }
 
 // RunRepoCounts aggregates the count of repos by status within a batch.
@@ -125,7 +128,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 		return BatchSummary{
-			ID:        srvResp.TicketID,
+			ID:        domaintypes.RunID(srvResp.TicketID), // Convert to domain type
 			Name:      c.Name,
 			Status:    strings.ToLower(srvResp.Status),
 			RepoURL:   srvResp.RepoURL,
@@ -195,10 +198,11 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 }
 
 // GetBatchStatusCommand retrieves detailed status for a single batch run.
+// Uses domain type (RunID) for type-safe identification.
 type GetBatchStatusCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // ID of the batch run (KSUID string).
+	BatchID domaintypes.RunID // ID of the batch run (KSUID-backed)
 }
 
 // Run executes GET /v1/runs/{id} to fetch batch run details.
@@ -209,11 +213,12 @@ func (c GetBatchStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
 	if c.BaseURL == nil {
 		return BatchSummary{}, fmt.Errorf("batch status: base url required")
 	}
-	if strings.TrimSpace(c.BatchID) == "" {
+	// Use domain type's IsZero method for validation.
+	if c.BatchID.IsZero() {
 		return BatchSummary{}, fmt.Errorf("batch status: batch id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", strings.TrimSpace(c.BatchID))
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return BatchSummary{}, fmt.Errorf("batch status: build request: %w", err)
@@ -238,10 +243,11 @@ func (c GetBatchStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
 }
 
 // StopBatchCommand stops a batch run and cancels all pending repos.
+// Uses domain type (RunID) for type-safe identification.
 type StopBatchCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // ID of the batch run to stop (KSUID string).
+	BatchID domaintypes.RunID // ID of the batch run to stop (KSUID-backed)
 }
 
 // Run executes POST /v1/runs/{id}/stop to stop the batch run.
@@ -253,11 +259,12 @@ func (c StopBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	if c.BaseURL == nil {
 		return BatchSummary{}, fmt.Errorf("batch stop: base url required")
 	}
-	if strings.TrimSpace(c.BatchID) == "" {
+	// Use domain type's IsZero method for validation.
+	if c.BatchID.IsZero() {
 		return BatchSummary{}, fmt.Errorf("batch stop: batch id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", strings.TrimSpace(c.BatchID), "stop")
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String(), "stop")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return BatchSummary{}, fmt.Errorf("batch stop: build request: %w", err)
@@ -282,18 +289,20 @@ func (c StopBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 }
 
 // StartBatchCommand starts execution for pending repos in a batch run.
+// Uses domain type (RunID) for type-safe identification.
 type StartBatchCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID string // ID of the batch run to start (KSUID string).
+	BatchID domaintypes.RunID // ID of the batch run to start (KSUID-backed)
 }
 
 // StartBatchResult contains the result of starting a batch run.
+// Uses domain type (RunID) for type-safe identification.
 type StartBatchResult struct {
-	RunID       string `json:"run_id"`
-	Started     int    `json:"started"`      // Number of repos that started.
-	AlreadyDone int    `json:"already_done"` // Number of repos in terminal state.
-	Pending     int    `json:"pending"`      // Number of repos still pending.
+	RunID       domaintypes.RunID `json:"run_id"`       // Run ID (KSUID-backed)
+	Started     int               `json:"started"`      // Number of repos that started.
+	AlreadyDone int               `json:"already_done"` // Number of repos in terminal state.
+	Pending     int               `json:"pending"`      // Number of repos still pending.
 }
 
 // Run executes POST /v1/runs/{id}/start to start execution for pending repos.
@@ -304,11 +313,12 @@ func (c StartBatchCommand) Run(ctx context.Context) (StartBatchResult, error) {
 	if c.BaseURL == nil {
 		return StartBatchResult{}, fmt.Errorf("batch start: base url required")
 	}
-	if strings.TrimSpace(c.BatchID) == "" {
+	// Use domain type's IsZero method for validation.
+	if c.BatchID.IsZero() {
 		return StartBatchResult{}, fmt.Errorf("batch start: batch id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", strings.TrimSpace(c.BatchID), "start")
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String(), "start")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return StartBatchResult{}, fmt.Errorf("batch start: build request: %w", err)

@@ -13,13 +13,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // DiffsCommand lists diffs for a Mods run and optionally downloads the newest patch.
+// Uses domain type (RunID) for type-safe identification.
 type DiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID // Run ID (KSUID-backed)
 	Output  io.Writer
 
 	Download bool   // when true, download newest diff and print to stdout (gunzipped)
@@ -34,10 +37,11 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods diffs: base url required")
 	}
-	runID := strings.TrimSpace(c.RunID)
-	if runID == "" {
+	// Use domain type's IsZero method for validation.
+	if c.RunID.IsZero() {
 		return errors.New("mods diffs: run id required")
 	}
+	runID := c.RunID.String()
 	out := c.Output
 	if out == nil {
 		out = io.Discard

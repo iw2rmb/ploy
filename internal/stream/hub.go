@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -26,18 +27,19 @@ type Options struct {
 // context so clients can correlate log lines with specific nodes, jobs, and
 // Mods pipeline stages. These fields are optional — older or internal-only
 // log sources may omit them.
+// Uses domain types (NodeID, JobID) for type-safe identification.
 type LogRecord struct {
 	Timestamp string `json:"timestamp"`
 	Stream    string `json:"stream"`
 	Line      string `json:"line"`
 
-	// NodeID identifies the execution node that produced this log line.
+	// NodeID identifies the execution node that produced this log line (NanoID-backed).
 	// Empty when the source is not node-bound (e.g., hub-generated events).
-	NodeID string `json:"node_id,omitempty"`
+	NodeID domaintypes.NodeID `json:"node_id,omitempty"`
 
-	// JobID is the identifier of the job that produced this log line (KSUID string).
+	// JobID is the identifier of the job that produced this log line (KSUID-backed).
 	// Empty for events not tied to a specific job.
-	JobID string `json:"job_id,omitempty"`
+	JobID domaintypes.JobID `json:"job_id,omitempty"`
 
 	// ModType indicates the Mods step type (e.g., "mod", "hook", "gate").
 	// Empty when not applicable or unknown.

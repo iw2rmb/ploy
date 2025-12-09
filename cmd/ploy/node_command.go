@@ -17,6 +17,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleNode routes node subcommands.
@@ -299,9 +300,10 @@ func resolvePloydNodeBinaryPath(v stringValue) (string, error) {
 }
 
 // pkiSignRequest is the JSON request body for POST /v1/pki/sign.
+// Uses domain type (NodeID) for type-safe identification.
 type pkiSignRequest struct {
-	NodeID string `json:"node_id"`
-	CSR    string `json:"csr"`
+	NodeID domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	CSR    string             `json:"csr"`
 }
 
 // pkiSignResponse is the JSON response body for POST /v1/pki/sign.
@@ -315,9 +317,10 @@ type pkiSignResponse struct {
 }
 
 // signNodeCSR calls the server's /v1/pki/sign endpoint to sign the CSR.
+// nodeID parameter is a string that gets converted to domain type for the request.
 func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (certPEM, caCertPEM string, err error) {
 	reqBody := pkiSignRequest{
-		NodeID: nodeID,
+		NodeID: domaintypes.NodeID(nodeID), // Convert to domain type
 		CSR:    string(csrPEM),
 	}
 	bodyJSON, err := json.Marshal(reqBody)

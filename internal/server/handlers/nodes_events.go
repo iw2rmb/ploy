@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -37,10 +38,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 
 		// Decode request body.
+		// Uses domain types (RunID, JobID) for type-safe request parsing.
 		var req struct {
-			RunID  string `json:"run_id"`
+			RunID  domaintypes.RunID `json:"run_id"` // Run ID (KSUID-backed)
 			Events []struct {
-				JobID   *string                `json:"job_id,omitempty"`
+				JobID   *domaintypes.JobID     `json:"job_id,omitempty"` // Job ID (KSUID-backed, optional)
 				Time    *string                `json:"time,omitempty"`
 				Level   string                 `json:"level"`
 				Message string                 `json:"message"`
@@ -59,8 +61,8 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			return
 		}
 
-		// Validate run_id is present.
-		if strings.TrimSpace(req.RunID) == "" {
+		// Validate run_id is present using domain type's IsZero method.
+		if req.RunID.IsZero() {
 			http.Error(w, "run_id is required", http.StatusBadRequest)
 			return
 		}
@@ -97,11 +99,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 				return
 			}
 
-			// Parse job_id if provided.
+			// Parse job_id if provided; convert domain type to string for store.
 			var jobID *string
-			if evt.JobID != nil && strings.TrimSpace(*evt.JobID) != "" {
-				jobIDStr := strings.TrimSpace(*evt.JobID)
-				jobID = &jobIDStr
+			if evt.JobID != nil && !evt.JobID.IsZero() {
+				s := evt.JobID.String()
+				jobID = &s
 			}
 
 			// Parse event time if provided, otherwise use server time.
@@ -130,10 +132,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 			// Create event params.
 			// Normalize level to lowercase for consistency in SSE streams.
+			// Convert domain type to string for store layer.
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID: req.RunID,
+				RunID: req.RunID.String(), // Convert domain type to string
 				JobID: jobID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,

@@ -1,16 +1,21 @@
 package lifecycle
 
-import "time"
+import (
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 // NodeStatus contains the complete lifecycle status snapshot for a node.
 // This type replaces untyped map[string]any usage in status reporting,
 // providing compile-time type safety for status fields.
+// Uses domain type (NodeID) for type-safe identification.
 type NodeStatus struct {
 	State           string
 	Timestamp       time.Time
 	Heartbeat       time.Time
 	Role            string
-	NodeID          string
+	NodeID          domaintypes.NodeID // Node ID (NanoID-backed)
 	Hostname        string
 	Resources       NodeResources
 	Components      NodeComponents

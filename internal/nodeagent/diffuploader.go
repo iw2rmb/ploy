@@ -150,16 +150,17 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 
 // bearerTokenTransport wraps an http.RoundTripper and adds Authorization and
 // PLOY_NODE_UUID headers to all requests.
+// Uses domain type (NodeID) for type-safe identification.
 type bearerTokenTransport struct {
 	base   http.RoundTripper
 	token  string
-	nodeID string
+	nodeID types.NodeID // Node ID (NanoID-backed)
 }
 
 func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone request to avoid modifying the original
 	req = req.Clone(req.Context())
 	req.Header.Set("Authorization", "Bearer "+t.token)
-	req.Header.Set("PLOY_NODE_UUID", t.nodeID)
+	req.Header.Set("PLOY_NODE_UUID", t.nodeID.String()) // Convert domain type to string for header
 	return t.base.RoundTrip(req)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -47,10 +48,11 @@ func (p SimplePrinter) Stage(s modsapi.StageStatus) {
 // EventsCommand streams run events until a terminal state is reached.
 // When LogPrinter is set, also handles "log" events using the shared log printer
 // for unified log output alongside run/stage updates (used by `mod run --follow`).
+// Uses domain type (RunID) for type-safe identification.
 type EventsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID // Run ID (KSUID-backed)
 	Output  io.Writer
 	Printer EventsPrinter
 
@@ -71,10 +73,11 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.BaseURL == nil {
 		return "", errors.New("mods events: base url required")
 	}
-	runID := strings.TrimSpace(c.RunID)
-	if runID == "" {
+	// Use domain type's IsZero method for validation.
+	if c.RunID.IsZero() {
 		return "", errors.New("mods events: run id required")
 	}
+	runID := c.RunID.String()
 	out := c.Output
 	if out == nil {
 		out = io.Discard

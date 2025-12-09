@@ -3,6 +3,8 @@ package deploy
 import (
 	"errors"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -50,8 +52,9 @@ type RotateOptions struct {
 }
 
 // CAState describes the persisted CA state for a cluster.
+// Uses domain type (ClusterID) for type-safe identification.
 type CAState struct {
-	ClusterID          string
+	ClusterID          domaintypes.ClusterID `json:"cluster_id"` // Cluster ID
 	Nodes              NodeSet
 	CurrentCA          CABundle
 	BeaconCertificates map[string]LeafCertificate
@@ -75,17 +78,18 @@ type CABundle struct {
 }
 
 // LeafCertificate describes node certificates issued by the CA.
+// Uses domain type (NodeID) for type-safe identification.
 type LeafCertificate struct {
-	NodeID          string    `json:"node_id"`
-	Usage           string    `json:"usage"`
-	Version         string    `json:"version"`
-	ParentVersion   string    `json:"parent_version"`
-	SerialNumber    string    `json:"serial_number"`
-	CertificatePEM  string    `json:"certificate_pem"`
-	KeyPEM          string    `json:"key_pem"`
-	IssuedAt        time.Time `json:"issued_at"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	PreviousVersion string    `json:"previous_version,omitempty"`
+	NodeID          domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	Usage           string             `json:"usage"`
+	Version         string             `json:"version"`
+	ParentVersion   string             `json:"parent_version"`
+	SerialNumber    string             `json:"serial_number"`
+	CertificatePEM  string             `json:"certificate_pem"`
+	KeyPEM          string             `json:"key_pem"`
+	IssuedAt        time.Time          `json:"issued_at"`
+	ExpiresAt       time.Time          `json:"expires_at"`
+	PreviousVersion string             `json:"previous_version,omitempty"`
 }
 
 // RevokedRecord records a revoked CA version.

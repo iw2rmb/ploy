@@ -25,6 +25,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
@@ -115,7 +116,7 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 			RetryBackoff: *flags.RetryWait,
 		},
 		BaseURL:    base,
-		RunID:      runID,
+		RunID:      domaintypes.RunID(runID), // Convert to domain type
 		Output:     stderr,
 		LogPrinter: logPrinter, // Wire unified logs into follow mode.
 	}

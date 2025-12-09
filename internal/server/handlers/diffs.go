@@ -24,10 +24,10 @@ import (
 // - mod_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
 // Rehydration queries fetch all diffs ordered by job step_index.
 //
-// NOTE: job_id is now a KSUID-backed string (no UUID parsing).
+// NOTE: job_id is now a KSUID-backed JobID type (no UUID parsing).
 type diffItem struct {
 	ID        string                  `json:"id"`
-	JobID     string                  `json:"job_id"`
+	JobID     domaintypes.JobID       `json:"job_id"` // Job ID (KSUID-backed)
 	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
 	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains mod_type, timings.
@@ -39,11 +39,11 @@ type diffListResponse struct {
 }
 
 // diffGetResponse is the typed response for getting a single diff's metadata.
-// NOTE: run_id and job_id are now KSUID-backed strings.
+// NOTE: run_id and job_id are now KSUID-backed domain types.
 type diffGetResponse struct {
 	ID          string                  `json:"id"`
-	RunID       string                  `json:"run_id"`
-	JobID       *string                 `json:"job_id,omitempty"`
+	RunID       domaintypes.RunID       `json:"run_id"`           // Run ID (KSUID-backed)
+	JobID       *domaintypes.JobID      `json:"job_id,omitempty"` // Job ID (KSUID-backed, optional)
 	CreatedAt   time.Time               `json:"created_at"`
 	GzippedSize int                     `json:"gzipped_size"`
 	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
@@ -76,14 +76,14 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
-			// d.JobID is now *string (KSUID-backed).
-			jobIDStr := ""
+			// d.JobID is now *string (KSUID-backed); convert to domaintypes.JobID.
+			var jobID domaintypes.JobID
 			if d.JobID != nil && *d.JobID != "" {
-				jobIDStr = *d.JobID
+				jobID = domaintypes.JobID(*d.JobID)
 			}
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
-				JobID:     jobIDStr,
+				JobID:     jobID,                          // KSUID-backed domain type
 				CreatedAt: d.CreatedAt.Time,
 				Size:      len(d.Patch),
 				Summary:   summary,
@@ -136,16 +136,18 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		if len(d.Summary) > 0 {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
-		// d.ID is still pgtype.UUID; d.RunID and d.JobID are now strings.
+		// d.ID is still pgtype.UUID; d.RunID and d.JobID are now KSUID strings.
+		// Convert to domain types for type-safe API response.
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
-			RunID:       d.RunID, // run_id is now a string (KSUID)
+			RunID:       domaintypes.RunID(d.RunID), // Convert to domain type
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,
 		}
 		if d.JobID != nil && *d.JobID != "" {
-			resp.JobID = d.JobID
+			jobID := domaintypes.JobID(*d.JobID)
+			resp.JobID = &jobID
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

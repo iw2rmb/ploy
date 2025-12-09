@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestListBatchesCommand_Run validates ListBatchesCommand with pagination.
@@ -30,7 +32,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			offset: 0,
 			serverResp: []BatchSummary{
 				{
-					ID:        "batch-001",
+					ID:        domaintypes.RunID("batch-001"), // Convert to domain type
 					Name:      strPtr("test-batch"),
 					Status:    "running",
 					RepoURL:   "https://github.com/org/repo.git",
@@ -46,7 +48,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 					},
 				},
 				{
-					ID:        "batch-002",
+					ID:        domaintypes.RunID("batch-002"), // Convert to domain type
 					Status:    "completed",
 					RepoURL:   "https://github.com/org/repo2.git",
 					BaseRef:   "main",
@@ -68,7 +70,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			limit:  10,
 			offset: 5,
 			serverResp: []BatchSummary{
-				{ID: "batch-page", Status: "queued"},
+				{ID: domaintypes.RunID("batch-page"), Status: "queued"}, // Convert to domain type
 			},
 			wantCount: 1,
 		},
@@ -143,7 +145,7 @@ func TestGetBatchStatusCommand_Run(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		batchID     string
+		batchID     domaintypes.RunID // Updated to domain type
 		serverResp  BatchSummary
 		statusCode  int
 		wantErr     bool
@@ -151,9 +153,9 @@ func TestGetBatchStatusCommand_Run(t *testing.T) {
 	}{
 		{
 			name:    "successful status fetch",
-			batchID: "batch-123",
+			batchID: domaintypes.RunID("batch-123"), // Convert to domain type
 			serverResp: BatchSummary{
-				ID:        "batch-123",
+				ID:        domaintypes.RunID("batch-123"), // Convert to domain type
 				Name:      strPtr("my-batch"),
 				Status:    "running",
 				RepoURL:   "https://github.com/org/repo.git",
@@ -172,14 +174,14 @@ func TestGetBatchStatusCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "batch not found",
-			batchID:     "nonexistent",
+			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run not found",
 		},
 		{
 			name:        "empty batch id",
-			batchID:     "",
+			batchID:     domaintypes.RunID(""), // Empty domain type
 			wantErr:     true,
 			wantErrText: "batch id required",
 		},
@@ -241,7 +243,7 @@ func TestStopBatchCommand_Run(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		batchID     string
+		batchID     domaintypes.RunID // Updated to domain type
 		serverResp  BatchSummary
 		statusCode  int
 		wantErr     bool
@@ -249,9 +251,9 @@ func TestStopBatchCommand_Run(t *testing.T) {
 	}{
 		{
 			name:    "successful stop",
-			batchID: "batch-456",
+			batchID: domaintypes.RunID("batch-456"), // Convert to domain type
 			serverResp: BatchSummary{
-				ID:     "batch-456",
+				ID:     domaintypes.RunID("batch-456"), // Convert to domain type
 				Status: "canceled",
 				Counts: &RunRepoCounts{
 					Total:         5,
@@ -264,14 +266,14 @@ func TestStopBatchCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "batch not found",
-			batchID:     "nonexistent",
+			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run not found",
 		},
 		{
 			name:        "empty batch id",
-			batchID:     "",
+			batchID:     domaintypes.RunID(""), // Empty domain type
 			wantErr:     true,
 			wantErrText: "batch id required",
 		},
@@ -338,7 +340,7 @@ func TestStartBatchCommand_Run(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		batchID     string
+		batchID     domaintypes.RunID // Updated to domain type
 		serverResp  StartBatchResult
 		statusCode  int
 		wantErr     bool
@@ -346,9 +348,9 @@ func TestStartBatchCommand_Run(t *testing.T) {
 	}{
 		{
 			name:    "successful start",
-			batchID: "batch-789",
+			batchID: domaintypes.RunID("batch-789"), // Convert to domain type
 			serverResp: StartBatchResult{
-				RunID:       "batch-789",
+				RunID:       domaintypes.RunID("batch-789"), // Convert to domain type
 				Started:     3,
 				AlreadyDone: 1,
 				Pending:     0,
@@ -357,9 +359,9 @@ func TestStartBatchCommand_Run(t *testing.T) {
 		},
 		{
 			name:    "start with pending",
-			batchID: "batch-partial",
+			batchID: domaintypes.RunID("batch-partial"), // Convert to domain type
 			serverResp: StartBatchResult{
-				RunID:       "batch-partial",
+				RunID:       domaintypes.RunID("batch-partial"), // Convert to domain type
 				Started:     2,
 				AlreadyDone: 0,
 				Pending:     3,
@@ -368,14 +370,14 @@ func TestStartBatchCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "batch not found",
-			batchID:     "nonexistent",
+			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run not found",
 		},
 		{
 			name:        "empty batch id",
-			batchID:     "",
+			batchID:     domaintypes.RunID(""), // Empty domain type
 			wantErr:     true,
 			wantErrText: "batch id required",
 		},

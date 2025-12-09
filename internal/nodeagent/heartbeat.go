@@ -16,20 +16,22 @@ import (
 	"strings"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // HeartbeatPayload contains resource snapshot data sent to the server.
+// Uses domain type (NodeID) for type-safe identification.
 type HeartbeatPayload struct {
-	NodeID        string    `json:"node_id"`
-	Timestamp     time.Time `json:"timestamp"`
-	CPUFreeMilli  float64   `json:"cpu_free_millis"`
-	MemFreeMB     float64   `json:"mem_free_mb"`
-	DiskFreeMB    float64   `json:"disk_free_mb"`
-	CPUTotalMilli float64   `json:"cpu_total_millis"`
-	MemTotalMB    float64   `json:"mem_total_mb"`
-	DiskTotalMB   float64   `json:"disk_total_mb"`
+	NodeID        domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
+	Timestamp     time.Time          `json:"timestamp"`
+	CPUFreeMilli  float64            `json:"cpu_free_millis"`
+	MemFreeMB     float64            `json:"mem_free_mb"`
+	DiskFreeMB    float64            `json:"disk_free_mb"`
+	CPUTotalMilli float64            `json:"cpu_total_millis"`
+	MemTotalMB    float64            `json:"mem_total_mb"`
+	DiskTotalMB   float64            `json:"disk_total_mb"`
 }
 
 // HeartbeatManager periodically sends resource snapshots to the server.
@@ -57,7 +59,7 @@ func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
 
 	collector := lifecycle.NewCollector(lifecycle.Options{
 		Role:             "node",
-		NodeID:           cfg.NodeID,
+		NodeID:           cfg.NodeID.String(), // Convert domain type to string for lifecycle collector
 		IgnoreInterfaces: ignore,
 	})
 
@@ -156,7 +158,7 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	reqCtx, cancel := context.WithTimeout(ctx, h.cfg.Heartbeat.Timeout)
 	defer cancel()
 
-	hbURL, err := buildURL(h.cfg.ServerURL, path.Join("/v1/nodes", url.PathEscape(h.cfg.NodeID), "heartbeat"))
+	hbURL, err := buildURL(h.cfg.ServerURL, path.Join("/v1/nodes", url.PathEscape(h.cfg.NodeID.String()), "heartbeat"))
 	if err != nil {
 		return fmt.Errorf("build heartbeat url: %w", err)
 	}

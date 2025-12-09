@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func handleModCancel(args []string, stderr io.Writer) error {
@@ -121,7 +122,7 @@ func handleModDiffs(args []string, stderr io.Writer) error {
 		}
 		runIDArg = strings.TrimSpace(rest[0])
 	}
-	runID := runIDArg
+	runID := domaintypes.RunID(runIDArg) // Convert to domain type
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {

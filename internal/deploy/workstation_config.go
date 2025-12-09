@@ -10,13 +10,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // This file manages optional workstation CA installation and resolver setup.
 
 // configureWorkstationOptions describes how workstation CA and resolver steps should run.
+// Uses domain type (ClusterID) for type-safe identification.
 type configureWorkstationOptions struct {
-	ClusterID   string
+	ClusterID   domaintypes.ClusterID // Cluster ID
 	CAPath      string
 	BeaconIP    string
 	ResolverDir string

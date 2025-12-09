@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -578,10 +579,11 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	// Verify enriched fields are present.
-	if rec.NodeID != nodeID {
+	// Compare as domain types (LogRecord fields are now NodeID/JobID domain types).
+	if rec.NodeID != domaintypes.NodeID(nodeID) {
 		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
 	}
-	if rec.JobID != jobID {
+	if rec.JobID != domaintypes.JobID(jobID) {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
 	if rec.ModType != "mod" {

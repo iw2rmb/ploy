@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // This file defines bootstrap constants plus helper types shared across splits.
@@ -20,6 +22,7 @@ const (
 )
 
 // Options configure bootstrap execution.
+// Uses domain types (ClusterID, NodeID) for type-safe identification.
 type Options struct {
 	Host                   string
 	Address                string
@@ -37,10 +40,10 @@ type Options struct {
 	DescriptorID           string
 	DescriptorAddress      string
 	DescriptorIdentityPath string
-	ClusterID              string
+	ClusterID              domaintypes.ClusterID `yaml:"cluster_id"` // Cluster ID
 	InitialWorkers         []string
 	Primary                bool
-	NodeID                 string
+	NodeID                 domaintypes.NodeID `yaml:"node_id"` // Node ID (NanoID-backed)
 	NodeAddress            string
 }
 
