@@ -76,12 +76,12 @@ func buildRunRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 }
 
 // submitRun sends the run request to the control plane and returns the initial summary.
-func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest, specPayload []byte) (modsapi.RunSummary, error) {
+// Uses the canonical submit contract: POST /v1/mods returns 201 Created with RunSummary.
+func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (modsapi.RunSummary, error) {
 	cmd := mods.SubmitCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Request: request,
-		Spec:    specPayload,
 	}
 	return cmd.Run(ctx)
 }
