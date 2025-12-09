@@ -252,12 +252,12 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	opts, _, typedOpts := parseSpec(raw)
 
-	// Verify raw opts map is populated (backward compatibility).
+	// Verify raw opts map is populated (internal intermediate representation).
 	if opts["image"] != "docker.io/test/mod:latest" {
 		t.Errorf("raw opts image mismatch")
 	}
 
-	// Verify typed options are populated.
+	// Verify typed options are populated (canonical source of truth).
 	// Image is now a ModImage type; verify universal image was parsed.
 	resolved, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
@@ -289,9 +289,9 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}
 }
 
-// TestParseSpec_ModIndexPropagatesToOptions verifies that server-injected
-// mod_index is preserved in the flattened options map.
-func TestParseSpec_ModIndexPropagatesToOptions(t *testing.T) {
+// TestParseSpec_ModIndexPropagatesToTypedOptions verifies that server-injected
+// mod_index is available in typed RunOptions.ModIndex.
+func TestParseSpec_ModIndexPropagatesToTypedOptions(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
@@ -303,14 +303,14 @@ func TestParseSpec_ModIndexPropagatesToOptions(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	opts, _, _ := parseSpec(raw)
+	_, _, typedOpts := parseSpec(raw)
 
-	v, ok := opts["mod_index"].(int)
-	if !ok {
-		t.Fatalf("expected mod_index to be int in opts, got %T (%v)", opts["mod_index"], opts["mod_index"])
+	// Verify typed ModIndex is populated.
+	if !typedOpts.ModIndexSet {
+		t.Errorf("expected ModIndexSet=true, got false")
 	}
-	if v != 1 {
-		t.Errorf("expected mod_index=1 in opts, got %d", v)
+	if typedOpts.ModIndex != 1 {
+		t.Errorf("expected ModIndex=1, got %d", typedOpts.ModIndex)
 	}
 }
 
@@ -818,4 +818,189 @@ func TestParseRunOptions_MultiStepStackAwareImage(t *testing.T) {
 	if mavenImg != "docker.io/user/step1:latest" {
 		t.Errorf("expected default image for maven stack, got %q", mavenImg)
 	}
+}
+
+// TestParseRunOptions_MRFlagsPresence verifies that MR flag presence tracking
+// correctly distinguishes between "not set" and "set to false".
+func TestParseRunOptions_MRFlagsPresence(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mr_on_success set to true", func(t *testing.T) {
+		opts := map[string]any{
+			"mr_on_success": true,
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.MRFlagsPresent.MROnSuccessSet {
+			t.Errorf("expected MROnSuccessSet=true when mr_on_success is present")
+		}
+		if !runOpts.MRWiring.MROnSuccess {
+			t.Errorf("expected MROnSuccess=true")
+		}
+		if runOpts.MRFlagsPresent.MROnFailSet {
+			t.Errorf("expected MROnFailSet=false when mr_on_fail is not present")
+		}
+	})
+
+	t.Run("mr_on_success set to false", func(t *testing.T) {
+		opts := map[string]any{
+			"mr_on_success": false,
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.MRFlagsPresent.MROnSuccessSet {
+			t.Errorf("expected MROnSuccessSet=true when mr_on_success is present (even if false)")
+		}
+		if runOpts.MRWiring.MROnSuccess {
+			t.Errorf("expected MROnSuccess=false")
+		}
+	})
+
+	t.Run("both flags set", func(t *testing.T) {
+		opts := map[string]any{
+			"mr_on_success": true,
+			"mr_on_fail":    false,
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.MRFlagsPresent.MROnSuccessSet {
+			t.Errorf("expected MROnSuccessSet=true")
+		}
+		if !runOpts.MRFlagsPresent.MROnFailSet {
+			t.Errorf("expected MROnFailSet=true")
+		}
+		if !runOpts.MRWiring.MROnSuccess {
+			t.Errorf("expected MROnSuccess=true")
+		}
+		if runOpts.MRWiring.MROnFail {
+			t.Errorf("expected MROnFail=false")
+		}
+	})
+
+	t.Run("no flags set", func(t *testing.T) {
+		opts := map[string]any{}
+		runOpts := parseRunOptions(opts)
+		if runOpts.MRFlagsPresent.MROnSuccessSet {
+			t.Errorf("expected MROnSuccessSet=false when not present")
+		}
+		if runOpts.MRFlagsPresent.MROnFailSet {
+			t.Errorf("expected MROnFailSet=false when not present")
+		}
+	})
+}
+
+// TestParseRunOptions_ArtifactPaths verifies that artifact_paths are correctly
+// parsed from both []any (JSON) and []string (programmatic) forms.
+func TestParseRunOptions_ArtifactPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("artifact_paths as []any from JSON", func(t *testing.T) {
+		opts := map[string]any{
+			"artifact_paths": []any{"path/to/file1.txt", "path/to/dir/", "path/to/file2.log"},
+		}
+		runOpts := parseRunOptions(opts)
+		want := []string{"path/to/file1.txt", "path/to/dir/", "path/to/file2.log"}
+		if len(runOpts.Artifacts.Paths) != len(want) {
+			t.Fatalf("expected %d artifact paths, got %d", len(want), len(runOpts.Artifacts.Paths))
+		}
+		for i, p := range want {
+			if runOpts.Artifacts.Paths[i] != p {
+				t.Errorf("expected Artifacts.Paths[%d]=%q, got %q", i, p, runOpts.Artifacts.Paths[i])
+			}
+		}
+	})
+
+	t.Run("artifact_paths as []string programmatic", func(t *testing.T) {
+		opts := map[string]any{
+			"artifact_paths": []string{"a.txt", "b.log"},
+		}
+		runOpts := parseRunOptions(opts)
+		want := []string{"a.txt", "b.log"}
+		if len(runOpts.Artifacts.Paths) != len(want) {
+			t.Fatalf("expected %d artifact paths, got %d", len(want), len(runOpts.Artifacts.Paths))
+		}
+		for i, p := range want {
+			if runOpts.Artifacts.Paths[i] != p {
+				t.Errorf("expected Artifacts.Paths[%d]=%q, got %q", i, p, runOpts.Artifacts.Paths[i])
+			}
+		}
+	})
+
+	t.Run("artifact_paths filters empty strings", func(t *testing.T) {
+		opts := map[string]any{
+			"artifact_paths": []any{"valid.txt", "", "  ", "also-valid.log"},
+		}
+		runOpts := parseRunOptions(opts)
+		want := []string{"valid.txt", "also-valid.log"}
+		if len(runOpts.Artifacts.Paths) != len(want) {
+			t.Fatalf("expected %d artifact paths after filtering, got %d: %v", len(want), len(runOpts.Artifacts.Paths), runOpts.Artifacts.Paths)
+		}
+		for i, p := range want {
+			if runOpts.Artifacts.Paths[i] != p {
+				t.Errorf("expected Artifacts.Paths[%d]=%q, got %q", i, p, runOpts.Artifacts.Paths[i])
+			}
+		}
+	})
+
+	t.Run("no artifact_paths results in empty slice", func(t *testing.T) {
+		opts := map[string]any{}
+		runOpts := parseRunOptions(opts)
+		if len(runOpts.Artifacts.Paths) != 0 {
+			t.Errorf("expected empty Artifacts.Paths, got %v", runOpts.Artifacts.Paths)
+		}
+	})
+}
+
+// TestParseRunOptions_ModIndex verifies that mod_index is correctly parsed
+// and ModIndexSet is set appropriately.
+func TestParseRunOptions_ModIndex(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mod_index as int", func(t *testing.T) {
+		opts := map[string]any{
+			"mod_index": 2,
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.ModIndexSet {
+			t.Errorf("expected ModIndexSet=true")
+		}
+		if runOpts.ModIndex != 2 {
+			t.Errorf("expected ModIndex=2, got %d", runOpts.ModIndex)
+		}
+	})
+
+	t.Run("mod_index as float64 from JSON", func(t *testing.T) {
+		opts := map[string]any{
+			"mod_index": float64(3),
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.ModIndexSet {
+			t.Errorf("expected ModIndexSet=true")
+		}
+		if runOpts.ModIndex != 3 {
+			t.Errorf("expected ModIndex=3, got %d", runOpts.ModIndex)
+		}
+	})
+
+	t.Run("mod_index=0 is valid and set", func(t *testing.T) {
+		opts := map[string]any{
+			"mod_index": 0,
+		}
+		runOpts := parseRunOptions(opts)
+		if !runOpts.ModIndexSet {
+			t.Errorf("expected ModIndexSet=true even for mod_index=0")
+		}
+		if runOpts.ModIndex != 0 {
+			t.Errorf("expected ModIndex=0, got %d", runOpts.ModIndex)
+		}
+	})
+
+	t.Run("no mod_index means ModIndexSet=false", func(t *testing.T) {
+		opts := map[string]any{}
+		runOpts := parseRunOptions(opts)
+		if runOpts.ModIndexSet {
+			t.Errorf("expected ModIndexSet=false when not present")
+		}
+		// ModIndex defaults to 0.
+		if runOpts.ModIndex != 0 {
+			t.Errorf("expected ModIndex=0 default, got %d", runOpts.ModIndex)
+		}
+	})
 }

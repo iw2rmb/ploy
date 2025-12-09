@@ -27,6 +27,10 @@ import (
 //
 // RunOptions is populated from StartRunRequest.Options by parseRunOptions and
 // consumed by buildManifestFromRequest and execution orchestration phases.
+//
+// This type is the canonical source of truth for run options. Raw map[string]any
+// access should not be used; all option keys understood by the nodeagent are
+// exposed as typed fields on this struct.
 type RunOptions struct {
 	// BuildGate configures pre-mod build gate validation.
 	BuildGate BuildGateOptions
@@ -37,6 +41,10 @@ type RunOptions struct {
 	// MRWiring configures GitLab merge request creation.
 	MRWiring MRWiringOptions
 
+	// MRFlagsPresent tracks which MR flags were explicitly set in the spec.
+	// This enables distinguishing between "not set" and "set to false".
+	MRFlagsPresent MRFlagsPresence
+
 	// Execution configures container image, command, and retention.
 	Execution ExecutionOptions
 
@@ -45,6 +53,15 @@ type RunOptions struct {
 
 	// ServerMetadata holds server-injected metadata for uploads and tracking.
 	ServerMetadata ServerMetadataOptions
+
+	// ModIndex is the server-injected index for multi-step runs. It selects
+	// which entry in Steps[] to use for manifest building. Defaults to 0.
+	// For single-step runs, this field is ignored.
+	ModIndex int
+
+	// ModIndexSet is true when mod_index was explicitly provided in the spec.
+	// This distinguishes between "not set" (use 0) and "set to 0".
+	ModIndexSet bool
 
 	// Steps holds the list of mod steps for multi-step runs (mods[] array).
 	// For single-step runs, this slice is empty and Execution options are used.
@@ -237,6 +254,16 @@ type ArtifactOptions struct {
 	Name string
 }
 
+// MRFlagsPresence tracks whether MR creation flags were explicitly set in the spec.
+// This enables distinguishing between "not set" and "set to false" for MR wiring options.
+type MRFlagsPresence struct {
+	// MROnSuccessSet is true when mr_on_success was explicitly specified in the spec.
+	MROnSuccessSet bool
+
+	// MROnFailSet is true when mr_on_fail was explicitly specified in the spec.
+	MROnFailSet bool
+}
+
 // ServerMetadataOptions holds server-injected metadata for uploads and tracking.
 // These options are populated by the control plane and used by the nodeagent
 // for status reporting, artifact uploads, and run correlation.
@@ -270,8 +297,8 @@ type StepMod struct {
 // This function centralizes the map[string]any → RunOptions conversion and
 // provides a single point for option validation and defaulting.
 //
-// The raw map is still preserved in StartRunRequest.Options for backward
-// compatibility, but typed accessors should be preferred for new code.
+// All callers should use the typed RunOptions struct instead of accessing
+// the raw map directly. The typed struct is the canonical source of truth.
 func parseRunOptions(opts map[string]any) RunOptions {
 	runOpts := RunOptions{}
 
@@ -319,11 +346,15 @@ func parseRunOptions(opts map[string]any) RunOptions {
 	if domain, ok := opts["gitlab_domain"].(string); ok {
 		runOpts.MRWiring.GitLabDomain = domain
 	}
+	// Track MR flag presence separately from their values to distinguish
+	// between "not set" and "set to false".
 	if mrSuccess, ok := opts["mr_on_success"].(bool); ok {
 		runOpts.MRWiring.MROnSuccess = mrSuccess
+		runOpts.MRFlagsPresent.MROnSuccessSet = true
 	}
 	if mrFail, ok := opts["mr_on_fail"].(bool); ok {
 		runOpts.MRWiring.MROnFail = mrFail
+		runOpts.MRFlagsPresent.MROnFailSet = true
 	}
 
 	// Parse execution options.
@@ -350,15 +381,38 @@ func parseRunOptions(opts map[string]any) RunOptions {
 	if name, ok := opts["artifact_name"].(string); ok {
 		runOpts.Artifacts.Name = name
 	}
-	// artifact_paths is handled separately in uploadConfiguredArtifacts
-	// due to its []any representation; we don't parse it here to avoid
-	// duplicating the conversion logic.
+	// Parse artifact_paths (accepts both []any from JSON and []string from programmatic callers).
+	switch paths := opts["artifact_paths"].(type) {
+	case []any:
+		for _, p := range paths {
+			if s, ok := p.(string); ok && strings.TrimSpace(s) != "" {
+				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, s)
+			}
+		}
+	case []string:
+		for _, s := range paths {
+			if strings.TrimSpace(s) != "" {
+				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, s)
+			}
+		}
+	}
 
 	// Parse server metadata.
 	if jobID, ok := opts["job_id"].(string); ok {
 		if trimmed := strings.TrimSpace(jobID); trimmed != "" {
 			runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
 		}
+	}
+
+	// Parse mod_index for multi-step runs (server-injected per-job index).
+	// Handle both int and float64 (JSON unmarshals numbers as float64).
+	switch mi := opts["mod_index"].(type) {
+	case int:
+		runOpts.ModIndex = mi
+		runOpts.ModIndexSet = true
+	case float64:
+		runOpts.ModIndex = int(mi)
+		runOpts.ModIndexSet = true
 	}
 
 	// Parse multi-step mods array for sequential execution.
