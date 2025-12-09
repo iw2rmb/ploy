@@ -24,16 +24,21 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 		nodeExists: true,
 	}
 
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	_, err := gzWriter.Write([]byte("test log line\n"))
-	if err != nil {
+	if _, err = gzWriter.Write([]byte("test log line\n")); err != nil {
 		t.Fatalf("gzip write failed: %v", err)
 	}
-	if err := gzWriter.Close(); err != nil {
+	if err = gzWriter.Close(); err != nil {
 		t.Fatalf("gzip close failed: %v", err)
 	}
 	gzippedData := buf.Bytes()
@@ -85,16 +90,21 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 		nodeExists: true,
 	}
 
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	_, err := gzWriter.Write([]byte("hello with job id\n"))
-	if err != nil {
+	if _, err = gzWriter.Write([]byte("hello with job id\n")); err != nil {
 		t.Fatalf("gzip write failed: %v", err)
 	}
-	if err := gzWriter.Close(); err != nil {
+	if err = gzWriter.Close(); err != nil {
 		t.Fatalf("gzip close failed: %v", err)
 	}
 	gzippedData := buf.Bytes()
@@ -146,7 +156,12 @@ func TestCreateNodeLogsHandler_InvalidNodeID(t *testing.T) {
 	t.Parallel()
 
 	mockStore := &mockStoreForLogs{}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Create request with invalid node ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid/logs", strings.NewReader("{}"))
@@ -167,7 +182,12 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Create decoded payload larger than 1 MiB (will trigger 413 after decode).
 	largeData := make([]byte, 1<<20+1)
@@ -200,7 +220,12 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Craft a request whose JSON body exceeds 2 MiB due to base64 overhead.
 	// 2 MiB raw → ~2.66 MiB base64 → trips MaxBytesReader body cap.
@@ -234,7 +259,12 @@ func TestCreateNodeLogsHandler_MissingRunID(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Create payload without run_id.
 	payload := map[string]interface{}{
@@ -265,7 +295,12 @@ func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Create payload with empty data.
 	payload := map[string]interface{}{
@@ -297,7 +332,12 @@ func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: false,
 	}
-	handler := createNodeLogsHandler(mockStore, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(mockStore)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	handler := createNodeLogsHandler(mockStore, eventsService)
 
 	// Create valid payload.
 	payload := map[string]interface{}{
@@ -349,4 +389,9 @@ func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogPar
 		ChunkNo: arg.ChunkNo,
 		Data:    arg.Data,
 	}, nil
+}
+
+// GetJob returns an empty job for log enrichment (no-op for this test).
+func (m *mockStoreForLogs) GetJob(ctx context.Context, id string) (store.Job, error) {
+	return store.Job{}, nil
 }

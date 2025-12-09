@@ -28,9 +28,19 @@ func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParam
 	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
 }
 
+// GetJob returns an empty job for log enrichment (no-op for this test).
+func (m *mockStoreRunLogs) GetJob(_ context.Context, id string) (store.Job, error) {
+	return store.Job{}, nil
+}
+
 func TestCreateRunLogsHandler_Success(t *testing.T) {
 	ms := &mockStoreRunLogs{}
-	h := createRunLogHandler(ms, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(ms)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	h := createRunLogHandler(ms, eventsService)
 	runID := domaintypes.NewRunID().String()
 	jobID := domaintypes.NewJobID().String()
 	// Note: build_id removed; logs are now grouped at job level only.
@@ -51,7 +61,12 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 
 func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	ms := &mockStoreRunLogs{}
-	h := createRunLogHandler(ms, nil)
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(ms)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+	h := createRunLogHandler(ms, eventsService)
 	runID := domaintypes.NewRunID().String()
 	big := make([]byte, 1<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}

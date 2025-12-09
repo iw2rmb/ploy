@@ -32,6 +32,12 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 		Data:    []byte{0x1f, 0x8b},
 	}
 
+	// Create events service with the mock store — required for log ingestion.
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+
 	// Prepare request payload.
 	reqBody := map[string]interface{}{
 		"run_id":   runID.String(),
@@ -48,7 +54,7 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
 
-	createNodeLogsHandler(st, nil).ServeHTTP(rr, req)
+	createNodeLogsHandler(st, eventsService).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status %d, want 201", rr.Code)

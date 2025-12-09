@@ -51,7 +51,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: N/A (handler deletion or simplification).
   - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Run lifecycle and SSE tests must pass without the ack endpoint.
 
-- [ ] Make events service mandatory for logs; remove direct store write fallbacks — Use a single logging path.
+- [x] Make events service mandatory for logs; remove direct store write fallbacks — Use a single logging path.
   - Repository: ploy
   - Component: internal/server/handlers (nodes_logs.go, runs_logs.go), internal/server/events.
   - Scope: In createNodeLogsHandler and run logs handler, drop the `eventsService == nil` branches; require eventsService and always call CreateAndPublishLog. Update server wiring to always construct events.Service. Delete or adjust tests that exercised the direct st.CreateLog fallback.
