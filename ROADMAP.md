@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: Simplify parseSpec to handle only the canonical schema; delete branches that copy from `mod.*` into top-level fields for BC.
   - Tests: go test ./internal/nodeagent/... ./cmd/ploy/... — Spec parsing tests must reflect only the canonical shape.
 
-- [ ] Drop single-strategy healing fallback in maybeCreateHealingJobs — Require new healing configuration structure.
+- [x] Drop single-strategy healing fallback in maybeCreateHealingJobs — Require new healing configuration structure.
   - Repository: ploy
   - Component: internal/server/handlers/nodes_complete_healing.go.
   - Scope: Remove the block that converts top-level `mods[]` into a single unnamed healing strategy “for backward compatibility.” Require callers to provide healing strategies via the new `build_gate_healing` schema. Update tests that depend on the single-strategy fallback.
