@@ -7,7 +7,7 @@ Documentation: AGENTS.md, docs/mods-lifecycle.md, docs/api/OpenAPI.yaml, cmd/plo
 Legend: [ ] todo, [x] done.
 
 ## Mods API wire contracts
-- [ ] Collapse Mods API responses to a single canonical type (no `ticket` wrapper, no legacy field names) — Ensure GET/POST /v1/mods return one consistent JSON schema.
+- [x] Collapse Mods API responses to a single canonical type (no `ticket` wrapper, no legacy field names) — Ensure GET/POST /v1/mods return one consistent JSON schema.
   - Repository: ploy
   - Component: internal/mods/api, internal/server/handlers (mods_ticket.go), internal/cli/mods, cmd/ploy/mods_*.
   - Scope: Replace `RunSubmitResponse`, `RunStatusResponse`, and `Ticket` wrapper usage in internal/mods/api/types.go and handler responses in internal/server/handlers/mods_ticket.go. Update callers in internal/cli/mods and tests in cmd/ploy/* and internal/server/handlers/* to use the new canonical type. Remove comments and docs that reference “backward compatibility” for `ticket` / `stages` naming.
