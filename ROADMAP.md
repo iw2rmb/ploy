@@ -218,7 +218,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Extend `internal/nodeagent/claimer_gitlab_config_test.go` or add `claimer_global_env_test.go` to assert that when spec includes `env: { "CODEX_AUTH_JSON": "..." }`, the resulting `StartRunRequest.Env` passes through to manifests and that gate manifests also expose the same key when built via `buildGateManifestFromRequest`.
 
 ## Container Runtime & Gate Integration
-- [ ] Ensure container specs pass env through to Docker — Confirm that the Docker runtime receives all env keys from manifests, ready for image-level startup hooks to consume.
+- [x] Ensure container specs pass env through to Docker — Confirm that the Docker runtime receives all env keys from manifests, ready for image-level startup hooks to consume.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/workflow/runtime/step
   - Scope:
