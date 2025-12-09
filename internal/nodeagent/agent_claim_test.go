@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
-// TestClaimLoop verifies the claim loop posts claim, ack, and complete in order.
+// TestClaimLoop verifies the claim loop posts claim and starts execution.
 func TestClaimLoop(t *testing.T) {
 	t.Parallel()
 
@@ -41,14 +41,6 @@ func TestClaimLoop(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(resp)
-
-		case "/v1/nodes/test-node/ack":
-			calls = append(calls, "ack")
-			w.WriteHeader(http.StatusNoContent)
-
-		// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) removed.
-		// Job completion uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
-
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -103,25 +95,17 @@ func TestClaimLoop(t *testing.T) {
 	cancel()
 	wg.Wait()
 
-	// Verify calls were made in order.
+	// Verify claim was called at least once.
 	mu.Lock()
 	defer mu.Unlock()
 
-	if len(calls) < 2 {
-		t.Fatalf("expected at least 2 calls (claim, ack), got %d: %v", len(calls), calls)
+	if len(calls) < 1 {
+		t.Fatalf("expected at least 1 call (claim), got %d: %v", len(calls), calls)
 	}
 
-	// Verify order: claim followed by ack.
 	if calls[0] != "claim" {
 		t.Errorf("expected first call to be 'claim', got %s", calls[0])
 	}
-	if calls[1] != "ack" {
-		t.Errorf("expected second call to be 'ack', got %s", calls[1])
-	}
-
-	// Note: Job completion uses /v1/jobs/{job_id}/complete (via StatusUploader).
-	// Since we're using a minimal controller that starts execution in a goroutine,
-	// we only verify claim and ack order in this basic test.
 }
 
 // TestClaimLoopNoWork verifies the loop handles 204 No Content gracefully.
@@ -319,10 +303,6 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(resp)
-
-		case "/v1/nodes/test-node/ack":
-			w.WriteHeader(http.StatusNoContent)
-
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -403,94 +383,6 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	}
 }
 
-// TestClaimLoopAckFailure verifies behavior when ack fails.
-func TestClaimLoopAckFailure(t *testing.T) {
-	t.Parallel()
-
-	var mu sync.Mutex
-	ackCalled := false
-
-	// Server for unified claim queue; ack returns failure.
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
-			resp := ClaimResponse{
-				RunID:     types.RunID("run-456"),
-				JobID:     types.JobID("job-456"),
-				RepoURL:   "https://github.com/test/repo",
-				Status:    "assigned",
-				NodeID:    types.NodeID("test-node"),
-				BaseRef:   "main",
-				TargetRef: "feature",
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(resp)
-
-		case "/v1/nodes/test-node/ack":
-			ackCalled = true
-			// Return failure.
-			w.WriteHeader(http.StatusInternalServerError)
-
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer ts.Close()
-
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    "test-node",
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-	}
-
-	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
-	}
-
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager failed: %v", err)
-	}
-
-	// Override backoff policy to speed up test.
-	testPolicy := backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     100 * time.Millisecond,
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = claimer.Start(ctx)
-	}()
-
-	wg.Wait()
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if !ackCalled {
-		t.Error("expected ack to be called")
-	}
-}
-
 // TestClaimLoop_MapsClaimToStartRunRequest ensures ClaimResponse fields map 1:1 into StartRunRequest.
 func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	t.Parallel()
@@ -515,10 +407,6 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		case "/v1/nodes/test-node/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
-		case "/v1/nodes/test-node/ack":
-			w.WriteHeader(http.StatusNoContent)
-		// NOTE: Node-based completion endpoint removed; job completion
-		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -598,19 +486,12 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	}
 
 	// HTTP test server for unified claim queue with step-level claim.
-	var ackPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/nodes/test-node/claim":
 			// Return step-level claim with step_index.
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
-		case "/v1/nodes/test-node/ack":
-			// Capture ack payload to verify job_id is sent.
-			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
-			w.WriteHeader(http.StatusNoContent)
-		// NOTE: Node-based completion endpoint removed; job completion
-		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -654,17 +535,6 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	// Verify StepIndex matches the claim.
 	if got.StepIndex != stepIndex {
 		t.Errorf("StepIndex=%.0f want %.0f", got.StepIndex, stepIndex)
-	}
-
-	// Verify ack request included job_id (not step_index).
-	if ackPayload == nil {
-		t.Fatal("ack payload not captured")
-	}
-	ackJobID, ok := ackPayload["job_id"]
-	if !ok {
-		t.Error("ack payload missing job_id field")
-	} else if ackJobID != claim.JobID.String() {
-		t.Errorf("ack job_id=%v want %s", ackJobID, claim.JobID)
 	}
 
 	// Verify other fields remain correct.
@@ -731,10 +601,6 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		case "/v1/nodes/node-1/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim0)
-		case "/v1/nodes/node-1/ack":
-			w.WriteHeader(http.StatusNoContent)
-		// NOTE: Node-based completion endpoint removed; job completion
-		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -781,10 +647,6 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		case "/v1/nodes/node-2/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim1)
-		case "/v1/nodes/node-2/ack":
-			w.WriteHeader(http.StatusNoContent)
-		// NOTE: Node-based completion endpoint removed; job completion
-		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
