@@ -265,6 +265,21 @@ CREATE TABLE IF NOT EXISTS bootstrap_tokens (
 );
 CREATE INDEX IF NOT EXISTS bootstrap_tokens_token_id_idx ON bootstrap_tokens(token_id);
 
+-- Global Environment Variables (config_env)
+-- Stores global environment entries (including secrets) for injection into jobs.
+-- Per ROADMAP.md: scope controls which job types receive the env var (mods, heal, gate, all).
+-- The secret flag indicates whether the value should be redacted at the CLI/HTTP layer.
+-- Primary key on 'key' ensures uniqueness; upsert semantics for updates.
+CREATE TABLE IF NOT EXISTS config_env (
+  key         TEXT PRIMARY KEY,                           -- Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)
+  value       TEXT NOT NULL,                              -- Environment variable value (may be large, e.g., PEM bundles)
+  scope       TEXT NOT NULL,                              -- Selection scope: 'mods', 'heal', 'gate', 'all'
+  secret      BOOLEAN NOT NULL DEFAULT TRUE,              -- If true, value is redacted in list views
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- Last modification timestamp
+);
+-- Index for listing by scope (useful for job claim filtering).
+CREATE INDEX IF NOT EXISTS config_env_scope_idx ON config_env(scope);
+
 -- Advisory lock usage (documentation only)
 --   Assignment query sketch:
 --   WITH cte AS (

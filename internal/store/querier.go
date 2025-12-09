@@ -64,6 +64,9 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
+	// Removes an environment entry by key.
+	// No-op if the key does not exist (exec returns no error).
+	DeleteGlobalEnv(ctx context.Context, key string) error
 	DeleteJob(ctx context.Context, id string) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
@@ -77,6 +80,9 @@ type Querier interface {
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
+	// Retrieves a single environment entry by key.
+	// Returns pgx.ErrNoRows if the key does not exist.
+	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
 	GetJob(ctx context.Context, id string) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id string) (Node, error)
@@ -119,6 +125,11 @@ type Querier interface {
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID string) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	// config_env.sql — CRUD queries for global environment variables (config_env table).
+	// Per ROADMAP.md line 10-44: provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
+	// Returns all global environment entries, ordered by key for consistent iteration.
+	// Used by ConfigHolder initialization and HTTP list endpoint.
+	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID string) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
@@ -177,6 +188,10 @@ type Querier interface {
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
 	UpdateRunResume(ctx context.Context, id string) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
+	// Inserts or updates an environment entry (upsert on primary key 'key').
+	// Updates value, scope, secret, and refreshes updated_at on conflict.
+	// This ensures idempotent set operations from the CLI or API.
+	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 }
 
 var _ Querier = (*Queries)(nil)
