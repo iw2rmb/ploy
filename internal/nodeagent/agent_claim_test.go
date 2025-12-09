@@ -30,7 +30,7 @@ func TestClaimLoop(t *testing.T) {
 			calls = append(calls, "claim")
 			// Return a run to claim.
 			resp := ClaimResponse{
-				ID:        types.RunID("run-123"),
+				RunID:     types.RunID("run-123"),
 				JobID:     types.JobID("job-123"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
@@ -310,7 +310,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 			// Return success to reset backoff.
 			resp := ClaimResponse{
-				ID:        types.RunID("run-reset"),
+				RunID:     types.RunID("run-reset"),
 				JobID:     types.JobID("job-reset"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
@@ -420,7 +420,7 @@ func TestClaimLoopAckFailure(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/nodes/test-node/claim":
 			resp := ClaimResponse{
-				ID:        types.RunID("run-456"),
+				RunID:     types.RunID("run-456"),
 				JobID:     types.JobID("job-456"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
@@ -499,7 +499,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 
 	commit := "deadbeef"
 	claim := ClaimResponse{
-		ID:        types.RunID("run-map-1"),
+		RunID:     types.RunID("run-map-1"),
 		JobID:     types.JobID("job-map-1"),
 		RepoURL:   "https://github.com/acme/thing.git",
 		Status:    "assigned",
@@ -560,8 +560,8 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		t.Fatalf("controller.StartRun not called")
 	}
 	got := mock.lastStart
-	if got.RunID != claim.ID {
-		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
+	if got.RunID != claim.RunID {
+		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
 	}
 	if got.RepoURL.String() != claim.RepoURL {
 		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
@@ -586,7 +586,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
 	commit := "abc123"
 	claim := ClaimResponse{
-		ID:        types.RunID("run-step-map"),
+		RunID:     types.RunID("run-step-map"),
 		JobID:     types.JobID("job-123-step-map"),
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi.git",
@@ -671,8 +671,8 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	}
 
 	// Verify other fields remain correct.
-	if got.RunID != claim.ID {
-		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
+	if got.RunID != claim.RunID {
+		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
 	}
 	if got.RepoURL.String() != claim.RepoURL {
 		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
@@ -697,7 +697,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// Node1 claims job 0 (pre-gate).
 	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
-		ID:        runID,
+		RunID:     runID,
 		JobID:     types.JobID("job-node1-pregate"),
 		JobName:   "pre-gate",
 		RepoURL:   "https://github.com/acme/multi-node.git",
@@ -714,7 +714,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// Node2 claims job 1 (mod-0).
 	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
-		ID:        runID,
+		RunID:     runID,
 		JobID:     types.JobID("job-node2-mod0"),
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi-node.git",
