@@ -272,21 +272,19 @@ compatibility with universal images.
 
 ### Image specification forms
 
-The `image` field in `mod`, `mods[]`, and `build_gate_healing.mods[]` accepts two forms:
+The `image` field (top-level, in `mods[]`, and in `build_gate_healing.mods[]`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
-mod:
-  image: docker.io/user/mods-openrewrite:latest
+image: docker.io/user/mods-openrewrite:latest
 ```
 
 **Stack-specific images (map)** — Different images per detected stack:
 ```yaml
-mod:
-  image:
-    default: docker.io/user/mods-openrewrite:latest
-    java-maven: docker.io/user/mods-orw-maven:latest
-    java-gradle: docker.io/user/mods-orw-gradle:latest
+image:
+  default: docker.io/user/mods-openrewrite:latest
+  java-maven: docker.io/user/mods-orw-maven:latest
+  java-gradle: docker.io/user/mods-orw-gradle:latest
 ```
 
 ### Stack detection via Build Gate
@@ -362,13 +360,12 @@ Maven-specific image throughout the entire run, including healing retries.
 A common use case is dedicated OpenRewrite images for Maven and Gradle:
 
 ```yaml
-mod:
-  image:
-    default: docker.io/user/mods-openrewrite:latest
-    java-maven: docker.io/user/mods-orw-maven:latest
-    java-gradle: docker.io/user/mods-orw-gradle:latest
-  env:
-    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+image:
+  default: docker.io/user/mods-openrewrite:latest
+  java-maven: docker.io/user/mods-orw-maven:latest
+  java-gradle: docker.io/user/mods-orw-gradle:latest
+env:
+  RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
 When this spec runs against a Maven project (`pom.xml` present):

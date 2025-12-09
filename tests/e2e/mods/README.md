@@ -53,7 +53,7 @@ Example spec:
 **Using `--spec`:**
 
 The `--spec` flag accepts a YAML or JSON file defining:
-- **Main mod configuration** (`mod.image`, `mod.command`, `mod.env`, `mod.env_from_file`)
+- **Main mod configuration** (`image`, `command`, `env`, `env_from_file`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.profile`)
 - **Healing sequence** (`build_gate_healing.retries`, `build_gate_healing.mods[]`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)

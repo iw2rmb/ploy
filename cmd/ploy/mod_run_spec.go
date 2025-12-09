@@ -2,8 +2,12 @@
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
 // and resolves env_from_file references to inject file content as environment
-// variables. Spec parsing includes validation and error handling for missing
-// files. Isolating spec handling from execution flow enables focused testing
+// variables. Specs are expected to use canonical shapes:
+//   - Single-step runs: top-level fields (image, command, env, retain_container).
+//   - Multi-step runs: mods[] array with one entry per step plus global build_gate[_healing].
+//
+// Spec parsing includes validation and error handling for missing files.
+// Isolating spec handling from execution flow enables focused testing
 // of file I/O and parsing logic without coupling to HTTP submission.
 package main
 
@@ -104,14 +108,11 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // Processing order:
 // 1. Load spec file (YAML or JSON format) if provided
 // 2. Resolve env_from_file references in:
-//   - mod (single-mod format)
+//   - top-level env (canonical single-step format)
 //   - mods[] (multi-step format)
 //   - build_gate_healing.mods[] (healing steps)
-//   - top-level (back-compat)
 //
-// 3. Apply CLI flag overrides (higher precedence than spec file)
-//   - When a canonical `mod` section exists, apply overrides inside `mod` (env/image/command/retain).
-//   - Multi-step mods[] are preserved as-is; CLI overrides apply only to single-mod format.
+// 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
 //
 // 4. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
 //
@@ -151,17 +152,9 @@ func buildSpecPayload(
 		base = make(map[string]any)
 	}
 
-	// Resolve env_from_file references:
-	// 1) In the nested mod section when present (canonical schema)
-	if mod, ok := base["mod"].(map[string]any); ok {
-		if err := resolveEnvFromFileInPlace(mod); err != nil {
-			return nil, fmt.Errorf("resolve env from file (mod): %w", err)
-		}
-	} else {
-		// 2) Back-compat: resolve in top-level when users omit mod block
-		if err := resolveEnvFromFileInPlace(base); err != nil {
-			return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
-		}
+	// Resolve env_from_file references in the canonical top-level env block.
+	if err := resolveEnvFromFileInPlace(base); err != nil {
+		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
 	// Resolve env_from_file references in build_gate_healing.mods[] if present
@@ -200,25 +193,10 @@ func buildSpecPayload(
 		return nil, nil
 	}
 
-	// Apply CLI overrides to the base spec. When a canonical `mod` section is present,
-	// apply overrides inside that section to avoid producing split top-level/mod keys.
-	var modRef map[string]any
-	if m, ok := base["mod"].(map[string]any); ok {
-		modRef = m
-	}
-
 	if len(modEnvs) > 0 {
-		// Start from existing env (prefer mod.env when mod exists)
+		// Start from existing env.
 		current := make(map[string]any)
-		if modRef != nil {
-			if existingEnv, ok := modRef["env"].(map[string]any); ok {
-				for k, v := range existingEnv {
-					if s, ok := v.(string); ok {
-						current[k] = s
-					}
-				}
-			}
-		} else if existingEnv, ok := base["env"].(map[string]any); ok {
+		if existingEnv, ok := base["env"].(map[string]any); ok {
 			for k, v := range existingEnv {
 				if s, ok := v.(string); ok {
 					current[k] = s
@@ -245,28 +223,16 @@ func buildSpecPayload(
 			}
 		}
 		if len(current) > 0 {
-			if modRef != nil {
-				modRef["env"] = current
-			} else {
-				base["env"] = current
-			}
+			base["env"] = current
 		}
 	}
 
 	if modImage != "" {
-		if modRef != nil {
-			modRef["image"] = modImage
-		} else {
-			base["image"] = modImage
-		}
+		base["image"] = modImage
 	}
 
 	if retain {
-		if modRef != nil {
-			modRef["retain_container"] = true
-		} else {
-			base["retain_container"] = true
-		}
+		base["retain_container"] = true
 	}
 
 	if modCommand != "" {
@@ -275,24 +241,12 @@ func buildSpecPayload(
 		var asArray []string
 		if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
 			if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
-				if modRef != nil {
-					modRef["command"] = asArray
-				} else {
-					base["command"] = asArray
-				}
-			} else {
-				if modRef != nil {
-					modRef["command"] = modCommand
-				} else {
-					base["command"] = modCommand
-				}
-			}
-		} else {
-			if modRef != nil {
-				modRef["command"] = modCommand
+				base["command"] = asArray
 			} else {
 				base["command"] = modCommand
 			}
+		} else {
+			base["command"] = modCommand
 		}
 	}
 

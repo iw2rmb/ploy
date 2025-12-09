@@ -19,11 +19,10 @@ Overview
 Stack-aware images
 - Use the stack-aware `image` map in `mod.yaml` to select `orw-maven` or `orw-gradle` based on the Build Gate detected stack:
   ```yaml
-  mod:
-    image:
-      default: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
-      java-maven: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
-      java-gradle: docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
+  image:
+    default: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
+    java-maven: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
+    java-gradle: docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
   ```
 - The Build Gate detects `java-maven` when `pom.xml` is present, `java-gradle` when only Gradle files exist.
 

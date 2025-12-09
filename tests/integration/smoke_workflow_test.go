@@ -41,10 +41,8 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Step 1: Create a run representing a mod execution workflow.
 	modSpec := []byte(`{
 		"type": "smoke-workflow",
-		"mod": {
-			"image": "docker.io/example/mod-test:latest",
-			"command": ["mod-test", "--input", "/workspace"]
-		},
+		"image": "docker.io/example/mod-test:latest",
+		"command": ["mod-test", "--input", "/workspace"],
 		"build_gate": {
 			"enabled": true,
 			"profile": "java-maven"

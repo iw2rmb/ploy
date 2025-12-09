@@ -10,14 +10,13 @@
 apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
-mod:
-  image: docker.io/iwtormb/mods-orw-maven:latest
-  env:
-    RECIPE_GROUP: org.openrewrite.recipe
-    RECIPE_ARTIFACT: rewrite-migrate-java
-    RECIPE_VERSION: "3.20.0"
-    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-    MAVEN_PLUGIN_VERSION: "6.18.0"
+image: docker.io/iwtormb/mods-orw-maven:latest
+env:
+  RECIPE_GROUP: org.openrewrite.recipe
+  RECIPE_ARTIFACT: rewrite-migrate-java
+  RECIPE_VERSION: "3.20.0"
+  RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+  MAVEN_PLUGIN_VERSION: "6.18.0"
 
 build_gate:
   enabled: true
