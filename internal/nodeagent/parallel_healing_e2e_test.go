@@ -89,9 +89,8 @@ func TestParseRunOptions_MultiStrategy(t *testing.T) {
 	}
 }
 
-// Single-strategy mods[]-only healing specs are still supported and are
-// normalized to a single unnamed strategy; callers can also opt into
-// build_gate_healing.strategies for explicit multi-branch healing.
+// Single-strategy healing must use build_gate_healing.strategies with one entry;
+// legacy mods[]-only healing specs are no longer supported.
 
 // -----------------------------------------------------------------------------
 // TestParseRunOptions_StrategiesTakesPrecedence verifies that when both mods[]
@@ -100,8 +99,8 @@ func TestParseRunOptions_MultiStrategy(t *testing.T) {
 func TestParseRunOptions_StrategiesTakesPrecedence(t *testing.T) {
 	t.Parallel()
 
-	// Spec with both mods[] (single-strategy form) and strategies[] (multi-strategy).
-	// Per documentation, strategies[] should take precedence.
+	// Spec with both legacy mods[] and canonical strategies[].
+	// Per documentation, strategies[] should take precedence and legacy mods[] is ignored.
 	options := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(1),

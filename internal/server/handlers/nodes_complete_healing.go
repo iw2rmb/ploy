@@ -15,9 +15,9 @@ import (
 )
 
 // healingStrategy represents a named healing strategy (branch) parsed from the spec.
-// A strategy contains a name and a list of healing mods to execute sequentially.
+// A strategy contains an optional name and a list of healing mods to execute sequentially.
 type healingStrategy struct {
-	Name string           // Strategy name (e.g., "codex-ai", "static-patch"); empty for single-strategy mods-only configs.
+	Name string           // Strategy name (e.g., "codex-ai", "static-patch"); may be empty when not provided.
 	Mods []map[string]any // Ordered list of healing mod definitions (image, command, env, etc.).
 }
 
