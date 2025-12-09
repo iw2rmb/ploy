@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	runscli "github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
@@ -40,7 +41,8 @@ func handleMods(args []string, stderr io.Writer) error {
 func handleModsLogs(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mods logs", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
+	// Use canonical logs.Format constants directly (no package-level re-exports).
+	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
@@ -77,7 +79,7 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 
 	cmd := mods.LogsCommand{
 		RunID:  domaintypes.RunID(runID),
-		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
+		Format: logs.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
 			HTTPClient:  cloneForStream(httpClient),
@@ -120,7 +122,8 @@ func handleRuns(args []string, stderr io.Writer) error {
 func handleRunsFollow(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("runs follow", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	format := fs.String("format", string(runscli.FormatStructured), "output format (raw|structured)")
+	// Use canonical logs.Format constants directly (no package-level re-exports).
+	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
@@ -157,7 +160,7 @@ func handleRunsFollow(args []string, stderr io.Writer) error {
 
 	cmd := runscli.FollowCommand{
 		JobID:  domaintypes.JobID(jobID),
-		Format: runscli.Format(strings.ToLower(strings.TrimSpace(*format))),
+		Format: logs.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
 			HTTPClient:  cloneForStream(httpClient),

@@ -14,17 +14,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Format controls job log rendering. Re-exported from internal/cli/logs
-// for backward compatibility with existing callers.
-type Format = logs.Format
-
-const (
-	// FormatStructured includes timestamp, stream labels, and execution context.
-	FormatStructured Format = logs.FormatStructured
-	// FormatRaw prints log lines as-is (message only).
-	FormatRaw Format = logs.FormatRaw
-)
-
 // ErrInvalidFormat signals an unsupported format.
 var ErrInvalidFormat = errors.New("jobs: invalid format")
 
@@ -33,7 +22,7 @@ type FollowCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
 	JobID   domaintypes.JobID
-	Format  Format
+	Format  logs.Format // Use canonical logs.Format directly.
 	Output  io.Writer
 }
 
@@ -41,9 +30,10 @@ type FollowCommand struct {
 func (c FollowCommand) Run(ctx context.Context) error {
 	format := c.Format
 	if format == "" {
-		format = FormatStructured
+		format = logs.FormatStructured
 	}
-	if format != FormatStructured && format != FormatRaw {
+	// Validate format against canonical logs.Format constants.
+	if format != logs.FormatStructured && format != logs.FormatRaw {
 		return ErrInvalidFormat
 	}
 	if c.JobID.IsZero() {
