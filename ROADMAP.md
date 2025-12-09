@@ -98,7 +98,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./docs/api/...` (including `docs/api/verify_openapi_test.go`) — Expect no schema changes, only verification that documentation remains consistent with the existing wire format.
 
 ## Replace primitives with domaintypes IDs in control-plane and CLI
-- [ ] Migrate control-plane and CLI structs from `string` IDs to `domaintypes` newtypes — Use `RunID`, `JobID`, `NodeID`, `ClusterID`, and `RunRepoID` instead of raw `string` where values are stable identifiers.
+- [x] Migrate control-plane and CLI structs from `string` IDs to `domaintypes` newtypes — Use `RunID`, `JobID`, `NodeID`, `ClusterID`, and `RunRepoID` instead of raw `string` where values are stable identifiers.
   - Repository: github.com/iw2rmb/ploy
   - Components: `internal/server`, `internal/cli`, `internal/deploy`, `internal/nodeagent`, `internal/worker`, `cmd/ploy`
   - Scope:
