@@ -9,7 +9,6 @@
 package nodeagent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -68,9 +67,8 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 //  1. POST /v1/nodes/{id}/claim to attempt claiming a job.
 //  2. If 204 returned, no jobs are available; return false.
 //  3. If 200 returned, decode claim response and job metadata.
-//  4. Ack job start (transition job to "running" state).
-//  5. Parse spec into options and environment variables.
-//  6. Invoke controller to start job execution.
+//  4. Parse spec into options and environment variables.
+//  5. Invoke controller to start job execution.
 //
 // Note: Returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
@@ -121,12 +119,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 
 	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
 
-	// Send ack before execution.
-	// Include job_id to acknowledge the specific job being executed.
-	if err := c.ackRun(ctx, claim.RunID.String(), claim.JobID.String()); err != nil {
-		return true, fmt.Errorf("ack run: %w", err)
-	}
-
 	// Map claim response to StartRunRequest.
 	// Parse spec into options/env and typed RunOptions.
 	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
@@ -161,43 +153,4 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// ackRun sends POST /v1/nodes/{id}/ack to acknowledge job start.
-// Transitions the job from "assigned" to "running" and also updates the run status.
-func (c *ClaimManager) ackRun(ctx context.Context, runID string, jobID string) error {
-	ackURL := fmt.Sprintf("%s/v1/nodes/%s/ack", c.cfg.ServerURL, c.cfg.NodeID)
-
-	// Build payload with run_id and job_id.
-	payload := map[string]interface{}{
-		"run_id": runID,
-		"job_id": jobID,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal ack payload: %w", err)
-	}
-
-	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, ackURL, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create ack request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("send ack request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusNoContent {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("ack failed: status %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	slog.Info("job acknowledged", "run_id", runID, "job_id", jobID)
-	return nil
 }
