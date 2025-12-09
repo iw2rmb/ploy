@@ -89,10 +89,10 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/worker/... — Worker lifecycle and status reporting tests must pass without map-based helpers.
 
 ## Nodeagent options and manifest BC
-- [ ] Remove raw options map round-trip when typed RunOptions is sufficient — Reduce duplicate state.
+- [x] Remove raw options map round-trip when typed RunOptions is sufficient — Reduce duplicate state.
   - Repository: ploy
   - Component: internal/nodeagent/run_options.go, internal/nodeagent/run_options_test.go, internal/nodeagent/manifest.go.
-  - Scope: Audit how RunOptions and the raw options map are used. If all consumers can operate on RunOptions, remove the need to preserve the raw map “for backward compatibility” and update tests that assert its presence. Simplify manifest and step builders to use only typed fields.
+  - Scope: Audit how RunOptions and the raw options map are used. If all consumers can operate on RunOptions, remove the need to preserve the raw map "for backward compatibility" and update tests that assert its presence. Simplify manifest and step builders to use only typed fields.
   - Snippets: Delete fields and methods that exist solely to mirror raw map[string]any into RunOptions.
   - Tests: go test ./internal/nodeagent/... — RunOptions and manifest tests must pass with typed-only options.
 
