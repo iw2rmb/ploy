@@ -33,7 +33,8 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: run})
+		// Return RunSummary directly — the canonical response shape.
+		_ = json.NewEncoder(w).Encode(run)
 	}))
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
@@ -116,7 +117,8 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_ = json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: tt.run})
+				// Return RunSummary directly — the canonical response shape.
+				_ = json.NewEncoder(w).Encode(tt.run)
 			}))
 			defer srv.Close()
 			base, _ := url.Parse(srv.URL)
@@ -154,8 +156,12 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(modsapi.RunSubmitResponse{Ticket: modsapi.RunSummary{RunID: domaintypes.RunID("t2"), State: modsapi.RunStatePending}})
+		// Server returns 201 Created with canonical submit response.
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(struct {
+			RunID  string `json:"run_id"`
+			Status string `json:"status"`
+		}{RunID: "t2", Status: "pending"})
 	})
 	mux.HandleFunc("/v1/mods/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
@@ -194,16 +200,14 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// SSE server emits a terminal run event.
+			// SSE server emits a terminal run event (RunSummary directly, no wrapper).
 			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
-				evt := struct {
-					Ticket modsapi.RunSummary `json:"ticket"`
-				}{Ticket: modsapi.RunSummary{RunID: domaintypes.RunID("t3"), State: tt.terminalState}}
-				b, _ := json.Marshal(evt.Ticket)
+				runSummary := modsapi.RunSummary{RunID: domaintypes.RunID("t3"), State: tt.terminalState}
+				b, _ := json.Marshal(runSummary)
 				_, _ = w.Write([]byte("event: run\n"))
 				_, _ = w.Write([]byte("data: "))
 				_, _ = w.Write(b)

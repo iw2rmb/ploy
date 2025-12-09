@@ -197,7 +197,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build mods-style RunStatusResponse with Stages and Artifacts.
+		// Build RunSummary response with Stages and Artifacts.
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
 		runState := modsapi.RunStatusFromStore(run.Status)
 
@@ -300,7 +300,8 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(modsapi.RunStatusResponse{Ticket: summary}); err != nil {
+		// Encode RunSummary directly — no wrapper type.
+		if err := json.NewEncoder(w).Encode(summary); err != nil {
 			slog.Error("get run status: encode response failed", "err", err)
 		}
 	}

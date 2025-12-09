@@ -25,23 +25,20 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
-			// Run status endpoint.
-			resp := modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID("test-123"),
-					State: modsapi.RunStateSucceeded,
-					Stages: map[string]modsapi.StageStatus{
-						"stage1": {
-							State: modsapi.StageStateSucceeded,
-							Artifacts: map[string]string{
-								"artifact1": "cid-abc123",
-							},
+			// Run status endpoint — return RunSummary directly (canonical response shape).
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID("test-123"),
+				State: modsapi.RunStateSucceeded,
+				Stages: map[string]modsapi.StageStatus{
+					"stage1": {
+						State: modsapi.StageStateSucceeded,
+						Artifacts: map[string]string{
+							"artifact1": "cid-abc123",
 						},
 					},
 				},
-			}
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(resp)
+			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts") && r.URL.Query().Get("cid") != "":
 			// Artifact lookup by CID.
 			listing := struct {
@@ -140,29 +137,26 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
-			// Run status with multiple stages.
-			resp := modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{
-					RunID: domaintypes.RunID("test-multi"),
-					State: modsapi.RunStateSucceeded,
-					Stages: map[string]modsapi.StageStatus{
-						"plan": {
-							State: modsapi.StageStateSucceeded,
-							Artifacts: map[string]string{
-								"plan.json": "cid-plan",
-							},
+			// Run status with multiple stages — return RunSummary directly.
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID("test-multi"),
+				State: modsapi.RunStateSucceeded,
+				Stages: map[string]modsapi.StageStatus{
+					"plan": {
+						State: modsapi.StageStateSucceeded,
+						Artifacts: map[string]string{
+							"plan.json": "cid-plan",
 						},
-						"exec": {
-							State: modsapi.StageStateSucceeded,
-							Artifacts: map[string]string{
-								"output.log": "cid-exec",
-							},
+					},
+					"exec": {
+						State: modsapi.StageStateSucceeded,
+						Artifacts: map[string]string{
+							"output.log": "cid-exec",
 						},
 					},
 				},
-			}
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(resp)
+			})
 		case strings.Contains(r.URL.Path, "/v1/artifacts") && r.URL.Query().Get("cid") == "cid-plan":
 			listing := struct {
 				Artifacts []struct {
@@ -262,16 +256,14 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 			name: "artifact CID not found",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts") {
-					resp := modsapi.RunStatusResponse{
-						Ticket: modsapi.RunSummary{
-							RunID: domaintypes.RunID("test"),
-							Stages: map[string]modsapi.StageStatus{
-								"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
-							},
-						},
-					}
+					// Return RunSummary directly.
 					w.WriteHeader(http.StatusOK)
-					_ = json.NewEncoder(w).Encode(resp)
+					_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+						RunID: domaintypes.RunID("test"),
+						Stages: map[string]modsapi.StageStatus{
+							"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
+						},
+					})
 				} else if strings.Contains(r.URL.Path, "/v1/artifacts") {
 					// Return empty artifact list.
 					_, _ = w.Write([]byte(`{"artifacts":[]}`))
@@ -403,15 +395,13 @@ func TestFetchMRURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := modsapi.RunStatusResponse{
-					Ticket: modsapi.RunSummary{
-						RunID:    domaintypes.RunID("test"),
-						Metadata: tt.metadata,
-					},
-				}
+				// Return RunSummary directly — the canonical response shape.
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(resp)
+				_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+					RunID:    domaintypes.RunID("test"),
+					Metadata: tt.metadata,
+				})
 			}))
 			defer server.Close()
 
@@ -453,14 +443,12 @@ func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v1/mods/") {
-			resp := modsapi.RunStatusResponse{
-				Ticket: modsapi.RunSummary{Stages: map[string]modsapi.StageStatus{
-					"stage0": {Artifacts: map[string]string{}},
-				}},
-			}
+			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{Stages: map[string]modsapi.StageStatus{
+				"stage0": {Artifacts: map[string]string{}},
+			}})
 			return
 		}
 		http.NotFound(w, r)

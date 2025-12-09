@@ -285,28 +285,29 @@ func TestGetRunStatusHandlerSuccess(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.RunStatusResponse
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var resp modsapi.RunSummary
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	// Verify RunID field is correctly populated.
-	if string(resp.Ticket.RunID) != runID.String() {
-		t.Errorf("expected run_id %s, got %s", runID.String(), string(resp.Ticket.RunID))
+	if string(resp.RunID) != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), string(resp.RunID))
 	}
-	if resp.Ticket.State != modsapi.RunStateRunning {
-		t.Errorf("expected status running, got %s", resp.Ticket.State)
+	if resp.State != modsapi.RunStateRunning {
+		t.Errorf("expected status running, got %s", resp.State)
 	}
-	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
-		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Ticket.Repository)
+	if resp.Repository != "https://github.com/user/repo.git" {
+		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Repository)
 	}
-	if resp.Ticket.Metadata["repo_base_ref"] != "main" {
-		t.Errorf("expected base_ref main, got %s", resp.Ticket.Metadata["repo_base_ref"])
+	if resp.Metadata["repo_base_ref"] != "main" {
+		t.Errorf("expected base_ref main, got %s", resp.Metadata["repo_base_ref"])
 	}
-	if resp.Ticket.Metadata["repo_target_ref"] != "feature" {
-		t.Errorf("expected target_ref feature, got %s", resp.Ticket.Metadata["repo_target_ref"])
+	if resp.Metadata["repo_target_ref"] != "feature" {
+		t.Errorf("expected target_ref feature, got %s", resp.Metadata["repo_target_ref"])
 	}
-	if got := resp.Ticket.Metadata["node_id"]; got != nodeID {
+	if got := resp.Metadata["node_id"]; got != nodeID {
 		t.Errorf("expected node_id %s, got %s", nodeID, got)
 	}
 
@@ -398,17 +399,18 @@ func TestGetRunStatusHandlerWithOptionalFields(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.RunStatusResponse
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var resp modsapi.RunSummary
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
-		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Ticket.Repository)
+	if resp.Repository != "https://github.com/user/repo.git" {
+		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Repository)
 	}
 	// MR URL should be propagated from stats.metadata.mr_url
-	if resp.Ticket.Metadata["mr_url"] != "https://gitlab.com/org/repo/-/merge_requests/99" {
-		t.Errorf("expected mr_url to be present, got %q", resp.Ticket.Metadata["mr_url"])
+	if resp.Metadata["mr_url"] != "https://gitlab.com/org/repo/-/merge_requests/99" {
+		t.Errorf("expected mr_url to be present, got %q", resp.Metadata["mr_url"])
 	}
 	// FinishedAt not exposed directly; rely on state only.
 }
@@ -780,30 +782,31 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.RunStatusResponse
+	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
+	var resp modsapi.RunSummary
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	// Verify both jobs are present with correct step_index.
-	if len(resp.Ticket.Stages) != 2 {
-		t.Fatalf("expected 2 jobs, got %d", len(resp.Ticket.Stages))
+	if len(resp.Stages) != 2 {
+		t.Fatalf("expected 2 jobs, got %d", len(resp.Stages))
 	}
 
 	job0ID := job0.ID
 	job1ID := job1.ID
 
-	if _, ok := resp.Ticket.Stages[job0ID]; !ok {
+	if _, ok := resp.Stages[job0ID]; !ok {
 		t.Errorf("expected job %s to be present", job0ID)
 	}
-	if resp.Ticket.Stages[job0ID].StepIndex != 2000 {
-		t.Errorf("expected job 0 step_index 2000, got %d", resp.Ticket.Stages[job0ID].StepIndex)
+	if resp.Stages[job0ID].StepIndex != 2000 {
+		t.Errorf("expected job 0 step_index 2000, got %d", resp.Stages[job0ID].StepIndex)
 	}
 
-	if _, ok := resp.Ticket.Stages[job1ID]; !ok {
+	if _, ok := resp.Stages[job1ID]; !ok {
 		t.Errorf("expected job %s to be present", job1ID)
 	}
-	if resp.Ticket.Stages[job1ID].StepIndex != 3000 {
-		t.Errorf("expected job 1 step_index 3000, got %d", resp.Ticket.Stages[job1ID].StepIndex)
+	if resp.Stages[job1ID].StepIndex != 3000 {
+		t.Errorf("expected job 1 step_index 3000, got %d", resp.Stages[job1ID].StepIndex)
 	}
 }
