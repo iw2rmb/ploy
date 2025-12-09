@@ -72,11 +72,9 @@ func TestCacheStoreAndCopy(t *testing.T) {
 		t.Fatalf("unexpected node_id: got %v, want test-node-123", got.NodeID)
 	}
 
-	// Verify LatestStatusMap returns the correct map representation.
-	gotMap, ok := c.LatestStatusMap()
-	if !ok {
-		t.Fatal("expected cached status available from LatestStatusMap")
-	}
+	// Verify ToMap() produces the expected wire format for JSON serialization.
+	// ToMap() is called at serialization boundaries (e.g., in status.Provider.Snapshot).
+	gotMap := got.ToMap()
 	resources, ok := gotMap["resources"].(map[string]any)
 	if !ok {
 		t.Fatal("expected resources to be map[string]any")
@@ -90,15 +88,11 @@ func TestCacheStoreAndCopy(t *testing.T) {
 	}
 }
 
-// TestCacheEmpty verifies that an empty cache returns false for both typed and map accessors.
+// TestCacheEmpty verifies that an empty cache returns false from LatestStatus.
 func TestCacheEmpty(t *testing.T) {
 	c := NewCache()
 
 	if _, ok := c.LatestStatus(); ok {
 		t.Fatal("expected empty cache to return false")
-	}
-
-	if _, ok := c.LatestStatusMap(); ok {
-		t.Fatal("expected empty cache to return false from LatestStatusMap")
 	}
 }

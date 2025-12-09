@@ -97,7 +97,7 @@ type NodeComponents struct {
 }
 
 // ToMap converts NodeStatus to map[string]any for JSON serialization.
-// The wire format is preserved for backward compatibility with existing clients.
+// Called at serialization boundaries (e.g., status.Provider.Snapshot).
 func (s NodeStatus) ToMap() map[string]any {
 	status := map[string]any{
 		"state":      s.State,

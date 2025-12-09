@@ -5,7 +5,8 @@ import (
 )
 
 // Cache stores the latest lifecycle status snapshot for reuse.
-// Now stores typed NodeStatus instead of map[string]any for type safety.
+// Stores typed NodeStatus for compile-time safety; use LatestStatus()
+// to retrieve the cached status.
 type Cache struct {
 	mu     sync.RWMutex
 	status *NodeStatus
@@ -27,6 +28,8 @@ func (c *Cache) Store(status NodeStatus) {
 }
 
 // LatestStatus returns a copy of the cached NodeStatus when available.
+// This is the canonical accessor for status data; callers should use
+// NodeStatus.ToMap() only at JSON serialization boundaries.
 func (c *Cache) LatestStatus() (NodeStatus, bool) {
 	if c == nil {
 		return NodeStatus{}, false
@@ -37,16 +40,6 @@ func (c *Cache) LatestStatus() (NodeStatus, bool) {
 		return NodeStatus{}, false
 	}
 	return *c.status, true
-}
-
-// LatestStatusMap returns the cached status as map[string]any for backward compatibility.
-// This preserves the existing SnapshotSource interface used by status.Provider.
-func (c *Cache) LatestStatusMap() (map[string]any, bool) {
-	status, ok := c.LatestStatus()
-	if !ok {
-		return nil, false
-	}
-	return status.ToMap(), true
 }
 
 func cloneAnyMap(src map[string]any) map[string]any {

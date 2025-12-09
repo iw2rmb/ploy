@@ -81,7 +81,7 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/workflow/contracts/... ./internal/nodeagent/... — Image resolution tests confirm both forms work correctly.
 
 ## Worker lifecycle / status snapshots
-- [ ] Remove map-based status accessors in lifecycle cache — Use typed NodeStatus everywhere.
+- [x] Remove map-based status accessors in lifecycle cache — Use typed NodeStatus everywhere.
   - Repository: ploy
   - Component: internal/worker/lifecycle/cache.go, internal/worker/lifecycle/types.go, status providers/consumers.
   - Scope: Find all callers of Cache.LatestStatusMap and migrate them to use Cache.LatestStatus and NodeStatus directly. Once all callers are updated, remove LatestStatusMap and any map-based SnapshotSource shims. Keep ToMap only if it is still used for JSON output; otherwise consider simplifying its shape.
