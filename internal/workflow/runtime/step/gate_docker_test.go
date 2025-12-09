@@ -70,6 +70,110 @@ func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
 	}
 }
 
+// TestDockerGateExecutor_EnvPassthrough verifies that environment variables from
+// StepGateSpec.Env are passed through to the Docker container. This ensures that
+// global env vars injected by the control plane (e.g., CA_CERTS_PEM_BUNDLE,
+// CODEX_AUTH_JSON) are available to image-level startup hooks.
+func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
+	t.Parallel()
+
+	rt := &mockGateRuntimeMinimal{}
+	executor := NewDockerGateExecutor(rt)
+
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Profile: "java",
+		Env: map[string]string{
+			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+			"CODEX_AUTH_JSON":     `{"token":"secret"}`,
+			"CUSTOM_VAR":          "custom-value",
+		},
+	}
+
+	_, err := executor.Execute(context.Background(), spec, t.TempDir())
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	// Verify all env vars from spec.Env are passed to the container spec.
+	if rt.lastSpec.Env == nil {
+		t.Fatal("expected ContainerSpec.Env to be set, got nil")
+	}
+	if len(rt.lastSpec.Env) != 3 {
+		t.Fatalf("expected 3 env vars, got %d: %v", len(rt.lastSpec.Env), rt.lastSpec.Env)
+	}
+
+	// Check each expected key.
+	expectedKeys := []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "CUSTOM_VAR"}
+	for _, key := range expectedKeys {
+		if _, ok := rt.lastSpec.Env[key]; !ok {
+			t.Errorf("expected env var %q to be present, but it's missing", key)
+		}
+	}
+
+	// Verify values are correct.
+	if rt.lastSpec.Env["CA_CERTS_PEM_BUNDLE"] != spec.Env["CA_CERTS_PEM_BUNDLE"] {
+		t.Errorf("CA_CERTS_PEM_BUNDLE mismatch: got %q, want %q",
+			rt.lastSpec.Env["CA_CERTS_PEM_BUNDLE"], spec.Env["CA_CERTS_PEM_BUNDLE"])
+	}
+	if rt.lastSpec.Env["CODEX_AUTH_JSON"] != spec.Env["CODEX_AUTH_JSON"] {
+		t.Errorf("CODEX_AUTH_JSON mismatch: got %q, want %q",
+			rt.lastSpec.Env["CODEX_AUTH_JSON"], spec.Env["CODEX_AUTH_JSON"])
+	}
+	if rt.lastSpec.Env["CUSTOM_VAR"] != spec.Env["CUSTOM_VAR"] {
+		t.Errorf("CUSTOM_VAR mismatch: got %q, want %q",
+			rt.lastSpec.Env["CUSTOM_VAR"], spec.Env["CUSTOM_VAR"])
+	}
+}
+
+// TestDockerGateExecutor_EmptyEnv verifies that the gate executor handles
+// empty or nil env maps gracefully without errors.
+func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		env  map[string]string
+	}{
+		{"nil_env", nil},
+		{"empty_env", map[string]string{}},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := &mockGateRuntimeMinimal{}
+			executor := NewDockerGateExecutor(rt)
+
+			spec := &contracts.StepGateSpec{
+				Enabled: true,
+				Profile: "java",
+				Env:     tc.env,
+			}
+
+			_, err := executor.Execute(context.Background(), spec, t.TempDir())
+			if err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+
+			if !rt.createCalled {
+				t.Fatal("expected Create to be called")
+			}
+
+			// For nil/empty input, the container spec env should be nil or empty.
+			if len(rt.lastSpec.Env) != 0 {
+				t.Errorf("expected empty env for %s, got %v", tc.name, rt.lastSpec.Env)
+			}
+		})
+	}
+}
+
 func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)

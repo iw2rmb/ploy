@@ -711,6 +711,107 @@ func TestDockerContainerRuntimeNilClient(t *testing.T) {
 	}
 }
 
+// TestDockerContainerRuntimeEnvPassthrough verifies that ContainerSpec.Env is
+// correctly converted to Docker's Env []string format and passed to the container.
+// This test confirms the flattenEnv function works correctly and that env vars
+// injected by the control plane (e.g., CA_CERTS_PEM_BUNDLE) reach the moby API.
+func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		env         map[string]string
+		wantEnvKeys []string // expected keys (values checked separately)
+	}{
+		{
+			name: "global_env_vars",
+			env: map[string]string{
+				"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+				"CODEX_AUTH_JSON":     `{"token":"secret123"}`,
+				"OPENAI_API_KEY":      "sk-test-key",
+			},
+			wantEnvKeys: []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
+		},
+		{
+			name: "mixed_env_vars",
+			env: map[string]string{
+				"CUSTOM_VAR":    "custom-value",
+				"PATH_OVERRIDE": "/custom/bin:/usr/bin",
+			},
+			wantEnvKeys: []string{"CUSTOM_VAR", "PATH_OVERRIDE"},
+		},
+		{
+			name:        "nil_env",
+			env:         nil,
+			wantEnvKeys: nil,
+		},
+		{
+			name:        "empty_env",
+			env:         map[string]string{},
+			wantEnvKeys: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fake := &fakeDockerClient{
+				createResult: client.ContainerCreateResult{ID: "env-test-" + tc.name},
+			}
+			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
+
+			spec := ContainerSpec{
+				Image: "alpine:latest",
+				Env:   tc.env,
+			}
+
+			_, err := rt.Create(context.Background(), spec)
+			if err != nil {
+				t.Fatalf("Create failed: %v", err)
+			}
+
+			if !fake.createCalled {
+				t.Fatal("ContainerCreate was not called")
+			}
+
+			// Verify env was passed to moby Config.
+			if fake.createOpts.Config == nil {
+				t.Fatal("Config should not be nil")
+			}
+
+			gotEnv := fake.createOpts.Config.Env
+			if tc.wantEnvKeys == nil {
+				if len(gotEnv) != 0 {
+					t.Errorf("expected no env vars, got %v", gotEnv)
+				}
+				return
+			}
+
+			// Check each expected key appears in the "KEY=value" format.
+			for _, key := range tc.wantEnvKeys {
+				found := false
+				for _, envStr := range gotEnv {
+					if strings.HasPrefix(envStr, key+"=") {
+						found = true
+						// Verify value matches.
+						expectedVal := tc.env[key]
+						expectedEntry := key + "=" + expectedVal
+						if envStr != expectedEntry {
+							t.Errorf("env entry for %s: got %q, want %q", key, envStr, expectedEntry)
+						}
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected env key %q to be present in %v", key, gotEnv)
+				}
+			}
+		})
+	}
+}
+
 // TestDockerContainerRuntimeNetworkMode verifies network option is applied.
 func TestDockerContainerRuntimeNetworkMode(t *testing.T) {
 	t.Parallel()

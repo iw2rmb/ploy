@@ -204,7 +204,19 @@ fi`
 			limitDisk = n3
 		}
 	}
+	// Copy env from gate spec to pass through all environment variables to the
+	// Docker container. This includes global env vars injected by the control plane
+	// (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON) which image-level startup hooks
+	// may consume.
+	var envCopy map[string]string
+	if len(spec.Env) > 0 {
+		envCopy = make(map[string]string, len(spec.Env))
+		for k, v := range spec.Env {
+			envCopy[k] = v
+		}
+	}
 	specC := ContainerSpec{Image: image, Command: cmd, WorkingDir: "/workspace", Mounts: mounts,
+		Env:              envCopy,
 		LimitMemoryBytes: limitMem,
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis → nanos
 		LimitDiskBytes:   limitDisk,
