@@ -42,7 +42,6 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	retryWait := fs.Duration("retry-wait", time.Second, "wait duration between reconnect attempts")
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
 	if err := fs.Parse(args); err != nil {
@@ -64,10 +63,6 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		printModsUsage(stderr)
 		return fmt.Errorf("max retries must be >= -1")
 	}
-	if *retryWait < 0 {
-		printModsUsage(stderr)
-		return fmt.Errorf("retry wait must be non-negative")
-	}
 
 	ctx := context.Background()
 	if *overall > 0 {
@@ -85,10 +80,10 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
-			HTTPClient:   cloneForStream(httpClient),
-			MaxRetries:   *maxRetries,
-			RetryBackoff: *retryWait,
-			IdleTimeout:  *idle,
+			HTTPClient:  cloneForStream(httpClient),
+			MaxRetries:  *maxRetries,
+			IdleTimeout: *idle,
+			// Backoff is handled by the shared SSE backoff policy in stream.Client.
 		},
 		BaseURL: base,
 	}
@@ -127,7 +122,6 @@ func handleRunsFollow(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	format := fs.String("format", string(runscli.FormatStructured), "output format (raw|structured)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait duration between reconnect attempts")
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
 	if err := fs.Parse(args); err != nil {
@@ -149,10 +143,6 @@ func handleRunsFollow(args []string, stderr io.Writer) error {
 		printRunsUsage(stderr)
 		return fmt.Errorf("max retries must be >= -1")
 	}
-	if *retryWait < 0 {
-		printRunsUsage(stderr)
-		return fmt.Errorf("retry wait must be non-negative")
-	}
 
 	ctx := context.Background()
 	if *overall > 0 {
@@ -170,10 +160,10 @@ func handleRunsFollow(args []string, stderr io.Writer) error {
 		Format: runscli.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
-			HTTPClient:   cloneForStream(httpClient),
-			MaxRetries:   *maxRetries,
-			RetryBackoff: *retryWait,
-			IdleTimeout:  *idle,
+			HTTPClient:  cloneForStream(httpClient),
+			MaxRetries:  *maxRetries,
+			IdleTimeout: *idle,
+			// Backoff is handled by the shared SSE backoff policy in stream.Client.
 		},
 		BaseURL: base,
 	}

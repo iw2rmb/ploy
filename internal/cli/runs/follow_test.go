@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
@@ -41,9 +40,9 @@ func TestFollowCommandReconnects(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd := FollowCommand{
 		Client: stream.Client{
-			HTTPClient:   httpClient,
-			MaxRetries:   3,
-			RetryBackoff: 5 * time.Millisecond,
+			HTTPClient: httpClient,
+			MaxRetries: 3,
+			// Backoff is handled by the shared SSE backoff policy.
 		},
 		BaseURL: baseURL,
 		JobID:   "job-1",

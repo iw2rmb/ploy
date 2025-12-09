@@ -32,4 +32,3 @@ Flags for 'ploy mod run':
   --artifact-dir <dir>       Download final artifacts
   --json                     Print JSON summary
   --max-retries N            Max reconnect attempts for event stream
-  --retry-wait D             Wait between event stream reconnects

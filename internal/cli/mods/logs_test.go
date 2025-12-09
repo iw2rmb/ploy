@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
@@ -32,9 +31,9 @@ func TestLogsCommandStreamsStructured(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd := LogsCommand{
 		Client: stream.Client{
-			HTTPClient:   httpClient,
-			MaxRetries:   1,
-			RetryBackoff: 10 * time.Millisecond,
+			HTTPClient: httpClient,
+			MaxRetries: 1,
+			// Backoff is handled by the shared SSE backoff policy.
 		},
 		BaseURL: baseURL,
 		RunID:   "test",

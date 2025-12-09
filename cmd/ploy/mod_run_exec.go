@@ -111,9 +111,9 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 
 	ev := mods.EventsCommand{
 		Client: stream.Client{
-			HTTPClient:   cloneForStream(httpClient),
-			MaxRetries:   *flags.MaxRetries,
-			RetryBackoff: *flags.RetryWait,
+			HTTPClient: cloneForStream(httpClient),
+			MaxRetries: *flags.MaxRetries,
+			// Backoff is handled by the shared SSE backoff policy in stream.Client.
 		},
 		BaseURL:    base,
 		RunID:      domaintypes.RunID(runID), // Convert to domain type

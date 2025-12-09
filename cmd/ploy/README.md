@@ -284,8 +284,7 @@ ploy completion <shell> --help
   - `--idle-timeout <duration>` (default `45s`): Cancels the stream when no events arrive within the specified duration. Set to `0` to disable idle timeout.
   - `--timeout <duration>` (default `0`, unlimited): Caps the overall stream time. When exceeded, the CLI exits the stream.
   - `--max-retries <int>` (default `3` for `mods logs`, `3` for `runs follow`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
-  - `--retry-wait <duration>` (deprecated; default `1s` for `mods logs`, `500ms` for `runs follow`): Initial wait duration between reconnect attempts. The backoff policy applies exponential growth with jitter (2x multiplier, capped at 30s). This flag is preserved for backward compatibility; the shared backoff policy handles reconnect delays.
-  - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (starting at `--retry-wait` if set, otherwise 250ms for SSE streams). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
+  - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (250ms initial interval, 2x multiplier with jitter, capped at 30s). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
 

@@ -112,7 +112,9 @@ func TestClientStreamHandlerError(t *testing.T) {
 }
 
 func TestClientStreamConnectRetries(t *testing.T) {
-	c := Client{HTTPClient: &http.Client{Timeout: 50 * time.Millisecond}, MaxRetries: 1, RetryBackoff: 10 * time.Millisecond}
+	// MaxRetries=1 allows initial attempt + 1 retry before failing.
+	// Backoff is handled by the shared SSE backoff policy.
+	c := Client{HTTPClient: &http.Client{Timeout: 50 * time.Millisecond}, MaxRetries: 1}
 	// Unreachable port to trigger immediate connect error.
 	err := c.Stream(context.Background(), "http://127.0.0.1:1", func(e Event) error { return nil })
 	if err == nil || !strings.Contains(err.Error(), "connect failed") {
@@ -139,7 +141,8 @@ func TestClientStreamSendsLastEventIDOnReconnect(t *testing.T) {
 		_, _ = w.Write([]byte("event: done\n\n"))
 	}))
 	defer srv.Close()
-	c := Client{HTTPClient: srv.Client(), MaxRetries: 1, RetryBackoff: 10 * time.Millisecond}
+	// MaxRetries=1 allows reconnection after first EOF. Backoff is handled by the shared policy.
+	c := Client{HTTPClient: srv.Client(), MaxRetries: 1}
 	_ = c.Stream(context.Background(), srv.URL, func(e Event) error {
 		if e.Type == "done" {
 			return ErrDone
@@ -172,11 +175,11 @@ func TestClientStreamReconnectBackoffGrowth(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Use small initial backoff for fast test, but allow exponential growth.
+	// Use shared SSE backoff policy (250ms initial with exponential growth).
+	// Allow enough retries for the test to complete.
 	c := Client{
-		HTTPClient:   srv.Client(),
-		MaxRetries:   10,
-		RetryBackoff: 50 * time.Millisecond, // Initial backoff: 50ms
+		HTTPClient: srv.Client(),
+		MaxRetries: 10,
 	}
 
 	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
@@ -194,14 +197,14 @@ func TestClientStreamReconnectBackoffGrowth(t *testing.T) {
 		t.Fatalf("expected at least 3 connection attempts, got %d", len(reconnectTimes))
 	}
 
-	// Verify backoff delay between first and second reconnect is >= initial backoff (50ms)
-	// with jitter tolerance. The backoff grows: 50ms, 100ms, 200ms, etc.
-	// We allow jitter (±50%) so minimum delay is ~25ms and maximum is ~75ms for first backoff.
+	// Verify backoff delay between first and second reconnect is >= initial backoff (250ms from SSE policy)
+	// with jitter tolerance. The backoff grows: 250ms, 500ms, 1s, etc.
+	// We allow jitter (±50%) so minimum delay is ~125ms and maximum is ~375ms for first backoff.
 	if len(reconnectTimes) >= 2 {
 		delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
-		// Allow jitter tolerance: expect delay in range [25ms, 150ms] for first backoff.
-		if delay1 < 25*time.Millisecond || delay1 > 150*time.Millisecond {
-			t.Logf("warning: first backoff delay %v outside expected range [25ms, 150ms]", delay1)
+		// Allow jitter tolerance: expect delay in range [100ms, 500ms] for first backoff.
+		if delay1 < 100*time.Millisecond || delay1 > 500*time.Millisecond {
+			t.Logf("warning: first backoff delay %v outside expected range [100ms, 500ms]", delay1)
 		}
 	}
 
@@ -247,10 +250,10 @@ func TestClientStreamBackoffResetAfterSuccessfulEvent(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Use shared SSE backoff policy (250ms initial with exponential growth).
 	c := Client{
-		HTTPClient:   srv.Client(),
-		MaxRetries:   10,
-		RetryBackoff: 50 * time.Millisecond,
+		HTTPClient: srv.Client(),
+		MaxRetries: 10,
 	}
 
 	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
@@ -273,13 +276,13 @@ func TestClientStreamBackoffResetAfterSuccessfulEvent(t *testing.T) {
 	delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
 	delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
 
-	// First delay after event should be small (initial backoff ~50ms with jitter).
+	// First delay after event should be small (initial backoff ~250ms from SSE policy with jitter).
 	// Second delay should also be small because backoff was reset after the event.
-	// We verify both are within the initial backoff range (25ms-150ms with jitter).
-	if delay1 < 10*time.Millisecond || delay1 > 200*time.Millisecond {
+	// We verify both are within the initial backoff range (100ms-500ms with jitter).
+	if delay1 < 50*time.Millisecond || delay1 > 600*time.Millisecond {
 		t.Logf("warning: first delay %v outside expected range", delay1)
 	}
-	if delay2 < 10*time.Millisecond || delay2 > 200*time.Millisecond {
+	if delay2 < 50*time.Millisecond || delay2 > 600*time.Millisecond {
 		t.Logf("warning: second delay %v outside expected range", delay2)
 	}
 
@@ -309,10 +312,11 @@ func TestClientStreamMaxRetriesExhausted(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// MaxRetries=2 allows initial attempt + 2 retries = 3 total attempts.
+	// Backoff is handled by the shared SSE backoff policy.
 	c := Client{
-		HTTPClient:   srv.Client(),
-		MaxRetries:   2, // Initial attempt + 2 retries = 3 total attempts.
-		RetryBackoff: 10 * time.Millisecond,
+		HTTPClient: srv.Client(),
+		MaxRetries: 2,
 	}
 
 	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
