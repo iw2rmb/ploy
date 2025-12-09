@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -30,8 +31,8 @@ func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParam
 func TestCreateRunLogsHandler_Success(t *testing.T) {
 	ms := &mockStoreRunLogs{}
 	h := createRunLogHandler(ms, nil)
-	runID := uuid.New().String()
-	jobID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
+	jobID := domaintypes.NewJobID().String()
 	// Note: build_id removed; logs are now grouped at job level only.
 	payload := map[string]any{"job_id": jobID, "chunk_no": 2, "data": []byte("hello")}
 	b, _ := json.Marshal(payload)
@@ -51,7 +52,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	ms := &mockStoreRunLogs{}
 	h := createRunLogHandler(ms, nil)
-	runID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
 	big := make([]byte, 1<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}
 	b, _ := json.Marshal(payload)
@@ -85,8 +86,8 @@ func (m *mockStoreRunDiffs) CreateDiff(_ context.Context, p store.CreateDiffPara
 }
 
 func TestCreateRunDiffHandler_Success(t *testing.T) {
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunDiffs{
 		job: store.Job{ID: jobID.String(), RunID: runID.String()},
 		run: store.Run{ID: runID.String()},
@@ -124,8 +125,8 @@ func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.
 }
 
 func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunArtifacts{
 		job: store.Job{ID: jobID.String(), RunID: runID.String()},
 		run: store.Run{ID: runID.String()},
@@ -144,8 +145,8 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 }
 
 func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
-	modID := uuid.New()
-	jobID := uuid.New()
+	modID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunArtifacts{
 		job: store.Job{ID: jobID.String(), RunID: modID.String()},
 		run: store.Run{ID: modID.String()},
@@ -164,7 +165,7 @@ func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 }
 
 func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
-	modID := uuid.New()
+	modID := domaintypes.NewRunID()
 	ms := &mockStoreRunArtifacts{
 		run: store.Run{ID: modID.String()},
 	}
@@ -192,7 +193,7 @@ func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id string) (st
 }
 
 func TestCreateModArtifactBundleHandler_RunNotFound(t *testing.T) {
-	modID := uuid.New()
+	modID := domaintypes.NewRunID()
 	ms := &mockStoreRunArtifactsNotFound{}
 	h := createRunArtifactBundleHandler(ms)
 	payload := map[string]any{"bundle": []byte("gz-tar")}

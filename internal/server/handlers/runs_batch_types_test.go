@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -44,7 +44,7 @@ func TestIsTerminalRunStatus(t *testing.T) {
 func TestGetRunRepoCounts(t *testing.T) {
 	t.Parallel()
 
-	runID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
 
 	tests := []struct {
 		name              string

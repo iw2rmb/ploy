@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -417,8 +418,8 @@ func TestCancelRun_StageDuration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			id := uuid.New()
-			jobID := uuid.New()
+			id := domaintypes.NewRunID()
+			jobID := domaintypes.NewJobID()
 			st := &mockStore{
 				getRunResult: store.Run{
 					ID:        id.String(),

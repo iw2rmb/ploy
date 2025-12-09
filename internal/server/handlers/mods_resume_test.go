@@ -6,18 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // TestResumeRun_FailedRun verifies that a failed run can be resumed.
 func TestResumeRun_FailedRun(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
-	jobID := uuid.New()
+	id := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -78,7 +78,7 @@ func TestResumeRun_FailedRun(t *testing.T) {
 // TestResumeRun_CanceledRun verifies that a canceled run can be resumed.
 func TestResumeRun_CanceledRun(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -88,7 +88,7 @@ func TestResumeRun_CanceledRun(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusCanceled, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusCanceled, StepIndex: 1000},
 		},
 	}
 
@@ -123,7 +123,7 @@ func TestResumeRun_Idempotent_AlreadyRunning(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			id := uuid.New()
+			id := domaintypes.NewRunID()
 			st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: tt.runStatus}}
 			handler := resumeRunHandler(st, nil)
 			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
@@ -144,7 +144,7 @@ func TestResumeRun_Idempotent_AlreadyRunning(t *testing.T) {
 // This tests resumability invariant 2: succeeded runs cannot be resumed.
 func TestResumeRun_SucceededConflict(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{getRunResult: store.Run{ID: id.String(), Status: store.RunStatusSucceeded}}
 	handler := resumeRunHandler(st, nil)
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/resume", nil)
@@ -189,7 +189,7 @@ func TestResumeRun_BadID_And_NotFound(t *testing.T) {
 		},
 		{
 			name:       "run not found",
-			id:         uuid.New().String(),
+			id:         domaintypes.NewRunID().String(),
 			mockStore:  &mockStore{getRunErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
 			wantBody:   "not found",
@@ -217,10 +217,10 @@ func TestResumeRun_BadID_And_NotFound(t *testing.T) {
 // TestResumeRun_PartiallySucceeded resumes a run where some jobs succeeded and one failed.
 func TestResumeRun_PartiallySucceeded(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
-	successJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
-	failedJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 2000}
-	createdJob := store.Job{ID: uuid.New().String(), Status: store.JobStatusCreated, StepIndex: 3000}
+	id := domaintypes.NewRunID()
+	successJob := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
+	failedJob := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 2000}
+	createdJob := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusCreated, StepIndex: 3000}
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -261,10 +261,10 @@ func TestResumeRun_PartiallySucceeded(t *testing.T) {
 // TestResumeRun_MultipleFailedJobs verifies correct ordering when multiple jobs need reset.
 func TestResumeRun_MultipleFailedJobs(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
-	job1 := store.Job{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
-	job2 := store.Job{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 2000}
-	job3 := store.Job{ID: uuid.New().String(), Status: store.JobStatusCanceled, StepIndex: 3000}
+	id := domaintypes.NewRunID()
+	job1 := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusSucceeded, StepIndex: 1000}
+	job2 := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 2000}
+	job3 := store.Job{ID: domaintypes.NewJobID().String(), Status: store.JobStatusCanceled, StepIndex: 3000}
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -308,7 +308,7 @@ func TestResumeRun_MultipleFailedJobs(t *testing.T) {
 // TestResumeRun_SSEPublish verifies that resume publishes run events.
 func TestResumeRun_SSEPublish(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -318,7 +318,7 @@ func TestResumeRun_SSEPublish(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -358,7 +358,7 @@ func TestResumeRun_SSEPublish(t *testing.T) {
 // TestResumeRun_IdempotentWhenPendingJobExists verifies 200 OK when a pending job already exists.
 func TestResumeRun_IdempotentWhenPendingJobExists(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -368,7 +368,7 @@ func TestResumeRun_IdempotentWhenPendingJobExists(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusPending, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusPending, StepIndex: 1000},
 		},
 	}
 
@@ -392,7 +392,7 @@ func TestResumeRun_IdempotentWhenPendingJobExists(t *testing.T) {
 // TestResumeRun_AllJobsSucceeded verifies 200 OK when all jobs are already succeeded.
 func TestResumeRun_AllJobsSucceeded(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -402,8 +402,8 @@ func TestResumeRun_AllJobsSucceeded(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 1000},
-			{ID: uuid.New().String(), Status: store.JobStatusSucceeded, StepIndex: 2000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusSucceeded, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusSucceeded, StepIndex: 2000},
 		},
 	}
 
@@ -427,7 +427,7 @@ func TestResumeRun_AllJobsSucceeded(t *testing.T) {
 // TestResumeRun_UpdateRunResumeCalled verifies that UpdateRunResume is called to track resume metadata.
 func TestResumeRun_UpdateRunResumeCalled(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         id.String(),
@@ -439,7 +439,7 @@ func TestResumeRun_UpdateRunResumeCalled(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -467,7 +467,7 @@ func TestResumeRun_UpdateRunResumeCalled(t *testing.T) {
 // TestResumeRun_SSEPublishWithResumeMetadata verifies that resume events include resume metadata.
 func TestResumeRun_SSEPublishWithResumeMetadata(t *testing.T) {
 	t.Parallel()
-	id := uuid.New()
+	id := domaintypes.NewRunID()
 	// Simulate a run that has already been resumed once (stats contain resume_count=1).
 	statsJSON := []byte(`{"resume_count":1,"last_resumed_at":"2025-01-15T10:00:00Z"}`)
 	st := &mockStore{
@@ -482,7 +482,7 @@ func TestResumeRun_SSEPublishWithResumeMetadata(t *testing.T) {
 			FinishedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
+			{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 		},
 	}
 
@@ -573,12 +573,12 @@ func TestResumeRun_ResumabilityInvariants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			id := uuid.New()
+			id := domaintypes.NewRunID()
 			// For resumable states, provide a job to reset.
 			jobs := []store.Job{}
 			if tt.runStatus == store.RunStatusFailed || tt.runStatus == store.RunStatusCanceled {
 				jobs = []store.Job{
-					{ID: uuid.New().String(), Status: store.JobStatusFailed, StepIndex: 1000},
+					{ID: domaintypes.NewJobID().String(), Status: store.JobStatusFailed, StepIndex: 1000},
 				}
 			}
 			st := &mockStore{
@@ -654,9 +654,9 @@ func TestResumeRun_JobLevelInvariants(t *testing.T) {
 
 	t.Run("invariant 4: succeeded jobs preserved", func(t *testing.T) {
 		t.Parallel()
-		id := uuid.New()
-		succeededJobID := uuid.New()
-		failedJobID := uuid.New()
+		id := domaintypes.NewRunID()
+		succeededJobID := domaintypes.NewJobID()
+		failedJobID := domaintypes.NewJobID()
 
 		st := &mockStore{
 			getRunResult: store.Run{
@@ -695,7 +695,7 @@ func TestResumeRun_JobLevelInvariants(t *testing.T) {
 
 	t.Run("invariant 5: pending job triggers idempotent response", func(t *testing.T) {
 		t.Parallel()
-		id := uuid.New()
+		id := domaintypes.NewRunID()
 
 		st := &mockStore{
 			getRunResult: store.Run{
@@ -705,7 +705,7 @@ func TestResumeRun_JobLevelInvariants(t *testing.T) {
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			},
 			listJobsByRunResult: []store.Job{
-				{ID: uuid.New().String(), Status: store.JobStatusPending, StepIndex: 1000},
+				{ID: domaintypes.NewJobID().String(), Status: store.JobStatusPending, StepIndex: 1000},
 			},
 		}
 
@@ -727,7 +727,7 @@ func TestResumeRun_JobLevelInvariants(t *testing.T) {
 
 	t.Run("invariant 5: running job triggers idempotent response", func(t *testing.T) {
 		t.Parallel()
-		id := uuid.New()
+		id := domaintypes.NewRunID()
 
 		st := &mockStore{
 			getRunResult: store.Run{
@@ -737,7 +737,7 @@ func TestResumeRun_JobLevelInvariants(t *testing.T) {
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 			},
 			listJobsByRunResult: []store.Job{
-				{ID: uuid.New().String(), Status: store.JobStatusRunning, StepIndex: 1000},
+				{ID: domaintypes.NewJobID().String(), Status: store.JobStatusRunning, StepIndex: 1000},
 			},
 		}
 

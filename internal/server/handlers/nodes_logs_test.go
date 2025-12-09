@@ -7,22 +7,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
-
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 func TestCreateNodeLogs_Success(t *testing.T) {
 	t.Parallel()
 	st := &mockStore{}
-	nodeID := uuid.New()
-	runID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
 	logID := int64(123)
 	chunkNo := int32(5)
 
 	// Mock GetNode to succeed (node exists).
 	st.getNodeResult = store.Node{
-		ID: nodeID.String(),
+		ID: nodeID,
 	}
 
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
@@ -45,8 +44,8 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/logs", bytes.NewReader(bodyBytes))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(bodyBytes))
+	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
 
 	createNodeLogsHandler(st, nil).ServeHTTP(rr, req)

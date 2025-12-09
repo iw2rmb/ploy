@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -25,13 +25,13 @@ import (
 func TestAckJobStart_Success(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nodeIDStr := nodeID
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			NodeID: &nodeIDStr,
@@ -52,8 +52,8 @@ func TestAckJobStart_Success(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -72,14 +72,14 @@ func TestAckJobStart_Success(t *testing.T) {
 func TestAckJobStart_WrongNode(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	otherNode := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	otherNodeStr := otherNode.String()
+	nodeID := domaintypes.NewNodeKey()
+	otherNode := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	otherNodeStr := otherNode
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusQueued,
@@ -98,8 +98,8 @@ func TestAckJobStart_WrongNode(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -116,13 +116,13 @@ func TestAckJobStart_WrongNode(t *testing.T) {
 func TestAckJobStart_WrongStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nodeIDStr := nodeID
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -141,8 +141,8 @@ func TestAckJobStart_WrongStatus(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -159,12 +159,12 @@ func TestAckJobStart_WrongStatus(t *testing.T) {
 func TestAckJobStart_JobNotFound(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusQueued,
@@ -177,8 +177,8 @@ func TestAckJobStart_JobNotFound(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -195,14 +195,14 @@ func TestAckJobStart_JobNotFound(t *testing.T) {
 func TestAckJobStart_JobRunMismatch(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	otherRunID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	otherRunID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nodeIDStr := nodeID
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusQueued,
@@ -221,8 +221,8 @@ func TestAckJobStart_JobRunMismatch(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -239,8 +239,8 @@ func TestAckJobStart_JobRunMismatch(t *testing.T) {
 func TestAckJobStart_MissingJobID(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
 
 	st := &mockStore{}
 
@@ -249,8 +249,8 @@ func TestAckJobStart_MissingJobID(t *testing.T) {
 		"run_id": runID.String(),
 		// job_id omitted
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -264,14 +264,14 @@ func TestAckJobStart_MissingJobID(t *testing.T) {
 func TestAckJobStart_PublishesEvent(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now()
-	nodeIDStr := nodeID.String()
+	nodeIDStr := nodeID
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:        runID.String(),
 			NodeID:    &nodeIDStr,
@@ -298,8 +298,8 @@ func TestAckJobStart_PublishesEvent(t *testing.T) {
 		"run_id": runID.String(),
 		"job_id": jobID.String(),
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -89,35 +88,35 @@ func TestStream_PublishRun(t *testing.T) {
 	}{
 		{
 			name:        "publish queued run",
-			runID:       uuid.New().String(),
+			runID:       domaintypes.NewRunID().String(),
 			state:       modsapi.RunStatePending,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish running run",
-			runID:       uuid.New().String(),
+			runID:       domaintypes.NewRunID().String(),
 			state:       modsapi.RunStateRunning,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish succeeded run",
-			runID:       uuid.New().String(),
+			runID:       domaintypes.NewRunID().String(),
 			state:       modsapi.RunStateSucceeded,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish failed run",
-			runID:       uuid.New().String(),
+			runID:       domaintypes.NewRunID().String(),
 			state:       modsapi.RunStateFailed,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish cancelled run",
-			runID:       uuid.New().String(),
+			runID:       domaintypes.NewRunID().String(),
 			state:       modsapi.RunStateCancelled,
 			wantErr:     false,
 			checkEvents: true,
@@ -226,7 +225,7 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 		t.Fatalf("failed to create service: %v", err)
 	}
 
-	runID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
 	payload := modsapi.RunSummary{
 		RunID:     domaintypes.RunID("test-run"),
 		State:     modsapi.RunStateRunning,

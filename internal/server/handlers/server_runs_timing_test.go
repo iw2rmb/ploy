@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -19,7 +19,7 @@ import (
 func TestGetRunTiming_Success(t *testing.T) {
 	t.Parallel()
 
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
 		getRunTimingResult: store.RunsTiming{
@@ -70,7 +70,7 @@ func TestGetRunTiming_Success(t *testing.T) {
 func TestGetRunTiming_NotFound(t *testing.T) {
 	t.Parallel()
 
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
 		getRunTimingErr: pgx.ErrNoRows,

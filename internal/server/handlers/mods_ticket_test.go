@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -31,7 +30,7 @@ func newTestEventsService() *events.Service {
 
 // TestSubmitRunHandlerSuccess verifies successful run submission.
 func TestSubmitRunHandlerSuccess(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
 	st := &mockStore{
@@ -194,7 +193,7 @@ func TestSubmitRunHandlerInvalidRepoURL(t *testing.T) {
 
 // TestSubmitRunHandlerWithOptionalFields verifies optional fields are handled correctly.
 func TestSubmitRunHandlerWithOptionalFields(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 	commitSha := "abc1234567890"
 	createdBy := "user@example.com"
@@ -257,11 +256,11 @@ func TestSubmitRunHandlerWithOptionalFields(t *testing.T) {
 
 // TestGetRunStatusHandlerSuccess verifies successful retrieval of run status.
 func TestGetRunStatusHandlerSuccess(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
-	nodeID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	nodeIDStr := nodeID
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID.String(),
@@ -307,8 +306,8 @@ func TestGetRunStatusHandlerSuccess(t *testing.T) {
 	if resp.Ticket.Metadata["repo_target_ref"] != "feature" {
 		t.Errorf("expected target_ref feature, got %s", resp.Ticket.Metadata["repo_target_ref"])
 	}
-	if got := resp.Ticket.Metadata["node_id"]; got != nodeID.String() {
-		t.Errorf("expected node_id %s, got %s", nodeID.String(), got)
+	if got := resp.Ticket.Metadata["node_id"]; got != nodeID {
+		t.Errorf("expected node_id %s, got %s", nodeID, got)
 	}
 
 	if !st.getRunCalled {
@@ -318,7 +317,7 @@ func TestGetRunStatusHandlerSuccess(t *testing.T) {
 
 // TestGetRunStatusHandlerNotFound verifies 404 when run doesn't exist.
 func TestGetRunStatusHandlerNotFound(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 
 	st := &mockStore{
 		getRunErr: pgx.ErrNoRows,
@@ -367,7 +366,7 @@ func TestGetRunStatusHandlerEmptyID(t *testing.T) {
 
 // TestGetRunStatusHandlerWithOptionalFields verifies optional fields are serialized correctly.
 func TestGetRunStatusHandlerWithOptionalFields(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 	commitSha := "abc1234567890"
 	// Include MR URL under runs.stats.metadata to verify surfacing in response metadata.
@@ -416,7 +415,7 @@ func TestGetRunStatusHandlerWithOptionalFields(t *testing.T) {
 
 // TestSubmitRunHandlerPublishesEvent verifies that submitting a run publishes a queued event.
 func TestSubmitRunHandlerPublishesEvent(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
 	st := &mockStore{
@@ -475,7 +474,7 @@ func TestSubmitRunHandlerPublishesEvent(t *testing.T) {
 // TestSubmitRunHandlerMultiStepCreatesMultipleStages verifies that submitting
 // a multi-step spec (with mods[] array) creates one job per mod.
 func TestSubmitRunHandlerMultiStepCreatesMultipleStages(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
 	st := &mockStore{
@@ -567,7 +566,7 @@ func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			runID := uuid.New()
+			runID := types.NewRunID()
 			now := time.Now()
 
 			specBytes, _ := json.Marshal(tc.spec)
@@ -623,7 +622,7 @@ func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 // a multi-step spec (with mods[] array) creates jobs but NOT run_steps.
 // Run steps have been replaced by jobs in the new architecture.
 func TestSubmitRunHandlerMultiStepNoRunSteps(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
 	st := &mockStore{
@@ -691,7 +690,7 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			runID := uuid.New()
+			runID := types.NewRunID()
 			now := time.Now()
 
 			specBytes, _ := json.Marshal(tc.spec)
@@ -736,7 +735,7 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 // TestGetRunStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
 // exposes step_index for each job based on the job's StepIndex field.
 func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
-	runID := uuid.New()
+	runID := types.NewRunID()
 	now := time.Now()
 
 	// Create mock jobs with step_index field set.

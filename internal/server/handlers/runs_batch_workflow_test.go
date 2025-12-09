@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -20,9 +20,9 @@ import (
 func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 	t.Parallel()
 
-	sampleRunRepoID := uuid.New()
-	sampleBatchRunID := uuid.New()
-	sampleExecutionRunID := uuid.New()
+	sampleRunRepoID := domaintypes.NewRunRepoID()
+	sampleBatchRunID := domaintypes.NewRunID()
+	sampleExecutionRunID := domaintypes.NewRunID()
 
 	executionRunIDStr := sampleExecutionRunID.String()
 	linkedRunRepo := store.RunRepo{
@@ -146,11 +146,11 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	// Sample UUIDs for the batch run and repos.
-	batchRunID := uuid.New()
-	repo1ID := uuid.New()
-	repo2ID := uuid.New()
-	childRun1ID := uuid.New()
+	// Sample KSUID/NanoID-based IDs for the batch run and repos.
+	batchRunID := domaintypes.NewRunID()
+	repo1ID := domaintypes.NewRunRepoID()
+	repo2ID := domaintypes.NewRunRepoID()
+	childRun1ID := domaintypes.NewRunID()
 
 	// Batch run (parent) with queued status.
 	batchRun := store.Run{
@@ -385,9 +385,9 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 	t.Parallel()
 
-	batchRunID := uuid.New()
-	repoID := uuid.New()
-	unknownID := uuid.New()
+	batchRunID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRunRepoID()
+	unknownID := domaintypes.NewRunRepoID()
 
 	runningRun := store.Run{
 		ID:        batchRunID.String(),

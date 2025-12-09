@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -18,7 +18,7 @@ import (
 func TestDeleteRun_Success(t *testing.T) {
 	t.Parallel()
 
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -51,7 +51,7 @@ func TestDeleteRun_Success(t *testing.T) {
 func TestDeleteRun_NotFound(t *testing.T) {
 	t.Parallel()
 
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
 		getRunErr: pgx.ErrNoRows,

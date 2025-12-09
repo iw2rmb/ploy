@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -39,8 +39,8 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 	gzippedData := buf.Bytes()
 
 	// Prepare request payload.
-	runID := uuid.New().String()
-	jobID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
+	jobID := domaintypes.NewJobID().String()
 	payload := map[string]interface{}{
 		"run_id":   runID,
 		"job_id":   jobID,
@@ -53,7 +53,7 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 	}
 
 	// Create request.
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -100,8 +100,8 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	gzippedData := buf.Bytes()
 
 	// Prepare request payload including job_id.
-	runID := uuid.New().String()
-	jobID := uuid.New().String()
+	runID := domaintypes.NewRunID().String()
+	jobID := domaintypes.NewJobID().String()
 	payload := map[string]interface{}{
 		"run_id":   runID,
 		"job_id":   jobID,
@@ -114,7 +114,7 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	}
 
 	// Create request.
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -172,7 +172,7 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 	// Create decoded payload larger than 1 MiB (will trigger 413 after decode).
 	largeData := make([]byte, 1<<20+1)
 	payload := map[string]interface{}{
-		"run_id":   uuid.New().String(),
+		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,
 		"data":     largeData,
 	}
@@ -181,7 +181,7 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -206,7 +206,7 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 	// 2 MiB raw → ~2.66 MiB base64 → trips MaxBytesReader body cap.
 	hugeData := make([]byte, 2<<20)
 	payload := map[string]interface{}{
-		"run_id":   uuid.New().String(),
+		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,
 		"data":     hugeData,
 	}
@@ -215,7 +215,7 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -246,7 +246,7 @@ func TestCreateNodeLogsHandler_MissingRunID(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -269,7 +269,7 @@ func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
 
 	// Create payload with empty data.
 	payload := map[string]interface{}{
-		"run_id":   uuid.New().String(),
+		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,
 		"data":     []byte{},
 	}
@@ -278,7 +278,7 @@ func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")
@@ -301,7 +301,7 @@ func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
 
 	// Create valid payload.
 	payload := map[string]interface{}{
-		"run_id":   uuid.New().String(),
+		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,
 		"data":     []byte("test"),
 	}
@@ -310,7 +310,7 @@ func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	nodeID := uuid.New().String()
+	nodeID := domaintypes.NewNodeKey()
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID)
 	req.Header.Set("Content-Type", "application/json")

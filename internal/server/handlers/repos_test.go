@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -151,7 +151,7 @@ func TestListReposHandler_StoreError(t *testing.T) {
 
 func TestListRunsForRepoHandler_Success(t *testing.T) {
 	// Test that GET /v1/repos/{repo_id}/runs returns runs for the repo.
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	name := "test-batch"
 	st := &mockStore{

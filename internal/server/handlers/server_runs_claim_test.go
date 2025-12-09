@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -22,16 +22,16 @@ import (
 func TestClaimJob_Success(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now()
-	nodeIDStr := nodeID.String()
+	nodeIDStr := nodeID
 
 	// Mock store that returns a node, a claimed job, and the parent run.
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: nodeID.String(),
+			ID: nodeID,
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
@@ -59,8 +59,8 @@ func TestClaimJob_Success(t *testing.T) {
 	configHolder := &ConfigHolder{}
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -74,7 +74,7 @@ func TestClaimJob_Success(t *testing.T) {
 	if !st.claimJobCalled {
 		t.Fatal("expected ClaimJob to be called")
 	}
-	if *st.claimJobParams != nodeID.String() {
+	if *st.claimJobParams != nodeID {
 		t.Fatalf("ClaimJob called with wrong node id: %v", st.claimJobParams)
 	}
 
@@ -101,8 +101,8 @@ func TestClaimJob_Success(t *testing.T) {
 	if !ok || stepIndex != 2000 {
 		t.Errorf("expected step_index 2000, got %v", resp["step_index"])
 	}
-	if resp["node_id"] != nodeID.String() {
-		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp["node_id"])
+	if resp["node_id"] != nodeID {
+		t.Errorf("expected node_id %s, got %v", nodeID, resp["node_id"])
 	}
 	if resp["repo_url"] != "https://github.com/user/repo.git" {
 		t.Errorf("expected repo_url from parent run, got %v", resp["repo_url"])
@@ -128,11 +128,11 @@ func TestClaimJob_Success(t *testing.T) {
 func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now()
-	nodeIDStr := nodeID.String()
+	nodeIDStr := nodeID
 
 	// Run spec already contains per-run env values; these should be preserved
 	// and take precedence over global env for the same keys.
@@ -140,7 +140,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: nodeID.String(),
+			ID: nodeID,
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
@@ -188,8 +188,8 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -239,12 +239,12 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 
 	// Mock store that returns a node but no available jobs (ClaimJob returns ErrNoRows).
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: nodeID.String(),
+			ID: nodeID,
 		},
 		claimJobErr: pgx.ErrNoRows,
 	}
@@ -252,8 +252,8 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	configHolder := &ConfigHolder{}
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -274,7 +274,7 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 func TestClaimJob_NodeNotFound(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 
 	// Mock store that returns ErrNoRows for GetNode.
 	st := &mockStore{
@@ -284,8 +284,8 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 	configHolder := &ConfigHolder{}
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -329,16 +329,16 @@ func TestClaimJob_EmptyNodeID(t *testing.T) {
 func TestClaimJob_AcksRunStart(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now()
-	nodeIDStr := nodeID.String()
+	nodeIDStr := nodeID
 
 	// Mock store with a queued run - should trigger AckRunStart.
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID: nodeID.String(),
+			ID: nodeID,
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
@@ -365,8 +365,8 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 	configHolder := &ConfigHolder{}
 	handler := claimJobHandler(st, configHolder)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

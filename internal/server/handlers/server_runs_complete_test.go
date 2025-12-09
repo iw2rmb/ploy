@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -26,10 +25,10 @@ import (
 func TestCompleteRun_Success(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Set up mock to return job via GetJob (by job_id).
 	job := store.Job{
@@ -41,7 +40,7 @@ func TestCompleteRun_Success(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -59,8 +58,8 @@ func TestCompleteRun_Success(t *testing.T) {
 		"status":     "succeeded",
 		"step_index": 1000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -81,11 +80,11 @@ func TestCompleteRun_Success(t *testing.T) {
 func TestCompleteRun_WrongNode(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	otherNode := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	otherNodeStr := otherNode.String()
+	nodeID := types.NewNodeKey()
+	otherNode := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	otherNodeStr := otherNode
 
 	// Job is assigned to a different node (otherNode).
 	job := store.Job{
@@ -97,7 +96,7 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -115,8 +114,8 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 		"status":     "succeeded",
 		"step_index": 1000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -133,10 +132,10 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 func TestCompleteRun_NotRunning(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Job is in 'assigned' status (not 'running').
 	job := store.Job{
@@ -148,7 +147,7 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -166,8 +165,8 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 		"status":     "failed",
 		"step_index": 1000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -184,12 +183,12 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 func TestCompleteRun_InvalidStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -206,8 +205,8 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 		"status":     "running",
 		"step_index": 1000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -224,10 +223,10 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	job := store.Job{
 		ID:        jobID.String(),
@@ -238,7 +237,7 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -257,8 +256,8 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 		"step_index": 1000,
 		"stats":      "oops",
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -275,9 +274,9 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 func TestCompleteRun_NotFound(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
 
 	// Node not found
 	st1 := &mockStore{getNodeErr: pgx.ErrNoRows}
@@ -288,8 +287,8 @@ func TestCompleteRun_NotFound(t *testing.T) {
 		"status":     "failed",
 		"step_index": 1000,
 	})
-	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b1))
-	req1.SetPathValue("id", nodeID.String())
+	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(b1))
+	req1.SetPathValue("id", nodeID)
 	rr1 := httptest.NewRecorder()
 	handler1.ServeHTTP(rr1, req1)
 	if rr1.Code != http.StatusNotFound {
@@ -298,7 +297,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 
 	// Run not found
 	st2 := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunErr:     pgx.ErrNoRows,
 	}
 	handler2 := completeRunHandler(st2, nil)
@@ -308,8 +307,8 @@ func TestCompleteRun_NotFound(t *testing.T) {
 		"status":     "failed",
 		"step_index": 1000,
 	})
-	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b2))
-	req2.SetPathValue("id", nodeID.String())
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(b2))
+	req2.SetPathValue("id", nodeID)
 	rr2 := httptest.NewRecorder()
 	handler2.ServeHTTP(rr2, req2)
 	if rr2.Code != http.StatusNotFound {
@@ -318,7 +317,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 
 	// Job not found
 	st3 := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -332,8 +331,8 @@ func TestCompleteRun_NotFound(t *testing.T) {
 		"status":     "failed",
 		"step_index": 1000,
 	})
-	req3 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b3))
-	req3.SetPathValue("id", nodeID.String())
+	req3 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(b3))
+	req3.SetPathValue("id", nodeID)
 	rr3 := httptest.NewRecorder()
 	handler3.ServeHTTP(rr3, req3)
 	if rr3.Code != http.StatusNotFound {
@@ -346,11 +345,11 @@ func TestCompleteRun_NotFound(t *testing.T) {
 func TestCompleteRun_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
 	now := time.Now()
-	nodeIDStr := nodeID.String()
+	nodeIDStr := nodeID
 
 	job := store.Job{
 		ID:        jobID.String(),
@@ -361,7 +360,7 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:        runID.String(),
 			Status:    store.RunStatusRunning,
@@ -387,8 +386,8 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 		"stats":      map[string]any{"exit_code": 0},
 	}
 	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -440,10 +439,10 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	modJobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	modJobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Build jobs with gate metadata: pre-gate failed, heal succeeded, re-gate succeeded, mod succeeded.
 	// The final gate (re-gate) succeeded, so run should succeed.
@@ -487,7 +486,7 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -505,8 +504,8 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 		"status":     "succeeded",
 		"step_index": 2000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -529,10 +528,10 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	modJobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	modJobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Build jobs: pre-gate succeeded, mod failed.
 	// Mod failure should cause run to fail.
@@ -558,7 +557,7 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -576,8 +575,8 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 		"status":     "failed",
 		"step_index": 2000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -600,10 +599,10 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	postGateJobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	postGateJobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Build jobs: pre-gate succeeded, mod succeeded, post-gate failed.
 	// Final gate failure should cause run to fail.
@@ -636,7 +635,7 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -654,8 +653,8 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 		"status":     "failed",
 		"step_index": 3000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -678,13 +677,13 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	preGateJobID := uuid.New()
-	healJobID := uuid.New()
-	reGateJobID := uuid.New()
-	modJobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	preGateJobID := types.NewJobID()
+	healJobID := types.NewJobID()
+	reGateJobID := types.NewJobID()
+	modJobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	jobs := []store.Job{
 		{
@@ -722,7 +721,7 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -739,8 +738,8 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 		"status":     "failed",
 		"step_index": 1333.3333,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -780,10 +779,10 @@ func TestHealingFailureCancelsRemainingJobs(t *testing.T) {
 func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	job := store.Job{
 		ID:        jobID.String(),
@@ -795,7 +794,7 @@ func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -813,8 +812,8 @@ func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 		"status":     "succeeded",
 		"step_index": 1000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -840,10 +839,10 @@ func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 	t.Parallel()
 
-	nodeID := uuid.New()
-	runID := uuid.New()
-	modJobID := uuid.New()
-	nodeIDStr := nodeID.String()
+	nodeID := types.NewNodeKey()
+	runID := types.NewRunID()
+	modJobID := types.NewJobID()
+	nodeIDStr := nodeID
 
 	// Build jobs: pre-gate succeeded, mod canceled (no failures).
 	jobs := []store.Job{
@@ -867,7 +866,7 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID.String()},
+		getNodeResult: store.Node{ID: nodeID},
 		getRunResult: store.Run{
 			ID:     runID.String(),
 			Status: store.RunStatusRunning,
@@ -885,8 +884,8 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 		"status":     "canceled",
 		"step_index": 2000,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
