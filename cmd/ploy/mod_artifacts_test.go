@@ -33,7 +33,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mod", "artifacts", runID}, buf)
+	err := executeCmd([]string{"mod", "artifacts", runID}, buf)
 	if err != nil {
 		t.Fatalf("mod artifacts error: %v", err)
 	}

@@ -129,10 +129,11 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/cli/... — Logs/follow tests must pass with direct use of logs.Format.
   - Done: Removed type aliases (`type Format = logs.Format`) and re-exported constants (`FormatStructured`, `FormatRaw`) from internal/cli/runs/follow.go and internal/cli/mods/logs.go. Struct fields now use `logs.Format` directly. Updated cmd/ploy/mods_jobs_commands.go to import and use logs.Format constants directly instead of package-level re-exports. Updated all tests in internal/cli/runs and internal/cli/mods to use logs.FormatStructured and logs.FormatRaw directly. ErrInvalidFormat errors remain package-specific for proper error context.
 
-- [ ] Remove execute helper in main.go once tests are updated — Keep a single CLI entrypoint.
+- [x] Remove execute helper in main.go once tests are updated — Keep a single CLI entrypoint.
   - Repository: ploy
   - Component: cmd/ploy/main.go, cmd/ploy tests.
   - Scope: Update tests that depend on execute(args, stderr) to instead construct and execute newRootCmd directly. After tests are updated, delete execute and its comment about backward compatibility.
   - Snippets: Replace test calls to execute with rootCmd := newRootCmd(...); rootCmd.SetArgs(...); rootCmd.Execute().
   - Tests: go test ./cmd/ploy/... — All CLI tests must pass without execute.
+  - Done: Added executeCmd test helper function in cli_test.go that wraps newRootCmd construction and execution. Migrated all 44 usages of execute() across 10 test files (mods_logs_test.go, cluster_command_test.go, mod_run_batch_test.go, help_flags_test.go, mod_resume_test.go, mod_run_repo_test.go, jobs_inspect_test.go, mod_inspect_test.go, mod_cancel_test.go, mod_artifacts_test.go) to use executeCmd() instead. Removed execute() function and its backward compatibility comment from main.go. All CLI tests pass without the legacy execute helper.
 

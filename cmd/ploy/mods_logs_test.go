@@ -39,7 +39,7 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "structured", "run-123"}, buf)
+	err := executeCmd([]string{"mods", "logs", "--format", "structured", "run-123"}, buf)
 	if err != nil {
 		t.Fatalf("mods logs: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestModsLogsRawOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "raw", "run-raw"}, buf)
+	err := executeCmd([]string{"mods", "logs", "--format", "raw", "run-raw"}, buf)
 	if err != nil {
 		t.Fatalf("mods logs raw: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestModsLogsRequiresRunID(t *testing.T) {
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs"}, buf)
+	err := executeCmd([]string{"mods", "logs"}, buf)
 	if err == nil {
 		t.Fatal("expected error when run id is missing")
 	}
@@ -94,7 +94,7 @@ func TestModsLogsInvalidFormat(t *testing.T) {
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"mods", "logs", "--format", "yaml", "run-123"}, buf)
+	err := executeCmd([]string{"mods", "logs", "--format", "yaml", "run-123"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid format")
 	}
@@ -127,7 +127,7 @@ func TestJobsFollowReconnects(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"runs", "follow", "job-42"}, buf)
+	err := executeCmd([]string{"runs", "follow", "job-42"}, buf)
 	if err != nil {
 		t.Fatalf("runs follow: %v", err)
 	}

@@ -245,7 +245,7 @@ func TestClusterCommandIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := execute(tt.args, buf)
+			err := executeCmd(tt.args, buf)
 
 			if tt.expectNoError && err != nil {
 				t.Errorf("expected no error, got: %v", err)

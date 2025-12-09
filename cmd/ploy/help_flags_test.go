@@ -226,7 +226,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := execute(tt.args, buf)
+			err := executeCmd(tt.args, buf)
 
 			// Check error expectation
 			if tt.expectNoError && err != nil {
@@ -301,7 +301,7 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	for _, args := range commands {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := execute(args, buf)
+			err := executeCmd(args, buf)
 
 			// Should not return an error
 			if err != nil {
@@ -322,11 +322,11 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 func TestRootHelpConsistency(t *testing.T) {
 	// Get output from ploy --help
 	helpFlagBuf := &bytes.Buffer{}
-	errHelpFlag := execute([]string{"--help"}, helpFlagBuf)
+	errHelpFlag := executeCmd([]string{"--help"}, helpFlagBuf)
 
 	// Get output from ploy help
 	helpCmdBuf := &bytes.Buffer{}
-	errHelpCmd := execute([]string{"help"}, helpCmdBuf)
+	errHelpCmd := executeCmd([]string{"help"}, helpCmdBuf)
 
 	// Both should succeed
 	if errHelpFlag != nil {
