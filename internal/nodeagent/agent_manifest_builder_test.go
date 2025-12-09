@@ -26,7 +26,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -88,7 +89,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
 
-		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err == nil {
 			t.Fatal("expected error for missing run_id")
 		}
@@ -102,7 +104,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID: types.RunID("run-123"),
 		}
 
-		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err == nil {
 			t.Fatal("expected error for missing repo_url")
 		}
@@ -118,7 +121,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			BaseRef: types.GitRef("main"),
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -135,7 +139,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TargetRef: types.GitRef("main"),
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -155,7 +160,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -181,7 +187,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"image": "docker.io/example/mods-openrewrite:latest",
 			},
 		}
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -198,7 +205,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:   types.RunID("run-456"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -225,7 +233,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"retain_container": true,
 			},
 		}
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -258,7 +267,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"mr_on_success": true,
 			},
 		}
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -300,7 +310,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		// Build manifest for step 0.
-		manifest0, err := buildManifestFromRequest(req, typedOpts, 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest0, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step=0) error: %v", err)
 		}
@@ -324,7 +335,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		// Build manifest for step 1.
-		manifest1, err := buildManifestFromRequest(req, typedOpts, 1)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest1, err := buildManifestFromRequest(req, typedOpts, 1, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
 		}
@@ -364,7 +376,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		typedOpts := parseRunOptions(req.Options)
-		manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -389,7 +402,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		typedOpts := parseRunOptions(req.Options)
-		_, err := buildManifestFromRequest(req, typedOpts, 1) // Index 1 out of range (only 1 step).
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		_, err := buildManifestFromRequest(req, typedOpts, 1, contracts.ModStackUnknown) // Index 1 out of range (only 1 step).
 		if err == nil {
 			t.Fatal("expected error for out of range step index")
 		}
@@ -414,7 +428,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		// stepIndex is ignored for single-step runs (always uses Execution options).
-		manifest, err := buildManifestFromRequest(req, typedOpts, 42) // Arbitrary stepIndex.
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, typedOpts, 42, contracts.ModStackUnknown) // Arbitrary stepIndex.
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -450,7 +465,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			Options:   map[string]any{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -482,7 +498,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			Options: map[string]any{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -503,7 +520,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			Options: map[string]any{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -523,7 +541,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			Options: map[string]any{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -546,7 +565,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			Options:   map[string]any{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -575,7 +595,8 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 
 		typedOpts := parseRunOptions(req.Options)
-		manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}

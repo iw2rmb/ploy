@@ -157,7 +157,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 
 	for stepIndex := 0; stepIndex < stepCount; stepIndex++ {
 		// Build manifest for this step.
-		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step %d) error = %v", stepIndex, err)
 		}
@@ -364,7 +365,8 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 	inDir := ""
 
 	for stepIndex := 0; stepIndex < stepCount; stepIndex++ {
-		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex)
+		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step %d) error = %v", stepIndex, err)
 		}

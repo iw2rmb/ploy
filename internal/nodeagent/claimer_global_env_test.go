@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // TestParseSpec_GlobalEnvFromServerClaim verifies that parseSpec correctly
@@ -165,7 +166,8 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}
 
 	// Step 3: Build manifest (simulates manifest.go).
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest() error: %v", err)
 	}
@@ -309,7 +311,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Build manifest for step 0 (should have step override).
-	manifest0, err := buildManifestFromRequest(req, typedOpts, 0)
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest0, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest(step=0) error: %v", err)
 	}
@@ -329,7 +332,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Build manifest for step 1 (should not have step0 override).
-	manifest1, err := buildManifestFromRequest(req, typedOpts, 1)
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest1, err := buildManifestFromRequest(req, typedOpts, 1, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
 	}
@@ -373,7 +377,8 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		},
 	}
 
-	manifest, err := buildHealingManifest(req, healingMod, 0, "")
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, healingMod, 0, "", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error: %v", err)
 	}
@@ -430,7 +435,8 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		Env:     env,
 	}
 
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest() error: %v", err)
 	}

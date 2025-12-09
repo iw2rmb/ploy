@@ -241,7 +241,10 @@ func (r *runController) runGateWithHealing(
 				// Pass healingSession through so agent-specific session env (for example,
 				// CODEX_RESUME=1 for Codex-based healers) can be injected by
 				// buildHealingManifest when appropriate.
-				healManifest, buildErr := buildHealingManifest(req, mod, idx, healingSession)
+				// Stack is unknown during inline healing loops since the gate result
+				// that detected the stack is the one that just failed. Use explicit
+				// ModStackUnknown to indicate this is intentional, not a fallback.
+				healManifest, buildErr := buildHealingManifest(req, mod, idx, healingSession, contracts.ModStackUnknown)
 				if buildErr != nil {
 					slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
 					return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
