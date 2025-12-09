@@ -23,7 +23,15 @@ type nodeLogCreateResponse struct {
 
 // createNodeLogsHandler handles POST /v1/nodes/{id}/logs for receiving gzipped log chunks.
 // Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
+//
+// The eventsService parameter is required and must not be nil. Log ingestion always
+// goes through the events service to ensure both database persistence and SSE fanout
+// occur in a single path. Direct store writes are no longer supported.
 func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+	// Validate eventsService is provided — log ingestion requires SSE fanout.
+	if eventsService == nil {
+		panic("createNodeLogsHandler: eventsService is required")
+	}
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
 	const maxBodySize = 2 << 20  // 2 MiB
@@ -113,14 +121,9 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			Data:    req.Data,
 		}
 
-		// Persist and publish to SSE when events service is available; otherwise
-		// fall back to direct store write for backward compatibility.
-		var log store.Log
-		if eventsService != nil {
-			log, err = eventsService.CreateAndPublishLog(r.Context(), params)
-		} else {
-			log, err = st.CreateLog(r.Context(), params)
-		}
+		// Persist log to database and publish to SSE hub via events service.
+		// This is the single canonical logging path — no direct store fallback.
+		log, err := eventsService.CreateAndPublishLog(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
 			slog.Error("node logs: create failed", "node_id", nodeIDStr, "run_id", req.RunID, "chunk_no", req.ChunkNo, "err", err)

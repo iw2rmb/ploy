@@ -18,7 +18,12 @@ func FuzzCreateNodeLogsHandler(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, chunkNo int32) {
 		mockStore := &mockStoreForLogs{nodeExists: true}
-		handler := createNodeLogsHandler(mockStore, nil)
+		// Create events service with the mock store — required for log ingestion.
+		eventsService, err := createTestEventsServiceWithStore(mockStore)
+		if err != nil {
+			t.Skip("failed to create events service")
+		}
+		handler := createNodeLogsHandler(mockStore, eventsService)
 
 		payload := map[string]any{
 			"run_id":   uuid.New().String(),
