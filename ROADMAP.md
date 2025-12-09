@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/nodeagent/...` — Confirm no tests rely on the old `ID` identifier and that JSON round-trips still work as before.
 
 ## Server claim response struct symmetry (optional)
-- [ ] Rename the inline `ID` field to `RunID` in the server claim response struct — Align server-side naming with nodeagent while preserving the JSON schema.
+- [x] Rename the inline `ID` field to `RunID` in the server claim response struct — Align server-side naming with nodeagent while preserving the JSON schema.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers/nodes_claim.go
   - Scope:

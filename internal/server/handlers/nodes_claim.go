@@ -129,7 +129,7 @@ func buildAndSendJobClaimResponse(
 	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
 
 	resp := struct {
-		ID        string                `json:"id"`         // Run ID
+		RunID     string                `json:"id"`         // Run ID (KSUID); JSON key stays "id" for wire compatibility
 		JobID     string                `json:"job_id"`     // Job ID
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 		ModType   string                `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
@@ -145,7 +145,7 @@ func buildAndSendJobClaimResponse(
 		CreatedAt string                `json:"created_at"`
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
-		ID:        run.ID, // Run IDs are KSUID strings.
+		RunID:     run.ID, // Run IDs are KSUID strings.
 		JobID:     job.ID, // Job IDs are KSUID strings.
 		JobName:   job.Name,
 		ModType:   job.ModType,
