@@ -56,7 +56,7 @@ Gate validation is orchestrated by the node agent as part of the Mods run lifecy
 3. For gate jobs, the node executes validation using the Docker gate executor.
 4. Gate runs inside a Docker container with the workspace mounted at `/workspace`.
 5. Results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).
-6. Node reports completion via `/v1/nodes/{id}/complete`.
+6. Node reports completion via `/v1/jobs/{job_id}/complete`.
 
 ## Gate Executor
 

@@ -83,7 +83,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st, eventsService), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st, eventsService), auth.RoleWorker)
+	// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
+	// Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
 

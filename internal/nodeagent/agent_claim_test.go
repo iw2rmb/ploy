@@ -46,9 +46,8 @@ func TestClaimLoop(t *testing.T) {
 			calls = append(calls, "ack")
 			w.WriteHeader(http.StatusNoContent)
 
-		case "/v1/nodes/test-node/complete":
-			calls = append(calls, "complete")
-			w.WriteHeader(http.StatusNoContent)
+		// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) removed.
+		// Job completion uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -120,10 +119,9 @@ func TestClaimLoop(t *testing.T) {
 		t.Errorf("expected second call to be 'ack', got %s", calls[1])
 	}
 
-	// Note: complete is called by executeRun after the run finishes.
+	// Note: Job completion uses /v1/jobs/{job_id}/complete (via StatusUploader).
 	// Since we're using a minimal controller that starts execution in a goroutine,
-	// the complete call may or may not happen within the test timeout.
-	// For this basic test, we verify claim and ack order.
+	// we only verify claim and ack order in this basic test.
 }
 
 // TestClaimLoopNoWork verifies the loop handles 204 No Content gracefully.
@@ -519,9 +517,8 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(claim)
 		case "/v1/nodes/test-node/ack":
 			w.WriteHeader(http.StatusNoContent)
-		case "/v1/nodes/test-node/complete":
-			// Allow terminal status attempts to succeed quickly.
-			w.WriteHeader(http.StatusNoContent)
+		// NOTE: Node-based completion endpoint removed; job completion
+		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -612,8 +609,8 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 			// Capture ack payload to verify job_id is sent.
 			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
 			w.WriteHeader(http.StatusNoContent)
-		case "/v1/nodes/test-node/complete":
-			w.WriteHeader(http.StatusNoContent)
+		// NOTE: Node-based completion endpoint removed; job completion
+		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -736,8 +733,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(claim0)
 		case "/v1/nodes/node-1/ack":
 			w.WriteHeader(http.StatusNoContent)
-		case "/v1/nodes/node-1/complete":
-			w.WriteHeader(http.StatusNoContent)
+		// NOTE: Node-based completion endpoint removed; job completion
+		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}
@@ -786,8 +783,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(claim1)
 		case "/v1/nodes/node-2/ack":
 			w.WriteHeader(http.StatusNoContent)
-		case "/v1/nodes/node-2/complete":
-			w.WriteHeader(http.StatusNoContent)
+		// NOTE: Node-based completion endpoint removed; job completion
+		// uses /v1/jobs/{job_id}/complete (handled by StatusUploader).
 		default:
 			http.NotFound(w, r)
 		}

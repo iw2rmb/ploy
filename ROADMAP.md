@@ -37,7 +37,7 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/server/handlers/... — Mods submit handler tests must only reference the canonical contract.
 
 ## Node vs job completion / ack / logs
-- [ ] Remove node-based completion endpoint when job-level completion is canonical — Simplify node → server contract to /v1/jobs/{job_id}/complete only.
+- [x] Remove node-based completion endpoint when job-level completion is canonical — Simplify node → server contract to /v1/jobs/{job_id}/complete only.
   - Repository: ploy
   - Component: internal/server/handlers (nodes_complete.go, jobs_complete.go), internal/nodeagent (statusuploader.go), router registration.
   - Scope: Verify that internal/nodeagent/statusuploader.go only uses /v1/jobs/{job_id}/complete. Remove completeRunHandler and its route from internal/server/handlers/nodes_complete.go and the router wiring if unused. Delete tests that depend on /v1/nodes/{id}/complete.

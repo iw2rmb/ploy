@@ -90,10 +90,10 @@ paths:
   # Node run-start acknowledgement endpoint
   /v1/nodes/{id}/ack:
     $ref: './paths/nodes_id_ack.yaml'
-  # Node run completion endpoint
-  /v1/nodes/{id}/complete:
-    $ref: './paths/nodes_id_complete.yaml'
-  # Job-level completion endpoint (job-scoped, no node ID)
+  # NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
+  # Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
+
+  # Job-level completion endpoint (job-scoped, no node ID) — canonical endpoint for job completion
   /v1/jobs/{job_id}/complete:
     $ref: './paths/jobs_job_id_complete.yaml'
   # Node events endpoint

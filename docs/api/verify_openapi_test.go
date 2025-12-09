@@ -66,8 +66,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/nodes/{id}/claim", "post"},
 		// Node ack
 		{"/v1/nodes/{id}/ack", "post"},
-		// Node complete
-		{"/v1/nodes/{id}/complete", "post"},
+		// Job-level completion (node-based /v1/nodes/{id}/complete has been removed)
+		{"/v1/jobs/{job_id}/complete", "post"},
 		// Node events
 		{"/v1/nodes/{id}/events", "post"},
 		// Node logs

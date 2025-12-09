@@ -579,7 +579,8 @@ renew via your external process.
 Legacy endpoint notice:
 - All `/v1/jobs*` endpoints and `/v1/mods/{run}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
   - Logs: `GET /v1/mods/{id}/events`
-  - Heartbeat/complete: `POST /v1/nodes/{id}/heartbeat` and `POST /v1/nodes/{id}/complete`
+  - Heartbeat: `POST /v1/nodes/{id}/heartbeat`
+  - Job completion: `POST /v1/jobs/{job_id}/complete` (node-based endpoint removed)
 
 ## Connectivity and Authentication
 
