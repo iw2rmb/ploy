@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -35,7 +36,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		testName := "test-artifact"
 		testBundle := []byte("test-bundle-data")
 		artifactID := uuid.New()
-		runID := uuid.New()
+		runID := domaintypes.NewRunID()
 
 		st := &mockStore{
 			listArtifactBundlesByCIDResult: []store.ArtifactBundle{
@@ -165,7 +166,7 @@ func TestGetArtifactHandler(t *testing.T) {
 
 	t.Run("SuccessMetadata", func(t *testing.T) {
 		artifactID := uuid.New()
-		runID := uuid.New()
+		runID := domaintypes.NewRunID()
 		testCID := "bafy123xyz"
 		testDigest := "sha256:fedcba"
 		testName := "metadata-test"
@@ -216,7 +217,7 @@ func TestGetArtifactHandler(t *testing.T) {
 
 	t.Run("SuccessDownload", func(t *testing.T) {
 		artifactID := uuid.New()
-		runID := uuid.New()
+		runID := domaintypes.NewRunID()
 		testCID := "bafy-download"
 		testDigest := "sha256:download"
 		testBundle := []byte("download-bundle-data")

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -23,12 +23,12 @@ func strPtr(s string) *string {
 
 // TestDrainNodeHandlerSuccess verifies successful node draining.
 func TestDrainNodeHandlerSuccess(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	now := time.Now()
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            nodeID.String(),
+			ID:            nodeID,
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -39,8 +39,8 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/drain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -93,14 +93,14 @@ func TestDrainNodeHandlerInvalidID(t *testing.T) {
 
 // TestDrainNodeHandlerNotFound verifies 404 when node doesn't exist.
 func TestDrainNodeHandlerNotFound(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	st := &mockStore{
 		getNodeErr: pgx.ErrNoRows,
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/drain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -115,12 +115,12 @@ func TestDrainNodeHandlerNotFound(t *testing.T) {
 
 // TestDrainNodeHandlerAlreadyDrained verifies 409 when node is already drained.
 func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	now := time.Now()
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            nodeID.String(),
+			ID:            nodeID,
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -131,8 +131,8 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/drain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -150,12 +150,12 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 
 // TestUndrainNodeHandlerSuccess verifies successful node undraining.
 func TestUndrainNodeHandlerSuccess(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	now := time.Now()
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            nodeID.String(),
+			ID:            nodeID,
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -166,8 +166,8 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/undrain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -220,14 +220,14 @@ func TestUndrainNodeHandlerInvalidID(t *testing.T) {
 
 // TestUndrainNodeHandlerNotFound verifies 404 when node doesn't exist.
 func TestUndrainNodeHandlerNotFound(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	st := &mockStore{
 		getNodeErr: pgx.ErrNoRows,
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/undrain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -242,12 +242,12 @@ func TestUndrainNodeHandlerNotFound(t *testing.T) {
 
 // TestUndrainNodeHandlerNotDrained verifies 409 when node is not drained.
 func TestUndrainNodeHandlerNotDrained(t *testing.T) {
-	nodeID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
 	now := time.Now()
 
 	st := &mockStore{
 		getNodeResult: store.Node{
-			ID:            nodeID.String(),
+			ID:            nodeID,
 			Name:          "worker-1",
 			IpAddress:     netip.MustParseAddr("10.0.0.1"),
 			Concurrency:   4,
@@ -258,8 +258,8 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/undrain", nil)
-	req.SetPathValue("id", nodeID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
+	req.SetPathValue("id", nodeID)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -277,14 +277,14 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 
 // TestListNodesHandlerSuccess verifies successful node listing.
 func TestListNodesHandlerSuccess(t *testing.T) {
-	node1ID := uuid.New()
-	node2ID := uuid.New()
+	node1ID := domaintypes.NewNodeKey()
+	node2ID := domaintypes.NewNodeKey()
 	now := time.Now()
 
 	st := &mockStore{
 		listNodesResult: []store.Node{
 			{
-				ID:              node1ID.String(),
+				ID:              node1ID,
 				Name:            "worker-1",
 				IpAddress:       netip.MustParseAddr("10.0.0.1"),
 				Version:         strPtr("v1.0.0"),
@@ -304,7 +304,7 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 				CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
 			},
 			{
-				ID:             node2ID.String(),
+				ID:             node2ID,
 				Name:           "worker-2",
 				IpAddress:      netip.MustParseAddr("10.0.0.2"),
 				Concurrency:    2,
@@ -360,8 +360,8 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	}
 
 	// Check first node.
-	if resp[0].ID != node1ID.String() {
-		t.Errorf("expected id %s, got %s", node1ID.String(), resp[0].ID)
+	if resp[0].ID != node1ID {
+		t.Errorf("expected id %s, got %s", node1ID, resp[0].ID)
 	}
 	if resp[0].Name != "worker-1" {
 		t.Errorf("expected name worker-1, got %s", resp[0].Name)
@@ -380,8 +380,8 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	}
 
 	// Check second node.
-	if resp[1].ID != node2ID.String() {
-		t.Errorf("expected id %s, got %s", node2ID.String(), resp[1].ID)
+	if resp[1].ID != node2ID {
+		t.Errorf("expected id %s, got %s", node2ID, resp[1].ID)
 	}
 	if resp[1].Name != "worker-2" {
 		t.Errorf("expected name worker-2, got %s", resp[1].Name)

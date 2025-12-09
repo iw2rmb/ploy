@@ -17,8 +17,8 @@ import (
 
 func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	st := &mockStore{}
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
@@ -64,8 +64,8 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 
 func TestGetDiff_Download(t *testing.T) {
 	st := &mockStore{}
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	st.getDiffResult = store.Diff{
@@ -93,8 +93,8 @@ func TestGetDiff_Download(t *testing.T) {
 
 func TestGetDiff_Metadata(t *testing.T) {
 	st := &mockStore{}
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
@@ -168,8 +168,8 @@ func TestGetDiff_MissingID(t *testing.T) {
 
 func TestGetDiff_NotFound(t *testing.T) {
 	st := &mockStore{}
-	runID := uuid.New()
-	jobID := uuid.New()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	diffID := uuid.New()
 	_ = runID
 	_ = jobID
@@ -186,7 +186,7 @@ func TestGetDiff_NotFound(t *testing.T) {
 
 func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
 	st := &mockStore{}
-	runID := uuid.New()
+	runID := domaintypes.NewRunID()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{

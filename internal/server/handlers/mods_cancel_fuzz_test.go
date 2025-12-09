@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -30,7 +30,7 @@ func FuzzCancelRun_Body(f *testing.F) {
 		var idStr string
 		st := &mockStore{}
 		if useValidID {
-			runID := uuid.New()
+			runID := domaintypes.NewRunID()
 			idStr = runID.String()
 			st.getRunResult = store.Run{ID: runID.String(), Status: store.RunStatusRunning}
 		} else {

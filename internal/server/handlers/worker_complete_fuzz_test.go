@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -17,9 +17,9 @@ import (
 // objects and rejection of non-objects. This target is fast and deterministic
 // and only runs under -fuzz; normal `go test` is unaffected.
 func FuzzCompleteRun_StatsShapes(f *testing.F) {
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 
 	// Seeds: valid object, nested object, empty object, array (invalid), string (invalid)
 	seeds := [][]byte{
@@ -35,7 +35,7 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, statsJSON []byte) {
 		// Set up job for GetJob lookup (job_id-based).
-		nodeIDStr := nodeID.String()
+		nodeIDStr := nodeID
 		job := store.Job{
 			ID:        jobID.String(),
 			RunID:     runID.String(),
@@ -44,7 +44,7 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 			StepIndex: 1000,
 		}
 		st := &mockStore{
-			getNodeResult: store.Node{ID: nodeID.String()},
+			getNodeResult: store.Node{ID: nodeID},
 			getRunResult: store.Run{
 				ID:     runID.String(),
 				Status: store.RunStatusRunning,
@@ -67,8 +67,8 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 			}
 		}
 		body, _ := json.Marshal(payload)
-		req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
-		req.SetPathValue("id", nodeID.String())
+		req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/complete", bytes.NewReader(body))
+		req.SetPathValue("id", nodeID)
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req)

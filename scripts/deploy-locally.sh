@@ -17,7 +17,7 @@ cd "$ROOT_DIR"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
-NODE_ID="${NODE_ID:-00000000-0000-0000-0000-000000000001}"
+NODE_ID="${NODE_ID:-LOCAL01}"
 AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
