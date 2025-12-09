@@ -129,7 +129,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Add `cmd/ploy/config_env_command_flags_test.go` to cover flag/usage errors and `cmd/ploy/config_env_command_files_test.go` to exercise list/show/set/unset flows against a fake HTTP server — expect correct HTTP methods/paths and redaction behavior for secrets.
 
 ## Spec Merge on Job Claim
-- [ ] Merge global env into job spec env on claim — Ensure every job spec carries the right global env vars before it reaches the node agent.
+- [x] Merge global env into job spec env on claim — Ensure every job spec carries the right global env vars before it reaches the node agent.
   - Repository: github.com/iw2rmb/ploy
   - Component: internal/server/handlers
   - Scope:

@@ -123,6 +123,11 @@ func buildAndSendJobClaimResponse(
 	gitlabCfg := configHolder.GetGitLab()
 	mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
 
+	// Merge global env vars (CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, OPENAI_API_KEY, etc.)
+	// into spec.env based on job type and scope matching.
+	// Per-run env vars in spec take precedence over global env.
+	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
+
 	resp := struct {
 		ID        string                `json:"id"`         // Run ID
 		JobID     string                `json:"job_id"`     // Job ID
