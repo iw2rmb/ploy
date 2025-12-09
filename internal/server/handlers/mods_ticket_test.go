@@ -29,6 +29,12 @@ func newTestEventsService() *events.Service {
 }
 
 // TestSubmitRunHandlerSuccess verifies successful run submission.
+//
+// Canonical contract verification:
+//   - HTTP 201 Created (not 202 or other legacy codes)
+//   - Response body is RunSummary directly (no wrapper types)
+//   - run_id is a KSUID string
+//   - state field uses canonical enum values (pending, running, etc.)
 func TestSubmitRunHandlerSuccess(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
@@ -250,6 +256,12 @@ func TestSubmitRunHandlerWithOptionalFields(t *testing.T) {
 }
 
 // TestGetRunStatusHandlerSuccess verifies successful retrieval of run status.
+//
+// Canonical contract verification:
+//   - HTTP 200 OK
+//   - Response body is RunSummary directly (no wrapper types)
+//   - run_id field uses canonical JSON key (not legacy "id" or "ticket_id")
+//   - stages map is keyed by job ID (KSUID string)
 func TestGetRunStatusHandlerSuccess(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
@@ -803,5 +815,141 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	}
 	if resp.Stages[job1ID].StepIndex != 3000 {
 		t.Errorf("expected job 1 step_index 3000, got %d", resp.Stages[job1ID].StepIndex)
+	}
+}
+
+// TestSubmitRunHandlerCanonicalContract verifies that the submit handler returns
+// only the canonical response shape (RunSummary directly, no legacy envelope).
+//
+// This test ensures the server aligns with the canonical CLI contract per ROADMAP.md:
+//   - No "ticket" wrapper field
+//   - No legacy field names (e.g., "ticket_id", "status" instead of "state")
+//   - RunSummary is the JSON root object
+func TestSubmitRunHandlerCanonicalContract(t *testing.T) {
+	runID := types.NewRunID()
+	now := time.Now()
+
+	st := &mockStore{
+		createRunResult: store.Run{
+			ID:        runID.String(),
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      []byte("{}"),
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	handler := submitRunHandler(st, nil)
+
+	reqBody := map[string]interface{}{
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	// Canonical contract: HTTP 201 (not 202).
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Parse response as raw JSON to verify no legacy fields are present.
+	var rawResp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&rawResp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify canonical fields are present.
+	if _, ok := rawResp["run_id"]; !ok {
+		t.Error("expected 'run_id' field in response (canonical)")
+	}
+	if _, ok := rawResp["state"]; !ok {
+		t.Error("expected 'state' field in response (canonical)")
+	}
+	if _, ok := rawResp["stages"]; !ok {
+		t.Error("expected 'stages' field in response (canonical)")
+	}
+
+	// Verify legacy/envelope fields are NOT present.
+	if _, ok := rawResp["ticket"]; ok {
+		t.Error("unexpected 'ticket' wrapper field in response (legacy)")
+	}
+	if _, ok := rawResp["ticket_id"]; ok {
+		t.Error("unexpected 'ticket_id' field in response (legacy)")
+	}
+	if _, ok := rawResp["status"]; ok {
+		t.Error("unexpected 'status' field in response (legacy - use 'state')")
+	}
+}
+
+// TestGetRunStatusHandlerCanonicalContract verifies that the status handler returns
+// only the canonical response shape (RunSummary directly, no legacy envelope).
+//
+// This test ensures the server aligns with the canonical CLI contract per ROADMAP.md:
+//   - No "ticket" wrapper field
+//   - No legacy field names
+//   - RunSummary is the JSON root object
+func TestGetRunStatusHandlerCanonicalContract(t *testing.T) {
+	runID := types.NewRunID()
+	now := time.Now()
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:        runID.String(),
+			RepoUrl:   "https://github.com/user/repo.git",
+			Status:    store.RunStatusRunning,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	handler := getRunStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	// Canonical contract: HTTP 200.
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Parse response as raw JSON to verify no legacy fields are present.
+	var rawResp map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&rawResp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify canonical fields are present.
+	if _, ok := rawResp["run_id"]; !ok {
+		t.Error("expected 'run_id' field in response (canonical)")
+	}
+	if _, ok := rawResp["state"]; !ok {
+		t.Error("expected 'state' field in response (canonical)")
+	}
+	if _, ok := rawResp["stages"]; !ok {
+		t.Error("expected 'stages' field in response (canonical)")
+	}
+	if _, ok := rawResp["repository"]; !ok {
+		t.Error("expected 'repository' field in response (canonical)")
+	}
+
+	// Verify legacy/envelope fields are NOT present.
+	if _, ok := rawResp["ticket"]; ok {
+		t.Error("unexpected 'ticket' wrapper field in response (legacy)")
+	}
+	if _, ok := rawResp["ticket_id"]; ok {
+		t.Error("unexpected 'ticket_id' field in response (legacy)")
+	}
+	if _, ok := rawResp["status"]; ok {
+		t.Error("unexpected 'status' field in response (legacy - use 'state')")
 	}
 }

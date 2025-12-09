@@ -29,7 +29,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: Replace the switch on resp.StatusCode with a single case for the canonical status and error handling for all others.
   - Tests: go test ./internal/cli/mods/... ./cmd/ploy/... — Submit tests must pass with a single response path.
 
-- [ ] Align server Mods submit handler with the canonical CLI contract — Avoid supporting legacy response shapes.
+- [x] Align server Mods submit handler with the canonical CLI contract — Avoid supporting legacy response shapes.
   - Repository: ploy
   - Component: internal/server/handlers (mods_ticket.go and related).
   - Scope: Ensure POST /v1/mods always returns the chosen canonical status code and JSON shape. Remove any code that builds or accepts legacy submit responses tied to modsapi.RunSubmitResponse or other legacy envelopes.
