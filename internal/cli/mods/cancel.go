@@ -10,13 +10,15 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // CancelCommand requests cancellation for a Mods run.
 type CancelCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID
 	Reason  string
 	Output  io.Writer
 }
@@ -29,10 +31,10 @@ func (c CancelCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods cancel: base url required")
 	}
-	runID := strings.TrimSpace(c.RunID)
-	if runID == "" {
+	if c.RunID.IsZero() {
 		return errors.New("mods cancel: run id required")
 	}
+	runID := c.RunID.String()
 	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "cancel")
 	if err != nil {
 		return err

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ResumeCommand requests a resume for a Mods run via POST /v1/mods/{id}/resume.
@@ -16,7 +18,7 @@ import (
 type ResumeCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID
 	Output  io.Writer
 }
 
@@ -33,10 +35,10 @@ func (c ResumeCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods resume: base url required")
 	}
-	runID := strings.TrimSpace(c.RunID)
-	if runID == "" {
+	if c.RunID.IsZero() {
 		return errors.New("mods resume: run id required")
 	}
+	runID := c.RunID.String()
 
 	// Build the server resume endpoint URL.
 	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "resume")

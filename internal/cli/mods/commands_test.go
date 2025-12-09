@@ -125,7 +125,7 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: base,
-				RunID:   string(tt.run.RunID),
+				RunID:   tt.run.RunID,
 				Output:  &out,
 			}
 			if err := cmd.Run(context.Background()); err != nil {

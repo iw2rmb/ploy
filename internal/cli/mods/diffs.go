@@ -71,10 +71,10 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 	var listing struct {
 		Diffs []struct {
-			ID        string `json:"id"`
-			JobID     string `json:"job_id"`
-			CreatedAt string `json:"created_at"`
-			Size      int    `json:"gzipped_size"`
+			ID        string            `json:"id"`
+			JobID     domaintypes.JobID `json:"job_id"`
+			CreatedAt string            `json:"created_at"`
+			Size      int               `json:"gzipped_size"`
 		} `json:"diffs"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
@@ -83,7 +83,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 
 	if !c.Download {
 		for _, d := range listing.Diffs {
-			job := strings.TrimSpace(d.JobID)
+			job := strings.TrimSpace(d.JobID.String())
 			if job == "" {
 				job = "-"
 			}

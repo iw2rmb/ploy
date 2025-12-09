@@ -57,7 +57,7 @@ func NewDiffFetcher(cfg Config) (*DiffFetcher, error) {
 // This mirrors the diffItem struct from internal/server/handlers/handlers_diffs.go.
 type diffListItem struct {
 	ID        string          `json:"id"`
-	JobID     string          `json:"job_id"`
+	JobID     types.JobID     `json:"job_id"`
 	StepIndex types.StepIndex `json:"step_index"`
 	CreatedAt time.Time       `json:"created_at"`
 	Size      int             `json:"gzipped_size"`

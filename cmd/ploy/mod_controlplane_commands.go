@@ -29,7 +29,13 @@ func handleModCancel(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := mods.CancelCommand{BaseURL: base, Client: httpClient, RunID: strings.TrimSpace(*runFlag), Reason: strings.TrimSpace(*reason), Output: stderr}
+	cmd := mods.CancelCommand{
+		BaseURL: base,
+		Client:  httpClient,
+		RunID:   domaintypes.RunID(strings.TrimSpace(*runFlag)),
+		Reason:  strings.TrimSpace(*reason),
+		Output:  stderr,
+	}
 	return cmd.Run(ctx)
 }
 
@@ -51,7 +57,12 @@ func handleModResume(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := mods.ResumeCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
+	cmd := mods.ResumeCommand{
+		BaseURL: base,
+		Client:  httpClient,
+		RunID:   domaintypes.RunID(runID),
+		Output:  stderr,
+	}
 	return cmd.Run(ctx)
 }
 
@@ -73,7 +84,12 @@ func handleModInspect(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := mods.InspectCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
+	cmd := mods.InspectCommand{
+		BaseURL: base,
+		Client:  httpClient,
+		RunID:   domaintypes.RunID(runID),
+		Output:  stderr,
+	}
 	return cmd.Run(ctx)
 }
 
@@ -95,7 +111,12 @@ func handleModArtifacts(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := mods.ArtifactsCommand{BaseURL: base, Client: httpClient, RunID: runID, Output: stderr}
+	cmd := mods.ArtifactsCommand{
+		BaseURL: base,
+		Client:  httpClient,
+		RunID:   domaintypes.RunID(runID),
+		Output:  stderr,
+	}
 	return cmd.Run(ctx)
 }
 

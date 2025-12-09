@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -18,7 +19,7 @@ import (
 type ArtifactsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string
+	RunID   domaintypes.RunID
 	Output  io.Writer
 }
 
@@ -30,10 +31,10 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return errors.New("mods artifacts: base url required")
 	}
-	runID := strings.TrimSpace(c.RunID)
-	if runID == "" {
+	if c.RunID.IsZero() {
 		return errors.New("mods artifacts: run id required")
 	}
+	runID := c.RunID.String()
 	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID))
 	if err != nil {
 		return err

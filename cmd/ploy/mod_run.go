@@ -113,7 +113,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 	// Output JSON summary if requested.
 	if *flags.JSONOut {
-		if err := outputJSONSummary(ctx, base, httpClient, string(summary.RunID), initialState, finalState, flags); err != nil {
+		if err := outputJSONSummary(ctx, base, httpClient, summary.RunID, initialState, finalState, flags); err != nil {
 			return err
 		}
 	}

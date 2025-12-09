@@ -196,8 +196,8 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 
 	// Verify run data.
 	run := resp.Runs[0]
-	if run.RunID != runID.String() {
-		t.Errorf("unexpected run_id: %s", run.RunID)
+	if run.RunID.String() != runID.String() {
+		t.Errorf("unexpected run_id: %s", run.RunID.String())
 	}
 	if run.Name == nil || *run.Name != "test-batch" {
 		t.Errorf("unexpected name: %v", run.Name)

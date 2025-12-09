@@ -166,7 +166,7 @@ func TestInspectCommand_Run(t *testing.T) {
 			cmd := InspectCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				RunID:   string(tc.run.RunID),
+				RunID:   tc.run.RunID,
 				Output:  &out,
 			}
 

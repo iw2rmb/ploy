@@ -14,6 +14,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestHandleNodeRequiresSubcommand(t *testing.T) {
@@ -328,7 +329,7 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 	clusterID := "test-cluster-node"
 	serverURL := "https://10.0.0.5:8443"
 	cfg := nodeAddConfig{
-		ClusterID:       clusterID,
+		ClusterID:       domaintypes.ClusterID(clusterID),
 		Address:         "10.0.0.10",
 		ServerURL:       serverURL,
 		User:            "testuser",

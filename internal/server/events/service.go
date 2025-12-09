@@ -257,8 +257,8 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 // jobContext holds execution context extracted from job metadata.
 // Used to enrich log records with node and mod information.
 type jobContext struct {
-	NodeID    string
-	JobID     string
+	NodeID    domaintypes.NodeID
+	JobID     domaintypes.JobID
 	ModType   string
 	StepIndex int
 }
@@ -291,8 +291,8 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 	// job.ID is now a string (KSUID-backed).
 	// job.NodeID is now *string (NanoID-backed after node ID migration).
 	return jobContext{
-		NodeID:    stringPtrToString(job.NodeID),
-		JobID:     job.ID,
+		NodeID:    domaintypes.NodeID(stringPtrToString(job.NodeID)),
+		JobID:     domaintypes.JobID(job.ID),
 		ModType:   job.ModType,
 		StepIndex: int(job.StepIndex),
 	}

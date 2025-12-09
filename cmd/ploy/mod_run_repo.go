@@ -25,6 +25,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRunRepo routes `mod run repo <action>` subcommands.
@@ -294,17 +296,17 @@ type runRepoRestartRequest struct {
 
 // runRepoResponse mirrors the server's RunRepoResponse for CLI consumption.
 type runRepoResponse struct {
-	ID         string     `json:"id"`
-	RunID      string     `json:"run_id"`
-	RepoURL    string     `json:"repo_url"`
-	BaseRef    string     `json:"base_ref"`
-	TargetRef  string     `json:"target_ref"`
-	Status     string     `json:"status"`
-	Attempt    int32      `json:"attempt"`
-	LastError  *string    `json:"last_error,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	StartedAt  *time.Time `json:"started_at,omitempty"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	ID         domaintypes.RunRepoID `json:"id"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoURL    string                `json:"repo_url"`
+	BaseRef    string                `json:"base_ref"`
+	TargetRef  string                `json:"target_ref"`
+	Status     string                `json:"status"`
+	Attempt    int32                 `json:"attempt"`
+	LastError  *string               `json:"last_error,omitempty"`
+	CreatedAt  time.Time             `json:"created_at"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 // doRunRepoAdd sends POST /v1/runs/{id}/repos to add a repo to a batch.

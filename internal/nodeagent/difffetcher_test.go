@@ -214,9 +214,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			runID:     "run-123",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: stepIndex(0)},
-				{ID: "diff-1", StepIndex: stepIndex(1)},
-				{ID: "diff-2", StepIndex: stepIndex(2)},
+				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0)},
+				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1)},
+				{ID: "diff-2", JobID: "job-2", StepIndex: stepIndex(2)},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -231,9 +231,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			runID:     "run-456",
 			stepIndex: 2,
 			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: stepIndex(0)},
-				{ID: "diff-1", StepIndex: stepIndex(1)},
-				{ID: "diff-2", StepIndex: stepIndex(2)},
+				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0)},
+				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1)},
+				{ID: "diff-2", JobID: "job-2", StepIndex: stepIndex(2)},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -251,14 +251,14 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			stepIndex: 1,
 			diffs: []diffListItem{
 				// Step 0: mod + healing.
-				{ID: "diff-0-mod", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-0-heal", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing"}},
+				{ID: "diff-0-mod", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-0-heal", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing"}},
 				// Step 1: mod + healing (2 attempts).
-				{ID: "diff-1-mod", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-1-heal1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
-				{ID: "diff-1-heal2", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
+				{ID: "diff-1-mod", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-1-heal1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
+				{ID: "diff-1-heal2", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
 				// Step 2: mod (not included).
-				{ID: "diff-2-mod", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-2-mod", JobID: "job-2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod"}},
 			},
 			patches: map[string][]byte{
 				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
@@ -420,10 +420,10 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 			stepIndex:    2,
 			targetBranch: "", // Empty = mainline only.
 			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-2-a", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-2-b", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
+				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-2-a", JobID: "job-2a", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-2-b", JobID: "job-2b", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
 			},
 			patches: map[string][]byte{
 				"diff-0":   gzipBytesHelper(t, []byte("patch 0")),
@@ -440,11 +440,11 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 			stepIndex:    3,
 			targetBranch: "branch-a",
 			diffs: []diffListItem{
-				{ID: "diff-mainline-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-mainline-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-branch-a-2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-branch-b-2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
-				{ID: "diff-branch-a-3", StepIndex: stepIndex(3), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-mainline-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-mainline-1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-branch-a-2", JobID: "job-a2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-branch-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
+				{ID: "diff-branch-a-3", JobID: "job-a3", StepIndex: stepIndex(3), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
 			},
 			patches: map[string][]byte{
 				"diff-mainline-0": gzipBytesHelper(t, []byte("patch mainline 0")),
@@ -462,9 +462,9 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 			stepIndex:    3,
 			targetBranch: "branch-b",
 			diffs: []diffListItem{
-				{ID: "diff-mainline-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-branch-a-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-branch-b-2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
+				{ID: "diff-mainline-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-branch-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-branch-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
 			},
 			patches: map[string][]byte{
 				"diff-mainline-0": gzipBytesHelper(t, []byte("patch mainline 0")),
@@ -480,10 +480,10 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 			stepIndex:    2,
 			targetBranch: "branch-a",
 			diffs: []diffListItem{
-				{ID: "diff-mod-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-heal-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
-				{ID: "diff-mod-a-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-heal-a-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
+				{ID: "diff-mod-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-heal-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
+				{ID: "diff-mod-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-heal-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
 			},
 			patches: map[string][]byte{
 				"diff-mod-0":    gzipBytesHelper(t, []byte("patch mod 0")),

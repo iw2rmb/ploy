@@ -12,6 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	runscli "github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func handleMods(args []string, stderr io.Writer) error {
@@ -80,7 +81,7 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 	}
 
 	cmd := mods.LogsCommand{
-		RunID:  runID,
+		RunID:  domaintypes.RunID(runID),
 		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
@@ -165,7 +166,7 @@ func handleRunsFollow(args []string, stderr io.Writer) error {
 	}
 
 	cmd := runscli.FollowCommand{
-		JobID:  jobID,
+		JobID:  domaintypes.JobID(jobID),
 		Format: runscli.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
 		Client: stream.Client{
@@ -203,6 +204,11 @@ func handleRunsInspect(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := runscli.InspectCommand{BaseURL: base, Client: httpClient, JobID: jobID, Output: stderr}
+	cmd := runscli.InspectCommand{
+		BaseURL: base,
+		Client:  httpClient,
+		JobID:   domaintypes.JobID(jobID),
+		Output:  stderr,
+	}
 	return cmd.Run(ctx)
 }
