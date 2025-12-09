@@ -6,12 +6,15 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 )
 
 // SnapshotSource exposes cached lifecycle status snapshots.
-// Uses LatestStatusMap for backward-compatible map[string]any access.
+// Returns typed NodeStatus for compile-time safety; callers convert
+// to map[string]any via ToMap() only at serialization boundaries.
 type SnapshotSource interface {
-	LatestStatusMap() (map[string]any, bool)
+	LatestStatus() (lifecycle.NodeStatus, bool)
 }
 
 // Options configure the status provider.
@@ -39,12 +42,17 @@ func New(opts Options) *Provider {
 }
 
 // Snapshot returns the current node status.
+// Uses typed NodeStatus internally and converts to map[string]any at the
+// serialization boundary via ToMap(). This maintains wire-format compatibility
+// while providing type safety throughout the status pipeline.
 func (p *Provider) Snapshot(context.Context) (map[string]any, error) {
 	if p.source != nil {
-		if snapshot, ok := p.source.LatestStatusMap(); ok && len(snapshot) > 0 {
-			return snapshot, nil
+		// Use typed LatestStatus() accessor and convert to map at serialization boundary.
+		if status, ok := p.source.LatestStatus(); ok {
+			return status.ToMap(), nil
 		}
 	}
+	// Fallback when no cached status is available (e.g., during startup).
 	host, _ := os.Hostname()
 	return map[string]any{
 		"state":      "ok",
