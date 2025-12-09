@@ -871,7 +871,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
   metadata).
 - `POST /v1/nodes/{id}/ack` — confirm job start (transitions the parent run to
   `running` when still queued).
-- `POST /v1/nodes/{id}/complete` — report final status and stats for a job.
+- `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
+  (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.
 - `POST /v1/runs/{run_id}/jobs/{job_id}/diff` — upload per-job diffs.
 - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact` — upload per-job artifacts.
@@ -910,7 +911,7 @@ For a spec without `mods[]` (single `mod` or legacy top-level image):
      - Hydrates the workspace using `step.WorkspaceHydrator`.
      - Executes the job (gate check or mod container).
      - Generates diffs with `DiffGenerator` and uploads them.
-     - Completes the job via `/v1/nodes/{id}/complete`.
+     - Completes the job via `/v1/jobs/{job_id}/complete`.
 4. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
@@ -1105,7 +1106,7 @@ Code paths most relevant for Mods:
   - `internal/mods/api/*`
   - `internal/server/handlers/handlers_mods_ run.go`
   - `internal/server/handlers/handlers_diffs.go`
-  - `internal/server/handlers/nodes_complete.go` — job completion
+  - `internal/server/handlers/jobs_complete.go` — job completion (via /v1/jobs/{job_id}/complete)
   - `internal/server/handlers/nodes_claim.go` — job claiming
   - `internal/server/events/service.go`
   - `internal/stream/hub.go`, `internal/stream/http.go`
