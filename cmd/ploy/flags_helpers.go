@@ -46,10 +46,8 @@ type boolValue struct {
 
 func (v *boolValue) String() string { return fmt.Sprintf("%t", v.value) }
 func (v *boolValue) Set(s string) error {
-	var tmp flag.FlagSet
-	var parsed bool
-	tmp.BoolVar(&parsed, "v", false, "")
-	if err := tmp.Parse([]string{"-v", s}); err != nil {
+	parsed, err := parseBoolValue(s)
+	if err != nil {
 		return err
 	}
 	v.value = parsed
@@ -57,6 +55,18 @@ func (v *boolValue) Set(s string) error {
 	return nil
 }
 func (v *boolValue) IsBoolFlag() bool { return true }
+
+// parseBoolValue parses a boolean string value (1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False).
+func parseBoolValue(s string) (bool, error) {
+	switch s {
+	case "1", "t", "T", "true", "TRUE", "True":
+		return true, nil
+	case "0", "f", "F", "false", "FALSE", "False":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value: %q", s)
+	}
+}
 
 // resolveIdentityPath chooses a default SSH identity when not explicitly set.
 func resolveIdentityPath(v stringValue) (string, error) {

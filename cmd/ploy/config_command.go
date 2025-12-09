@@ -28,6 +28,8 @@ func handleConfig(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "gitlab":
 		return handleConfigGitLab(args[1:], stderr)
+	case "env":
+		return handleConfigEnv(args[1:], stderr)
 	default:
 		printConfigUsage(stderr)
 		return fmt.Errorf("unknown config subcommand %q", args[0])
@@ -39,6 +41,7 @@ func printConfigUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  gitlab    Manage GitLab integration credentials")
+	_, _ = fmt.Fprintln(w, "  env       Manage global environment variables")
 }
 
 // handleConfigGitLab routes gitlab subcommands.
