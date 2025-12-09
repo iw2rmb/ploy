@@ -105,8 +105,8 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 			}
 		case "stage":
 			var payload struct {
-				TicketID string              `json:"run_id"`
-				Stage    modsapi.StageStatus `json:"stage"`
+				RunID string              `json:"run_id"` // Run ID for the stage event
+				Stage modsapi.StageStatus `json:"stage"`
 			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
 				return fmt.Errorf("mods events: decode stage: %w", err)

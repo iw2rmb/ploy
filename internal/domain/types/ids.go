@@ -7,17 +7,8 @@ package types
 import "encoding"
 
 // RunID identifies a run instance (workflow execution).
-// This is the canonical identifier for workflow runs, consolidating
-// the previous TicketID and RunID types into a single type.
+// This is the canonical identifier for workflow runs in the Mods system.
 type RunID string
-
-// TicketID is a deprecated alias for RunID.
-// Use RunID directly for all new code. This alias exists only for
-// backward compatibility during the migration from ticket to run terminology.
-//
-// Deprecated: Use RunID instead. This alias will be removed once all
-// callers have been migrated (see ROADMAP.md tasks).
-type TicketID = RunID
 
 // StepID identifies a step within a stage.
 type StepID string
@@ -105,7 +96,6 @@ func unmarshalIDText[S ~string](dst *S, b []byte) error {
 
 // RunID implements encoding.TextMarshaler and encoding.TextUnmarshaler
 // for text-based serialization (normalizes and rejects empty values).
-// Note: TicketID is a type alias for RunID and shares these methods.
 var _ interface {
 	encoding.TextMarshaler
 	encoding.TextUnmarshaler

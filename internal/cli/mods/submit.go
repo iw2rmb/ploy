@@ -57,7 +57,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	switch resp.StatusCode {
 	case http.StatusCreated: // 201 — server simplified summary
 		var srvResp struct {
-			TicketID  string `json:"run_id"`
+			RunID     string `json:"run_id"` // Run ID returned from server
 			Status    string `json:"status"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
@@ -66,9 +66,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
-		// Map to modsapi summary type. Use RunID field (formerly TicketID).
+		// Map to modsapi summary type.
 		return modsapi.RunSummary{
-			RunID:      domaintypes.RunID(srvResp.TicketID),
+			RunID:      domaintypes.RunID(srvResp.RunID),
 			State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 			Repository: srvResp.RepoURL,
 			Metadata: map[string]string{
@@ -116,7 +116,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 							defer func() { _ = resp2.Body.Close() }()
 							if resp2.StatusCode == http.StatusCreated {
 								var srvResp struct {
-									TicketID  string `json:"run_id"`
+									RunID     string `json:"run_id"` // Run ID returned from server
 									Status    string `json:"status"`
 									RepoURL   string `json:"repo_url"`
 									BaseRef   string `json:"base_ref"`
@@ -125,9 +125,8 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 								if err := json.NewDecoder(resp2.Body).Decode(&srvResp); err != nil {
 									return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 								}
-								// Use RunID field (formerly TicketID).
 								return modsapi.RunSummary{
-									RunID:      domaintypes.RunID(srvResp.TicketID),
+									RunID:      domaintypes.RunID(srvResp.RunID),
 									State:      modsapi.RunState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 									Repository: srvResp.RepoURL,
 									Metadata: map[string]string{

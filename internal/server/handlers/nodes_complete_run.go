@@ -166,7 +166,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 			runState = modsapi.RunStateFailed
 		}
 
-		// Run IDs are now KSUID strings. Use RunID field (formerly TicketID).
+		// Publish run summary event with final run state.
 		summary := modsapi.RunSummary{
 			RunID:      domaintypes.RunID(runID),
 			State:      runState,

@@ -37,7 +37,7 @@ func TestGetModEventsHandler_TicketNotFound(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_InvalidTicketID(t *testing.T) {
+func TestGetModEventsHandler_InvalidRunID(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	st := &mockStore{}

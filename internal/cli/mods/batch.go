@@ -118,7 +118,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	// Handle 201 Created response from server.
 	if resp.StatusCode == http.StatusCreated {
 		var srvResp struct {
-			TicketID  string `json:"run_id"`
+			RunID     string `json:"run_id"` // Run ID returned from server
 			Status    string `json:"status"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
@@ -128,7 +128,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 		return BatchSummary{
-			ID:        domaintypes.RunID(srvResp.TicketID), // Convert to domain type
+			ID:        domaintypes.RunID(srvResp.RunID), // Convert to domain type
 			Name:      c.Name,
 			Status:    strings.ToLower(srvResp.Status),
 			RepoURL:   srvResp.RepoURL,

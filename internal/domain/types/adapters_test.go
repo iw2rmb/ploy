@@ -15,7 +15,7 @@ func TestStringsAdapter(t *testing.T) {
 }
 
 func TestStringPtrAdapter(t *testing.T) {
-	// Test with RunID (canonical run identifier; TicketID is a deprecated alias).
+	// Test with RunID (canonical run identifier).
 	if p := StringPtr(RunID("")); p != nil {
 		t.Fatalf("StringPtr(empty) = %#v, want nil", *p)
 	}
