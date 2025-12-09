@@ -99,28 +99,55 @@ func (m JobMeta) Validate() error {
 
 // MarshalJobMeta encodes a JobMeta struct to JSON bytes suitable for
 // storing in jobs.meta JSONB.
+//
+// Returns an error if m is nil or if the metadata fails validation.
+// Callers must provide a valid JobMeta with a recognized Kind field.
 func MarshalJobMeta(m *JobMeta) ([]byte, error) {
 	if m == nil {
-		return []byte("{}"), nil
+		return nil, fmt.Errorf("job meta is nil; use NewModJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata")
+	}
+	// Validate before marshaling to catch invalid state early.
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("marshal job meta: %w", err)
 	}
 	return json.Marshal(m)
 }
 
 // UnmarshalJobMeta decodes JSON bytes from jobs.meta JSONB into a JobMeta struct.
-// Returns nil (not an error) for empty JSON objects or null values to support
-// backward compatibility with existing jobs that have no structured metadata.
+//
+// Returns an error for invalid payloads:
+//   - Empty bytes, empty JSON objects ("{}"), or JSON null are rejected.
+//   - Missing or invalid "kind" field is rejected.
+//   - Payloads that fail JobMeta.Validate() are rejected.
+//
+// All job metadata must now be structured with an explicit kind field.
+// Use NewModJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata.
 func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
-	if len(data) == 0 || string(data) == "{}" || string(data) == "null" {
-		return nil, nil
+	// Reject empty/null payloads - structured metadata is now required.
+	if len(data) == 0 {
+		return nil, fmt.Errorf("job meta is empty; structured metadata with kind field is required")
 	}
+	s := string(data)
+	if s == "{}" || s == "null" {
+		return nil, fmt.Errorf("job meta is %s; structured metadata with kind field is required", s)
+	}
+
 	var m JobMeta
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal job meta: %w", err)
 	}
-	// For backward compatibility, tolerate payloads that omit kind for mod jobs.
+
+	// Require explicit kind field - no defaulting to mod for legacy payloads.
 	if m.Kind == "" {
-		m.Kind = JobKindMod
+		return nil, fmt.Errorf("job meta missing required 'kind' field; must be one of: %q, %q, %q",
+			JobKindMod, JobKindGate, JobKindBuild)
 	}
+
+	// Validate the unmarshaled metadata for structural correctness.
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("unmarshal job meta: %w", err)
+	}
+
 	return &m, nil
 }
 

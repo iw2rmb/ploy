@@ -104,12 +104,13 @@ Legend: [ ] todo, [x] done.
   - Tests: go test ./internal/nodeagent/... ./internal/workflow/contracts/... — Manifest tests must pass with explicit stack handling.
   - Done: Collapsed buildManifestFromRequest and buildHealingManifest to require explicit stack parameter. Removed wrapper functions and updated all callers to pass explicit contracts.ModStack values. Gate jobs use ModStackUnknown since stack detection hasn't occurred. Production callers use detected stack from lifecycle cache. Tests pass explicit ModStackUnknown to document intentional unknown stack context.
 
-- [ ] Tighten JobMeta JSON handling; treat legacy shapes as invalid if acceptable — Enforce structured metadata going forward.
+- [x] Tighten JobMeta JSON handling; treat legacy shapes as invalid if acceptable — Enforce structured metadata going forward.
   - Repository: ploy
   - Component: internal/workflow/contracts/job_meta.go.
-  - Scope: In UnmarshalJobMeta, reconsider “backward compatibility” behavior for empty `{}`/`null` and missing `kind`. If acceptable, change logic to require non-empty kind and return an error for invalid payloads (or handle them via explicit migration). Update tests accordingly.
+  - Scope: In UnmarshalJobMeta, reconsider "backward compatibility" behavior for empty `{}`/`null` and missing `kind`. If acceptable, change logic to require non-empty kind and return an error for invalid payloads (or handle them via explicit migration). Update tests accordingly.
   - Snippets: Replace defaulting `m.Kind = JobKindMod` with validation and error handling.
   - Tests: go test ./internal/workflow/contracts/... — Job meta tests must reflect the stricter expectations.
+  - Done: MarshalJobMeta now returns error for nil input and validates metadata before marshaling. UnmarshalJobMeta now rejects empty bytes, `{}`, `null`, missing `kind` field, and invalid kind values. Tests updated to expect errors for legacy shapes and verify descriptive error messages.
 
 ## CLI surface and tests
 - [ ] Remove deprecated CLI flags and BC mentions from docs — Simplify user-facing interface.
