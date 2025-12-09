@@ -661,25 +661,105 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 
 ### 2.1 Run summary (`internal/mods/api`)
 
-- `RunSummary` (in `internal/mods/api/types.go`) is the wire type returned by
-  `POST /v1/mods` (submit), `GET /v1/mods/{id}` (status), and streamed on SSE:
-  - `run_id` — run ID (KSUID string, 27 characters).
-  - `state` —  run lifecycle state (`pending`, `running`, `succeeded`,
-    `failed`, `cancelled`).
-  - `repository` — repo URL for this run.
-  - `metadata` — string map for additional diagnostics:
-    - `repo_base_ref`, `repo_target_ref`
-    - `node_id` (claiming worker)
-    - `mr_url` (if MR was created)
-    - `gate_summary` (Build Gate result)
-    - `reason` (terminal error reason when available).
-  - `stages` — map keyed by **job ID** (`jobs.id`, KSUID string), value is `StageStatus`.
-    Each entry represents a `jobs` table row; the map key is the job's ID (KSUID string).
+`RunSummary` is the **canonical wire type** for Mods run status. It is the single
+response schema for:
 
-- `StageStatus`:
-  - `state` — job lifecycle state (mirrors `jobs.status`).
-  - `artifacts` — map of artifact logical names to bundle CIDs.
-  - `step_index` — float index for job ordering (mirrors `jobs.step_index`).
+- `POST /v1/mods` (submit) — 201 response body.
+- `GET /v1/mods/{id}` (status) — 200 response body.
+- `event: run` SSE payloads on `/v1/mods/{id}/events`.
+
+**Wire contract guarantees:**
+
+- No wrapper types — `RunSummary` is returned directly as the JSON root.
+- Field names are stable and match `internal/mods/api/types.go` exactly.
+- All IDs use KSUID format (27 characters, lexicographically sortable).
+
+**OpenAPI reference:** See `docs/api/components/schemas/controlplane.yaml#/RunSummary`
+for the formal schema definition.
+
+#### RunSummary fields
+
+| Field        | Type                        | Description                                       |
+|--------------|-----------------------------|---------------------------------------------------|
+| `run_id`     | string (KSUID)              | Unique run identifier (27 characters).            |
+| `state`      | string (enum)               | Lifecycle state: `pending`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`. |
+| `submitter`  | string (optional)           | Submitter identifier (e.g., user email).          |
+| `repository` | string                      | Git repository URL.                               |
+| `metadata`   | map[string]string           | Additional diagnostics (see below).               |
+| `created_at` | string (RFC 3339)           | Run creation timestamp.                           |
+| `updated_at` | string (RFC 3339)           | Timestamp of the latest status update.            |
+| `stages`     | map[string]StageStatus      | Job execution states keyed by job ID.             |
+
+**Metadata keys:**
+
+- `repo_base_ref`, `repo_target_ref`: Git refs used for this run.
+- `node_id`: ID of the node that claimed/executed the run.
+- `mr_url`: Merge request URL when available (GitLab/GitHub).
+- `gate_summary`: Build Gate health summary from run stats.
+- `reason`: Terminal failure/cancellation reason when available.
+- `resume_count`, `last_resumed_at`: Resume history when present.
+
+#### stages map semantics
+
+The `stages` field is a map keyed by **job ID** (`jobs.id`, KSUID string). Each
+value is a `StageStatus` object describing that job's execution state.
+
+**Key semantics:**
+
+- Keys are job IDs (KSUID strings), **not** job names or step indices.
+- Use `step_index` within each `StageStatus` for ordering jobs in multi-step runs.
+- Typical entries: `pre-gate`, `mod-0`, `post-gate` jobs, plus dynamically inserted
+  `heal-*` and `re-gate` jobs for healing flows.
+
+#### StageStatus fields
+
+| Field           | Type                | Description                                         |
+|-----------------|---------------------|-----------------------------------------------------|
+| `state`         | string (enum)       | Job state: `pending`, `queued`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`. |
+| `attempts`      | int                 | Number of execution attempts for this job.          |
+| `max_attempts`  | int                 | Maximum allowed attempts.                           |
+| `current_job_id`| string (optional)   | Execution job ID (may differ in retry scenarios).   |
+| `artifacts`     | map[string]string   | Artifact logical names → bundle CIDs.               |
+| `last_error`    | string (optional)   | Error message from the most recent failed attempt.  |
+| `step_index`    | int                 | Float index from `jobs.step_index` for ordering.    |
+
+**step_index values:**
+
+- Pre-gate: 1000
+- First mod: 2000
+- Post-gate: 3000
+- Healing jobs: midpoints (e.g., 1500, 1750)
+
+#### Example response
+
+```json
+{
+  "run_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+  "state": "running",
+  "repository": "https://github.com/org/repo.git",
+  "metadata": {
+    "repo_base_ref": "main",
+    "repo_target_ref": "feature-branch",
+    "node_id": "aB3xY9"
+  },
+  "created_at": "2025-01-15T10:00:00Z",
+  "updated_at": "2025-01-15T10:05:00Z",
+  "stages": {
+    "2NQPoBfVkc8dFmGAQqJnUwMu9jS": {
+      "state": "succeeded",
+      "step_index": 1000
+    },
+    "2NQPoBfVkc8dFmGAQqJnUwMu9jT": {
+      "state": "running",
+      "step_index": 2000
+    },
+    "2NQPoBfVkc8dFmGAQqJnUwMu9jU": {
+      "state": "pending",
+      "step_index": 3000
+    }
+  }
+}
+```
 
 ### 2.2 Jobs and diffs
 
@@ -945,13 +1025,21 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 The event hub (`internal/stream/hub.go`) and HTTP wrapper (`internal/stream/http.go`)
 implement a minimal SSE protocol used by the Mods endpoints.
 
+**OpenAPI reference:** See `docs/api/paths/mods_id_events.yaml` for the formal
+endpoint specification and event payload schemas.
+
 ### 7.1 Event types
 
-- `"log"` — Enriched `LogRecord` with execution context (see below).
-- `"retention"` — `RetentionHint {retained, ttl, expires_at, bundle_cid}`.
-- `" run"` — `mods/api.RunSummary`.
-- `"done"` — `Status {status:"done"}` sentinel; the stream is finished and the
-  hub closes subscribers.
+| Event Type   | Payload Schema       | Description                                    |
+|--------------|----------------------|------------------------------------------------|
+| `run`        | `RunSummary`         | Run lifecycle snapshot (state changes)         |
+| `log`        | `LogRecord`          | Enriched log line with execution context       |
+| `retention`  | `RetentionHint`      | Artifact retention metadata                    |
+| `done`       | `Status`             | Terminal sentinel; stream closes after this    |
+
+**`event: run`** — Canonical `RunSummary` payload (see § 2.1). Published when run
+or job state changes. Clients can poll for the latest snapshot using the staged
+map and metadata fields.
 
 ### 7.2 LogRecord payload (`event: log`)
 
@@ -996,7 +1084,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 
 - `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
   retry streams.
-- `internal/cli/mods.EventsCommand` handles `" run"` and `"stage"` events
+- `internal/cli/mods.EventsCommand` handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
 - `internal/cli/runs.FollowCommand` and `ploy mods logs` focus on `"log"` and

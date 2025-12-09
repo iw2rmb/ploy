@@ -1,14 +1,25 @@
+# GET /v1/mods/{id}/events — SSE stream for run events
+#
+# Event payloads:
+# - `event: run` → RunSummary (canonical schema, no wrapper)
+# - `event: log` → LogRecord (enriched log line)
+# - `event: retention` → RetentionHint
+# - `event: done` → Terminal sentinel
+#
+# See docs/mods-lifecycle.md § 7 for complete SSE contract.
 parameters:
   - in: path
     name: id
     required: true
-    # Run IDs are KSUID strings (27 characters, lexicographically sortable).
-    schema: { type: string }
-    description: Run ID (KSUID string)
+    schema:
+      type: string
+    description: Run ID (KSUID string, 27 characters).
   - in: header
     name: Last-Event-ID
     required: false
-    description: Optional SSE resume token. Server replays events with id greater than this value.
+    description: |
+      Optional SSE resume token. Server replays events with `id` greater than
+      this value. Use for reconnection after network failures.
     schema:
       type: string
       example: "42"
@@ -16,45 +27,89 @@ get:
   tags: [Control]
   summary: Stream run events (SSE)
   description: |
-    Server-Sent Events stream of run (mods run) events. Supports `Last-Event-ID` header for resume.
+    Server-Sent Events stream for real-time run status and log updates.
+    Supports `Last-Event-ID` header for resume after reconnection.
 
-    ## Event types
+    ## Event Types
 
-    - `run` — Run lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
-    - `log` — Enriched log record with execution context (see LogRecord schema below).
-    - `retention` — Retention metadata hint (retained, ttl, expires_at, bundle_cid).
-    - `done` — Terminal sentinel; stream closes immediately after this frame.
+    | Event Type   | Payload Schema | Description                                    |
+    |--------------|----------------|------------------------------------------------|
+    | `run`        | `RunSummary`   | Run lifecycle snapshot (state changes)         |
+    | `log`        | `LogRecord`    | Enriched log line with execution context       |
+    | `retention`  | `RetentionHint`| Artifact retention metadata                    |
+    | `done`       | `Status`       | Terminal sentinel; stream closes after this    |
 
-    ## LogRecord payload (`event: log`)
+    ## `event: run` — Run Lifecycle Snapshots
 
-    Each `event: log` frame carries a JSON-encoded LogRecord:
+    Each `event: run` frame carries the canonical `RunSummary` schema:
+    - `run_id`: KSUID string (27 characters).
+    - `state`: `pending`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`.
+    - `repository`: Git repository URL.
+    - `metadata`: Derived context (refs, node_id, gate_summary, reason).
+    - `stages`: Map of job IDs (KSUID) to `StageStatus` objects.
+    - `created_at`, `updated_at`: RFC 3339 timestamps.
+
+    **Example:**
+    ```
+    event: run
+    data: {"run_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","state":"running","repository":"https://github.com/org/repo.git","metadata":{"node_id":"aB3xY9"},"created_at":"2025-01-15T10:00:00Z","updated_at":"2025-01-15T10:05:00Z","stages":{"2NQPoBfVkc8dFmGAQqJnUwMu9jS":{"state":"succeeded","step_index":1000}}}
+    ```
+
+    ## `event: log` — Enriched Log Records
+
+    Each `event: log` frame carries a JSON-encoded `LogRecord`:
 
     **Core fields (always present):**
-    - `timestamp` (string): RFC 3339 timestamp when the log line was captured.
-    - `stream` (string): Output stream, typically `stdout` or `stderr`.
-    - `line` (string): Log message content.
+    | Field       | Type   | Description                                       |
+    |-------------|--------|---------------------------------------------------|
+    | `timestamp` | string | RFC 3339 timestamp when the log line was captured |
+    | `stream`    | string | Output stream (`stdout` or `stderr`)              |
+    | `line`      | string | Log message content                               |
 
     **Enriched fields (optional, omitempty):**
-    - `node_id` (string): Node ID (NanoID 6-character string) of the execution node that produced this log line.
-    - `job_id` (string): Job ID (KSUID string) that produced this log line.
-    - `mod_type` (string): Mods step type — `pre_gate`, `mod`, `post_gate`, `heal`, or `re_gate`.
-    - `step_index` (int): Float index of the job within the pipeline (e.g., 1000, 2000, 3000).
+    | Field        | Type   | Description                                                      |
+    |--------------|--------|------------------------------------------------------------------|
+    | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
+    | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
+    | `mod_type`   | string | Job phase: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`     |
+    | `step_index` | int    | Float index of the job (e.g., 1000, 2000, 3000)                  |
 
     **Example:**
     ```
     event: log
-    data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","mod_type":"mod","step_index":2000}
+    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","mod_type":"mod","step_index":2000}
     ```
 
-    Enriched fields may be empty for events not tied to a specific job or when context is unavailable.
-    See `docs/mods-lifecycle.md` § 7.2 for the complete payload specification.
+    ## `event: retention` — Retention Metadata
+
+    Emitted when artifact retention status changes:
+    ```
+    event: retention
+    data: {"retained":true,"ttl":86400,"expires_at":"2025-01-16T10:00:00Z","bundle_cid":"QmXyz..."}
+    ```
+
+    ## `event: done` — Terminal Sentinel
+
+    Signals stream completion. The server closes the connection after this event:
+    ```
+    event: done
+    data: {"status":"done"}
+    ```
+
+    See `docs/mods-lifecycle.md` § 7 for the complete SSE contract specification.
   responses:
     '200':
-      description: OK
+      description: OK — SSE stream established.
       content:
         text/event-stream:
           schema:
             type: string
-    '400': { description: Bad Request }
-    '404': { description: Not Found }
-    '500': { description: Internal Server Error }
+            description: |
+              Server-Sent Events stream. Each frame consists of `event:` type and
+              `data:` JSON payload. See description above for payload schemas.
+    '400':
+      description: Bad Request — missing or invalid run ID.
+    '404':
+      description: Not Found — run does not exist.
+    '500':
+      description: Internal Server Error.

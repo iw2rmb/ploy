@@ -1,12 +1,46 @@
+# POST /v1/mods — Submit a Mods run
+#
+# Canonical response: RunSummary (no wrapper types).
+# See docs/api/components/schemas/controlplane.yaml#/RunSummary for schema.
 post:
   tags: [Control]
   summary: Submit Mods run
   description: |
-    Submit a new Mods run using a repository URL and Git refs. The
-    server creates the repository entry if it does not exist, creates a
-    mod with the provided `spec` (or `{}`), and enqueues a run. The
-    response includes a canonical `RunSummary` (KSUID `run_id`, `state`,
-    repository, metadata, and stages map).
+    Submit a new Mods run using a repository URL and Git refs. The server:
+
+    1. Creates the repository entry if it does not exist.
+    2. Creates jobs for the run (pre-gate, mod, post-gate) based on the `spec`.
+    3. Enqueues the run with initial state `pending`.
+    4. Returns a canonical `RunSummary` response.
+
+    **Response contract**:
+    - Returns `RunSummary` directly (no wrapper types).
+    - `run_id` is a KSUID string (27 characters, lexicographically sortable).
+    - `stages` is a map keyed by job ID (KSUID string), not job name.
+    - Use `step_index` within each `StageStatus` for ordering jobs.
+
+    **Example response**:
+    ```json
+    {
+      "run_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+      "state": "pending",
+      "repository": "https://github.com/org/repo.git",
+      "metadata": {
+        "repo_base_ref": "main",
+        "repo_target_ref": "feature-branch"
+      },
+      "created_at": "2025-01-15T10:00:00Z",
+      "updated_at": "2025-01-15T10:00:00Z",
+      "stages": {
+        "2NQPoBfVkc8dFmGAQqJnUwMu9jS": {
+          "state": "pending",
+          "step_index": 1000
+        }
+      }
+    }
+    ```
+
+    See `docs/mods-lifecycle.md` § 2.1 for the complete data model reference.
   requestBody:
     required: true
     content:
@@ -15,19 +49,19 @@ post:
           $ref: '../components/schemas/controlplane.yaml#/RunSubmitRequest'
   responses:
     '201':
-      description: Created (run accepted and queued for execution)
+      description: Created — run accepted and queued for execution.
       content:
         application/json:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/RunSummary'
     '400':
-      description: Bad request
+      description: Bad request — missing or invalid fields in the request body.
       content:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '500':
-      description: Server error
+      description: Internal server error.
       content:
         application/json:
           schema:

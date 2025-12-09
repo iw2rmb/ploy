@@ -282,32 +282,56 @@ RunSubmitRequest:
     created_by: { type: string, nullable: true }
   required: [repo_url, base_ref, target_ref]
 
+# RunSummary — Canonical Mods run status schema
+#
+# This is the single authoritative response type for:
+# - POST /v1/mods (submit) → 201 response body
+# - GET /v1/mods/{id} (status) → 200 response body
+# - SSE `event: run` payloads on /v1/mods/{id}/events
+#
+# Wire contract guarantees:
+# - No wrapper types — RunSummary is returned directly as the JSON root.
+# - Field names are stable and match internal/mods/api/types.go exactly.
+# - All IDs use KSUID format (27 characters, lexicographically sortable).
+#
+# See docs/mods-lifecycle.md § 2.1 for the complete data model reference.
 RunSummary:
   type: object
-  # Canonical Mods run schema used by POST /v1/mods (submit),
-  # GET /v1/mods/{id} (status), and SSE `run` events.
-  # Note: run_id is now a KSUID-backed string (27 characters).
+  description: |
+    Canonical Mods run status schema. This is the single response type for run
+    submission (POST /v1/mods), status queries (GET /v1/mods/{id}), and SSE
+    `event: run` payloads. No wrapper types are used — the JSON shape is
+    RunSummary directly.
   properties:
     run_id:
       type: string
-      description: "Run ID (KSUID string)"
+      description: |
+        Unique run identifier (KSUID string, 27 characters). KSUIDs are
+        lexicographically sortable by creation time.
+      example: "2NQPoBfVkc8dFmGAQqJnUwMu9jR"
     state:
       type: string
-      description: Run lifecycle state (`pending`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`).
+      description: |
+        Run lifecycle state. Terminal states are `succeeded`, `failed`, and `cancelled`.
+      enum: [pending, running, succeeded, failed, cancelling, cancelled]
     submitter:
       type: string
-      description: "Optional submitter identifier"
+      description: Optional submitter identifier (e.g., user email or CI system).
       nullable: true
     repository:
       type: string
-      description: "Repository URL for this run"
+      description: Git repository URL (https, ssh, or file scheme).
+      example: "https://github.com/org/repo.git"
     metadata:
       description: |
-        Additional run metadata. Contains derived failure/cancellation context and diagnostics:
-        - `repo_base_ref`, `repo_target_ref`: Git refs used for this run.
-        - `mr_url`: Merge request URL when available.
-        - `gate_summary`: Gate health summary from stats.
-        - `node_id`: Claiming node identifier.
+        Additional run metadata as string key-value pairs. Contains derived
+        failure/cancellation context and diagnostics:
+        - `repo_base_ref`: Base Git ref used for this run (e.g., "main").
+        - `repo_target_ref`: Target Git ref for the run (e.g., "feature-branch").
+        - `mr_url`: Merge request URL when available (GitLab/GitHub).
+        - `gate_summary`: Build Gate health summary from run stats.
+        - `node_id`: ID of the node that claimed/executed the run.
+        - `reason`: Terminal failure/cancellation reason when available.
         - `resume_count`, `last_resumed_at`: Resume history when present.
       type: object
       additionalProperties:
@@ -315,45 +339,80 @@ RunSummary:
     created_at:
       type: string
       format: date-time
-      description: "Run creation timestamp"
+      description: Run creation timestamp (RFC 3339).
     updated_at:
       type: string
       format: date-time
-      description: "Timestamp of the latest status update"
+      description: Timestamp of the latest status update (RFC 3339).
     stages:
       description: |
-        Map keyed by job ID (`jobs.id`, KSUID string). Each value is a StageStatus summarising
-        job execution state and artifacts. The key is the job's ID (KSUID string).
+        Map of job execution states keyed by job ID. Each key is a KSUID string
+        (`jobs.id` from the database) and each value is a StageStatus object
+        describing that job's execution state, artifacts, and ordering.
+
+        **Key semantics**: Keys are job IDs (KSUID strings), not job names or
+        step indices. Use `step_index` within each StageStatus for ordering
+        jobs in multi-step runs.
+
+        **Typical entries**: `pre-gate`, `mod-0`, `post-gate` jobs, plus any
+        dynamically inserted `heal-*` and `re-gate` jobs for healing flows.
       type: object
       additionalProperties:
-        type: object
-        properties:
-          state:
-            type: string
-            description: Stage lifecycle state (`pending`, `queued`, `running`, `succeeded`, `failed`, `cancelling`, `cancelled`).
-          attempts:
-            type: integer
-            format: int32
-          max_attempts:
-            type: integer
-            format: int32
-          current_job_id:
-            type: string
-            nullable: true
-            description: "Execution job ID (KSUID string) when applicable"
-          artifacts:
-            type: object
-            additionalProperties:
-              type: string
-            description: "Map of artifact logical names to bundle CIDs"
-          last_error:
-            type: string
-            description: "Last error message when the stage failed"
-          step_index:
-            type: integer
-            format: int32
-            description: "Float index from jobs.step_index, exposed as integer for API consumers"
+        $ref: '#/StageStatus'
   required: [run_id, state, repository, created_at, updated_at, stages]
+
+# StageStatus — Job execution state within a RunSummary.stages map
+#
+# Each StageStatus corresponds to a row in the `jobs` table. The parent map
+# key is the job ID (KSUID string); use step_index for ordering jobs.
+StageStatus:
+  type: object
+  description: |
+    Job execution state within a RunSummary. Each StageStatus maps to a row
+    in the `jobs` table, identified by its job ID (the parent map key).
+  properties:
+    state:
+      type: string
+      description: |
+        Job lifecycle state. Terminal states are `succeeded`, `failed`, and `cancelled`.
+      enum: [pending, queued, running, succeeded, failed, cancelling, cancelled]
+    attempts:
+      type: integer
+      format: int32
+      description: Number of execution attempts for this job.
+    max_attempts:
+      type: integer
+      format: int32
+      description: Maximum allowed attempts before marking the job as failed.
+    current_job_id:
+      type: string
+      nullable: true
+      description: |
+        Execution job ID (KSUID string). For most jobs, this equals the map key.
+        May differ in retry scenarios where a new job is created for retries.
+    artifacts:
+      type: object
+      additionalProperties:
+        type: string
+      description: |
+        Map of artifact logical names to bundle CIDs. Example entries:
+        - `"output"`: CID of the primary output bundle.
+        - `"logs"`: CID of captured execution logs.
+    last_error:
+      type: string
+      nullable: true
+      description: Human-readable error message from the most recent failed attempt.
+    step_index:
+      type: integer
+      format: int32
+      description: |
+        Float index from `jobs.step_index`, exposed as integer for API consumers.
+        Used to order jobs in multi-step runs:
+        - Pre-gate: 1000
+        - First mod: 2000
+        - Post-gate: 3000
+        - Healing jobs: midpoints (e.g., 1500, 1750)
+  required: [state]
 
 # Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
