@@ -81,10 +81,14 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Node worker endpoints
 	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st, eventsService), auth.RoleWorker)
+	// claimJobHandler now publishes SSE "running" events directly when the run
+	// transitions from 'queued' to 'running'. The separate ackRunStartHandler
+	// endpoint has been removed — claim is the canonical place for run lifecycle events.
+	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder, eventsService), auth.RoleWorker)
 	// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
 	// Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
+	// NOTE: The ack endpoint (/v1/nodes/{id}/ack) has been removed. Run status
+	// transitions and SSE events are now handled in claimJobHandler.
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
 

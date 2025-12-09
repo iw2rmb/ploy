@@ -13,6 +13,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -27,7 +29,10 @@ import (
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
 // Jobs transition directly from 'pending' to 'running' on claim (no 'assigned' intermediate state).
-func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
+//
+// When the run transitions from 'queued' to 'running' on first job claim, the handler
+// publishes an SSE "running" event so clients can track run lifecycle in real-time.
+func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -78,10 +83,27 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Transition run to 'running' if it's still queued.
+		// Transition run to 'running' if it's still queued. This is the canonical
+		// place for run status transition — no separate ack endpoint is needed.
+		// When the transition succeeds, publish an SSE "running" event so clients
+		// can track run lifecycle in real-time.
 		if run.Status == store.RunStatusQueued {
 			if err := st.AckRunStart(r.Context(), run.ID); err != nil {
 				slog.Warn("claim: failed to ack run start", "run_id", run.ID, "err", err)
+			} else if eventsService != nil {
+				// Publish SSE "running" event for real-time client updates.
+				// Build a RunSummary with the new running state.
+				runSummary := modsapi.RunSummary{
+					RunID:      domaintypes.RunID(run.ID),
+					State:      modsapi.RunStateRunning,
+					Repository: run.RepoUrl,
+					CreatedAt:  run.CreatedAt.Time,
+					UpdatedAt:  time.Now().UTC(),
+					Stages:     make(map[string]modsapi.StageStatus),
+				}
+				if err := eventsService.PublishRun(r.Context(), run.ID, runSummary); err != nil {
+					slog.Error("claim: publish run event failed", "run_id", run.ID, "err", err)
+				}
 			}
 		}
 

@@ -868,9 +868,9 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/nodes/{id}/heartbeat` — report node liveness.
 - `POST /v1/nodes/{id}/claim` — claim the next pending job from the unified
   jobs queue (FIFO by `step_index`; returns the claimed job plus parent run
-  metadata).
-- `POST /v1/nodes/{id}/ack` — confirm job start (transitions the parent run to
-  `running` when still queued).
+  metadata). This endpoint now transitions the parent run to `running` when
+  still queued and publishes SSE "running" events for real-time client updates.
+  (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
   (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -55,9 +57,9 @@ func TestClaimJob_Success(t *testing.T) {
 		},
 	}
 
-	// Create handler with empty config holder.
+	// Create handler with empty config holder and nil events service.
 	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
 	req.SetPathValue("id", nodeID)
@@ -186,7 +188,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		Secret: false,
 	})
 
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
 	req.SetPathValue("id", nodeID)
@@ -250,7 +252,7 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
 	req.SetPathValue("id", nodeID)
@@ -282,7 +284,7 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
 	req.SetPathValue("id", nodeID)
@@ -309,7 +311,7 @@ func TestClaimJob_EmptyNodeID(t *testing.T) {
 
 	st := &mockStore{}
 	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	// Note: "invalid-uuid" is now a valid NanoID string ID, so we only test empty ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//claim", nil)
@@ -363,7 +365,7 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
 	req.SetPathValue("id", nodeID)
@@ -382,5 +384,93 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 	}
 	if st.ackRunStartParam != runID.String() {
 		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
+	}
+}
+
+// TestClaimJob_PublishesRunningEvent verifies that when claiming a job on a
+// queued run, an SSE "running" event is published to notify clients in real-time.
+func TestClaimJob_PublishesRunningEvent(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now()
+	nodeIDStr := nodeID
+
+	// Mock store with a queued run - should trigger AckRunStart and SSE event.
+	st := &mockStore{
+		getNodeResult: store.Node{
+			ID: nodeID,
+		},
+		claimJobResult: store.Job{
+			ID:        jobID.String(),
+			RunID:     runID.String(),
+			NodeID:    &nodeIDStr,
+			Name:      "mod-0",
+			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
+			StepIndex: 2000,
+			Meta:      []byte("{}"),
+		},
+		getRunResult: store.Run{
+			ID:        runID.String(),
+			NodeID:    &nodeIDStr,
+			Status:    store.RunStatusQueued, // Still queued — triggers SSE event
+			RepoUrl:   "https://github.com/user/repo.git",
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			Spec:      []byte(`{}`),
+		},
+	}
+
+	// Create events service for SSE fanout.
+	eventsService, err := events.New(events.Options{
+		BufferSize:  10,
+		HistorySize: 100,
+	})
+	if err != nil {
+		t.Fatalf("failed to create events service: %v", err)
+	}
+
+	configHolder := &ConfigHolder{}
+	handler := claimJobHandler(st, configHolder, eventsService)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	// Verify response status is 200 OK.
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify AckRunStart was called.
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called")
+	}
+
+	// Verify SSE "running" event was published by checking the hub snapshot.
+	snapshot := eventsService.Hub().Snapshot(runID.String())
+	if len(snapshot) == 0 {
+		t.Fatal("expected at least one run event to be published")
+	}
+
+	// Verify the event type is "run" and contains "running" state.
+	foundRunEvent := false
+	for _, evt := range snapshot {
+		if evt.Type == "run" {
+			foundRunEvent = true
+			if !strings.Contains(string(evt.Data), "running") {
+				t.Errorf("expected run event data to contain 'running', got: %s", string(evt.Data))
+			}
+			break
+		}
+	}
+	if !foundRunEvent {
+		t.Error("expected to find a 'run' event in the snapshot")
 	}
 }
