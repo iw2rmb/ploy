@@ -29,7 +29,17 @@ import (
 // materialization for single- and multi-step runs.
 
 // submitRunHandler returns an HTTP handler that submits a new run (mods run).
-// POST /v1/mods — Accepts RunSubmitRequest, returns RunSummary (run_id is a KSUID string).
+//
+// Endpoint: POST /v1/mods
+// Request:  RunSubmitRequest {repo_url, base_ref, target_ref?, commit_sha?, spec?, created_by?}
+// Response: 201 Created with RunSummary body (canonical schema, no wrapper types)
+//
+// Canonical contract (see docs/mods-lifecycle.md § 2.1):
+//   - Returns RunSummary directly as JSON root (no envelope or wrapper types).
+//   - HTTP 201 on success; no 202 or other legacy status codes.
+//   - run_id is a KSUID string (27 characters, lexicographically sortable).
+//   - stages map is keyed by job ID (KSUID), not job name.
+//
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
 func submitRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -164,9 +174,17 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 }
 
 // getRunStatusHandler returns an HTTP handler that fetches run status by ID.
-// GET /v1/mods/{id} — Returns RunSummary by run ID (KSUID string).
 //
-// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
+// Endpoint: GET /v1/mods/{id}
+// Response: 200 OK with RunSummary body (canonical schema, no wrapper types)
+//
+// Canonical contract (see docs/mods-lifecycle.md § 2.1):
+//   - Returns RunSummary directly as JSON root (no envelope or wrapper types).
+//   - HTTP 200 on success; 404 if run not found.
+//   - run_id is a KSUID string (27 characters).
+//   - stages map is keyed by job ID (KSUID), not job name; use step_index for ordering.
+//
+// Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
