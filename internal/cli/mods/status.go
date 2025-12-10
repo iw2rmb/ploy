@@ -121,14 +121,9 @@ func (c FetchRunStatusCommand) Run(ctx context.Context) (*RunStatusInfo, error) 
 		info.TargetRef = result.Metadata["repo_target_ref"]
 	}
 
-	// To get commit_sha, we need to query the underlying run record.
-	// However, the RunSummary API doesn't expose commit_sha directly.
-	// For mod run pull, we fetch the run via the node claim response pattern
-	// or use a separate endpoint. For now, we use the runs endpoint.
-	// TODO: The commit_sha is stored in runs.commit_sha but not exposed via GET /v1/mods/{id}.
-	// We'll need to either: (1) extend the API, or (2) use a different endpoint.
-	// For this implementation, we'll fetch from /v1/runs/{id} which exposes commit_sha.
-
+	// RunSummary does not expose commit_sha directly. Callers that need the
+	// pinned commit (such as `ploy mod run pull`) should use FetchRunWithCommitSHA
+	// against GET /v1/runs/{id} in addition to this helper.
 	return info, nil
 }
 
