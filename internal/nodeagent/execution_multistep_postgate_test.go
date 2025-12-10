@@ -337,9 +337,13 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 			},
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods": []any{
+				"strategies": []any{
 					map[string]any{
-						"image": "test/healer:latest",
+						"mods": []any{
+							map[string]any{
+								"image": "test/healer:latest",
+							},
+						},
 					},
 				},
 			},
