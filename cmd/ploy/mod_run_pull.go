@@ -1,8 +1,8 @@
 // mod_run_pull.go implements the `ploy mod run pull` subcommand surface for
 // pulling Mods diffs into the current git worktree.
 //
-// This file provides CLI routing, flag parsing, and git worktree validation
-// for the pull operation. The command enforces:
+// This file provides CLI routing, flag parsing, git worktree validation, and
+// run resolution for the pull operation. The command enforces:
 //   - Execution inside a git repository (via git rev-parse --is-inside-work-tree)
 //   - A clean working tree (no staged or unstaged changes via git status --porcelain=v1)
 //   - A resolvable git remote (default: "origin" via git remote get-url)
@@ -15,8 +15,11 @@
 // matching against server-side repo identifiers. The normalization strips trailing
 // slashes and .git suffixes, matching the semantics in internal/worker/hydration/git_fetcher.go.
 //
+// Run resolution uses the repo-centric API (/v1/repos/{repo_id}/runs) to locate
+// the correct run for the current repository, honoring both UUIDs and human-readable
+// run names while selecting the first matching result.
+//
 // Future implementation will:
-//   - Resolve the run via /v1/repos/{repo_id}/runs API
 //   - Fetch commit SHA and verify reachability
 //   - Create target branch and apply diffs
 package main
@@ -32,23 +35,28 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/cli/mods"
 )
 
 // handleModRunPull implements `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`.
-// Parses CLI flags, validates arguments, and enforces git worktree preconditions.
+// Parses CLI flags, validates arguments, enforces git worktree preconditions, and resolves the run.
 //
-// The function performs the following validations in order:
+// The function performs the following steps in order:
 //  1. Parses --origin and --dry-run flags, extracts <run-name|run-id> positional argument
 //  2. Verifies current directory is inside a git worktree
 //  3. Verifies working tree is clean (no staged or unstaged changes)
 //  4. Resolves and validates the specified git remote URL
+//  5. Calls the repo-centric API to list runs for the repository
+//  6. Resolves <run-name|run-id> to a unique run, preferring RunID match over Name match
+//  7. Captures ExecutionRunID, base_ref, target_ref, and attempt for subsequent steps
 //
 // Arguments:
 //   - args: remaining arguments after "pull" has been stripped (e.g., ["--dry-run", "my-run"])
 //   - stderr: writer for user-facing output and error messages
 //
-// Returns an error if argument parsing fails, preconditions are not met, or
-// git operations fail.
+// Returns an error if argument parsing fails, preconditions are not met, run resolution fails,
+// or git/API operations fail.
 func handleModRunPull(args []string, stderr io.Writer) error {
 	// Create a flag set for the pull subcommand.
 	// Use ContinueOnError to handle parse errors gracefully and show usage.
@@ -85,9 +93,9 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("unexpected argument: %s", rest[1])
 	}
 
-	// Create a context with a reasonable timeout for git operations.
-	// This prevents the command from hanging indefinitely on slow or unresponsive git operations.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Create a context with a reasonable timeout for git and API operations.
+	// This prevents the command from hanging indefinitely on slow or unresponsive operations.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	// Step 1: Verify we are inside a git worktree.
@@ -109,17 +117,97 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Normalize the origin URL for comparison with server-side repo identifiers.
-	// The raw URL is preserved for exact matching where needed (e.g., API calls).
+	// Normalize the origin URL for comparison/logging purposes.
+	// The raw URL is used for API calls to match stored run_repos.repo_url values.
 	normalizedOriginURL := normalizeRepoURLForCLI(rawOriginURL)
 
-	// Placeholder: print what would be done (will be replaced with actual API and diff logic).
-	_, _ = fmt.Fprintf(stderr, "mod run pull: would pull run %q from origin %q (dry-run: %v)\n",
+	// Step 4: Resolve the run via the repo-centric API.
+	// Use the raw origin URL as repo_id (URL-encoded for path segment) to match
+	// the stored run_repos.repo_url value populated via CreateRunRepoParams.RepoUrl.
+	resolvedRun, err := resolveRunForPull(ctx, rawOriginURL, runNameOrID)
+	if err != nil {
+		return err
+	}
+
+	// Log resolved run information for user visibility.
+	_, _ = fmt.Fprintf(stderr, "mod run pull: resolved run %q from origin %q (dry-run: %v)\n",
 		runNameOrID, *origin, *dryRun)
 	_, _ = fmt.Fprintf(stderr, "  raw origin URL: %s\n", rawOriginURL)
 	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
+	_, _ = fmt.Fprintf(stderr, "  run ID: %s\n", resolvedRun.RunID)
+	if resolvedRun.Name != nil && *resolvedRun.Name != "" {
+		_, _ = fmt.Fprintf(stderr, "  run name: %s\n", *resolvedRun.Name)
+	}
+	_, _ = fmt.Fprintf(stderr, "  repo status: %s\n", resolvedRun.RepoStatus)
+	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", resolvedRun.BaseRef)
+	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolvedRun.TargetRef)
+	_, _ = fmt.Fprintf(stderr, "  attempt: %d\n", resolvedRun.Attempt)
+	if resolvedRun.ExecutionRunID != nil && *resolvedRun.ExecutionRunID != "" {
+		_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", *resolvedRun.ExecutionRunID)
+	} else {
+		_, _ = fmt.Fprintf(stderr, "  execution run ID: (not set)\n")
+	}
+
+	// TODO: Future steps (per ROADMAP.md § "Diff Retrieval, Branch Creation, and Patch Application"):
+	// - Validate ExecutionRunID is set (if not, error with guidance)
+	// - Fetch run status via GET /v1/mods/{execution_run_id} to obtain commit_sha
+	// - Verify commit SHA reachability on origin remote
+	// - Create target branch at commit SHA
+	// - Download and apply Mods diffs
+	// - Handle --dry-run flag appropriately
 
 	return nil
+}
+
+// resolveRunForPull fetches runs for the given repository URL from the control plane
+// and resolves <run-name|run-id> to a unique run using the resolution rules from ROADMAP.md:
+//  1. First, try to match by RunID (exact string equality).
+//  2. If no RunID match, match against Name (after trimming spaces).
+//  3. Filter only runs whose RepoStatus indicates execution ran (succeeded, failed, skipped).
+//  4. If multiple results match the same name, select the first entry (API returns DESC by created_at).
+//  5. If no match found, return error.
+//
+// Parameters:
+//   - ctx: context for timeout and cancellation
+//   - repoURL: raw repository URL from git remote (used as repo_id in API call)
+//   - runNameOrID: the <run-name|run-id> argument from CLI
+//
+// Returns the resolved RepoRunSummary on success, or an error if resolution fails.
+func resolveRunForPull(ctx context.Context, repoURL, runNameOrID string) (*mods.RepoRunSummary, error) {
+	// Get control plane HTTP client.
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: %w", err)
+	}
+
+	// Fetch runs for this repository using the repo-centric API.
+	// Use limit=100 per ROADMAP.md specification to cover recent history.
+	cmd := mods.ListRunsForRepoCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		RepoURL: repoURL,
+		Limit:   100,
+		Offset:  0,
+	}
+
+	runs, err := cmd.Run(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: failed to list runs for repo: %w", err)
+	}
+
+	// If no runs found for this repo, return a clear error.
+	if len(runs) == 0 {
+		return nil, fmt.Errorf("mod run pull: no runs found for origin %q", repoURL)
+	}
+
+	// Resolve the run by name or ID using the resolution rules.
+	resolved := mods.ResolveRunForRepo(runs, runNameOrID)
+	if resolved == nil {
+		// Per ROADMAP.md: return clear error if no matching run found.
+		return nil, fmt.Errorf("mod run pull: no run found for %q and origin %q", runNameOrID, repoURL)
+	}
+
+	return resolved, nil
 }
 
 // ensureInsideGitWorktree verifies that the current working directory is inside

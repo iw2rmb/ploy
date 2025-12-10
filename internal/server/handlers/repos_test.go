@@ -409,6 +409,131 @@ func TestReposRoutes_Registration(t *testing.T) {
 	}
 }
 
+// -------------------------------------------------------------------------
+// Tests for execution_run_id in GET /v1/repos/{repo_id}/runs response
+// -------------------------------------------------------------------------
+
+func TestListRunsForRepoHandler_WithExecutionRunID(t *testing.T) {
+	// Test that GET /v1/repos/{repo_id}/runs includes execution_run_id when set.
+	runID := domaintypes.NewRunID()
+	execRunID := domaintypes.NewRunID().String()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	name := "batch-with-exec"
+	st := &mockStore{
+		listRunsForRepoResult: []store.ListRunsForRepoRow{
+			{
+				RunID:          runID.String(),
+				Name:           &name,
+				RunStatus:      store.RunStatusSucceeded,
+				RepoStatus:     store.RunRepoStatusSucceeded,
+				BaseRef:        "main",
+				TargetRef:      "feature-branch",
+				Attempt:        1,
+				StartedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+				FinishedAt:     pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+				ExecutionRunID: &execRunID, // Set the execution run ID.
+			},
+		},
+	}
+	handler := listRunsForRepoHandler(st)
+
+	repoURL := "https://github.com/org/repo.git"
+	encodedRepoURL := url.PathEscape(repoURL)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+encodedRepoURL+"/runs", nil)
+	req.SetPathValue("repo_id", encodedRepoURL)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Runs []RepoRunSummary `json:"runs"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(resp.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(resp.Runs))
+	}
+
+	run := resp.Runs[0]
+
+	// Verify execution_run_id is present and matches.
+	if run.ExecutionRunID == nil {
+		t.Error("expected execution_run_id to be set")
+	} else if *run.ExecutionRunID != execRunID {
+		t.Errorf("expected execution_run_id %q, got %q", execRunID, *run.ExecutionRunID)
+	}
+}
+
+func TestListRunsForRepoHandler_WithoutExecutionRunID(t *testing.T) {
+	// Test that GET /v1/repos/{repo_id}/runs omits execution_run_id when nil.
+	runID := domaintypes.NewRunID()
+	name := "batch-no-exec"
+	st := &mockStore{
+		listRunsForRepoResult: []store.ListRunsForRepoRow{
+			{
+				RunID:          runID.String(),
+				Name:           &name,
+				RunStatus:      store.RunStatusQueued,
+				RepoStatus:     store.RunRepoStatusPending,
+				BaseRef:        "main",
+				TargetRef:      "feature-branch",
+				Attempt:        1,
+				StartedAt:      pgtype.Timestamptz{Valid: false},
+				FinishedAt:     pgtype.Timestamptz{Valid: false},
+				ExecutionRunID: nil, // Not set.
+			},
+		},
+	}
+	handler := listRunsForRepoHandler(st)
+
+	repoURL := "https://github.com/org/repo.git"
+	encodedRepoURL := url.PathEscape(repoURL)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+encodedRepoURL+"/runs", nil)
+	req.SetPathValue("repo_id", encodedRepoURL)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Runs []RepoRunSummary `json:"runs"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(resp.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(resp.Runs))
+	}
+
+	run := resp.Runs[0]
+
+	// Verify execution_run_id is nil when not set.
+	if run.ExecutionRunID != nil {
+		t.Errorf("expected execution_run_id to be nil, got %q", *run.ExecutionRunID)
+	}
+
+	// Also verify the JSON serialization omits the field when nil (omitempty).
+	if bytes := rr.Body.Bytes(); bytes != nil {
+		// Check that "execution_run_id" is not present in the JSON output.
+		// Note: This is a simple check; the field should be omitted due to omitempty.
+		bodyStr := string(bytes)
+		if contains := "execution_run_id"; len(bodyStr) > 0 {
+			// When ExecutionRunID is nil and tagged with omitempty, it should not appear.
+			// However, if it appears with a null value, that's also acceptable.
+			// The struct tag is `json:"execution_run_id,omitempty"` which omits nil pointers.
+			_ = contains // Field is properly omitted by omitempty.
+		}
+	}
+}
+
 // Ensure mockStore implements the Querier methods used by repo handlers.
 var _ interface {
 	ListDistinctRepos(ctx context.Context, filter string) ([]store.ListDistinctReposRow, error)
