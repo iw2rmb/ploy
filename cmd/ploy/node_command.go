@@ -248,7 +248,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	// Prefer existing descriptor CA/client cert for future mTLS operations.
 	existing, loadErr := config.LoadDefault()
 	desc := config.Descriptor{
-		ClusterID:       config.ClusterID(cfg.ClusterID),
+		ClusterID:       cfg.ClusterID,
 		Address:         serverURL,
 		SSHIdentityPath: identityPath,
 	}

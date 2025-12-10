@@ -217,8 +217,8 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 				Timestamp: ts,
 				Stream:    "stdout",
 				Line:      line,
-				NodeID:    domaintypes.NodeID(jobCtx.NodeID), // Convert to domain type
-				JobID:     domaintypes.JobID(jobCtx.JobID),   // Convert to domain type
+				NodeID:    jobCtx.NodeID,
+				JobID:     jobCtx.JobID,
 				ModType:   jobCtx.ModType,
 				StepIndex: jobCtx.StepIndex,
 			}
@@ -232,8 +232,8 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 				Timestamp: ts,
 				Stream:    "stdout",
 				Line:      "[log decode error]",
-				NodeID:    domaintypes.NodeID(jobCtx.NodeID), // Convert to domain type
-				JobID:     domaintypes.JobID(jobCtx.JobID),   // Convert to domain type
+				NodeID:    jobCtx.NodeID,
+				JobID:     jobCtx.JobID,
 				ModType:   jobCtx.ModType,
 				StepIndex: jobCtx.StepIndex,
 			}
@@ -246,8 +246,8 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 		Timestamp: ts,
 		Stream:    "log",
 		Line:      string(log.Data),
-		NodeID:    domaintypes.NodeID(jobCtx.NodeID), // Convert to domain type
-		JobID:     domaintypes.JobID(jobCtx.JobID),   // Convert to domain type
+		NodeID:    jobCtx.NodeID,
+		JobID:     jobCtx.JobID,
 		ModType:   jobCtx.ModType,
 		StepIndex: jobCtx.StepIndex,
 	}
