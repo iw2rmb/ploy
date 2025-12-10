@@ -1,13 +1,10 @@
-// status.go provides CLI client implementations for fetching run status and diffs.
+// status.go provides CLI client implementations for fetching run details and diffs.
 //
-// This file implements:
-//   - FetchRunStatusCommand: Fetches run status via GET /v1/mods/{id} to obtain
-//     commit_sha, base_ref, target_ref, and repo_url for `ploy mod run pull`.
-//   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs
-//     and downloads each diff via GET /v1/diffs/{diff_id}?download=true.
-//
-// These commands support the `ploy mod run pull` workflow for reconstructing
-// Mods changes in a local git repository.
+// This file implements helpers used by `ploy mod run pull`:
+//   - FetchRunWithCommitSHA: Fetches full run details (including commit_sha)
+//     via GET /v1/runs/{id}.
+//   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs.
+//   - DownloadDiffCommand: Downloads a single diff via GET /v1/diffs/{diff_id}?download=true.
 package mods
 
 import (
@@ -24,108 +21,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// RunStatusInfo contains the run status fields needed by `ploy mod run pull`.
-// This is a simplified view of RunSummary focused on the fields required
-// for commit verification and branch creation.
-type RunStatusInfo struct {
-	// RunID is the run identifier (KSUID-backed string).
-	RunID string `json:"run_id"`
-
-	// State is the current run lifecycle state (pending, running, succeeded, etc.).
-	State string `json:"state"`
-
-	// RepoURL is the Git repository URL for this run.
-	RepoURL string `json:"repository"`
-
-	// BaseRef is the Git base ref used for this run (from metadata or defaults).
-	BaseRef string `json:"-"`
-
-	// TargetRef is the Git target ref for this run (from metadata or defaults).
-	TargetRef string `json:"-"`
-
-	// CommitSHA is the pinned commit SHA for this run, if available.
-	// Empty string if no commit was pinned when the run was created.
-	CommitSHA string `json:"-"`
-
-	// Metadata contains additional run metadata as key-value pairs.
-	Metadata map[string]string `json:"metadata"`
-}
-
-// FetchRunStatusCommand fetches run status via GET /v1/mods/{id}.
-// Used by `ploy mod run pull` to obtain commit_sha and verify run metadata
-// before creating branches and applying patches.
-type FetchRunStatusCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	RunID   string // Run ID (KSUID-backed string)
-}
-
-// Run executes GET /v1/mods/{id} and returns the run status info.
-// Extracts base_ref, target_ref, and commit_sha from the run record.
-func (c FetchRunStatusCommand) Run(ctx context.Context) (*RunStatusInfo, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("fetch run status: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("fetch run status: base url required")
-	}
-	if strings.TrimSpace(c.RunID) == "" {
-		return nil, fmt.Errorf("fetch run status: run id required")
-	}
-
-	// Build endpoint: /v1/mods/{id}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID))
-	if err != nil {
-		return nil, fmt.Errorf("fetch run status: build url: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("fetch run status: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch run status: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "fetch run status")
-	}
-
-	// Response structure mirrors RunSummary from internal/mods/api/types.go.
-	// We decode into a flexible structure to extract metadata fields.
-	var result struct {
-		RunID      string            `json:"run_id"`
-		State      string            `json:"state"`
-		Repository string            `json:"repository"`
-		Metadata   map[string]string `json:"metadata"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("fetch run status: decode response: %w", err)
-	}
-
-	info := &RunStatusInfo{
-		RunID:    result.RunID,
-		State:    result.State,
-		RepoURL:  result.Repository,
-		Metadata: result.Metadata,
-	}
-
-	// Extract base_ref and target_ref from metadata.
-	// The server stores these as "repo_base_ref" and "repo_target_ref" in metadata.
-	if result.Metadata != nil {
-		info.BaseRef = result.Metadata["repo_base_ref"]
-		info.TargetRef = result.Metadata["repo_target_ref"]
-	}
-
-	// RunSummary does not expose commit_sha directly. Callers that need the
-	// pinned commit (such as `ploy mod run pull`) should use FetchRunWithCommitSHA
-	// against GET /v1/runs/{id} in addition to this helper.
-	return info, nil
-}
 
 // FetchRunWithCommitSHA fetches full run details including commit_sha via GET /v1/runs/{id}.
 // This is used when we need the commit_sha that isn't exposed in the mods API.
