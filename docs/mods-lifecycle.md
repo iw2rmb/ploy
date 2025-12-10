@@ -670,7 +670,8 @@ on changes produced by a batch run without relying on MR-based workflows.
 │                                                                             │
 │  2. Fetch execution details                                                 │
 │     ├─ Use RepoRunSummary.execution_run_id to identify the child run        │
-│     └─ Call GET /v1/mods/{execution_run_id} to get commit_sha, target_ref   │
+│     └─ Call GET /v1/runs/{execution_run_id} to get commit_sha, base_ref,    │
+│        and target_ref                                                       │
 │                                                                             │
 │  3. Verify commit reachability                                              │
 │     └─ git fetch <origin> <commit_sha> --depth=1                            │
