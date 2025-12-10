@@ -90,7 +90,7 @@ Legend: [ ] todo, [x] done.
         - When `<run-name|run-id>` does not match any `RunID` but matches `Name`, the first matching `Name` is selected when multiple entries share the name.
 
 ## Diff Retrieval, Branch Creation, and Patch Application
-- [ ] Fetch commit SHA and diffs for the resolved run, create a new branch, and apply patches — Use the execution run id to locate the Mods run, verify the base commit exists on the origin remote, create the `target-ref` branch at that commit, and apply all stored diffs via `git apply`. Support `--dry-run` to perform all lookups and validations without mutating the git repository.
+- [x] Fetch commit SHA and diffs for the resolved run, create a new branch, and apply patches — Use the execution run id to locate the Mods run, verify the base commit exists on the origin remote, create the `target-ref` branch at that commit, and apply all stored diffs via `git apply`. Support `--dry-run` to perform all lookups and validations without mutating the git repository.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (mod_run_pull), internal/cli/mods (diffs and inspect clients), internal/server/handlers/mods_ticket.go, internal/nodeagent/execution.go, docs/api
   - Scope:
