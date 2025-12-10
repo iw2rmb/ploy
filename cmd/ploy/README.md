@@ -166,9 +166,58 @@ ploy mod run repo remove \
 | `mod run repo add`       | Attach a repository to an existing batch     |
 | `mod run repo remove`    | Detach a repository from a batch             |
 | `mod run repo restart`   | Re-queue a repo job with optional new branch |
+| `mod run pull`           | Pull Mods diffs into the current git worktree |
 | `runs follow <batch>`    | Follow logs for all repos in a batch         |
 
 See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
+
+### Pull Mods Changes Locally
+
+After a batch run completes, you can pull the Mods-generated changes into your local
+repository using `mod run pull`. This command reconstructs the Mods branch locally by
+fetching stored diffs from the control plane and applying them to a new branch.
+
+```bash
+# From a repo that participated in a Mods batch:
+cd service-a
+ploy mod run pull java17-fleet
+```
+
+**How it works:**
+1. Resolves `<run-name|run-id>` against the current git remote (default: `origin`).
+2. Verifies the working tree is clean (no uncommitted changes).
+3. Fetches the pinned `commit_sha` from the origin remote.
+4. Creates a new branch at that commit using the run's `target_ref`.
+5. Downloads and applies all stored Mods diffs via `git apply`.
+
+**Arguments:**
+- `<run-name|run-id>` — The batch name (passed via `--name`) or run ID (KSUID string).
+  When multiple runs match the same name, the most recent one is selected.
+
+**Flags:**
+- `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
+  repository has multiple remotes.
+- `--dry-run` — Validate and print planned actions without creating branches or applying
+  patches. Useful for previewing what changes would be pulled.
+
+**Examples:**
+
+```bash
+# Pull changes from a named batch run.
+ploy mod run pull java17-fleet
+
+# Preview what would be pulled without making changes.
+ploy mod run pull --dry-run my-batch
+
+# Pull from a run using a specific remote.
+ploy mod run pull --origin upstream 2xK9mNpL
+```
+
+**Requirements:**
+- Must be run inside a git repository.
+- Working tree must be clean (commit or stash changes first).
+- The origin remote URL must match the `repo_url` used when the run was created.
+- The run must have completed execution (`execution_run_id` must be set).
 
 ---
 

@@ -244,6 +244,31 @@ ploy mod inspect java17-fleet
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
 
+### Pull Changes Locally (Alternative to MR)
+
+Instead of reviewing changes via GitLab MRs, you can pull Mods-generated diffs directly
+into your local repository. This is useful for manual inspection, local testing, or
+when MR creation is not needed.
+
+```bash
+# After a batch run completes, pull changes locally:
+cd service-a
+ploy mod run pull java17-fleet
+
+# Preview what would be pulled:
+ploy mod run pull --dry-run java17-fleet
+```
+
+The `mod run pull` command:
+1. Resolves the run using your local git remote URL.
+2. Creates a new branch at the run's pinned commit.
+3. Applies all stored Mods diffs to reconstruct the changes.
+
+This approach complements MR-based workflows—you can use MRs for production changes
+while using `mod run pull` for local development and testing.
+
+See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
+
 ## Related Documentation
 
 - [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options

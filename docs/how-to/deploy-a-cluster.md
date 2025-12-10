@@ -242,6 +242,21 @@ dist/ploy runs follow fleet-upgrade
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full command reference.
 
+**Pull changes locally:** After a batch completes, developers can reconstruct Mods changes
+in their local repositories without relying on MRs:
+
+```bash
+# From a repo that participated in the batch:
+cd service-a
+ploy mod run pull fleet-upgrade
+
+# Preview without making changes:
+ploy mod run pull --dry-run fleet-upgrade
+```
+
+This creates a local branch at the pinned commit and applies all stored diffs. See
+`cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
+
 ## Reuse Existing Cluster
 
 When redeploying a Ploy server to a host that already contains a cluster, the deploy command automatically detects and reuses the existing cluster CA and server identity. This enables **idempotent** deployments: running `ploy cluster deploy` multiple times against the same host will not clobber PKI material or cluster identity.
