@@ -222,7 +222,13 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"mods":    []any{map[string]any{"image": "healer:latest"}},
+				"strategies": []any{
+					map[string]any{
+						"mods": []any{
+							map[string]any{"image": "healer:latest"},
+						},
+					},
+				},
 			},
 		},
 	}
