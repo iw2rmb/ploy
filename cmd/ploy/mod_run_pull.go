@@ -19,9 +19,13 @@
 // the correct run for the current repository, honoring both UUIDs and human-readable
 // run names while selecting the first matching result.
 //
-// Future implementation will:
-//   - Fetch commit SHA and verify reachability
-//   - Create target branch and apply diffs
+// The pull workflow then:
+//   - Uses RepoRunSummary.ExecutionRunID to locate the execution Mods run.
+//   - Fetches commit_sha, base_ref, and target_ref for the execution run.
+//   - Verifies commit reachability via `git fetch <origin> <commit_sha> --depth=1`.
+//   - Creates the target branch at the pinned commit and checks it out.
+//   - Downloads all Mods diffs and applies them via `git apply`, or prints the
+//     planned actions when --dry-run is set.
 package main
 
 import (
@@ -152,6 +156,14 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return err
 	}
 
+	// Surface repository URL and base_ref from the execution run for diagnostics.
+	if strings.TrimSpace(runDetails.RepoURL) != "" {
+		_, _ = fmt.Fprintf(stderr, "  run repository: %s\n", runDetails.RepoURL)
+	}
+	if strings.TrimSpace(runDetails.BaseRef) != "" {
+		_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", runDetails.BaseRef)
+	}
+
 	// Validate that commit_sha is available.
 	// Per ROADMAP.md: If commit_sha is empty, treat as a hard error.
 	if runDetails.CommitSHA == nil || strings.TrimSpace(*runDetails.CommitSHA) == "" {
@@ -197,8 +209,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %s (origin %q) and apply %d Mods diff(s)\n",
 			targetRef, commitSHA, *origin, len(diffs))
 		for i, diff := range diffs {
-			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (step %d, %d bytes gzipped)\n",
-				i+1, diff.ID, diff.StepIndex, diff.Size)
+			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
+				i+1, diff.ID, diff.Size)
 		}
 		return nil
 	}
