@@ -7,7 +7,7 @@ Documentation: ../auto/ROADMAP.md, cmd/ploy/README.md § "Batched Mod Runs", doc
 Legend: [ ] todo, [x] done.
 
 ## CLI Command Surface
-- [x] Add `ploy mod run pull` routing and flags — Expose the new subcommand and argument shape in the CLI entrypoint so users can invoke `ploy mod run pull <run-name|run-id> [<origin>] [--dry-run]` from within a git repository.
+- [x] Add `ploy mod run pull` routing and flags — Expose the new subcommand and argument shape in the CLI entrypoint so users can invoke `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>` from within a git repository.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (mods control-plane commands, mod run router)
   - Scope: 
