@@ -26,7 +26,7 @@ Legend: [ ] todo, [x] done.
       - Usage errors: missing `<run-name|run-id>` and invalid flag combinations return the expected error strings and usage output.
 
 ## Origin Resolution & Working Tree Safety
-- [ ] Enforce git worktree detection, clean state, and normalized origin URL — Ensure `mod run pull` runs only inside a git repository with a clean working tree and a resolvable remote; derive a normalized origin URL compatible with server-side repo identification.
+- [x] Enforce git worktree detection, clean state, and normalized origin URL — Ensure `mod run pull` runs only inside a git repository with a clean working tree and a resolvable remote; derive a normalized origin URL compatible with server-side repo identification.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (mod_run_pull helper), internal/worker/hydration (reference for normalization)
   - Scope:
