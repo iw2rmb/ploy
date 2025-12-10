@@ -57,9 +57,8 @@ type EventsCommand struct {
 	Printer EventsPrinter
 
 	// LogPrinter is an optional log printer for handling "log" events.
-	// When set, enriched log events are rendered using the shared logs.Printer,
-	// providing a consistent view for `mod run --follow`. When nil, log events
-	// are ignored (backward-compatible with existing behavior).
+	// When nil, EventsCommand creates a default structured logs.Printer that
+	// writes to Output so log events are always rendered alongside run/stage updates.
 	LogPrinter *logs.Printer
 }
 
@@ -82,10 +81,20 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if out == nil {
 		out = io.Discard
 	}
+
+	// Default run/stage printer.
 	printer := c.Printer
 	if printer == nil {
 		printer = SimplePrinter{out: out}
 	}
+
+	// Ensure log events are always rendered: when LogPrinter is nil, create a
+	// default structured printer that writes to the same output writer.
+	logPrinter := c.LogPrinter
+	if logPrinter == nil {
+		logPrinter = logs.NewPrinter(logs.FormatStructured, out)
+	}
+
 	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "events")
 	if err != nil {
 		return "", err
@@ -112,26 +121,24 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 				return fmt.Errorf("mods events: decode stage: %w", err)
 			}
 			printer.Stage(payload.Stage)
-		case "", "log":
-			// Handle log events when LogPrinter is configured (for unified log streaming).
-			// Empty event type is treated as "log" for backward compatibility with servers
-			// that omit the event type field.
-			if c.LogPrinter != nil && len(evt.Data) > 0 {
+		case "log":
+			// Handle log events using the shared log printer for unified log streaming.
+			if logPrinter != nil && len(evt.Data) > 0 {
 				var rec logs.LogRecord
 				if err := json.Unmarshal(evt.Data, &rec); err != nil {
 					return fmt.Errorf("mods events: decode log: %w", err)
 				}
-				c.LogPrinter.PrintLog(rec)
+				logPrinter.PrintLog(rec)
 			}
 		case "retention":
-			// Handle retention hints when LogPrinter is configured.
-			// Retention metadata is recorded for summary output at stream completion.
-			if c.LogPrinter != nil && len(evt.Data) > 0 {
+			// Handle retention hints; retention metadata is recorded for summary output
+			// at stream completion.
+			if logPrinter != nil && len(evt.Data) > 0 {
 				var hint logs.RetentionHint
 				if err := json.Unmarshal(evt.Data, &hint); err != nil {
 					return fmt.Errorf("mods events: decode retention: %w", err)
 				}
-				c.LogPrinter.RecordRetention(hint)
+				logPrinter.RecordRetention(hint)
 			}
 		default:
 			// ignore unknown event types
@@ -141,9 +148,9 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
 		return "", err
 	}
-	// Print retention summary if LogPrinter was configured (for unified log streaming).
-	if c.LogPrinter != nil {
-		c.LogPrinter.PrintRetentionSummary()
+	// Print retention summary when a log printer is available (for unified log streaming).
+	if logPrinter != nil {
+		logPrinter.PrintRetentionSummary()
 	}
 	return final, nil
 }
