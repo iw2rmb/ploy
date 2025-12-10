@@ -1,139 +1,173 @@
-# Remove backward compatibility code
+# ploy mod run pull
 
-Scope: Remove backward‑compatibility shims in CLI, control plane, nodeagent, workflow, and docs. Simplify contracts to a single canonical shape per surface (Mods API, endpoints, specs) assuming fresh redeploys only.
+Scope: Introduce a `ploy mod run pull` subcommand that replays Mods diffs into the current git worktree for a specific run/repository pair. The command resolves `<run-name|run-id>` plus the local git remote (default `origin`), enforces a clean working tree, normalizes the origin URL, verifies the run’s base commit is reachable from the remote, creates a new target branch, and applies the stored Mods diffs. A `--dry-run` flag validates and prints the planned operations without mutating the repository.
 
-Documentation: AGENTS.md, docs/mods-lifecycle.md, docs/api/OpenAPI.yaml, cmd/ploy/README.md, internal/mods/api/types.go, internal/server/handlers/*, internal/nodeagent/*, internal/workflow/contracts/*, internal/cli/*.
+Documentation: ../auto/ROADMAP.md, cmd/ploy/README.md § "Batched Mod Runs", docs/mods-lifecycle.md, docs/how-to/create-mr.md, docs/how-to/deploy-a-cluster.md, docs/envs/README.md, docs/api/OpenAPI.yaml, docs/api/components/schemas/controlplane.yaml, docs/api/paths/mods_id.yaml, docs/api/paths/mods_id_diffs.yaml, docs/api/paths/diffs_id.yaml, internal/worker/hydration/git_fetcher.go, internal/nodeagent/execution.go.
 
 Legend: [ ] todo, [x] done.
 
-## Mods API wire contracts
-- [x] Collapse Mods API responses to a single canonical type (no `ticket` wrapper, no legacy field names) — Ensure GET/POST /v1/mods return one consistent JSON schema.
-  - Repository: ploy
-  - Component: internal/mods/api, internal/server/handlers (mods_ticket.go), internal/cli/mods, cmd/ploy/mods_*.
-  - Scope: Replace `RunSubmitResponse`, `RunStatusResponse`, and `Ticket` wrapper usage in internal/mods/api/types.go and handler responses in internal/server/handlers/mods_ticket.go. Update callers in internal/cli/mods and tests in cmd/ploy/* and internal/server/handlers/* to use the new canonical type. Remove comments and docs that reference “backward compatibility” for `ticket` / `stages` naming.
-  - Snippets: Encode `modsapi.RunSummary` (or a new canonical struct) directly from handlers instead of `modsapi.RunStatusResponse{Ticket: summary}`.
-  - Tests: go test ./internal/mods/... ./internal/server/handlers/... ./cmd/ploy/... — All existing Mods status/submit tests must pass with updated types and response shapes.
+## CLI Command Surface
+- [ ] Add `ploy mod run pull` routing and flags — Expose the new subcommand and argument shape in the CLI entrypoint so users can invoke `ploy mod run pull <run-name|run-id> [<origin>] [--dry-run]` from within a git repository.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: cmd/ploy (mods control-plane commands, mod run router)
+  - Scope: 
+    - Extend `handleModRun` in `cmd/ploy/mod_run.go` to dispatch `args[0] == "pull"` to a new `handleModRunPull` helper instead of falling through to `executeModRun`.
+    - Implement `handleModRunPull(args []string, stderr io.Writer) error` in a new file `cmd/ploy/mod_run_pull.go` to keep pull-specific logic isolated from batch/list/repo handlers.
+    - Define argument order as `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`; treat a final non-flag argument as `<run-name|run-id>` and default `origin` to `"origin"` when `--origin` is omitted.
+    - On parse errors or missing `<run-name|run-id>`, print a focused usage line, e.g. `Usage: ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`, mirroring existing `printModRun*Usage` helpers.
+  - Snippets:
+    - Router extension in `cmd/ploy/mod_run.go`:
+      - `case "pull": return handleModRunPull(args[1:], stderr)`
+    - Flag parsing sketch in `cmd/ploy/mod_run_pull.go`:
+      - `fs := flag.NewFlagSet("mod run pull", flag.ContinueOnError); origin := fs.String("origin", "origin", "git remote to match (default origin)"); dryRun := fs.Bool("dry-run", false, "validate and print actions without mutating the repo")`
+  - Tests: 
+    - Add table-driven tests in `cmd/ploy/mod_run_batch_test.go` or a new `cmd/ploy/mod_run_pull_test.go` to verify:
+      - Routing: `handleModRun([]string{"pull", "r1"}, ...)` calls `handleModRunPull`.
+      - Usage errors: missing `<run-name|run-id>` and invalid flag combinations return the expected error strings and usage output.
 
-- [x] Decide and document the canonical Mods run status schema in OpenAPI/docs — Keep wire contracts discoverable and stable.
-  - Repository: ploy
-  - Component: docs/api, docs/mods-lifecycle.md.
-  - Scope: Update docs/api/OpenAPI.yaml and docs/mods-lifecycle.md to describe the new response shape for Mods submit/status and SSE events (no `ticket` wrapper, clarified `stages` semantics or a new field name if changed). Remove notes about “retained for API backward compatibility”.
-  - Snippets: N/A (documentation only).
-  - Tests: go test ./docs/... (if any doc validation) + manual review; ensure docs/api/verify_openapi_test.go still passes.
+## Origin Resolution & Working Tree Safety
+- [ ] Enforce git worktree detection, clean state, and normalized origin URL — Ensure `mod run pull` runs only inside a git repository with a clean working tree and a resolvable remote; derive a normalized origin URL compatible with server-side repo identification.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: cmd/ploy (mod_run_pull helper), internal/worker/hydration (reference for normalization)
+  - Scope:
+    - In `handleModRunPull`, detect that the current directory is inside a git worktree:
+      - Execute `git rev-parse --is-inside-work-tree` using the same `exec.CommandContext` pattern as `internal/worker/hydration/git_fetcher.go::runGitCommand`, with `GIT_TERMINAL_PROMPT=0` and `GIT_ASKPASS=echo` to avoid interactive prompts.
+      - If not inside a worktree, return an error like `mod run pull: must be run inside a git repository`.
+    - Require a clean working tree (no staged or unstaged changes) before making any modifications:
+      - Run `git status --porcelain=v1` in the repo root; if the output is non-empty, print a concise error: `mod run pull: working tree must be clean (commit or stash changes first)` and abort.
+    - Resolve the requested remote (default `"origin"` or the value of `--origin`):
+      - Call `git remote get-url <origin>` and capture `stdout`.
+      - If the remote does not exist, error: `mod run pull: git remote "<origin>" not found`.
+    - Normalize the origin URL using the same semantics as `internal/worker/hydration/git_fetcher.go::normalizeRepoURL`:
+      - Implement a small helper in the CLI (e.g., `normalizeRepoURLForCLI`) that trims whitespace, removes a trailing slash, and strips a trailing `.git` suffix from the remote URL string.
+      - Keep the raw remote URL string for exact equality where required (e.g., when calling `/v1/repos/{repo_id}/runs`), and use the normalized form only for comparison / matching.
+  - Snippets:
+    - Normalization reference from `internal/worker/hydration/git_fetcher.go`:
+      - `normalized := strings.TrimSpace(raw); normalized = strings.TrimSuffix(normalized, "/"); normalized = strings.TrimSuffix(normalized, ".git")`
+    - Clean-WT check:
+      - `git status --porcelain=v1` → treat any non-empty output as “dirty”.
+  - Tests:
+    - Unit tests in `cmd/ploy/mod_run_pull_test.go` using a temporary git repository:
+      - Dirty working tree (untracked or modified files) triggers a clear error and no further actions.
+      - Missing remote `origin` or a custom `--origin` fails with the expected error.
+      - Origin URL normalization removes `.git` and trailing slashes but leaves scheme and host intact.
 
-## Mods submit flow (CLI ↔ server)
-- [x] Remove dual response handling (201 vs 202) and simplified fallback payload from Mods submit CLI — Use a single canonical submit contract.
-  - Repository: ploy
-  - Component: internal/cli/mods (submit.go), cmd/ploy (mods commands).
-  - Scope: In internal/cli/mods/submit.go, drop the 202 path that decodes modsapi.RunSubmitResponse and the second POST that sends simplified `{repo_url,base_ref,target_ref,spec}`. Keep only the canonical request+response path (e.g., 201 with a single summary type). Update cmd/ploy tests that assert 202 or dual behavior.
-  - Snippets: Replace the switch on resp.StatusCode with a single case for the canonical status and error handling for all others.
-  - Tests: go test ./internal/cli/mods/... ./cmd/ploy/... — Submit tests must pass with a single response path.
+## Run & Repo Resolution
+- [ ] Resolve `<run-name|run-id>` plus origin repo to a unique Mods run/repo combination — Use the repo-centric API to locate the correct run for the current repository, honoring both UUIDs and human-readable run names while selecting the first matching result.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: cmd/ploy (mod_run_pull), internal/server/handlers/repos.go, internal/store/queries/run_repos.sql, docs/api
+  - Scope:
+    - Derive the repo identifier for the `/v1/repos/{repo_id}/runs` API:
+      - Use the raw origin URL string from `git remote get-url` as `repo_id` (URL-encoded for the path segment) so it matches the stored `run_repos.repo_url` value populated via `CreateRunRepoParams.RepoUrl`.
+      - If needed in future, consider documenting in `docs/envs/README.md` that `--repo-url` should match the git remote reported by `git remote get-url <origin>` to enable `mod run pull`.
+    - Call `GET /v1/repos/{repo_id}/runs?limit=N&offset=0` (start with `limit=100` to comfortably cover recent history), using the HTTP client from `resolveControlPlaneHTTP`.
+      - Reuse the response type `RepoRunSummary` from `internal/server/handlers/repos.go` on the CLI side (define a mirrored struct under `internal/cli/mods` or a new package to avoid import cycles).
+    - Implement run resolution rules:
+      - Treat the final positional argument as `<run-name|run-id>`.
+      - First, try to match `RepoRunSummary.RunID` by string equality (IDs are KSUID-backed strings but treated as opaque by the CLI).
+      - If no `RunID` match is found, match against `RepoRunSummary.Name` (after trimming spaces).
+      - Filter only runs whose `RepoStatus` indicates that execution actually ran (e.g., `succeeded`, `failed`, or `skipped`), not purely pending repos; this ensures diffs exist or meaningful errors are returned.
+      - If multiple results match the same name, **do not** error; select the first entry returned by the API, which is ordered by `run_repos.created_at DESC` per `ListRunsForRepo` (satisfies the “do not guard multiple run-name results (just select first)” requirement).
+      - If no matching run is found for the given `<run-name|run-id>` and origin, return: `mod run pull: no run found for <run-name|run-id> and origin <origin>`.
+    - Capture from the selected `RepoRunSummary`:
+      - Parent `run_id` (batch or single run) for diagnostics.
+      - `base_ref`, `target_ref`, and `attempt` for branch naming and logging.
+    - To support diff/commit lookup for the specific repo execution, extend the repo-centric API to surface the child execution run id associated with this `run_repos` row:
+      - Add `execution_run_id` (string, nullable) to `RepoRunSummary` in `internal/server/handlers/repos.go` and wire it from `run_repos.execution_run_id` (TEXT KSUID-backed column).
+      - Update `ListRunsForRepo` query in `internal/store/queries/run_repos.sql` (and generated `run_repos.sql.go`) to select `rr.execution_run_id` and alias it appropriately.
+      - Document the new field in `docs/api/components/schemas/controlplane.yaml#/RepoRunSummary` and ensure `docs/api/OpenAPI.yaml` references remain correct.
+  - Snippets:
+    - Existing `RepoRunSummary` in `internal/server/handlers/repos.go`:
+      - `type RepoRunSummary struct { RunID string \`json:"run_id"\`; Name *string \`json:"name,omitempty"\`; ... }`
+    - New field sketch (KSUID-backed string ID):
+      - `ExecutionRunID *string \`json:"execution_run_id,omitempty"\`` populated from `rr.execution_run_id` when non-null.
+  - Tests:
+    - Extend `internal/server/handlers/repos_test.go` to:
+      - Verify that `GET /v1/repos/{repo_id}/runs` includes `execution_run_id` when `run_repos.execution_run_id` is set.
+    - Add CLI tests in `cmd/ploy/mod_run_pull_test.go`:
+      - Use an httptest server that serves a canned `/v1/repos/{repo_id}/runs` response with multiple runs and confirm that:
+        - When `<run-name|run-id>` equals a `RunID` value, that entry is selected (ID selectors prefer `RunID`).
+        - When `<run-name|run-id>` does not match any `RunID` but matches `Name`, the first matching `Name` is selected when multiple entries share the name.
 
-- [x] Align server Mods submit handler with the canonical CLI contract — Avoid supporting legacy response shapes.
-  - Repository: ploy
-  - Component: internal/server/handlers (mods_ticket.go and related).
-  - Scope: Ensure POST /v1/mods always returns the chosen canonical status code and JSON shape. Remove any code that builds or accepts legacy submit responses tied to modsapi.RunSubmitResponse or other legacy envelopes.
-  - Snippets: N/A (implementation detail is handler-specific).
-  - Tests: go test ./internal/server/handlers/... — Mods submit handler tests must only reference the canonical contract.
+## Diff Retrieval, Branch Creation, and Patch Application
+- [ ] Fetch commit SHA and diffs for the resolved run, create a new branch, and apply patches — Use the execution run id to locate the Mods run, verify the base commit exists on the origin remote, create the `target-ref` branch at that commit, and apply all stored diffs via `git apply`. Support `--dry-run` to perform all lookups and validations without mutating the git repository.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: cmd/ploy (mod_run_pull), internal/cli/mods (diffs and inspect clients), internal/server/handlers/mods_ticket.go, internal/nodeagent/execution.go, docs/api
+  - Scope:
+    - Resolve the execution Mods run:
+      - Use `RepoRunSummary.ExecutionRunID` (string) as the Mods run id for status and diff queries.
+      - If `ExecutionRunID` is nil or empty, return a clear error: `mod run pull: execution run id missing for <run-name|run-id> (repo may not have started)`.
+    - Fetch run status to obtain base ref, target ref, and commit SHA:
+      - Call `GET /v1/mods/{id}` where `{id}` is the execution run id.
+      - Reuse `modsapi.TicketStatusResponse` decoding helpers from `cmd/ploy/mod_run_artifact.go` or `internal/cli/mods/inspect.go`, and surface:
+        - `repo_url` (for diagnostics; should match origin).
+        - `base_ref`, `target_ref`, and `commit_sha` from `RunStatus` (see `docs/api/components/schemas/controlplane.yaml#/RunStatus`).
+      - If `commit_sha` is empty, treat this as a hard error for `mod run pull` and prompt the user to rerun the Mods flow with commit pinning: `mod run pull: commit_sha is not available for this run; pull requires a pinned commit`.
+    - Verify commit SHA reachability on the origin remote:
+      - Run `git fetch <origin> <commit_sha> --depth=1` in the current repo using the same `runGitCommand` pattern (non-interactive).
+      - If fetch fails with “couldn't find remote ref” or similar, return: `mod run pull: commit <sha> not reachable from origin "<origin>" (force-push or mirror mismatch)` and abort without creating any branches.
+    - Create the target branch from the commit SHA, using fetch + branch instead of cloning:
+      - Determine the branch name:
+        - Prefer the per-repo `target_ref` from `RepoRunSummary.TargetRef` when present; otherwise, fall back to the execution run’s `target_ref` from `RunStatus`.
+      - Before creating the branch, check both local and remote collisions:
+        - `git show-ref --verify refs/heads/<target_ref>`; if it exists, fail with `mod run pull: branch "<target_ref>" already exists locally`.
+        - `git ls-remote --heads <origin> <target_ref>`; if it exists, fail with `mod run pull: branch "<target_ref>" already exists on remote "<origin>"`.
+      - Create the branch and switch to it:
+        - `git branch <target_ref> <commit_sha>`
+        - `git checkout <target_ref>`
+      - For `--dry-run`, **do not** execute the `git branch` or `git checkout` calls; instead, print a summary to stderr:
+        - `Would create branch "<target_ref>" at <commit_sha> (origin "<origin>") and apply Mods diffs`.
+    - Download and apply Mods diffs:
+      - Use the existing Mods diffs API:
+        - List diffs: `GET /v1/mods/{execution_run_id}/diffs`.
+        - For each diff id, download patch: `GET /v1/diffs/{diff_id}?download=true` (returns gzipped bytes).
+      - Prefer reusing or extending `internal/cli/mods.DiffsCommand` so that `mod run pull` can obtain **all** diffs for the run, not just the newest:
+        - Option A (minimal): add a helper (e.g., `ListAllDiffs`) under `internal/cli/mods` that mirrors the first part of `DiffsCommand.Run` but returns the full `diffs` array instead of printing or downloading a single patch.
+        - Option B: introduce a new command object (e.g., `DiffsListCommand`) that returns the list of diff IDs and metadata.
+      - For each diff:
+        - Decompress gzipped patch bytes using the same logic as `internal/nodeagent/execution.go::decompressPatch`.
+        - Skip empty patches (after trimming whitespace), matching `applyGzippedPatch` semantics.
+        - Apply the patch via `git apply` in the current worktree (no `--index`), using the same error reporting semantics as `applyGzippedPatch` (`git apply failed: <stderr>`).
+      - For `--dry-run`, do not call `git apply`; instead, print the number of diffs and their IDs, plus a summary of the approximate patch size, e.g.:
+        - `Would apply 3 Mods diffs for run <execution_run_id> onto branch "<target_ref>"`.
+    - On successful non-dry-run completion:
+      - Print a concise success message to stderr: `Applied N Mods diffs from run <run-id> to branch "<target_ref>" (origin "<origin>")`.
+  - Snippets:
+    - Commit fetch pattern from `internal/worker/hydration/git_fetcher.go::cloneAndCheckout`:
+      - `git fetch origin <commit_sha> --depth 1`
+    - Patch application reference from `internal/nodeagent/execution.go::applyGzippedPatch`:
+      - `cmd := exec.CommandContext(ctx, "git", "apply")` with `cmd.Dir = workspace`.
+  - Tests:
+    - Unit tests in `cmd/ploy/mod_run_pull_test.go` using a fake HTTP server and a temporary git repo:
+      - Happy path: reachable `commit_sha`, no existing branch, and non-empty diffs → branch created and `git apply` invoked; verify final HEAD matches expected commit and files are patched (simple file content assertion).
+      - Existing local or remote branch with the same `target_ref` short-circuits with appropriate error, and no `git apply` is performed.
+      - Unreachable `commit_sha` (simulated by failing `git fetch`) causes a clear error and no branch or patch application.
+      - `--dry-run` performs all HTTP and git validation steps but leaves the working tree and branch list unchanged.
 
-## Node vs job completion / ack / logs
-- [x] Remove node-based completion endpoint when job-level completion is canonical — Simplify node → server contract to /v1/jobs/{job_id}/complete only.
-  - Repository: ploy
-  - Component: internal/server/handlers (nodes_complete.go, jobs_complete.go), internal/nodeagent (statusuploader.go), router registration.
-  - Scope: Verify that internal/nodeagent/statusuploader.go only uses /v1/jobs/{job_id}/complete. Remove completeRunHandler and its route from internal/server/handlers/nodes_complete.go and the router wiring if unused. Delete tests that depend on /v1/nodes/{id}/complete.
-  - Snippets: N/A (mostly deletions and route changes).
-  - Tests: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodeagent and completion tests must pass using only the job-level endpoint.
-
-- [x] Remove ackRunStart backward-compatibility handler or narrow its role — Let claim/completion paths drive run status and events.
-  - Repository: ploy
-  - Component: internal/server/handlers/nodes_ack.go, internal/server/events, any nodeagent callers.
-  - Scope: Confirm whether any nodeagent or CLI code still calls /v1/nodes/{id}/runs/ack. If not needed, remove ackRunStartHandler, its route, and tests. If SSE “run started” events are still required, emit them from claim logic or completion instead of a separate ack endpoint.
-  - Snippets: N/A (handler deletion or simplification).
-  - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Run lifecycle and SSE tests must pass without the ack endpoint.
-
-- [x] Make events service mandatory for logs; remove direct store write fallbacks — Use a single logging path.
-  - Repository: ploy
-  - Component: internal/server/handlers (nodes_logs.go, runs_logs.go), internal/server/events.
-  - Scope: In createNodeLogsHandler and run logs handler, drop the `eventsService == nil` branches; require eventsService and always call CreateAndPublishLog. Update server wiring to always construct events.Service. Delete or adjust tests that exercised the direct st.CreateLog fallback.
-  - Snippets: Replace conditional eventService usage with a single call to eventsService.CreateAndPublishLog.
-  - Tests: go test ./internal/server/handlers/... ./internal/server/events/... — Log ingestion and SSE tests must pass with the events service required.
-
-## Spec, healing, and image compatibility
-- [x] Tighten Mods spec parsing to a single canonical shape — Stop supporting legacy single-mod `mod` fallbacks.
-  - Repository: ploy
-  - Component: internal/nodeagent/claimer_spec.go, internal/nodeagent/claimer_spec_test.go, cmd/ploy/mod_run_spec_parsing_test.go.
-  - Scope: In parseSpec, remove fallbacks that treat `mod` as a legacy single-mod spec when top-level fields are missing. Define and implement a canonical spec structure (e.g., multi-step `mods[]` plus structured healing config) and require it. Update tests that currently assert mixed legacy behavior.
-  - Snippets: Simplify parseSpec to handle only the canonical schema; delete branches that copy from `mod.*` into top-level fields for BC.
-  - Tests: go test ./internal/nodeagent/... ./cmd/ploy/... — Spec parsing tests must reflect only the canonical shape.
-
-- [x] Drop single-strategy healing fallback in maybeCreateHealingJobs — Require new healing configuration structure.
-  - Repository: ploy
-  - Component: internal/server/handlers/nodes_complete_healing.go.
-  - Scope: Remove the block that converts top-level `mods[]` into a single unnamed healing strategy “for backward compatibility.” Require callers to provide healing strategies via the new `build_gate_healing` schema. Update tests that depend on the single-strategy fallback.
-  - Snippets: Delete the `fallback to single-strategy form (mods[] at top level)` code path.
-  - Tests: go test ./internal/server/handlers/... — Healing behavior tests must configure healing explicitly via the canonical schema.
-
-- [x] Re-evaluate ModImage dual-form handling (string vs map) — Decision: Keep both forms as canonical.
-  - Repository: ploy
-  - Component: internal/workflow/contracts/mod_image.go, internal/nodeagent/manifest.go, docs/mods-lifecycle.md.
-  - Scope: Evaluated whether both universal string and stack-map forms should remain supported. Decision: **Keep both forms**. The dual-form design is intentional polymorphism (not backward compatibility) serving distinct use cases — universal images for simple configs, stack maps for per-tool optimization.
-  - Changes: Updated comments in mod_image.go, manifest.go, and docs/mods-lifecycle.md to clarify both forms are first-class canonical schema options (removed "backward compatibility" language that implied one form was legacy).
-  - Tests: go test ./internal/workflow/contracts/... ./internal/nodeagent/... — Image resolution tests confirm both forms work correctly.
-
-## Worker lifecycle / status snapshots
-- [x] Remove map-based status accessors in lifecycle cache — Use typed NodeStatus everywhere.
-  - Repository: ploy
-  - Component: internal/worker/lifecycle/cache.go, internal/worker/lifecycle/types.go, status providers/consumers.
-  - Scope: Find all callers of Cache.LatestStatusMap and migrate them to use Cache.LatestStatus and NodeStatus directly. Once all callers are updated, remove LatestStatusMap and any map-based SnapshotSource shims. Keep ToMap only if it is still used for JSON output; otherwise consider simplifying its shape.
-  - Snippets: Replace usages of LatestStatusMap with typed accessors on NodeStatus.
-  - Tests: go test ./internal/worker/... — Worker lifecycle and status reporting tests must pass without map-based helpers.
-
-## Nodeagent options and manifest BC
-- [x] Remove raw options map round-trip when typed RunOptions is sufficient — Reduce duplicate state.
-  - Repository: ploy
-  - Component: internal/nodeagent/run_options.go, internal/nodeagent/run_options_test.go, internal/nodeagent/manifest.go.
-  - Scope: Audit how RunOptions and the raw options map are used. If all consumers can operate on RunOptions, remove the need to preserve the raw map "for backward compatibility" and update tests that assert its presence. Simplify manifest and step builders to use only typed fields.
-  - Snippets: Delete fields and methods that exist solely to mirror raw map[string]any into RunOptions.
-  - Tests: go test ./internal/nodeagent/... — RunOptions and manifest tests must pass with typed-only options.
-
-- [x] Make manifest builders require explicit stack where appropriate — Avoid relying on "unknown" for BC.
-  - Repository: ploy
-  - Component: internal/nodeagent/manifest.go, internal/workflow/contracts/mod_image.go.
-  - Scope: Collapse buildManifestFromRequest wrapper into buildManifestFromRequestWithStack where callers can provide a concrete stack. For callers that truly cannot know the stack, document and keep the "unknown" path explicitly rather than labeling it as backward compatibility. Update tests to call the stack-aware builder directly.
-  - Snippets: Replace calls to buildManifestFromRequest with buildManifestFromRequestWithStack and explicit contracts.ModStack values.
-  - Tests: go test ./internal/nodeagent/... ./internal/workflow/contracts/... — Manifest tests must pass with explicit stack handling.
-  - Done: Collapsed buildManifestFromRequest and buildHealingManifest to require explicit stack parameter. Removed wrapper functions and updated all callers to pass explicit contracts.ModStack values. Gate jobs use ModStackUnknown since stack detection hasn't occurred. Production callers use detected stack from lifecycle cache. Tests pass explicit ModStackUnknown to document intentional unknown stack context.
-
-- [x] Tighten JobMeta JSON handling; treat legacy shapes as invalid if acceptable — Enforce structured metadata going forward.
-  - Repository: ploy
-  - Component: internal/workflow/contracts/job_meta.go.
-  - Scope: In UnmarshalJobMeta, reconsider "backward compatibility" behavior for empty `{}`/`null` and missing `kind`. If acceptable, change logic to require non-empty kind and return an error for invalid payloads (or handle them via explicit migration). Update tests accordingly.
-  - Snippets: Replace defaulting `m.Kind = JobKindMod` with validation and error handling.
-  - Tests: go test ./internal/workflow/contracts/... — Job meta tests must reflect the stricter expectations.
-  - Done: MarshalJobMeta now returns error for nil input and validates metadata before marshaling. UnmarshalJobMeta now rejects empty bytes, `{}`, `null`, missing `kind` field, and invalid kind values. Tests updated to expect errors for legacy shapes and verify descriptive error messages.
-
-## CLI surface and tests
-- [x] Remove deprecated CLI flags and BC mentions from docs — Simplify user-facing interface.
-  - Repository: ploy
-  - Component: cmd/ploy, cmd/ploy/README.md, relevant cobra command files.
-  - Scope: Remove deprecated flags like `--retry-wait` where the README says "preserved for backward compatibility," and update command help/usage strings. Adjust tests that rely on deprecated flags.
-  - Snippets: Delete flag declarations and update usage examples in cmd/ploy/README.md.
-  - Tests: go test ./cmd/ploy/... — CLI tests must pass without deprecated flags.
-  - Done: Removed `--retry-wait` flag from mod_run_flags.go, mods_jobs_commands.go (handleModsLogs and handleRunsFollow), mod_command.go usage summary, and testdata/help_mod.txt. Updated cmd/ploy/README.md to remove BC mentions and document that backoff is now handled by the shared SSE backoff policy. Removed RetryBackoff field from stream.Client struct and updated related tests. All CLI tests pass.
-
-- [x] Drop CLI type aliases kept solely for backward compatibility — Use canonical types directly.
-  - Repository: ploy
-  - Component: internal/cli/runs/follow.go, internal/cli/mods/logs.go, cmd/ploy/mods_jobs_commands.go.
-  - Scope: Remove `type Format = logs.Format` re-exports when no longer needed as a public API. Update any external or internal callers to import and use logs.Format directly (if any remain).
-  - Snippets: Replace usages of runs.Format/mods.Format with logs.Format where necessary.
-  - Tests: go test ./internal/cli/... — Logs/follow tests must pass with direct use of logs.Format.
-  - Done: Removed type aliases (`type Format = logs.Format`) and re-exported constants (`FormatStructured`, `FormatRaw`) from internal/cli/runs/follow.go and internal/cli/mods/logs.go. Struct fields now use `logs.Format` directly. Updated cmd/ploy/mods_jobs_commands.go to import and use logs.Format constants directly instead of package-level re-exports. Updated all tests in internal/cli/runs and internal/cli/mods to use logs.FormatStructured and logs.FormatRaw directly. ErrInvalidFormat errors remain package-specific for proper error context.
-
-- [x] Remove execute helper in main.go once tests are updated — Keep a single CLI entrypoint.
-  - Repository: ploy
-  - Component: cmd/ploy/main.go, cmd/ploy tests.
-  - Scope: Update tests that depend on execute(args, stderr) to instead construct and execute newRootCmd directly. After tests are updated, delete execute and its comment about backward compatibility.
-  - Snippets: Replace test calls to execute with rootCmd := newRootCmd(...); rootCmd.SetArgs(...); rootCmd.Execute().
-  - Tests: go test ./cmd/ploy/... — All CLI tests must pass without execute.
-  - Done: Added executeCmd test helper function in cli_test.go that wraps newRootCmd construction and execution. Migrated all 44 usages of execute() across 10 test files (mods_logs_test.go, cluster_command_test.go, mod_run_batch_test.go, help_flags_test.go, mod_resume_test.go, mod_run_repo_test.go, jobs_inspect_test.go, mod_inspect_test.go, mod_cancel_test.go, mod_artifacts_test.go) to use executeCmd() instead. Removed execute() function and its backward compatibility comment from main.go. All CLI tests pass without the legacy execute helper.
-
+## Documentation & OpenAPI Updates
+- [ ] Document `ploy mod run pull` behavior and keep API schema aligned — Update user-facing docs and OpenAPI definitions to describe the new workflow and any added fields used by the CLI.
+  - Repository: github.com/iw2rmb/ploy
+  - Component: docs (cmd/ploy/README.md, docs/mods-lifecycle.md, docs/how-to), docs/api
+  - Scope:
+    - Extend `cmd/ploy/README.md`:
+      - Add `mod run pull` to the command summary table and include a short usage example:
+        - From a repo that participated in a Mods batch: `ploy mod run pull java17-fleet` (reconstructs the Mods branch for the current origin).
+      - Clarify that `<run-name|run-id>` may be either the run ID (KSUID string) or the unique batch name passed via `--name`, and that `run-name|run-id + origin` selects the corresponding repo within that run.
+    - Update `docs/mods-lifecycle.md`:
+      - Add a subsection under the Mods workflow explaining how diffs stored in `diffs` are now consumable by the CLI via `mod run pull`, including a high-level sequence:
+        - Resolve run + repo, fetch `commit_sha`, create branch, apply diffs.
+      - Reference the normalization and clean working tree requirements for safety.
+    - Update `docs/how-to/create-mr.md` and `docs/how-to/deploy-a-cluster.md`:
+      - Add a short “pull locally” follow-up example after batch creation, e.g.:
+        - `cd service-a && ploy mod run pull java17-fleet`.
+    - Ensure OpenAPI docs match any API changes:
+      - If `RepoRunSummary` gains `execution_run_id`, update `docs/api/components/schemas/controlplane.yaml#/RepoRunSummary` and regenerate or adjust `docs/api/OpenAPI.yaml` references.
+  - Snippets:
+    - Example doc snippet for README:
+      - ```bash
+        # Reconstruct Mods changes for the current repo
+        ploy mod run pull java17-fleet
+        ```
+  - Tests:
+    - Run `go test ./docs/api/...` or the existing OpenAPI verification test (`docs/api/verify_openapi_test.go`) to confirm schema changes are wired correctly.
+    - Run `make test` to ensure new CLI tests and existing guardrails pass after documentation and schema updates.
