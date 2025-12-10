@@ -650,6 +650,95 @@ ploy mod run repo remove --repo-id <repo-id> my-batch
 | `diffs`      | Per-job workspace patches                      | diffs→child_run, diffs→job            |
 | `logs`       | Execution logs                                 | logs→child_run, logs→job              |
 
+### Pulling Diffs Locally (`mod run pull`)
+
+The `ploy mod run pull` command enables developers to reconstruct Mods-generated changes
+in their local git repository. This is useful for reviewing, testing, or continuing work
+on changes produced by a batch run without relying on MR-based workflows.
+
+**High-level sequence:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        mod run pull Workflow                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. Resolve run + repo                                                      │
+│     ├─ Get origin URL from `git remote get-url origin`                      │
+│     ├─ Call GET /v1/repos/{repo_id}/runs to list runs for this repo         │
+│     └─ Match <run-name|run-id> to find RepoRunSummary                       │
+│                                                                             │
+│  2. Fetch execution details                                                 │
+│     ├─ Use RepoRunSummary.execution_run_id to identify the child run        │
+│     └─ Call GET /v1/mods/{execution_run_id} to get commit_sha, target_ref   │
+│                                                                             │
+│  3. Verify commit reachability                                              │
+│     └─ git fetch <origin> <commit_sha> --depth=1                            │
+│                                                                             │
+│  4. Create branch                                                           │
+│     ├─ Check no local/remote collision for target_ref                       │
+│     ├─ git branch <target_ref> <commit_sha>                                 │
+│     └─ git checkout <target_ref>                                            │
+│                                                                             │
+│  5. Apply diffs                                                             │
+│     ├─ Call GET /v1/mods/{execution_run_id}/diffs to list diffs             │
+│     ├─ For each diff (ordered by step_index):                               │
+│     │   ├─ Download via GET /v1/diffs/{id}?download=true                    │
+│     │   ├─ Decompress gzipped patch                                         │
+│     │   └─ git apply (skip empty patches)                                   │
+│     └─ Print success summary                                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Preconditions enforced by the CLI:**
+
+- **Inside git worktree**: The command must be run from within a git repository.
+- **Clean working tree**: No staged or unstaged changes allowed (prevents data loss
+  and ensures deterministic patch application).
+- **Resolvable remote**: The specified `--origin` remote must exist and have a URL
+  that matches the `repo_url` stored in `run_repos`.
+
+**Key fields used:**
+
+| Field                            | Source                     | Purpose                                    |
+|----------------------------------|----------------------------|--------------------------------------------|
+| `run_repos.repo_url`             | API / run_repos table      | Match against local origin URL             |
+| `run_repos.execution_run_id`     | API / run_repos table      | Link to child run with diffs               |
+| `runs.commit_sha`                | API / runs table           | Pinned commit for branch creation          |
+| `run_repos.target_ref`           | API / run_repos table      | Branch name for the reconstructed changes  |
+| `diffs.step_index`               | API / diffs table          | Order diffs for correct application        |
+
+**API endpoints consumed:**
+
+- `GET /v1/repos/{repo_id}/runs` — List runs for the repository (repo_id is URL-encoded
+  origin URL).
+- `GET /v1/mods/{id}` — Fetch run details including `commit_sha`.
+- `GET /v1/mods/{id}/diffs` — List diffs for the execution run.
+- `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
+
+**Normalization:**
+
+The CLI normalizes the local origin URL by stripping trailing slashes and `.git` suffixes
+for comparison purposes. However, the raw URL is used for API calls to ensure exact
+matching against stored `run_repos.repo_url` values.
+
+**Example usage:**
+
+```bash
+# After a batch run completes:
+cd /path/to/service-a
+ploy mod run pull java17-fleet
+
+# Preview without making changes:
+ploy mod run pull --dry-run java17-fleet
+
+# Use a different remote:
+ploy mod run pull --origin upstream java17-fleet
+```
+
+See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
+
 ### Implementation references
 
 - Parent/child run creation: `internal/server/handlers/runs_batch_http.go`.

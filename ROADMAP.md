@@ -145,7 +145,7 @@ Legend: [ ] todo, [x] done.
       - `--dry-run` performs all HTTP and git validation steps but leaves the working tree and branch list unchanged.
 
 ## Documentation & OpenAPI Updates
-- [ ] Document `ploy mod run pull` behavior and keep API schema aligned — Update user-facing docs and OpenAPI definitions to describe the new workflow and any added fields used by the CLI.
+- [x] Document `ploy mod run pull` behavior and keep API schema aligned — Update user-facing docs and OpenAPI definitions to describe the new workflow and any added fields used by the CLI.
   - Repository: github.com/iw2rmb/ploy
   - Component: docs (cmd/ploy/README.md, docs/mods-lifecycle.md, docs/how-to), docs/api
   - Scope:
