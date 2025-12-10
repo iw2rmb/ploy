@@ -526,7 +526,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 
 	// Initialize gate executor using local Docker-based execution.
 	// All gates run via the container runtime.
-	gateExecutor := step.NewGateExecutor("", containerRuntime)
+	gateExecutor := step.NewGateExecutor(containerRuntime)
 
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	logStreamer := NewLogStreamer(r.cfg, runID, "")

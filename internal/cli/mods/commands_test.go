@@ -378,8 +378,8 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 	}
 }
 
-// TestEventsCommandWithoutLogPrinter verifies backward compatibility: when
-// LogPrinter is nil, log events are ignored and only run/stage events are processed.
+// TestEventsCommandWithoutLogPrinter verifies that when LogPrinter is nil,
+// EventsCommand still renders log events using a default structured printer.
 func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	t.Parallel()
 
@@ -394,7 +394,7 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 		// Send run, log, and run events.
 		events := []string{
 			"event: run\ndata: {\"run_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
-			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
+			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be printed\"}\n\n",
 			"event: run\ndata: {\"run_id\":\"t-nolog\",\"state\":\"succeeded\"}\n\n",
 		}
 		for _, evt := range events {
@@ -425,9 +425,9 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	}
 
 	out := buf.String()
-	// Log message should NOT appear since LogPrinter is nil.
-	if bytes.Contains([]byte(out), []byte("Should be ignored")) {
-		t.Errorf("log message should not appear when LogPrinter is nil, got: %s", out)
+	// Log message should appear even when LogPrinter is nil.
+	if !bytes.Contains([]byte(out), []byte("Should be printed")) {
+		t.Errorf("log message should appear when LogPrinter is nil, got: %s", out)
 	}
 	// Ticket state should still appear via SimplePrinter.
 	if !bytes.Contains([]byte(out), []byte("t-nolog")) {

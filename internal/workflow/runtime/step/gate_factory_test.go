@@ -7,14 +7,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestNewGateExecutor_DefaultLocalDocker verifies that empty mode returns docker executor.
+// TestNewGateExecutor_DefaultLocalDocker verifies that the factory returns a docker executor.
 func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
 	t.Parallel()
 
 	mockRT := &mockContainerRuntime{}
 
-	// Empty mode should default to local-docker.
-	executor := NewGateExecutor("", mockRT)
+	executor := NewGateExecutor(mockRT)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor for empty mode")
@@ -31,58 +30,11 @@ func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
 	}
 }
 
-// TestNewGateExecutor_ExplicitLocalDocker verifies "local-docker" mode returns docker executor.
-func TestNewGateExecutor_ExplicitLocalDocker(t *testing.T) {
-	t.Parallel()
-
-	mockRT := &mockContainerRuntime{}
-
-	// Explicit "local-docker" mode.
-	executor := NewGateExecutor(GateExecutorModeLocalDocker, mockRT)
-
-	if executor == nil {
-		t.Fatal("expected non-nil executor for local-docker mode")
-	}
-
-	// Verify it's a dockerGateExecutor.
-	result, err := executor.Execute(context.Background(), nil, "/workspace")
-	if err != nil {
-		t.Errorf("expected nil error, got: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil result for nil spec, got: %+v", result)
-	}
-}
-
-// TestNewGateExecutor_UnrecognizedModeFallback verifies that unrecognized mode falls back to docker.
-func TestNewGateExecutor_UnrecognizedModeFallback(t *testing.T) {
-	t.Parallel()
-
-	mockRT := &mockContainerRuntime{}
-
-	// Unrecognized mode should fall back to local-docker.
-	executor := NewGateExecutor("invalid-mode", mockRT)
-
-	if executor == nil {
-		t.Fatal("expected non-nil executor for fallback")
-	}
-
-	// Verify it's a dockerGateExecutor.
-	result, err := executor.Execute(context.Background(), nil, "/workspace")
-	if err != nil {
-		t.Errorf("expected nil error, got: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil result for nil spec (docker fallback), got: %+v", result)
-	}
-}
-
 // TestNewGateExecutor_NilRuntime verifies behavior with nil container runtime.
 func TestNewGateExecutor_NilRuntime(t *testing.T) {
 	t.Parallel()
 
-	// Local-docker mode with nil runtime.
-	executor := NewGateExecutor(GateExecutorModeLocalDocker, nil)
+	executor := NewGateExecutor(nil)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor even with nil runtime")
@@ -98,15 +50,6 @@ func TestNewGateExecutor_NilRuntime(t *testing.T) {
 	}
 	if result == nil {
 		t.Error("expected non-nil result (empty metadata) with nil runtime")
-	}
-}
-
-// TestNewGateExecutor_ModeConstant verifies mode constant is correct.
-func TestNewGateExecutor_ModeConstant(t *testing.T) {
-	t.Parallel()
-
-	if GateExecutorModeLocalDocker != "local-docker" {
-		t.Errorf("GateExecutorModeLocalDocker = '%s', want 'local-docker'", GateExecutorModeLocalDocker)
 	}
 }
 
