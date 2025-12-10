@@ -130,31 +130,96 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Log resolved run information for user visibility.
-	_, _ = fmt.Fprintf(stderr, "mod run pull: resolved run %q from origin %q (dry-run: %v)\n",
-		runNameOrID, *origin, *dryRun)
-	_, _ = fmt.Fprintf(stderr, "  raw origin URL: %s\n", rawOriginURL)
-	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
-	_, _ = fmt.Fprintf(stderr, "  run ID: %s\n", resolvedRun.RunID)
+	_, _ = fmt.Fprintf(stderr, "mod run pull: resolved run %q from origin %q\n", runNameOrID, *origin)
 	if resolvedRun.Name != nil && *resolvedRun.Name != "" {
 		_, _ = fmt.Fprintf(stderr, "  run name: %s\n", *resolvedRun.Name)
 	}
+	_, _ = fmt.Fprintf(stderr, "  run ID: %s\n", resolvedRun.RunID)
 	_, _ = fmt.Fprintf(stderr, "  repo status: %s\n", resolvedRun.RepoStatus)
-	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", resolvedRun.BaseRef)
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolvedRun.TargetRef)
-	_, _ = fmt.Fprintf(stderr, "  attempt: %d\n", resolvedRun.Attempt)
-	if resolvedRun.ExecutionRunID != nil && *resolvedRun.ExecutionRunID != "" {
-		_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", *resolvedRun.ExecutionRunID)
-	} else {
-		_, _ = fmt.Fprintf(stderr, "  execution run ID: (not set)\n")
+
+	// Step 5: Validate ExecutionRunID is set.
+	// Per ROADMAP.md: If ExecutionRunID is nil or empty, return a clear error.
+	if resolvedRun.ExecutionRunID == nil || strings.TrimSpace(*resolvedRun.ExecutionRunID) == "" {
+		return fmt.Errorf("mod run pull: execution run id missing for %q (repo may not have started)", runNameOrID)
+	}
+	executionRunID := strings.TrimSpace(*resolvedRun.ExecutionRunID)
+	_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", executionRunID)
+
+	// Step 6: Fetch run details to obtain commit_sha.
+	// Use the execution run ID to get the run record with commit_sha.
+	runDetails, err := fetchRunDetails(ctx, executionRunID)
+	if err != nil {
+		return err
 	}
 
-	// TODO: Future steps (per ROADMAP.md § "Diff Retrieval, Branch Creation, and Patch Application"):
-	// - Validate ExecutionRunID is set (if not, error with guidance)
-	// - Fetch run status via GET /v1/mods/{execution_run_id} to obtain commit_sha
-	// - Verify commit SHA reachability on origin remote
-	// - Create target branch at commit SHA
-	// - Download and apply Mods diffs
-	// - Handle --dry-run flag appropriately
+	// Validate that commit_sha is available.
+	// Per ROADMAP.md: If commit_sha is empty, treat as a hard error.
+	if runDetails.CommitSHA == nil || strings.TrimSpace(*runDetails.CommitSHA) == "" {
+		return errors.New("mod run pull: commit_sha is not available for this run; pull requires a pinned commit")
+	}
+	commitSHA := strings.TrimSpace(*runDetails.CommitSHA)
+	_, _ = fmt.Fprintf(stderr, "  commit SHA: %s\n", commitSHA)
+
+	// Determine the target branch name.
+	// Per ROADMAP.md: Prefer the per-repo target_ref from RepoRunSummary.TargetRef when present;
+	// otherwise, fall back to the execution run's target_ref from RunDetails.
+	targetRef := resolvedRun.TargetRef
+	if strings.TrimSpace(targetRef) == "" {
+		targetRef = runDetails.TargetRef
+	}
+	if strings.TrimSpace(targetRef) == "" {
+		return errors.New("mod run pull: target_ref is not available for this run")
+	}
+	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", targetRef)
+
+	// Step 7: Verify commit SHA reachability on the origin remote.
+	// Per ROADMAP.md: Run `git fetch <origin> <commit_sha> --depth=1`.
+	if err := verifyCommitReachable(ctx, *origin, commitSHA, stderr, *dryRun); err != nil {
+		return err
+	}
+
+	// Step 8: Check for branch collisions (local and remote).
+	// Per ROADMAP.md: Check both local and remote for existing branches with the same name.
+	if err := checkBranchCollision(ctx, *origin, targetRef, stderr); err != nil {
+		return err
+	}
+
+	// Step 9: Fetch all diffs for the execution run.
+	diffs, err := fetchAllDiffs(ctx, executionRunID)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stderr, "  diffs to apply: %d\n", len(diffs))
+
+	// Step 10: Handle --dry-run mode.
+	// Per ROADMAP.md: For --dry-run, do not execute git branch/checkout/apply calls.
+	if *dryRun {
+		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %s (origin %q) and apply %d Mods diff(s)\n",
+			targetRef, commitSHA, *origin, len(diffs))
+		for i, diff := range diffs {
+			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (step %d, %d bytes gzipped)\n",
+				i+1, diff.ID, diff.StepIndex, diff.Size)
+		}
+		return nil
+	}
+
+	// Step 11: Create the target branch at the commit SHA.
+	// Per ROADMAP.md: git branch <target_ref> <commit_sha>, then git checkout <target_ref>.
+	if err := createAndCheckoutBranch(ctx, targetRef, commitSHA, stderr); err != nil {
+		return err
+	}
+
+	// Step 12: Download and apply all diffs.
+	// Per ROADMAP.md: For each diff, download, decompress, and apply via `git apply`.
+	appliedCount, err := downloadAndApplyDiffs(ctx, diffs, stderr)
+	if err != nil {
+		return err
+	}
+
+	// Success message.
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
+		appliedCount, executionRunID, targetRef, *origin)
+	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
 
 	return nil
 }
@@ -349,4 +414,214 @@ func printModRunPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  ploy mod run pull java17-fleet")
 	_, _ = fmt.Fprintln(w, "  ploy mod run pull --dry-run my-batch")
 	_, _ = fmt.Fprintln(w, "  ploy mod run pull --origin upstream 2xK9mNpL")
+}
+
+// =============================================================================
+// Diff Retrieval, Branch Creation, and Patch Application Helpers
+// =============================================================================
+
+// fetchRunDetails fetches the full run record including commit_sha via the API.
+// This uses the runs endpoint (GET /v1/runs/{id}) which exposes commit_sha.
+func fetchRunDetails(ctx context.Context, runID string) (*mods.RunDetails, error) {
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: %w", err)
+	}
+
+	cmd := mods.FetchRunWithCommitSHA{
+		Client:  httpClient,
+		BaseURL: base,
+		RunID:   runID,
+	}
+
+	details, err := cmd.Run(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: failed to fetch run details: %w", err)
+	}
+
+	return details, nil
+}
+
+// fetchAllDiffs fetches all diffs for the given execution run.
+// Returns diffs sorted by step_index for correct application order.
+func fetchAllDiffs(ctx context.Context, executionRunID string) ([]mods.DiffEntry, error) {
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: %w", err)
+	}
+
+	cmd := mods.ListAllDiffsCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		RunID:   executionRunID,
+	}
+
+	diffs, err := cmd.Run(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: failed to list diffs: %w", err)
+	}
+
+	return diffs, nil
+}
+
+// verifyCommitReachable verifies that the given commit SHA is reachable from the origin remote.
+// Uses `git fetch <origin> <commit_sha> --depth=1` to fetch the specific commit.
+//
+// Per ROADMAP.md: If fetch fails with "couldn't find remote ref" or similar, return an error.
+func verifyCommitReachable(ctx context.Context, origin, commitSHA string, stderr io.Writer, dryRun bool) error {
+	_, _ = fmt.Fprintf(stderr, "  verifying commit %s is reachable from %s...\n", commitSHA, origin)
+
+	// Run: git fetch <origin> <commit_sha> --depth=1
+	// This fetches the specific commit without a full clone.
+	cmd := exec.CommandContext(ctx, "git", "fetch", origin, commitSHA, "--depth=1")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Run(); err != nil {
+		// Check for common error patterns indicating the commit is not reachable.
+		stderrStr := stderrBuf.String()
+		if strings.Contains(stderrStr, "couldn't find remote ref") ||
+			strings.Contains(stderrStr, "not found") ||
+			strings.Contains(stderrStr, "invalid refspec") {
+			return fmt.Errorf("mod run pull: commit %s not reachable from origin %q (force-push or mirror mismatch)", commitSHA, origin)
+		}
+		// Generic error.
+		return fmt.Errorf("mod run pull: failed to verify commit reachability: %w (stderr: %s)", err, stderrStr)
+	}
+
+	return nil
+}
+
+// checkBranchCollision checks if a branch with the given name already exists locally or remotely.
+// Per ROADMAP.md: Check both local refs/heads/<target_ref> and remote refs via git ls-remote.
+func checkBranchCollision(ctx context.Context, origin, targetRef string, stderr io.Writer) error {
+	// Check local branch existence.
+	// `git show-ref --verify refs/heads/<target_ref>` returns 0 if branch exists.
+	localCmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "refs/heads/"+targetRef)
+	localCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	if err := localCmd.Run(); err == nil {
+		// Branch exists locally.
+		return fmt.Errorf("mod run pull: branch %q already exists locally", targetRef)
+	}
+	// If error, branch doesn't exist locally (expected).
+
+	// Check remote branch existence.
+	// `git ls-remote --heads <origin> <target_ref>` returns the ref if it exists.
+	remoteCmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", origin, targetRef)
+	remoteCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	var remoteBuf bytes.Buffer
+	remoteCmd.Stdout = &remoteBuf
+
+	if err := remoteCmd.Run(); err == nil && strings.TrimSpace(remoteBuf.String()) != "" {
+		// Branch exists on remote.
+		return fmt.Errorf("mod run pull: branch %q already exists on remote %q", targetRef, origin)
+	}
+
+	return nil
+}
+
+// createAndCheckoutBranch creates a new branch at the given commit SHA and checks it out.
+// Per ROADMAP.md: `git branch <target_ref> <commit_sha>` followed by `git checkout <target_ref>`.
+func createAndCheckoutBranch(ctx context.Context, targetRef, commitSHA string, stderr io.Writer) error {
+	_, _ = fmt.Fprintf(stderr, "  creating branch %q at %s...\n", targetRef, commitSHA)
+
+	// Step 1: Create the branch.
+	branchCmd := exec.CommandContext(ctx, "git", "branch", targetRef, commitSHA)
+	branchCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	var branchStderr bytes.Buffer
+	branchCmd.Stderr = &branchStderr
+
+	if err := branchCmd.Run(); err != nil {
+		return fmt.Errorf("mod run pull: failed to create branch %q: %w (stderr: %s)", targetRef, err, branchStderr.String())
+	}
+
+	// Step 2: Checkout the branch.
+	checkoutCmd := exec.CommandContext(ctx, "git", "checkout", targetRef)
+	checkoutCmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	var checkoutStderr bytes.Buffer
+	checkoutCmd.Stderr = &checkoutStderr
+
+	if err := checkoutCmd.Run(); err != nil {
+		return fmt.Errorf("mod run pull: failed to checkout branch %q: %w (stderr: %s)", targetRef, err, checkoutStderr.String())
+	}
+
+	_, _ = fmt.Fprintf(stderr, "  switched to branch %q\n", targetRef)
+	return nil
+}
+
+// downloadAndApplyDiffs downloads and applies all diffs to the working tree.
+// Returns the count of successfully applied diffs (excluding empty patches).
+//
+// Per ROADMAP.md: For each diff, decompress gzipped patch bytes and apply via `git apply`.
+// Empty patches (after trimming whitespace) are skipped, matching applyGzippedPatch semantics.
+func downloadAndApplyDiffs(ctx context.Context, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
+	if len(diffs) == 0 {
+		return 0, nil
+	}
+
+	// Get control plane HTTP client for downloading diffs.
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("mod run pull: %w", err)
+	}
+
+	appliedCount := 0
+
+	for i, diff := range diffs {
+		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s (step %d)...\n",
+			i+1, len(diffs), diff.ID, diff.StepIndex)
+
+		// Download the diff patch (returns decompressed bytes).
+		downloadCmd := mods.DownloadDiffCommand{
+			Client:  httpClient,
+			BaseURL: base,
+			DiffID:  diff.ID,
+		}
+
+		patch, err := downloadCmd.Run(ctx)
+		if err != nil {
+			return appliedCount, fmt.Errorf("mod run pull: failed to download diff %s: %w", diff.ID, err)
+		}
+
+		// Skip empty patches (per ROADMAP.md and applyGzippedPatch semantics).
+		if len(bytes.TrimSpace(patch)) == 0 {
+			_, _ = fmt.Fprintf(stderr, "    skipped (empty patch)\n")
+			continue
+		}
+
+		// Apply the patch via `git apply`.
+		if err := applyPatch(ctx, patch); err != nil {
+			return appliedCount, fmt.Errorf("mod run pull: failed to apply diff %s: %w", diff.ID, err)
+		}
+
+		appliedCount++
+		_, _ = fmt.Fprintf(stderr, "    applied (%d bytes)\n", len(patch))
+	}
+
+	return appliedCount, nil
+}
+
+// applyPatch applies a unified diff patch to the current working directory via `git apply`.
+// Uses the same semantics as internal/nodeagent/execution.go::applyGzippedPatch.
+func applyPatch(ctx context.Context, patch []byte) error {
+	// git apply without --index applies changes to the working tree only.
+	cmd := exec.CommandContext(ctx, "git", "apply")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	cmd.Stdin = bytes.NewReader(patch)
+
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git apply failed: %w (stderr: %s)", err, stderrBuf.String())
+	}
+
+	return nil
 }

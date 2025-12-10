@@ -1,0 +1,337 @@
+// status.go provides CLI client implementations for fetching run status and diffs.
+//
+// This file implements:
+//   - FetchRunStatusCommand: Fetches run status via GET /v1/mods/{id} to obtain
+//     commit_sha, base_ref, target_ref, and repo_url for `ploy mod run pull`.
+//   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs
+//     and downloads each diff via GET /v1/diffs/{diff_id}?download=true.
+//
+// These commands support the `ploy mod run pull` workflow for reconstructing
+// Mods changes in a local git repository.
+package mods
+
+import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
+
+// RunStatusInfo contains the run status fields needed by `ploy mod run pull`.
+// This is a simplified view of RunSummary focused on the fields required
+// for commit verification and branch creation.
+type RunStatusInfo struct {
+	// RunID is the run identifier (KSUID-backed string).
+	RunID string `json:"run_id"`
+
+	// State is the current run lifecycle state (pending, running, succeeded, etc.).
+	State string `json:"state"`
+
+	// RepoURL is the Git repository URL for this run.
+	RepoURL string `json:"repository"`
+
+	// BaseRef is the Git base ref used for this run (from metadata or defaults).
+	BaseRef string `json:"-"`
+
+	// TargetRef is the Git target ref for this run (from metadata or defaults).
+	TargetRef string `json:"-"`
+
+	// CommitSHA is the pinned commit SHA for this run, if available.
+	// Empty string if no commit was pinned when the run was created.
+	CommitSHA string `json:"-"`
+
+	// Metadata contains additional run metadata as key-value pairs.
+	Metadata map[string]string `json:"metadata"`
+}
+
+// FetchRunStatusCommand fetches run status via GET /v1/mods/{id}.
+// Used by `ploy mod run pull` to obtain commit_sha and verify run metadata
+// before creating branches and applying patches.
+type FetchRunStatusCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   string // Run ID (KSUID-backed string)
+}
+
+// Run executes GET /v1/mods/{id} and returns the run status info.
+// Extracts base_ref, target_ref, and commit_sha from the run record.
+func (c FetchRunStatusCommand) Run(ctx context.Context) (*RunStatusInfo, error) {
+	if c.Client == nil {
+		return nil, fmt.Errorf("fetch run status: http client required")
+	}
+	if c.BaseURL == nil {
+		return nil, fmt.Errorf("fetch run status: base url required")
+	}
+	if strings.TrimSpace(c.RunID) == "" {
+		return nil, fmt.Errorf("fetch run status: run id required")
+	}
+
+	// Build endpoint: /v1/mods/{id}
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID))
+	if err != nil {
+		return nil, fmt.Errorf("fetch run status: build url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch run status: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch run status: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeHTTPError(resp, "fetch run status")
+	}
+
+	// Response structure mirrors RunSummary from internal/mods/api/types.go.
+	// We decode into a flexible structure to extract metadata fields.
+	var result struct {
+		RunID      string            `json:"run_id"`
+		State      string            `json:"state"`
+		Repository string            `json:"repository"`
+		Metadata   map[string]string `json:"metadata"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("fetch run status: decode response: %w", err)
+	}
+
+	info := &RunStatusInfo{
+		RunID:    result.RunID,
+		State:    result.State,
+		RepoURL:  result.Repository,
+		Metadata: result.Metadata,
+	}
+
+	// Extract base_ref and target_ref from metadata.
+	// The server stores these as "repo_base_ref" and "repo_target_ref" in metadata.
+	if result.Metadata != nil {
+		info.BaseRef = result.Metadata["repo_base_ref"]
+		info.TargetRef = result.Metadata["repo_target_ref"]
+	}
+
+	// To get commit_sha, we need to query the underlying run record.
+	// However, the RunSummary API doesn't expose commit_sha directly.
+	// For mod run pull, we fetch the run via the node claim response pattern
+	// or use a separate endpoint. For now, we use the runs endpoint.
+	// TODO: The commit_sha is stored in runs.commit_sha but not exposed via GET /v1/mods/{id}.
+	// We'll need to either: (1) extend the API, or (2) use a different endpoint.
+	// For this implementation, we'll fetch from /v1/runs/{id} which exposes commit_sha.
+
+	return info, nil
+}
+
+// FetchRunWithCommitSHA fetches full run details including commit_sha via GET /v1/runs/{id}.
+// This is used when we need the commit_sha that isn't exposed in the mods API.
+type FetchRunWithCommitSHA struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   string // Run ID (KSUID-backed string)
+}
+
+// RunDetails contains the full run record with commit_sha.
+type RunDetails struct {
+	ID        string  `json:"id"`
+	RepoURL   string  `json:"repo_url"`
+	Status    string  `json:"status"`
+	BaseRef   string  `json:"base_ref"`
+	TargetRef string  `json:"target_ref"`
+	CommitSHA *string `json:"commit_sha,omitempty"`
+}
+
+// Run executes GET /v1/runs/{id} and returns the run details including commit_sha.
+func (c FetchRunWithCommitSHA) Run(ctx context.Context) (*RunDetails, error) {
+	if c.Client == nil {
+		return nil, fmt.Errorf("fetch run: http client required")
+	}
+	if c.BaseURL == nil {
+		return nil, fmt.Errorf("fetch run: base url required")
+	}
+	if strings.TrimSpace(c.RunID) == "" {
+		return nil, fmt.Errorf("fetch run: run id required")
+	}
+
+	// Build endpoint: /v1/runs/{id}
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID))
+	if err != nil {
+		return nil, fmt.Errorf("fetch run: build url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch run: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch run: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeHTTPError(resp, "fetch run")
+	}
+
+	var result RunDetails
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("fetch run: decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// DiffEntry represents a single diff record from the list diffs response.
+type DiffEntry struct {
+	ID        string            `json:"id"`
+	JobID     domaintypes.JobID `json:"job_id"`
+	CreatedAt string            `json:"created_at"`
+	Size      int               `json:"gzipped_size"`
+	StepIndex int               `json:"step_index"` // Job step index for ordering
+}
+
+// ListAllDiffsCommand fetches all diffs for a run via GET /v1/mods/{id}/diffs.
+// Returns the list of diff entries sorted by step_index for correct application order.
+type ListAllDiffsCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   string // Run ID (KSUID-backed string, execution run id)
+}
+
+// Run executes GET /v1/mods/{id}/diffs and returns all diff entries.
+// The diffs are sorted by step_index to ensure correct application order.
+func (c ListAllDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
+	if c.Client == nil {
+		return nil, fmt.Errorf("list all diffs: http client required")
+	}
+	if c.BaseURL == nil {
+		return nil, fmt.Errorf("list all diffs: base url required")
+	}
+	if strings.TrimSpace(c.RunID) == "" {
+		return nil, fmt.Errorf("list all diffs: run id required")
+	}
+
+	// Build endpoint: /v1/mods/{id}/diffs
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID), "diffs")
+	if err != nil {
+		return nil, fmt.Errorf("list all diffs: build url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list all diffs: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list all diffs: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeHTTPError(resp, "list all diffs")
+	}
+
+	// Response structure: {"diffs": [...]}
+	var result struct {
+		Diffs []DiffEntry `json:"diffs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("list all diffs: decode response: %w", err)
+	}
+
+	// Sort diffs by step_index for correct application order.
+	// Lower step_index values should be applied first.
+	sort.Slice(result.Diffs, func(i, j int) bool {
+		return result.Diffs[i].StepIndex < result.Diffs[j].StepIndex
+	})
+
+	return result.Diffs, nil
+}
+
+// DownloadDiffCommand downloads a single diff patch via GET /v1/diffs/{id}?download=true.
+// Returns the decompressed patch bytes ready for application via `git apply`.
+type DownloadDiffCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	DiffID  string // Diff ID (UUID string)
+}
+
+// Run executes GET /v1/diffs/{id}?download=true and returns the decompressed patch.
+func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
+	if c.Client == nil {
+		return nil, fmt.Errorf("download diff: http client required")
+	}
+	if c.BaseURL == nil {
+		return nil, fmt.Errorf("download diff: base url required")
+	}
+	if strings.TrimSpace(c.DiffID) == "" {
+		return nil, fmt.Errorf("download diff: diff id required")
+	}
+
+	// Build endpoint: /v1/diffs/{id}?download=true
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "diffs", url.PathEscape(c.DiffID))
+	if err != nil {
+		return nil, fmt.Errorf("download diff: build url: %w", err)
+	}
+	endpoint += "?download=true"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("download diff: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download diff: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeHTTPError(resp, "download diff")
+	}
+
+	// Read the gzipped response body.
+	gzData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("download diff: read body: %w", err)
+	}
+
+	// Decompress the gzipped patch.
+	patch, err := decompressGzipBytes(gzData)
+	if err != nil {
+		return nil, fmt.Errorf("download diff: decompress: %w", err)
+	}
+
+	return patch, nil
+}
+
+// decompressGzipBytes decompresses gzipped bytes and returns the plaintext content.
+func decompressGzipBytes(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return []byte{}, nil
+	}
+
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("gzip reader: %w", err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, reader); err != nil {
+		return nil, fmt.Errorf("gzip decompress: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}

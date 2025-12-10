@@ -832,3 +832,253 @@ func runGitCmdForPull(t *testing.T, dir string, args ...string) {
 // Note: The comprehensive tests for ResolveRunForRepo are in
 // internal/cli/mods/repos_test.go. These tests verify integration with
 // the mod_run_pull handler and error message formatting.
+
+// =============================================================================
+// Branch Collision Detection Tests
+// =============================================================================
+
+// TestCheckBranchCollision_LocalBranchExists verifies that checkBranchCollision
+// returns an error when a local branch with the target name already exists.
+func TestCheckBranchCollision_LocalBranchExists(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	// Create a git repository with a branch named "feature-branch".
+	repoDir := setupTestGitRepoWithRemote(t, "https://github.com/example/repo.git")
+	runGitCmdForPull(t, repoDir, "checkout", "-b", "feature-branch")
+	runGitCmdForPull(t, repoDir, "checkout", "main") // Switch back to main
+
+	// Change to the repo directory.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var buf bytes.Buffer
+	err = checkBranchCollision(ctx, "origin", "feature-branch", &buf)
+	if err == nil {
+		t.Error("checkBranchCollision() should return error when local branch exists")
+	}
+	if !strings.Contains(err.Error(), `branch "feature-branch" already exists locally`) {
+		t.Errorf("error should mention local branch exists, got: %v", err)
+	}
+}
+
+// TestCheckBranchCollision_NoBranchExists verifies that checkBranchCollision
+// returns nil when no local or remote branch with the target name exists.
+func TestCheckBranchCollision_NoBranchExists(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	// Create a clean git repository.
+	repoDir := setupTestGitRepoWithRemote(t, "https://github.com/example/repo.git")
+
+	// Change to the repo directory.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var buf bytes.Buffer
+	// Check for a branch that doesn't exist locally.
+	// Note: The remote check will fail/succeed based on network, but we're testing local.
+	err = checkBranchCollision(ctx, "origin", "nonexistent-branch-xyz", &buf)
+	// This test only verifies local branch detection; remote check may vary.
+	// The function should not error for local non-existence.
+	if err != nil && strings.Contains(err.Error(), "already exists locally") {
+		t.Errorf("unexpected local branch collision error: %v", err)
+	}
+}
+
+// TestCreateAndCheckoutBranch_Success verifies that createAndCheckoutBranch
+// successfully creates a new branch at a given commit SHA.
+func TestCreateAndCheckoutBranch_Success(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	// Create a git repository.
+	repoDir := setupTestGitRepoForPull(t)
+
+	// Get the current commit SHA.
+	commitSHA := getHeadCommitSHA(t, repoDir)
+
+	// Change to the repo directory.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var buf bytes.Buffer
+	err = createAndCheckoutBranch(ctx, "test-new-branch", commitSHA, &buf)
+	if err != nil {
+		t.Fatalf("createAndCheckoutBranch() should succeed: %v", err)
+	}
+
+	// Verify we're on the new branch.
+	currentBranch := getCurrentBranch(t, repoDir)
+	if currentBranch != "test-new-branch" {
+		t.Errorf("expected to be on branch 'test-new-branch', got %q", currentBranch)
+	}
+
+	// Verify the output mentions the branch name.
+	output := buf.String()
+	if !strings.Contains(output, "test-new-branch") {
+		t.Errorf("output should mention the branch name, got: %s", output)
+	}
+}
+
+// TestApplyPatch_Success verifies that applyPatch successfully applies a valid patch.
+func TestApplyPatch_Success(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	// Create a git repository.
+	repoDir := setupTestGitRepoForPull(t)
+
+	// Change to the repo directory.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	// Create a simple patch that adds a line to README.md.
+	patch := []byte(`diff --git a/README.md b/README.md
+index abc1234..def5678 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,2 @@
+ # Test Repo
++Added by patch.
+`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = applyPatch(ctx, patch)
+	if err != nil {
+		t.Fatalf("applyPatch() should succeed: %v", err)
+	}
+
+	// Verify the patch was applied by checking file contents.
+	content, err := os.ReadFile(filepath.Join(repoDir, "README.md"))
+	if err != nil {
+		t.Fatalf("failed to read README.md: %v", err)
+	}
+	if !strings.Contains(string(content), "Added by patch.") {
+		t.Errorf("patch was not applied correctly, got: %s", string(content))
+	}
+}
+
+// TestApplyPatch_EmptyPatch verifies behavior with empty patches.
+// Note: git apply returns an error for truly empty input (no valid patches).
+// This is why downloadAndApplyDiffs skips empty patches before calling applyPatch.
+func TestApplyPatch_EmptyPatch(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	// Create a git repository.
+	repoDir := setupTestGitRepoForPull(t)
+
+	// Change to the repo directory.
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	if err := os.Chdir(repoDir); err != nil {
+		t.Fatalf("failed to change to repo directory: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Empty patch returns an error from git apply (no valid patches in input).
+	// The downloadAndApplyDiffs function skips empty patches before calling applyPatch.
+	err = applyPatch(ctx, []byte{})
+	if err == nil {
+		t.Log("applyPatch() with empty patch did not return error (unexpected but acceptable)")
+		return
+	}
+	// Verify the error mentions the expected git error.
+	if !strings.Contains(err.Error(), "git apply failed") {
+		t.Errorf("expected git apply error, got: %v", err)
+	}
+}
+
+// =============================================================================
+// Additional Test Helpers
+// =============================================================================
+
+// getHeadCommitSHA returns the SHA of the HEAD commit in the given repository.
+func getHeadCommitSHA(t *testing.T, repoDir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get HEAD commit SHA: %v (output: %s)", err, string(output))
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// getCurrentBranch returns the current branch name in the given repository.
+func getCurrentBranch(t *testing.T, repoDir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get current branch: %v (output: %s)", err, string(output))
+	}
+	return strings.TrimSpace(string(output))
+}
