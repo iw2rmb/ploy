@@ -149,6 +149,7 @@ type Querier interface {
 	// Lists all runs (via run_repos) for a given repository URL.
 	// Returns run details joined with run_repo status and timing for repo-centric view.
 	// Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+	// The execution_run_id field links to the child Mods run for this repo within the batch.
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error

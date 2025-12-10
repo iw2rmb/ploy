@@ -346,7 +346,8 @@ SELECT
     rr.target_ref,
     rr.attempt,
     rr.started_at,
-    rr.finished_at
+    rr.finished_at,
+    rr.execution_run_id
 FROM run_repos rr
 INNER JOIN runs r ON rr.run_id = r.id
 WHERE rr.repo_url = $1
@@ -362,20 +363,22 @@ type ListRunsForRepoParams struct {
 }
 
 type ListRunsForRepoRow struct {
-	RunID      string             `json:"run_id"`
-	Name       *string            `json:"name"`
-	RunStatus  RunStatus          `json:"run_status"`
-	RepoStatus RunRepoStatus      `json:"repo_status"`
-	BaseRef    string             `json:"base_ref"`
-	TargetRef  string             `json:"target_ref"`
-	Attempt    int32              `json:"attempt"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	RunID          string             `json:"run_id"`
+	Name           *string            `json:"name"`
+	RunStatus      RunStatus          `json:"run_status"`
+	RepoStatus     RunRepoStatus      `json:"repo_status"`
+	BaseRef        string             `json:"base_ref"`
+	TargetRef      string             `json:"target_ref"`
+	Attempt        int32              `json:"attempt"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+	ExecutionRunID *string            `json:"execution_run_id"`
 }
 
 // Lists all runs (via run_repos) for a given repository URL.
 // Returns run details joined with run_repo status and timing for repo-centric view.
 // Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+// The execution_run_id field links to the child Mods run for this repo within the batch.
 func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
 	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoUrl, arg.Off, arg.Lim)
 	if err != nil {
@@ -395,6 +398,7 @@ func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams
 			&i.Attempt,
 			&i.StartedAt,
 			&i.FinishedAt,
+			&i.ExecutionRunID,
 		); err != nil {
 			return nil, err
 		}

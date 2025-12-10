@@ -122,6 +122,7 @@ ORDER BY rr.repo_url, rr.started_at DESC NULLS LAST;
 -- Lists all runs (via run_repos) for a given repository URL.
 -- Returns run details joined with run_repo status and timing for repo-centric view.
 -- Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
+-- The execution_run_id field links to the child Mods run for this repo within the batch.
 SELECT
     r.id AS run_id,
     r.name,
@@ -131,7 +132,8 @@ SELECT
     rr.target_ref,
     rr.attempt,
     rr.started_at,
-    rr.finished_at
+    rr.finished_at,
+    rr.execution_run_id
 FROM run_repos rr
 INNER JOIN runs r ON rr.run_id = r.id
 WHERE rr.repo_url = @repo_url

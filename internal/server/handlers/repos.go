@@ -46,6 +46,10 @@ type RepoRunSummary struct {
 	Attempt    int32             `json:"attempt"`
 	StartedAt  *time.Time        `json:"started_at,omitempty"`
 	FinishedAt *time.Time        `json:"finished_at,omitempty"`
+	// ExecutionRunID is the child execution run id (KSUID-backed string) for this repo
+	// within the batch. It links to the Mods run that was created to process this repo.
+	// Used by `ploy mod run pull` to fetch diffs and status for the specific repo execution.
+	ExecutionRunID *string `json:"execution_run_id,omitempty"`
 }
 
 // -------------------------------------------------------------------------
@@ -180,13 +184,14 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:      domaintypes.RunID(run.RunID),
-				Name:       run.Name,
-				RunStatus:  string(run.RunStatus),
-				RepoStatus: string(run.RepoStatus),
-				BaseRef:    run.BaseRef,
-				TargetRef:  run.TargetRef,
-				Attempt:    run.Attempt,
+				RunID:          domaintypes.RunID(run.RunID),
+				Name:           run.Name,
+				RunStatus:      string(run.RunStatus),
+				RepoStatus:     string(run.RepoStatus),
+				BaseRef:        run.BaseRef,
+				TargetRef:      run.TargetRef,
+				Attempt:        run.Attempt,
+				ExecutionRunID: run.ExecutionRunID, // Nullable; populated when execution started.
 			}
 			if run.StartedAt.Valid {
 				t := run.StartedAt.Time

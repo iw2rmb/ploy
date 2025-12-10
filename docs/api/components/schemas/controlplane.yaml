@@ -814,6 +814,14 @@ RepoRunSummary:
       format: date-time
       nullable: true
       description: Timestamp when execution completed
+    execution_run_id:
+      type: string
+      nullable: true
+      description: |
+        Child execution run ID (KSUID string) for this repo within the batch.
+        Links to the Mods run created to process this specific repo. Used by
+        `ploy mod run pull` to fetch diffs and status for the repo execution.
+        Null when execution has not started or no child run was created.
   required:
     - run_id
     - run_status
