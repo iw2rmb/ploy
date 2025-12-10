@@ -1,14 +1,14 @@
-// mod_run_pull.go implements the `ploy mod run pull` subcommand for pulling
-// Mods diffs into the current git worktree.
+// mod_run_pull.go implements the `ploy mod run pull` subcommand surface for
+// pulling Mods diffs into the current git worktree.
 //
-// This file provides CLI routing and flag parsing for the pull operation that
-// reconstructs Mods changes locally. The command resolves a run by name or ID,
-// verifies the local git environment, and applies stored diffs to a new branch.
+// This file currently provides CLI routing and flag parsing for the pull
+// operation. Subsequent ROADMAP tasks wire the command into git worktree
+// detection, control-plane APIs, and diff application.
 //
 // Command structure:
 //   - ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>
 //
-// The command requires:
+// The full command behavior will eventually require:
 //   - A valid git worktree (must be run inside a git repository)
 //   - A clean working tree (no staged or unstaged changes)
 //   - A resolvable git remote (default: "origin")
@@ -72,23 +72,9 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("unexpected argument: %s", rest[1])
 	}
 
-	// At this point, we have valid parsed arguments:
-	// - runNameOrID: the run to pull diffs from
-	// - *origin: the git remote to use (default "origin")
-	// - *dryRun: whether to perform a dry run
-	//
-	// The actual implementation (git worktree detection, API calls, diff application)
-	// will be added in subsequent ROADMAP tasks. For now, we just validate the CLI surface.
-
 	// Placeholder: print what would be done (will be replaced with actual logic).
 	_, _ = fmt.Fprintf(stderr, "mod run pull: would pull run %q from origin %q (dry-run: %v)\n",
 		runNameOrID, *origin, *dryRun)
-
-	// Mark variables as used to satisfy the compiler.
-	// These will be consumed by the actual implementation.
-	_ = origin
-	_ = dryRun
-	_ = runNameOrID
 
 	return nil
 }

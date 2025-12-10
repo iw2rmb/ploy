@@ -18,7 +18,7 @@ import (
 //   - stop <id>: Stops a batch run and cancels pending repos.
 //   - start <id>: Starts execution for pending repos in a batch.
 //   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
-//   - pull <run-name|run-id>: Pulls Mods diffs into local git repository.
+//   - pull [--origin <remote>] [--dry-run] <run-name|run-id>: Pulls Mods diffs into a local git repository.
 func handleModRun(args []string, stderr io.Writer) error {
 	if len(args) > 0 {
 		switch args[0] {
