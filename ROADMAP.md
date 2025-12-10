@@ -53,7 +53,7 @@ Legend: [ ] todo, [x] done.
       - Origin URL normalization removes `.git` and trailing slashes but leaves scheme and host intact.
 
 ## Run & Repo Resolution
-- [ ] Resolve `<run-name|run-id>` plus origin repo to a unique Mods run/repo combination — Use the repo-centric API to locate the correct run for the current repository, honoring both UUIDs and human-readable run names while selecting the first matching result.
+- [x] Resolve `<run-name|run-id>` plus origin repo to a unique Mods run/repo combination — Use the repo-centric API to locate the correct run for the current repository, honoring both UUIDs and human-readable run names while selecting the first matching result.
   - Repository: github.com/iw2rmb/ploy
   - Component: cmd/ploy (mod_run_pull), internal/server/handlers/repos.go, internal/store/queries/run_repos.sql, docs/api
   - Scope:
