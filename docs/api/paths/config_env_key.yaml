@@ -135,4 +135,3 @@ delete:
       description: Forbidden (requires cli-admin role)
     '500':
       description: Server error
-
