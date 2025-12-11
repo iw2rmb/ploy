@@ -156,7 +156,7 @@ func buildAndSendJobClaimResponse(
 		RunID     domaintypes.RunID     `json:"id"`         // Run ID (KSUID); JSON key stays "id" for wire compatibility
 		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-		ModType   string                `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+		ModType   domaintypes.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
 		ModImage  string                `json:"mod_image"`  // Container image for mod/heal jobs
 		StepIndex domaintypes.StepIndex `json:"step_index"` // Job ordering index
 		RepoURL   string                `json:"repo_url"`
@@ -172,7 +172,7 @@ func buildAndSendJobClaimResponse(
 		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
-		ModType:   job.ModType,
+		ModType:   domaintypes.ModType(job.ModType),
 		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,

@@ -50,11 +50,11 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Dispatch based on job type (ModType).
 	switch req.ModType {
-	case "pre_gate", "post_gate", "re_gate":
+	case types.ModTypePreGate, types.ModTypePostGate, types.ModTypeReGate:
 		r.executeGateJob(ctx, req)
-	case "mod":
+	case types.ModTypeMod:
 		r.executeModJob(ctx, req)
-	case "heal":
+	case types.ModTypeHeal:
 		r.executeHealingJob(ctx, req)
 	default:
 		// Fallback for legacy jobs without ModType - execute as mod job.

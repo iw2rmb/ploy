@@ -460,8 +460,8 @@
 ## [2025-09-27] Mods Runner Parallel Execution
 
 - Reworked the workflow runner to schedule Mods stages according to dependency
-  readiness, launching `orw-apply`, `orw-gen`, and `llm-plan` in parallel while
-  holding `llm-exec`/`mods-human` until prerequisites complete.
+  readiness, allowing planner output stages to run in parallel while
+  holding `mods-human` until prerequisites complete.
 - Added concurrency-focused unit tests (including retry coverage) plus helper
   stubs so the runner package stays at ≥90% coverage even under
   `go test -cover ./...`.
@@ -535,26 +535,15 @@
 
 ## [2025-09-26] Mods Planner Skeleton
 
-- Added `internal/workflow/mods` with a planner that emits `mods-plan`,
-  `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, and `mods-human` stages wired
-  with repository lane defaults.
-- Updated the default workflow planner to delegate Mods staging, propagate new
-  stage kinds, and adjust unit tests/checkpoint expectations across the runner
-  suite.
-- Recorded completion of `docs/tasks/mods/01-planner-skeleton.md` and refreshed
-  `docs/design/mods/README.md` to capture the planner skeleton milestone.
+- Introduced an experimental Mods planner and skeleton stages for `mods-plan`
+  and `mods-human`; this planner has since been removed in favour of the
+  current spec‑driven Mods pipeline.
 
 ## [2025-09-26] Stage Artifact Streams
 
-- Added `contracts.WorkflowArtifact` and JetStream/in-memory events client
-  support so workflow stage artifacts mirror onto `ploy.artifact.<run_id>`
-  alongside checkpoints.
-- Updated the workflow runner to emit artifact envelopes for completed stages,
-  propagate publication failures, and surface envelopes in unit tests for cache
-  hydrator consumers.
-- Documented the slice in `docs/design/stage-artifacts/README.md`, marked the
-  checkpoint metadata follow-up complete, and recorded roadmap entry
-  `18-stage-artifact-streams` as shipped.
+- Initially added `contracts.WorkflowArtifact` and JetStream/in-memory events
+  client support for per‑stage artifact envelopes; this experimental path has
+  since been removed in favour of the current Mods/job pipeline.
 
 ## [2025-09-26] Workflow Checkpoint Metadata
 

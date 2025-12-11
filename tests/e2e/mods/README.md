@@ -2,7 +2,7 @@
 
 - Goal: Recreate the historic Mods E2E using the current Ploy implementation (own job orchestration + integrated Build Gate) and the original sample repo ploy-orw-java11-maven. Two scenarios:
   - OpenRewrite apply upgrades Java 11→17 and Build Gate passes.
-  - Same apply, but first Build Gate fails which triggers a healing loop (llm-plan + llm-exec) before Build Gate re-runs.
+  - Same apply, but first Build Gate fails which triggers a healing loop (Codex-based healer) before Build Gate re-runs.
 
 **Prereqs**
 
@@ -314,7 +314,6 @@ SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-stack-aware-images/run.sh
 **References**
 
 - Historic E2E assets from prior implementations are found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
-  - `internal/workflow/mods/plan/` — Stage graph construction and lane bindings.
   - `internal/workflow/contracts/` — Step manifest shapes and validation.
   - `internal/workflow/runner/job_templates.go` — Mods image bindings for lanes.
   - `internal/workflow/runner/healing.go` — Healing flow appended after Build Gate failures.
