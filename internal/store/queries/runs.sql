@@ -46,6 +46,16 @@ SET stats = stats || jsonb_build_object(
 )
 WHERE id = $1;
 
+-- name: UpdateRunStatsMRURL :exec
+-- Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
+-- Preserves existing stats and metadata keys via JSONB merge.
+UPDATE runs
+SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
+    'metadata',
+    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', $2)
+)
+WHERE id = $1;
+
 -- name: GetRunTiming :one
 SELECT id,
        COALESCE(queue_ms, 0) AS queue_ms,
