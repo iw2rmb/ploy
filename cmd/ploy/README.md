@@ -320,7 +320,7 @@ ploy completion <shell> --help
   and GitLab MR settings. See `docs/schemas/mod.example.yaml` for the full schema and
   `tests/e2e/mods/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `/mod/<run-id>` (using the run ID, a KSUID string) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
+  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
