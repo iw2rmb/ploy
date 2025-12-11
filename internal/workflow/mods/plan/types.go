@@ -7,10 +7,6 @@ const (
 	StageNameORWApply = "orw-apply"
 	// StageNameORWGenerate identifies the OpenRewrite generate stage.
 	StageNameORWGenerate = "orw-gen"
-	// StageNameLLMPlan identifies the LLM planning stage.
-	StageNameLLMPlan = "llm-plan"
-	// StageNameLLMExec identifies the LLM execution stage.
-	StageNameLLMExec = "llm-exec"
 	// StageNameHuman identifies the human review stage.
 	StageNameHuman = "mods-human"
 
@@ -20,25 +16,14 @@ const (
 	StageKindORWApply = StageNameORWApply
 	// StageKindORWGenerate mirrors StageNameORWGenerate for kind classification.
 	StageKindORWGenerate = StageNameORWGenerate
-	// StageKindLLMPlan mirrors StageNameLLMPlan for kind classification.
-	StageKindLLMPlan = StageNameLLMPlan
-	// StageKindLLMExec mirrors StageNameLLMExec for kind classification.
-	StageKindLLMExec = StageNameLLMExec
 	// StageKindHuman mirrors StageNameHuman for kind classification.
 	StageKindHuman = StageNameHuman
-
-	defaultPlanLane        = "node-wasm"
-	defaultOpenRewriteLane = "node-wasm"
-	defaultLLMPlanLane     = "gpu-ml"
-	defaultLLMExecLane     = "gpu-ml"
-	defaultHumanLane       = "mods-human"
 )
 
 // Stage models a Mods workflow stage produced by the planner.
 type Stage struct {
 	Name         string
 	Kind         string
-	Lane         string
 	Dependencies []string
 	Metadata     StageMetadata
 }

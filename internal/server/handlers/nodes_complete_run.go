@@ -34,10 +34,10 @@ import (
 //
 // This avoids rewriting per-job terminal states after completion; each job's
 // terminal status is set atomically by UpdateJobCompletion and remains unchanged.
-func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID string) error {
+func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
 	// Fetch all jobs for the run to compute gate-aware status in a single pass.
 	// runID is now a KSUID-backed string after run ID migration.
-	jobs, err := st.ListJobsByRun(ctx, runID)
+	jobs, err := st.ListJobsByRun(ctx, runID.String())
 	if err != nil {
 		return fmt.Errorf("list jobs: %w", err)
 	}
@@ -143,7 +143,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	// Note: We intentionally do NOT mutate per-job terminal states here—each job's
 	// status was set atomically by UpdateJobCompletion and should remain unchanged.
 	err = st.UpdateRunCompletion(ctx, store.UpdateRunCompletionParams{
-		ID:     runID,
+		ID:     runID.String(),
 		Status: runStatus,
 		Stats:  []byte("{}"),
 	})
@@ -168,7 +168,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 
 		// Publish run summary event with final run state.
 		summary := modsapi.RunSummary{
-			RunID:      domaintypes.RunID(runID),
+			RunID:      runID,
 			State:      runState,
 			Repository: run.RepoUrl,
 			CreatedAt:  run.CreatedAt.Time,
@@ -181,7 +181,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 
 		// Publish done event to signal stream completion.
 		doneStatus := logstream.Status{Status: "done"}
-		if err := eventsService.Hub().PublishStatus(ctx, runID, doneStatus); err != nil {
+		if err := eventsService.Hub().PublishStatus(ctx, runID.String(), doneStatus); err != nil {
 			slog.Error("complete multi-step run: publish done status failed", "run_id", runID, "err", err)
 		}
 	}
@@ -213,10 +213,11 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 //   - succeeded → succeeded
 //   - failed    → failed
 //   - canceled  → cancelled (note spelling difference)
-func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID string, runStatus store.RunStatus) error {
+func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID domaintypes.RunID, runStatus store.RunStatus) error {
 	// Look up the RunRepo entry that references this run as its execution_run_id.
 	// runID is now a KSUID string after run ID migration.
-	runRepo, err := st.GetRunRepoByExecutionRun(ctx, &runID)
+	runIDStr := runID.String()
+	runRepo, err := st.GetRunRepoByExecutionRun(ctx, &runIDStr)
 	if err != nil {
 		// If no RunRepo is linked to this run, it's a standalone run (not part of a batch).
 		// This is expected for single-repo runs created via /v1/mods; silently skip.

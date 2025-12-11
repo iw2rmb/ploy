@@ -180,7 +180,15 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	base, _ := url.Parse(srv.URL)
 
 	// Submit
-	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.RunSubmitRequest{RunID: domaintypes.RunID("t2")}}).Run(context.Background())
+	sum, err := (SubmitCommand{
+		Client:  srv.Client(),
+		BaseURL: base,
+		Request: modsapi.RunSubmitRequest{
+			RepoURL:   "https://example.com/repo.git",
+			BaseRef:   "main",
+			TargetRef: "feature",
+		},
+	}).Run(context.Background())
 	if err != nil || string(sum.RunID) != "t2" {
 		t.Fatalf("submit err=%v run=%+v", err, sum)
 	}

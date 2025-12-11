@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -34,24 +35,22 @@ const (
 	RunStateCancelled  RunState = "cancelled"
 )
 
-// StageDefinition defines a stage within the Mods run graph.
-type StageDefinition struct {
-	ID           string            `json:"id"`
-	Dependencies []string          `json:"dependencies,omitempty"`
-	Lane         string            `json:"lane,omitempty"`
-	Priority     string            `json:"priority,omitempty"`
-	MaxAttempts  int               `json:"max_attempts,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
-}
-
-// RunSubmitRequest represents a run submission payload.
-// The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON.
+// RunSubmitRequest represents the canonical submit payload for POST /v1/mods.
+//
+// This mirrors docs/api/components/schemas/controlplane.yaml#/RunSubmitRequest:
+//   - repo_url: Git repository URL (https/ssh/file)
+//   - base_ref: base Git ref (branch or tag)
+//   - target_ref: target Git ref (optional)
+//   - commit_sha: optional exact commit for reproducible runs
+//   - spec: arbitrary JSON spec (YAML/JSON from CLI after normalisation)
+//   - created_by: optional submitter identifier (email, CI job, etc.)
 type RunSubmitRequest struct {
-	RunID      domaintypes.RunID `json:"run_id,omitempty"`
-	Submitter  string            `json:"submitter,omitempty"`
-	Repository string            `json:"repository,omitempty"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-	Stages     []StageDefinition `json:"stages"`
+	RepoURL   string          `json:"repo_url"`
+	BaseRef   string          `json:"base_ref"`
+	TargetRef string          `json:"target_ref,omitempty"`
+	CommitSHA string          `json:"commit_sha,omitempty"`
+	Spec      json.RawMessage `json:"spec,omitempty"`
+	CreatedBy string          `json:"created_by,omitempty"`
 }
 
 // RunSummary is the canonical response type for both POST /v1/mods (submit)

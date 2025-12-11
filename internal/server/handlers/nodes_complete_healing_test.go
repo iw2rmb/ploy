@@ -103,7 +103,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(reGateStepIndex), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(reGateStepIndex), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -200,7 +200,7 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -339,7 +339,7 @@ func TestMaybeCreateHealingJobs_SingleStrategyWithMultipleMods(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -442,7 +442,7 @@ func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -598,7 +598,7 @@ func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+	if err := cancelLoserBranches(ctx, st, domaintypes.RunID(runID), winnerJob, jobs); err != nil {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
@@ -685,7 +685,7 @@ func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+	if err := cancelLoserBranches(ctx, st, domaintypes.RunID(runID), winnerJob, jobs); err != nil {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
@@ -759,7 +759,7 @@ func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+	if err := cancelLoserBranches(ctx, st, domaintypes.RunID(runID), winnerJob, jobs); err != nil {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
@@ -845,7 +845,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, domaintypes.RunID(runID)); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
 
@@ -930,7 +930,7 @@ func TestCancelLoserBranches_AllBranchesFail_RunFailsCorrectly(t *testing.T) {
 	}
 
 	// Call maybeCompleteMultiStepRun to verify run completes as failed.
-	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, domaintypes.RunID(runID)); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
 

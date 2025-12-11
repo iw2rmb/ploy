@@ -7,11 +7,10 @@ import (
 
 // CheckpointStage captures DAG metadata for a workflow stage recorded in a
 // checkpoint. It mirrors the planner output so consumers can reconstruct
-// dependencies and lane assignments without inspecting the CLI runtime state.
+// dependencies without inspecting the CLI runtime state.
 type CheckpointStage struct {
 	Name         string                  `json:"name"`
 	Kind         string                  `json:"kind"`
-	Lane         string                  `json:"lane"`
 	Dependencies []string                `json:"dependencies,omitempty"`
 	Manifest     ManifestReference       `json:"manifest"`
 	Aster        CheckpointStageAster    `json:"aster"`
@@ -27,9 +26,6 @@ func (s CheckpointStage) Validate() error {
 	}
 	if strings.TrimSpace(s.Kind) == "" {
 		return fmt.Errorf("stage kind is required")
-	}
-	if strings.TrimSpace(s.Lane) == "" {
-		return fmt.Errorf("stage lane is required")
 	}
 	for i, dep := range s.Dependencies {
 		if strings.TrimSpace(dep) == "" {

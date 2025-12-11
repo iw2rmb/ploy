@@ -80,7 +80,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 			// Fetch repo counts for this run to provide batch-level aggregates.
 			// run.ID is now a string (KSUID).
-			counts, err := getRunRepoCounts(r.Context(), st, run.ID)
+			counts, err := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
 			if err != nil {
 				// Log but continue — repo counts are optional enhancement.
 				slog.Warn("list runs: failed to fetch repo counts", "run_id", run.ID, "err", err)
@@ -137,7 +137,7 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 
 		// Fetch repo counts to provide batch-level aggregates.
 		// run.ID is now a string (KSUID).
-		counts, err := getRunRepoCounts(r.Context(), st, run.ID)
+		counts, err := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
 		if err != nil {
 			slog.Warn("get run: failed to fetch repo counts", "run_id", runIDStr, "err", err)
 		} else if counts.Total > 0 {
@@ -185,7 +185,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			// Run is already terminal — return current state without error.
 			// This makes the stop operation idempotent.
 			summary := runToSummary(run)
-			counts, _ := getRunRepoCounts(r.Context(), st, run.ID)
+			counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
 			if counts != nil && counts.Total > 0 {
 				summary.Counts = counts
 			}
@@ -243,7 +243,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 
 		// Build and return the updated summary.
 		summary := runToSummary(run)
-		counts, _ := getRunRepoCounts(r.Context(), st, run.ID)
+		counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
 		if counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}
@@ -782,7 +782,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Create jobs from the batch spec for this child run.
-			if err := createJobsFromSpec(r.Context(), st, childRun.ID, batchRun.Spec); err != nil {
+			if err := createJobsFromSpec(r.Context(), st, domaintypes.RunID(childRun.ID), batchRun.Spec); err != nil {
 				slog.Error("start run: create jobs failed",
 					"run_id", runIDStr,
 					"child_run_id", childRun.ID, // KSUID string; use directly.

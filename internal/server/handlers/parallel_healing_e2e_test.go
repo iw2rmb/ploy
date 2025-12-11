@@ -133,7 +133,7 @@ func TestParallelHealing_AllBranchesFail_TicketFails(t *testing.T) {
 
 	// Call maybeCompleteMultiStepRun to verify run completes with failed status.
 	// All branches failed (both re-gates failed) → no winner → run fails.
-	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, domaintypes.RunID(runID)); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
 
@@ -242,7 +242,7 @@ func TestParallelHealing_OneBranchWins_RunSucceeds(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, domaintypes.RunID(runID)); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
 
@@ -338,7 +338,7 @@ func TestParallelHealing_BranchCreation_DistinctWindows(t *testing.T) {
 	}
 
 	// Trigger healing job creation.
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -545,7 +545,7 @@ func TestParallelHealing_WinnerSelection_CancelsLoserJobs(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+	if err := cancelLoserBranches(ctx, st, domaintypes.RunID(runID), winnerJob, jobs); err != nil {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 
@@ -690,7 +690,7 @@ func TestParallelHealing_RetriesExhausted_AllBranchesCanceled(t *testing.T) {
 
 	// Simulate the last re-gate failing and triggering retry check.
 	// failedStepIndex=1600 (re-gate-branch-b-1).
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1600), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1600), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -814,7 +814,7 @@ func TestParallelHealing_MixedBranchOutcomes(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := cancelLoserBranches(ctx, st, runID, winnerJob, jobs); err != nil {
+	if err := cancelLoserBranches(ctx, st, domaintypes.RunID(runID), winnerJob, jobs); err != nil {
 		t.Fatalf("cancelLoserBranches returned error: %v", err)
 	}
 

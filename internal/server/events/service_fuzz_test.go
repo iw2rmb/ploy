@@ -37,7 +37,7 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 		payload := modsapi.RunSummary{RunID: domaintypes.RunID(payloadRunID), State: state}
 		ctx := context.Background()
 
-		err := svc.PublishRun(ctx, streamRunID, payload)
+		err := svc.PublishRun(ctx, domaintypes.RunID(streamRunID), payload)
 		if strings.TrimSpace(streamRunID) == "" {
 			if err == nil {
 				t.Fatalf("expected error for empty runID")

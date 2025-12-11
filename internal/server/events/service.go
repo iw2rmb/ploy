@@ -152,24 +152,23 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 }
 
 // PublishRun publishes a run lifecycle event (queued/running/succeeded/failed/cancelled)
-// to the SSE hub. The runID (KSUID string) is used as the streamID for SSE fanout.
+// to the SSE hub. The runID (KSUID-backed RunID) is used as the streamID for SSE fanout.
 //
 // The payload is intentionally typed as modsapi.RunSummary to enforce a
 // JSON‑serializable contract at the service boundary and prevent accidental
 // non‑JSON payloads from being published. Callers should also emit a terminal
 // "done" status via Hub().PublishStatus when the run reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
-func (s *Service) PublishRun(ctx context.Context, runID string, payload modsapi.RunSummary) error {
-	// Validate stream id after trimming whitespace so callers can't silently
-	// succeed with an all‑whitespace runID (the hub ignores empty ids).
-	if strings.TrimSpace(runID) == "" {
+func (s *Service) PublishRun(ctx context.Context, runID domaintypes.RunID, payload modsapi.RunSummary) error {
+	streamID := strings.TrimSpace(runID.String())
+	if streamID == "" {
 		return errors.New("events: runID required for run publish")
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	return s.hub.PublishRun(ctx, runID, payload)
+	return s.hub.PublishRun(ctx, streamID, payload)
 }
 
 // publishEventToHub converts a database event to a logstream event and publishes it.

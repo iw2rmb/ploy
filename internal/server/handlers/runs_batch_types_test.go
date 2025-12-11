@@ -115,7 +115,7 @@ func TestGetRunRepoCounts(t *testing.T) {
 				countRunReposByStatusErr:    tc.mockErr,
 			}
 
-			counts, err := getRunRepoCounts(context.Background(), m, runID)
+			counts, err := getRunRepoCounts(context.Background(), m, domaintypes.RunID(runID))
 			if tc.wantErr {
 				if err == nil {
 					t.Error("expected error")

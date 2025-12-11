@@ -135,7 +135,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Derive run_id from the job for run completion checks.
-		runID := job.RunID
+		runID := domaintypes.RunID(job.RunID)
 
 		// Derive node ID from required header. auth middleware already enforces
 		// presence for worker-role callers; this handler performs an additional
@@ -211,7 +211,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		)
 
 		// Fetch the run for post-completion processing.
-		run, err := st.GetRun(ctx, runID)
+		run, err := st.GetRun(ctx, runID.String())
 		if err != nil {
 			// Log error but don't fail the job completion (job is already marked complete).
 			slog.Error("complete job: get run failed", "job_id", jobIDStr, "run_id", runID, "err", err)
@@ -223,7 +223,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// - If it is a non-gate job (mod/heal), cancel remaining non-terminal jobs so the run
 		//   can reach a terminal state instead of leaving jobs stranded.
 		if jobStatus == store.JobStatusFailed && err == nil {
-			jobs, jobsErr := st.ListJobsByRun(ctx, runID)
+			jobs, jobsErr := st.ListJobsByRun(ctx, runID.String())
 			if jobsErr != nil {
 				slog.Error("complete job: failed to list jobs for failure handling",
 					"job_id", jobIDStr,
@@ -253,7 +253,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
 		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {
-			if _, err := st.ScheduleNextJob(ctx, runID); err != nil {
+			if _, err := st.ScheduleNextJob(ctx, runID.String()); err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to schedule next job",
 						"job_id", jobIDStr,
