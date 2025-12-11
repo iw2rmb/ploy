@@ -178,6 +178,22 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   # Per ROADMAP.md Phase D: RED→GREEN→REFACTOR discipline for Codex healing.
   # ─────────────────────────────────────────────────────────────────────────────
   if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+    echo "Extracting Codex mod-out artifact bundles (if present)..."
+    shopt -s nullglob
+    mod_out_bundles=("${ARTIFACT_DIR}"/*_mod-out.bin)
+    shopt -u nullglob
+    if ((${#mod_out_bundles[@]} == 0)); then
+      echo "   - no mod-out bundles found in ${ARTIFACT_DIR} (Codex artifacts may be missing)"
+    else
+      for bundle in "${mod_out_bundles[@]}"; do
+        echo "   extracting $(basename "$bundle")"
+        if ! tar -xzf "$bundle" -C "${ARTIFACT_DIR}"; then
+          echo "   ⚠ failed to extract ${bundle}"
+        fi
+      done
+    fi
+    echo ""
+
     echo "6. Codex healing handshake (if healing was triggered):"
     echo "   - Codex completion: Codex exits after editing; node agent re-gates when workspace diffs exist"
     echo "   - Session resume: Check for codex-session.txt artifact for retry continuity"
