@@ -133,7 +133,8 @@ All Build Gate failures (pre or post) follow identical handling:
 The final gate result (pre-gate for runs with no mods executed, or the last
 post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in run status responses.
-- `ploy mod inspect < run-id>` output as `Gate: passed|failed ...`.
+Gate summary is exposed in `RunSummary.Metadata["gate_summary"]` and can be consumed via
+`GET /v1/runs/{id}/status` or CLI surfaces such as `ploy run status`.
 
 ### Healing configuration
 

@@ -61,7 +61,7 @@ TICKET=$(dist/ploy mod run --json \
 if [[ -n "${TICKET:-}" ]]; then
   echo ""
   echo "Inspecting run..."
-  dist/ploy mod inspect "$TICKET" || true
+  dist/ploy run status "$TICKET" || true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +75,8 @@ VALIDATION_FAILED=0
 # 1. Verify the run succeeded (indicates image was resolved correctly).
 #    If the run failed with "no image specified for stack", the map form failed.
 if [[ -n "${TICKET:-}" ]]; then
-  TICKET_STATUS=$(dist/ploy mod inspect "$TICKET" --json 2>/dev/null | jq -r '.state // .status // "unknown"' || echo "unknown")
+  # Derive run status from `ploy run status` human-readable output.
+  TICKET_STATUS=$(dist/ploy run status "$TICKET" 2>/dev/null | awk -F': ' '/^Status:/ {print tolower($2)}' | tr -d ' ' || echo "unknown")
   if [[ "$TICKET_STATUS" == "succeeded" ]]; then
     echo "  Pass: Run succeeded (stack-aware image resolution worked)"
   elif [[ "$TICKET_STATUS" == "failed" ]]; then

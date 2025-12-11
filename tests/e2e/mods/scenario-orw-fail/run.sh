@@ -32,7 +32,8 @@ RUN=$(dist/ploy mod run --json \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
 if [[ -n "${RUN:-}" ]]; then
-  dist/ploy mod inspect "$RUN" || true
+  # Print run summary for debugging; inspect subcommand has been removed.
+  dist/ploy run status "$RUN" || true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

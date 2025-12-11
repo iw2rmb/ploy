@@ -46,9 +46,9 @@ TICKET=$(dist/ploy mod run --json \
   --artifact-dir "${ARTIFACT_DIR}" \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
-# Print MR URL if present in run metadata.
+# Print run summary if present; inspect subcommand has been removed.
 if [[ -n "${TICKET:-}" ]]; then
-  dist/ploy mod inspect "$TICKET" || true
+  dist/ploy run status "$TICKET" || true
 fi
 
 echo "OK: orw-pass scenario"
