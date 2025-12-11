@@ -98,17 +98,17 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	// Handle 201 Created response from server.
 	if resp.StatusCode == http.StatusCreated {
 		var srvResp struct {
-			RunID     string `json:"run_id"` // Run ID returned from server
-			Status    string `json:"status"`
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
+			RunID     domaintypes.RunID `json:"run_id"` // Run ID returned from server
+			Status    string            `json:"status"`
+			RepoURL   string            `json:"repo_url"`
+			BaseRef   string            `json:"base_ref"`
+			TargetRef string            `json:"target_ref"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
 			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 		return BatchSummary{
-			ID:        domaintypes.RunID(srvResp.RunID), // Convert to domain type
+			ID:        srvResp.RunID,
 			Name:      c.Name,
 			Status:    strings.ToLower(srvResp.Status),
 			RepoURL:   srvResp.RepoURL,

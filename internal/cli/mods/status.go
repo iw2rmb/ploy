@@ -27,7 +27,7 @@ import (
 type FetchRunWithCommitSHA struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string // Run ID (KSUID-backed string)
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
 }
 
 // RunDetails contains the full run record with commit_sha.
@@ -48,12 +48,12 @@ func (c FetchRunWithCommitSHA) Run(ctx context.Context) (*RunDetails, error) {
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("fetch run: base url required")
 	}
-	if strings.TrimSpace(c.RunID) == "" {
+	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("fetch run: run id required")
 	}
 
 	// Build endpoint: /v1/runs/{id}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID))
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()))
 	if err != nil {
 		return nil, fmt.Errorf("fetch run: build url: %w", err)
 	}
@@ -95,7 +95,7 @@ type DiffEntry struct {
 type ListAllDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   string // Run ID (KSUID-backed string, execution run id)
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type, execution run id)
 }
 
 // Run executes GET /v1/mods/{id}/diffs and returns all diff entries.
@@ -107,12 +107,12 @@ func (c ListAllDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("list all diffs: base url required")
 	}
-	if strings.TrimSpace(c.RunID) == "" {
+	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("list all diffs: run id required")
 	}
 
 	// Build endpoint: /v1/mods/{id}/diffs
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID), "diffs")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID.String()), "diffs")
 	if err != nil {
 		return nil, fmt.Errorf("list all diffs: build url: %w", err)
 	}

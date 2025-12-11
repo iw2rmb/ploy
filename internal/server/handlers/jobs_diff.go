@@ -102,8 +102,7 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the job belongs to the provided run.
-		// job.RunID is now a string (KSUID-backed).
-		if job.RunID != runIDStr {
+		if job.RunID.String() != runIDStr {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
@@ -129,9 +128,9 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Store params use string IDs (KSUID-backed).
+		// Store params use domain RunID (KSUID-backed) and string job ID.
 		params := store.CreateDiffParams{
-			RunID:   runIDStr,
+			RunID:   domaintypes.RunID(runIDStr),
 			JobID:   &jobIDStr,
 			Patch:   req.Patch,
 			Summary: summaryBytes,

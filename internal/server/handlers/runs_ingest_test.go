@@ -143,7 +143,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: runID.String()},
+		job: store.Job{ID: jobID.String(), RunID: runID},
 		run: store.Run{ID: runID.String()},
 	}
 	h := createRunArtifactBundleHandler(ms)
@@ -163,7 +163,7 @@ func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 	modID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: modID.String()},
+		job: store.Job{ID: jobID.String(), RunID: modID},
 		run: store.Run{ID: modID.String()},
 	}
 	h := createRunArtifactBundleHandler(ms)

@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRunPull implements `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`.
@@ -146,8 +147,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	if resolvedRun.ExecutionRunID == nil || strings.TrimSpace(*resolvedRun.ExecutionRunID) == "" {
 		return fmt.Errorf("mod run pull: execution run id missing for %q (repo may not have started)", runNameOrID)
 	}
-	executionRunID := strings.TrimSpace(*resolvedRun.ExecutionRunID)
-	_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", executionRunID)
+	executionRunID := domaintypes.RunID(strings.TrimSpace(*resolvedRun.ExecutionRunID))
+	_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", executionRunID.String())
 
 	// Step 6: Fetch run details to obtain commit_sha.
 	// Use the execution run ID to get the run record with commit_sha.
@@ -434,7 +435,7 @@ func printModRunPullUsage(w io.Writer) {
 
 // fetchRunDetails fetches the full run record including commit_sha via the API.
 // This uses the runs endpoint (GET /v1/runs/{id}) which exposes commit_sha.
-func fetchRunDetails(ctx context.Context, runID string) (*mods.RunDetails, error) {
+func fetchRunDetails(ctx context.Context, runID domaintypes.RunID) (*mods.RunDetails, error) {
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mod run pull: %w", err)
@@ -456,7 +457,7 @@ func fetchRunDetails(ctx context.Context, runID string) (*mods.RunDetails, error
 
 // fetchAllDiffs fetches all diffs for the given execution run.
 // Returns diffs sorted by step_index for correct application order.
-func fetchAllDiffs(ctx context.Context, executionRunID string) ([]mods.DiffEntry, error) {
+func fetchAllDiffs(ctx context.Context, executionRunID domaintypes.RunID) ([]mods.DiffEntry, error) {
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mod run pull: %w", err)

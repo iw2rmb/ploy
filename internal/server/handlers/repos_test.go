@@ -157,7 +157,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
-				RunID:      runID.String(),
+				RunID:      runID,
 				Name:       &name,
 				RunStatus:  store.RunStatusSucceeded,
 				RepoStatus: store.RunRepoStatusSucceeded,
@@ -422,7 +422,7 @@ func TestListRunsForRepoHandler_WithExecutionRunID(t *testing.T) {
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
-				RunID:          runID.String(),
+				RunID:          runID,
 				Name:           &name,
 				RunStatus:      store.RunStatusSucceeded,
 				RepoStatus:     store.RunRepoStatusSucceeded,
@@ -476,7 +476,7 @@ func TestListRunsForRepoHandler_WithoutExecutionRunID(t *testing.T) {
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
-				RunID:          runID.String(),
+				RunID:          runID,
 				Name:           &name,
 				RunStatus:      store.RunStatusQueued,
 				RepoStatus:     store.RunRepoStatusPending,

@@ -194,12 +194,12 @@ func TestGetArtifactHandler(t *testing.T) {
 		}
 
 		var response struct {
-			ID     string  `json:"id"`
-			RunID  string  `json:"run_id"`
-			CID    string  `json:"cid"`
-			Digest string  `json:"digest"`
-			Name   *string `json:"name"`
-			Size   int64   `json:"size"`
+			ID     string            `json:"id"`
+			RunID  domaintypes.RunID `json:"run_id"`
+			CID    string            `json:"cid"`
+			Digest string            `json:"digest"`
+			Name   *string           `json:"name"`
+			Size   int64             `json:"size"`
 		}
 		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 			t.Fatalf("failed to decode response: %v", err)

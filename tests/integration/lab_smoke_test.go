@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -46,7 +47,7 @@ func TestLabSmoke(t *testing.T) {
 
 	// Step 4: Simulate node operations - Create a job for the run.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     run.ID,
+		RunID:     domaintypes.RunID(run.ID),
 		Name:      "build",
 		Status:    store.JobStatusRunning,
 		ModType:   "",
@@ -62,7 +63,7 @@ func TestLabSmoke(t *testing.T) {
 	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).
 	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build job\n")
 	log, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		ChunkNo: 0,
 		Data:    logData,
 	})
@@ -74,7 +75,7 @@ func TestLabSmoke(t *testing.T) {
 	// Create a second log chunk to simulate continued streaming.
 	log2Data := []byte("INFO: Build completed successfully\nINFO: Running tests\nINFO: All tests passed\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		ChunkNo: 1,
 		Data:    log2Data,
 	})
@@ -96,7 +97,7 @@ index 1234567..abcdefg 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
@@ -140,8 +141,8 @@ index 1234567..abcdefg 100644
 		if diffs[0].ID.Bytes != diff.ID.Bytes {
 			t.Errorf("Diff ID mismatch: expected %v, got %v", diff.ID, diffs[0].ID)
 		}
-		if diffs[0].RunID != run.ID {
-			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID)
+		if diffs[0].RunID.String() != run.ID {
+			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID.String())
 		}
 		if diffs[0].JobID == nil || *diffs[0].JobID != job.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", job.ID, diffs[0].JobID)
@@ -163,15 +164,15 @@ index 1234567..abcdefg 100644
 	if fetchedDiff.ID.Bytes != diff.ID.Bytes {
 		t.Errorf("Fetched diff ID mismatch: expected %v, got %v", diff.ID, fetchedDiff.ID)
 	}
-	if fetchedDiff.RunID != run.ID {
-		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID)
+	if fetchedDiff.RunID.String() != run.ID {
+		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID.String())
 	}
 	t.Logf("✓ Individual diff retrieval successful")
 
 	// Step 10: Create an event to simulate node status updates.
 	now := time.Now().UTC()
 	eventParams := store.CreateEventParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		Time: pgtype.Timestamptz{
 			Time:  now,
 			Valid: true,

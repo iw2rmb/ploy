@@ -309,12 +309,12 @@ func TestStopRunHandler(t *testing.T) {
 			mockRepos: []store.RunRepo{
 				{
 					ID:     pendingRepoID,
-					RunID:  sampleRunID,
+					RunID:  domaintypes.RunID(sampleRunID),
 					Status: store.RunRepoStatusPending,
 				},
 				{
 					ID:     runningRepoID,
-					RunID:  sampleRunID,
+					RunID:  domaintypes.RunID(sampleRunID),
 					Status: store.RunRepoStatusRunning,
 				},
 			},
@@ -423,7 +423,7 @@ func TestAddRunRepoHandler(t *testing.T) {
 
 	createdRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		RepoUrl:   "https://github.com/example/new-repo.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -581,7 +581,7 @@ func TestListRunReposHandler(t *testing.T) {
 	sampleRepos := []store.RunRepo{
 		{
 			ID:        sampleRepoID1,
-			RunID:     sampleRunID,
+			RunID:     domaintypes.RunID(sampleRunID),
 			RepoUrl:   "https://github.com/example/repo1.git",
 			BaseRef:   "main",
 			TargetRef: "feature-1",
@@ -591,7 +591,7 @@ func TestListRunReposHandler(t *testing.T) {
 		},
 		{
 			ID:        sampleRepoID2,
-			RunID:     sampleRunID,
+			RunID:     domaintypes.RunID(sampleRunID),
 			RepoUrl:   "https://github.com/example/repo2.git",
 			BaseRef:   "main",
 			TargetRef: "feature-2",
@@ -701,7 +701,7 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 
 	pendingRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
@@ -710,7 +710,7 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 
 	runningRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusRunning,
 		Attempt:   1,
@@ -719,7 +719,7 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 
 	succeededRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusSucceeded,
 		Attempt:   1,
@@ -730,7 +730,7 @@ func TestDeleteRunRepoHandler(t *testing.T) {
 	differentRunID := string(domaintypes.NewRunID())
 	differentRunRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     differentRunID,
+		RunID:     domaintypes.RunID(differentRunID),
 		RepoUrl:   "https://github.com/example/repo.git",
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
@@ -884,7 +884,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 
 	pendingRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		Status:    store.RunRepoStatusPending,
 		Attempt:   1,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -892,7 +892,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 
 	failedRepo := store.RunRepo{
 		ID:        sampleRepoID,
-		RunID:     sampleRunID,
+		RunID:     domaintypes.RunID(sampleRunID),
 		Status:    store.RunRepoStatusFailed,
 		Attempt:   1,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -1001,7 +1001,7 @@ func TestRestartRunRepoHandler(t *testing.T) {
 			runID:      sampleRunID,
 			repoID:     sampleRepoID,
 			mockRun:    runningRun,
-			mockRepo:   store.RunRepo{RunID: string(domaintypes.NewRunID())}, // Different KSUID.
+			mockRepo:   store.RunRepo{RunID: domaintypes.NewRunID()}, // Different KSUID.
 			wantStatus: http.StatusNotFound,
 		},
 		{
@@ -1148,7 +1148,7 @@ func TestStartRunHandler(t *testing.T) {
 	// Sample pending run repos.
 	pendingRepo1 := store.RunRepo{
 		ID:        sampleRepoID1,
-		RunID:     sampleBatchRunID,
+		RunID:     domaintypes.RunID(sampleBatchRunID),
 		RepoUrl:   "https://github.com/example/repo1.git",
 		BaseRef:   "main",
 		TargetRef: "feature-1",
@@ -1159,7 +1159,7 @@ func TestStartRunHandler(t *testing.T) {
 
 	pendingRepo2 := store.RunRepo{
 		ID:        sampleRepoID2,
-		RunID:     sampleBatchRunID,
+		RunID:     domaintypes.RunID(sampleBatchRunID),
 		RepoUrl:   "https://github.com/example/repo2.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -1171,7 +1171,7 @@ func TestStartRunHandler(t *testing.T) {
 	// Sample already succeeded repo.
 	succeededRepo := store.RunRepo{
 		ID:        sampleRepoID1,
-		RunID:     sampleBatchRunID,
+		RunID:     domaintypes.RunID(sampleBatchRunID),
 		RepoUrl:   "https://github.com/example/repo1.git",
 		Status:    store.RunRepoStatusSucceeded,
 		Attempt:   1,

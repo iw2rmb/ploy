@@ -27,7 +27,7 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 	executionRunIDStr := sampleExecutionRunID.String()
 	linkedRunRepo := store.RunRepo{
 		ID:             sampleRunRepoID.String(),
-		RunID:          sampleBatchRunID.String(),
+		RunID:          sampleBatchRunID,
 		ExecutionRunID: &executionRunIDStr,
 		RepoUrl:        "https://github.com/example/repo.git",
 		Status:         store.RunRepoStatusRunning,
@@ -168,7 +168,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 	// Run repos representing individual repositories in the batch.
 	pendingRepo1 := store.RunRepo{
 		ID:        repo1ID.String(),
-		RunID:     batchRunID.String(),
+		RunID:     batchRunID,
 		RepoUrl:   "https://github.com/org/repo1.git",
 		BaseRef:   "main",
 		TargetRef: "feature-1",
@@ -179,7 +179,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 
 	pendingRepo2 := store.RunRepo{
 		ID:        repo2ID.String(),
-		RunID:     batchRunID.String(),
+		RunID:     batchRunID,
 		RepoUrl:   "https://github.com/org/repo2.git",
 		BaseRef:   "main",
 		TargetRef: "feature-2",
@@ -402,7 +402,7 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 
 	failedRepo := store.RunRepo{
 		ID:        repoID.String(),
-		RunID:     batchRunID.String(),
+		RunID:     batchRunID,
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusFailed,
 		Attempt:   1,
@@ -411,7 +411,7 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 
 	runningRepo := store.RunRepo{
 		ID:        repoID.String(),
-		RunID:     batchRunID.String(),
+		RunID:     batchRunID,
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusRunning,
 		Attempt:   1,
@@ -468,7 +468,7 @@ func TestBatchRunWorkflow_ErrorPaths(t *testing.T) {
 			getRunResult: runningRun,
 			getRunRepoResult: store.RunRepo{
 				ID:        repoID.String(),
-				RunID:     batchRunID.String(),
+				RunID:     batchRunID,
 				Status:    store.RunRepoStatusPending,
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},

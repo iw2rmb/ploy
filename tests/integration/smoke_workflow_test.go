@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -111,7 +112,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Build Gate logs
 	buildGateLog := []byte("INFO: Starting build gate validation\nINFO: Running Maven build\nINFO: Build gate passed\n")
 	log1, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		ChunkNo: 0,
 		Data:    buildGateLog,
 	})
@@ -123,7 +124,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Main job logs
 	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		ChunkNo: 1,
 		Data:    mainLog,
 	})
@@ -135,7 +136,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Post-processing logs
 	postLog := []byte("INFO: Uploading artifacts\nINFO: Artifacts uploaded successfully\n")
 	log3, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		ChunkNo: 2,
 		Data:    postLog,
 	})
@@ -176,7 +177,7 @@ index abc1234..def5678 100644
 
 	// Event 1: Run started
 	event1, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		Time: pgtype.Timestamptz{
 			Time:  now,
 			Valid: true,
@@ -192,7 +193,7 @@ index abc1234..def5678 100644
 
 	// Event 2: Build gate passed
 	event2, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(10 * time.Second),
 			Valid: true,
@@ -208,7 +209,7 @@ index abc1234..def5678 100644
 
 	// Event 3: Main mod completed
 	event3, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(30 * time.Second),
 			Valid: true,
@@ -224,7 +225,7 @@ index abc1234..def5678 100644
 
 	// Event 4: Run completed
 	event4, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(40 * time.Second),
 			Valid: true,

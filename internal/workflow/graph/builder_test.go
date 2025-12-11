@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -56,11 +57,11 @@ func TestBuildFromJobs_SimpleRun(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(runID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 
 	// Verify run ID.
-	if graph.RunID != runID {
-		t.Errorf("RunID = %q, want %q", graph.RunID, runID)
+	if graph.RunID.String() != runID {
+		t.Errorf("RunID = %q, want %q", graph.RunID.String(), runID)
 	}
 
 	// Verify node count.
@@ -133,7 +134,7 @@ func TestBuildFromJobs_WithHealing(t *testing.T) {
 		{ID: postGateID, RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 	}
 
-	graph := BuildFromJobs(runID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 
 	// Verify 5 nodes.
 	if graph.NodeCount() != 5 {
@@ -177,7 +178,7 @@ func TestBuildFromJobs_EmptyJobs(t *testing.T) {
 
 	runID := "run-empty"
 
-	graph := BuildFromJobs(runID, []store.Job{})
+	graph := BuildFromJobs(domaintypes.RunID(runID), []store.Job{})
 
 	if graph.NodeCount() != 0 {
 		t.Errorf("NodeCount() = %d, want 0", graph.NodeCount())
@@ -197,11 +198,11 @@ func TestBuildFromJobs_InvalidRunID(t *testing.T) {
 		{ID: "job-1", RunID: invalidRunID, Name: "job-1", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
 	}
 
-	graph := BuildFromJobs(invalidRunID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(invalidRunID), jobs)
 
 	// Should still build graph, but RunID should be empty.
-	if graph.RunID != "" {
-		t.Errorf("RunID should be empty for invalid input, got %q", graph.RunID)
+	if graph.RunID.String() != "" {
+		t.Errorf("RunID should be empty for invalid input, got %q", graph.RunID.String())
 	}
 	if graph.NodeCount() != 1 {
 		t.Errorf("NodeCount() = %d, want 1", graph.NodeCount())
@@ -236,7 +237,7 @@ func TestBuildFromJobs_StatusMapping(t *testing.T) {
 				{ID: jobID, RunID: runID, Name: "job", Status: tt.storeStatus, ModType: "mod", StepIndex: 1000},
 			}
 
-			graph := BuildFromJobs(runID, jobs)
+			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 			node := graph.GetNode(jobID)
 
 			if node.Status != tt.wantStatus {
@@ -274,7 +275,7 @@ func TestBuildFromJobs_TypeMapping(t *testing.T) {
 				{ID: jobID, RunID: runID, Name: "job", Status: store.JobStatusPending, ModType: tt.modType, StepIndex: 1000},
 			}
 
-			graph := BuildFromJobs(runID, jobs)
+			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 			node := graph.GetNode(jobID)
 
 			if node.Type != tt.wantType {
@@ -309,7 +310,7 @@ func TestBuildFromJobs_TimestampMapping(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(runID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 	node := graph.GetNode(jobID)
 
 	if node.StartedAt == nil || !node.StartedAt.Equal(startedAt) {
@@ -345,7 +346,7 @@ func TestBuildFromJobs_NilTimestamps(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(runID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 	node := graph.GetNode(jobID)
 
 	if node.StartedAt != nil {
@@ -370,7 +371,7 @@ func TestBuildFromJobsWithEdgeStrategy(t *testing.T) {
 	}
 
 	// Use linear strategy (default).
-	graph := BuildFromJobsWithEdgeStrategy(runID, jobs, &LinearEdgeStrategy{})
+	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &LinearEdgeStrategy{})
 
 	// Verify linear edges.
 	nodeA := graph.GetNode(job1ID)
@@ -391,7 +392,7 @@ func TestBuildFromJobsWithEdgeStrategy_NilStrategy(t *testing.T) {
 	}
 
 	// Nil strategy should not panic; uses default edges.
-	graph := BuildFromJobsWithEdgeStrategy(runID, jobs, nil)
+	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, nil)
 	if graph.NodeCount() != 1 {
 		t.Errorf("NodeCount() = %d, want 1", graph.NodeCount())
 	}
@@ -411,7 +412,7 @@ func TestHealingWindowEdgeStrategy(t *testing.T) {
 	}
 
 	// Healing window strategy should work (currently delegates to linear).
-	graph := BuildFromJobsWithEdgeStrategy(runID, jobs, &HealingWindowEdgeStrategy{})
+	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &HealingWindowEdgeStrategy{})
 	if graph.NodeCount() != 2 {
 		t.Errorf("NodeCount() = %d, want 2", graph.NodeCount())
 	}
@@ -438,7 +439,7 @@ func TestBuildFromJobs_MultiStepRun(t *testing.T) {
 		{ID: postGateID, RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 5000},
 	}
 
-	graph := BuildFromJobs(runID, jobs)
+	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
 
 	// Verify 5 nodes in linear chain.
 	if graph.NodeCount() != 5 {

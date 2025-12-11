@@ -112,10 +112,9 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			jobID = &s
 		}
 
-		// Store the gzipped log chunk in the database.
-		// Convert domain type to string for store layer.
+		// Store the gzipped log chunk in the database using domain RunID.
 		params := store.CreateLogParams{
-			RunID:   req.RunID.String(), // Convert domain type to string
+			RunID:   req.RunID,
 			JobID:   jobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,

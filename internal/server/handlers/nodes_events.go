@@ -132,11 +132,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 			// Create event params.
 			// Normalize level to lowercase for consistency in SSE streams.
-			// Convert domain type to string for store layer.
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID: req.RunID.String(), // Convert domain type to string
+				RunID: req.RunID,
 				JobID: jobID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,

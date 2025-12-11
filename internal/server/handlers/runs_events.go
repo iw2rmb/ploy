@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -76,9 +77,9 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		// Normalize optional job ID (KSUID string; no UUID parsing).
 		jobID := normalizeOptionalID(req.JobID)
 
-		// Create log row using string IDs directly.
+		// Create log row using domain RunID and string job ID.
 		params := store.CreateLogParams{
-			RunID:   runIDStr,
+			RunID:   domaintypes.RunID(runIDStr),
 			JobID:   jobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
