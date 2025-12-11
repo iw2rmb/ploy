@@ -139,104 +139,6 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	}
 }
 
-// TestGetRunStatusCommand_Run validates GetRunStatusCommand responses.
-func TestGetRunStatusCommand_Run(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		runID       domaintypes.RunID // Updated to domain type
-		serverResp  BatchSummary
-		statusCode  int
-		wantErr     bool
-		wantErrText string
-	}{
-		{
-			name:  "successful status fetch",
-			runID: domaintypes.RunID("batch-123"), // Convert to domain type
-			serverResp: BatchSummary{
-				ID:        domaintypes.RunID("batch-123"), // Convert to domain type
-				Name:      strPtr("my-batch"),
-				Status:    "running",
-				RepoURL:   "https://github.com/org/repo.git",
-				BaseRef:   "main",
-				TargetRef: "feature",
-				CreatedAt: time.Now(),
-				Counts: &RunRepoCounts{
-					Total:         3,
-					Pending:       1,
-					Running:       1,
-					Succeeded:     1,
-					DerivedStatus: "running",
-				},
-			},
-			statusCode: http.StatusOK,
-		},
-		{
-			name:        "run not found",
-			runID:       domaintypes.RunID("nonexistent"), // Convert to domain type
-			statusCode:  http.StatusNotFound,
-			wantErr:     true,
-			wantErrText: "run not found",
-		},
-		{
-			name:        "empty run id",
-			runID:       domaintypes.RunID(""), // Empty domain type
-			wantErr:     true,
-			wantErrText: "run id required",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Set up mock server.
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tc.statusCode == http.StatusNotFound {
-					http.Error(w, "run not found", http.StatusNotFound)
-					return
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(tc.serverResp)
-			}))
-			t.Cleanup(srv.Close)
-
-			baseURL, err := url.Parse(srv.URL)
-			if err != nil {
-				t.Fatalf("parse server URL: %v", err)
-			}
-
-			cmd := GetRunStatusCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				RunID:   tc.runID,
-			}
-
-			result, err := cmd.Run(context.Background())
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tc.wantErrText != "" && !strings.Contains(err.Error(), tc.wantErrText) {
-					t.Errorf("error %q should contain %q", err.Error(), tc.wantErrText)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Run() error: %v", err)
-			}
-			if result.ID != tc.serverResp.ID {
-				t.Errorf("got ID %q, want %q", result.ID, tc.serverResp.ID)
-			}
-			if result.Status != tc.serverResp.Status {
-				t.Errorf("got status %q, want %q", result.Status, tc.serverResp.Status)
-			}
-		})
-	}
-}
-
 // TestStopBatchCommand_Run validates StopBatchCommand responses.
 func TestStopBatchCommand_Run(t *testing.T) {
 	t.Parallel()
@@ -596,14 +498,6 @@ func TestBatchCommand_Errors(t *testing.T) {
 			wantErr: "base url required",
 		},
 		{
-			name: "status missing base URL",
-			cmd: &statusWrapper{GetRunStatusCommand{
-				Client: http.DefaultClient,
-				RunID:  "test",
-			}},
-			wantErr: "base url required",
-		},
-		{
 			name: "stop missing batch ID",
 			cmd: &stopWrapper{StopBatchCommand{
 				Client:  http.DefaultClient,
@@ -648,10 +542,9 @@ func TestHTTPError(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := GetRunStatusCommand{
+	cmd := ListBatchesCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		RunID:   "test",
 	}
 
 	_, err := cmd.Run(context.Background())
@@ -672,12 +565,6 @@ func strPtr(s string) *string {
 type listWrapper struct{ ListBatchesCommand }
 
 func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListBatchesCommand.Run(ctx) }
-
-type statusWrapper struct{ GetRunStatusCommand }
-
-func (w *statusWrapper) Run(ctx context.Context) (any, error) {
-	return w.GetRunStatusCommand.Run(ctx)
-}
 
 type stopWrapper struct{ StopBatchCommand }
 
