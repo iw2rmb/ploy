@@ -31,9 +31,7 @@
 //     Healing mods operate on this same workspace.
 //
 //   - Healing modifications: Healing containers modify the workspace in-place.
-//     Each healing mod's changes accumulate as diffs on top of the repo baseline.
-//     Per-step diff capture (uploadHealingModDiff) records these changes for
-//     multi-node rehydration scenarios.
+//     Each healing mod's changes accumulate on top of the repo baseline.
 //
 //   - Re-gate verification: After healing completes, the gate re-runs against
 //     the same workspace (repo_url+ref + healing modifications).
@@ -70,7 +68,7 @@ import (
 //   - outDir: Path to the /out directory for artifacts.
 //   - inDir: Pointer to the /in directory path; created if empty and healing is triggered.
 //   - gatePhase: "pre" or "post" to indicate which gate phase is executing.
-//   - stepIndex: 0-based step number for tagging healing diffs (C2: stage+diff model).
+//   - stepIndex: 0-based step number used for logging and gate statistics (matches Mods step index).
 //
 // ## Returns
 //
@@ -113,7 +111,7 @@ func (r *runController) runGateWithHealing(
 	workspace, outDir string,
 	inDir *string,
 	gatePhase string, // "pre" or "post"
-	stepIndex int, // C2: step number for healing diff tagging
+	stepIndex int, // logical step index for logging and stats
 ) (*gateRunMetadata, []gateRunMetadata, error) {
 	gateSpec := manifest.Gate
 
@@ -296,10 +294,6 @@ func (r *runController) runGateWithHealing(
 			slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "mod_index", modIndex, "error", uploadErr)
 		}
 
-		// Per-step diff capture: Generate and upload diff after the healing mod step.
-		jobName := req.JobName
-		r.uploadHealingModDiff(ctx, req.RunID, req.JobID, jobName, workspace, healResult, modIndex, attempt, stepIndex)
-
 		// Read session artifacts from /out for propagation across retries.
 		if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
 			if session := strings.TrimSpace(string(sessionBytes)); session != "" {
@@ -349,15 +343,15 @@ func (r *runController) runGateWithHealing(
 		// that healing modifications have resolved the validation failure.
 		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
 
-		// Clone gateSpec for re-gate execution. DiffPatch is computed for potential
-		// future use in distributed gate scenarios but currently unused by Docker gates.
+		// Clone gateSpec for re-gate execution. DiffPatch is intentionally left empty:
+		// gate validation runs directly against the mutated workspace, and discrete
+		// healing jobs publish baseline-based diffs for rehydration.
 		regateSpec := &contracts.StepGateSpec{
-			Enabled:   gateSpec.Enabled,
-			Profile:   gateSpec.Profile,
-			Env:       gateSpec.Env,
-			RepoURL:   gateSpec.RepoURL,
-			Ref:       gateSpec.Ref,
-			DiffPatch: computeGzippedDiff(ctx, workspace),
+			Enabled: gateSpec.Enabled,
+			Profile: gateSpec.Profile,
+			Env:     gateSpec.Env,
+			RepoURL: gateSpec.RepoURL,
+			Ref:     gateSpec.Ref,
 		}
 
 		regateStart := time.Now()
@@ -458,7 +452,7 @@ func (r *runController) executeWithHealing(
 	// Phase G: Run pre-mod gate via runGateWithHealing (not via Runner.Run).
 	// This centralizes all gate execution in runGateWithHealing, ensuring gate failures
 	// are handled uniformly with healing support. Runner.Run is reserved for container execution.
-	// C2: Pass stepIndex so healing diffs are tagged with the correct step.
+	// Pass stepIndex so gate history and stats remain aligned with the Mods step index.
 	preGate, preReGates, preGateErr := r.runGateWithHealing(
 		ctx, runner, req, manifest, workspace, outDir, inDir, "pre", stepIndex,
 	)
@@ -533,7 +527,7 @@ func (r *runController) executeWithHealing(
 	// Run post-mod gate only if main mod succeeded (ExitCode == 0).
 	// This validates the workspace after modifications using the same healing behavior
 	// as pre-mod gates, keeping gate orchestration consistent.
-	// C2: Pass stepIndex so post-gate healing diffs are tagged with the correct step.
+	// Pass stepIndex so post-mod gate history and stats remain aligned with the Mods step index.
 	if result.ExitCode == 0 {
 		postGate, postReGates, postErr := r.runGateWithHealing(
 			ctx, runner, req, manifest, workspace, outDir, inDir, "post", stepIndex,

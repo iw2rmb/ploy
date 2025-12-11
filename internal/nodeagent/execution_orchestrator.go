@@ -227,7 +227,8 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// Conditionally create MR on success.
 	if shouldCreateMR("succeeded", manifest) {
 		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
+			// Run has already succeeded; surface missing MR as a warning for debuggability.
+			slog.Warn("MR creation failed after successful run", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
 		} else {
 			stats["metadata"] = map[string]interface{}{"mr_url": url}
 			slog.Info("MR created", "run_id", req.RunID, "job_id", req.JobID, "mr_url", url)
@@ -611,7 +612,11 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	mrURL := ""
 	if shouldCreateMR(terminalStatus, manifest) {
 		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
+			if terminalStatus == "succeeded" {
+				slog.Warn("MR creation failed after successful run", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
+			} else {
+				slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
+			}
 		} else {
 			mrURL = url
 			slog.Info("MR created successfully", "run_id", req.RunID, "job_id", req.JobID, "mr_url", mrURL)

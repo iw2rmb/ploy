@@ -182,61 +182,6 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	}
 }
 
-// TestUploadHealingModDiff_MetadataTagging verifies that healing mod diffs are uploaded
-// with proper metadata (mod_type=healing, mod_index, healing_attempt) to distinguish
-// them from main mod diffs in the database.
-func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
-	t.Parallel()
-
-	// Create temporary workspace with git repo for diff generation.
-	workspace, err := os.MkdirTemp("", "ploy-test-ws-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll(workspace) }()
-
-	// Initialize git repo and create a change.
-	if err := setupGitRepoWithChange(workspace); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create runController with minimal config.
-	// Note: This test validates diff metadata structure but doesn't actually upload
-	// to a server (would require integration test setup).
-	rc := &runController{
-		cfg: Config{
-			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
-		},
-	}
-
-	// Create mock result for healing mod.
-	healResult := step.Result{
-		ExitCode: 0,
-		Timings: step.StageTiming{
-			HydrationDuration: 100,
-			ExecutionDuration: 500,
-			BuildGateDuration: 0,
-			DiffDuration:      50,
-			TotalDuration:     650,
-		},
-	}
-
-	// Call uploadHealingModDiff (will fail at upload but we can verify the setup logic).
-	// C2: Pass stepIndex=3 to tag the healing diff with the parent step.
-	// E3: Pass job name for branch identification (empty string for single-branch healing).
-	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", "heal-1-0", workspace, healResult, 2, 1, 3)
-
-	// Verify that the function completes without panics (basic smoke test).
-	// The key contract is that the summary includes:
-	//   - "mod_type": "healing"
-	//   - "mod_index": 2
-	//   - "healing_attempt": 1
-	//   - "exit_code": 0
-	//   - "timings": {...}
-	//   - E3: "path_id" (only present for multi-path jobs like "heal-path-a-1-0")
-}
-
 // trackingDiffGenerator is a test helper that records Generate/GenerateBetween calls.
 type trackingDiffGenerator struct {
 	diffContent     []byte

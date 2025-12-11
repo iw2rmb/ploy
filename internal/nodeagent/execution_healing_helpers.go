@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"log/slog"
@@ -55,46 +54,15 @@ type executionResult struct {
 	ReGates []gateRunMetadata
 }
 
-// uploadHealingModDiff generates and uploads diff after a single healing mod execution.
-// It enriches the diff summary with healing-specific metadata (mod_type, mod_index, healing_attempt)
-// to distinguish healing mod diffs from main mod diffs in the database.
-//
-// C2: Healing diffs are tagged with the same step_index as their parent mod step, enabling
-// unified rehydration that includes both mod and healing diffs. The mod_type="healing" field
-// distinguishes healing diffs from regular mod diffs when filtering is needed.
-//
-// This per-step diff capture enables multi-node rehydration where each node can reconstruct
-// the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
-func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.RunID, jobID types.JobID, jobName, workspace string, healResult step.Result, modIndex, healingAttempt, stepIndex int) {
-	// Retrieve the diff generator from runtime components.
-	diffGenerator := r.createDiffGenerator()
-	if diffGenerator == nil {
-		return
-	}
-
-	// Healing mods run inline against the same workspace; there is no separate
-	// baseline directory available here. To keep semantics consistent with the
-	// rest of the system and avoid legacy HEAD-based diffs, healing mod diffs
-	// are currently disabled. When a baseline snapshot is introduced for inline
-	// healing, this function must be updated to use GenerateBetween.
-	_ = diffGenerator
-	slog.Warn("uploadHealingModDiff: baseline-less healing mod diff generation disabled (no Generate fallback)", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex)
-}
-
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job by
 // comparing the pre-healing baseline snapshot with the post-healing workspace.
 //
-// Unlike uploadHealingModDiff (which tags diffs as mod_type="healing" for inline
-// gate healing), discrete healing jobs must publish diffs as mod_type="mod" so
-// that subsequent re-gate steps rehydrate the healed workspace from the diff
-// chain. Using GenerateBetween(baseDir, workspace) ensures that:
+// Discrete healing jobs publish diffs as mod_type="mod" so that subsequent
+// steps rehydrate the healed workspace from the diff chain. Using
+// GenerateBetween(baseDir, workspace) ensures that:
 //   - Untracked files created by the healer are included in the diff
 //   - The diff captures the full delta from the baseline (base+prior-diffs)
 //     to the healed workspace, matching repo+diff semantics.
-//
-// When baseDir is empty or the diff generator is nil, this helper falls back to
-// the standard per-step diff behavior (uploadDiffForStep) so healing still
-// produces diagnostics even if baseline snapshots are unavailable.
 func (r *runController) uploadHealingJobDiff(
 	ctx context.Context,
 	runID types.RunID,
@@ -159,64 +127,6 @@ func (r *runController) uploadHealingJobDiff(
 	}
 
 	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
-}
-
-// computeGzippedDiff generates a unified git diff of workspace changes and compresses it.
-// It captures accumulated healing changes so gate re-execution can reason about the same
-// repo+diff workspace model used by the Docker-based gate executor.
-//
-// The diff captures all changes relative to the initial repo_url+ref clone (HEAD), enabling
-// future distributed gate workers to reconstruct workspace state by cloning repo_url+ref
-// and applying the patch when needed.
-//
-// Returns:
-//   - Gzipped diff bytes (suitable for repo+diff-style consumers).
-//   - nil if workspace has no changes or diff generation fails (logs warning but continues).
-func computeGzippedDiff(ctx context.Context, workspace string) []byte {
-	// Generate unified diff of all workspace changes relative to HEAD.
-	cmd := exec.CommandContext(ctx, "git", "diff", "HEAD")
-	cmd.Dir = workspace
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		// Log warning but don't fail re-gate — the gate executor will fall back to validating
-		// the repo_url+ref baseline without an explicit diff patch.
-		slog.Warn("failed to generate diff for gate re-execution",
-			"workspace", workspace,
-			"error", err,
-			"stderr", strings.TrimSpace(stderr.String()),
-		)
-		return nil
-	}
-
-	diffBytes := stdout.Bytes()
-	if len(diffBytes) == 0 {
-		// No changes in workspace; gate executor will validate baseline.
-		return nil
-	}
-
-	// Gzip the diff for efficient transmission.
-	var gzBuf bytes.Buffer
-	gzWriter := gzip.NewWriter(&gzBuf)
-	if _, err := gzWriter.Write(diffBytes); err != nil {
-		slog.Warn("failed to gzip diff for gate re-execution", "workspace", workspace, "error", err)
-		return nil
-	}
-	if err := gzWriter.Close(); err != nil {
-		slog.Warn("failed to close gzip writer for gate re-execution", "workspace", workspace, "error", err)
-		return nil
-	}
-
-	slog.Debug("computed gzipped diff for gate re-execution",
-		"workspace", workspace,
-		"raw_size", len(diffBytes),
-		"gzipped_size", gzBuf.Len(),
-	)
-
-	return gzBuf.Bytes()
 }
 
 // workspaceStatus returns the output of `git status --porcelain` for the given
