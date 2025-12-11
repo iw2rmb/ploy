@@ -143,81 +143,10 @@ func (r *runController) rehydrateWorkspaceForStep(
 	return workspacePath, nil
 }
 
-// uploadDiffForStep generates and uploads a diff for the given step with step_index metadata.
-// This replaces the older uploadDiff method and tags each diff with its step index for
-// ordered rehydration in multi-step/multi-node scenarios.
-//
-// E3: For path jobs (e.g., heal-path-a-1-0, re-gate-path-a-1), the job name is used to
-// extract path_id and tag the diff. This enables path-local workspace isolation during
-// rehydration — each execution path only sees mainline diffs plus its own path's diffs.
-func (r *runController) uploadDiffForStep(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	jobName string,
-	diffGenerator step.DiffGenerator,
-	workspace string,
-	result step.Result,
-	stepIndex types.StepIndex,
-) {
-	if diffGenerator == nil {
-		return
-	}
-
-	// Generate workspace diff for this step.
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, workspace, workspace)
-	if err != nil {
-		slog.Error("failed to generate step diff (baseline-less GenerateBetween)", "run_id", runID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	if len(diffBytes) == 0 {
-		// No changes from this step; skip upload.
-		slog.Info("no diff to upload for step (no changes)", "run_id", runID, "step_index", stepIndex)
-		return
-	}
-
-	// Build diff summary with step metadata for database storage.
-	// C2: Every diff is tagged with step_index + mod_type for unified rehydration.
-	// - step_index: Job step index for ordering and rehydration queries.
-	// - mod_type: "mod" for main mod diffs (healing diffs use "healing" in execution_healing.go).
-	summary := types.DiffSummary{
-		"step_index": stepIndex,
-		"mod_type":   "mod", // Identifies this diff as a main mod step diff.
-		"exit_code":  result.ExitCode,
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
-		},
-	}
-
-	// Upload diff with step metadata to control plane.
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create diff uploader", "run_id", runID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	// Upload diff to job-scoped endpoint. Step ordering is tracked in the summary metadata.
-	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload step diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	slog.Info("step diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
-}
-
 // uploadModDiffWithBaseline generates and uploads a diff for a mod job by comparing
 // the pre-mod baseline snapshot with the post-mod workspace. This ensures that
 // untracked files created by the mod are included in the patch (git diff --no-index
 // semantics via GenerateBetween).
-//
-// When baseDir is empty or the diff generator is nil, this helper falls back to
-// the standard per-step diff behavior (uploadDiffForStep) so mods still produce
-// diagnostics even if baseline snapshots are unavailable.
 func (r *runController) uploadModDiffWithBaseline(
 	ctx context.Context,
 	runID types.RunID,
@@ -233,10 +162,11 @@ func (r *runController) uploadModDiffWithBaseline(
 		return
 	}
 
-	// If no baseline snapshot is available, fall back to the standard per-step
-	// diff generation so we still capture changes for diagnostics.
+	// If no baseline snapshot is available, skip diff upload rather than
+	// falling back to legacy baseline-less generation. Mod diffs must use
+	// baseline-aware GenerateBetween semantics.
 	if strings.TrimSpace(baseDir) == "" {
-		r.uploadDiffForStep(ctx, runID, jobID, jobName, diffGenerator, workspace, result, stepIndex)
+		slog.Warn("mod diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName, "step_index", stepIndex)
 		return
 	}
 
