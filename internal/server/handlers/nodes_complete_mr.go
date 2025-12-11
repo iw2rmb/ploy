@@ -76,7 +76,10 @@ func maybeScheduleMRJobForRun(
 
 	// Create a single MR job as a best-effort post-run task.
 	const mrStepIndex = 9000
-	if err := createJobWithIndex(ctx, st, runID, "mr", "mr", domaintypes.StepIndex(mrStepIndex), "", store.JobStatusCreated); err != nil {
+	// MR jobs are scheduled after the run reaches a terminal state, so they
+	// must be immediately claimable by workers. Use 'pending' status so that
+	// ClaimJob can pick them up without relying on ScheduleNextJob.
+	if err := createJobWithIndex(ctx, st, runID, "mr", "mr", domaintypes.StepIndex(mrStepIndex), "", store.JobStatusPending); err != nil {
 		return fmt.Errorf("create MR job: %w", err)
 	}
 

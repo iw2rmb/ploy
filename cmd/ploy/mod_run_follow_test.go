@@ -36,7 +36,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				Status string `json:"status"`
 			}{RunID: runID, Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			// SSE stream: run running -> run succeeded
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -159,7 +159,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 				Status string `json:"status"`
 			}{RunID: runID, Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			// SSE stream with run, stage, and log events.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -266,7 +266,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 				Status string `json:"status"`
 			}{RunID: runID, Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {

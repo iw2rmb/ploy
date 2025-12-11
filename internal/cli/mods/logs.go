@@ -17,7 +17,7 @@ import (
 // ErrInvalidFormat indicates an unsupported format value.
 var ErrInvalidFormat = errors.New("mods: invalid format")
 
-// LogsCommand streams Mods logs over SSE.
+// LogsCommand streams logs for a single Mods run over SSE.
 type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
@@ -47,7 +47,7 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(c.RunID.String()), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "events")
 	if err != nil {
 		return fmt.Errorf("mods: build endpoint: %w", err)
 	}

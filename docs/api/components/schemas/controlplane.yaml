@@ -287,7 +287,7 @@ RunSubmitRequest:
 # This is the single authoritative response type for:
 # - POST /v1/mods (submit) → 201 response body
 # - GET /v1/mods/{id} (status) → 200 response body
-# - SSE `event: run` payloads on /v1/mods/{id}/events
+# - SSE `event: run` payloads on /v1/runs/{id}/events
 #
 # Wire contract guarantees:
 # - No wrapper types — RunSummary is returned directly as the JSON root.

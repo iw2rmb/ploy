@@ -29,28 +29,15 @@ func newModCmd(stderr io.Writer) *cobra.Command {
 	return modCmd
 }
 
-// newModsCmd creates the cobra command for 'ploy mods' (observe Mods execution).
-func newModsCmd(stderr io.Writer) *cobra.Command {
-	modsCmd := &cobra.Command{
-		Use:                "mods",
-		Short:              "Observe Mods execution (logs, events)",
+// newRunCmd creates the cobra command for 'ploy run' (inspect/follow runs).
+func newRunCmd(stderr io.Writer) *cobra.Command {
+	runCmd := &cobra.Command{
+		Use:                "run",
+		Short:              "Inspect runs and stream events",
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleMods(args, stderr)
+			return handleRun(args, stderr)
 		},
 	}
-	return modsCmd
-}
-
-// newRunsCmd creates the cobra command for 'ploy runs' (inspect/follow runs).
-func newRunsCmd(stderr io.Writer) *cobra.Command {
-	runsCmd := &cobra.Command{
-		Use:                "runs",
-		Short:              "Inspect and follow individual runs",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleRuns(args, stderr)
-		},
-	}
-	return runsCmd
+	return runCmd
 }

@@ -197,46 +197,46 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 	return result.Runs, nil
 }
 
-// GetBatchStatusCommand retrieves detailed status for a single batch run.
+// GetRunStatusCommand retrieves detailed status for a single run.
 // Uses domain type (RunID) for type-safe identification.
-type GetBatchStatusCommand struct {
+type GetRunStatusCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	BatchID domaintypes.RunID // ID of the batch run (KSUID-backed)
+	RunID   domaintypes.RunID // ID of the run (KSUID-backed)
 }
 
-// Run executes GET /v1/runs/{id} to fetch batch run details.
-func (c GetBatchStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
+// Run executes GET /v1/runs/{id} to fetch run details.
+func (c GetRunStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
 	if c.Client == nil {
-		return BatchSummary{}, fmt.Errorf("batch status: http client required")
+		return BatchSummary{}, fmt.Errorf("run status: http client required")
 	}
 	if c.BaseURL == nil {
-		return BatchSummary{}, fmt.Errorf("batch status: base url required")
+		return BatchSummary{}, fmt.Errorf("run status: base url required")
 	}
 	// Use domain type's IsZero method for validation.
-	if c.BatchID.IsZero() {
-		return BatchSummary{}, fmt.Errorf("batch status: batch id required")
+	if c.RunID.IsZero() {
+		return BatchSummary{}, fmt.Errorf("run status: run id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String())
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch status: build request: %w", err)
+		return BatchSummary{}, fmt.Errorf("run status: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch status: http request failed: %w", err)
+		return BatchSummary{}, fmt.Errorf("run status: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return BatchSummary{}, decodeHTTPError(resp, "batch status")
+		return BatchSummary{}, decodeHTTPError(resp, "run status")
 	}
 
 	var summary BatchSummary
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		return BatchSummary{}, fmt.Errorf("batch status: decode response: %w", err)
+		return BatchSummary{}, fmt.Errorf("run status: decode response: %w", err)
 	}
 
 	return summary, nil

@@ -29,7 +29,6 @@ ploy mod run \
 	  [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
-ploy upload --run-id <run-id> [--name <string>] <path>
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -123,8 +122,8 @@ ploy mod run repo add \
   --target-ref upgrade-deps \
   my-batch
 
-# Step 3: Optionally follow logs for the entire batch.
-ploy runs follow my-batch
+# Step 3: Optionally stream events for the entire batch.
+ploy run events my-batch
 ```
 
 Each attached repository creates a `run_repo` entry, and jobs execute per-repo
@@ -160,14 +159,14 @@ ploy mod run repo remove \
 
 ### Batch Workflow Summary
 
-| Command                  | Description                                  |
-|--------------------------|----------------------------------------------|
-| `mod run --name <batch>` | Create a batch run (no repos yet)            |
-| `mod run repo add`       | Attach a repository to an existing batch     |
-| `mod run repo remove`    | Detach a repository from a batch             |
-| `mod run repo restart`   | Re-queue a repo job with optional new branch |
+| Command                  | Description                                   |
+|--------------------------|-----------------------------------------------|
+| `mod run --name <batch>` | Create a batch run (no repos yet)             |
+| `mod run repo add`       | Attach a repository to an existing batch      |
+| `mod run repo remove`    | Detach a repository from a batch              |
+| `mod run repo restart`   | Re-queue a repo job with optional new branch  |
 | `mod run pull`           | Pull Mods diffs into the current git worktree |
-| `runs follow <batch>`    | Follow logs for all repos in a batch         |
+| `run events <batch>`     | Stream events for all repos in a batch        |
 
 See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
@@ -329,19 +328,19 @@ ploy completion <shell> --help
   successful run (`mod run --follow`). A `manifest.json` file is created with
   artifact metadata.
 - Streaming guards (long-lived SSE):
-  - `mods logs` and `runs follow` use resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
+  - `run events` uses resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
   - `--idle-timeout <duration>` (default `45s`): Cancels the stream when no events arrive within the specified duration. Set to `0` to disable idle timeout.
   - `--timeout <duration>` (default `0`, unlimited): Caps the overall stream time. When exceeded, the CLI exits the stream.
-  - `--max-retries <int>` (default `3` for `mods logs`, `3` for `runs follow`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
+  - `--max-retries <int>` (default `3` for `run events`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
   - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (250ms initial interval, 2x multiplier with jitter, capped at 30s). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Structured Log Format
 
-The `ploy mods logs` and `ploy runs follow` commands consume enriched log events
-from the Mods SSE stream (`GET /v1/mods/{id}/events`). A shared log printer
-(`internal/cli/logs`) formats these events consistently across both commands.
+The `ploy run events` command consumes enriched log events
+from the run SSE stream (`GET /v1/runs/{id}/events`). A shared log printer
+(`internal/cli/logs`) formats these events consistently.
 
 ### Log record fields
 
@@ -383,13 +382,10 @@ Step started
 
 ```bash
 # Follow logs in structured format (default)
-ploy mods logs <run-id>
+ploy run events <run-id>
 
-# Follow logs in raw format (message only)
-ploy mods logs <run-id> --format raw
-
-# Follow a run with structured log output
-ploy runs follow <run-id>
+# Follow events in raw format (message only)
+ploy run events <run-id> --format raw
 ```
 
 See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.
@@ -510,7 +506,7 @@ jobs are regular jobs in the unified queue; there is no separate HTTP Build Gate
 mode and no `buildgate_worker_enabled` toggle.
 
 **CLI-visible gate summaries:**
-Gate results are surfaced via `ploy mod inspect <run-id>` in the same format regardless
+Gate results are surfaced via `GET /v1/runs/{id}/status` in the same format regardless
 of execution location:
 - `Gate: passed duration=1234ms`
 - `Gate: failed pre-gate duration=567ms`
@@ -545,7 +541,7 @@ for end-to-end usage with `mods-codex`.
 
 Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
 surfaces via `GET /v1/mods/{id}` in `RunSummary.stages` and through the
-`ploy mod inspect` command. Each job has a `step_index` for execution ordering
+Run status includes a `stages` map. Each job has a `step_index` for execution ordering
 and optional metadata identifying the job phase.
 
 **Job phases (mod_type):**
@@ -569,10 +565,10 @@ fix. If re-gate passes, the DAG continues to the next mod.
 
 **CLI inspection:**
 
-Use `ploy mod inspect <run-id>` to view job-level state:
+Use `GET /v1/runs/{id}/status` to view job-level state:
 
 ```bash
-$ ploy mod inspect mods-abc123
+$ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/mods-abc123/status" | jq .
 Run mods-abc123: running
 MR: https://gitlab.com/org/repo/-/merge_requests/1
 Gate: failed pre-gate duration=567ms

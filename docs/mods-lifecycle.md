@@ -132,7 +132,7 @@ All Build Gate failures (pre or post) follow identical handling:
 
 The final gate result (pre-gate for runs with no mods executed, or the last
 post-gate) is surfaced in:
-- `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
+- `Metadata["gate_summary"]` in run status responses.
 - `ploy mod inspect < run-id>` output as `Gate: passed|failed ...`.
 
 ### Healing configuration
@@ -734,7 +734,7 @@ on changes produced by a batch run without relying on MR-based workflows.
 
 - `GET /v1/repos/{repo_id}/runs` — List runs for the repository (repo_id is URL-encoded
   origin URL).
-- `GET /v1/mods/{id}` — Fetch run details including `commit_sha`.
+- `GET /v1/runs/{id}/status` — Fetch run details including `commit_sha`.
 - `GET /v1/mods/{id}/diffs` — List diffs for the execution run.
 - `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
 
@@ -776,8 +776,8 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 response schema for:
 
 - `POST /v1/mods` (submit) — 201 response body.
-- `GET /v1/mods/{id}` (status) — 200 response body.
-- `event: run` SSE payloads on `/v1/mods/{id}/events`.
+- `GET /v1/runs/{id}/status` (status) — 200 response body.
+- `event: run` SSE payloads on `/v1/runs/{id}/events`.
 
 **Wire contract guarantees:**
 
@@ -917,8 +917,7 @@ value is a `StageStatus` object describing that job's execution state.
 
 - Nodeagents upload artifact bundles with:
   - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`.
-  - Control plane exposes bundles per  run:
-    - `POST /v1/mods/{id}/artifact_bundles`.
+  - Control plane exposes bundles per run via:
     - `GET /v1/artifacts` and `GET /v1/artifacts/{id}` for listing/downloading
       by CID/id.
 - `StageStatus.Artifacts` map keys are human-readable names; values are bundle
@@ -938,7 +937,7 @@ value is a `StageStatus` object describing that job's execution state.
     - Publishes an initial `RunSummary` snapshot to SSE via
       `events.Service.PublishRun`.
 
-- `GET /v1/mods/{id}` — run status.
+- `GET /v1/runs/{id}/status` — run status.
   - Handler: `getRunStatusHandler`.
   - Aggregates:
     - `runs` row.
@@ -947,7 +946,7 @@ value is a `StageStatus` object describing that job's execution state.
     - Run stats (MR URL, gate summary).
   - Returns `RunSummary` directly (Go type `modsapi.RunSummary`); the canonical JSON shape for run state.
 
-- `GET /v1/mods/{id}/events` — SSE event stream for a run.
+- `GET /v1/runs/{id}/events` — SSE event stream for a run.
   - Handler: `getModEventsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
@@ -1123,14 +1122,13 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Optional `--follow` streams  run events via
     `internal/cli/mods.EventsCommand`, backed by `internal/cli/stream`.
 
-- `ploy mods logs < run>`:
-  - Streams logs from `/v1/mods/{id}/events`, focusing on `log` and
-    `retention` events (see `cmd/ploy/mods_jobs_commands.go` and
-    `internal/cli/runs/follow.go`).
+- `ploy run events < run>`:
+  - Streams events from `/v1/runs/{id}/events`, focusing on `log` and
+    `retention` events (see `internal/cli/mods/logs.go`).
 
-- `ploy runs inspect < run>`:
-  - Calls `GET /v1/mods/{id}` and prints a concise summary
-    (`internal/cli/runs/inspect.go`).
+- Run summaries (gate/MR/job graph) are exposed via:
+  - `ploy run status <run-id>` (CLI)
+  - `GET /v1/runs/{id}/status` (HTTP)
 
 ## 7. SSE Contract
 
@@ -1189,7 +1187,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
   hub-generated system events) or when context is unavailable.
 - `step_index` uses float values (1000, 2000, 3000) to allow dynamic insertion
   of healing jobs at midpoints (e.g., 1500 for heal-1).
-- CLI consumers (`ploy mods logs`, `ploy runs follow`) use the enriched fields
+- CLI consumers (`ploy run events`) use the enriched fields
   to display contextual information in structured output format.
 
 ### 7.3 Clients
@@ -1199,7 +1197,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 - `internal/cli/mods.EventsCommand` handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
-- `internal/cli/runs.FollowCommand` and `ploy mods logs` focus on `"log"` and
+- `internal/cli/runs.FollowCommand` and `ploy run events` focus on `"log"` and
   `"retention"` events for human-readable tails.
 - The shared log printer (`internal/cli/logs`) formats log records using
   enriched fields when available (see "Structured Log Format" below).

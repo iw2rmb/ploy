@@ -69,9 +69,15 @@ func join(parts []string, sep string) string {
 	return out
 }
 
-// Minimal helpers for mods/jobs usage output paths.
-func printModsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy mods <command>") }
-func printRunsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy runs <command>") }
+// Minimal helpers for run usage output paths.
+// For `ploy run`, print full subcommand list.
+func printRunUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy run <command>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  status      Show status for a run")
+	_, _ = fmt.Fprintln(w, "  events      Stream run events (logs, retention)")
+}
 
 // wantsHelp checks whether the given argument list represents a help request.
 // It returns true if the sole argument is "--help" or "-h", which is the

@@ -28,9 +28,9 @@ func parseLastEventID(header string) int64 {
 	return id
 }
 
-// getModEventsHandler returns an HTTP handler that streams mod (run) events over SSE.
+// getModEventsHandler returns an HTTP handler that streams run events over SSE.
 // Supports Last-Event-ID header for resuming streams from a specific event.
-// GET /v1/mods/{id}/events — Native SSE under mods (no proxy).
+// GET /v1/runs/{id}/events — Native SSE for run events.
 //
 // Run IDs are now KSUID-backed strings (27 characters). We perform a cheap
 // length check to reject obviously invalid IDs before hitting the store; the

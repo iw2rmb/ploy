@@ -39,17 +39,17 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign/client", "post"},
 		// Mods (run submit + status/events + ingest)
 		{"/v1/mods", "post"},
-		{"/v1/mods/{id}", "get"},
+		// Legacy /v1/mods/{id} status endpoint has been replaced by /v1/runs/{id}/status.
 		{"/v1/mods/{id}/graph", "get"},
 		{"/v1/mods/{id}/cancel", "post"},
-		{"/v1/mods/{id}/events", "get"},
-		{"/v1/mods/{id}/artifact_bundles", "post"},
+		{"/v1/runs/{id}/events", "get"},
 		{"/v1/mods/{id}/logs", "post"},
 		{"/v1/mods/{id}/diffs", "post"},
 		{"/v1/diffs/{id}", "get"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},
+		{"/v1/runs/{id}/status", "get"},
 		{"/v1/runs/{id}/stop", "post"},
 		// RunRepo handlers (repos within a batch)
 		{"/v1/runs/{id}/repos", "get"},

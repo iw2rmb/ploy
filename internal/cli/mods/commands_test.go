@@ -23,7 +23,7 @@ func newTestLogPrinter(w io.Writer) *logs.Printer {
 	return logs.NewPrinter(logs.FormatStructured, w)
 }
 
-func TestInspectAndArtifactsCommands(t *testing.T) {
+func TestArtifactsCommand(t *testing.T) {
 	run := modsapi.RunSummary{
 		RunID: domaintypes.RunID("t1"),
 		State: modsapi.RunStateSucceeded,
@@ -39,113 +39,12 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
 
-	// Inspect prints one-line summary.
 	var out bytes.Buffer
-	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, RunID: "t1", Output: &out}).Run(context.Background()); err != nil {
-		t.Fatalf("inspect run: %v", err)
-	}
-	if out.Len() == 0 {
-		t.Fatalf("expected inspect to write output")
-	}
-
-	// Artifacts prints per-stage artifacts.
-	out.Reset()
 	if err := (ArtifactsCommand{Client: srv.Client(), BaseURL: base, RunID: "t1", Output: &out}).Run(context.Background()); err != nil {
 		t.Fatalf("artifacts run: %v", err)
 	}
 	if out.Len() == 0 {
 		t.Fatalf("expected artifacts to write output")
-	}
-}
-
-func TestInspectCommand_GateSummary(t *testing.T) {
-	// Test that inspect command displays gate summary when present in metadata.
-	tests := []struct {
-		name         string
-		run          modsapi.RunSummary
-		wantContains string
-	}{
-		{
-			name: "gate summary present",
-			run: modsapi.RunSummary{
-				RunID: domaintypes.RunID("t-gate-1"),
-				State: modsapi.RunStateSucceeded,
-				Metadata: map[string]string{
-					"gate_summary": "passed duration=1234ms",
-				},
-			},
-			wantContains: "Gate: passed duration=1234ms",
-		},
-		{
-			name: "gate summary and MR URL",
-			run: modsapi.RunSummary{
-				RunID: domaintypes.RunID("t-gate-2"),
-				State: modsapi.RunStateSucceeded,
-				Metadata: map[string]string{
-					"mr_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
-					"gate_summary": "failed pre-gate duration=567ms",
-				},
-			},
-			wantContains: "Gate: failed pre-gate duration=567ms",
-		},
-		{
-			// Verifies CLI displays post-mod (final_gate) failure correctly.
-			// The gate_summary is populated by the server from stats.GateSummary(),
-			// which prioritizes final_gate over pre_gate. This test ensures the CLI
-			// renders the "failed final-gate ..." format without alteration.
-			name: "final gate failed after mods",
-			run: modsapi.RunSummary{
-				RunID: domaintypes.RunID("t-gate-final-failed"),
-				State: modsapi.RunStateFailed,
-				Metadata: map[string]string{
-					"gate_summary": "failed final-gate duration=2345ms",
-				},
-			},
-			wantContains: "Gate: failed final-gate duration=2345ms",
-		},
-		{
-			name: "no gate summary",
-			run: modsapi.RunSummary{
-				RunID:    domaintypes.RunID("t-no-gate"),
-				State:    modsapi.RunStateSucceeded,
-				Metadata: map[string]string{},
-			},
-			wantContains: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Return RunSummary directly — the canonical response shape.
-				_ = json.NewEncoder(w).Encode(tt.run)
-			}))
-			defer srv.Close()
-			base, _ := url.Parse(srv.URL)
-
-			var out bytes.Buffer
-			cmd := InspectCommand{
-				Client:  srv.Client(),
-				BaseURL: base,
-				RunID:   tt.run.RunID,
-				Output:  &out,
-			}
-			if err := cmd.Run(context.Background()); err != nil {
-				t.Fatalf("inspect run: %v", err)
-			}
-
-			output := out.String()
-			if tt.wantContains != "" {
-				if !bytes.Contains([]byte(output), []byte(tt.wantContains)) {
-					t.Errorf("output missing expected gate summary\ngot: %q\nwant substring: %q", output, tt.wantContains)
-				}
-			} else {
-				// When no gate summary, ensure "Gate:" line is not present.
-				if bytes.Contains([]byte(output), []byte("Gate:")) {
-					t.Errorf("output unexpectedly contains gate summary\ngot: %q", output)
-				}
-			}
-		})
 	}
 }
 
@@ -269,10 +168,6 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 	// Resume
 	if err := (ResumeCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
 		t.Fatal("expected resume error")
-	}
-	// Inspect
-	if err := (InspectCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
-		t.Fatal("expected inspect error")
 	}
 }
 

@@ -1,4 +1,4 @@
-# GET /v1/mods/{id}/events — SSE stream for run events
+# GET /v1/runs/{id}/events — SSE stream for run events
 #
 # Event payloads:
 # - `event: run` → RunSummary (canonical schema, no wrapper)

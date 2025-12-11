@@ -126,7 +126,7 @@ The gate does not modify the repository; it validates the current working tree.
 - **Logs:** Combined stdout/stderr captured and truncated to ≤1 MiB; uploaded as
   `build-gate.log` artifact.
 - **Summary:** Pass/fail flag, duration, optional resource usage.
-- **API exposure:** Gate status is surfaced via `ploy mod inspect <run-id>`.
+- **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
 

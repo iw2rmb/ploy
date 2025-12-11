@@ -158,7 +158,7 @@ dist/ploy cluster rollout nodes \
 **Choosing concurrency:**
 
 - Ensure `concurrency < total_nodes` to maintain cluster availability.
-- Monitor active runs during rollout: `ploy runs list --status running`.
+- Monitor active runs during rollout: `ploy run list --status running`.
 - If runs queue or stall, reduce concurrency on next rollout.
 
 ### Resume on Failure
@@ -240,8 +240,7 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
 - Check runs/events if needed:
 
 ```bash
-./dist/ploy runs inspect <run-id>
-./dist/ploy runs follow <run-id>
+./dist/ploy run events <run-id>
 ```
 
 - **Batch run verification**: Test batch workflows to confirm multi-repo scheduling works:
@@ -264,7 +263,7 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
   post-update-test
 
 # Follow batch logs.
-./dist/ploy runs follow post-update-test
+./dist/ploy run events post-update-test
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for full batch command reference.
@@ -395,7 +394,7 @@ ssh root@<node-ip> 'apt-get install -y docker-ce=<version> docker-ce-cli=<versio
 | Step | Action | Verification |
 |------|--------|--------------|
 | 1 | Drain node | Node stops claiming new jobs |
-| 2 | Wait for active runs | `ploy runs list --node <id>` shows no running jobs |
+| 2 | Wait for active runs | `ploy run list --node <id>` shows no running jobs |
 | 3 | Stop ployd-node | `systemctl status ployd-node` shows inactive |
 | 4 | Upgrade Docker | `docker version` shows v29.0+ |
 | 5 | Start ployd-node | `systemctl status ployd-node` shows active |

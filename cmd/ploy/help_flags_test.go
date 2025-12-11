@@ -53,31 +53,17 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectNoError:  true,
 		},
 
-		// mods command --help
+		// run command --help
 		{
-			name:           "ploy mods --help",
-			args:           []string{"mods", "--help"},
-			expectContains: []string{"Usage: ploy mods"},
+			name:           "ploy run --help",
+			args:           []string{"run", "--help"},
+			expectContains: []string{"Usage: ploy run"},
 			expectNoError:  true,
 		},
 		{
-			name:           "ploy mods -h",
-			args:           []string{"mods", "-h"},
-			expectContains: []string{"Usage: ploy mods"},
-			expectNoError:  true,
-		},
-
-		// runs command --help
-		{
-			name:           "ploy runs --help",
-			args:           []string{"runs", "--help"},
-			expectContains: []string{"Usage: ploy runs"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy runs -h",
-			args:           []string{"runs", "-h"},
-			expectContains: []string{"Usage: ploy runs"},
+			name:           "ploy run -h",
+			args:           []string{"run", "-h"},
+			expectContains: []string{"Usage: ploy run"},
 			expectNoError:  true,
 		},
 
@@ -149,20 +135,6 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		// Token operations are now accessible only via `ploy cluster token`.
 		// The ploy token --help tests have been removed from this section.
 		// See cluster token --help tests below.
-
-		// upload command --help
-		{
-			name:           "ploy upload --help",
-			args:           []string{"upload", "--help"},
-			expectContains: []string{"Usage: ploy upload"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy upload -h",
-			args:           []string{"upload", "-h"},
-			expectContains: []string{"Usage: ploy upload"},
-			expectNoError:  true,
-		},
 
 		// cluster command --help
 		{
