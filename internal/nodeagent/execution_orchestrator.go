@@ -281,6 +281,26 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
 
+	// Snapshot the pre-healing workspace so we can generate a diff that includes
+	// untracked files (git diff --no-index semantics via GenerateBetween). This
+	// snapshot represents the baseline state: repo clone plus all prior diffs for
+	// this run and step index.
+	var healingBaselineDir string
+	if diffGenerator != nil {
+		snapshotDir, snapErr := os.MkdirTemp("", "ploy-heal-base-*")
+		if snapErr != nil {
+			slog.Warn("healing: failed to create baseline snapshot directory", "run_id", req.RunID, "job_id", req.JobID, "error", snapErr)
+		} else {
+			if err := copyGitClone(workspace, snapshotDir); err != nil {
+				slog.Warn("healing: failed to snapshot baseline workspace", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+				_ = os.RemoveAll(snapshotDir)
+			} else {
+				healingBaselineDir = snapshotDir
+				defer func() { _ = os.RemoveAll(healingBaselineDir) }()
+			}
+		}
+	}
+
 	// Prepare /out and /in directories.
 	outDir, err := os.MkdirTemp("", "ploy-heal-out-*")
 	if err != nil {
@@ -397,11 +417,11 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		}
 	}
 
-	// Upload diff for this healing step.
+	// Upload diff for this healing step using the pre-healing baseline snapshot.
 	// E3: Pass job name for path-local diff tagging in multi-strategy healing.
 	// We still upload diffs for failing healing jobs so diagnostics are preserved,
-	// but a "successful" healing job with no changes is treated as a failure below.
-	r.uploadDiffForStep(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, workspace, result, req.StepIndex)
+	// but a "successful" healing job with no workspace changes is treated as a failure below.
+	r.uploadHealingJobDiff(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, healingBaselineDir, workspace, result, req.StepIndex)
 
 	// Upload /out artifacts.
 	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {

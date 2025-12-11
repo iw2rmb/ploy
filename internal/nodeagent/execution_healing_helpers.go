@@ -123,6 +123,86 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.Ru
 	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
 }
 
+// uploadHealingJobDiff generates and uploads a diff for a discrete healing job by
+// comparing the pre-healing baseline snapshot with the post-healing workspace.
+//
+// Unlike uploadHealingModDiff (which tags diffs as mod_type="healing" for inline
+// gate healing), discrete healing jobs must publish diffs as mod_type="mod" so
+// that subsequent re-gate steps rehydrate the healed workspace from the diff
+// chain. Using GenerateBetween(baseDir, workspace) ensures that:
+//   - Untracked files created by the healer are included in the diff
+//   - The diff captures the full delta from the baseline (base+prior-diffs)
+//     to the healed workspace, matching repo+diff semantics.
+//
+// When baseDir is empty or the diff generator is nil, this helper falls back to
+// the standard per-step diff behavior (uploadDiffForStep) so healing still
+// produces diagnostics even if baseline snapshots are unavailable.
+func (r *runController) uploadHealingJobDiff(
+	ctx context.Context,
+	runID types.RunID,
+	jobID types.JobID,
+	jobName string,
+	diffGenerator step.DiffGenerator,
+	baseDir string,
+	workspace string,
+	result step.Result,
+	stepIndex types.StepIndex,
+) {
+	if diffGenerator == nil {
+		return
+	}
+
+	// If no baseline snapshot is available, fall back to the standard per-step
+	// diff generation so we still capture changes for diagnostics.
+	if strings.TrimSpace(baseDir) == "" {
+		r.uploadDiffForStep(ctx, runID, jobID, jobName, diffGenerator, workspace, result, stepIndex)
+		return
+	}
+
+	// Generate diff between baseline snapshot and healed workspace so untracked
+	// files are included in the patch (git diff --no-index semantics).
+	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
+	if err != nil {
+		slog.Error("failed to generate healing job diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	if len(diffBytes) == 0 {
+		// No changes between baseline and healed workspace; skip upload.
+		slog.Info("no diff to upload for healing job (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
+		return
+	}
+
+	// Build diff summary with step metadata for database storage.
+	// Discrete healing jobs publish mod_type="mod" so their diffs participate in
+	// the rehydration chain (healing diffs are not intermediate states here).
+	summary := types.DiffSummary{
+		"step_index": stepIndex,
+		"mod_type":   "mod",
+		"exit_code":  result.ExitCode,
+		"timings": map[string]interface{}{
+			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
+			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
+			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
+			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
+			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
+		},
+	}
+
+	diffUploader, err := NewDiffUploader(r.cfg)
+	if err != nil {
+		slog.Error("failed to create diff uploader for healing job", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
+}
+
 // computeGzippedDiff generates a unified git diff of workspace changes and compresses it.
 // It captures accumulated healing changes so gate re-execution can reason about the same
 // repo+diff workspace model used by the Docker-based gate executor.
