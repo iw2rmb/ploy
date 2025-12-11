@@ -457,7 +457,7 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Verify the repo belongs to this run by comparing string run IDs.
-		if runRepo.RunID != runIDStr {
+		if runRepo.RunID.String() != runIDStr {
 			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
 			return
 		}
@@ -571,7 +571,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Verify the repo belongs to this run by comparing string run IDs.
-		if runRepo.RunID != runIDStr {
+		if runRepo.RunID.String() != runIDStr {
 			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
 			return
 		}

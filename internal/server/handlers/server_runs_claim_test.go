@@ -37,7 +37,7 @@ func TestClaimJob_Success(t *testing.T) {
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Name:      "mod-0",
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
@@ -146,7 +146,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Name:      "mod-0",
 			Status:    store.JobStatusRunning,
@@ -344,7 +344,7 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Name:      "pre-gate",
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
@@ -405,7 +405,7 @@ func TestClaimJob_PublishesRunningEvent(t *testing.T) {
 		},
 		claimJobResult: store.Job{
 			ID:        jobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Name:      "mod-0",
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim

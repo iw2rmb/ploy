@@ -27,7 +27,7 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
 	st.createLogResult = store.Log{
 		ID:      logID,
-		RunID:   runID.String(),
+		RunID:   runID,
 		ChunkNo: chunkNo,
 		Data:    []byte{0x1f, 0x8b},
 	}

@@ -65,7 +65,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Step 2: Create multiple jobs representing the workflow phases.
 	// Stage 1: Build Gate (pre-validation)
 	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     run.ID,
+		RunID:     domaintypes.RunID(run.ID),
 		Name:      "build-gate",
 		Status:    store.JobStatusRunning,
 		ModType:   "",
@@ -80,7 +80,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 2: Main mod execution
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     run.ID,
+		RunID:     domaintypes.RunID(run.ID),
 		Name:      "main",
 		Status:    store.JobStatusCreated,
 		ModType:   "",
@@ -95,7 +95,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 3: Post-processing (e.g., artifact upload)
 	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     run.ID,
+		RunID:     domaintypes.RunID(run.ID),
 		Name:      "post-process",
 		Status:    store.JobStatusCreated,
 		ModType:   "",
@@ -162,7 +162,7 @@ index abc1234..def5678 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &jobMain.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
@@ -342,7 +342,7 @@ index abc1234..def5678 100644
 
 	// Verify ListEventsByRunSince works correctly
 	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 		ID:    event2.ID, // Get events after build-gate-passed
 	})
 	if err != nil {
@@ -396,7 +396,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create a job.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     run.ID,
+		RunID:     domaintypes.RunID(run.ID),
 		Name:      "main",
 		Status:    store.JobStatusRunning,
 		ModType:   "",
@@ -420,7 +420,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 0 mod diff.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
 		Summary: step0ModSummary,
@@ -432,7 +432,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 0 healing diff with same step_index.
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x02},
 		Summary: step0HealSummary,
@@ -444,7 +444,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 1 mod diff.
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x03},
 		Summary: step1ModSummary,
@@ -456,7 +456,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x04},
 		Summary: step1Heal1Summary,
@@ -467,7 +467,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 1 healing diff 1: id=%v", step1Heal1Diff.ID)
 
 	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
+		RunID:   domaintypes.RunID(run.ID),
 		JobID:   &job.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x05},
 		Summary: step1Heal2Summary,
@@ -490,7 +490,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// C2: Verify ListDiffsBeforeStep returns correct subset.
 	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).
 	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
@@ -502,7 +502,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Query for step_index <= 1 should return 5 diffs (all).
 	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID: run.ID,
+		RunID: domaintypes.RunID(run.ID),
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)

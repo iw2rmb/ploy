@@ -53,7 +53,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	// Job ID is now KSUID-backed; generate via types.NewJobID().
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
@@ -137,7 +137,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	// Create three pending jobs with different step_index values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-1",
 		ModType:   "",
 		ModImage:  "",
@@ -151,7 +151,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-2",
 		ModType:   "",
 		ModImage:  "",
@@ -165,7 +165,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-3",
 		ModType:   "",
 		ModImage:  "",
@@ -265,7 +265,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	for i := 0; i < numJobs; i++ {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:        string(types.NewJobID()),
-			RunID:     run.ID,
+			RunID:     types.RunID(run.ID),
 			Name:      "job-" + strconv.Itoa(i),
 			ModType:   "",
 			ModImage:  "",
@@ -419,7 +419,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 	// Create a pending job for the run.
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
@@ -545,7 +545,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
@@ -622,7 +622,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
@@ -708,7 +708,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	// Create jobs in reverse step_index order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-3",
 		ModType:   "",
 		ModImage:  "",
@@ -722,7 +722,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-1",
 		ModType:   "",
 		ModImage:  "",
@@ -736,7 +736,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "job-2",
 		ModType:   "",
 		ModImage:  "",
@@ -815,7 +815,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	// Create a non-pending job (already running).
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
+		RunID:     types.RunID(run.ID),
 		Name:      "running-job",
 		Status:    JobStatusRunning,
 		ModType:   "",

@@ -412,7 +412,7 @@ func createJobWithIndex(ctx context.Context, st store.Store, runID domaintypes.R
 	// Create the job with step_index and status.
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(jobID),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Name:      name,
 		Status:    status,
 		ModType:   modType,

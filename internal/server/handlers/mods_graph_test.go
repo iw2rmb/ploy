@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/graph"
 )
@@ -33,7 +34,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 		listJobsByRunResult: []store.Job{
 			{
 				ID:        job1ID.String(),
-				RunID:     runID,
+				RunID:     domaintypes.RunID(runID),
 				Name:      "pre-gate",
 				Status:    store.JobStatusSucceeded,
 				ModType:   "pre_gate",
@@ -41,7 +42,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 			},
 			{
 				ID:        job2ID.String(),
-				RunID:     runID,
+				RunID:     domaintypes.RunID(runID),
 				Name:      "mod-0",
 				Status:    store.JobStatusRunning,
 				ModType:   "mod",
@@ -50,7 +51,7 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 			},
 			{
 				ID:        job3ID.String(),
-				RunID:     runID,
+				RunID:     domaintypes.RunID(runID),
 				Name:      "post-gate",
 				Status:    store.JobStatusCreated,
 				ModType:   "post_gate",
@@ -78,8 +79,8 @@ func TestGetModGraphHandler_Success(t *testing.T) {
 	}
 
 	// Verify run ID.
-	if result.RunID != runID {
-		t.Errorf("RunID = %q, want %q", result.RunID, runID)
+	if result.RunID.String() != runID {
+		t.Errorf("RunID = %q, want %q", result.RunID.String(), runID)
 	}
 
 	// Verify 3 nodes.
@@ -165,11 +166,11 @@ func TestGetModGraphHandler_WithHealing(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: preGateID.String(), RunID: runID, Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
-			{ID: heal1ID.String(), RunID: runID, Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
-			{ID: reGateID.String(), RunID: runID, Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
-			{ID: mod0ID.String(), RunID: runID, Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
-			{ID: postGateID.String(), RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
+			{ID: preGateID.String(), RunID: domaintypes.RunID(runID), Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
+			{ID: heal1ID.String(), RunID: domaintypes.RunID(runID), Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
+			{ID: reGateID.String(), RunID: domaintypes.RunID(runID), Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
+			{ID: mod0ID.String(), RunID: domaintypes.RunID(runID), Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
+			{ID: postGateID.String(), RunID: domaintypes.RunID(runID), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 		},
 	}
 

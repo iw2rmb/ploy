@@ -35,7 +35,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	// Set up mock to return job via GetJob.
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -94,7 +94,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -153,7 +153,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -308,7 +308,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -359,7 +359,7 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -411,7 +411,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	// Job is assigned to a different node (otherNode).
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &otherNodeStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -458,7 +458,7 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	// Job is in 'pending' status (not 'running').
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusPending, // Not 'running'
 		StepIndex: 1000,
@@ -565,7 +565,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -649,7 +649,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -735,7 +735,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -743,7 +743,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 
 	nextJob := store.Job{
 		ID:        nextJobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000,
 	}
@@ -796,7 +796,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -853,7 +853,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	jobs := []store.Job{
 		{
 			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusSucceeded,
 			StepIndex: 1000,
@@ -861,7 +861,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 		},
 		{
 			ID:        modJobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			NodeID:    &nodeIDStr,
 			Status:    store.JobStatusRunning,
 			StepIndex: 2000,
@@ -869,7 +869,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 		},
 		{
 			ID:        postJobID.String(),
-			RunID:     runID.String(),
+			RunID:     runID,
 			Status:    store.JobStatusCreated,
 			StepIndex: 3000,
 			Meta:      []byte(`{"mod_type":"post_gate"}`),
@@ -948,7 +948,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,

@@ -18,7 +18,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	ctx := context.Background()
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 
 	// build_gate_healing with a single healing mod and retries=3.
 	// Uses canonical single-mod schema (build_gate_healing.mod).
@@ -90,7 +90,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 	}
 
 	run := store.Run{
-		ID:   runID,
+		ID:   runID.String(),
 		Spec: specBytes,
 	}
 
@@ -138,7 +138,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 
 	ctx := context.Background()
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 
 	// Healing spec with a single mod and retries=2.
 	spec := map[string]any{
@@ -177,7 +177,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	}
 
 	run := store.Run{
-		ID:   runID,
+		ID:   runID.String(),
 		Spec: specBytes,
 	}
 
@@ -234,7 +234,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 
 	ctx := context.Background()
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 
 	jobs := []store.Job{
 		{
@@ -288,7 +288,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 	}
 
 	run := store.Run{
-		ID:   runID,
+		ID:   runID.String(),
 		Spec: []byte(`{}`),
 	}
 

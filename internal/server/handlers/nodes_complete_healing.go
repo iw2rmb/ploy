@@ -246,7 +246,7 @@ func maybeCreateHealingJobs(
 	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(domaintypes.NewJobID()),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Name:      healJobName,
 		ModType:   "heal",
 		ModImage:  modImage,
@@ -270,7 +270,7 @@ func maybeCreateHealingJobs(
 	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(domaintypes.NewJobID()),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Name:      reGateName,
 		ModType:   "re_gate",
 		ModImage:  "",
