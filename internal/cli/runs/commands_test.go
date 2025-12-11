@@ -7,12 +7,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestGetStatusCommandDelegates validates that GetStatusCommand delegates to the
-// Mods batch client and returns a BatchSummary.
+// TestGetStatusCommandDelegates validates that GetStatusCommand issues a
+// GET /v1/runs/{id} request and returns a Summary.
 func TestGetStatusCommandDelegates(t *testing.T) {
 	t.Parallel()
 
@@ -40,7 +39,7 @@ func TestGetStatusCommandDelegates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatusCommand.Run error: %v", err)
 	}
-	if summary.ID != (mods.BatchSummary{ID: "run-123"}).ID {
+	if summary.ID != domaintypes.RunID("run-123") {
 		t.Fatalf("unexpected run id: %s", summary.ID)
 	}
 }

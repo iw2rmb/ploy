@@ -21,11 +21,6 @@ func TestModRunBatchRouting(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "status without run-name",
-			args:    []string{"mod", "run", "status"},
-			wantErr: "run-name required",
-		},
-		{
 			name:    "stop without run-name",
 			args:    []string{"mod", "run", "stop"},
 			wantErr: "run-name required",
@@ -33,11 +28,6 @@ func TestModRunBatchRouting(t *testing.T) {
 		{
 			name:    "start without run-name",
 			args:    []string{"mod", "run", "start"},
-			wantErr: "run-name required",
-		},
-		{
-			name:    "status with empty run-name",
-			args:    []string{"mod", "run", "status", "   "},
 			wantErr: "run-name required",
 		},
 		{

@@ -18,38 +18,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// BatchSummary represents a batch run summary from the control-plane.
+// BatchSummary is an alias for the run-level Summary used by run commands.
 // It mirrors the server's RunBatchSummary type for CLI consumption.
 // Uses domain type (RunID) for type-safe identification.
-type BatchSummary struct {
-	ID         domaintypes.RunID `json:"id"` // Run ID (KSUID-backed)
-	Name       *string           `json:"name,omitempty"`
-	Status     string            `json:"status"`
-	RepoURL    string            `json:"repo_url"`
-	BaseRef    string            `json:"base_ref"`
-	TargetRef  string            `json:"target_ref"`
-	CreatedBy  *string           `json:"created_by,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	StartedAt  *time.Time        `json:"started_at,omitempty"`
-	FinishedAt *time.Time        `json:"finished_at,omitempty"`
-	Counts     *RunRepoCounts    `json:"repo_counts,omitempty"`
-}
+type BatchSummary = runs.Summary
 
 // RunRepoCounts aggregates the count of repos by status within a batch.
 // DerivedStatus provides a single batch-level status derived from repo states.
-type RunRepoCounts struct {
-	Total         int32  `json:"total"`
-	Pending       int32  `json:"pending"`
-	Running       int32  `json:"running"`
-	Succeeded     int32  `json:"succeeded"`
-	Failed        int32  `json:"failed"`
-	Skipped       int32  `json:"skipped"`
-	Cancelled     int32  `json:"cancelled"`
-	DerivedStatus string `json:"derived_status"`
-}
+type RunRepoCounts = runs.RepoCounts
 
 // CreateBatchCommand creates a new batch run with a shared spec.
 // The batch run serves as the parent for multiple repo executions.
@@ -195,51 +175,6 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 	}
 
 	return result.Runs, nil
-}
-
-// GetRunStatusCommand retrieves detailed status for a single run.
-// Uses domain type (RunID) for type-safe identification.
-type GetRunStatusCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	RunID   domaintypes.RunID // ID of the run (KSUID-backed)
-}
-
-// Run executes GET /v1/runs/{id} to fetch run details.
-func (c GetRunStatusCommand) Run(ctx context.Context) (BatchSummary, error) {
-	if c.Client == nil {
-		return BatchSummary{}, fmt.Errorf("run status: http client required")
-	}
-	if c.BaseURL == nil {
-		return BatchSummary{}, fmt.Errorf("run status: base url required")
-	}
-	// Use domain type's IsZero method for validation.
-	if c.RunID.IsZero() {
-		return BatchSummary{}, fmt.Errorf("run status: run id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String())
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return BatchSummary{}, fmt.Errorf("run status: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return BatchSummary{}, fmt.Errorf("run status: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return BatchSummary{}, decodeHTTPError(resp, "run status")
-	}
-
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		return BatchSummary{}, fmt.Errorf("run status: decode response: %w", err)
-	}
-
-	return summary, nil
 }
 
 // StopBatchCommand stops a batch run and cancels all pending repos.

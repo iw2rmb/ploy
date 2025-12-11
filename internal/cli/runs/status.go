@@ -2,11 +2,13 @@ package runs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -18,23 +20,43 @@ type GetStatusCommand struct {
 	RunID   domaintypes.RunID
 }
 
-// Run delegates to the Mods batch client to fetch run status from
-// GET /v1/runs/{id} and returns the BatchSummary.
-func (c GetStatusCommand) Run(ctx context.Context) (mods.BatchSummary, error) {
+// Run executes GET /v1/runs/{id} and returns the run Summary.
+func (c GetStatusCommand) Run(ctx context.Context) (Summary, error) {
 	if c.Client == nil {
-		return mods.BatchSummary{}, fmt.Errorf("run status: http client required")
+		return Summary{}, fmt.Errorf("run status: http client required")
 	}
 	if c.BaseURL == nil {
-		return mods.BatchSummary{}, fmt.Errorf("run status: base url required")
+		return Summary{}, fmt.Errorf("run status: base url required")
 	}
 	if c.RunID.IsZero() {
-		return mods.BatchSummary{}, fmt.Errorf("run status: run id required")
+		return Summary{}, fmt.Errorf("run status: run id required")
 	}
 
-	cmd := mods.GetRunStatusCommand{
-		Client:  c.Client,
-		BaseURL: c.BaseURL,
-		RunID:   c.RunID,
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return Summary{}, fmt.Errorf("run status: build request: %w", err)
 	}
-	return cmd.Run(ctx)
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return Summary{}, fmt.Errorf("run status: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		msg := strings.TrimSpace(string(data))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return Summary{}, fmt.Errorf("run status: %s", msg)
+	}
+
+	var summary Summary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		return Summary{}, fmt.Errorf("run status: decode response: %w", err)
+	}
+
+	return summary, nil
 }
