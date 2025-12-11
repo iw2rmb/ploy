@@ -24,7 +24,7 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 	artifactContent := []byte("test artifact content")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
+		case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status"):
 			// Run status endpoint — return RunSummary directly (canonical response shape).
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
@@ -136,7 +136,7 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts"):
+		case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status"):
 			// Run status with multiple stages — return RunSummary directly.
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
@@ -245,7 +245,7 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 		{
 			name: "run status 404",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				if strings.Contains(r.URL.Path, "/v1/mods/") {
+				if strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
 					w.WriteHeader(http.StatusNotFound)
 					_, _ = w.Write([]byte(`{"error":"run not found"}`))
 				}
@@ -255,7 +255,7 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 		{
 			name: "artifact CID not found",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				if strings.HasPrefix(r.URL.Path, "/v1/mods/") && !strings.Contains(r.URL.Path, "/artifacts") {
+				if strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
 					// Return RunSummary directly.
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
@@ -442,7 +442,7 @@ func TestFetchMRURLErrorHandling(t *testing.T) {
 func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/v1/mods/") {
+		if strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
 			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

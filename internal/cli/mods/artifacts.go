@@ -23,7 +23,7 @@ type ArtifactsCommand struct {
 	Output  io.Writer
 }
 
-// Run performs GET /v1/mods/{id} and prints per-stage artifacts.
+// Run performs GET /v1/runs/{id}/status and prints per-stage artifacts.
 func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("mods artifacts: http client required")
@@ -35,7 +35,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		return errors.New("mods artifacts: run id required")
 	}
 	runID := c.RunID.String()
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID))
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "status")
 	if err != nil {
 		return err
 	}

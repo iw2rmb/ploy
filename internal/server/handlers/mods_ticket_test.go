@@ -883,7 +883,7 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 	}
 }
 
-// TestGetRunStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
+// TestGetRunStatusHandlerExposesStepIndex verifies that GET /v1/runs/{id}/status
 // exposes step_index for each job based on the job's StepIndex field.
 func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	runID := types.NewRunID()
