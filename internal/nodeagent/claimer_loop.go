@@ -124,10 +124,18 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
 
 	// Derive target ref: prefer server-provided value, otherwise default to
-	// /mod/<run-id> so MR branch and PLOY_TARGET_REF have a deterministic name.
+	// ploy/{run_name|run_id} so MR branch and PLOY_TARGET_REF have a deterministic name.
 	targetRef := strings.TrimSpace(claim.TargetRef)
 	if targetRef == "" {
-		targetRef = fmt.Sprintf("/mod/%s", claim.RunID)
+		runName := ""
+		if claim.Name != nil {
+			runName = strings.TrimSpace(*claim.Name)
+		}
+		if runName != "" {
+			targetRef = fmt.Sprintf("ploy/%s", runName)
+		} else {
+			targetRef = fmt.Sprintf("ploy/%s", claim.RunID)
+		}
 	}
 
 	startReq := StartRunRequest{
