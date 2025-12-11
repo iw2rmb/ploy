@@ -141,6 +141,78 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_MRJobUpdatesRunStatsMRURL verifies that when an MR job
+// completes with stats.metadata.mr_url, the handler merges that URL into
+// runs.stats via UpdateRunStatsMRURL.
+func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID.String(),
+		RunID:     runID,
+		NodeID:    &nodeIDStr,
+		Status:    store.JobStatusRunning,
+		StepIndex: 9000,
+		ModType:   "mr",
+	}
+
+	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusSucceeded,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "succeeded",
+		"exit_code": 0,
+		"stats": map[string]any{
+			"duration_ms": 500,
+			"metadata": map[string]any{
+				"mr_url": mrURL,
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !st.updateRunStatsMRURLCalled {
+		t.Fatal("expected UpdateRunStatsMRURL to be called")
+	}
+	if st.updateRunStatsMRURLParams.ID != runID.String() {
+		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", runID, st.updateRunStatsMRURLParams.ID)
+	}
+	if st.updateRunStatsMRURLParams.MrUrl != mrURL {
+		t.Fatalf("expected UpdateRunStatsMRURL mr_url %q, got %q", mrURL, st.updateRunStatsMRURLParams.MrUrl)
+	}
+}
+
 // TestCompleteJob_WithJobMetaInStats verifies that when stats.job_meta is provided,
 // the handler uses UpdateJobCompletionWithMeta to persist jobs.meta JSONB.
 func TestCompleteJob_WithJobMetaInStats(t *testing.T) {

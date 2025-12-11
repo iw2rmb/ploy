@@ -93,6 +93,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		statsBytes := []byte("{}")
 		var jobMetaBytes []byte
 		var healingWarning string
+		var mrURL string
 		if len(req.Stats) > 0 {
 			if !json.Valid(req.Stats) {
 				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
@@ -130,6 +131,17 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			if hwRaw, ok := obj["healing_warning"]; ok && hwRaw != nil {
 				if hwStr, ok := hwRaw.(string); ok {
 					healingWarning = strings.TrimSpace(hwStr)
+				}
+			}
+
+			// Detect optional MR URL under stats.metadata.mr_url for MR jobs.
+			if metaRaw, ok := obj["metadata"]; ok && metaRaw != nil {
+				if metaMap, ok := metaRaw.(map[string]any); ok {
+					if mrRaw, ok := metaMap["mr_url"]; ok && mrRaw != nil {
+						if mrStr, ok := mrRaw.(string); ok {
+							mrURL = strings.TrimSpace(mrStr)
+						}
+					}
 				}
 			}
 		}
@@ -315,6 +327,23 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					"job_id", jobIDStr,
 					"step_index", job.StepIndex,
 					"err", completeErr,
+				)
+			}
+		}
+
+		// For MR jobs that reported an MR URL in stats.metadata.mr_url, merge the
+		// URL into runs.stats.metadata.mr_url so that GET /v1/mods/{id} can expose
+		// it via RunStats.MRURL() and CLI commands can display it. This is a
+		// best-effort update and does not affect run status.
+		if err == nil && mrURL != "" && strings.TrimSpace(job.ModType) == "mr" {
+			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
+				ID:    runID.String(),
+				MrUrl: mrURL,
+			}); updateErr != nil {
+				slog.Error("complete job: failed to merge MR URL into run stats",
+					"job_id", jobIDStr,
+					"run_id", runID,
+					"err", updateErr,
 				)
 			}
 		}

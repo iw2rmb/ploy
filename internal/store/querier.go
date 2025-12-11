@@ -188,6 +188,9 @@ type Querier interface {
 	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
 	UpdateRunResume(ctx context.Context, id string) error
+	// Merges an MR URL into runs.stats.metadata.mr_url without altering other fields.
+	// Preserves existing stats and metadata keys via JSONB merge.
+	UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	// Inserts or updates an environment entry (upsert on primary key 'key').
 	// Updates value, scope, secret, and refreshes updated_at on conflict.
