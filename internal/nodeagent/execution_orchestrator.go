@@ -127,6 +127,26 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	}
 	defer func() { _ = os.RemoveAll(workspace) }()
 
+	// Snapshot the pre-mod workspace so we can generate a diff that includes
+	// untracked files (git diff --no-index semantics via GenerateBetween).
+	// This snapshot represents the baseline state: repo clone plus all prior
+	// diffs for this run and step index.
+	var modBaselineDir string
+	if diffGenerator != nil {
+		snapshotDir, snapErr := os.MkdirTemp("", "ploy-mod-base-*")
+		if snapErr != nil {
+			slog.Warn("mod: failed to create baseline snapshot directory", "run_id", req.RunID, "job_id", req.JobID, "error", snapErr)
+		} else {
+			if err := copyGitClone(workspace, snapshotDir); err != nil {
+				slog.Warn("mod: failed to snapshot baseline workspace", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+				_ = os.RemoveAll(snapshotDir)
+			} else {
+				modBaselineDir = snapshotDir
+				defer func() { _ = os.RemoveAll(modBaselineDir) }()
+			}
+		}
+	}
+
 	// Prepare /out directory.
 	outDir, err := os.MkdirTemp("", "ploy-mod-out-*")
 	if err != nil {
@@ -160,9 +180,10 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	})
 	duration := time.Since(startTime)
 
-	// Upload diff for this mod.
+	// Upload diff for this mod using the pre-mod baseline snapshot so untracked
+	// files are captured in the patch (repo+diff semantics).
 	// E3: Pass job name for branch-local diff tagging (mainline mod jobs have empty branch).
-	r.uploadDiffForStep(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, workspace, result, req.StepIndex)
+	r.uploadModDiffWithBaseline(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, modBaselineDir, workspace, result, req.StepIndex)
 
 	// Upload /out artifacts.
 	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {

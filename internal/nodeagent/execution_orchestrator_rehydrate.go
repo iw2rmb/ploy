@@ -210,6 +210,78 @@ func (r *runController) uploadDiffForStep(
 	slog.Info("step diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
 }
 
+// uploadModDiffWithBaseline generates and uploads a diff for a mod job by comparing
+// the pre-mod baseline snapshot with the post-mod workspace. This ensures that
+// untracked files created by the mod are included in the patch (git diff --no-index
+// semantics via GenerateBetween).
+//
+// When baseDir is empty or the diff generator is nil, this helper falls back to
+// the standard per-step diff behavior (uploadDiffForStep) so mods still produce
+// diagnostics even if baseline snapshots are unavailable.
+func (r *runController) uploadModDiffWithBaseline(
+	ctx context.Context,
+	runID types.RunID,
+	jobID types.JobID,
+	jobName string,
+	diffGenerator step.DiffGenerator,
+	baseDir string,
+	workspace string,
+	result step.Result,
+	stepIndex types.StepIndex,
+) {
+	if diffGenerator == nil {
+		return
+	}
+
+	// If no baseline snapshot is available, fall back to the standard per-step
+	// diff generation so we still capture changes for diagnostics.
+	if strings.TrimSpace(baseDir) == "" {
+		r.uploadDiffForStep(ctx, runID, jobID, jobName, diffGenerator, workspace, result, stepIndex)
+		return
+	}
+
+	// Generate diff between baseline snapshot and post-mod workspace so untracked
+	// files are included in the patch (git diff --no-index semantics).
+	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
+	if err != nil {
+		slog.Error("failed to generate mod diff from baseline", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	if len(diffBytes) == 0 {
+		// No changes between baseline and workspace; skip upload.
+		slog.Info("no diff to upload for mod (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
+		return
+	}
+
+	// Build diff summary with step metadata for database storage.
+	summary := types.DiffSummary{
+		"step_index": stepIndex,
+		"mod_type":   "mod",
+		"exit_code":  result.ExitCode,
+		"timings": map[string]interface{}{
+			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
+			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
+			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
+			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
+			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
+		},
+	}
+
+	diffUploader, err := NewDiffUploader(r.cfg)
+	if err != nil {
+		slog.Error("failed to create diff uploader for mod", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+		slog.Error("failed to upload mod diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		return
+	}
+
+	slog.Info("mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
+}
+
 // uploadBaselineDiff uploads a diff between two directories with the specified mod_type and step_index.
 // Used by C2 to persist pre-mod or post-mod healing changes so subsequent steps run on the healed baseline.
 //
