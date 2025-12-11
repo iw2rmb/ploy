@@ -39,9 +39,9 @@ func handleRun(args []string, stderr io.Writer) error {
 		return handleRunStop(args[1:], stderr)
 	case "status":
 		return handleRunStatus(args[1:], stderr)
-	case "events":
-		return handleRunEvents(args[1:], stderr)
-	case "diffs":
+	case "logs":
+		return handleRunLogs(args[1:], stderr)
+	case "diff":
 		return handleRunDiff(args[1:], stderr)
 	default:
 		printRunUsage(stderr)
@@ -117,8 +117,8 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func handleRunEvents(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("run events", flag.ContinueOnError)
+func handleRunLogs(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("run logs", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")

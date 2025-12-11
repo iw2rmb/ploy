@@ -34,7 +34,7 @@ func handleModRun(args []string, stderr io.Writer) error {
 // executeModRun orchestrates the full mod run workflow:
 // 1. Parse CLI flags
 // 2. Build and submit run request
-// 3. Follow run events (if requested)
+// 3. Follow run logs/events (if requested)
 // 4. Download artifacts (if requested)
 // 5. Output JSON summary (if requested)
 func executeModRun(args []string, stderr io.Writer) error {
@@ -72,7 +72,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 	initialState := strings.ToLower(string(summary.State))
 	finalState := ""
 
-	// Follow run events if requested.
+	// Follow run logs/events if requested.
 	if *flags.Follow {
 		final, err := followRunEvents(ctx, base, httpClient, string(summary.RunID), flags, stderr)
 		if err != nil {

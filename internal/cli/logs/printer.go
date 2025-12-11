@@ -1,5 +1,5 @@
 // Package logs provides a shared log printer for CLI commands that consume
-// enriched log events from the run SSE stream. The `ploy run events` command
+// enriched log events from the run SSE stream. The `ploy run logs` command
 // delegates to this printer to ensure consistent formatting across all
 // log-consuming commands.
 package logs

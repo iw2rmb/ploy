@@ -237,7 +237,7 @@ dist/ploy mod run repo add \
   fleet-upgrade
 
 # Follow all repos in the batch.
-dist/ploy run events fleet-upgrade
+   dist/ploy run logs fleet-upgrade
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full command reference.
@@ -548,13 +548,13 @@ See also:
 - **Logs**: Structured logs (slog) on stdout; capture with journalctl or systemd.
 - **Database**: Monitor PostgreSQL disk usage, connection pool, and query performance.
 
-### Follow Run Events
+### Follow Run Logs
 
 ```bash
-dist/ploy run events <run-id>
+dist/ploy run logs <run-id>
 ```
 
-Events stream via SSE from `/v1/runs/{id}/events`. Final logs are persisted in PostgreSQL.
+Events stream via SSE from `/v1/runs/{id}/logs`. Final logs are persisted in PostgreSQL.
 
 ### TTL and Cleanup
 
@@ -593,7 +593,7 @@ renew via your external process.
 
 Legacy endpoint notice:
 - All `/v1/jobs*` endpoints and `/v1/mods/{run}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
-  - Events: `GET /v1/runs/{id}/events`
+  - Events: `GET /v1/runs/{id}/logs`
   - Heartbeat: `POST /v1/nodes/{id}/heartbeat`
   - Job completion: `POST /v1/jobs/{job_id}/complete` (node-based endpoint removed)
 

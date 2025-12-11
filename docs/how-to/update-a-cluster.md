@@ -240,7 +240,7 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
 - Check runs/events if needed:
 
 ```bash
-./dist/ploy run events <run-id>
+./dist/ploy run logs <run-id>
 ```
 
 - **Batch run verification**: Test batch workflows to confirm multi-repo scheduling works:
@@ -263,7 +263,7 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
   post-update-test
 
 # Follow batch logs.
-./dist/ploy run events post-update-test
+./dist/ploy run logs post-update-test
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for full batch command reference.

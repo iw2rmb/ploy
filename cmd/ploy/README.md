@@ -122,8 +122,8 @@ ploy mod run repo add \
   --target-ref upgrade-deps \
   my-batch
 
-# Step 3: Optionally stream events for the entire batch.
-ploy run events my-batch
+# Step 3: Optionally stream logs for the entire batch.
+ploy run logs my-batch
 ```
 
 Each attached repository creates a `run_repo` entry, and jobs execute per-repo
@@ -166,7 +166,7 @@ ploy mod run repo remove \
 | `mod run repo remove`    | Detach a repository from a batch              |
 | `mod run repo restart`   | Re-queue a repo job with optional new branch  |
 | `mod run pull`           | Pull Mods diffs into the current git worktree |
-| `run events <batch>`     | Stream events for all repos in a batch        |
+| `run logs <batch>`       | Stream logs/events for all repos in a batch   |
 
 See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
@@ -328,18 +328,18 @@ ploy completion <shell> --help
   successful run (`mod run --follow`). A `manifest.json` file is created with
   artifact metadata.
 - Streaming guards (long-lived SSE):
-  - `run events` uses resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
+  - `run logs` uses resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
   - `--idle-timeout <duration>` (default `45s`): Cancels the stream when no events arrive within the specified duration. Set to `0` to disable idle timeout.
   - `--timeout <duration>` (default `0`, unlimited): Caps the overall stream time. When exceeded, the CLI exits the stream.
-  - `--max-retries <int>` (default `3` for `run events`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
+  - `--max-retries <int>` (default `3` for `run logs`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
   - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (250ms initial interval, 2x multiplier with jitter, capped at 30s). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Structured Log Format
 
-The `ploy run events` command consumes enriched log events
-from the run SSE stream (`GET /v1/runs/{id}/events`). A shared log printer
+The `ploy run logs` command consumes enriched log events
+from the run SSE stream (`GET /v1/runs/{id}/logs`). A shared log printer
 (`internal/cli/logs`) formats these events consistently.
 
 ### Log record fields
@@ -382,10 +382,10 @@ Step started
 
 ```bash
 # Follow logs in structured format (default)
-ploy run events <run-id>
+ploy run logs <run-id>
 
 # Follow events in raw format (message only)
-ploy run events <run-id> --format raw
+ploy run logs <run-id> --format raw
 ```
 
 See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.

@@ -16,7 +16,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// End-to-end happy path for 3.1: submit, follow events, download artifacts.
+// End-to-end happy path for 3.1: submit, follow logs/events, download artifacts.
 func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	t.Helper()
 
@@ -36,7 +36,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				Status string            `json:"status"`
 			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream: run running -> run succeeded
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -159,7 +159,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 				Status string            `json:"status"`
 			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream with run, stage, and log events.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -266,7 +266,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 				Status string            `json:"status"`
 			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {

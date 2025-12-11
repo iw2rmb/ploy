@@ -83,7 +83,7 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	flags.RepoWorkspaceHint = fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
 
 	// Follow/polling behavior
-	flags.Follow = fs.Bool("follow", false, "follow run events until completion")
+	flags.Follow = fs.Bool("follow", false, "follow run logs until completion")
 	flags.CapDuration = fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
 	flags.CancelOnCap = fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the run if the cap is exceeded")
 	flags.MaxRetries = fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")

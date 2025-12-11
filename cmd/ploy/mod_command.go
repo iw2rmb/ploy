@@ -56,7 +56,7 @@ func printModRunFlagsSummary(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --gitlab-domain <domain>   GitLab domain")
 	_, _ = fmt.Fprintln(w, "  --mr-success               Create merge request on success")
 	_, _ = fmt.Fprintln(w, "  --mr-fail                  Create merge request on failure")
-	_, _ = fmt.Fprintln(w, "  --follow                   Follow run events until completion")
+	_, _ = fmt.Fprintln(w, "  --follow                   Follow run logs until completion")
 	_, _ = fmt.Fprintln(w, "  --cap <duration>           Time cap for --follow")
 	_, _ = fmt.Fprintln(w, "  --cancel-on-cap            Cancel run if cap exceeded")
 	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir>       Download final artifacts")
