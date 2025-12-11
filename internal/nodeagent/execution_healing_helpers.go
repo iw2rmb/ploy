@@ -110,10 +110,10 @@ func (r *runController) uploadHealingJobDiff(
 		return
 	}
 
-	// If no baseline snapshot is available, fall back to the standard per-step
-	// diff generation so we still capture changes for diagnostics.
+	// If no baseline snapshot is available, skip diff upload rather than
+	// falling back to legacy HEAD-based generation. Healing job diffs must
+	// use baseline-aware GenerateBetween semantics.
 	if strings.TrimSpace(baseDir) == "" {
-		r.uploadDiffForStep(ctx, runID, jobID, jobName, diffGenerator, workspace, result, stepIndex)
 		return
 	}
 

@@ -17,34 +17,7 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
-
-// uploadDiff generates and uploads the workspace diff to the control plane.
-// It compresses the diff, uploads it with execution summary metadata, and also
-// uploads the diff as an artifact bundle named "diff" for client download.
-//
-// The diff is uploaded to both:
-//  1. The diff endpoint for execution metadata tracking
-//  2. The artifact endpoint as a "diff" bundle for client convenience
-//
-// If the diff generator is nil or produces no changes, no uploads occur.
-func (r *runController) uploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffGenerator step.DiffGenerator, workspace string, result step.Result) {
-	if diffGenerator == nil {
-		return
-	}
-
-	// Legacy Generate/HEAD-based diffs are disabled. Callers that require
-	// workspace diffs must use baseline-aware helpers (GenerateBetween) and
-	// provide their own upload logic.
-	_ = diffGenerator
-	_ = workspace
-	slog.Warn("uploadDiff: disabled legacy Generate-based diff path; use baseline-aware helpers instead", "run_id", runID, "job_id", jobID)
-	return
-
-	// Note: uploadDiffArtifact is left intact for callers that already have
-	// a diff and want to publish it as an artifact.
-}
 
 // uploadDiffArtifact uploads the diff as an artifact bundle for client download.
 // Creates a temporary file, writes the diff content, and uploads as "diff" artifact.
