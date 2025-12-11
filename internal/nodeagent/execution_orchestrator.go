@@ -357,8 +357,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	)
 
 	// Capture workspace status before running healing so we can detect whether
-	// this discrete healing job produced any net changes. A healing job that
-	// reports success but leaves the workspace untouched is considered a failure.
+	// this discrete healing job produced any net changes. This is used for
+	// diagnostics and path-level decisions; it must not alter the container
+	// exit code reported for the healing job itself.
 	preStatus, preStatusErr := workspaceStatus(ctx, workspace)
 	if preStatusErr != nil {
 		slog.Warn("healing: failed to compute workspace status before healing; assuming changes may occur",
@@ -380,6 +381,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	duration := time.Since(startTime)
 
 	// Determine whether this healing job produced any workspace changes.
+	// This does not affect the job's exit code or terminal status directly;
+	// it is surfaced via logs and stats for higher-level path control.
 	healingNoChange := false
 	if runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
 		if postStatus, postErr := workspaceStatus(ctx, workspace); postErr != nil {
@@ -433,17 +436,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		return
 	}
 
-	// A healing job that reports success but produced no workspace changes is
-	// considered a failed healing attempt. Continuing without a diff would
-	// re-run gates on the original failing baseline, which is misleading.
 	if healingNoChange {
-		exitCode := int32(1)
-		stats["healing_error"] = "no_workspace_changes"
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload healing no-change failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "duration", duration)
-		return
+		stats["healing_warning"] = "no_workspace_changes"
 	}
 
 	var exitCodeZero int32 = 0
