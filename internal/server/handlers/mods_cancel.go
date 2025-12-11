@@ -113,7 +113,7 @@ func cancelRunHandler(st store.Store, eventsService *events.Service) http.Handle
 				}
 				runSummary.Metadata["reason"] = strings.TrimSpace(*req.Reason)
 			}
-			if err := eventsService.PublishRun(r.Context(), runIDStr, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), domaintypes.RunID(runIDStr), runSummary); err != nil {
 				slog.Error("cancel run: publish run event failed", "run_id", runIDStr, "err", err)
 			}
 			// Signal done on the stream.

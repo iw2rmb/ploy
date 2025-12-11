@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -77,7 +78,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 		}
 
 		// Create jobs from the batch spec for this child run.
-		if err := createJobsFromSpec(ctx, s.store, childRun.ID, batchRun.Spec); err != nil {
+		if err := createJobsFromSpec(ctx, s.store, domaintypes.RunID(childRun.ID), batchRun.Spec); err != nil {
 			slog.Error("batch-scheduler: create jobs failed",
 				"run_id", runIDStr,
 				"child_run_id", childRun.ID,

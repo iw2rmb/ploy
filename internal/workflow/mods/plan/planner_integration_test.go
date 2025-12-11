@@ -13,36 +13,28 @@ import (
 )
 
 func TestPlannerBuildsModsStageGraph_Integration(t *testing.T) {
-	planner := plan.NewPlanner(plan.Options{
-		PlanLane:        "node-wasm",
-		OpenRewriteLane: "node-wasm",
-		LLMPlanLane:     "gpu-ml",
-		LLMExecLane:     "gpu-ml",
-		HumanLane:       "mods-human",
-	})
+	planner := plan.NewPlanner(plan.Options{})
 	stages, err := planner.Plan(context.Background(), plan.PlanInput{
 		Run: contracts.WorkflowRun{SchemaVersion: contracts.SchemaVersion, RunID: types.RunID("run-123")},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
 	}
-	if len(stages) != 6 {
-		t.Fatalf("expected 6 stages, got %d", len(stages))
+	if len(stages) != 4 {
+		t.Fatalf("expected 4 stages, got %d", len(stages))
 	}
 	expect := []struct {
-		name, kind, lane string
-		deps             []string
+		name, kind string
+		deps       []string
 	}{
-		{plan.StageNamePlan, plan.StageNamePlan, "node-wasm", nil},
-		{plan.StageNameORWApply, plan.StageNameORWApply, "node-wasm", []string{plan.StageNamePlan}},
-		{plan.StageNameORWGenerate, plan.StageNameORWGenerate, "node-wasm", []string{plan.StageNamePlan}},
-		{plan.StageNameLLMPlan, plan.StageNameLLMPlan, "gpu-ml", []string{plan.StageNamePlan}},
-		{plan.StageNameLLMExec, plan.StageNameLLMExec, "gpu-ml", []string{plan.StageNameORWApply, plan.StageNameORWGenerate, plan.StageNameLLMPlan}},
-		{plan.StageNameHuman, plan.StageNameHuman, "mods-human", []string{plan.StageNameLLMExec}},
+		{plan.StageNamePlan, plan.StageKindPlan, nil},
+		{plan.StageNameORWApply, plan.StageKindORWApply, []string{plan.StageNamePlan}},
+		{plan.StageNameORWGenerate, plan.StageKindORWGenerate, []string{plan.StageNamePlan}},
+		{plan.StageNameHuman, plan.StageKindHuman, []string{plan.StageNameORWApply, plan.StageNameORWGenerate}},
 	}
 	for i, exp := range expect {
 		s := stages[i]
-		if s.Name != exp.name || s.Kind != exp.kind || s.Lane != exp.lane || !reflect.DeepEqual(s.Dependencies, exp.deps) {
+		if s.Name != exp.name || s.Kind != exp.kind || !reflect.DeepEqual(s.Dependencies, exp.deps) {
 			t.Fatalf("unexpected stage[%d]: %+v", i, s)
 		}
 	}
@@ -148,11 +140,6 @@ func setOptionsHints(t *testing.T, opts *plan.Options, planTimeout time.Duration
 	}
 	if f := v.FieldByName("MaxParallel"); f.IsValid() && f.CanSet() {
 		f.SetInt(int64(maxParallel))
-	}
-	for k, val := range map[string]string{"PlanLane": "mods-plan", "OpenRewriteLane": "mods-java", "LLMPlanLane": "mods-llm", "LLMExecLane": "mods-llm", "HumanLane": "mods-human"} {
-		if f := v.FieldByName(k); f.IsValid() && f.CanSet() && f.Kind() == reflect.String {
-			f.SetString(val)
-		}
 	}
 }
 

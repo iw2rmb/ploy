@@ -169,7 +169,7 @@ func TestStream_PublishRun(t *testing.T) {
 				},
 			}
 
-			err = svc.PublishRun(ctx, tt.runID, payload)
+			err = svc.PublishRun(ctx, domaintypes.RunID(tt.runID), payload)
 
 			if tt.wantErr {
 				if err == nil {
@@ -239,7 +239,7 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 	cancel()
 
 	// Call renamed PublishRun method.
-	err = svc.PublishRun(ctx, runID, payload)
+	err = svc.PublishRun(ctx, domaintypes.RunID(runID), payload)
 	if err == nil {
 		t.Fatal("expected error with cancelled context, got nil")
 	}

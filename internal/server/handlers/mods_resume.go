@@ -190,7 +190,7 @@ func resumeRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			if updatedRun, err := st.GetRun(r.Context(), runIDStr); err == nil {
 				runSummary.Metadata = buildResumeMetadata(updatedRun)
 			}
-			if err := eventsService.PublishRun(r.Context(), runIDStr, runSummary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), domaintypes.RunID(runIDStr), runSummary); err != nil {
 				slog.Error("resume run: publish run event failed", "run_id", runIDStr, "err", err)
 			}
 		}

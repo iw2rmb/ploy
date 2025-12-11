@@ -101,7 +101,7 @@ func TestMaybeUpdateRunRepoFromExecution(t *testing.T) {
 				updateRunRepoStatusErr:         tc.mockUpdateErr,
 			}
 
-			execRunID := sampleExecutionRunID.String()
+			execRunID := domaintypes.RunID(sampleExecutionRunID.String())
 			err := maybeUpdateRunRepoFromExecution(context.Background(), m, execRunID, tc.runStatus)
 
 			if tc.wantErr {

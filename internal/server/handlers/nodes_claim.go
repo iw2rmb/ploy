@@ -101,7 +101,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 					UpdatedAt:  time.Now().UTC(),
 					Stages:     make(map[string]modsapi.StageStatus),
 				}
-				if err := eventsService.PublishRun(r.Context(), run.ID, runSummary); err != nil {
+				if err := eventsService.PublishRun(r.Context(), domaintypes.RunID(run.ID), runSummary); err != nil {
 					slog.Error("claim: publish run event failed", "run_id", run.ID, "err", err)
 				}
 			}

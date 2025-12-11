@@ -62,7 +62,6 @@ func TestJSONCompatibility_WorkflowCheckpoint_Golden(t *testing.T) {
 		StageMetadata: &CheckpointStage{
 			Name:         "mods-plan",
 			Kind:         "mods-plan",
-			Lane:         "node-wasm",
 			Dependencies: []string{"compile"},
 			Manifest:     ManifestReference{Name: "smoke", Version: "2025-09-26"},
 			Aster: CheckpointStageAster{
@@ -103,7 +102,6 @@ func TestJSONCompatibility_WorkflowArtifact_Golden(t *testing.T) {
 		StageMetadata: &CheckpointStage{
 			Name:     "mods-plan",
 			Kind:     "mods-plan",
-			Lane:     "node-wasm",
 			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		},
 		Artifact: CheckpointArtifact{

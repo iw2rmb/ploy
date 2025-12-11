@@ -1,28 +1,10 @@
 package plan
 
-import (
-	"strings"
-	"time"
-)
+import "time"
 
 // applyDefaults normalises planner options with expected defaults.
 func applyDefaults(opts Options) Options {
 	result := opts
-	if strings.TrimSpace(result.PlanLane) == "" {
-		result.PlanLane = defaultPlanLane
-	}
-	if strings.TrimSpace(result.OpenRewriteLane) == "" {
-		result.OpenRewriteLane = defaultOpenRewriteLane
-	}
-	if strings.TrimSpace(result.LLMPlanLane) == "" {
-		result.LLMPlanLane = defaultLLMPlanLane
-	}
-	if strings.TrimSpace(result.LLMExecLane) == "" {
-		result.LLMExecLane = defaultLLMExecLane
-	}
-	if strings.TrimSpace(result.HumanLane) == "" {
-		result.HumanLane = defaultHumanLane
-	}
 	if result.PlanTimeout < 0 {
 		result.PlanTimeout = 0
 	}

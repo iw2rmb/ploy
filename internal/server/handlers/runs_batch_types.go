@@ -85,9 +85,9 @@ func runToSummary(run store.Run) RunBatchSummary {
 }
 
 // getRunRepoCounts fetches and aggregates repo counts by status for a run.
-// runID is now a string (KSUID).
-func getRunRepoCounts(ctx context.Context, st store.Store, runID string) (*RunRepoCounts, error) {
-	rows, err := st.CountRunReposByStatus(ctx, runID)
+// runID is now a KSUID-backed domain type.
+func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*RunRepoCounts, error) {
+	rows, err := st.CountRunReposByStatus(ctx, runID.String())
 	if err != nil {
 		return nil, err
 	}

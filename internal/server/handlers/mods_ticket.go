@@ -125,8 +125,8 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		// Jobs are created with float step_index for ordered execution:
 		//   pre-gate (1000) → mod-0 (2000) → post-gate (3000)
 		// For multi-step runs (mods[] array), creates one mod job per entry.
-		// run.ID is now a string (KSUID).
-		if err := createJobsFromSpec(r.Context(), st, run.ID, spec); err != nil {
+		// runID is a KSUID-backed domain type; convert to string only at the store boundary.
+		if err := createJobsFromSpec(r.Context(), st, runID, spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("submit run: create jobs failed", "run_id", run.ID, "err", err)
 			return
@@ -151,7 +151,7 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
 			// Publish the same RunSummary used for the HTTP response.
-			if err := eventsService.PublishRun(r.Context(), summary.RunID.String(), summary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), summary.RunID, summary); err != nil {
 				slog.Error("submit run: publish run event failed", "run_id", summary.RunID, "err", err)
 			}
 		}
@@ -328,8 +328,8 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 // For multi-step runs (mods[] array), creates one mod job per entry.
 // Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
 //
-// runID is now a string (KSUID); job IDs are generated using domaintypes.NewJobID().
-func createJobsFromSpec(ctx context.Context, st store.Store, runID string, spec []byte) error {
+// runID is a KSUID-backed domain type; job IDs are generated using domaintypes.NewJobID().
+func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, spec []byte) error {
 	// Parse spec to detect multi-step vs single-step.
 	var specMap map[string]interface{}
 	if len(spec) > 0 && json.Valid(spec) {
@@ -344,7 +344,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, spec 
 		// Multi-step run: create pre-gate, one job per mod, and post-gate.
 		// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
 		// Pre-gate job - pending (ready to be claimed immediately)
-		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusPending); err != nil {
+		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
@@ -358,14 +358,14 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, spec 
 				}
 			}
 			jobName := fmt.Sprintf("mod-%d", i)
-			stepIndex := float64(2000 + i*1000)
+			stepIndex := domaintypes.StepIndex(2000 + i*1000)
 			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
 				return fmt.Errorf("create mod job %d: %w", i, err)
 			}
 		}
 
 		// Post-gate job: after all mods - starts as 'created'
-		postGateIndex := float64(2000 + len(mods)*1000)
+		postGateIndex := domaintypes.StepIndex(2000 + len(mods)*1000)
 		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
 			return fmt.Errorf("create post-gate job: %w", err)
 		}
@@ -386,16 +386,16 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, spec 
 
 // createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
 // Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
-// runID is a string (KSUID).
-func createSingleModJob(ctx context.Context, st store.Store, runID string, modImage string) error {
+// runID is a KSUID-backed domain type.
+func createSingleModJob(ctx context.Context, st store.Store, runID domaintypes.RunID, modImage string) error {
 	// Pre-gate is pending (ready to claim), others are created (wait for server to schedule).
-	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusPending); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", 2000, modImage, store.JobStatusCreated); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", domaintypes.StepIndex(2000), modImage, store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create mod job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", 3000, "", store.JobStatusCreated); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", domaintypes.StepIndex(3000), "", store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create post-gate job: %w", err)
 	}
 	return nil
@@ -404,19 +404,19 @@ func createSingleModJob(ctx context.Context, st store.Store, runID string, modIm
 // createJobWithIndex creates a job with the given step_index, status, and metadata.
 // modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
 // status should be JobStatusPending for the first job, JobStatusCreated for others.
-// runID is a string (KSUID); job ID is generated using domaintypes.NewJobID().
-func createJobWithIndex(ctx context.Context, st store.Store, runID string, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
+// runID is a KSUID-backed domain type; job ID is generated using domaintypes.NewJobID().
+func createJobWithIndex(ctx context.Context, st store.Store, runID domaintypes.RunID, name, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus) error {
 	// Generate KSUID-backed job ID using central helper.
 	jobID := domaintypes.NewJobID()
 	// Create the job with step_index and status.
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(jobID),
-		RunID:     runID,
+		RunID:     runID.String(),
 		Name:      name,
 		Status:    status,
 		ModType:   modType,
 		ModImage:  modImage,
-		StepIndex: stepIndex,
+		StepIndex: stepIndex.Float64(),
 		Meta:      []byte(`{}`),
 	})
 	return err

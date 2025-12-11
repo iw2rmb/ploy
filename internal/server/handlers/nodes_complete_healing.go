@@ -96,7 +96,7 @@ func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
 	run store.Run,
-	runID string, // KSUID-backed string ID after run ID migration.
+	runID domaintypes.RunID, // KSUID-backed string ID after run ID migration.
 	failedStepIndex domaintypes.StepIndex,
 	jobs []store.Job,
 ) error {
@@ -348,7 +348,8 @@ func maybeCreateHealingJobs(
 			// Job name includes attempt, branch name, and mod index.
 			jobName := fmt.Sprintf("heal-%s-%d-%d", branchSuffix, healingAttemptNumber, modIdx)
 			_, err := st.CreateJob(ctx, store.CreateJobParams{
-				RunID:     runID,
+				ID:        string(domaintypes.NewJobID()),
+				RunID:     runID.String(),
 				Name:      jobName,
 				ModType:   "heal",
 				ModImage:  modImage,
@@ -374,7 +375,8 @@ func maybeCreateHealingJobs(
 		reGateStepIndex := branchWindowStart + branchIncrement*float64(modsCount+1)
 		reGateName := fmt.Sprintf("re-gate-%s-%d", branchSuffix, healingAttemptNumber)
 		_, err := st.CreateJob(ctx, store.CreateJobParams{
-			RunID:     runID,
+			ID:        string(domaintypes.NewJobID()),
+			RunID:     runID.String(),
 			Name:      reGateName,
 			ModType:   "re_gate",
 			ModImage:  "",
@@ -415,7 +417,7 @@ func maybeCreateHealingJobs(
 func cancelLoserBranches(
 	ctx context.Context,
 	st store.Store,
-	runID string, // KSUID-backed string ID after run ID migration.
+	runID domaintypes.RunID, // KSUID-backed string ID after run ID migration.
 	winnerJob store.Job,
 	jobs []store.Job,
 ) error {
@@ -544,7 +546,7 @@ func cancelLoserBranches(
 func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
-	runID string, // KSUID-backed string ID after run ID migration.
+	runID domaintypes.RunID, // KSUID-backed string ID after run ID migration.
 	failedStepIndex domaintypes.StepIndex,
 	jobs []store.Job,
 ) error {

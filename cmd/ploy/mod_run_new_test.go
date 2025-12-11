@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -37,19 +39,33 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	if err := os.WriteFile(specPath, []byte("image: docker.io/test/image:v1\n"), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
 	buf := &bytes.Buffer{}
-	args := []string{"--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
+	args := []string{
+		"--repo-url", "https://example.com/repo.git",
+		"--repo-base-ref", "main",
+		"--repo-target-ref", "feature",
+		"--spec", specPath,
+	}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
-	if received.Repository != "https://example.com/repo.git" {
-		t.Fatalf("unexpected repository: %s", received.Repository)
+	if received.RepoURL != "https://example.com/repo.git" {
+		t.Fatalf("unexpected repo_url: %s", received.RepoURL)
 	}
-	if received.Metadata["repo_target_ref"] != "feature" {
-		t.Fatalf("expected repo target metadata, got %v", received.Metadata)
+	if received.BaseRef != "main" {
+		t.Fatalf("expected base_ref main, got %s", received.BaseRef)
 	}
-	if len(received.Stages) != 5 {
-		t.Fatalf("expected 5 stages, got %d", len(received.Stages))
+	if received.TargetRef != "feature" {
+		t.Fatalf("expected target_ref feature, got %s", received.TargetRef)
+	}
+	if len(received.Spec) == 0 {
+		t.Fatalf("expected non-empty spec payload")
 	}
 	output := buf.String()
 	if !strings.Contains(output, "Mods run mods-server-123 submitted") {
@@ -100,11 +116,18 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	if err := os.WriteFile(specPath, []byte("image: docker.io/test/image:v1\n"), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
 	buf := &bytes.Buffer{}
 	args := []string{
 		"--repo-url", "https://example.com/repo.git",
 		"--repo-base-ref", "main",
 		"--repo-target-ref", "feature",
+		"--spec", specPath,
 		"--gitlab-pat", "glpat-test123",
 		"--gitlab-domain", "gitlab.example.com",
 		"--mr-success",
@@ -115,14 +138,14 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 	}
 
 	// Verify repository fields are set correctly.
-	if received.Repository != "https://example.com/repo.git" {
-		t.Fatalf("expected repo_url https://example.com/repo.git, got %s", received.Repository)
+	if received.RepoURL != "https://example.com/repo.git" {
+		t.Fatalf("expected repo_url https://example.com/repo.git, got %s", received.RepoURL)
 	}
-	if received.Metadata["repo_base_ref"] != "main" {
-		t.Fatalf("expected base_ref main, got %s", received.Metadata["repo_base_ref"])
+	if received.BaseRef != "main" {
+		t.Fatalf("expected base_ref main, got %s", received.BaseRef)
 	}
-	if received.Metadata["repo_target_ref"] != "feature" {
-		t.Fatalf("expected target_ref feature, got %s", received.Metadata["repo_target_ref"])
+	if received.TargetRef != "feature" {
+		t.Fatalf("expected target_ref feature, got %s", received.TargetRef)
 	}
 
 	// Verify PAT is not printed in output.

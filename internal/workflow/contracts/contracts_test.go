@@ -122,7 +122,6 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 		StageMetadata: &CheckpointStage{
 			Name:         modsStage,
 			Kind:         modsStage,
-			Lane:         "node-wasm",
 			Dependencies: []string{},
 			Manifest:     ManifestReference{Name: "smoke", Version: "2025-09-26"},
 			Aster: CheckpointStageAster{
@@ -151,7 +150,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 				},
 				Recommendations: []ModsRecommendation{{
 					Source:     "advisor",
-					Message:    "Apply recipe.alpha before llm-exec",
+					Message:    "Apply recipe.alpha before final review",
 					Confidence: 0.9,
 				}},
 			},
@@ -219,7 +218,6 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 	stage := CheckpointStage{
 		Name:      buildGateStage,
 		Kind:      buildGateStage,
-		Lane:      "build-gate",
 		Manifest:  ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		BuildGate: &meta,
 	}
@@ -271,7 +269,6 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 		StageMetadata: &CheckpointStage{
 			Name:     modsStage,
 			Kind:     modsStage,
-			Lane:     "node-wasm",
 			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		},
 		Artifact: CheckpointArtifact{

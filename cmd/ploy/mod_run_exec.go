@@ -27,49 +27,83 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
-	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
-// defaultStageDefinitions returns the standard workflow stages for a mod run.
-// These stages represent the typical mods execution pipeline:
-// 1. Plan stage: determines which modifications are needed
-// 2. ORW stages: apply and generate OpenRewrite transformations
-// 3. LLM stages: plan and execute LLM-based modifications
-// When the control plane handles the simplified /v1/mods submission flow, it
-// creates stages from the spec (mod/mods[]) but reuses these logical stage
-// names and lane roles.
-func defaultStageDefinitions() []modsapi.StageDefinition {
-	return []modsapi.StageDefinition{
-		{ID: modplan.StageNamePlan, Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
-		{ID: modplan.StageNameORWApply, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameORWGenerate, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameLLMPlan, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameLLMExec, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNameORWApply, modplan.StageNameORWGenerate, modplan.StageNameLLMPlan}},
-	}
-}
-
 // buildRunRequest constructs the initial run submission request from CLI flags and defaults.
-// Repository metadata (base_ref, target_ref, workspace_hint) is attached when provided.
+// It mirrors the control-plane RunSubmitRequest schema:
+//   - repo_url, base_ref, target_ref (required by server)
+//   - spec: JSON payload built from --spec and CLI overrides
+//   - created_by: populated from USER when available
 func buildRunRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
+	// Build spec payload from file and CLI overrides (env, image, retain, GitLab flags).
+	specFile := ""
+	if flags.SpecFile != nil {
+		specFile = strings.TrimSpace(*flags.SpecFile)
+	}
+	var modEnvs []string
+	if flags.ModEnvs != nil {
+		modEnvs = append(modEnvs, (*flags.ModEnvs)...)
+	}
+	modImage := ""
+	if flags.ModImage != nil {
+		modImage = strings.TrimSpace(*flags.ModImage)
+	}
+	retain := false
+	if flags.Retain != nil {
+		retain = *flags.Retain
+	}
+	modCommand := ""
+	if flags.ModCommand != nil {
+		modCommand = strings.TrimSpace(*flags.ModCommand)
+	}
+	gitlabPAT := ""
+	if flags.GitLabPAT != nil {
+		gitlabPAT = strings.TrimSpace(*flags.GitLabPAT)
+	}
+	gitlabDomain := ""
+	if flags.GitLabDomain != nil {
+		gitlabDomain = strings.TrimSpace(*flags.GitLabDomain)
+	}
+	mrSuccess := false
+	if flags.MRSuccess != nil {
+		mrSuccess = *flags.MRSuccess
+	}
+	mrFail := false
+	if flags.MRFail != nil {
+		mrFail = *flags.MRFail
+	}
+
+	specPayload, err := buildSpecPayload(
+		specFile,
+		modEnvs,
+		modImage,
+		retain,
+		modCommand,
+		gitlabPAT,
+		gitlabDomain,
+		mrSuccess,
+		mrFail,
+	)
+	if err != nil {
+		return modsapi.RunSubmitRequest{}, err
+	}
+
 	repoURL := strings.TrimSpace(*flags.RepoURL)
+	baseRef := ""
+	if flags.RepoBaseRef != nil {
+		baseRef = strings.TrimSpace(*flags.RepoBaseRef)
+	}
 	targetRef := strings.TrimSpace(*flags.RepoTargetRef)
 
 	request := modsapi.RunSubmitRequest{
-		Submitter:  strings.TrimSpace(os.Getenv("USER")),
-		Repository: repoURL,
-		Metadata:   make(map[string]string),
-		Stages:     defaultStageDefinitions(),
+		RepoURL:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
 
-	// Attach repository metadata when provided.
-	if baseRef := strings.TrimSpace(*flags.RepoBaseRef); baseRef != "" {
-		request.Metadata["repo_base_ref"] = baseRef
-	}
-	if targetRef != "" {
-		request.Metadata["repo_target_ref"] = targetRef
-	}
-	if hint := strings.TrimSpace(*flags.RepoWorkspaceHint); hint != "" {
-		request.Metadata["repo_workspace_hint"] = hint
+	if len(specPayload) > 0 {
+		request.Spec = specPayload
 	}
 
 	return request, nil
