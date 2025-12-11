@@ -20,9 +20,6 @@ import (
 func handleModRun(args []string, stderr io.Writer) error {
 	if len(args) > 0 {
 		switch args[0] {
-		// Batch lifecycle commands: list.
-		case "list":
-			return handleModRunList(args[1:], stderr)
 		// Repo-level operations for managing repos within a batch.
 		case "repo":
 			return handleModRunRepo(args[1:], stderr)

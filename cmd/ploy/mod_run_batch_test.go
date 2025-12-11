@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// TestModRunBatchListCallsControlPlane validates list command calls the API.
+// TestRunListCallsControlPlane validates list command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchListCallsControlPlane(t *testing.T) {
+func TestRunListCallsControlPlane(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,9 +97,9 @@ func TestModRunBatchListCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"mod", "run", "list", "--limit", "10", "--offset", "5"}, &buf)
+	err := executeCmd([]string{"run", "list", "--limit", "10", "--offset", "5"}, &buf)
 	if err != nil {
-		t.Fatalf("mod run list error: %v", err)
+		t.Fatalf("run list error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected GET /v1/runs to be called")
@@ -121,9 +121,9 @@ func TestModRunBatchListCallsControlPlane(t *testing.T) {
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunBatchStatusRemoved(t *testing.T) {}
 
-// TestModRunBatchListEmptyResult validates list command handles empty results.
+// TestRunListEmptyResult validates list command handles empty results.
 // Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchListEmptyResult(t *testing.T) {
+func TestRunListEmptyResult(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/runs") {
 			resp := struct {
@@ -141,9 +141,9 @@ func TestModRunBatchListEmptyResult(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"mod", "run", "list"}, &buf)
+	err := executeCmd([]string{"run", "list"}, &buf)
 	if err != nil {
-		t.Fatalf("mod run list error: %v", err)
+		t.Fatalf("run list error: %v", err)
 	}
 
 	output := buf.String()
@@ -152,9 +152,9 @@ func TestModRunBatchListEmptyResult(t *testing.T) {
 	}
 }
 
-// TestModRunBatchListInvalidLimit validates list command rejects invalid limit.
+// TestRunListInvalidLimit validates list command rejects invalid limit.
 // This uses t.Parallel since it does not use t.Setenv.
-func TestModRunBatchListInvalidLimit(t *testing.T) {
+func TestRunListInvalidLimit(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -164,17 +164,17 @@ func TestModRunBatchListInvalidLimit(t *testing.T) {
 	}{
 		{
 			name:    "limit below minimum",
-			args:    []string{"mod", "run", "list", "--limit", "0"},
+			args:    []string{"run", "list", "--limit", "0"},
 			wantErr: "limit must be between 1 and 100",
 		},
 		{
 			name:    "limit above maximum",
-			args:    []string{"mod", "run", "list", "--limit", "101"},
+			args:    []string{"run", "list", "--limit", "101"},
 			wantErr: "limit must be between 1 and 100",
 		},
 		{
 			name:    "negative offset",
-			args:    []string{"mod", "run", "list", "--offset", "-1"},
+			args:    []string{"run", "list", "--offset", "-1"},
 			wantErr: "offset must be non-negative",
 		},
 	}
