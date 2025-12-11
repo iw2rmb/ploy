@@ -5,7 +5,7 @@
 // internal/cli/mods batch client for HTTP communication with the control plane.
 //
 // Command structure:
-//   - ploy mod run list [--limit N] [--offset N]
+//   - ploy run list [--limit N] [--offset N]
 package main
 
 import (
@@ -19,26 +19,26 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 )
 
-// handleModRunList implements `ploy mod run list [--limit N] [--offset N]`.
+// handleRunList implements `ploy run list [--limit N] [--offset N]`.
 // Lists batch runs with pagination, showing ID, name, status, and repo counts.
-func handleModRunList(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run list", flag.ContinueOnError)
+func handleRunList(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("run list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	limit := fs.Int("limit", 50, "Max number of runs to return (1-100)")
 	offset := fs.Int("offset", 0, "Number of runs to skip")
 
 	if err := fs.Parse(args); err != nil {
-		printModRunListUsage(stderr)
+		printRunListUsage(stderr)
 		return err
 	}
 
 	// Validate pagination parameters.
 	if *limit < 1 || *limit > 100 {
-		printModRunListUsage(stderr)
+		printRunListUsage(stderr)
 		return errors.New("limit must be between 1 and 100")
 	}
 	if *offset < 0 {
-		printModRunListUsage(stderr)
+		printRunListUsage(stderr)
 		return errors.New("offset must be non-negative")
 	}
 
@@ -88,9 +88,9 @@ func handleModRunList(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printModRunListUsage renders help for mod run list.
-func printModRunListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run list [--limit N] [--offset N]")
+// printRunListUsage renders help for run list.
+func printRunListUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy run list [--limit N] [--offset N]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Lists batch runs with pagination.")
 	_, _ = fmt.Fprintln(w, "")

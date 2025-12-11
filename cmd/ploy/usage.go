@@ -73,6 +73,7 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  list        List batch runs with pagination")
 	_, _ = fmt.Fprintln(w, "  status      Show status for a run")
 	_, _ = fmt.Fprintln(w, "  events      Stream run events (logs, retention)")
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
