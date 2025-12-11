@@ -1,4 +1,4 @@
-package mods
+package runs
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// DiffsCommand lists diffs for a Mods run and optionally downloads the newest patch.
+// DiffsCommand lists diffs for a run and optionally downloads the newest patch.
 // Uses domain type (RunID) for type-safe identification.
 type DiffsCommand struct {
 	Client  *http.Client
@@ -32,14 +32,14 @@ type DiffsCommand struct {
 // Run executes the command.
 func (c DiffsCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
-		return errors.New("mods diffs: http client required")
+		return errors.New("run diffs: http client required")
 	}
 	if c.BaseURL == nil {
-		return errors.New("mods diffs: base url required")
+		return errors.New("run diffs: base url required")
 	}
 	// Use domain type's IsZero method for validation.
 	if c.RunID.IsZero() {
-		return errors.New("mods diffs: run id required")
+		return errors.New("run diffs: run id required")
 	}
 	runID := c.RunID.String()
 	out := c.Output
@@ -48,7 +48,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 
 	// List diffs
-	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "diffs")
+	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "diffs")
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 		if msg == "" {
 			msg = resp.Status
 		}
-		return fmt.Errorf("mods diffs: %s", msg)
+		return fmt.Errorf("run diffs: %s", msg)
 	}
 	var listing struct {
 		Diffs []struct {
@@ -93,7 +93,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 
 	if len(listing.Diffs) == 0 {
-		return errors.New("mods diffs: no diffs available for this run")
+		return errors.New("run diffs: no diffs available for this run")
 	}
 	// Newest first by API; take first.
 	diffID := strings.TrimSpace(listing.Diffs[0].ID)
@@ -120,7 +120,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 		if msg == "" {
 			msg = resp2.Status
 		}
-		return fmt.Errorf("mods diffs: %s", msg)
+		return fmt.Errorf("run diffs: %s", msg)
 	}
 	gzData, err := io.ReadAll(resp2.Body)
 	if err != nil {

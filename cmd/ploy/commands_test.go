@@ -206,7 +206,6 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 				"run",
 				"run repo",
 				"artifacts",
-				"diffs",
 			},
 			mustContainAll: true,
 			description:    "mod --help must list all subcommands",
