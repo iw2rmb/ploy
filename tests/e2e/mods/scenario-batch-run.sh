@@ -93,14 +93,14 @@ run dist/ploy mod run \
     cat "${ARTIFACT_DIR}/create-batch.out" || true
   }
 
-# Extract batch ID from output (if available).
-BATCH_ID=""
+# Extract run ID from output (if available).
+RUN_ID=""
 if [[ -f "${ARTIFACT_DIR}/create-batch.out" ]]; then
   # Try to extract UUID from output.
-  BATCH_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${ARTIFACT_DIR}/create-batch.out" | head -1 || true)
+  RUN_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${ARTIFACT_DIR}/create-batch.out" | head -1 || true)
 fi
 
-if [[ -z "${BATCH_ID}" ]]; then
+if [[ -z "${RUN_ID}" ]]; then
   echo "WARN: Could not extract batch ID from output."
   echo "This test requires a running control plane."
   echo "Skipping remaining steps."
@@ -109,7 +109,7 @@ if [[ -z "${BATCH_ID}" ]]; then
   exit 0
 fi
 
-echo "Batch ID: ${BATCH_ID}"
+echo "Batch ID: ${RUN_ID}"
 
 # Step 2: Add repos to the batch.
 echo ""
@@ -118,20 +118,20 @@ run dist/ploy mod run repo add \
   --repo-url "https://github.com/example/repo1.git" \
   --base-ref main \
   --target-ref "feature-${TS}-1" \
-  "${BATCH_ID}" \
+  "${RUN_ID}" \
   > "${ARTIFACT_DIR}/add-repo1.out" 2>&1 || true
 
 run dist/ploy mod run repo add \
   --repo-url "https://github.com/example/repo2.git" \
   --base-ref main \
   --target-ref "feature-${TS}-2" \
-  "${BATCH_ID}" \
+  "${RUN_ID}" \
   > "${ARTIFACT_DIR}/add-repo2.out" 2>&1 || true
 
 # Step 3: List repos in the batch.
 echo ""
 echo "[3/5] Listing repos in batch"
-run dist/ploy mod run repo status "${BATCH_ID}" \
+run dist/ploy mod run repo status "${RUN_ID}" \
   > "${ARTIFACT_DIR}/status.out" 2>&1 || true
 cat "${ARTIFACT_DIR}/status.out" || true
 
@@ -144,7 +144,7 @@ if [[ -n "${REPO1_ID}" ]]; then
   run dist/ploy mod run repo restart \
     --repo-id "${REPO1_ID}" \
     --target-ref "feature-${TS}-1-retry" \
-    "${BATCH_ID}" \
+    "${RUN_ID}" \
     > "${ARTIFACT_DIR}/restart-repo1.out" 2>&1 || true
 else
   echo "SKIP: Could not extract repo ID for restart test"
@@ -153,11 +153,11 @@ fi
 # Step 5: Stop the batch and verify final status.
 echo ""
 echo "[5/5] Stopping batch and verifying final status"
-run dist/ploy mod run stop "${BATCH_ID}" \
+run dist/ploy run stop "${RUN_ID}" \
   > "${ARTIFACT_DIR}/stop.out" 2>&1 || true
 
 # Final status check.
-run dist/ploy mod run repo status "${BATCH_ID}" \
+run dist/ploy mod run repo status "${RUN_ID}" \
   > "${ARTIFACT_DIR}/final-status.out" 2>&1 || true
 echo "Final status:"
 cat "${ARTIFACT_DIR}/final-status.out" || true

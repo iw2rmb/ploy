@@ -1000,7 +1000,7 @@ artifacts/diffs to the correct node.
 
 - `GET /v1/runs` — list batch runs with basic metadata (repo_url, refs, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
-- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `canceled` and marking pending `run_repos` as `cancelled` (idempotent for terminal runs).
+- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `canceled` and marking pending `run_repos` as `cancelled` (idempotent for terminal runs). The CLI maps this to `ploy run stop <run-id>` and returns the canonical `RunSummary` payload.
 
 ## 4. Node Execution and Rehydration
 

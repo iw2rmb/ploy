@@ -139,103 +139,6 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	}
 }
 
-// TestStopBatchCommand_Run validates StopBatchCommand responses.
-func TestStopBatchCommand_Run(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		batchID     domaintypes.RunID // Updated to domain type
-		serverResp  BatchSummary
-		statusCode  int
-		wantErr     bool
-		wantErrText string
-	}{
-		{
-			name:    "successful stop",
-			batchID: domaintypes.RunID("batch-456"), // Convert to domain type
-			serverResp: BatchSummary{
-				ID:     domaintypes.RunID("batch-456"), // Convert to domain type
-				Status: "canceled",
-				Counts: &RunRepoCounts{
-					Total:         5,
-					Cancelled:     3,
-					Succeeded:     2,
-					DerivedStatus: "cancelled",
-				},
-			},
-			statusCode: http.StatusOK,
-		},
-		{
-			name:        "batch not found",
-			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
-			statusCode:  http.StatusNotFound,
-			wantErr:     true,
-			wantErrText: "run not found",
-		},
-		{
-			name:        "empty batch id",
-			batchID:     domaintypes.RunID(""), // Empty domain type
-			wantErr:     true,
-			wantErrText: "batch id required",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify POST method.
-				if r.Method != http.MethodPost {
-					t.Errorf("expected POST, got %s", r.Method)
-				}
-				// Verify path ends with /stop.
-				if !strings.HasSuffix(r.URL.Path, "/stop") {
-					t.Errorf("expected path to end with /stop, got %s", r.URL.Path)
-				}
-
-				if tc.statusCode == http.StatusNotFound {
-					http.Error(w, "run not found", http.StatusNotFound)
-					return
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(tc.serverResp)
-			}))
-			t.Cleanup(srv.Close)
-
-			baseURL, err := url.Parse(srv.URL)
-			if err != nil {
-				t.Fatalf("parse server URL: %v", err)
-			}
-
-			cmd := StopBatchCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				BatchID: tc.batchID,
-			}
-
-			result, err := cmd.Run(context.Background())
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tc.wantErrText != "" && !strings.Contains(err.Error(), tc.wantErrText) {
-					t.Errorf("error %q should contain %q", err.Error(), tc.wantErrText)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Run() error: %v", err)
-			}
-			if result.Status != tc.serverResp.Status {
-				t.Errorf("got status %q, want %q", result.Status, tc.serverResp.Status)
-			}
-		})
-	}
-}
-
 // TestStartBatchCommand_Run validates StartBatchCommand responses.
 func TestStartBatchCommand_Run(t *testing.T) {
 	t.Parallel()
@@ -458,14 +361,6 @@ func TestBatchCommand_Errors(t *testing.T) {
 			cmd:     &listWrapper{ListBatchesCommand{Client: http.DefaultClient}},
 			wantErr: "base url required",
 		},
-		{
-			name: "stop missing batch ID",
-			cmd: &stopWrapper{StopBatchCommand{
-				Client:  http.DefaultClient,
-				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-			}},
-			wantErr: "batch id required",
-		},
 	}
 
 	for _, tc := range tests {
@@ -518,7 +413,3 @@ func strPtr(s string) *string {
 type listWrapper struct{ ListBatchesCommand }
 
 func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListBatchesCommand.Run(ctx) }
-
-type stopWrapper struct{ StopBatchCommand }
-
-func (w *stopWrapper) Run(ctx context.Context) (any, error) { return w.StopBatchCommand.Run(ctx) }

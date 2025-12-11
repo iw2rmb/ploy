@@ -1,0 +1,63 @@
+package runs
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
+
+// StopCommand stops a run and returns its Summary.
+type StopCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   domaintypes.RunID
+}
+
+// Run executes POST /v1/runs/{id}/stop to stop the run.
+func (c StopCommand) Run(ctx context.Context) (Summary, error) {
+	var zero Summary
+
+	if c.Client == nil {
+		return zero, fmt.Errorf("run stop: http client required")
+	}
+	if c.BaseURL == nil {
+		return zero, fmt.Errorf("run stop: base url required")
+	}
+	if c.RunID.IsZero() {
+		return zero, fmt.Errorf("run stop: run id required")
+	}
+
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String(), "stop")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
+	if err != nil {
+		return zero, fmt.Errorf("run stop: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return zero, fmt.Errorf("run stop: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		msg := strings.TrimSpace(string(data))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return zero, fmt.Errorf("run stop: %s", msg)
+	}
+
+	var summary Summary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		return zero, fmt.Errorf("run stop: decode response: %w", err)
+	}
+
+	return summary, nil
+}

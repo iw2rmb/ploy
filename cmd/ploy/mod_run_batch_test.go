@@ -10,44 +10,6 @@ import (
 	"time"
 )
 
-// TestModRunBatchRouting validates that batch lifecycle subcommands are routed correctly.
-// This uses t.Parallel since it does not use t.Setenv.
-func TestModRunBatchRouting(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		args    []string
-		wantErr string
-	}{
-		{
-			name:    "stop without run-name",
-			args:    []string{"mod", "run", "stop"},
-			wantErr: "run-name required",
-		},
-		{
-			name:    "stop with empty run-name",
-			args:    []string{"mod", "run", "stop", ""},
-			wantErr: "run-name required",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			var buf bytes.Buffer
-			err := executeCmd(tc.args, &buf)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Errorf("error %q should contain %q", err.Error(), tc.wantErr)
-			}
-		})
-	}
-}
-
 // TestModRunBatchListCallsControlPlane validates list command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunBatchListCallsControlPlane(t *testing.T) {
@@ -158,65 +120,6 @@ func TestModRunBatchListCallsControlPlane(t *testing.T) {
 // TestModRunBatchStatusCallsControlPlane validates status command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunBatchStatusRemoved(t *testing.T) {}
-
-// TestModRunBatchStopCallsControlPlane validates stop command calls the API.
-// Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchStopCallsControlPlane(t *testing.T) {
-	var called bool
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-456/stop" {
-			called = true
-
-			now := time.Now()
-			resp := struct {
-				ID        string    `json:"id"`
-				Status    string    `json:"status"`
-				CreatedAt time.Time `json:"created_at"`
-				Counts    *struct {
-					Total     int32 `json:"total"`
-					Cancelled int32 `json:"cancelled"`
-				} `json:"repo_counts,omitempty"`
-			}{
-				ID:        "batch-456",
-				Status:    "canceled",
-				CreatedAt: now,
-				Counts: &struct {
-					Total     int32 `json:"total"`
-					Cancelled int32 `json:"cancelled"`
-				}{Total: 5, Cancelled: 3},
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	useServerDescriptor(t, server.URL)
-
-	var buf bytes.Buffer
-	err := executeCmd([]string{"mod", "run", "stop", "batch-456"}, &buf)
-	if err != nil {
-		t.Fatalf("mod run stop error: %v", err)
-	}
-	if !called {
-		t.Fatal("expected POST /v1/runs/batch-456/stop to be called")
-	}
-
-	output := buf.String()
-	if !strings.Contains(output, "batch-456") {
-		t.Errorf("output should contain batch-456: %s", output)
-	}
-	if !strings.Contains(output, "stopped") {
-		t.Errorf("output should contain stopped: %s", output)
-	}
-	if !strings.Contains(output, "Cancelled 3") {
-		t.Errorf("output should contain Cancelled 3: %s", output)
-	}
-}
 
 // TestModRunBatchListEmptyResult validates list command handles empty results.
 // Not parallel because useServerDescriptor uses t.Setenv.
