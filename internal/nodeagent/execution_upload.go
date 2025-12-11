@@ -120,6 +120,14 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 		return fmt.Errorf("create status uploader: %w", err)
 	}
 
+	// Dereference exitCode for logging so we log the actual numeric code
+	// instead of the pointer address. The StatusUploader already dereferences
+	// exitCode when building the JSON payload, so this only affects logs.
+	var loggedExitCode any
+	if exitCode != nil {
+		loggedExitCode = *exitCode
+	}
+
 	// Use a short, detached context to attempt status upload even if run context is cancelled.
 	// The 10-second timeout provides sufficient time for retries while preventing indefinite hangs.
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -129,7 +137,7 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", exitCode, "step_index", stepIndex)
+	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode, "step_index", stepIndex)
 	return nil
 }
 

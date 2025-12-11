@@ -14,9 +14,13 @@ import (
 const claimJob = `-- name: ClaimJob :one
 WITH eligible AS (
   SELECT j.id FROM jobs j
-  WHERE j.run_id IN (SELECT id FROM runs WHERE status IN ('queued', 'running'))
-    AND j.status = 'pending'
+  JOIN runs r ON j.run_id = r.id
+  WHERE j.status = 'pending'
     AND j.node_id IS NULL
+    AND (
+      r.status IN ('queued', 'running') OR
+      (j.mod_type = 'mr' AND r.status IN ('succeeded', 'failed'))
+    )
   ORDER BY j.step_index ASC
   FOR UPDATE SKIP LOCKED
   LIMIT 1

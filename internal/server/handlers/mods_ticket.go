@@ -176,7 +176,7 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 
 // getRunStatusHandler returns an HTTP handler that fetches run status by ID.
 //
-// Endpoint: GET /v1/mods/{id}
+// Endpoint: GET /v1/runs/{id}/status
 // Response: 200 OK with RunSummary body (canonical schema, no wrapper types)
 //
 // Canonical contract (see docs/mods-lifecycle.md § 2.1):

@@ -139,21 +139,21 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	}
 }
 
-// TestGetBatchStatusCommand_Run validates GetBatchStatusCommand responses.
-func TestGetBatchStatusCommand_Run(t *testing.T) {
+// TestGetRunStatusCommand_Run validates GetRunStatusCommand responses.
+func TestGetRunStatusCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name        string
-		batchID     domaintypes.RunID // Updated to domain type
+		runID       domaintypes.RunID // Updated to domain type
 		serverResp  BatchSummary
 		statusCode  int
 		wantErr     bool
 		wantErrText string
 	}{
 		{
-			name:    "successful status fetch",
-			batchID: domaintypes.RunID("batch-123"), // Convert to domain type
+			name:  "successful status fetch",
+			runID: domaintypes.RunID("batch-123"), // Convert to domain type
 			serverResp: BatchSummary{
 				ID:        domaintypes.RunID("batch-123"), // Convert to domain type
 				Name:      strPtr("my-batch"),
@@ -173,17 +173,17 @@ func TestGetBatchStatusCommand_Run(t *testing.T) {
 			statusCode: http.StatusOK,
 		},
 		{
-			name:        "batch not found",
-			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
+			name:        "run not found",
+			runID:       domaintypes.RunID("nonexistent"), // Convert to domain type
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run not found",
 		},
 		{
-			name:        "empty batch id",
-			batchID:     domaintypes.RunID(""), // Empty domain type
+			name:        "empty run id",
+			runID:       domaintypes.RunID(""), // Empty domain type
 			wantErr:     true,
-			wantErrText: "batch id required",
+			wantErrText: "run id required",
 		},
 	}
 
@@ -208,10 +208,10 @@ func TestGetBatchStatusCommand_Run(t *testing.T) {
 				t.Fatalf("parse server URL: %v", err)
 			}
 
-			cmd := GetBatchStatusCommand{
+			cmd := GetRunStatusCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				BatchID: tc.batchID,
+				RunID:   tc.runID,
 			}
 
 			result, err := cmd.Run(context.Background())
@@ -597,9 +597,9 @@ func TestBatchCommand_Errors(t *testing.T) {
 		},
 		{
 			name: "status missing base URL",
-			cmd: &statusWrapper{GetBatchStatusCommand{
-				Client:  http.DefaultClient,
-				BatchID: "test",
+			cmd: &statusWrapper{GetRunStatusCommand{
+				Client: http.DefaultClient,
+				RunID:  "test",
 			}},
 			wantErr: "base url required",
 		},
@@ -648,10 +648,10 @@ func TestHTTPError(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := GetBatchStatusCommand{
+	cmd := GetRunStatusCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		BatchID: "test",
+		RunID:   "test",
 	}
 
 	_, err := cmd.Run(context.Background())
@@ -673,10 +673,10 @@ type listWrapper struct{ ListBatchesCommand }
 
 func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListBatchesCommand.Run(ctx) }
 
-type statusWrapper struct{ GetBatchStatusCommand }
+type statusWrapper struct{ GetRunStatusCommand }
 
 func (w *statusWrapper) Run(ctx context.Context) (any, error) {
-	return w.GetBatchStatusCommand.Run(ctx)
+	return w.GetRunStatusCommand.Run(ctx)
 }
 
 type stopWrapper struct{ StopBatchCommand }

@@ -1,7 +1,7 @@
 // Package logs provides a shared log printer for CLI commands that consume
-// enriched log events from the Mods SSE stream. Both `ploy mods logs` and
-// `ploy runs follow` delegate to this printer to ensure consistent formatting
-// across all log-consuming commands.
+// enriched log events from the run SSE stream. The `ploy run events` command
+// delegates to this printer to ensure consistent formatting across all
+// log-consuming commands.
 package logs
 
 import (

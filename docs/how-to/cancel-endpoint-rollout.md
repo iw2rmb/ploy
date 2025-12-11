@@ -45,8 +45,8 @@ A **resume** operation (to restart or retry a canceled  run) is tracked separate
 
 The cancel handler publishes a terminal run event (`state=cancelled`) over SSE when the cancellation succeeds. This ensures:
 - `ploy mod run --follow` receives the terminal state and exits cleanly.
-- `ploy mods logs <run-id>` streams show the cancellation event.
-- SSE clients observing `/v1/mods/{id}/events` receive the `cancelled` state.
+- `ploy run events <run-id>` streams show the cancellation event.
+- SSE clients observing `/v1/runs/{id}/events` receive the `cancelled` state.
 
 Optional: The handler may also emit a `PublishStatus(done)` event for stream completion.
 

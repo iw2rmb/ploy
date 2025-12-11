@@ -48,22 +48,18 @@ paths:
   /v1/pki/sign/client:
     $ref: './paths/pki_sign_client.yaml'
   # Control-plane CRUD
-  # Jobs endpoints removed; use /v1/mods/* for read/stream, legacy ingest under /v1/runs/{id}/*.
+  # Jobs endpoints removed; use /v1/mods/* for control, legacy ingest under /v1/runs/{id}/*.
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
-  # Legacy mods logs stream removed; use /v1/mods/{id}/events.
-  # Future runs endpoints (target naming)
+  # SSE events are exposed under /v1/runs/{id}/events.
   /v1/mods:
     $ref: './paths/mods.yaml'
-  /v1/mods/{id}:
-    $ref: './paths/mods_id.yaml'
+  # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
   /v1/mods/{id}/graph:
     $ref: './paths/mods_id_graph.yaml'
   /v1/mods/{id}/cancel:
     $ref: './paths/mods_id_cancel.yaml'
-  /v1/mods/{id}/events:
+  /v1/runs/{id}/events:
     $ref: './paths/mods_id_events.yaml'
-  /v1/mods/{id}/artifact_bundles:
-    $ref: './paths/mods_id_artifact_bundles.yaml'
   /v1/mods/{id}/logs:
     $ref: './paths/mods_id_logs.yaml'
   /v1/mods/{id}/diffs:
@@ -108,6 +104,8 @@ paths:
     $ref: './paths/runs.yaml'
   /v1/runs/{id}:
     $ref: './paths/runs_id.yaml'
+  /v1/runs/{id}/status:
+    $ref: './paths/mods_id.yaml'
   /v1/runs/{id}/stop:
     $ref: './paths/runs_id_stop.yaml'
   /v1/runs/{id}/repos:

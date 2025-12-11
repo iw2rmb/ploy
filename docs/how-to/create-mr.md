@@ -90,11 +90,9 @@ echo "MR:     ${MR_URL:-<none>}"
 
 ### Step 4: View the MR URL
 
-If you only captured the run, you can inspect to retrieve MR URL later:
+If you only captured the run, you can inspect to retrieve MR URL later via the HTTP API:
 ```bash
-ploy mod inspect "$RUN_ID"
-# Output includes:
-# MR: https://gitlab.com/yourorg/yourproject/-/merge_requests/123
+curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/$RUN_ID/status" | jq '.metadata.mr_url'
 ```
 
 ## Method 2: Per-Run GitLab Credentials
@@ -216,7 +214,7 @@ ploy mod run repo add \
   java17-fleet
 
 # 4. Follow batch progress.
-ploy runs follow java17-fleet
+ploy run events java17-fleet
 ```
 
 ### Restart a Repo with a Hotfix Branch

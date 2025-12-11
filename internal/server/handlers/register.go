@@ -33,9 +33,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Mods run submission (simplified API for single-repo runs).
 	s.HandleFunc("POST /v1/mods", submitRunHandler(st, eventsService), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{id}", getRunStatusHandler(st), auth.RoleControlPlane)
 	// Mods run cancellation.
 	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelRunHandler(st, eventsService), auth.RoleControlPlane)
 	// Mods run resume (for failed/canceled runs).
@@ -43,7 +41,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Diffs listing and download (Worker role for multi-node rehydration C2, ControlPlane for CLI access)
 	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
-	s.HandleFunc("POST /v1/mods/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
 
@@ -51,9 +48,11 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/artifacts/{id}", getArtifactHandler(st), auth.RoleControlPlane)
 
-	// Runs — batch lifecycle endpoints for listing, inspecting, stopping, and starting batched runs.
+	// Runs — batch lifecycle endpoints for listing, inspecting, stopping, starting, and streaming events.
 	s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs/{id}/status", getRunStatusHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/stop", stopRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
 
@@ -71,7 +70,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/runs/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Node management endpoints

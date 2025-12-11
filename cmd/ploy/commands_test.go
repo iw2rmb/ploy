@@ -25,9 +25,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 	expectedCommands := []string{
 		"version",  // Built-in version command
 		"mod",      // newModCmd
-		"mods",     // newModsCmd
-		"runs",     // newRunsCmd
-		"upload",   // newUploadCmd
+		"run",      // newRunCmd
 		"cluster",  // newClusterCmd (includes token, node, rollout, deploy)
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
@@ -72,9 +70,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		builder func(w *bytes.Buffer) *cobra.Command
 	}{
 		{"newModCmd", func(w *bytes.Buffer) *cobra.Command { return newModCmd(w) }},
-		{"newModsCmd", func(w *bytes.Buffer) *cobra.Command { return newModsCmd(w) }},
-		{"newRunsCmd", func(w *bytes.Buffer) *cobra.Command { return newRunsCmd(w) }},
-		{"newUploadCmd", func(w *bytes.Buffer) *cobra.Command { return newUploadCmd(w) }},
+		{"newRunCmd", func(w *bytes.Buffer) *cobra.Command { return newRunCmd(w) }},
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},
 		{"newConfigCmd", func(w *bytes.Buffer) *cobra.Command { return newConfigCmd(w) }},
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},

@@ -32,7 +32,7 @@ curl -sSI --cacert ca.pem https://api.alpha.ploy/v1/status | head -n1
 
 # Optional: submit a run and attach an artifact bundle
 # (Requires a valid run ID created via 'ploy mod run'; run IDs are KSUID-backed strings).
-# dist/ploy upload --run-id <run-id> /path/to/bundle.tar.gz
+# (manual CLI artifact upload via `ploy upload` has been removed)
 ```
 
 Rollback

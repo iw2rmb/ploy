@@ -1,4 +1,4 @@
-// mod_run_batch.go implements batch run lifecycle CLI commands (list/status/stop/start).
+// mod_run_batch.go implements batch run lifecycle CLI commands (list/stop/start).
 //
 // This file provides CLI handlers for managing batch runs as a whole, complementing
 // the repo-level operations in mod_run_repo.go. Batch commands delegate to the
@@ -6,7 +6,6 @@
 //
 // Command structure:
 //   - ploy mod run list [--limit N] [--offset N]
-//   - ploy mod run status <run-name>
 //   - ploy mod run stop <run-name>
 //   - ploy mod run start <run-name>
 package main
@@ -104,86 +103,9 @@ func printModRunListUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --offset N  Number of runs to skip (default 0)")
 }
 
-// handleModRunStatus implements `ploy mod run status <run-name>`.
-// Shows detailed status of a single batch run including repo counts.
-func handleModRunStatus(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run status", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	if err := fs.Parse(args); err != nil {
-		printModRunStatusUsage(stderr)
-		return err
-	}
-
-	// Extract positional batch ID.
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printModRunStatusUsage(stderr)
-		return errors.New("run-name required")
-	}
-	batchID := strings.TrimSpace(rest[0])
-
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Execute the status command using the batch client.
-	cmd := mods.GetBatchStatusCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		BatchID: domaintypes.RunID(batchID), // Convert to domain type
-	}
-
-	batch, err := cmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Print batch summary.
-	_, _ = fmt.Fprintf(stderr, "Batch Run: %s\n", batch.ID)
-	if batch.Name != nil && *batch.Name != "" {
-		_, _ = fmt.Fprintf(stderr, "Name: %s\n", *batch.Name)
-	}
-	_, _ = fmt.Fprintf(stderr, "Status: %s\n", batch.Status)
-	_, _ = fmt.Fprintf(stderr, "Repo URL: %s\n", batch.RepoURL)
-	_, _ = fmt.Fprintf(stderr, "Base Ref: %s\n", batch.BaseRef)
-	_, _ = fmt.Fprintf(stderr, "Target Ref: %s\n", batch.TargetRef)
-	if batch.CreatedBy != nil && *batch.CreatedBy != "" {
-		_, _ = fmt.Fprintf(stderr, "Created By: %s\n", *batch.CreatedBy)
-	}
-	_, _ = fmt.Fprintf(stderr, "Created At: %s\n", batch.CreatedAt.Format("2006-01-02 15:04:05"))
-	if batch.StartedAt != nil {
-		_, _ = fmt.Fprintf(stderr, "Started At: %s\n", batch.StartedAt.Format("2006-01-02 15:04:05"))
-	}
-	if batch.FinishedAt != nil {
-		_, _ = fmt.Fprintf(stderr, "Finished At: %s\n", batch.FinishedAt.Format("2006-01-02 15:04:05"))
-	}
-
-	// Print repo counts if available.
-	if batch.Counts != nil {
-		_, _ = fmt.Fprintln(stderr, "")
-		_, _ = fmt.Fprintln(stderr, "Repo Counts:")
-		_, _ = fmt.Fprintf(stderr, "  Total:     %d\n", batch.Counts.Total)
-		_, _ = fmt.Fprintf(stderr, "  Pending:   %d\n", batch.Counts.Pending)
-		_, _ = fmt.Fprintf(stderr, "  Running:   %d\n", batch.Counts.Running)
-		_, _ = fmt.Fprintf(stderr, "  Succeeded: %d\n", batch.Counts.Succeeded)
-		_, _ = fmt.Fprintf(stderr, "  Failed:    %d\n", batch.Counts.Failed)
-		_, _ = fmt.Fprintf(stderr, "  Skipped:   %d\n", batch.Counts.Skipped)
-		_, _ = fmt.Fprintf(stderr, "  Cancelled: %d\n", batch.Counts.Cancelled)
-		_, _ = fmt.Fprintf(stderr, "  Derived:   %s\n", batch.Counts.DerivedStatus)
-	}
-
-	return nil
-}
-
-// printModRunStatusUsage renders help for mod run status.
-func printModRunStatusUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run status <run-name>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Shows detailed status of a batch run including repo counts.")
-}
+// NOTE: The `ploy mod run status` command has been removed.
+// Run-level status is now exposed via `ploy run status <run-id>`, which
+// reuses the richer status output previously implemented here.
 
 // handleModRunStop implements `ploy mod run stop <run-name>`.
 // Stops a batch run and cancels all pending repos.

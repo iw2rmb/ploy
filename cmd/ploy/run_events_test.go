@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestModsLogsStructuredOutput(t *testing.T) {
+func TestRunEventsStructuredOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
 		modRunID: "run-123",
@@ -39,9 +39,9 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mods", "logs", "--format", "structured", "run-123"}, buf)
+	err := executeCmd([]string{"run", "events", "--format", "structured", "run-123"}, buf)
 	if err != nil {
-		t.Fatalf("mods logs: %v", err)
+		t.Fatalf("run events: %v", err)
 	}
 	expect := loadGolden(t, "mods_logs_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
@@ -49,7 +49,7 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 	}
 }
 
-func TestModsLogsRawOutput(t *testing.T) {
+func TestRunEventsRawOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
 		modRunID: "run-raw",
@@ -65,9 +65,9 @@ func TestModsLogsRawOutput(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mods", "logs", "--format", "raw", "run-raw"}, buf)
+	err := executeCmd([]string{"run", "events", "--format", "raw", "run-raw"}, buf)
 	if err != nil {
-		t.Fatalf("mods logs raw: %v", err)
+		t.Fatalf("run events raw: %v", err)
 	}
 	expect := loadGolden(t, "mods_logs_raw.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
@@ -75,12 +75,12 @@ func TestModsLogsRawOutput(t *testing.T) {
 	}
 }
 
-func TestModsLogsRequiresRunID(t *testing.T) {
+func TestRunEventsRequiresRunID(t *testing.T) {
 	t.Helper()
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mods", "logs"}, buf)
+	err := executeCmd([]string{"run", "events"}, buf)
 	if err == nil {
 		t.Fatal("expected error when run id is missing")
 	}
@@ -89,12 +89,12 @@ func TestModsLogsRequiresRunID(t *testing.T) {
 	}
 }
 
-func TestModsLogsInvalidFormat(t *testing.T) {
+func TestRunEventsInvalidFormat(t *testing.T) {
 	t.Helper()
 	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mods", "logs", "--format", "yaml", "run-123"}, buf)
+	err := executeCmd([]string{"run", "events", "--format", "yaml", "run-123"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid format")
 	}
@@ -103,7 +103,7 @@ func TestModsLogsInvalidFormat(t *testing.T) {
 	}
 }
 
-func TestJobsFollowReconnects(t *testing.T) {
+func TestRunEventsReconnects(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
 		jobID: "job-42",
@@ -127,13 +127,13 @@ func TestJobsFollowReconnects(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"runs", "follow", "job-42"}, buf)
+	err := executeCmd([]string{"run", "events", "job-42"}, buf)
 	if err != nil {
-		t.Fatalf("runs follow: %v", err)
+		t.Fatalf("run events reconnect: %v", err)
 	}
 	expect := loadGolden(t, "jobs_follow_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
-		t.Fatalf("runs follow output mismatch:\n%s", diff)
+		t.Fatalf("job follow output mismatch:\n%s", diff)
 	}
 }
 
@@ -162,10 +162,10 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 	)
 	streamPath := ""
 	if cfg.modRunID != "" {
-		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.modRunID)
+		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.modRunID)
 	}
 	if cfg.jobID != "" {
-		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.jobID)
+		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.jobID)
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -216,5 +216,3 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 	})
 	return server
 }
-
-// env helper removed; tests now use useServerDescriptor to point CLI to the test server.

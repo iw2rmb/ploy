@@ -8,25 +8,22 @@ import (
 )
 
 // handleModRun executes the Mods-specific run command.
-// Routes to batch lifecycle subcommands (list/status/stop/start), repo
+// Routes to batch lifecycle subcommands (list/stop/start), repo
 // subcommands, and pull when args[0] matches a known action. Otherwise executes
 // the standard mod run workflow for single-repo run submission.
 //
 // Batch lifecycle commands:
-//   - list: Lists all batch runs with status and repo counts.
-//   - status <id>: Shows detailed status of a single batch run.
-//   - stop <id>: Stops a batch run and cancels pending repos.
-//   - start <id>: Starts execution for pending repos in a batch.
+//   - list: Lists runs with status and repo counts.
+//   - stop <id>: Stops a run and cancels pending repos.
+//   - start <id>: Starts execution for pending repos in a run.
 //   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
 //   - pull [--origin <remote>] [--dry-run] <run-name|run-id>: Pulls Mods diffs into a local git repository.
 func handleModRun(args []string, stderr io.Writer) error {
 	if len(args) > 0 {
 		switch args[0] {
-		// Batch lifecycle commands: list/status/stop/start.
+		// Batch lifecycle commands: list/stop/start.
 		case "list":
 			return handleModRunList(args[1:], stderr)
-		case "status":
-			return handleModRunStatus(args[1:], stderr)
 		case "stop":
 			return handleModRunStop(args[1:], stderr)
 		case "start":

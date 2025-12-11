@@ -118,11 +118,10 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
     --mr-success \
     --follow
 
-- Follow run events and logs via SSE:
+- Stream run events via SSE:
 
   ```bash
-  dist/ploy runs follow <run-id>
-  dist/ploy mods logs <run-id>
+  dist/ploy run events <run-id>
   ```
 
 **Tests & Coverage**

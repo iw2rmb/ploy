@@ -33,23 +33,6 @@ func newManifestCmd(stderr io.Writer) *cobra.Command {
 	return manifestCmd
 }
 
-// NOTE: newTokenCmd has been removed. Token operations are now accessible only via `ploy cluster token`.
-// The handleToken function is invoked directly from handleCluster when the "token" subcommand is used.
-// See ROADMAP.md line 387 for migration rationale.
-
-// newUploadCmd creates the cobra command for 'ploy upload'.
-func newUploadCmd(stderr io.Writer) *cobra.Command {
-	uploadCmd := &cobra.Command{
-		Use:                "upload",
-		Short:              "Upload artifact bundle to a run (HTTPS)",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleUpload(args, stderr)
-		},
-	}
-	return uploadCmd
-}
-
 // newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.
 // This wires the cluster router into a proper cobra command hierarchy.
 // The cluster command provides a unified namespace for cluster management:
