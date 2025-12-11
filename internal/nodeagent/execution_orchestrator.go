@@ -356,6 +356,18 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		"step_index", req.StepIndex,
 	)
 
+	// Capture workspace status before running healing so we can detect whether
+	// this discrete healing job produced any net changes. A healing job that
+	// reports success but leaves the workspace untouched is considered a failure.
+	preStatus, preStatusErr := workspaceStatus(ctx, workspace)
+	if preStatusErr != nil {
+		slog.Warn("healing: failed to compute workspace status before healing; assuming changes may occur",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"error", preStatusErr,
+		)
+	}
+
 	// Run the healing container.
 	// Pass RunID directly for consistent labeling and telemetry.
 	result, runErr := runner.Run(ctx, step.Request{
@@ -367,8 +379,28 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	})
 	duration := time.Since(startTime)
 
+	// Determine whether this healing job produced any workspace changes.
+	healingNoChange := false
+	if runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
+		if postStatus, postErr := workspaceStatus(ctx, workspace); postErr != nil {
+			slog.Warn("healing: failed to compute workspace status after healing",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"error", postErr,
+			)
+		} else if postStatus == preStatus {
+			healingNoChange = true
+			slog.Warn("healing job produced no workspace changes; treating as failure",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+			)
+		}
+	}
+
 	// Upload diff for this healing step.
-	// E3: Pass job name for branch-local diff tagging in multi-strategy healing.
+	// E3: Pass job name for path-local diff tagging in multi-strategy healing.
+	// We still upload diffs for failing healing jobs so diagnostics are preserved,
+	// but a "successful" healing job with no changes is treated as a failure below.
 	r.uploadDiffForStep(ctx, req.RunID, req.JobID, req.JobName, diffGenerator, workspace, result, req.StepIndex)
 
 	// Upload /out artifacts.
@@ -398,6 +430,19 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
+		return
+	}
+
+	// A healing job that reports success but produced no workspace changes is
+	// considered a failed healing attempt. Continuing without a diff would
+	// re-run gates on the original failing baseline, which is misleading.
+	if healingNoChange {
+		exitCode := int32(1)
+		stats["healing_error"] = "no_workspace_changes"
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload healing no-change failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		}
+		slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "duration", duration)
 		return
 	}
 
