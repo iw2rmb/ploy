@@ -6,27 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// healPathPattern matches healing job names with execution path identifiers.
-// Format: heal-{path_name}-{attempt}-{mod_index} or re-gate-{path_name}-{attempt}
-// Examples: "heal-path-a-1-0", "heal-codex-ai-1-0", "re-gate-path-a-1".
-var healPathPattern = regexp.MustCompile(`^(?:heal|re-gate)-(.+?)-\d+(?:-\d+)?$`)
-
-// ExtractPathFromJobName extracts the execution path name from a healing job name.
-// Returns the path name if the job is part of a path-local healing strategy,
-// or empty string for mainline jobs (non-healing or non-path names).
-func ExtractPathFromJobName(jobName string) string {
-	matches := healPathPattern.FindStringSubmatch(jobName)
-	if len(matches) < 2 {
-		return ""
-	}
-	return matches[1]
-}
 
 // DiffFetcher fetches diffs from the control-plane server.
 // This is the symmetric counterpart to DiffUploader, enabling nodes to download
@@ -142,25 +125,6 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 // Each per-step mod diff is incremental from the rehydrated baseline, so applying only
 // these diffs in step_index order reconstructs the workspace safely.
 func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex types.StepIndex) ([][]byte, error) {
-	// Delegate to path-aware method with empty path (mainline behavior).
-	return f.FetchDiffsForPath(ctx, runID, stepIndex, "")
-}
-
-// FetchDiffsForPath fetches gzipped patches for workspace rehydration with path-local isolation.
-// This is the core E3 implementation that ensures execution-path workspaces are isolated.
-//
-// Path isolation rules:
-//   - Mainline diffs (path_id="" or absent) are included for all paths.
-//   - Path-specific diffs (path_id="path-a") are only included when targetPath matches.
-//   - If targetPath is empty, only mainline diffs are included (single-path behavior).
-//
-// This ensures that parallel healing paths (e.g., path-a, path-b) don't accidentally
-// apply each other's diffs during rehydration, keeping workspaces isolated per path.
-//
-// Example workspace construction:
-//   - workspace_path_a = base + mainline_diffs + diffs_path_a
-//   - workspace_path_b = base + mainline_diffs + diffs_path_b
-func (f *DiffFetcher) FetchDiffsForPath(ctx context.Context, runID string, stepIndex types.StepIndex, targetPath string) ([][]byte, error) {
 	// Step 1: List all diffs for the run.
 	diffs, err := f.ListRunDiffs(ctx, runID)
 	if err != nil {
@@ -176,34 +140,11 @@ func (f *DiffFetcher) FetchDiffsForPath(ctx context.Context, runID string, stepI
 		}
 
 		summary, _ := d.Summary.(map[string]any)
-
-		// Skip healing diffs in the patch chain. Healing diffs share the same step_index
-		// for telemetry but represent intermediate workspace states that are already
-		// captured in the final per-step mod diff.
 		if summary != nil {
+			// Skip healing diffs in the patch chain. Healing diffs share the same
+			// step_index for telemetry but represent intermediate workspace states
+			// that are already captured in the final per-step mod diff.
 			if modType, ok := summary["mod_type"].(string); ok && modType == "healing" {
-				continue
-			}
-		}
-
-		// E3: Path-local isolation — filter by path_id in diff summary.
-		// Include diff if:
-		//   1. Diff has no path_id (mainline) → always included.
-		//   2. Diff has path_id AND targetPath matches → included (same path).
-		//   3. Diff has path_id AND targetPath is empty → excluded (mainline-only mode).
-		//   4. Diff has path_id AND targetPath differs → excluded (different path).
-		diffPath := ""
-		if summary != nil {
-			if p, ok := summary["path_id"].(string); ok {
-				diffPath = p
-			}
-		}
-
-		// Mainline diffs (no path_id) are always included.
-		// Path diffs are only included if targetPath matches.
-		if diffPath != "" {
-			// Diff belongs to a path. Only include if caller's path matches.
-			if targetPath == "" || diffPath != targetPath {
 				continue
 			}
 		}
