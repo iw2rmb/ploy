@@ -382,6 +382,59 @@ When the same spec runs against a Gradle project (`build.gradle` present):
 - Image resolves to `mods-orw-gradle:latest`.
 - The Gradle-specific entrypoint executes OpenRewrite via `gradle rewriteRun`.
 
+### Example: Parameterized OpenRewrite via rewrite.yml
+
+When OpenRewrite recipes require parameters, you can generate a `rewrite.yml`
+config as a code change, then let the stack-aware ORW Mods apply it.
+
+1. **Generate rewrite.yml with mod-shell** (scripts live in the repo):
+
+```yaml
+mods:
+  - name: generate-rewrite-config
+    image: docker.io/user/mods-shell:latest
+    env:
+      MOD_SHELL_SCRIPT: scripts/generate-rewrite.sh
+```
+
+`scripts/generate-rewrite.sh` runs inside `/workspace` and writes a complete
+`rewrite.yml` to the repo root, for example:
+
+```yaml
+type: specs.openrewrite.org/v1beta/recipe
+name: PloyApplyYaml
+recipeList:
+  - org.openrewrite.java.migrate.UpgradeToJava17
+  # options: ...
+```
+
+2. **Apply OpenRewrite using the YAML recipe name**:
+
+```yaml
+mods:
+  - name: generate-rewrite-config
+    image: docker.io/user/mods-shell:latest
+    env:
+      MOD_SHELL_SCRIPT: scripts/generate-rewrite.sh
+  - name: apply-openrewrite
+    image:
+      java-maven: docker.io/user/mods-orw-maven:latest
+      java-gradle: docker.io/user/mods-orw-gradle:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: 3.20.0
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+```
+
+The ORW Mods honor an existing `rewrite.yml` in the workspace:
+
+- `rewrite.configLocation` points to `rewrite.yml`.
+- `rewrite.activeRecipes` defaults to the top-level `name:` in `rewrite.yml`
+  (or `REWRITE_ACTIVE_RECIPES` if provided).
+- If no `rewrite.yml` exists, ORW Mods fall back to running the class recipe
+  directly using `RECIPE_CLASSNAME` and the artifact coordinates.
+
 ### Implementation references
 
 - Image type and resolution: `internal/workflow/contracts/mod_image.go`

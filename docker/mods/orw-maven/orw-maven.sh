@@ -140,14 +140,33 @@ if [[ ! -f pom.xml ]]; then
   exit 5
 fi
 
-# Prepare a temporary rewrite.yml to ensure activeRecipes are picked up.
-cfg=$(mktemp)
-cat > "$cfg" <<YAML
+# Determine rewrite configuration: prefer an existing rewrite.yml in the
+# workspace; otherwise, prepare a temporary config to ensure activeRecipes
+# are picked up by the Maven plugin.
+cfg=""
+active_recipe="$classname"
+
+if [[ -f "rewrite.yml" ]]; then
+  cfg="$PWD/rewrite.yml"
+  if [[ -n "${REWRITE_ACTIVE_RECIPES:-}" ]]; then
+    active_recipe="$REWRITE_ACTIVE_RECIPES"
+  else
+    yaml_name="$(awk '/^name:[[:space:]]*/{print $2; exit}' "$cfg" || true)"
+    if [[ -n "$yaml_name" ]]; then
+      active_recipe="$yaml_name"
+    else
+      echo "[orw-maven] rewrite.yml present but no top-level name:; falling back to RECIPE_CLASSNAME as active recipe" >&2
+    fi
+  fi
+else
+  cfg=$(mktemp)
+  cat > "$cfg" <<YAML
 type: specs.openrewrite.org/v1beta/recipe
 name: PloyApply
 recipeList:
   - $classname
 YAML
+fi
 
 # -----------------------------------------------------------------------------
 # Run OpenRewrite via Maven.
@@ -163,7 +182,7 @@ echo "[orw-maven] Coordinates: $group:$artifact:$version (maven plugin $maven_pl
 status=0
 mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${maven_plugin_ver}:run" \
   -Drewrite.configLocation="$cfg" \
-  -Drewrite.activeRecipes="$classname" \
+  -Drewrite.activeRecipes="$active_recipe" \
   -Drewrite.recipeArtifactCoordinates="$group:$artifact:$version" \
   -DskipTests \
   -X | tee "$outdir/transform.log" || status=$?
