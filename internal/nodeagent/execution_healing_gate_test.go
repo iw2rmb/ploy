@@ -848,10 +848,11 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 	}
 }
 
-// TestRunGateWithHealing_HTTPModePassesDiffPatch verifies that when healing mods modify
-// the workspace, the re-gate execution populates DiffPatch with the accumulated workspace
-// changes so remote HTTP gates can validate them.
-func TestRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
+// TestRunGateWithHealing_HTTPModeNoDiffPatch verifies that when healing mods modify
+// the workspace, re-gate execution still occurs but DiffPatch is left empty. Nodeagent
+// avoids HEAD-based diff generation; discrete healing jobs publish baseline-based diffs
+// for rehydration instead of per-attempt gate patches.
+func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available, skipping test")
 	}
@@ -993,7 +994,10 @@ func TestRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
 	if len(gateSpecs) != 2 {
 		t.Fatalf("expected 2 captured gate specs, got %d", len(gateSpecs))
 	}
-	if len(gateSpecs[1].DiffPatch) == 0 {
-		t.Fatalf("expected non-empty DiffPatch on re-gate spec")
+	// DiffPatch is intentionally empty in nodeagent; gate validation runs directly
+	// against the mutated workspace, and discrete healing jobs publish baseline-based
+	// diffs for rehydration instead.
+	if len(gateSpecs[1].DiffPatch) != 0 {
+		t.Fatalf("expected empty DiffPatch on re-gate spec, got %d bytes", len(gateSpecs[1].DiffPatch))
 	}
 }
