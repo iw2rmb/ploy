@@ -4,7 +4,6 @@ Commands:
   run         Submit a Mods run to the control plane
   run repo    Manage repos within a batch run (add/remove/restart/status)
   artifacts   List run artifacts by stage
-  diffs       List diffs or download newest patch
 
 Use 'ploy mod run --help' for flag details.
 Use 'ploy mod run repo' for batch repo subcommands.

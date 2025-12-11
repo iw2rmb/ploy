@@ -41,6 +41,8 @@ func handleRun(args []string, stderr io.Writer) error {
 		return handleRunStatus(args[1:], stderr)
 	case "events":
 		return handleRunEvents(args[1:], stderr)
+	case "diffs":
+		return handleRunDiff(args[1:], stderr)
 	default:
 		printRunUsage(stderr)
 		return fmt.Errorf("unknown run subcommand %q", args[0])

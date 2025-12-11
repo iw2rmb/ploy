@@ -25,8 +25,6 @@ func handleMod(args []string, stderr io.Writer) error {
 		return handleModFetch(args[1:], stderr)
 	case "artifacts":
 		return handleModArtifacts(args[1:], stderr)
-	case "diffs":
-		return handleModDiffs(args[1:], stderr)
 	default:
 		printModUsage(stderr)
 		return fmt.Errorf("unknown mod subcommand %q", args[0])
