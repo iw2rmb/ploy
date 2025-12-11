@@ -41,13 +41,13 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 	h := createRunLogHandler(ms, eventsService)
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID().String()
 	// Note: build_id removed; logs are now grouped at job level only.
 	payload := map[string]any{"job_id": jobID, "chunk_no": 2, "data": []byte("hello")}
 	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/logs", bytes.NewReader(b))
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/logs", bytes.NewReader(b))
+	req.SetPathValue("id", runID.String())
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -67,12 +67,12 @@ func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 	h := createRunLogHandler(ms, eventsService)
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 	big := make([]byte, 1<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}
 	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/logs", bytes.NewReader(b))
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/logs", bytes.NewReader(b))
+	req.SetPathValue("id", runID.String())
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -104,7 +104,7 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunDiffs{
-		job: store.Job{ID: jobID.String(), RunID: runID.String()},
+		job: store.Job{ID: jobID.String(), RunID: runID},
 		run: store.Run{ID: runID.String()},
 	}
 	h := createRunDiffHandler(ms)
@@ -136,22 +136,35 @@ func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id string) (store.Run,
 }
 func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
 	m.created = p
-	return store.ArtifactBundle{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}}, nil
+	cid := "bafy-test"
+	digest := "sha256:test"
+	return store.ArtifactBundle{
+		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:  p.RunID,
+		JobID:  p.JobID,
+		Name:   p.Name,
+		Bundle: p.Bundle,
+		Cid:    &cid,
+		Digest: &digest,
+	}, nil
 }
 
 func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
+	nodeID := domaintypes.NewNodeKey()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: runID},
+		job: store.Job{ID: jobID.String(), RunID: runID, NodeID: &nodeID},
 		run: store.Run{ID: runID.String()},
 	}
-	h := createRunArtifactBundleHandler(ms)
-	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
+	h := createJobArtifactHandler(ms)
+	payload := map[string]any{"name": "artifact-name", "bundle": []byte("gz-tar")}
 	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/artifact_bundles", bytes.NewReader(b))
-	req.SetPathValue("id", runID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/jobs/"+jobID.String()+"/artifact", bytes.NewReader(b))
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(nodeUUIDHeader, nodeID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusCreated {
@@ -160,42 +173,11 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 }
 
 func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
-	modID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: modID},
-		run: store.Run{ID: modID.String()},
-	}
-	h := createRunArtifactBundleHandler(ms)
-	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
-	req.SetPathValue("id", modID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
-	}
+	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
-	modID := domaintypes.NewRunID()
-	ms := &mockStoreRunArtifacts{
-		run: store.Run{ID: modID.String()},
-	}
-	h := createRunArtifactBundleHandler(ms)
-	big := make([]byte, 1<<20+1)
-	payload := map[string]any{"bundle": big}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
-	req.SetPathValue("id", modID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("want 413 got %d", rr.Code)
-	}
+	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 // Ensure 404 is returned when the run does not exist.
@@ -208,19 +190,7 @@ func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id string) (st
 }
 
 func TestCreateModArtifactBundleHandler_RunNotFound(t *testing.T) {
-	modID := domaintypes.NewRunID()
-	ms := &mockStoreRunArtifactsNotFound{}
-	h := createRunArtifactBundleHandler(ms)
-	payload := map[string]any{"bundle": []byte("gz-tar")}
-	b, _ := json.Marshal(payload)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
-	req.SetPathValue("id", modID.String())
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("want 404 got %d body=%s", rr.Code, rr.Body.String())
-	}
+	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 // legacy jobs tests removed with legacy endpoints.

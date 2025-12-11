@@ -32,7 +32,7 @@ func TestBuildFromJobs_SimpleRun(t *testing.T) {
 	jobs := []store.Job{
 		{
 			ID:        job1ID,
-			RunID:     runID,
+			RunID:     domaintypes.RunID(runID),
 			Name:      "pre-gate",
 			Status:    store.JobStatusSucceeded,
 			ModType:   "pre_gate",
@@ -40,7 +40,7 @@ func TestBuildFromJobs_SimpleRun(t *testing.T) {
 		},
 		{
 			ID:        job2ID,
-			RunID:     runID,
+			RunID:     domaintypes.RunID(runID),
 			Name:      "mod-0",
 			Status:    store.JobStatusRunning,
 			ModType:   "mod",
@@ -49,7 +49,7 @@ func TestBuildFromJobs_SimpleRun(t *testing.T) {
 		},
 		{
 			ID:        job3ID,
-			RunID:     runID,
+			RunID:     domaintypes.RunID(runID),
 			Name:      "post-gate",
 			Status:    store.JobStatusCreated,
 			ModType:   "post_gate",
@@ -127,11 +127,11 @@ func TestBuildFromJobs_WithHealing(t *testing.T) {
 	postGateID := "job-post"
 
 	jobs := []store.Job{
-		{ID: preGateID, RunID: runID, Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
-		{ID: heal1ID, RunID: runID, Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
-		{ID: reGateID, RunID: runID, Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
-		{ID: mod0ID, RunID: runID, Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
-		{ID: postGateID, RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
+		{ID: preGateID, RunID: domaintypes.RunID(runID), Name: "pre-gate", Status: store.JobStatusFailed, ModType: "pre_gate", StepIndex: 1000},
+		{ID: heal1ID, RunID: domaintypes.RunID(runID), Name: "heal-1", Status: store.JobStatusSucceeded, ModType: "heal", StepIndex: 1500, ModImage: "mods-codex:latest"},
+		{ID: reGateID, RunID: domaintypes.RunID(runID), Name: "re-gate", Status: store.JobStatusSucceeded, ModType: "re_gate", StepIndex: 1750},
+		{ID: mod0ID, RunID: domaintypes.RunID(runID), Name: "mod-0", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 2000},
+		{ID: postGateID, RunID: domaintypes.RunID(runID), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 	}
 
 	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
@@ -183,8 +183,8 @@ func TestBuildFromJobs_EmptyJobs(t *testing.T) {
 	if graph.NodeCount() != 0 {
 		t.Errorf("NodeCount() = %d, want 0", graph.NodeCount())
 	}
-	if graph.RunID != runID {
-		t.Errorf("RunID = %q, want %q", graph.RunID, runID)
+	if graph.RunID.String() != runID {
+		t.Errorf("RunID = %q, want %q", graph.RunID.String(), runID)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestBuildFromJobs_InvalidRunID(t *testing.T) {
 	invalidRunID := ""
 
 	jobs := []store.Job{
-		{ID: "job-1", RunID: invalidRunID, Name: "job-1", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
+		{ID: "job-1", RunID: domaintypes.RunID(invalidRunID), Name: "job-1", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
 	}
 
 	graph := BuildFromJobs(domaintypes.RunID(invalidRunID), jobs)
@@ -234,7 +234,7 @@ func TestBuildFromJobs_StatusMapping(t *testing.T) {
 			jobID := "job-status"
 
 			jobs := []store.Job{
-				{ID: jobID, RunID: runID, Name: "job", Status: tt.storeStatus, ModType: "mod", StepIndex: 1000},
+				{ID: jobID, RunID: domaintypes.RunID(runID), Name: "job", Status: tt.storeStatus, ModType: "mod", StepIndex: 1000},
 			}
 
 			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
@@ -272,7 +272,7 @@ func TestBuildFromJobs_TypeMapping(t *testing.T) {
 			jobID := "job-type"
 
 			jobs := []store.Job{
-				{ID: jobID, RunID: runID, Name: "job", Status: store.JobStatusPending, ModType: tt.modType, StepIndex: 1000},
+				{ID: jobID, RunID: domaintypes.RunID(runID), Name: "job", Status: store.JobStatusPending, ModType: tt.modType, StepIndex: 1000},
 			}
 
 			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
@@ -298,7 +298,7 @@ func TestBuildFromJobs_TimestampMapping(t *testing.T) {
 	jobs := []store.Job{
 		{
 			ID:         jobID,
-			RunID:      runID,
+			RunID:      domaintypes.RunID(runID),
 			Name:       "job",
 			Status:     store.JobStatusSucceeded,
 			ModType:    "mod",
@@ -337,7 +337,7 @@ func TestBuildFromJobs_NilTimestamps(t *testing.T) {
 	jobs := []store.Job{
 		{
 			ID:        jobID,
-			RunID:     runID,
+			RunID:     domaintypes.RunID(runID),
 			Name:      "job",
 			Status:    store.JobStatusPending,
 			ModType:   "mod",
@@ -366,8 +366,8 @@ func TestBuildFromJobsWithEdgeStrategy(t *testing.T) {
 	job2ID := "job-b"
 
 	jobs := []store.Job{
-		{ID: job1ID, RunID: runID, Name: "a", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
-		{ID: job2ID, RunID: runID, Name: "b", Status: store.JobStatusCreated, ModType: "mod", StepIndex: 2000},
+		{ID: job1ID, RunID: domaintypes.RunID(runID), Name: "a", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
+		{ID: job2ID, RunID: domaintypes.RunID(runID), Name: "b", Status: store.JobStatusCreated, ModType: "mod", StepIndex: 2000},
 	}
 
 	// Use linear strategy (default).
@@ -388,7 +388,7 @@ func TestBuildFromJobsWithEdgeStrategy_NilStrategy(t *testing.T) {
 	jobID := "job-edge-nil"
 
 	jobs := []store.Job{
-		{ID: jobID, RunID: runID, Name: "job", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
+		{ID: jobID, RunID: domaintypes.RunID(runID), Name: "job", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
 	}
 
 	// Nil strategy should not panic; uses default edges.
@@ -407,8 +407,8 @@ func TestHealingWindowEdgeStrategy(t *testing.T) {
 	jobB := "job-b"
 
 	jobs := []store.Job{
-		{ID: jobA, RunID: runID, Name: "a", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
-		{ID: jobB, RunID: runID, Name: "b", Status: store.JobStatusCreated, ModType: "mod", StepIndex: 2000},
+		{ID: jobA, RunID: domaintypes.RunID(runID), Name: "a", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
+		{ID: jobB, RunID: domaintypes.RunID(runID), Name: "b", Status: store.JobStatusCreated, ModType: "mod", StepIndex: 2000},
 	}
 
 	// Healing window strategy should work (currently delegates to linear).
@@ -432,11 +432,11 @@ func TestBuildFromJobs_MultiStepRun(t *testing.T) {
 	postGateID := "job-post"
 
 	jobs := []store.Job{
-		{ID: preGateID, RunID: runID, Name: "pre-gate", Status: store.JobStatusSucceeded, ModType: "pre_gate", StepIndex: 1000},
-		{ID: mod0ID, RunID: runID, Name: "mod-0", Status: store.JobStatusSucceeded, ModType: "mod", StepIndex: 2000},
-		{ID: mod1ID, RunID: runID, Name: "mod-1", Status: store.JobStatusSucceeded, ModType: "mod", StepIndex: 3000},
-		{ID: mod2ID, RunID: runID, Name: "mod-2", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 4000},
-		{ID: postGateID, RunID: runID, Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 5000},
+		{ID: preGateID, RunID: domaintypes.RunID(runID), Name: "pre-gate", Status: store.JobStatusSucceeded, ModType: "pre_gate", StepIndex: 1000},
+		{ID: mod0ID, RunID: domaintypes.RunID(runID), Name: "mod-0", Status: store.JobStatusSucceeded, ModType: "mod", StepIndex: 2000},
+		{ID: mod1ID, RunID: domaintypes.RunID(runID), Name: "mod-1", Status: store.JobStatusSucceeded, ModType: "mod", StepIndex: 3000},
+		{ID: mod2ID, RunID: domaintypes.RunID(runID), Name: "mod-2", Status: store.JobStatusRunning, ModType: "mod", StepIndex: 4000},
+		{ID: postGateID, RunID: domaintypes.RunID(runID), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 5000},
 	}
 
 	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)

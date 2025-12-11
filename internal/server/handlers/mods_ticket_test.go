@@ -751,7 +751,7 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	// Note: StepIndex is read from the Job struct directly, not from metadata.
 	job0 := store.Job{
 		ID:        types.NewJobID().String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Name:      "mod-0",
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000, // First mod job
@@ -759,7 +759,7 @@ func TestGetRunStatusHandlerExposesStepIndex(t *testing.T) {
 	}
 	job1 := store.Job{
 		ID:        types.NewJobID().String(),
-		RunID:     runID.String(),
+		RunID:     runID,
 		Name:      "mod-1",
 		Status:    store.JobStatusCreated,
 		StepIndex: 3000, // Second mod job

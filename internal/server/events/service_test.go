@@ -246,7 +246,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 
 			// Check if event was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID)
+				streamID := strings.TrimSpace(tt.params.RunID.String())
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
@@ -324,7 +324,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			}
 
 			// Verify SSE stream used normalized level in LogRecord.Stream
-			streamID := strings.TrimSpace(params.RunID)
+			streamID := strings.TrimSpace(params.RunID.String())
 			snapshot := svc.Hub().Snapshot(streamID)
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
@@ -442,7 +442,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 
 			// Check if log was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID)
+				streamID := strings.TrimSpace(tt.params.RunID.String())
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected log event in hub snapshot, got none")
@@ -531,7 +531,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 			}
 			return store.Job{
 				ID:        jobID,
-				RunID:     runID,
+				RunID:     domaintypes.RunID(runID),
 				Name:      "build-step",
 				ModType:   "mod",
 				StepIndex: 2000,
