@@ -63,9 +63,9 @@ type executionResult struct {
 // unified rehydration that includes both mod and healing diffs. The mod_type="healing" field
 // distinguishes healing diffs from regular mod diffs when filtering is needed.
 //
-// E3: For multi-branch healing strategies, the diff summary includes branch_id extracted from
-// the job name. This enables branch-local workspace isolation during rehydration — each branch
-// only sees mainline diffs plus its own branch's diffs.
+// E3: For multi-path healing strategies, the diff summary includes path_id extracted from
+// the job name. This enables path-local workspace isolation during rehydration — each path
+// only sees mainline diffs plus its own path's diffs.
 //
 // This per-step diff capture enables multi-node rehydration where each node can reconstruct
 // the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
@@ -96,7 +96,7 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.Ru
 	// - mod_type: "healing" distinguishes from regular "mod" diffs for filtering.
 	// - mod_index: Index of healing mod within the healing config (for ordering within step).
 	// - healing_attempt: Retry iteration (1-based) for debugging and telemetry.
-	// E3: branch_id enables branch-local workspace isolation for multi-strategy healing.
+	// E3: path_id enables path-local workspace isolation for multi-strategy healing.
 	summary := types.DiffSummary{
 		"step_index":      stepIndex, // C2: Tag healing diff with parent step's index.
 		"mod_type":        "healing",
@@ -112,11 +112,11 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.Ru
 		},
 	}
 
-	// E3: Add branch_id for multi-branch healing isolation.
-	// For multi-branch jobs (e.g., "heal-branch-a-1-0"), this enables rehydration to filter
-	// diffs by branch, ensuring each branch workspace is isolated from others.
-	if branchID := ExtractBranchFromJobName(jobName); branchID != "" {
-		summary["branch_id"] = branchID
+	// E3: Add path_id for multi-path healing isolation.
+	// For multi-path jobs (e.g., "heal-path-a-1-0"), this enables rehydration to filter
+	// diffs by path, ensuring each execution path workspace is isolated from others.
+	if pathID := ExtractPathFromJobName(jobName); pathID != "" {
+		summary["path_id"] = pathID
 	}
 
 	// Upload diff with healing metadata to control plane.

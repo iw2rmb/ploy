@@ -241,5 +241,5 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 	//   - "healing_attempt": 1
 	//   - "exit_code": 0
 	//   - "timings": {...}
-	//   - E3: "branch_id" (only present for multi-branch jobs like "heal-branch-a-1-0")
+	//   - E3: "path_id" (only present for multi-path jobs like "heal-path-a-1-0")
 }
