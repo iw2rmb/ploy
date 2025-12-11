@@ -39,16 +39,36 @@ func TestSubmitRunHandlerSuccess(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
 
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      []byte("{}"),
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      []byte("{}"),
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	handler := submitRunHandler(st, nil)
@@ -200,18 +220,38 @@ func TestSubmitRunHandlerWithOptionalFields(t *testing.T) {
 	createdBy := "user@example.com"
 	customSpec := json.RawMessage(`{"key": "value"}`)
 
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      customSpec,
+		CreatedBy: &createdBy,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CommitSha: &commitSha,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      customSpec,
-			CreatedBy: &createdBy,
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CommitSha: &commitSha,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	handler := submitRunHandler(st, nil)
@@ -427,16 +467,36 @@ func TestSubmitRunHandlerPublishesEvent(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
 
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      []byte("{}"),
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      []byte("{}"),
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	eventsService := newTestEventsService()
@@ -486,16 +546,37 @@ func TestSubmitRunHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
 
+	specBytes := []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`)
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      specBytes,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	handler := submitRunHandler(st, nil)
@@ -579,16 +660,36 @@ func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 			now := time.Now()
 
 			specBytes, _ := json.Marshal(tc.spec)
+			execRun := store.Run{
+				ID:        runID.String(),
+				RepoUrl:   "https://github.com/user/repo.git",
+				Spec:      specBytes,
+				Status:    store.RunStatusQueued,
+				BaseRef:   "main",
+				TargetRef: "feature",
+				CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			}
+			repoID := types.NewRunRepoID()
+			repoPending := store.RunRepo{
+				ID:        string(repoID),
+				RunID:     types.RunID(runID.String()),
+				RepoUrl:   "https://github.com/user/repo.git",
+				BaseRef:   "main",
+				TargetRef: "feature",
+				Status:    store.RunRepoStatusPending,
+				CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			}
+			repoRunning := repoPending
+			execID := execRun.ID
+			repoRunning.Status = store.RunRepoStatusRunning
+			repoRunning.ExecutionRunID = &execID
+
 			st := &mockStore{
-				createRunResult: store.Run{
-					ID:        runID.String(),
-					RepoUrl:   "https://github.com/user/repo.git",
-					Spec:      specBytes,
-					Status:    store.RunStatusQueued,
-					BaseRef:   "main",
-					TargetRef: "feature",
-					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-				},
+				createRunResult:                execRun,
+				getRunResult:                   execRun,
+				createRunRepoResult:            repoPending,
+				listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+				getRunRepoResult:               repoRunning,
 			}
 
 			handler := submitRunHandler(st, nil)
@@ -634,16 +735,37 @@ func TestSubmitRunHandlerMultiStepNoRunSteps(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
 
+	specBytes := []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`)
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      specBytes,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	handler := submitRunHandler(st, nil)
@@ -703,16 +825,36 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 			now := time.Now()
 
 			specBytes, _ := json.Marshal(tc.spec)
+			execRun := store.Run{
+				ID:        runID.String(),
+				RepoUrl:   "https://github.com/user/repo.git",
+				Spec:      specBytes,
+				Status:    store.RunStatusQueued,
+				BaseRef:   "main",
+				TargetRef: "feature",
+				CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			}
+			repoID := types.NewRunRepoID()
+			repoPending := store.RunRepo{
+				ID:        string(repoID),
+				RunID:     types.RunID(runID.String()),
+				RepoUrl:   "https://github.com/user/repo.git",
+				BaseRef:   "main",
+				TargetRef: "feature",
+				Status:    store.RunRepoStatusPending,
+				CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			}
+			repoRunning := repoPending
+			execID := execRun.ID
+			repoRunning.Status = store.RunRepoStatusRunning
+			repoRunning.ExecutionRunID = &execID
+
 			st := &mockStore{
-				createRunResult: store.Run{
-					ID:        runID.String(),
-					RepoUrl:   "https://github.com/user/repo.git",
-					Spec:      specBytes,
-					Status:    store.RunStatusQueued,
-					BaseRef:   "main",
-					TargetRef: "feature",
-					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-				},
+				createRunResult:                execRun,
+				getRunResult:                   execRun,
+				createRunRepoResult:            repoPending,
+				listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+				getRunRepoResult:               repoRunning,
 			}
 
 			handler := submitRunHandler(st, nil)
@@ -829,16 +971,36 @@ func TestSubmitRunHandlerCanonicalContract(t *testing.T) {
 	runID := types.NewRunID()
 	now := time.Now()
 
+	execRun := store.Run{
+		ID:        runID.String(),
+		RepoUrl:   "https://github.com/user/repo.git",
+		Spec:      []byte("{}"),
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoID := types.NewRunRepoID()
+	repoPending := store.RunRepo{
+		ID:        string(repoID),
+		RunID:     types.RunID(runID.String()),
+		RepoUrl:   "https://github.com/user/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+		Status:    store.RunRepoStatusPending,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+	repoRunning := repoPending
+	execID := execRun.ID
+	repoRunning.Status = store.RunRepoStatusRunning
+	repoRunning.ExecutionRunID = &execID
+
 	st := &mockStore{
-		createRunResult: store.Run{
-			ID:        runID.String(),
-			RepoUrl:   "https://github.com/user/repo.git",
-			Spec:      []byte("{}"),
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "feature",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
+		createRunResult:                execRun,
+		getRunResult:                   execRun,
+		createRunRepoResult:            repoPending,
+		listPendingRunReposByRunResult: []store.RunRepo{repoPending},
+		getRunRepoResult:               repoRunning,
 	}
 
 	handler := submitRunHandler(st, nil)

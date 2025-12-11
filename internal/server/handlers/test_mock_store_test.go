@@ -21,6 +21,11 @@ type mockStore struct {
 	createRunParams store.CreateRunParams
 	createRunResult store.Run
 	createRunErr    error
+	// createRunResults allows tests to configure multiple CreateRun return values
+	// (e.g., parent + child runs). When non-empty, successive CreateRun calls
+	// return entries from this slice; the last entry is reused for extra calls.
+	createRunResults   []store.Run
+	createRunCallCount int
 
 	getRunCalled bool
 	getRunParams string
@@ -351,6 +356,15 @@ func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.Upd
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
 	m.createRunCalled = true
 	m.createRunParams = params
+	// When multiple results are configured, return them in order.
+	if len(m.createRunResults) > 0 {
+		idx := m.createRunCallCount
+		if idx >= len(m.createRunResults) {
+			idx = len(m.createRunResults) - 1
+		}
+		m.createRunCallCount++
+		return m.createRunResults[idx], m.createRunErr
+	}
 	return m.createRunResult, m.createRunErr
 }
 

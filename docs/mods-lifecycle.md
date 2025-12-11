@@ -930,12 +930,17 @@ value is a `StageStatus` object describing that job's execution state.
 - `POST /v1/mods` — submit a Mods run.
   - Simplified shape: `{repo_url, base_ref, target_ref, commit_sha?, spec?, created_by?}`.
   - Handler: `submitRunHandler`.
-  - Behaviour:
-    - Creates a `runs` row with `status=queued`.
-    - Creates `jobs` rows from the spec (pre-gate, mod, post-gate).
-    - Jobs use float step_index for ordering (1000, 2000, 3000).
-    - Publishes an initial `RunSummary` snapshot to SSE via
-      `events.Service.PublishRun`.
+  - Behaviour (single source of truth for Mods execution):
+    - Creates a **parent batch run** in `runs` with `status=queued` and the shared spec.
+    - Creates a single `run_repos` entry with `status=pending` for the submitted repo.
+    - Starts execution for that repo using the batch machinery (equivalent to a
+      one‑repo batch):
+      - `BatchRepoStarter.StartPendingRepos` creates a **child execution run** in `runs`.
+      - Child run inherits the parent spec, repo_url, base_ref, target_ref, and commit_sha.
+      - Child run gets its own `jobs` pipeline (pre-gate, mod-0, post-gate, …).
+      - The `run_repos` row is linked via `execution_run_id` and transitions to `running`.
+    - Publishes an initial `RunSummary` snapshot for the **execution run** via
+      `events.Service.PublishRun` (this run_id is used by SSE, diffs, and logs APIs).
 
 - `GET /v1/runs/{id}/status` — run status.
   - Handler: `getRunStatusHandler`.

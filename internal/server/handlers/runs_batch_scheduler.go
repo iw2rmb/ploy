@@ -56,7 +56,8 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 	var started int
 	for _, repo := range pendingRepos {
 		// Create child execution run for this repo.
-		// The child run inherits the spec from the batch but has repo-specific URL/refs.
+		// The child run inherits the spec and commit_sha from the batch but has
+		// repo-specific URL/refs.
 		childRun, err := s.store.CreateRun(ctx, store.CreateRunParams{
 			Name:      nil, // Child runs don't need a name; batch name is on parent.
 			RepoUrl:   repo.RepoUrl,
@@ -65,7 +66,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 			Status:    store.RunStatusQueued,
 			BaseRef:   repo.BaseRef,
 			TargetRef: repo.TargetRef,
-			CommitSha: nil, // Commit SHA resolved at execution time by node.
+			CommitSha: batchRun.CommitSha,
 		})
 		if err != nil {
 			slog.Error("batch-scheduler: create child run failed",

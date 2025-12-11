@@ -37,10 +37,13 @@ import (
 // Canonical contract (see docs/mods-lifecycle.md § 2.1):
 //   - Returns RunSummary directly as JSON root (no envelope or wrapper types).
 //   - HTTP 201 on success; no 202 or other legacy status codes.
-//   - run_id is a KSUID string (27 characters, lexicographically sortable).
+//   - run_id is the execution run ID (KSUID string, 27 characters).
 //   - stages map is keyed by job ID (KSUID), not job name.
 //
-// Accepts repo URL/refs directly (no pre-registered mod/repo required).
+// The handler now creates a **batch parent run + run_repo entry** and then
+// starts execution for that repo using the same batch machinery that powers
+// multi-repo runs (BatchRepoStarter). This ensures there is a single path for
+// creating execution runs and jobs for both single- and multi-repo workflows.
 func submitRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body with domain types for VCS fields.
@@ -91,9 +94,8 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			spec = *req.Spec
 		}
 
-		// Create the run directly with repo_url and spec inlined.
 		// Convert domain types to strings for storage layer.
-		// Generate KSUID-backed run ID using central helper.
+		// Generate KSUID-backed parent run ID using central helper.
 		var commitShaStr *string
 		if req.CommitSha != nil {
 			s := req.CommitSha.String()
@@ -104,10 +106,12 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			targetRef = req.TargetRef.String()
 		}
 
-		runID := domaintypes.NewRunID()
-		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			ID:        string(runID),
-			Name:      nil, // Single-repo runs do not use batch naming.
+		// 1. Create the parent batch run. This run holds the shared spec and
+		//    aggregates per-repo status via run_repos. It does not have jobs.
+		parentRunID := domaintypes.NewRunID()
+		parentRun, err := st.CreateRun(r.Context(), store.CreateRunParams{
+			ID:        string(parentRunID),
+			Name:      nil, // Optional batch name (not provided by RunSubmitRequest).
 			RepoUrl:   req.RepoURL.String(),
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
@@ -118,40 +122,81 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: create run failed", "repo_url", req.RepoURL, "err", err)
+			slog.Error("submit run: create parent run failed", "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
-		// Create jobs for the run execution pipeline.
-		// Jobs are created with float step_index for ordered execution:
-		//   pre-gate (1000) → mod-0 (2000) → post-gate (3000)
-		// For multi-step runs (mods[] array), creates one mod job per entry.
-		// runID is a KSUID-backed domain type; convert to string only at the store boundary.
-		if err := createJobsFromSpec(r.Context(), st, runID, spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: create jobs failed", "run_id", run.ID, "err", err)
+		// 2. Attach a single repo entry to the parent run. This models the
+		//    submission as a degenerate batch with exactly one repo.
+		repoID := domaintypes.NewRunRepoID()
+		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
+			ID:        string(repoID),
+			RunID:     parentRunID,
+			RepoUrl:   req.RepoURL.String(),
+			BaseRef:   req.BaseRef.String(),
+			TargetRef: targetRef,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: create run_repo failed", "run_id", parentRun.ID, "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
-		// Build canonical RunSummary response (run_id is a KSUID string).
-		// Both POST /v1/mods and GET /v1/mods/{id} return this shape.
+		// 3. Start execution for the pending repo using the batch machinery.
+		//    This creates a child execution run with jobs and links it via
+		//    run_repos.execution_run_id.
+		starter := NewBatchRepoStarter(st)
+		started, err := starter.StartPendingRepos(r.Context(), parentRun.ID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to start repo execution: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: start pending repos failed", "run_id", parentRun.ID, "err", err)
+			return
+		}
+		if started == 0 {
+			http.Error(w, "failed to start repo execution", http.StatusInternalServerError)
+			slog.Error("submit run: no repos started", "run_id", parentRun.ID, "repo_id", runRepo.ID)
+			return
+		}
+
+		// Re-fetch the repo entry to obtain the execution_run_id.
+		runRepo, err = st.GetRunRepo(r.Context(), runRepo.ID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to reload run repo: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: get run_repo failed after start", "run_id", parentRun.ID, "repo_id", runRepo.ID, "err", err)
+			return
+		}
+		if runRepo.ExecutionRunID == nil || strings.TrimSpace(*runRepo.ExecutionRunID) == "" {
+			http.Error(w, "run repo execution_run_id missing after start", http.StatusInternalServerError)
+			slog.Error("submit run: execution_run_id missing", "run_id", parentRun.ID, "repo_id", runRepo.ID)
+			return
+		}
+
+		// 4. Load the child execution run and build the canonical RunSummary
+		//    for it. The execution run is the Mods run exposed to clients.
+		childRunID := strings.TrimSpace(*runRepo.ExecutionRunID)
+		childRun, err := st.GetRun(r.Context(), childRunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get execution run: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: get execution run failed", "execution_run_id", childRunID, "err", err)
+			return
+		}
+
 		summary := modsapi.RunSummary{
-			RunID:      domaintypes.RunID(run.ID),
-			State:      modsapi.RunStatusFromStore(run.Status),
+			RunID:      domaintypes.RunID(childRun.ID),
+			State:      modsapi.RunStatusFromStore(childRun.Status),
 			Submitter:  "",
-			Repository: run.RepoUrl,
+			Repository: childRun.RepoUrl,
 			Metadata: map[string]string{
-				"repo_base_ref":   run.BaseRef,
-				"repo_target_ref": run.TargetRef,
+				"repo_base_ref":   childRun.BaseRef,
+				"repo_target_ref": childRun.TargetRef,
 			},
-			CreatedAt: timeOrZero(run.CreatedAt),
-			UpdatedAt: timeOrZero(run.CreatedAt),
+			CreatedAt: timeOrZero(childRun.CreatedAt),
+			UpdatedAt: timeOrZero(childRun.CreatedAt),
 			Stages:    make(map[string]modsapi.StageStatus),
 		}
 
-		// Publish queued event to SSE hub.
+		// Publish queued event to SSE hub for the execution run.
 		if eventsService != nil {
-			// Publish the same RunSummary used for the HTTP response.
 			if err := eventsService.PublishRun(r.Context(), summary.RunID, summary); err != nil {
 				slog.Error("submit run: publish run event failed", "run_id", summary.RunID, "err", err)
 			}
@@ -165,7 +210,9 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		}
 
 		slog.Info("run submitted",
-			"run_id", summary.RunID,
+			"parent_run_id", parentRun.ID,
+			"execution_run_id", summary.RunID,
+			"repo_id", runRepo.ID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
