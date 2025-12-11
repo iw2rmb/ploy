@@ -7,7 +7,6 @@
 // Command structure:
 //   - ploy mod run list [--limit N] [--offset N]
 //   - ploy mod run stop <run-name>
-//   - ploy mod run start <run-name>
 package main
 
 import (
@@ -157,54 +156,4 @@ func printModRunStopUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mod run stop <run-name>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Stops a batch run and cancels all pending repos.")
-}
-
-// handleModRunStart implements `ploy mod run start <run-name>`.
-// Starts execution for pending repos in a batch run.
-func handleModRunStart(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run start", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	if err := fs.Parse(args); err != nil {
-		printModRunStartUsage(stderr)
-		return err
-	}
-
-	// Extract positional batch ID.
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printModRunStartUsage(stderr)
-		return errors.New("run-name required")
-	}
-	batchID := strings.TrimSpace(rest[0])
-
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Execute the start command using the batch client.
-	cmd := mods.StartBatchCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		BatchID: domaintypes.RunID(batchID), // Convert to domain type
-	}
-
-	result, err := cmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, _ = fmt.Fprintf(stderr, "Batch run %s: started %d repo(s), %d already done, %d pending\n",
-		result.RunID, result.Started, result.AlreadyDone, result.Pending)
-
-	return nil
-}
-
-// printModRunStartUsage renders help for mod run start.
-func printModRunStartUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run start <run-name>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Starts execution for pending repos in a batch run.")
 }

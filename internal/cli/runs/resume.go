@@ -1,4 +1,4 @@
-package mods
+package runs
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// ResumeCommand requests a resume for a Mods run via POST /v1/mods/{id}/resume.
+// ResumeCommand requests a resume for a run via POST /v1/runs/{id}/resume.
 // The server resume endpoint requeues eligible jobs for failed or canceled runs,
 // enabling continuation of a previously interrupted workflow.
 type ResumeCommand struct {
@@ -22,7 +22,7 @@ type ResumeCommand struct {
 	Output  io.Writer
 }
 
-// Run executes POST /v1/mods/{id}/resume and handles server responses:
+// Run executes POST /v1/runs/{id}/resume and handles server responses:
 //   - 202 Accepted: resume successfully initiated
 //   - 200 OK: run already running (idempotent) or all jobs succeeded
 //   - 404 Not Found: run does not exist
@@ -30,18 +30,18 @@ type ResumeCommand struct {
 //   - 400 Bad Request: invalid run ID
 func (c ResumeCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
-		return errors.New("mods resume: http client required")
+		return errors.New("runs resume: http client required")
 	}
 	if c.BaseURL == nil {
-		return errors.New("mods resume: base url required")
+		return errors.New("runs resume: base url required")
 	}
 	if c.RunID.IsZero() {
-		return errors.New("mods resume: run id required")
+		return errors.New("runs resume: run id required")
 	}
 	runID := c.RunID.String()
 
 	// Build the server resume endpoint URL.
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "resume")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "resume")
 	if err != nil {
 		return err
 	}
@@ -69,25 +69,25 @@ func (c ResumeCommand) Run(ctx context.Context) error {
 			if msg == "" {
 				msg = "run not found"
 			}
-			return fmt.Errorf("mods resume: %s", msg)
+			return fmt.Errorf("runs resume: %s", msg)
 		case http.StatusConflict:
 			// Run state is not resumable (e.g., already succeeded).
 			if msg == "" {
 				msg = "run cannot be resumed"
 			}
-			return fmt.Errorf("mods resume: %s", msg)
+			return fmt.Errorf("runs resume: %s", msg)
 		case http.StatusBadRequest:
 			// Invalid run ID format.
 			if msg == "" {
 				msg = "invalid run id"
 			}
-			return fmt.Errorf("mods resume: %s", msg)
+			return fmt.Errorf("runs resume: %s", msg)
 		default:
 			// Generic error fallback for unexpected status codes.
 			if msg == "" {
 				msg = resp.Status
 			}
-			return fmt.Errorf("mods resume: %s", msg)
+			return fmt.Errorf("runs resume: %s", msg)
 		}
 	}
 

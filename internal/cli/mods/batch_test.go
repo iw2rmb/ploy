@@ -241,9 +241,14 @@ func TestStartBatchCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		batchID     domaintypes.RunID // Updated to domain type
-		serverResp  StartBatchResult
+		name       string
+		batchID    domaintypes.RunID // Updated to domain type
+		serverResp struct {
+			RunID       domaintypes.RunID
+			Started     int
+			AlreadyDone int
+			Pending     int
+		}
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -251,37 +256,18 @@ func TestStartBatchCommand_Run(t *testing.T) {
 		{
 			name:    "successful start",
 			batchID: domaintypes.RunID("batch-789"), // Convert to domain type
-			serverResp: StartBatchResult{
+			serverResp: struct {
+				RunID       domaintypes.RunID
+				Started     int
+				AlreadyDone int
+				Pending     int
+			}{
 				RunID:       domaintypes.RunID("batch-789"), // Convert to domain type
 				Started:     3,
 				AlreadyDone: 1,
 				Pending:     0,
 			},
 			statusCode: http.StatusOK,
-		},
-		{
-			name:    "start with pending",
-			batchID: domaintypes.RunID("batch-partial"), // Convert to domain type
-			serverResp: StartBatchResult{
-				RunID:       domaintypes.RunID("batch-partial"), // Convert to domain type
-				Started:     2,
-				AlreadyDone: 0,
-				Pending:     3,
-			},
-			statusCode: http.StatusOK,
-		},
-		{
-			name:        "batch not found",
-			batchID:     domaintypes.RunID("nonexistent"), // Convert to domain type
-			statusCode:  http.StatusNotFound,
-			wantErr:     true,
-			wantErrText: "run not found",
-		},
-		{
-			name:        "empty batch id",
-			batchID:     domaintypes.RunID(""), // Empty domain type
-			wantErr:     true,
-			wantErrText: "batch id required",
 		},
 	}
 
@@ -314,34 +300,9 @@ func TestStartBatchCommand_Run(t *testing.T) {
 				t.Fatalf("parse server URL: %v", err)
 			}
 
-			cmd := StartBatchCommand{
-				Client:  srv.Client(),
-				BaseURL: baseURL,
-				BatchID: tc.batchID,
-			}
-
-			result, err := cmd.Run(context.Background())
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if tc.wantErrText != "" && !strings.Contains(err.Error(), tc.wantErrText) {
-					t.Errorf("error %q should contain %q", err.Error(), tc.wantErrText)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Run() error: %v", err)
-			}
-			if result.Started != tc.serverResp.Started {
-				t.Errorf("got Started %d, want %d", result.Started, tc.serverResp.Started)
-			}
-			if result.AlreadyDone != tc.serverResp.AlreadyDone {
-				t.Errorf("got AlreadyDone %d, want %d", result.AlreadyDone, tc.serverResp.AlreadyDone)
-			}
-			if result.Pending != tc.serverResp.Pending {
-				t.Errorf("got Pending %d, want %d", result.Pending, tc.serverResp.Pending)
-			}
+			_ = baseURL
+			_ = tc
+			t.Skip("StartBatchCommand has been replaced by runs.StartCommand")
 		})
 	}
 }
@@ -505,14 +466,6 @@ func TestBatchCommand_Errors(t *testing.T) {
 			}},
 			wantErr: "batch id required",
 		},
-		{
-			name: "start missing batch ID",
-			cmd: &startWrapper{StartBatchCommand{
-				Client:  http.DefaultClient,
-				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-			}},
-			wantErr: "batch id required",
-		},
 	}
 
 	for _, tc := range tests {
@@ -569,7 +522,3 @@ func (w *listWrapper) Run(ctx context.Context) (any, error) { return w.ListBatch
 type stopWrapper struct{ StopBatchCommand }
 
 func (w *stopWrapper) Run(ctx context.Context) (any, error) { return w.StopBatchCommand.Run(ctx) }
-
-type startWrapper struct{ StartBatchCommand }
-
-func (w *startWrapper) Run(ctx context.Context) (any, error) { return w.StartBatchCommand.Run(ctx) }

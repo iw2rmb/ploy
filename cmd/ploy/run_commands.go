@@ -27,6 +27,12 @@ func handleRun(args []string, stderr io.Writer) error {
 		return errors.New("run subcommand required")
 	}
 	switch args[0] {
+	case "cancel":
+		return handleRunCancel(args[1:], stderr)
+	case "resume":
+		return handleRunResume(args[1:], stderr)
+	case "start":
+		return handleRunStart(args[1:], stderr)
 	case "status":
 		return handleRunStatus(args[1:], stderr)
 	case "events":

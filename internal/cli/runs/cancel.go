@@ -1,4 +1,4 @@
-package mods
+package runs
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// CancelCommand requests cancellation for a Mods run.
+// CancelCommand requests cancellation for a run.
 type CancelCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -23,19 +23,19 @@ type CancelCommand struct {
 	Output  io.Writer
 }
 
-// Run executes the cancel request (POST /v1/mods/{id}/cancel).
+// Run executes the cancel request (POST /v1/runs/{id}/cancel).
 func (c CancelCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
-		return errors.New("mods cancel: http client required")
+		return errors.New("runs cancel: http client required")
 	}
 	if c.BaseURL == nil {
-		return errors.New("mods cancel: base url required")
+		return errors.New("runs cancel: base url required")
 	}
 	if c.RunID.IsZero() {
-		return errors.New("mods cancel: run id required")
+		return errors.New("runs cancel: run id required")
 	}
 	runID := c.RunID.String()
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(runID), "cancel")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "cancel")
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (c CancelCommand) Run(ctx context.Context) error {
 		if msg == "" {
 			msg = resp.Status
 		}
-		return fmt.Errorf("mods cancel: %s", msg)
+		return fmt.Errorf("runs cancel: %s", msg)
 	}
 	if c.Output != nil {
 		_, _ = io.WriteString(c.Output, "Cancellation requested\n")

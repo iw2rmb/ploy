@@ -19,8 +19,6 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "Commands:")
 			_, _ = fmt.Fprintln(w, "  run         Submit a Mods run to the control plane")
 			_, _ = fmt.Fprintln(w, "  run repo    Manage repos within a batch run (add/remove/restart/status)")
-			_, _ = fmt.Fprintln(w, "  cancel      Cancel a Mods run via the control plane")
-			_, _ = fmt.Fprintln(w, "  resume      Resume a paused Mods run")
 			_, _ = fmt.Fprintln(w, "  inspect     Show summary for a Mods run")
 			_, _ = fmt.Fprintln(w, "  artifacts   List run artifacts by stage")
 			_, _ = fmt.Fprintln(w, "  diffs       List diffs or download newest patch")
@@ -77,6 +75,9 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  status      Show status for a run")
 	_, _ = fmt.Fprintln(w, "  events      Stream run events (logs, retention)")
+	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
+	_, _ = fmt.Fprintln(w, "  resume      Resume a failed or canceled run")
+	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
 }
 
 // wantsHelp checks whether the given argument list represents a help request.

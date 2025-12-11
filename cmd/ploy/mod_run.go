@@ -15,19 +15,16 @@ import (
 // Batch lifecycle commands:
 //   - list: Lists runs with status and repo counts.
 //   - stop <id>: Stops a run and cancels pending repos.
-//   - start <id>: Starts execution for pending repos in a run.
 //   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
 //   - pull [--origin <remote>] [--dry-run] <run-name|run-id>: Pulls Mods diffs into a local git repository.
 func handleModRun(args []string, stderr io.Writer) error {
 	if len(args) > 0 {
 		switch args[0] {
-		// Batch lifecycle commands: list/stop/start.
+		// Batch lifecycle commands: list/stop.
 		case "list":
 			return handleModRunList(args[1:], stderr)
 		case "stop":
 			return handleModRunStop(args[1:], stderr)
-		case "start":
-			return handleModRunStart(args[1:], stderr)
 		// Repo-level operations for managing repos within a batch.
 		case "repo":
 			return handleModRunRepo(args[1:], stderr)
