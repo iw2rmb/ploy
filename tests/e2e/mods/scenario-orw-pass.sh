@@ -31,7 +31,7 @@ if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
   EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
 fi
 
-TICKET=$(dist/ploy mod run --json \
+RUN=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
@@ -47,8 +47,8 @@ TICKET=$(dist/ploy mod run --json \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
 # Print run summary if present; inspect subcommand has been removed.
-if [[ -n "${TICKET:-}" ]]; then
-  dist/ploy run status "$TICKET" || true
+if [[ -n "${RUN:-}" ]]; then
+  dist/ploy run status "$RUN" || true
 fi
 
 echo "OK: orw-pass scenario"
