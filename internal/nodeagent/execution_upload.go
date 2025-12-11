@@ -34,49 +34,16 @@ func (r *runController) uploadDiff(ctx context.Context, runID types.RunID, jobID
 		return
 	}
 
-	// Generate workspace diff.
-	diffBytes, err := diffGenerator.Generate(ctx, workspace)
-	if err != nil {
-		slog.Error("failed to generate diff", "run_id", runID, "error", err)
-		return
-	}
+	// Legacy Generate/HEAD-based diffs are disabled. Callers that require
+	// workspace diffs must use baseline-aware helpers (GenerateBetween) and
+	// provide their own upload logic.
+	_ = diffGenerator
+	_ = workspace
+	slog.Warn("uploadDiff: disabled legacy Generate-based diff path; use baseline-aware helpers instead", "run_id", runID, "job_id", jobID)
+	return
 
-	if len(diffBytes) == 0 {
-		return
-	}
-
-	// Upload diff with execution summary metadata to diff endpoint.
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create diff uploader", "run_id", runID, "error", err)
-		return
-	}
-
-	// Build execution summary with timings for diff metadata.
-	// C2: Mark this as a mod diff using mod_type="mod" for consistency with uploadDiffForStep.
-	// The mod_type field enables rehydration logic to distinguish mod diffs from healing diffs.
-	summary := types.DiffSummary{
-		"mod_type":  "mod",
-		"exit_code": result.ExitCode,
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
-		},
-	}
-
-	// Upload diff to job-scoped endpoint.
-	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
-
-	slog.Info("diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
-
-	// Also upload diff as artifact bundle named "diff" for client download.
-	r.uploadDiffArtifact(ctx, runID, jobID, diffBytes)
+	// Note: uploadDiffArtifact is left intact for callers that already have
+	// a diff and want to publish it as an artifact.
 }
 
 // uploadDiffArtifact uploads the diff as an artifact bundle for client download.

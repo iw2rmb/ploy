@@ -67,60 +67,18 @@ type executionResult struct {
 // the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
 func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.RunID, jobID types.JobID, jobName, workspace string, healResult step.Result, modIndex, healingAttempt, stepIndex int) {
 	// Retrieve the diff generator from runtime components.
-	// Since healing reuses the same runner, we need to access the diff generator.
-	// The diff generator is initialized in initializeRuntime and reused across healing steps.
 	diffGenerator := r.createDiffGenerator()
 	if diffGenerator == nil {
 		return
 	}
 
-	// Generate workspace diff for this healing mod step.
-	diffBytes, err := diffGenerator.Generate(ctx, workspace)
-	if err != nil {
-		slog.Error("failed to generate healing mod diff", "run_id", runID, "mod_index", modIndex, "error", err)
-		return
-	}
-
-	if len(diffBytes) == 0 {
-		// No changes from this healing mod; skip upload.
-		return
-	}
-
-	// Build diff summary with healing mod metadata for database storage.
-	// C2: step_index + mod_type enable unified rehydration across mod and healing diffs.
-	// - step_index: Same as parent step, so rehydration queries include healing diffs.
-	// - mod_type: "healing" distinguishes from regular "mod" diffs for filtering.
-	// - mod_index: Index of healing mod within the healing config (for ordering within step).
-	// - healing_attempt: Retry iteration (1-based) for debugging and telemetry.
-	summary := types.DiffSummary{
-		"step_index":      stepIndex, // C2: Tag healing diff with parent step's index.
-		"mod_type":        "healing",
-		"mod_index":       modIndex,
-		"healing_attempt": healingAttempt,
-		"exit_code":       healResult.ExitCode,
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  healResult.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  healResult.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": healResult.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       healResult.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      healResult.Timings.TotalDuration.Milliseconds(),
-		},
-	}
-
-	// Upload diff with healing metadata to control plane.
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create diff uploader for healing mod", "run_id", runID, "mod_index", modIndex, "error", err)
-		return
-	}
-
-	// Upload diff to job-scoped endpoint. Step ordering is determined by the job's step_index.
-	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload healing mod diff", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
+	// Healing mods run inline against the same workspace; there is no separate
+	// baseline directory available here. To keep semantics consistent with the
+	// rest of the system and avoid legacy HEAD-based diffs, healing mod diffs
+	// are currently disabled. When a baseline snapshot is introduced for inline
+	// healing, this function must be updated to use GenerateBetween.
+	_ = diffGenerator
+	slog.Warn("uploadHealingModDiff: baseline-less healing mod diff generation disabled (no Generate fallback)", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex)
 }
 
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job by
