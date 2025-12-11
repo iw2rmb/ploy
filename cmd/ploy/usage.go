@@ -19,7 +19,6 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "Commands:")
 			_, _ = fmt.Fprintln(w, "  run         Submit a Mods run to the control plane")
 			_, _ = fmt.Fprintln(w, "  run repo    Manage repos within a batch run (add/remove/restart/status)")
-			_, _ = fmt.Fprintln(w, "  inspect     Show summary for a Mods run")
 			_, _ = fmt.Fprintln(w, "  artifacts   List run artifacts by stage")
 			_, _ = fmt.Fprintln(w, "  diffs       List diffs or download newest patch")
 			_, _ = fmt.Fprintln(w, "")
