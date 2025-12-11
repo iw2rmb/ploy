@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestListRunsForRepoCommand_Success tests the ListRunsForRepoCommand happy path.
@@ -45,7 +47,7 @@ func TestListRunsForRepoCommand_Success(t *testing.T) {
 		}{
 			Runs: []RepoRunSummary{
 				{
-					RunID:          "run-456",
+					RunID:          domaintypes.RunID("run-456"),
 					Name:           &name,
 					RunStatus:      "succeeded",
 					RepoStatus:     "succeeded",
@@ -79,8 +81,8 @@ func TestListRunsForRepoCommand_Success(t *testing.T) {
 	}
 
 	run := runs[0]
-	if run.RunID != "run-456" {
-		t.Errorf("unexpected run ID: %s", run.RunID)
+	if run.RunID.String() != "run-456" {
+		t.Errorf("unexpected run ID: %s", run.RunID.String())
 	}
 	if run.Name == nil || *run.Name != "test-batch" {
 		t.Errorf("unexpected name: %v", run.Name)
@@ -140,12 +142,12 @@ func TestResolveRunForRepo_MatchByRunID(t *testing.T) {
 	name2 := "batch-2"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name1,
 			RepoStatus: "succeeded",
 		},
 		{
-			RunID:      "run-222",
+			RunID:      domaintypes.RunID("run-222"),
 			Name:       &name2,
 			RepoStatus: "succeeded",
 		},
@@ -156,8 +158,8 @@ func TestResolveRunForRepo_MatchByRunID(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("expected to resolve run by ID")
 	}
-	if resolved.RunID != "run-222" {
-		t.Errorf("expected run-222, got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-222" {
+		t.Errorf("expected run-222, got %s", resolved.RunID.String())
 	}
 }
 
@@ -169,12 +171,12 @@ func TestResolveRunForRepo_MatchByName(t *testing.T) {
 	name2 := "java17-fleet"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name1,
 			RepoStatus: "succeeded",
 		},
 		{
-			RunID:      "run-222",
+			RunID:      domaintypes.RunID("run-222"),
 			Name:       &name2,
 			RepoStatus: "succeeded",
 		},
@@ -185,8 +187,8 @@ func TestResolveRunForRepo_MatchByName(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("expected to resolve run by name")
 	}
-	if resolved.RunID != "run-222" {
-		t.Errorf("expected run-222, got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-222" {
+		t.Errorf("expected run-222, got %s", resolved.RunID.String())
 	}
 }
 
@@ -198,12 +200,12 @@ func TestResolveRunForRepo_SelectFirstNameMatch(t *testing.T) {
 	name := "java17-fleet"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-333", // First/newest entry
+			RunID:      domaintypes.RunID("run-333"), // First/newest entry
 			Name:       &name,
 			RepoStatus: "succeeded",
 		},
 		{
-			RunID:      "run-222", // Second/older entry
+			RunID:      domaintypes.RunID("run-222"), // Second/older entry
 			Name:       &name,
 			RepoStatus: "succeeded",
 		},
@@ -214,8 +216,8 @@ func TestResolveRunForRepo_SelectFirstNameMatch(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("expected to resolve run by name")
 	}
-	if resolved.RunID != "run-333" {
-		t.Errorf("expected run-333 (first match), got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-333" {
+		t.Errorf("expected run-333 (first match), got %s", resolved.RunID.String())
 	}
 }
 
@@ -226,17 +228,17 @@ func TestResolveRunForRepo_FilterNonTerminalStatuses(t *testing.T) {
 	name := "my-batch"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-pending",
+			RunID:      domaintypes.RunID("run-pending"),
 			Name:       &name,
 			RepoStatus: "pending", // Should be filtered out.
 		},
 		{
-			RunID:      "run-running",
+			RunID:      domaintypes.RunID("run-running"),
 			Name:       &name,
 			RepoStatus: "running", // Should be filtered out.
 		},
 		{
-			RunID:      "run-succeeded",
+			RunID:      domaintypes.RunID("run-succeeded"),
 			Name:       &name,
 			RepoStatus: "succeeded", // Should be matched.
 		},
@@ -247,8 +249,8 @@ func TestResolveRunForRepo_FilterNonTerminalStatuses(t *testing.T) {
 		t.Fatal("expected to resolve run")
 	}
 	// Only run-succeeded has a terminal status.
-	if resolved.RunID != "run-succeeded" {
-		t.Errorf("expected run-succeeded, got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-succeeded" {
+		t.Errorf("expected run-succeeded, got %s", resolved.RunID.String())
 	}
 }
 
@@ -269,7 +271,7 @@ func TestResolveRunForRepo_IncludesFailedAndSkipped(t *testing.T) {
 		t.Run(tc.status, func(t *testing.T) {
 			runs := []RepoRunSummary{
 				{
-					RunID:      "run-" + tc.status,
+					RunID:      domaintypes.RunID("run-" + tc.status),
 					Name:       &name,
 					RepoStatus: tc.status,
 				},
@@ -290,7 +292,7 @@ func TestResolveRunForRepo_NoMatch(t *testing.T) {
 	name := "other-batch"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name,
 			RepoStatus: "succeeded",
 		},
@@ -316,7 +318,7 @@ func TestResolveRunForRepo_EmptyInput(t *testing.T) {
 	name := "my-batch"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name,
 			RepoStatus: "succeeded",
 		},
@@ -340,7 +342,7 @@ func TestResolveRunForRepo_TrimsWhitespace(t *testing.T) {
 	name := "java17-fleet"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name,
 			RepoStatus: "succeeded",
 		},
@@ -351,8 +353,8 @@ func TestResolveRunForRepo_TrimsWhitespace(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("expected to resolve run with whitespace-trimmed name")
 	}
-	if resolved.RunID != "run-111" {
-		t.Errorf("expected run-111, got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-111" {
+		t.Errorf("expected run-111, got %s", resolved.RunID.String())
 	}
 }
 
@@ -365,12 +367,12 @@ func TestResolveRunForRepo_RunIDPreferredOverName(t *testing.T) {
 	name2 := "other-batch"
 	runs := []RepoRunSummary{
 		{
-			RunID:      "run-111",
+			RunID:      domaintypes.RunID("run-111"),
 			Name:       &name1, // Name is "run-222"
 			RepoStatus: "succeeded",
 		},
 		{
-			RunID:      "run-222", // RunID is "run-222"
+			RunID:      domaintypes.RunID("run-222"), // RunID is "run-222"
 			Name:       &name2,
 			RepoStatus: "succeeded",
 		},
@@ -382,8 +384,8 @@ func TestResolveRunForRepo_RunIDPreferredOverName(t *testing.T) {
 		t.Fatal("expected to resolve run")
 	}
 	// Should match run-222 by ID, not run-111 by name.
-	if resolved.RunID != "run-222" {
-		t.Errorf("expected run-222 (ID match), got %s", resolved.RunID)
+	if resolved.RunID.String() != "run-222" {
+		t.Errorf("expected run-222 (ID match), got %s", resolved.RunID.String())
 	}
 }
 
@@ -495,8 +497,8 @@ func TestListRunsForRepoCommand_ParsesAllFields(t *testing.T) {
 	}
 
 	run := runs[0]
-	if run.RunID != "run-full" {
-		t.Errorf("unexpected RunID: %s", run.RunID)
+	if run.RunID.String() != "run-full" {
+		t.Errorf("unexpected RunID: %s", run.RunID.String())
 	}
 	if run.Name == nil || *run.Name != "full-batch" {
 		t.Errorf("unexpected Name: %v", run.Name)

@@ -9,12 +9,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestRunEventsStructuredOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modRunID: "run-123",
+		modRunID: domaintypes.RunID("run-123"),
 		logEvents: []sseTestEvent{
 			{
 				event: "log",
@@ -52,7 +54,7 @@ func TestRunEventsStructuredOutput(t *testing.T) {
 func TestRunEventsRawOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modRunID: "run-raw",
+		modRunID: domaintypes.RunID("run-raw"),
 		logEvents: []sseTestEvent{
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:00Z","stream":"stdout","line":"ready"}`},
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:01Z","stream":"stderr","line":"warn"}`},
@@ -138,7 +140,7 @@ func TestRunEventsReconnects(t *testing.T) {
 }
 
 type streamingServerConfig struct {
-	modRunID   string
+	modRunID   domaintypes.RunID
 	jobID      string
 	logEvents  []sseTestEvent
 	reconnects []streamReconnectPlan
@@ -161,8 +163,8 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 		connectionN int
 	)
 	streamPath := ""
-	if cfg.modRunID != "" {
-		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.modRunID)
+	if !cfg.modRunID.IsZero() {
+		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.modRunID.String())
 	}
 	if cfg.jobID != "" {
 		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.jobID)

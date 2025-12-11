@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,12 +19,12 @@ RETURNING id, run_id, job_id, name, bundle, cid, digest, created_at
 `
 
 type CreateArtifactBundleParams struct {
-	RunID  string  `json:"run_id"`
-	JobID  *string `json:"job_id"`
-	Name   *string `json:"name"`
-	Bundle []byte  `json:"bundle"`
-	Cid    *string `json:"cid"`
-	Digest *string `json:"digest"`
+	RunID  domaintypes.RunID `json:"run_id"`
+	JobID  *string           `json:"job_id"`
+	Name   *string           `json:"name"`
+	Bundle []byte            `json:"bundle"`
+	Cid    *string           `json:"cid"`
+	Digest *string           `json:"digest"`
 }
 
 // Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
@@ -168,8 +169,8 @@ ORDER BY created_at DESC
 `
 
 type ListArtifactBundlesByRunAndJobParams struct {
-	RunID string  `json:"run_id"`
-	JobID *string `json:"job_id"`
+	RunID domaintypes.RunID `json:"run_id"`
+	JobID *string           `json:"job_id"`
 }
 
 func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error) {

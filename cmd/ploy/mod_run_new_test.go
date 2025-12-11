@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -29,9 +30,9 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 		// Server returns 201 Created with canonical submit response.
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(struct {
-			RunID  string `json:"run_id"`
-			Status string `json:"status"`
-		}{RunID: "mods-server-123", Status: "pending"}); err != nil {
+			RunID  domaintypes.RunID `json:"run_id"`
+			Status string            `json:"status"`
+		}{RunID: domaintypes.RunID("mods-server-123"), Status: "pending"}); err != nil {
 			t.Fatalf("encode response: %v", err)
 		}
 	}))
@@ -80,9 +81,9 @@ func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 		// Server returns 201 Created with canonical submit response.
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(struct {
-			RunID  string `json:"run_id"`
-			Status string `json:"status"`
-		}{RunID: "mods-abc123", Status: "pending"})
+			RunID  domaintypes.RunID `json:"run_id"`
+			Status string            `json:"status"`
+		}{RunID: domaintypes.RunID("mods-abc123"), Status: "pending"})
 	}))
 	defer server.Close()
 
@@ -108,9 +109,9 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 		// Server returns 201 Created with canonical submit response.
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(struct {
-			RunID  string `json:"run_id"`
-			Status string `json:"status"`
-		}{RunID: "mods-gitlab-test", Status: "pending"})
+			RunID  domaintypes.RunID `json:"run_id"`
+			Status string            `json:"status"`
+		}{RunID: domaintypes.RunID("mods-gitlab-test"), Status: "pending"})
 	}))
 	defer server.Close()
 

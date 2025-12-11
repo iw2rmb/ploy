@@ -279,13 +279,13 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				}
 
 				resp := struct {
-					RunID     string `json:"run_id"` // Run ID returned from server
-					Status    string `json:"status"`
-					RepoURL   string `json:"repo_url"`
-					BaseRef   string `json:"base_ref"`
-					TargetRef string `json:"target_ref"`
+					RunID     domaintypes.RunID `json:"run_id"` // Run ID returned from server
+					Status    string            `json:"status"`
+					RepoURL   string            `json:"repo_url"`
+					BaseRef   string            `json:"base_ref"`
+					TargetRef string            `json:"target_ref"`
 				}{
-					RunID:     "batch-new-001",
+					RunID:     domaintypes.RunID("batch-new-001"),
 					Status:    "queued",
 					RepoURL:   tc.repoURL,
 					BaseRef:   tc.baseRef,

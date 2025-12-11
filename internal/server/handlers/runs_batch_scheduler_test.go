@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -29,7 +30,7 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 
 	pendingRepo := store.RunRepo{
 		ID:        repo1ID.String(),
-		RunID:     batchRunID.String(),
+		RunID:     domaintypes.RunID(batchRunID.String()),
 		RepoUrl:   "https://github.com/org/repo.git",
 		Status:    store.RunRepoStatusPending,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},

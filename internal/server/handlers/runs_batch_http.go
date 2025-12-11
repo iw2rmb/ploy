@@ -329,7 +329,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		repoID := domaintypes.NewRunRepoID()
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			ID:        string(repoID),
-			RunID:     runIDStr,
+			RunID:     domaintypes.RunID(runIDStr),
 			RepoUrl:   req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: targetRef,

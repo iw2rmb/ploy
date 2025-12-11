@@ -16,6 +16,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // RepoRunSummary represents a run for a specific repository from the control-plane.
@@ -23,7 +25,7 @@ import (
 // Used by `ploy mod run pull` to resolve run identifiers for a given repository.
 type RepoRunSummary struct {
 	// RunID is the parent batch run ID (KSUID-backed string).
-	RunID string `json:"run_id"`
+	RunID domaintypes.RunID `json:"run_id"`
 
 	// Name is the optional human-readable batch name.
 	Name *string `json:"name,omitempty"`
@@ -155,7 +157,7 @@ func ResolveRunForRepo(runs []RepoRunSummary, runNameOrID string) *RepoRunSummar
 	// RunID match takes precedence over Name match.
 	for i := range runs {
 		run := &runs[i]
-		if run.RunID == trimmed && terminalStatuses[run.RepoStatus] {
+		if run.RunID.String() == trimmed && terminalStatuses[run.RepoStatus] {
 			return run
 		}
 	}

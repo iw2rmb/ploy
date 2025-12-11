@@ -3,6 +3,7 @@ package graph
 import (
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -16,8 +17,8 @@ import (
 // The runID parameter identifies the Mods run; it's included in the
 // graph for context. All jobs should belong to the same run.
 //
-// runID is now a string (KSUID-backed); no UUID conversion needed.
-func BuildFromJobs(runID string, jobs []store.Job) *WorkflowGraph {
+// runID is now a domaintypes.RunID (KSUID-backed domain type); no UUID conversion needed.
+func BuildFromJobs(runID domaintypes.RunID, jobs []store.Job) *WorkflowGraph {
 	graph := NewWorkflowGraph(runID)
 
 	// Phase 1: Create nodes from jobs.
@@ -114,8 +115,8 @@ func mapModType(modType string) NodeType {
 
 // BuildFromJobsWithEdgeStrategy allows specifying a custom edge computation
 // strategy. This is provided for future extensibility. Currently delegates to
-// the standard linear edge computation. runID is now a string (KSUID-backed).
-func BuildFromJobsWithEdgeStrategy(runID string, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
+// the standard linear edge computation. runID is now a domaintypes.RunID.
+func BuildFromJobsWithEdgeStrategy(runID domaintypes.RunID, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
 	graph := BuildFromJobs(runID, jobs)
 
 	// If a custom strategy is provided, re-compute edges.

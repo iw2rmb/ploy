@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestNewStore verifies that Store creation works with a valid DSN.
@@ -181,7 +183,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	// Subtest: CreateRunRepo creates a repo entry with 'pending' status.
 	t.Run("create_run_repo", func(t *testing.T) {
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-a",
 			BaseRef:   "main",
 			TargetRef: "feature/a",
@@ -215,7 +217,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("list_run_repos_by_run", func(t *testing.T) {
 		// Add a second repo.
 		_, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-b",
 			BaseRef:   "main",
 			TargetRef: "feature/b",
@@ -244,7 +246,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("status_transitions_pending_to_running_to_succeeded", func(t *testing.T) {
 		// Create a fresh repo for isolated testing.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-transition",
 			BaseRef:   "main",
 			TargetRef: "feature/transition",
@@ -336,7 +338,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("update_run_repo_error", func(t *testing.T) {
 		// Create a repo for error testing.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-error",
 			BaseRef:   "main",
 			TargetRef: "feature/error",
@@ -380,7 +382,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("increment_run_repo_attempt", func(t *testing.T) {
 		// Create a repo and transition to failed.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-retry",
 			BaseRef:   "main",
 			TargetRef: "feature/retry",
@@ -432,7 +434,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	// Subtest: DeleteRunRepo removes the repo entry.
 	t.Run("delete_run_repo", func(t *testing.T) {
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     parentRun.ID,
+			RunID:     domaintypes.RunID(parentRun.ID),
 			RepoUrl:   "https://github.com/org/repo-delete",
 			BaseRef:   "main",
 			TargetRef: "feature/delete",

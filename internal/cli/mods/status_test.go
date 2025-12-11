@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestFetchRunWithCommitSHA_Success verifies successful retrieval of run details
@@ -39,7 +41,7 @@ func TestFetchRunWithCommitSHA_Success(t *testing.T) {
 	cmd := FetchRunWithCommitSHA{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   "run-123",
+		RunID:   domaintypes.RunID("run-123"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -72,7 +74,7 @@ func TestFetchRunWithCommitSHA_NotFound(t *testing.T) {
 	cmd := FetchRunWithCommitSHA{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   "nonexistent",
+		RunID:   domaintypes.RunID("nonexistent"),
 	}
 
 	_, err := cmd.Run(context.Background())
@@ -92,12 +94,12 @@ func TestFetchRunWithCommitSHA_MissingParams(t *testing.T) {
 	}{
 		{
 			name:    "missing client",
-			cmd:     FetchRunWithCommitSHA{BaseURL: &url.URL{}, RunID: "r1"},
+			cmd:     FetchRunWithCommitSHA{BaseURL: &url.URL{}, RunID: domaintypes.RunID("r1")},
 			wantErr: "http client required",
 		},
 		{
 			name:    "missing base url",
-			cmd:     FetchRunWithCommitSHA{Client: http.DefaultClient, RunID: "r1"},
+			cmd:     FetchRunWithCommitSHA{Client: http.DefaultClient, RunID: domaintypes.RunID("r1")},
 			wantErr: "base url required",
 		},
 		{
@@ -107,7 +109,7 @@ func TestFetchRunWithCommitSHA_MissingParams(t *testing.T) {
 		},
 		{
 			name:    "empty run id",
-			cmd:     FetchRunWithCommitSHA{Client: http.DefaultClient, BaseURL: &url.URL{}, RunID: "   "},
+			cmd:     FetchRunWithCommitSHA{Client: http.DefaultClient, BaseURL: &url.URL{}, RunID: domaintypes.RunID("   ")},
 			wantErr: "run id required",
 		},
 	}
@@ -167,7 +169,7 @@ func TestListAllDiffsCommand_Success(t *testing.T) {
 	cmd := ListAllDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   "run-123",
+		RunID:   domaintypes.RunID("run-123"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -205,7 +207,7 @@ func TestListAllDiffsCommand_EmptyList(t *testing.T) {
 	cmd := ListAllDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   "run-empty",
+		RunID:   domaintypes.RunID("run-empty"),
 	}
 
 	result, err := cmd.Run(context.Background())

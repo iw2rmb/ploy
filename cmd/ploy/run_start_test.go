@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestRunStartCallsControlPlane validates `ploy run start <run-id>` calls the API.
@@ -19,12 +21,12 @@ func TestRunStartCallsControlPlane(t *testing.T) {
 			called = true
 
 			resp := struct {
-				RunID       string `json:"run_id"`
-				Started     int    `json:"started"`
-				AlreadyDone int    `json:"already_done"`
-				Pending     int    `json:"pending"`
+				RunID       domaintypes.RunID `json:"run_id"`
+				Started     int               `json:"started"`
+				AlreadyDone int               `json:"already_done"`
+				Pending     int               `json:"pending"`
 			}{
-				RunID:       "run-789",
+				RunID:       domaintypes.RunID("run-789"),
 				Started:     3,
 				AlreadyDone: 1,
 				Pending:     0,

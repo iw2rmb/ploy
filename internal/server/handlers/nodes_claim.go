@@ -76,7 +76,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Fetch parent run metadata. Run IDs are KSUID strings.
-		run, err := st.GetRun(r.Context(), job.RunID)
+		run, err := st.GetRun(r.Context(), job.RunID.String())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
 			slog.Error("claim: get run failed for job", "node_id", nodeIDStr, "job_id", job.ID, "err", err)

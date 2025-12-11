@@ -10,6 +10,8 @@ import (
 	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type JobStatus string
@@ -168,7 +170,7 @@ type ApiToken struct {
 
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     string             `json:"run_id"`
+	RunID     domaintypes.RunID  `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
@@ -201,7 +203,7 @@ type ConfigEnv struct {
 
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     string             `json:"run_id"`
+	RunID     domaintypes.RunID  `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
@@ -210,7 +212,7 @@ type Diff struct {
 
 type Event struct {
 	ID      int64              `json:"id"`
-	RunID   string             `json:"run_id"`
+	RunID   domaintypes.RunID  `json:"run_id"`
 	JobID   *string            `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
@@ -220,7 +222,7 @@ type Event struct {
 
 type Job struct {
 	ID         string             `json:"id"`
-	RunID      string             `json:"run_id"`
+	RunID      domaintypes.RunID  `json:"run_id"`
 	Name       string             `json:"name"`
 	Status     JobStatus          `json:"status"`
 	ModType    string             `json:"mod_type"`
@@ -236,7 +238,7 @@ type Job struct {
 
 type Log struct {
 	ID        int64              `json:"id"`
-	RunID     string             `json:"run_id"`
+	RunID     domaintypes.RunID  `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
@@ -295,7 +297,7 @@ type Run struct {
 
 type RunRepo struct {
 	ID             string             `json:"id"`
-	RunID          string             `json:"run_id"`
+	RunID          domaintypes.RunID  `json:"run_id"`
 	RepoUrl        string             `json:"repo_url"`
 	BaseRef        string             `json:"base_ref"`
 	TargetRef      string             `json:"target_ref"`

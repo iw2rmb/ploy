@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -65,11 +66,11 @@ RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_erro
 `
 
 type CreateRunRepoParams struct {
-	ID        string `json:"id"`
-	RunID     string `json:"run_id"`
-	RepoUrl   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	ID        string            `json:"id"`
+	RunID     domaintypes.RunID `json:"run_id"`
+	RepoUrl   string            `json:"repo_url"`
+	BaseRef   string            `json:"base_ref"`
+	TargetRef string            `json:"target_ref"`
 }
 
 // Creates a new run_repo entry for batched runs.
@@ -363,7 +364,7 @@ type ListRunsForRepoParams struct {
 }
 
 type ListRunsForRepoRow struct {
-	RunID          string             `json:"run_id"`
+	RunID          domaintypes.RunID  `json:"run_id"`
 	Name           *string            `json:"name"`
 	RunStatus      RunStatus          `json:"run_status"`
 	RepoStatus     RunRepoStatus      `json:"repo_status"`

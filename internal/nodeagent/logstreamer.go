@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -189,12 +191,12 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Prepare request payload.
 	payload := struct {
-		RunID   string  `json:"run_id"`
-		JobID   *string `json:"job_id,omitempty"`
-		ChunkNo int32   `json:"chunk_no"`
-		Data    []byte  `json:"data"`
+		RunID   domaintypes.RunID `json:"run_id"`
+		JobID   *string           `json:"job_id,omitempty"`
+		ChunkNo int32             `json:"chunk_no"`
+		Data    []byte            `json:"data"`
 	}{
-		RunID:   ls.runID,
+		RunID:   domaintypes.RunID(ls.runID),
 		ChunkNo: chunkNo,
 		Data:    data,
 	}

@@ -32,9 +32,9 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			// Server returns 201 Created with canonical submit response.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  string `json:"run_id"`
-				Status string `json:"status"`
-			}{RunID: runID, Status: "running"})
+				RunID  domaintypes.RunID `json:"run_id"`
+				Status string            `json:"status"`
+			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			// SSE stream: run running -> run succeeded
@@ -155,9 +155,9 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 			// Server returns 201 Created with canonical submit response.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  string `json:"run_id"`
-				Status string `json:"status"`
-			}{RunID: runID, Status: "running"})
+				RunID  domaintypes.RunID `json:"run_id"`
+				Status string            `json:"status"`
+			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			// SSE stream with run, stage, and log events.
@@ -262,9 +262,9 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			// Server returns 201 Created with canonical submit response.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  string `json:"run_id"`
-				Status string `json:"status"`
-			}{RunID: runID, Status: "running"})
+				RunID  domaintypes.RunID `json:"run_id"`
+				Status string            `json:"status"`
+			}{RunID: domaintypes.RunID(runID), Status: "running"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/events", runID):
 			w.Header().Set("Content-Type", "text/event-stream")

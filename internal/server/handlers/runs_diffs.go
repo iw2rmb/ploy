@@ -71,7 +71,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 				slog.Error("run diff: job check failed", "job_id", *req.JobID, "err", err)
 				return
 			}
-			if job.RunID != runID {
+			if job.RunID.String() != runID {
 				http.Error(w, "job does not belong to run", http.StatusBadRequest)
 				return
 			}
@@ -95,7 +95,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 		params := store.CreateDiffParams{
-			RunID:   runID,
+			RunID:   domaintypes.RunID(runID),
 			JobID:   jobID,
 			Patch:   req.Patch,
 			Summary: summaryBytes,

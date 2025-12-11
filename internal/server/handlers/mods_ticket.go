@@ -278,7 +278,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
 			// job.ID and run.ID are now strings (KSUID).
-			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
+			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: domaintypes.RunID(run.ID), JobID: &job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
 				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", job.ID, "err", err)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/graph"
 )
@@ -82,8 +83,8 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 
 		// Build the workflow graph from jobs.
 		// The graph materializes nodes from jobs and computes edges from
-		// step_index ordering. runID is now a string (KSUID).
-		workflowGraph := graph.BuildFromJobs(runIDStr, jobs)
+		// step_index ordering. RunID is now a domaintypes.RunID (KSUID-backed).
+		workflowGraph := graph.BuildFromJobs(domaintypes.RunID(runIDStr), jobs)
 
 		// Return the graph as JSON.
 		w.Header().Set("Content-Type", "application/json")

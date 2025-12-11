@@ -11,6 +11,8 @@ package graph
 
 import (
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // NodeType identifies the job phase within a Mods workflow.
@@ -104,8 +106,8 @@ type GraphNode struct {
 // It provides an explicit view of job dependencies materialized from
 // jobs rows using step_index ordering.
 type WorkflowGraph struct {
-	// RunID is the run identifier (KSUID string).
-	RunID string `json:"run_id"`
+	// RunID is the run identifier (KSUID-backed domain type).
+	RunID domaintypes.RunID `json:"run_id"`
 
 	// Nodes contains all jobs as graph nodes, keyed by job ID.
 	Nodes map[string]*GraphNode `json:"nodes"`
@@ -125,7 +127,7 @@ type WorkflowGraph struct {
 }
 
 // NewWorkflowGraph creates an empty WorkflowGraph for the given run ID.
-func NewWorkflowGraph(runID string) *WorkflowGraph {
+func NewWorkflowGraph(runID domaintypes.RunID) *WorkflowGraph {
 	return &WorkflowGraph{
 		RunID:   runID,
 		Nodes:   make(map[string]*GraphNode),
