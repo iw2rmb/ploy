@@ -69,6 +69,85 @@ func TestOrwMaven_MavenWorkspace_AppliesRecipe(t *testing.T) {
 	}
 }
 
+// TestOrwMaven_UsesExistingRewriteYAML verifies that when rewrite.yml is present
+// in the workspace, orw-maven uses its top-level recipe name as the active recipe.
+func TestOrwMaven_UsesExistingRewriteYAML(t *testing.T) {
+	workspace := t.TempDir()
+	outdir := t.TempDir()
+
+	// Minimal Maven pom.xml.
+	pomPath := filepath.Join(workspace, "pom.xml")
+	if err := os.WriteFile(pomPath, []byte("<project></project>\n"), 0o644); err != nil {
+		t.Fatalf("write pom.xml: %v", err)
+	}
+
+	// Provide rewrite.yml with a named recipe.
+	rewritePath := filepath.Join(workspace, "rewrite.yml")
+	rewriteContent := []byte(`type: specs.openrewrite.org/v1beta/recipe
+name: PloyYamlRecipeMaven
+recipeList:
+  - org.openrewrite.java.migrate.UpgradeToJava17
+`)
+	if err := os.WriteFile(rewritePath, rewriteContent, 0o644); err != nil {
+		t.Fatalf("write rewrite.yml: %v", err)
+	}
+
+	// Stub mvn to avoid requiring real Maven.
+	binDir := t.TempDir()
+	mvnPath := filepath.Join(binDir, "mvn")
+	mvnScript := `#!/usr/bin/env bash
+echo "[maven-stub] rewrite-maven-plugin invoked with args: $@"
+`
+	if err := os.WriteFile(mvnPath, []byte(mvnScript), 0o755); err != nil {
+		t.Fatalf("write mvn stub: %v", err)
+	}
+
+	// Use scenario script defaults for recipe coordinates.
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioBytes, err := os.ReadFile(scenarioPath)
+	if err != nil {
+		t.Fatalf("read scenario script: %v", err)
+	}
+	repoURL, _, _, group, artifact, version, classname, plugin := parseScenarioORWPass(string(scenarioBytes))
+	_ = repoURL // unused for this stubbed test
+
+	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-maven", "orw-maven.sh")
+	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP="+group,
+		"RECIPE_ARTIFACT="+artifact,
+		"RECIPE_VERSION="+version,
+		"RECIPE_CLASSNAME="+classname,
+		"MAVEN_PLUGIN_VERSION="+plugin,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-maven (rewrite.yml) failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	// Verify that transform.log shows the YAML recipe name as active recipe.
+	logPath := filepath.Join(outdir, "transform.log")
+	logBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	if !strings.Contains(string(logBytes), "-Drewrite.activeRecipes=PloyYamlRecipeMaven") {
+		t.Fatalf("transform.log does not show YAML recipe as active:\n%s", string(logBytes))
+	}
+
+	// Verify the report.json exists and indicates success.
+	reportPath := filepath.Join(outdir, "report.json")
+	reportBytes, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report.json: %v", err)
+	}
+	if !strings.Contains(string(reportBytes), "\"success\": true") {
+		t.Fatalf("report.json does not indicate success: %s", string(reportBytes))
+	}
+}
+
 // TestOrwMaven_NonMavenWorkspace_Fails verifies that orw-maven fails with exit 5
 // when the workspace does not contain pom.xml.
 func TestOrwMaven_NonMavenWorkspace_Fails(t *testing.T) {

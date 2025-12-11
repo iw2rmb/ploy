@@ -113,10 +113,21 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
-	// E3: Extract branch name from job name for branch-local isolation.
-	// For multi-branch healing (e.g., "heal-branch-a-1-0"), this returns "branch-a".
-	// For mainline jobs (e.g., "mod-0", "pre-gate") or legacy healing, this returns "".
+	// E3: Determine branch identity for this job to drive branch-local isolation.
+	//
+	//  1. For healing / re-gate jobs, infer branch name from the job name
+	//     (e.g., "heal-codex-1-0" → "codex").
+	//  2. For downstream jobs (mod-0, post-gate) after a winning re-gate,
+	//     fall back to the run's active branch so they rehydrate from the
+	//     healed baseline along the same execution path.
+	//  3. For runs without healing, or before any re-gate succeeds, there is
+	//     no active branch and branchID remains empty (mainline behavior).
 	branchID := ExtractBranchFromJobName(req.JobName)
+	if branchID == "" {
+		if active := r.getActiveBranch(req.RunID); active != "" {
+			branchID = active
+		}
+	}
 
 	// C2: Uniform rehydration query for ALL steps.
 	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).

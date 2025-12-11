@@ -3,15 +3,28 @@ package nodeagent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // runController implements the RunController interface for managing runs.
 // Runs are tracked by job_id (not run_id) to support multiple jobs per run.
 type runController struct {
-	mu   sync.Mutex
-	cfg  Config
-	jobs map[string]*jobContext // keyed by job_id
+	mu sync.Mutex
+
+	cfg Config
+
+	// jobs tracks active jobs keyed by job_id.
+	jobs map[string]*jobContext
+
+	// activeBranch tracks the winning healing branch per run.
+	// When a re-gate job for a branch succeeds, that branch becomes the
+	// active execution path for subsequent jobs (e.g., mod-0, post-gate).
+	// This allows rehydration to include prior diffs from the healing path
+	// so downstream jobs see the healed baseline instead of the original.
+	activeBranch map[string]string // keyed by run_id string
 }
 
 type jobContext struct {
@@ -25,6 +38,13 @@ type jobContext struct {
 func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.jobs == nil {
+		r.jobs = make(map[string]*jobContext)
+	}
+	if r.activeBranch == nil {
+		r.activeBranch = make(map[string]string)
+	}
 
 	jobKey := req.JobID.String()
 	if _, exists := r.jobs[jobKey]; exists {
@@ -60,9 +80,49 @@ func (r *runController) StopRun(_ context.Context, req StopRunRequest) error {
 		}
 	}
 
+	// Clear any cached active branch for the stopped run to avoid leaks.
+	if r.activeBranch != nil {
+		delete(r.activeBranch, req.RunID.String())
+	}
+
 	if !found {
 		return fmt.Errorf("run %s not found", req.RunID)
 	}
 
 	return nil
+}
+
+// setActiveBranch records the winning healing branch for a run.
+// Once set, the active branch is not overwritten; the first successful
+// re-gate branch becomes the canonical execution path for downstream jobs.
+func (r *runController) setActiveBranch(runID types.RunID, branch string) {
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.activeBranch == nil {
+		r.activeBranch = make(map[string]string)
+	}
+	key := runID.String()
+	if _, exists := r.activeBranch[key]; exists {
+		// Preserve the first winning branch to avoid oscillation if
+		// multiple re-gates succeed due to scheduler races.
+		return
+	}
+	r.activeBranch[key] = branch
+}
+
+// getActiveBranch returns the winning healing branch for a run, if any.
+func (r *runController) getActiveBranch(runID types.RunID) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.activeBranch == nil {
+		return ""
+	}
+	return r.activeBranch[runID.String()]
 }
