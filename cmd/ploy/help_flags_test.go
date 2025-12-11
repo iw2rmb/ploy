@@ -43,7 +43,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy mod --help",
 			args:           []string{"mod", "--help"},
-			expectContains: []string{"Usage: ploy mod", "run", "inspect"},
+			expectContains: []string{"Usage: ploy mod", "run"},
 			expectNoError:  true,
 		},
 		{

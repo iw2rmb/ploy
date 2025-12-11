@@ -128,7 +128,7 @@ The gate does not modify the repository; it validates the current working tree.
 - **Summary:** Pass/fail flag, duration, optional resource usage.
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
-  - Accessible via `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
+  - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.
 
 ## Notes
 

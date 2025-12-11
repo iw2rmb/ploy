@@ -65,7 +65,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
-		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", runID):
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
 			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{

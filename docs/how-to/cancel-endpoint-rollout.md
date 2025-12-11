@@ -168,7 +168,7 @@ Test the following edge cases:
 
 **Risk**: SSE clients may not receive the cancellation event immediately if the connection is slow or interrupted.
 
-**Mitigation**: Terminal events are persisted in the database before being published. Clients can always query `/v1/mods/{id}` for the latest state. The CLI's SSE client includes reconnect logic with exponential backoff.
+**Mitigation**: Terminal events are persisted in the database before being published. Clients can always query `/v1/runs/{id}/status` for the latest state. The CLI's SSE client includes reconnect logic with exponential backoff.
 
 ### Unauthorized Cancellations
 
