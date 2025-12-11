@@ -187,7 +187,7 @@ RunRepo:
     - attempt
     - created_at
 
-RunBatchSummary:
+RunSummary:
   type: object
   description: |
     Batch run summary with optional aggregated repo status counts.
@@ -282,7 +282,7 @@ RunSubmitRequest:
     created_by: { type: string, nullable: true }
   required: [repo_url, base_ref, target_ref]
 
-# RunSummary — Canonical Mods run status schema
+# ModsRunSummary — Canonical Mods run status schema
 #
 # This is the single authoritative response type for:
 # - POST /v1/mods (submit) → 201 response body
@@ -295,7 +295,7 @@ RunSubmitRequest:
 # - All IDs use KSUID format (27 characters, lexicographically sortable).
 #
 # See docs/mods-lifecycle.md § 2.1 for the complete data model reference.
-RunSummary:
+ModsRunSummary:
   type: object
   description: |
     Canonical Mods run status schema. This is the single response type for run
