@@ -24,7 +24,7 @@ import (
 //   - "command" (string|[]string) — container command override.
 //   - "retain_container" (bool) — retain container after run for debugging.
 //   - "artifact_paths" ([]string|[]any) — list of workspace‑relative files/dirs to upload as a bundle.
-//   - "build_gate_healing" (object) — healing policy: {retries:int, mods:[{image,command,env,...}]}.
+//   - "build_gate_healing" (object) — healing policy: {retries:int, mod:{image,command,env,...}}.
 //
 // StepIndex field:
 //   - Identifies the job's step index for job-level execution tracking.

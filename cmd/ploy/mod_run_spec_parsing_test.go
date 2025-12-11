@@ -24,10 +24,8 @@ env:
 retain_container: true
 build_gate_healing:
   retries: 1
-  strategies:
-    - name: codex-heal
-      mods:
-        - image: docker.io/test/healer:latest
+  mod:
+    image: docker.io/test/healer:latest
 gitlab_domain: gitlab.example.com
 mr_on_success: true
 `
@@ -89,7 +87,9 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
   },
   "build_gate_healing": {
     "retries": 2,
-    "strategies": []
+    "mod": {
+      "image": "docker.io/test/healer:latest"
+    }
   }
 }`
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
@@ -265,7 +265,7 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 }
 
 // TestBuildSpecPayloadContainsBuildGateHealing verifies that complex nested
-// structures (like build_gate_healing with retries and strategies[].mods[]) are
+// structures (like build_gate_healing with retries and mod fields) are
 // correctly parsed from YAML and preserved in the payload.
 func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	// Test that build_gate_healing is preserved when present in spec
@@ -274,14 +274,12 @@ func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	specContent := `
 build_gate_healing:
   retries: 2
-  strategies:
-    - name: healer-branch
-      mods:
-        - image: docker.io/test/healer:latest
-          command: "heal.sh"
-          env:
-            HEALING_MODE: auto
-          retain_container: false
+  mod:
+    image: docker.io/test/healer:latest
+    command: "heal.sh"
+    env:
+      HEALING_MODE: auto
+    retain_container: false
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -308,31 +306,28 @@ build_gate_healing:
 		t.Errorf("expected build_gate_healing.retries=2, got %v", healing["retries"])
 	}
 
-	// Verify strategies array
-	strategies, ok := healing["strategies"].([]any)
-	if !ok || len(strategies) != 1 {
-		t.Fatalf("expected build_gate_healing.strategies array with 1 element, got %v", healing["strategies"])
-	}
-
-	// Verify first strategy and its mods array
-	strat0, ok := strategies[0].(map[string]any)
+	// Verify mod entry
+	mod, ok := healing["mod"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected first strategy to be a map, got %T", strategies[0])
+		t.Fatalf("expected build_gate_healing.mod to be a map, got %T", healing["mod"])
 	}
 
-	mods, ok := strat0["mods"].([]any)
-	if !ok || len(mods) != 1 {
-		t.Fatalf("expected build_gate_healing.strategies[0].mods array with 1 element, got %v", strat0["mods"])
+	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/healer:latest" {
+		t.Errorf("expected mod.image=docker.io/test/healer:latest, got %v", mod["image"])
 	}
-
-	// Verify first mod entry
-	mod0, ok := mods[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected first mod to be a map, got %T", mods[0])
+	if cmd, ok := mod["command"].(string); !ok || cmd != "heal.sh" {
+		t.Errorf("expected mod.command=heal.sh, got %v", mod["command"])
 	}
-
-	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/healer:latest" {
-		t.Errorf("expected first mod.image=docker.io/test/healer:latest, got %v", mod0["image"])
+	if env, ok := mod["env"].(map[string]any); ok {
+		if mode, _ := env["HEALING_MODE"].(string); mode != "auto" {
+			t.Errorf("expected mod.env.HEALING_MODE=auto, got %v", mode)
+		}
+	} else {
+		t.Errorf("expected mod.env to be a map")
+	}
+	if retain, ok := mod["retain_container"].(bool); !ok || retain {
+		// retain_container=false in the spec; ensure we see the value.
+		t.Errorf("expected mod.retain_container=false, got %v", mod["retain_container"])
 	}
 }
 

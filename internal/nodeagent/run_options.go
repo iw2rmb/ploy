@@ -82,53 +82,14 @@ type BuildGateOptions struct {
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
-// When the build gate fails, the agent can execute one or more healing mods
-// grouped into named strategies (branches), then re-run the gate. This struct
-// specifies the retry limit and the healing strategies to execute.
+// When the build gate fails, the agent can execute a single healing mod per gate.
 type HealingConfig struct {
 	// Retries is the maximum number of healing attempts (default: 1).
-	// Each retry executes all healing mods in sequence, then re-runs the gate.
-	// For multi-strategy configs, retries apply per-strategy.
+	// Each retry executes a healing mod, then re-runs the gate.
 	Retries int
 
-	// Strategies is the list of healing strategies (branches) to attempt.
-	// Each strategy has a name and its own mods[] list. Strategies can be
-	// executed in parallel by the control plane; the first to pass re-gate wins.
-	// When Strategies is populated, Mods is ignored.
-	Strategies []HealingStrategy
-}
-
-// HealingStrategy represents a named healing branch with its own sequence of mods.
-// Multiple strategies can be executed in parallel by the control plane to race
-// different healing approaches (e.g., AI-powered vs. static patches).
-//
-// Strategy Semantics:
-//   - Each strategy operates on an independent workspace clone.
-//   - Strategies execute in parallel (subject to available nodes).
-//   - Each strategy runs its Mods sequentially, then re-gates.
-//   - The first strategy whose re-gate passes wins; others are canceled.
-//   - If all strategies exhaust retries without passing, the run fails.
-type HealingStrategy struct {
-	// Name is an optional identifier for this strategy (e.g., "codex-ai", "static-patch").
-	// Used for logging, metrics, and debugging. If empty, defaults to "strategy-<index>".
-	Name string
-
-	// Mods is the list of healing mod specifications for this strategy.
-	// Executed sequentially; after all mods complete, re-gate is triggered.
-	Mods []HealingMod
-}
-
-// NormalizedStrategies returns the healing strategies to use for execution.
-// If Strategies is populated, returns it directly. Returns nil if no healing
-// configuration is present.
-func (h *HealingConfig) NormalizedStrategies() []HealingStrategy {
-	if h == nil {
-		return nil
-	}
-	if len(h.Strategies) > 0 {
-		return h.Strategies
-	}
-	return nil
+	// Mod is the single healing mod specification for this gate.
+	Mod HealingMod
 }
 
 // HealingMod describes a single healing mod container specification.
@@ -310,7 +271,7 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.BuildGate.Profile = profile
 	}
 
-	// Parse healing configuration (multi-strategy form).
+	// Parse healing configuration (single-mod form).
 	if healingMap, ok := opts["build_gate_healing"].(map[string]any); ok {
 		healing := &HealingConfig{
 			Retries: 1, // Default to 1 retry.
@@ -323,18 +284,9 @@ func parseRunOptions(opts map[string]any) RunOptions {
 			healing.Retries = int(rf)
 		}
 
-		// Multi-strategy form: strategies[] is the canonical schema.
-		if strategiesSlice, ok := healingMap["strategies"].([]any); ok && len(strategiesSlice) > 0 {
-			for _, stratEntry := range strategiesSlice {
-				if stratMap, ok := stratEntry.(map[string]any); ok {
-					strategy := parseHealingStrategy(stratMap)
-					healing.Strategies = append(healing.Strategies, strategy)
-				}
-			}
-		}
-
-		// Only treat healing as configured when at least one strategy is present.
-		if len(healing.Strategies) > 0 {
+		// Single-mod form: mod is the canonical schema.
+		if modMap, ok := healingMap["mod"].(map[string]any); ok {
+			healing.Mod = parseHealingModFromMap(modMap)
 			runOpts.Healing = healing
 		}
 	}
@@ -523,26 +475,7 @@ func parseHealingMod(modMap map[string]any) HealingMod {
 	return mod
 }
 
-// parseHealingStrategy extracts a HealingStrategy from an untyped map[string]any.
-// This function handles the multi-strategy healing schema where each strategy
-// has a name and its own mods[] list for parallel healing branches.
-func parseHealingStrategy(stratMap map[string]any) HealingStrategy {
-	strategy := HealingStrategy{}
-
-	// Extract strategy name (optional; used for logging and metrics).
-	if name, ok := stratMap["name"].(string); ok {
-		strategy.Name = name
-	}
-
-	// Extract mods[] for this strategy.
-	if modsSlice, ok := stratMap["mods"].([]any); ok {
-		for _, modEntry := range modsSlice {
-			if modMap, ok := modEntry.(map[string]any); ok {
-				mod := parseHealingMod(modMap)
-				strategy.Mods = append(strategy.Mods, mod)
-			}
-		}
-	}
-
-	return strategy
+// parseHealingModFromMap extracts a HealingMod from an untyped map[string]any.
+func parseHealingModFromMap(modMap map[string]any) HealingMod {
+	return parseHealingMod(modMap)
 }

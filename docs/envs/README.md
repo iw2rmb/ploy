@@ -85,7 +85,7 @@ Role model (bearer token claims):
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
-  - `strategies[].mods[]` — Healing strategies and their steps (each mod is a container with image/command/env/retain)
+  - `mod` — Single healing mod (container with image/command/env/retain)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mod proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods

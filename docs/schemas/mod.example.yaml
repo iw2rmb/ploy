@@ -110,28 +110,10 @@ build_gate:
   enabled: true
   profile: auto # auto | java | java-maven | java-gradle
 
-# Healing configuration executed when the Build Gate fails (applies globally to all mods).
-#
-# The healing block supports two forms:
-#
-# 1. **Single-strategy (mods form)** — A single `mods` list executed sequentially:
-#    build_gate_healing:
-#      retries: 1
-#      mods: [...]
-#
-# 2. **Multi-strategy (branches form)** — Multiple independent healing strategies
-#    that can be executed in parallel by the control plane:
-#    build_gate_healing:
-#      retries: 1
-#      strategies:
-#        - name: codex-ai
-#          mods: [...]
-#        - name: fallback-patch
-#          mods: [...]
-#
-# For multi-step runs, the healing policy is shared across all mod steps. When a
-# step's gate fails, healing runs once per the retry count, then the gate is
-# re-evaluated before proceeding to the next step.
+# Healing configuration executed when the Build Gate fails (applies globally to
+# all mods). For multi-step runs, the healing policy is shared across all mod
+# steps. When a step's gate fails, healing runs once per the retry count, then
+# the gate is re-evaluated before proceeding to the next step.
 #
 # Workspace Diff Handshake (recommended for Codex healing):
 # - Codex edits the workspace and exits when done.
@@ -145,70 +127,19 @@ build_gate:
 # - PLOY_BUILDGATE_REF: Git ref for Build Gate baseline (base_ref or commit_sha)
 # - PLOY_HOST_WORKSPACE: Host path to workspace (for direct host verification)
 # - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
-build_gate_healing:
-  retries: 1
-  strategies:
-    - name: codex-heal
-      mods:
-        - image: docker.io/your-dh-user/mods-codex:latest
-          # Codex prompt can be provided via env (CODEX_PROMPT) or a prompt file.
-          # Default prompt location: /in/prompt.txt (node mounts it R/O when provided in spec).
-          command: >-
-            mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
-          env:
-            # Workspace diff handshake: Codex edits code then exits when done.
-            # The node agent re-runs the Build Gate externally only when workspace
-            # diffs are detected; Codex does NOT invoke the Build Gate binary or run
-            # any build commands directly.
-            CODEX_PROMPT: |-
-              Rules:
-              - Use /workspace and /in/build-gate.log to understand the compile error.
-              - Edit files under /workspace as needed to fix the error.
-              - When you believe the code is ready for a full build validation, stop editing and end the session.
-
-              Task:
-              Fix the compilation error described in /in/build-gate.log.
-          env_from_file:
-            # Inline Codex auth as env from file content (resolved by CLI)
-            # CODEX_AUTH_JSON: ~/.codex/auth.json
-          retain_container: false
 
 ################################################################################
-# MULTI-STRATEGY HEALING (optional, for parallel healing branches)
+# SINGLE-MOD HEALING
 ################################################################################
-# When you need multiple independent healing strategies executed in parallel,
-# use the `strategies` field instead of `mods`. Each strategy is a named branch
-# with its own sequence of healing mods. The control plane can execute these
-# branches in parallel, and the first branch to pass the re-gate wins.
+# Healing uses a single `mod` per gate:
 #
-# Strategy Semantics:
-# - Each strategy is an independent healing attempt with its own workspace clone.
-# - Strategies execute in parallel (subject to available nodes).
-# - Each strategy runs its mods[] sequentially, then re-gates.
-# - The first strategy whose re-gate passes wins; other branches are canceled.
-# - If all strategies exhaust retries without passing, the run fails.
-#
-# Example multi-strategy healing:
 # build_gate_healing:
 #   retries: 2
-#   strategies:
-#     - name: codex-ai
-#       mods:
-#         - image: docker.io/your-dh-user/mods-codex:latest
-#           command: mod-codex --input /workspace --out /out
-#           env:
-#             CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
-#     - name: static-patch
-#       mods:
-#         - image: docker.io/your-dh-user/mods-patcher:latest
-#           command: apply-known-fixes.sh
-#           env:
-#             FIX_CATALOG: "/patches/java-migration-fixes.yaml"
-#
-# In this example:
-# - "codex-ai" attempts AI-powered healing via Codex.
-# - "static-patch" applies known patches from a fix catalog.
-# - Both run in parallel; whichever passes re-gate first wins.
+#   mod:
+#     image: docker.io/your-dh-user/mods-codex:latest
+#     command: mod-codex --input /workspace --out /out
+#     env:
+#       CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
@@ -223,7 +154,7 @@ mr_on_fail: true
 #
 # - The agent honors: image, command, env, retain_container,
 #   mods[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
-#   mr_on_fail, build_gate.* (profile), and build_gate_healing.* (retries, strategies).
+#   mr_on_fail, build_gate.* (profile), and build_gate_healing.* (retries, mod).
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use top-level fields for one transformation.
@@ -231,7 +162,7 @@ mr_on_fail: true
 #   * Both formats share the same global build_gate and build_gate_healing policy.
 #
 # - Stack-aware image selection:
-#   * The `image` field (top-level, in mods[], and in build_gate_healing.strategies[].mods[])
+#   * The `image` field (top-level, in mods[], and in build_gate_healing.mod)
 #     accepts either a string (universal image) or a map (stack-specific images).
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.

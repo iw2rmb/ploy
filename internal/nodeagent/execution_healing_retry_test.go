@@ -59,10 +59,8 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	req := StartRunRequest{RunID: types.RunID("t-nonzero"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": 1,
-			"strategies": []any{
-				map[string]any{
-					"mods": []any{map[string]any{"image": "heal:latest"}},
-				},
+			"mod": map[string]any{
+				"image": "heal:latest",
 			},
 		},
 	}}
@@ -119,11 +117,8 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	req := StartRunRequest{RunID: types.RunID("t-f64"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(2),
-			"strategies": []any{
-				map[string]any{
-					"name": "default",
-					"mods": []any{map[string]any{"image": "heal:latest"}},
-				},
+			"mod": map[string]any{
+				"image": "heal:latest",
 			},
 		},
 	}}
@@ -143,15 +138,16 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	}
 }
 
-// TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing verifies that an empty mods array
-// behaves as no-healing configuration (return pre-gate failure immediately).
-func TestExecuteWithHealing_HealingConfiguredNoStrategies_NoHealing(t *testing.T) {
+// TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing verifies that when
+// build_gate_healing is present but no mod is configured, healing is treated
+// as disabled (return pre-gate failure immediately).
+func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 	mockGate := &mockGateExecutor{executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 		return &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "java", Passed: false}}, LogsText: "fail"}, nil
 	}}
 
 	mockContainer := &mockContainerRuntime{createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-		t.Fatalf("no container should be created when strategies are empty")
+		t.Fatalf("no container should be created when no healing mod is configured")
 		return step.ContainerHandle{ID: "x"}, nil
 	}}
 
@@ -165,7 +161,7 @@ func TestExecuteWithHealing_HealingConfiguredNoStrategies_NoHealing(t *testing.T
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
 	req := StartRunRequest{RunID: types.RunID("t-empty-strategies"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
-		"build_gate_healing": map[string]any{"retries": 3, "strategies": []any{}},
+		"build_gate_healing": map[string]any{"retries": 3},
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
@@ -215,10 +211,8 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	req := StartRunRequest{RunID: types.RunID("t-tls"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": 1,
-			"strategies": []any{
-				map[string]any{
-					"mods": []any{map[string]any{"image": "heal:latest"}},
-				},
+			"mod": map[string]any{
+				"image": "heal:latest",
 			},
 		},
 	}}
@@ -306,14 +300,8 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2, // Try twice
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{
-								"image": "test/healer:latest",
-							},
-						},
-					},
+				"mod": map[string]any{
+					"image": "test/healer:latest",
 				},
 			},
 		},
@@ -410,10 +398,8 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 	req := StartRunRequest{RunID: types.RunID("t-env"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": 1,
-			"strategies": []any{
-				map[string]any{
-					"mods": []any{map[string]any{"image": "heal:latest"}},
-				},
+			"mod": map[string]any{
+				"image": "heal:latest",
 			},
 		},
 	}}
@@ -511,12 +497,8 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "heal:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "heal:latest",
 				},
 			},
 		},
@@ -611,12 +593,8 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "heal:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "heal:latest",
 				},
 			},
 		},
@@ -709,12 +687,8 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2, // Two retries to verify session propagation.
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "mods-codex:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "mods-codex:latest",
 				},
 			},
 		},
@@ -817,13 +791,9 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
-				"strategies": []any{
-					map[string]any{
-						// Non-Codex healer image.
-						"mods": []any{
-							map[string]any{"image": "standard-healer:v1"},
-						},
-					},
+				// Non-Codex healer image.
+				"mod": map[string]any{
+					"image": "standard-healer:v1",
 				},
 			},
 		},
@@ -926,12 +896,8 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "heal:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "heal:latest",
 				},
 			},
 		},

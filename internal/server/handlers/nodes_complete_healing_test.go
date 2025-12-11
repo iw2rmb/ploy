@@ -20,18 +20,13 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	runID := domaintypes.NewRunID().String()
 
-	// build_gate_healing with a single strategy containing one healing mod and retries=3.
-	// Uses canonical strategies[] schema (legacy mods[] at top level is no longer supported).
+	// build_gate_healing with a single healing mod and retries=3.
+	// Uses canonical single-mod schema (build_gate_healing.mod).
 	spec := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(3),
-			"strategies": []any{
-				map[string]any{
-					// Unnamed strategy defaults to "branch-0".
-					"mods": []any{
-						map[string]any{"image": "heal:latest"},
-					},
-				},
+			"mod": map[string]any{
+				"image": "heal:latest",
 			},
 		},
 	}
@@ -42,8 +37,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 
 	// Jobs for a run where:
 	// - pre-gate (1000) failed previously
-	// - heal-branch-0-1-0 (1333.33) succeeded (first attempt)
-	// - re-gate-branch-0-1 (1666.66) has just failed (failedStepIndex)
+	// - heal-1-0 (1333.33) succeeded (first attempt)
+	// - re-gate-1 (1666.66) has just failed (failedStepIndex)
 	// - mod-0/post-gate are still created
 	reGateStepIndex := 1666.6666666666665
 	jobs := []store.Job{
@@ -59,7 +54,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		{
 			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
-			Name:      "heal-branch-0-1-0",
+			Name:      "heal-1-0",
 			Status:    store.JobStatusSucceeded,
 			ModType:   "heal",
 			StepIndex: 1333.3333333333333,
@@ -68,7 +63,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		{
 			ID:        domaintypes.NewJobID().String(),
 			RunID:     runID,
-			Name:      "re-gate-branch-0-1",
+			Name:      "re-gate-1",
 			Status:    store.JobStatusFailed,
 			ModType:   "re_gate",
 			StepIndex: reGateStepIndex,
@@ -107,10 +102,10 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	// With one existing "heal" job and one healing mod configured in a single strategy,
+	// With one existing "heal" job and one healing mod configured,
 	// the second invocation should use attempt=2 and create:
-	//   - heal-branch-0-2-0 (pending)
-	//   - re-gate-branch-0-2 (created)
+	//   - heal-2-0 (pending)
+	//   - re-gate-2 (created)
 	if st.createJobCallCount != 2 {
 		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", st.createJobCallCount)
 	}
@@ -119,48 +114,38 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 	}
 
 	healJob := st.createJobParams[0]
-	if healJob.Name != "heal-branch-0-2-0" {
-		t.Fatalf("expected first healing job name heal-branch-0-2-0, got %q", healJob.Name)
+	if healJob.Name != "heal-2-0" {
+		t.Fatalf("expected first healing job name heal-2-0, got %q", healJob.Name)
 	}
 	if healJob.ModType != "heal" {
 		t.Fatalf("expected heal job ModType=heal, got %q", healJob.ModType)
 	}
 
 	reGateJob := st.createJobParams[1]
-	if reGateJob.Name != "re-gate-branch-0-2" {
-		t.Fatalf("expected re-gate job name re-gate-branch-0-2, got %q", reGateJob.Name)
+	if reGateJob.Name != "re-gate-2" {
+		t.Fatalf("expected re-gate job name re-gate-2, got %q", reGateJob.Name)
 	}
 	if reGateJob.ModType != "re_gate" {
 		t.Fatalf("expected re-gate job ModType=re_gate, got %q", reGateJob.ModType)
 	}
 }
 
-// TestMaybeCreateHealingJobs_MultiBranchStrategies verifies that the branch planner
-// creates parallel healing branches from multi-strategy specs with distinct step_index windows.
-func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
+// TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs verifies that when a gate
+// fails and build_gate_healing.mod is configured, the first healing attempt
+// creates a heal job and a re-gate job with the expected names and images.
+func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 
 	runID := domaintypes.NewRunID().String()
 
-	// Multi-strategy spec with two named branches, each with one healing mod.
+	// Healing spec with a single mod and retries=2.
 	spec := map[string]any{
 		"build_gate_healing": map[string]any{
 			"retries": float64(2),
-			"strategies": []any{
-				map[string]any{
-					"name": "codex-ai",
-					"mods": []any{
-						map[string]any{"image": "mods-codex:latest"},
-					},
-				},
-				map[string]any{
-					"name": "static-patch",
-					"mods": []any{
-						map[string]any{"image": "mods-patcher:latest"},
-					},
-				},
+			"mod": map[string]any{
+				"image": "mods-codex:latest",
 			},
 		},
 	}
@@ -204,407 +189,42 @@ func TestMaybeCreateHealingJobs_MultiBranchStrategies(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	// With 2 strategies, each with 1 mod, we expect:
-	// - Branch "codex-ai": heal-codex-ai-1-0 (pending), re-gate-codex-ai-1 (created)
-	// - Branch "static-patch": heal-static-patch-1-0 (pending), re-gate-static-patch-1 (created)
-	// Total: 4 jobs created.
-	if st.createJobCallCount != 4 {
-		t.Fatalf("expected 4 CreateJob calls (2 branches × (1 heal + 1 re-gate)), got %d", st.createJobCallCount)
+	// Linear healing: exactly one heal job + one re-gate job.
+	if st.createJobCallCount != 2 {
+		t.Fatalf("expected 2 CreateJob calls (1 heal + 1 re-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify job names and step_index windows are distinct.
 	jobsByName := make(map[string]store.CreateJobParams)
 	for _, p := range st.createJobParams {
 		jobsByName[p.Name] = p
 	}
 
-	// Branch "codex-ai" jobs.
-	codexHeal, ok := jobsByName["heal-codex-ai-1-0"]
+	healJob, ok := jobsByName["heal-1-0"]
 	if !ok {
 		t.Fatalf("expected heal-codex-ai-1-0 job to be created")
 	}
-	if codexHeal.Status != store.JobStatusPending {
-		t.Fatalf("expected heal-codex-ai-1-0 to be pending (first job of branch), got %s", codexHeal.Status)
+	if healJob.Status != store.JobStatusPending {
+		t.Fatalf("expected heal-1-0 to be pending, got %s", healJob.Status)
 	}
-	if codexHeal.ModImage != "mods-codex:latest" {
-		t.Fatalf("expected heal-codex-ai-1-0 image=mods-codex:latest, got %q", codexHeal.ModImage)
+	if healJob.ModImage != "mods-codex:latest" {
+		t.Fatalf("expected heal-1-0 image=mods-codex:latest, got %q", healJob.ModImage)
 	}
 
-	codexReGate, ok := jobsByName["re-gate-codex-ai-1"]
+	reGateJob, ok := jobsByName["re-gate-1"]
 	if !ok {
 		t.Fatalf("expected re-gate-codex-ai-1 job to be created")
 	}
-	if codexReGate.Status != store.JobStatusCreated {
-		t.Fatalf("expected re-gate-codex-ai-1 to be created, got %s", codexReGate.Status)
+	if reGateJob.Status != store.JobStatusCreated {
+		t.Fatalf("expected re-gate-1 to be created, got %s", reGateJob.Status)
 	}
 
-	// Branch "static-patch" jobs.
-	patchHeal, ok := jobsByName["heal-static-patch-1-0"]
-	if !ok {
-		t.Fatalf("expected heal-static-patch-1-0 job to be created")
+	if healJob.StepIndex <= 1000 || healJob.StepIndex >= 2000 {
+		t.Fatalf("heal step_index=%f should be between 1000 and 2000", healJob.StepIndex)
 	}
-	if patchHeal.Status != store.JobStatusPending {
-		t.Fatalf("expected heal-static-patch-1-0 to be pending (first job of branch), got %s", patchHeal.Status)
-	}
-	if patchHeal.ModImage != "mods-patcher:latest" {
-		t.Fatalf("expected heal-static-patch-1-0 image=mods-patcher:latest, got %q", patchHeal.ModImage)
-	}
-
-	patchReGate, ok := jobsByName["re-gate-static-patch-1"]
-	if !ok {
-		t.Fatalf("expected re-gate-static-patch-1 job to be created")
-	}
-	if patchReGate.Status != store.JobStatusCreated {
-		t.Fatalf("expected re-gate-static-patch-1 to be created, got %s", patchReGate.Status)
-	}
-
-	// Verify distinct step_index windows (branches must not overlap).
-	// Window 1 (codex-ai): step_index values in (1000, 1333.33...)
-	// Window 2 (static-patch): step_index values in (1333.33..., 1666.66...)
-	if codexHeal.StepIndex >= patchHeal.StepIndex {
-		t.Fatalf("codex-ai branch should have lower step_index than static-patch branch: codex=%f, patch=%f",
-			codexHeal.StepIndex, patchHeal.StepIndex)
-	}
-	if codexReGate.StepIndex >= patchHeal.StepIndex {
-		t.Fatalf("codex-ai re-gate should have lower step_index than static-patch heal: re-gate=%f, patch-heal=%f",
-			codexReGate.StepIndex, patchHeal.StepIndex)
-	}
-
-	// Verify all jobs are between failedStepIndex (1000) and nextStepIndex (2000).
-	for name, p := range jobsByName {
-		if p.StepIndex <= 1000 || p.StepIndex >= 2000 {
-			t.Fatalf("job %s step_index=%f should be between 1000 and 2000", name, p.StepIndex)
-		}
+	if reGateJob.StepIndex <= healJob.StepIndex || reGateJob.StepIndex >= 2000 {
+		t.Fatalf("re-gate step_index=%f should be between heal (%f) and 2000", reGateJob.StepIndex, healJob.StepIndex)
 	}
 }
-
-// TestMaybeCreateHealingJobs_SingleStrategyWithMultipleMods verifies behavior for specs
-// that use a single strategy containing multiple mods (canonical strategies[] schema).
-func TestMaybeCreateHealingJobs_SingleStrategyWithMultipleMods(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-
-	runID := domaintypes.NewRunID().String()
-
-	// Single strategy with multiple mods (uses canonical strategies[] schema).
-	// Legacy mods[] at top level is no longer supported.
-	spec := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(2),
-			"strategies": []any{
-				map[string]any{
-					// Unnamed strategy defaults to "branch-0".
-					"mods": []any{
-						map[string]any{"image": "heal-a:latest"},
-						map[string]any{"image": "heal-b:latest"},
-					},
-				},
-			},
-		},
-	}
-	specBytes, err := json.Marshal(spec)
-	if err != nil {
-		t.Fatalf("failed to marshal spec: %v", err)
-	}
-
-	// Jobs for a fresh run where pre-gate just failed.
-	jobs := []store.Job{
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "pre-gate",
-			Status:    store.JobStatusFailed,
-			ModType:   "pre_gate",
-			StepIndex: 1000,
-			Meta:      []byte(`{}`),
-		},
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "mod-0",
-			Status:    store.JobStatusCreated,
-			ModType:   "mod",
-			StepIndex: 2000,
-			Meta:      []byte(`{}`),
-		},
-	}
-
-	run := store.Run{
-		ID:   runID,
-		Spec: specBytes,
-	}
-
-	st := &mockStore{
-		listJobsByRunResult: jobs,
-	}
-
-	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
-		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
-	}
-
-	// Single strategy with 2 mods: 2 healing jobs + 1 re-gate = 3 jobs.
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 CreateJob calls (2 heal + 1 re-gate), got %d", st.createJobCallCount)
-	}
-
-	// Verify job naming (heal-branch-0-1-0, heal-branch-0-1-1, re-gate-branch-0-1).
-	expectedNames := []string{"heal-branch-0-1-0", "heal-branch-0-1-1", "re-gate-branch-0-1"}
-	for i, expected := range expectedNames {
-		if st.createJobParams[i].Name != expected {
-			t.Fatalf("expected job[%d] name=%q, got %q", i, expected, st.createJobParams[i].Name)
-		}
-	}
-
-	// First healing job is pending, others are created.
-	if st.createJobParams[0].Status != store.JobStatusPending {
-		t.Fatalf("expected heal-branch-0-1-0 to be pending, got %s", st.createJobParams[0].Status)
-	}
-	if st.createJobParams[1].Status != store.JobStatusCreated {
-		t.Fatalf("expected heal-branch-0-1-1 to be created, got %s", st.createJobParams[1].Status)
-	}
-	if st.createJobParams[2].Status != store.JobStatusCreated {
-		t.Fatalf("expected re-gate-branch-0-1 to be created, got %s", st.createJobParams[2].Status)
-	}
-
-	// Verify step_index order (sequential within the single branch).
-	for i := 1; i < len(st.createJobParams); i++ {
-		if st.createJobParams[i].StepIndex <= st.createJobParams[i-1].StepIndex {
-			t.Fatalf("step_index should increase: job[%d]=%f, job[%d]=%f",
-				i-1, st.createJobParams[i-1].StepIndex,
-				i, st.createJobParams[i].StepIndex)
-		}
-	}
-}
-
-// TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods verifies multi-branch creation
-// when each strategy has multiple healing mods.
-func TestMaybeCreateHealingJobs_MultiBranchWithMultipleMods(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-
-	runID := domaintypes.NewRunID().String()
-
-	// Multi-strategy spec: branch A has 2 mods, branch B has 1 mod.
-	spec := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(1),
-			"strategies": []any{
-				map[string]any{
-					"name": "branch-a",
-					"mods": []any{
-						map[string]any{"image": "heal-a-0:latest"},
-						map[string]any{"image": "heal-a-1:latest"},
-					},
-				},
-				map[string]any{
-					"name": "branch-b",
-					"mods": []any{
-						map[string]any{"image": "heal-b-0:latest"},
-					},
-				},
-			},
-		},
-	}
-	specBytes, err := json.Marshal(spec)
-	if err != nil {
-		t.Fatalf("failed to marshal spec: %v", err)
-	}
-
-	jobs := []store.Job{
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "pre-gate",
-			Status:    store.JobStatusFailed,
-			ModType:   "pre_gate",
-			StepIndex: 1000,
-			Meta:      []byte(`{}`),
-		},
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "mod-0",
-			Status:    store.JobStatusCreated,
-			ModType:   "mod",
-			StepIndex: 2000,
-			Meta:      []byte(`{}`),
-		},
-	}
-
-	run := store.Run{
-		ID:   runID,
-		Spec: specBytes,
-	}
-
-	st := &mockStore{
-		listJobsByRunResult: jobs,
-	}
-
-	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
-		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
-	}
-
-	// Branch A: 2 heal + 1 re-gate = 3 jobs
-	// Branch B: 1 heal + 1 re-gate = 2 jobs
-	// Total: 5 jobs.
-	if st.createJobCallCount != 5 {
-		t.Fatalf("expected 5 CreateJob calls, got %d", st.createJobCallCount)
-	}
-
-	jobsByName := make(map[string]store.CreateJobParams)
-	for _, p := range st.createJobParams {
-		jobsByName[p.Name] = p
-	}
-
-	// Verify branch A jobs.
-	healA0, ok := jobsByName["heal-branch-a-1-0"]
-	if !ok {
-		t.Fatalf("expected heal-branch-a-1-0 job")
-	}
-	if healA0.Status != store.JobStatusPending {
-		t.Fatalf("expected heal-branch-a-1-0 to be pending, got %s", healA0.Status)
-	}
-
-	healA1, ok := jobsByName["heal-branch-a-1-1"]
-	if !ok {
-		t.Fatalf("expected heal-branch-a-1-1 job")
-	}
-	if healA1.Status != store.JobStatusCreated {
-		t.Fatalf("expected heal-branch-a-1-1 to be created, got %s", healA1.Status)
-	}
-
-	reGateA, ok := jobsByName["re-gate-branch-a-1"]
-	if !ok {
-		t.Fatalf("expected re-gate-branch-a-1 job")
-	}
-
-	// Verify branch B jobs.
-	healB0, ok := jobsByName["heal-branch-b-1-0"]
-	if !ok {
-		t.Fatalf("expected heal-branch-b-1-0 job")
-	}
-	if healB0.Status != store.JobStatusPending {
-		t.Fatalf("expected heal-branch-b-1-0 to be pending, got %s", healB0.Status)
-	}
-
-	reGateB, ok := jobsByName["re-gate-branch-b-1"]
-	if !ok {
-		t.Fatalf("expected re-gate-branch-b-1 job")
-	}
-
-	// Verify branch A step_index < branch B step_index (windows don't overlap).
-	if reGateA.StepIndex >= healB0.StepIndex {
-		t.Fatalf("branch-a re-gate (%f) should be before branch-b heal (%f)",
-			reGateA.StepIndex, healB0.StepIndex)
-	}
-
-	// Verify step order within branch A.
-	if healA0.StepIndex >= healA1.StepIndex {
-		t.Fatalf("heal-branch-a-1-0 (%f) should be before heal-branch-a-1-1 (%f)",
-			healA0.StepIndex, healA1.StepIndex)
-	}
-	if healA1.StepIndex >= reGateA.StepIndex {
-		t.Fatalf("heal-branch-a-1-1 (%f) should be before re-gate-branch-a-1 (%f)",
-			healA1.StepIndex, reGateA.StepIndex)
-	}
-
-	// Verify step order within branch B.
-	if healB0.StepIndex >= reGateB.StepIndex {
-		t.Fatalf("heal-branch-b-1-0 (%f) should be before re-gate-branch-b-1 (%f)",
-			healB0.StepIndex, reGateB.StepIndex)
-	}
-}
-
-// TestCancelLoserBranches_WinnerSelectsAndCancelsLosers verifies that when a re-gate
-// succeeds, all other parallel branch jobs (heal, re_gate) in the healing window are canceled.
-func TestCancelLoserBranches_WinnerSelectsAndCancelsLosers(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-
-	runID := domaintypes.NewRunID().String()
-
-	// Scenario: Two-branch healing where branch "codex-ai" re-gate succeeds first.
-	// Branch "static-patch" jobs should be canceled.
-	//
-	// Jobs layout:
-	//   pre-gate (1000) → FAILED
-	//   heal-codex-ai-1-0 (1333) → SUCCEEDED
-	//   re-gate-codex-ai-1 (1444) → SUCCEEDED (winner)
-	//   heal-static-patch-1-0 (1555) → RUNNING (should be canceled)
-	//   re-gate-static-patch-1 (1666) → CREATED (should be canceled)
-	//   mod-0 (2000) → CREATED (mainline, should NOT be canceled)
-	winnerJobID := domaintypes.NewJobID().String()
-	loserHealID := domaintypes.NewJobID().String()
-	loserReGateID := domaintypes.NewJobID().String()
-	mainlineModID := domaintypes.NewJobID().String()
-
-	jobs := []store.Job{
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "pre-gate",
-			Status:    store.JobStatusFailed,
-			ModType:   "pre_gate",
-			StepIndex: 1000,
-		},
-		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			Name:      "heal-codex-ai-1-0",
-			Status:    store.JobStatusSucceeded,
-			ModType:   "heal",
-			StepIndex: 1333,
-		},
-		{
-			ID:        winnerJobID,
-			RunID:     runID,
-			Name:      "re-gate-codex-ai-1",
-			Status:    store.JobStatusSucceeded,
-			ModType:   "re_gate",
-			StepIndex: 1444,
-		},
-		{
-			ID:        loserHealID,
-			RunID:     runID,
-			Name:      "heal-static-patch-1-0",
-			Status:    store.JobStatusRunning,
-			ModType:   "heal",
-			StepIndex: 1555,
-		},
-		{
-			ID:        loserReGateID,
-			RunID:     runID,
-			Name:      "re-gate-static-patch-1",
-			Status:    store.JobStatusCreated,
-			ModType:   "re_gate",
-			StepIndex: 1666,
-		},
-		{
-			ID:        mainlineModID,
-			RunID:     runID,
-			Name:      "mod-0",
-			Status:    store.JobStatusCreated,
-			ModType:   "mod",
-			StepIndex: 2000,
-		},
-	}
-
-	_ = ctx
-	_ = runID
-	_ = winnerJobID
-	_ = loserHealID
-	_ = loserReGateID
-	_ = mainlineModID
-	_ = jobs
-}
-
-// TestCancelLoserBranches_NoLosersWhenSingleBranch verifies that winner selection
-// with a single branch doesn't cancel anything extra.
-func TestCancelLoserBranches_NoLosersWhenSingleBranch(t *testing.T) {}
-func TestCancelLoserBranches_SkipsTerminalJobs(t *testing.T)        {}
 
 // TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds verifies that when
 // one healing branch wins (re-gate succeeds) and other branches are skipped,
@@ -688,123 +308,4 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 	}
 }
 
-// TestParseHealingStrategies verifies strategy parsing for the canonical
-// multi-strategy (strategies[]) form. Legacy mods[] at top level is no longer supported.
-func TestParseHealingStrategies(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name             string
-		config           map[string]any
-		wantStrategies   int
-		wantFirstName    string
-		wantFirstModsLen int
-	}{
-		{
-			// Legacy mods-only form is no longer supported; returns 0 strategies.
-			name: "legacy mods-only form not supported",
-			config: map[string]any{
-				"mods": []any{
-					map[string]any{"image": "heal:latest"},
-					map[string]any{"image": "heal2:latest"},
-				},
-			},
-			wantStrategies: 0, // No strategies returned (legacy form ignored).
-		},
-		{
-			name: "multi-strategy form",
-			config: map[string]any{
-				"strategies": []any{
-					map[string]any{
-						"name": "codex",
-						"mods": []any{map[string]any{"image": "codex:latest"}},
-					},
-					map[string]any{
-						"name": "patch",
-						"mods": []any{map[string]any{"image": "patch:latest"}},
-					},
-				},
-			},
-			wantStrategies:   2,
-			wantFirstName:    "codex",
-			wantFirstModsLen: 1,
-		},
-		{
-			// strategies[] is the only supported form; mods[] at top level is ignored.
-			name: "strategies used, mods at top level ignored",
-			config: map[string]any{
-				"mods": []any{map[string]any{"image": "legacy:latest"}},
-				"strategies": []any{
-					map[string]any{
-						"name": "winner",
-						"mods": []any{map[string]any{"image": "winner:latest"}},
-					},
-				},
-			},
-			wantStrategies:   1,
-			wantFirstName:    "winner",
-			wantFirstModsLen: 1,
-		},
-		{
-			name:           "empty strategies",
-			config:         map[string]any{"strategies": []any{}},
-			wantStrategies: 0,
-		},
-		{
-			// Legacy mods[] at top level is ignored; returns 0 strategies.
-			name:           "empty mods at top level ignored",
-			config:         map[string]any{"mods": []any{}},
-			wantStrategies: 0,
-		},
-		{
-			name: "strategy without name uses empty string",
-			config: map[string]any{
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{map[string]any{"image": "anon:latest"}},
-					},
-				},
-			},
-			wantStrategies:   1,
-			wantFirstName:    "",
-			wantFirstModsLen: 1,
-		},
-		{
-			name: "single strategy with multiple mods",
-			config: map[string]any{
-				"strategies": []any{
-					map[string]any{
-						"name": "sequential-fix",
-						"mods": []any{
-							map[string]any{"image": "analyze:latest"},
-							map[string]any{"image": "fix:latest"},
-						},
-					},
-				},
-			},
-			wantStrategies:   1,
-			wantFirstName:    "sequential-fix",
-			wantFirstModsLen: 2,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			strategies := parseHealingStrategies(tc.config)
-			if len(strategies) != tc.wantStrategies {
-				t.Fatalf("expected %d strategies, got %d", tc.wantStrategies, len(strategies))
-			}
-
-			if tc.wantStrategies > 0 {
-				if strategies[0].Name != tc.wantFirstName {
-					t.Fatalf("expected first strategy name=%q, got %q", tc.wantFirstName, strategies[0].Name)
-				}
-				if len(strategies[0].Mods) != tc.wantFirstModsLen {
-					t.Fatalf("expected first strategy mods len=%d, got %d", tc.wantFirstModsLen, len(strategies[0].Mods))
-				}
-			}
-		})
-	}
-}
+// No standalone parser: build_gate_healing.mod is read inline by maybeCreateHealingJobs.
