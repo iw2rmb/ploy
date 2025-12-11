@@ -201,8 +201,8 @@ Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 **Build Gate Status Visibility**
 
 Gate execution results are exposed via:
-- `ploy mod inspect <run-id>` — Displays a concise gate summary line: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
 - `GET /v1/runs/{id}/status` API — Returns gate summary in `RunSummary.Metadata["gate_summary"]` for programmatic access.
+- `ploy run status <run-id>` — Human-readable summary of batch status and repo counts.
 
 This makes gate health visible without requiring raw artifact inspection.
 

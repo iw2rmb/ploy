@@ -231,13 +231,16 @@ ploy mod run repo restart \
 
 When the restarted job succeeds, an MR is created for the `hotfix` branch merge.
 
-### Inspect MRs from a Batch
+### Inspect Batch Status
 
-Use `ploy mod inspect` to view MR URLs for each repo in the batch:
+Use `ploy run status` and `ploy mod run repo status` to inspect batch state:
 
 ```bash
-ploy mod inspect java17-fleet
-# Output lists each run_repo with its MR URL (if created).
+# Batch-level status and repo counts:
+ploy run status java17-fleet
+
+# Per-repo status within the batch:
+ploy mod run repo status java17-fleet
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
