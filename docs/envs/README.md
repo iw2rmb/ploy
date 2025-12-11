@@ -227,7 +227,7 @@ Per-run overrides (CLI flags on `ploy mod run`):
 - `--mr-fail` — Create an MR when the run fails
 
 Branch naming semantics:
-- The MR source branch is always the effective target ref for the run. When `--repo-target-ref` is provided, that value is used. When it is omitted, the node derives a default of `/mod/<run-id>` using the run ID (KSUID string).
+- The MR source branch is always the effective target ref for the run. When `--repo-target-ref` is provided, that value is used. When it is omitted, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise.
 - The base branch is whatever you pass via `--repo-base-ref` (commonly `main`).
 
 Quick test (PAT via config or flags):
