@@ -56,6 +56,8 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		r.executeModJob(ctx, req)
 	case types.ModTypeHeal:
 		r.executeHealingJob(ctx, req)
+	case types.ModTypeMR:
+		r.executeMRJob(ctx, req)
 	default:
 		// Fallback for legacy jobs without ModType - execute as mod job.
 		slog.Warn("unknown mod_type, falling back to mod execution",
@@ -222,17 +224,6 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		}
 		slog.Info("mod job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
 		return
-	}
-
-	// Conditionally create MR on success.
-	if shouldCreateMR("succeeded", manifest) {
-		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			// Run has already succeeded; surface missing MR as a warning for debuggability.
-			slog.Warn("MR creation failed after successful run", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
-		} else {
-			stats["metadata"] = map[string]interface{}{"mr_url": url}
-			slog.Info("MR created", "run_id", req.RunID, "job_id", req.JobID, "mr_url", url)
-		}
 	}
 
 	var exitCodeZero int32 = 0
@@ -607,25 +598,9 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 		exitCode = int32(result.ExitCode) // 0 for success
 	}
 
-	// Phase 7: Create MR via GitLab API when conditions are met.
-	// Hook runs after terminal status is determined but before uploading status.
-	mrURL := ""
-	if shouldCreateMR(terminalStatus, manifest) {
-		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			if terminalStatus == "succeeded" {
-				slog.Warn("MR creation failed after successful run", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
-			} else {
-				slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
-			}
-		} else {
-			mrURL = url
-			slog.Info("MR created successfully", "run_id", req.RunID, "job_id", req.JobID, "mr_url", mrURL)
-		}
-	}
-
 	// Build stats with execution metrics and gate history.
 	// Job ID is used to associate gate log artifacts with the current job.
-	stats := r.buildExecutionStats(req.RunID, req.JobID, result, execResult, duration, mrURL)
+	stats := r.buildExecutionStats(req.RunID, req.JobID, result, execResult, duration, "")
 
 	// Phase 8: Upload terminal status to server.
 	// Upload job completion status with job_id, step_index and exit_code.

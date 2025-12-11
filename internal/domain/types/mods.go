@@ -13,6 +13,7 @@ import (
 //   - ModTypePostGate: post-mod Build Gate
 //   - ModTypeHeal: healing after gate failure
 //   - ModTypeReGate: re-run Build Gate after healing
+//   - ModTypeMR: post-run MR creation job
 //
 // Unknown or empty values should be treated carefully at boundaries; use
 // ModType.IsZero/Validate to enforce invariants when appropriate.
@@ -24,6 +25,7 @@ const (
 	ModTypePostGate ModType = "post_gate"
 	ModTypeHeal     ModType = "heal"
 	ModTypeReGate   ModType = "re_gate"
+	ModTypeMR       ModType = "mr"
 )
 
 // String returns the underlying string value.
@@ -36,7 +38,7 @@ func (v ModType) IsZero() bool { return IsEmpty(string(v)) }
 func (v ModType) Validate() error {
 	s := strings.TrimSpace(string(v))
 	switch ModType(s) {
-	case ModTypePreGate, ModTypeMod, ModTypePostGate, ModTypeHeal, ModTypeReGate:
+	case ModTypePreGate, ModTypeMod, ModTypePostGate, ModTypeHeal, ModTypeReGate, ModTypeMR:
 		return nil
 	default:
 		return fmt.Errorf("invalid mod_type %q", s)
