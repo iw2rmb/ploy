@@ -100,9 +100,15 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		return "", fmt.Errorf("extract project id: %w", err)
 	}
 
-	// Use a unique source branch per run: ploy-<run-id>.
-	// This avoids MR conflicts on repeated runs regardless of the submitted target ref.
-	sourceBranch := req.TargetRef.String()
+	// Determine source branch for MR:
+	//   - When TargetRef is provided, use it as-is (caller-managed branch name).
+	//   - When TargetRef is empty, derive a unique per-run branch: ploy/<run-id>.
+	// This matches the control plane contract where missing target_ref signals that
+	// downstream components should synthesize a branch name based on the run ID.
+	sourceBranch := strings.TrimSpace(req.TargetRef.String())
+	if sourceBranch == "" {
+		sourceBranch = fmt.Sprintf("ploy/%s", req.RunID.String())
+	}
 
 	// Create a commit with any workspace changes before pushing.
 	if committed, cerr := git.EnsureCommit(ctx, workspaceRoot, "ploy-bot", "ploy-bot@ploy.local", fmt.Sprintf("Ploy: apply changes for run %s", req.RunID)); cerr != nil {
