@@ -136,15 +136,15 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"PKIAdminSignRequest",
 		"PKIClientSignRequest",
 		"Run",
-		"RunBatchSummary",
+		"RunSummary",
 		"RunRepoCounts",
 		"RunRepoStatus",         // Per-repo execution status enum.
 		"RunBatchDerivedStatus", // Batch-level aggregate status enum.
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"RunSubmitRequest",
-		"RunSummary",  // Canonical Mods run status schema (POST/GET /v1/mods responses, SSE events).
-		"StageStatus", // Job execution state within RunSummary.stages map.
+		"ModsRunSummary", // Canonical Mods run status schema (POST/GET /v1/mods responses, SSE events).
+		"StageStatus",    // Job execution state within RunSummary.stages map.
 		"NodeClaimResponse",
 		"Event",
 		"Stage",

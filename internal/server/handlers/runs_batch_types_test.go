@@ -334,16 +334,16 @@ func ptrString(s string) *string {
 	return &s
 }
 
-// TestRunBatchSummary_JSONSerialization verifies that RunBatchSummary correctly
-// serializes domain types to JSON strings and preserves type information during
+// TestRunSummary_JSONSerialization verifies that RunSummary correctly
+// serializes fields to JSON strings and preserves type information during
 // round-trip encoding/decoding.
-func TestRunBatchSummary_JSONSerialization(t *testing.T) {
+func TestRunSummary_JSONSerialization(t *testing.T) {
 	t.Parallel()
 
-	summary := RunBatchSummary{
-		ID:        "12345678-1234-1234-1234-123456789abc",
+	summary := RunSummary{
+		ID:        domaintypes.RunID("12345678-1234-1234-1234-123456789abc"),
 		Name:      ptrString("test-batch"),
-		Status:    store.RunStatusRunning,
+		Status:    "running",
 		RepoURL:   "https://github.com/example/repo.git",
 		BaseRef:   "main",
 		TargetRef: "feature-branch",
@@ -360,7 +360,7 @@ func TestRunBatchSummary_JSONSerialization(t *testing.T) {
 	// Marshal to JSON.
 	data, err := json.Marshal(summary)
 	if err != nil {
-		t.Fatalf("marshal RunBatchSummary: %v", err)
+		t.Fatalf("marshal RunSummary: %v", err)
 	}
 
 	// Verify JSON contains expected string values (domain types serialize as strings).
@@ -382,23 +382,23 @@ func TestRunBatchSummary_JSONSerialization(t *testing.T) {
 	}
 
 	// Round-trip: unmarshal back to verify domain types decode correctly.
-	var decoded RunBatchSummary
+	var decoded RunSummary
 	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshal RunBatchSummary: %v", err)
+		t.Fatalf("unmarshal RunSummary: %v", err)
 	}
 
 	// Verify fields match after round-trip.
 	if decoded.ID.String() != summary.ID.String() {
 		t.Errorf("ID mismatch: got %s, want %s", decoded.ID.String(), summary.ID.String())
 	}
-	if decoded.RepoURL.String() != summary.RepoURL.String() {
-		t.Errorf("RepoURL mismatch: got %s, want %s", decoded.RepoURL.String(), summary.RepoURL.String())
+	if decoded.RepoURL != summary.RepoURL {
+		t.Errorf("RepoURL mismatch: got %s, want %s", decoded.RepoURL, summary.RepoURL)
 	}
-	if decoded.BaseRef.String() != summary.BaseRef.String() {
-		t.Errorf("BaseRef mismatch: got %s, want %s", decoded.BaseRef.String(), summary.BaseRef.String())
+	if decoded.BaseRef != summary.BaseRef {
+		t.Errorf("BaseRef mismatch: got %s, want %s", decoded.BaseRef, summary.BaseRef)
 	}
-	if decoded.TargetRef.String() != summary.TargetRef.String() {
-		t.Errorf("TargetRef mismatch: got %s, want %s", decoded.TargetRef.String(), summary.TargetRef.String())
+	if decoded.TargetRef != summary.TargetRef {
+		t.Errorf("TargetRef mismatch: got %s, want %s", decoded.TargetRef, summary.TargetRef)
 	}
 }
 

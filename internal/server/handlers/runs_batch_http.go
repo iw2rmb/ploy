@@ -74,7 +74,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		// Build response summaries with optional repo counts.
 		// For efficiency, we fetch repo counts per run to include batch aggregate data.
-		summaries := make([]RunBatchSummary, 0, len(runs))
+		summaries := make([]RunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := runToSummary(run)
 
@@ -93,7 +93,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		// Return response.
 		resp := struct {
-			Runs []RunBatchSummary `json:"runs"`
+			Runs []RunSummary `json:"runs"`
 		}{
 			Runs: summaries,
 		}

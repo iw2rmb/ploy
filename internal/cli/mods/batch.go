@@ -23,7 +23,7 @@ import (
 )
 
 // BatchSummary is an alias for the run-level Summary used by run commands.
-// It mirrors the server's RunBatchSummary type for CLI consumption.
+// It mirrors the server's RunSummary type for CLI consumption.
 // Uses domain type (RunID) for type-safe identification.
 type BatchSummary = runs.Summary
 
