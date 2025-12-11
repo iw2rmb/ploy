@@ -119,8 +119,8 @@ type WorkflowGraph struct {
 	LeafIDs []string `json:"leaf_ids"`
 
 	// Linear indicates whether the graph is a simple linear chain.
-	// True for standard runs (pre-gate → mod → post-gate).
-	// False when healing branches exist (future parallel healing).
+	// True for standard runs (pre-gate → mod → post-gate). Reserved for
+	// future non-linear graph support.
 	Linear bool `json:"linear"`
 }
 
@@ -152,12 +152,8 @@ func (g *WorkflowGraph) AddNode(node *GraphNode) {
 }
 
 // ComputeEdges derives parent/child relationships from step_index ordering.
-// For linear graphs, each node's parent is the immediately preceding node
-// by step_index. For non-linear graphs (future parallel healing), edges
-// follow healing window semantics.
-//
-// Current implementation: linear chain derived from step_index order.
-// Each node's parent is the node with the next-lowest step_index.
+// Current implementation: linear chain derived from step_index order. Each
+// node's parent is the node with the next-lowest step_index.
 func (g *WorkflowGraph) ComputeEdges() {
 	if len(g.Nodes) == 0 {
 		return

@@ -22,10 +22,6 @@ import (
 // This function implements the core rehydration strategy that enables multi-node execution:
 // each step can run on any node by reconstructing workspace state from base + diff chain.
 //
-// E3: Branch-local isolation — For multi-branch healing strategies, each branch's workspace
-// is isolated by filtering diffs during rehydration. Branch jobs only see mainline diffs
-// plus their own branch's diffs, preventing cross-branch contamination.
-//
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - req: StartRunRequest containing repo URL, base_ref, commit_sha, and job_name.

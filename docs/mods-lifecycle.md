@@ -137,62 +137,29 @@ post-gate) is surfaced in:
 
 ### Healing configuration
 
-The healing configuration requires the canonical `strategies[]` schema:
+Healing configuration uses a single `mod`:
 
 ```yaml
 build_gate_healing:
   retries: 2
-  strategies:
-    - name: codex-ai
-      mods:
-        - image: docker.io/user/mods-codex:latest
-          command: mod-codex --input /workspace --out /out
-    - name: static-patch
-      mods:
-        - image: docker.io/user/mods-patcher:latest
-          command: apply-known-fixes.sh
+  mod:
+    image: docker.io/user/mods-codex:latest
+    command: mod-codex --input /workspace --out /out
+    env:
+      CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
 ```
 
-Each strategy defines a named healing branch with its own `mods[]` list. The
-control plane creates parallel branches for each strategy, and the first branch
-whose re-gate passes wins.
+Semantics:
 
-**Single-strategy example** — For a single healing approach, use one strategy:
-```yaml
-build_gate_healing:
-  retries: 1
-  strategies:
-    - name: codex-fix
-      mods:
-        - image: docker.io/user/mods-codex:latest
-          command: mod-codex --input /workspace --out /out
-```
+- **Single workspace**: Healing runs on the same workspace that the failing gate validated.
+- **Linear execution**: The healing mod runs, then the gate is re-run.
+- **Retries**: If the gate still fails, the healing mod may be retried up to `retries`.
+- **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
 
-**Note:** Legacy single-strategy form (`build_gate_healing.mods[]` at top level)
-is no longer supported. All healing configurations must use the `strategies[]`
-schema.
+Implementation references:
 
-#### Multi-strategy semantics
-
-- **Independent workspaces**: Each strategy operates on its own workspace clone.
-- **Parallel execution**: Strategies execute in parallel (subject to node availability).
-- **Sequential mods within strategy**: Each strategy runs its mods[] sequentially,
-  then triggers a re-gate.
-- **First-wins racing**: The first strategy whose re-gate passes wins; other
-  branches are canceled.
-- **Exhaustion handling**: If all strategies exhaust retries without passing,
-  the run fails.
-
-This design enables racing different healing approaches (e.g., AI-powered vs.
-deterministic patches) to reduce total healing time while ensuring the first
-valid fix is applied.
-
-#### Implementation references
-
-- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`,
-  `HealingStrategy`, `NormalizedStrategies()`).
-- Spec parsing: `internal/nodeagent/run_options.go` (`parseRunOptions`,
-  `parseHealingStrategy`).
+- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`).
+- Spec parsing: `internal/nodeagent/run_options.go` (`parseRunOptions`).
 - Schema example: `docs/schemas/mod.example.yaml`.
 
 ### Workspace and rehydration semantics
@@ -276,7 +243,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (top-level, in `mods[]`, and in `build_gate_healing.strategies[].mods[]`) accepts two forms:
+The `image` field (top-level, in `mods[]`, and in `build_gate_healing.mod`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml

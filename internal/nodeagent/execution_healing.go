@@ -102,11 +102,9 @@ import (
 // ## Configuration
 //
 // Healing configuration is specified via build_gate_healing option in req.Options
-// using the canonical multi-strategy schema:
+// using the canonical single-mod schema:
 //   - retries (int): maximum number of healing attempts (default: 1)
-//   - strategies ([]map): list of healing strategies, each with:
-//   - name (string, optional): strategy identifier (e.g., "codex-ai")
-//   - mods ([]map): healing mod specs (image, command, env, retain_container)
+//   - mod (map): healing mod spec (image, command, env, retain_container)
 func (r *runController) runGateWithHealing(
 	ctx context.Context,
 	runner step.Runner,
@@ -159,12 +157,6 @@ func (r *runController) runGateWithHealing(
 	}
 
 	healingConfig := typedOpts.Healing
-	strategies := healingConfig.NormalizedStrategies()
-	if len(strategies) == 0 {
-		slog.Warn("build_gate_healing configured but no strategies provided", "run_id", req.RunID, "phase", gatePhase)
-		return initialGate, nil, step.ErrBuildGateFailed
-	}
-
 	retries := healingConfig.Retries
 
 	// Create /in directory if not already created (for build-gate.log).
@@ -211,15 +203,15 @@ func (r *runController) runGateWithHealing(
 
 	// Attempt healing loop.
 	// Note: This is a domain-specific healing retry loop (not a transient error retry).
-	// It executes healing mods between gate validation attempts based on user-configured retries.
+	// It executes a single healing mod between gate validation attempts based on user-configured retries.
 	// We intentionally do not use internal/workflow/backoff here because:
-	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running healing mods).
+	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running a healing mod).
 	//  2. The retry count is user-configured (manifest-specified retries parameter).
-	//  3. No exponential backoff is needed; each healing attempt runs immediately after healing mods complete.
+	//  3. No exponential backoff is needed; each healing attempt runs immediately after the healing mod completes.
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries, "phase", gatePhase)
 
-		// Capture workspace status before running healing mods so we can detect
+		// Capture workspace status before running the healing mod so we can detect
 		// whether this healing attempt produced any net changes.
 		preStatus, preStatusErr := workspaceStatus(ctx, workspace)
 		if preStatusErr != nil {
@@ -231,98 +223,88 @@ func (r *runController) runGateWithHealing(
 			)
 		}
 
-		// Execute each healing mod in sequence using typed HealingMod structs
-		// across all configured strategies. For now, strategies are executed
-		// serially within this node; parallelism is handled at the scheduler.
-		for _, strategy := range strategies {
-			slog.Info("executing healing strategy", "run_id", req.RunID, "attempt", attempt, "strategy", strategy.Name, "mod_count", len(strategy.Mods), "phase", gatePhase)
+		// Build healing manifest from the single configured HealingMod.
+		mod := healingConfig.Mod
+		const modIndex = 0
 
-			for idx, mod := range strategy.Mods {
-				// Pass healingSession through so agent-specific session env (for example,
-				// CODEX_RESUME=1 for Codex-based healers) can be injected by
-				// buildHealingManifest when appropriate.
-				// Stack is unknown during inline healing loops since the gate result
-				// that detected the stack is the one that just failed. Use explicit
-				// ModStackUnknown to indicate this is intentional, not a fallback.
-				healManifest, buildErr := buildHealingManifest(req, mod, idx, healingSession, contracts.ModStackUnknown)
-				if buildErr != nil {
-					slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
-					return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
-				}
+		// Pass healingSession through so agent-specific session env (for example,
+		// CODEX_RESUME=1 for Codex-based healers) can be injected by
+		// buildHealingManifest when appropriate.
+		// Stack is unknown during inline healing loops since the gate result
+		// that detected the stack is the one that just failed. Use explicit
+		// ModStackUnknown to indicate this is intentional, not a fallback.
+		healManifest, buildErr := buildHealingManifest(req, mod, modIndex, healingSession, contracts.ModStackUnknown)
+		if buildErr != nil {
+			slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", modIndex, "error", buildErr)
+			return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", modIndex, buildErr)
+		}
 
-				slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image, "phase", gatePhase)
+		slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", modIndex, "image", healManifest.Image, "phase", gatePhase)
 
-				// Provide host workspace path for in-container build verification tools.
-				if healManifest.Env == nil {
-					healManifest.Env = map[string]string{}
-				}
-				healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-				// Inject server connection details so healing containers can talk to the control plane.
-				healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
-				healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
-				healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
-				healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
-				if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+		// Provide host workspace path for in-container build verification tools.
+		if healManifest.Env == nil {
+			healManifest.Env = map[string]string{}
+		}
+		healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
+		// Inject server connection details so healing containers can talk to the control plane.
+		healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+		healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
+		healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+		healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+		if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+			healManifest.Env["PLOY_API_TOKEN"] = token
+		} else if !r.cfg.HTTP.TLS.Enabled {
+			if data, err := os.ReadFile(bearerTokenPath()); err == nil {
+				if token := strings.TrimSpace(string(data)); token != "" {
 					healManifest.Env["PLOY_API_TOKEN"] = token
-				} else if !r.cfg.HTTP.TLS.Enabled {
-					if data, err := os.ReadFile(bearerTokenPath()); err == nil {
-						if token := strings.TrimSpace(string(data)); token != "" {
-							healManifest.Env["PLOY_API_TOKEN"] = token
-						}
-					} else {
-						slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
-					}
 				}
+			} else {
+				slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
+			}
+		}
 
-				// Mount node's TLS certificates into healing container for authenticated control-plane access.
-				if healManifest.Options == nil {
-					healManifest.Options = make(map[string]any)
-				}
-				healManifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
-				healManifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
-				healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
+		// Mount node's TLS certificates into healing container for authenticated control-plane access.
+		if healManifest.Options == nil {
+			healManifest.Options = make(map[string]any)
+		}
+		healManifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
+		healManifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
+		healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
 
-				// Run the healing mod container.
-				// Pass RunID directly for consistent labeling and telemetry.
-				healResult, healErr := runner.Run(ctx, step.Request{
-					RunID:     req.RunID,
-					Manifest:  healManifest,
-					Workspace: workspace,
-					OutDir:    outDir,
-					InDir:     *inDir,
-				})
+		// Run the healing mod container.
+		// Pass RunID directly for consistent labeling and telemetry.
+		healResult, healErr := runner.Run(ctx, step.Request{
+			RunID:     req.RunID,
+			Manifest:  healManifest,
+			Workspace: workspace,
+			OutDir:    outDir,
+			InDir:     *inDir,
+		})
 
-				if healErr != nil {
-					slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", idx, "error", healErr)
-					return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
-				}
+		if healErr != nil {
+			slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", modIndex, "error", healErr)
+			return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", modIndex, healErr)
+		}
 
-				if healResult.ExitCode != 0 {
-					slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", idx, "exit_code", healResult.ExitCode)
-					// Continue with remaining mods; we'll check gate after all mods run.
-				}
+		if healResult.ExitCode != 0 {
+			slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", modIndex, "exit_code", healResult.ExitCode)
+			// Continue; re-gate will still run so callers see gate status.
+		}
 
-				// Upload /out artifacts for this healing mod if present.
-				if uploadErr := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); uploadErr != nil {
-					slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "mod_index", idx, "error", uploadErr)
-				}
+		// Upload /out artifacts for this healing mod if present.
+		if uploadErr := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); uploadErr != nil {
+			slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "mod_index", modIndex, "error", uploadErr)
+		}
 
-				// Per-step diff capture: Generate and upload diff after each healing mod step.
-				// E3: Pass job name for branch-local diff tagging in multi-strategy healing.
-				// Include strategy name in jobName for branch-local tagging when present.
-				jobName := req.JobName
-				if strategy.Name != "" {
-					jobName = fmt.Sprintf("heal-%s-%d-%d", strategy.Name, attempt, idx)
-				}
-				r.uploadHealingModDiff(ctx, req.RunID, req.JobID, jobName, workspace, healResult, idx, attempt, stepIndex)
+		// Per-step diff capture: Generate and upload diff after the healing mod step.
+		jobName := req.JobName
+		r.uploadHealingModDiff(ctx, req.RunID, req.JobID, jobName, workspace, healResult, modIndex, attempt, stepIndex)
 
-				// Read session artifacts from /out for propagation across retries.
-				if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
-					if session := strings.TrimSpace(string(sessionBytes)); session != "" {
-						healingSession = session
-						slog.Info("healing: captured session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", healingSession)
-					}
-				}
+		// Read session artifacts from /out for propagation across retries.
+		if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
+			if session := strings.TrimSpace(string(sessionBytes)); session != "" {
+				healingSession = session
+				slog.Info("healing: captured session from /out", "run_id", req.RunID, "mod_index", modIndex, "session_id", healingSession)
 			}
 		}
 
@@ -338,7 +320,7 @@ func (r *runController) runGateWithHealing(
 			}
 		}
 
-		// Capture workspace status after healing mods complete and compare with
+		// Capture workspace status after the healing mod completes and compare with
 		// the pre-healing status. If both are available and identical, then this
 		// healing attempt produced no net workspace changes and there is no point
 		// in re-running the gate. Treat this as a terminal build gate failure.
@@ -362,7 +344,7 @@ func (r *runController) runGateWithHealing(
 			return initialGate, reGates, fmt.Errorf("%w: healing produced no workspace changes", step.ErrBuildGateFailed)
 		}
 
-		// Re-run the gate after healing mods complete.
+		// Re-run the gate after the healing mod completes.
 		// The node agent ALWAYS re-runs the gate via runner.Gate.Execute to verify
 		// that healing modifications have resolved the validation failure.
 		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)

@@ -14,85 +14,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// healingStrategy represents a healing configuration parsed from the spec.
-// After collapsing parallel healing, only the first strategy with its first
-// healing mod is used per gate.
-type healingStrategy struct {
-	Name string           // Strategy name (e.g., "codex-ai"); may be empty when not provided.
-	Mods []map[string]any // Ordered list of healing mod definitions (image, command, env, etc.).
-}
-
-// parseHealingStrategies extracts healing strategies from the build_gate_healing config.
-// Returns a slice of strategies from the canonical multi-strategy (strategies[]) form.
-//
-// The canonical schema requires healing to be configured via:
-//
-//	build_gate_healing:
-//	  retries: N
-//	  strategies:
-//	    - name: "strategy-name"
-//	      mods:
-//	        - image: "heal-image:latest"
-//
-// Legacy single-strategy form (build_gate_healing.mods[] at top level) is no longer
-// supported. Callers must migrate to the strategies[] schema.
-func parseHealingStrategies(healingConfig map[string]any) []healingStrategy {
-	// Only accept the canonical multi-strategy form (strategies[]).
-	strategiesRaw, ok := healingConfig["strategies"].([]any)
-	if !ok || len(strategiesRaw) == 0 {
-		// No strategies configured — healing is not enabled.
-		// Note: Top-level mods[] (legacy single-strategy form) is intentionally
-		// not supported. Callers must use the strategies[] schema.
-		return nil
-	}
-
-	var strategies []healingStrategy
-	for _, sRaw := range strategiesRaw {
-		sMap, ok := sRaw.(map[string]any)
-		if !ok {
-			continue
-		}
-		// Extract strategy name (optional, defaults to empty).
-		name := ""
-		if n, ok := sMap["name"].(string); ok {
-			name = strings.TrimSpace(n)
-		}
-		// Extract mods list for this strategy.
-		modsRaw, ok := sMap["mods"].([]any)
-		if !ok || len(modsRaw) == 0 {
-			continue // Skip strategies without mods.
-		}
-		var mods []map[string]any
-		for _, mRaw := range modsRaw {
-			if m, ok := mRaw.(map[string]any); ok {
-				mods = append(mods, m)
-			}
-		}
-		if len(mods) > 0 {
-			strategies = append(strategies, healingStrategy{Name: name, Mods: mods})
-		}
-	}
-	return strategies
-}
-
-// maybeCreateHealingJobs creates healing jobs and a re-gate job when a gate job fails.
+// maybeCreateHealingJobs creates a single healing job and a re-gate job when a gate job fails.
 // This is called when a gate job (pre_gate, post_gate, re_gate) completes with reason="build-gate".
 //
 // The function:
 // 1. Finds the failed gate job by step_index
 // 2. Verifies it's a gate job (pre_gate, post_gate, re_gate)
-// 3. Checks if healing is configured in the run spec (requires strategies[] schema)
+// 3. Checks if healing is configured in the run spec (requires single-mod schema)
 // 4. Counts existing healing attempts to enforce retry limits
-// 5. Creates healing jobs and a re-gate job at intermediate step_index values
+// 5. Creates one healing job and one re-gate job at intermediate step_index values
 //
-// Creates parallel branches with distinct step_index windows:
-//
-//	pre-gate (1000) → FAIL → branch-a: heal-a-0 (1500), re-gate-a (1600)
-//	                       → branch-b: heal-b-0 (1700), re-gate-b (1800)
-//	→ mod-0 (2000)
-//
-// Note: Legacy single-strategy form (mods[] at top level) is no longer supported.
-// Callers must use the canonical strategies[] schema for healing configuration.
+// Note: Legacy multi-strategy forms (strategies[] or mods[] at top level) are
+// no longer supported. Callers must use the canonical single-mod schema for
+// healing configuration.
 func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
@@ -151,12 +85,10 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Parse healing strategies (requires canonical strategies[] schema).
-	// After collapsing parallel healing, only the first strategy and its
-	// first mod are used per gate.
-	strategies := parseHealingStrategies(healingConfig)
-	if len(strategies) == 0 || len(strategies[0].Mods) == 0 {
-		slog.Debug("maybeCreateHealingJobs: no healing strategies configured, canceling remaining jobs",
+	// Extract healing mod (canonical single-mod schema).
+	modMap, ok := healingConfig["mod"].(map[string]any)
+	if !ok || len(modMap) == 0 {
+		slog.Debug("maybeCreateHealingJobs: no healing mod configured, canceling remaining jobs",
 			"run_id", runID,
 		)
 		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
@@ -305,22 +237,13 @@ func maybeCreateHealingJobs(
 		"attempt", healingAttemptNumber,
 	)
 
-	// Use the first strategy and its first mod as the single healing mod.
-	strategy := strategies[0]
-	modMap := strategy.Mods[0]
-
 	modImage := ""
 	if img, ok := modMap["image"].(string); ok {
 		modImage = strings.TrimSpace(img)
 	}
 
-	branchSuffix := strategy.Name
-	if branchSuffix == "" {
-		branchSuffix = "branch-0"
-	}
-
 	// Create a single healing job for this attempt.
-	healJobName := fmt.Sprintf("heal-%s-%d-0", branchSuffix, healingAttemptNumber)
+	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(domaintypes.NewJobID()),
 		RunID:     runID.String(),
@@ -341,11 +264,10 @@ func maybeCreateHealingJobs(
 		"step_index", healStepIndex,
 		"status", store.JobStatusPending,
 		"image", modImage,
-		"branch", branchSuffix,
 	)
 
 	// Create a single re-gate job for this attempt.
-	reGateName := fmt.Sprintf("re-gate-%s-%d", branchSuffix, healingAttemptNumber)
+	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(domaintypes.NewJobID()),
 		RunID:     runID.String(),
@@ -364,14 +286,10 @@ func maybeCreateHealingJobs(
 		"run_id", runID,
 		"job_name", reGateName,
 		"step_index", reGateStepIndex,
-		"branch", branchSuffix,
 	)
 
 	return nil
 }
-
-// cancelLoserBranches and cancelHealingPathAfterNoChange have been removed as
-// part of collapsing parallel healing into a single linear healing path.
 
 // cancelRemainingJobsAfterFailure cancels all non-terminal jobs with
 // step_index greater than the failed job's step_index. This is used after the

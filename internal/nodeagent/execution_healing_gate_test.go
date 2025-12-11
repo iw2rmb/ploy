@@ -95,13 +95,8 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"name": "default",
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},
@@ -349,12 +344,8 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},
@@ -451,12 +442,8 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},
@@ -562,12 +549,8 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},
@@ -683,12 +666,8 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},
@@ -987,12 +966,8 @@ func TestRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
 		Options: map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
-				"strategies": []any{
-					map[string]any{
-						"mods": []any{
-							map[string]any{"image": "healer:latest"},
-						},
-					},
+				"mod": map[string]any{
+					"image": "healer:latest",
 				},
 			},
 		},

@@ -66,27 +66,25 @@ build_gate:
 # proceeding to the next step.
 build_gate_healing:
   retries: 1
-  strategies:
-    - name: codex-heal
-      mods:
-        # Codex healing container using the workspace diff handshake.
-        # Codex edits the workspace and exits when done; the node agent inspects
-        # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-        # Codex never runs the gate itself.
-        - image: docker.io/iwtormb/mods-codex:latest
-          env:
-            CODEX_PROMPT: |-
-              Rules:
-              - Use /workspace and /in/build-gate.log to understand the compile error.
-              - Edit files under /workspace as needed to fix the error.
-              - When you believe the code is ready for a full build validation, stop editing and end the session.
+  mod:
+    # Codex healing container using the workspace diff handshake.
+    # Codex edits the workspace and exits when done; the node agent inspects
+    # the workspace for diffs and re-runs the Build Gate externally when changes exist.
+    # Codex never runs the gate itself.
+    image: docker.io/iwtormb/mods-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Use /workspace and /in/build-gate.log to understand the compile error.
+        - Edit files under /workspace as needed to fix the error.
+        - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-              Task:
-              Fix the compilation error described in /in/build-gate.log.
-          env_from_file:
-            # Inline Codex auth JSON from local file (resolved by CLI)
-            # Uncomment and set your auth file path:
-            # CODEX_AUTH_JSON: ~/.codex/auth.json
+        Task:
+        Fix the compilation error described in /in/build-gate.log.
+    env_from_file:
+      # Inline Codex auth JSON from local file (resolved by CLI)
+      # Uncomment and set your auth file path:
+      # CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # GITLAB INTEGRATION (optional)

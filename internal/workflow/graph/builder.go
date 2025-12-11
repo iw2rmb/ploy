@@ -113,9 +113,8 @@ func mapModType(modType string) NodeType {
 }
 
 // BuildFromJobsWithEdgeStrategy allows specifying a custom edge computation
-// strategy. This is provided for future extensibility (e.g., parallel healing
-// branches). Currently delegates to the standard linear edge computation.
-// runID is now a string (KSUID-backed).
+// strategy. This is provided for future extensibility. Currently delegates to
+// the standard linear edge computation. runID is now a string (KSUID-backed).
 func BuildFromJobsWithEdgeStrategy(runID string, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
 	graph := BuildFromJobs(runID, jobs)
 
@@ -146,17 +145,10 @@ func (s *LinearEdgeStrategy) ComputeEdges(g *WorkflowGraph) {
 // HealingWindowEdgeStrategy implements EdgeStrategy for graphs with
 // healing windows. It groups healing jobs with their associated gate
 // and creates appropriate edge relationships.
-//
-// Healing window pattern:
-//
-//	gate (failed) → heal-1 → re-gate → heal-2 → re-gate → ... → next-job
-//
-// This strategy is provided for future parallel healing support.
 type HealingWindowEdgeStrategy struct{}
 
 // ComputeEdges derives edges considering healing window semantics.
-// Currently delegates to linear computation; future implementation
-// will handle parallel healing branches.
+// Currently delegates to linear computation.
 func (s *HealingWindowEdgeStrategy) ComputeEdges(g *WorkflowGraph) {
 	// For now, use linear edge computation.
 	// Future: detect healing windows and create branching edges.

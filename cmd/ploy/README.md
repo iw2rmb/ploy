@@ -496,9 +496,8 @@ repair of build failures using tools like Codex or other LLM-based workflows.
 1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `re_gate` phases)
    and are claimed by nodes via `/v1/nodes/{id}/claim`.
 2. If the pre-gate job fails and `build_gate_healing` is configured, the node executes
-   healing strategies defined under `build_gate_healing.strategies[]`, running each
-   strategy's `mods[]` in sequence against the same
-   workspace and Build Gate logs.
+   the healing mod defined under `build_gate_healing.mod` against the same workspace
+   and Build Gate logs.
 3. After all healing steps complete, a `re_gate` job runs as another job in the queue. If it
    passes, the main mod proceeds.
 4. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
@@ -521,20 +520,18 @@ and `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses remain unchanged
 gate executor logic abstracts execution location, ensuring consistent gate status
 reporting.
 
-**Spec format (single healing strategy):**
+**Spec format (single healing mod):**
 ```yaml
 build_gate_healing:
   retries: 1
-  strategies:
-    - name: codex-heal
-      mods:
-        - image: docker.io/you/mods-codex:latest
-          command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
-          env:
-            CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
-          env_from_file:
-            CODEX_AUTH_JSON: ~/.codex/auth.json
-          retain_container: false
+  mod:
+    image: docker.io/you/mods-codex:latest
+    command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
+    env:
+      CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+    retain_container: false
 ```
 
 **Cross-phase inputs:**

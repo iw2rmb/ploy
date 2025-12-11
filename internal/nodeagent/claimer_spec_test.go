@@ -3,8 +3,6 @@ package nodeagent
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // TestParseSpec_PassesThroughBuildGateHealing verifies that the node agent
@@ -151,7 +149,7 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 		"build_gate": {"enabled": true, "profile": "auto"},
 		"build_gate_healing": {
 			"retries": 1,
-			"mods": [{"image": "docker.io/test/healer:latest"}]
+			"mod": {"image": "docker.io/test/healer:latest"}
 		}
 	}`
 
@@ -228,84 +226,30 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 	}
 }
 
-// TestParseRunOptions_MultiStrategyHealing verifies that parseRunOptions correctly
-// parses the canonical multi-strategy healing schema and that strategies[] takes
-// precedence when legacy mods[] and strategies[] are both present.
-func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
+// TestParseRunOptions_HealingSingleMod verifies that parseRunOptions correctly
+// parses the canonical single-mod healing schema.
+func TestParseRunOptions_HealingSingleMod(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		specJSON         string
-		wantRetries      int
-		wantStrategies   int
-		wantStratNames   []string
-		wantModsPerStrat []int
+		name        string
+		specJSON    string
+		wantRetries int
+		wantImage   string
 	}{
 		{
-			name: "multi_strategy_form_two_branches",
+			name: "single_mod_healing",
 			specJSON: `{
 				"build_gate_healing": {
 					"retries": 3,
-					"strategies": [
-						{
-							"name": "codex-ai",
-							"mods": [
-								{"image": "docker.io/test/codex:latest", "command": "fix-with-ai"}
-							]
-						},
-						{
-							"name": "static-patch",
-							"mods": [
-								{"image": "docker.io/test/patcher:latest"},
-								{"image": "docker.io/test/validator:latest"}
-							]
-						}
-					]
+					"mod": {
+						"image": "docker.io/test/codex:latest",
+						"command": "fix-with-ai"
+					}
 				}
 			}`,
-			wantRetries:      3,
-			wantStrategies:   2,
-			wantStratNames:   []string{"codex-ai", "static-patch"},
-			wantModsPerStrat: []int{1, 2},
-		},
-		{
-			name: "strategies_takes_precedence_over_mods",
-			specJSON: `{
-				"build_gate_healing": {
-					"retries": 1,
-					"mods": [
-						{"image": "docker.io/test/legacy:latest"}
-					],
-					"strategies": [
-						{
-							"name": "preferred",
-							"mods": [{"image": "docker.io/test/new:latest"}]
-						}
-					]
-				}
-			}`,
-			wantRetries:      1,
-			wantStrategies:   1, // Strategies populated.
-			wantStratNames:   []string{"preferred"},
-			wantModsPerStrat: []int{1},
-		},
-		{
-			name: "empty_strategy_name_allowed",
-			specJSON: `{
-				"build_gate_healing": {
-					"retries": 1,
-					"strategies": [
-						{
-							"mods": [{"image": "docker.io/test/unnamed:latest"}]
-						}
-					]
-				}
-			}`,
-			wantRetries:      1,
-			wantStrategies:   1,
-			wantStratNames:   []string{""}, // Empty name allowed.
-			wantModsPerStrat: []int{1},
+			wantRetries: 3,
+			wantImage:   "docker.io/test/codex:latest",
 		},
 	}
 
@@ -330,143 +274,41 @@ func TestParseRunOptions_MultiStrategyHealing(t *testing.T) {
 				t.Errorf("Retries: got %d, want %d", typedOpts.Healing.Retries, tc.wantRetries)
 			}
 
-			if len(typedOpts.Healing.Strategies) != tc.wantStrategies {
-				t.Errorf("Strategies count: got %d, want %d", len(typedOpts.Healing.Strategies), tc.wantStrategies)
-			}
-
-			// Verify strategy names.
-			for i, wantName := range tc.wantStratNames {
-				if i >= len(typedOpts.Healing.Strategies) {
-					t.Errorf("missing strategy at index %d", i)
-					continue
-				}
-				if typedOpts.Healing.Strategies[i].Name != wantName {
-					t.Errorf("Strategy[%d].Name: got %q, want %q", i, typedOpts.Healing.Strategies[i].Name, wantName)
-				}
-			}
-
-			// Verify mods per strategy.
-			for i, wantMods := range tc.wantModsPerStrat {
-				if i >= len(typedOpts.Healing.Strategies) {
-					continue
-				}
-				if len(typedOpts.Healing.Strategies[i].Mods) != wantMods {
-					t.Errorf("Strategy[%d].Mods count: got %d, want %d", i, len(typedOpts.Healing.Strategies[i].Mods), wantMods)
-				}
+			if typedOpts.Healing.Mod.Image.Universal != tc.wantImage {
+				t.Errorf("Healing mod image: got %q, want %q", typedOpts.Healing.Mod.Image.Universal, tc.wantImage)
 			}
 		})
 	}
 }
 
-// TestHealingConfig_NormalizedStrategies verifies that NormalizedStrategies()
-// returns configured strategies when present and nil/empty otherwise.
-func TestHealingConfig_NormalizedStrategies(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name           string
-		config         *HealingConfig
-		wantStrategies int
-		wantFirstName  string
-		wantFirstMods  int
-	}{
-		{
-			name:           "nil_config_returns_nil",
-			config:         nil,
-			wantStrategies: 0,
-		},
-		{
-			name: "multi_strategy_returned_directly",
-			config: &HealingConfig{
-				Retries: 1,
-				Strategies: []HealingStrategy{
-					{Name: "alpha", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "a:latest"}}}},
-					{Name: "beta", Mods: []HealingMod{{Image: contracts.ModImage{Universal: "b:latest"}}}},
-				},
-			},
-			wantStrategies: 2,
-			wantFirstName:  "alpha",
-			wantFirstMods:  1,
-		},
-		{
-			name: "empty_config_returns_nil",
-			config: &HealingConfig{
-				Retries: 1,
-				// No Mods, no Strategies.
-			},
-			wantStrategies: 0,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			strategies := tc.config.NormalizedStrategies()
-
-			if len(strategies) != tc.wantStrategies {
-				t.Fatalf("NormalizedStrategies count: got %d, want %d", len(strategies), tc.wantStrategies)
-			}
-
-			if tc.wantStrategies == 0 {
-				return
-			}
-
-			if strategies[0].Name != tc.wantFirstName {
-				t.Errorf("First strategy name: got %q, want %q", strategies[0].Name, tc.wantFirstName)
-			}
-
-			if len(strategies[0].Mods) != tc.wantFirstMods {
-				t.Errorf("First strategy mods count: got %d, want %d", len(strategies[0].Mods), tc.wantFirstMods)
-			}
-		})
-	}
-}
-
-// TestParseHealingStrategy_ModFields verifies that parseHealingStrategy correctly
+// TestParseHealingMod_ModFields verifies that healing mod parsing correctly
 // extracts mod fields including image, command, env, and retain_container.
-func TestParseHealingStrategy_ModFields(t *testing.T) {
+func TestParseHealingMod_ModFields(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
 		"build_gate_healing": {
 			"retries": 1,
-			"strategies": [
-				{
-					"name": "test-strategy",
-					"mods": [
-						{
-							"image": "docker.io/test/healer:v1",
-							"command": "heal.sh --fix",
-							"env": {
-								"MODE": "aggressive",
-								"DEBUG": "true"
-							},
-							"retain_container": true
-						}
-					]
-				}
-			]
+			"mod": {
+				"image": "docker.io/test/healer:v1",
+				"command": "heal.sh --fix",
+				"env": {
+					"MODE": "aggressive",
+					"DEBUG": "true"
+				},
+				"retain_container": true
+			}
 		}
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
 	_, _, typedOpts := parseSpec(raw)
 
-	if typedOpts.Healing == nil || len(typedOpts.Healing.Strategies) == 0 {
-		t.Fatal("expected healing strategies to be parsed")
+	if typedOpts.Healing == nil {
+		t.Fatal("expected healing config to be parsed")
 	}
 
-	strategy := typedOpts.Healing.Strategies[0]
-	if strategy.Name != "test-strategy" {
-		t.Errorf("Strategy name: got %q, want %q", strategy.Name, "test-strategy")
-	}
-
-	if len(strategy.Mods) != 1 {
-		t.Fatalf("Strategy mods count: got %d, want 1", len(strategy.Mods))
-	}
-
-	mod := strategy.Mods[0]
+	mod := typedOpts.Healing.Mod
 
 	// Verify image.
 	if mod.Image.Universal != "docker.io/test/healer:v1" {
