@@ -268,7 +268,14 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				)
 			} else {
 				modType := strings.TrimSpace(job.ModType)
-				if modType == "pre_gate" || modType == "post_gate" || modType == "re_gate" {
+				if modType == "mr" {
+					// MR jobs are best-effort and must not trigger healing or
+					// cancellation of other jobs when they fail.
+					slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
+						"job_id", jobIDStr,
+						"step_index", job.StepIndex,
+					)
+				} else if modType == "pre_gate" || modType == "post_gate" || modType == "re_gate" {
 					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
 						slog.Error("complete job: failed to create healing jobs",
 							"job_id", jobIDStr,

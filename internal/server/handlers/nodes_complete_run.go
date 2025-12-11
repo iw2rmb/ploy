@@ -35,6 +35,10 @@ import (
 // This avoids rewriting per-job terminal states after completion; each job's
 // terminal status is set atomically by UpdateJobCompletion and remains unchanged.
 func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
+	// If the run is already in a terminal state, skip recomputation.
+	if run.Status == store.RunStatusSucceeded || run.Status == store.RunStatusFailed || run.Status == store.RunStatusCanceled {
+		return nil
+	}
 	// Fetch all jobs for the run to compute gate-aware status in a single pass.
 	// runID is now a KSUID-backed string after run ID migration.
 	jobs, err := st.ListJobsByRun(ctx, runID.String())
@@ -47,13 +51,14 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		return fmt.Errorf("run has no jobs")
 	}
 
-	// Iterate through jobs to compute:
+	// Iterate through jobs (excluding MR jobs) to compute:
 	// - terminalJobs: count of jobs in terminal state (for completion check).
 	// - hasNonGateFailure: any non-gate job (mod/heal) failed or canceled.
 	// - lastGateStepIndex + lastGateStatus: terminal status of highest-index gate.
 	// - hasCanceled: any job was canceled (for fallback precedence).
 	var (
 		terminalJobs      int64
+		totalJobs         int64
 		hasNonGateFailure bool
 		lastGateStepIndex float64
 		lastGateStatus    store.JobStatus
@@ -62,6 +67,16 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	)
 
 	for _, job := range jobs {
+		modType := strings.TrimSpace(job.ModType)
+		if modType == "mr" {
+			// MR jobs are auxiliary and do not participate in run completion
+			// status derivation. They must not block terminal state detection
+			// or change success/failure semantics for the run.
+			continue
+		}
+
+		totalJobs++
+
 		// Check if job is in terminal state.
 		isTerminal := job.Status == store.JobStatusSucceeded ||
 			job.Status == store.JobStatusFailed ||
@@ -77,7 +92,6 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		}
 
 		// Determine if this is a gate job based on mod_type column.
-		modType := strings.TrimSpace(job.ModType)
 		isGate := modType == "pre_gate" || modType == "post_gate" || modType == "re_gate"
 
 		if isGate {
@@ -98,7 +112,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	}
 
 	// If not all jobs are in terminal state, the run is still in progress.
-	if terminalJobs < int64(len(jobs)) {
+	if terminalJobs < totalJobs {
 		slog.Debug("multi-step run still in progress",
 			"run_id", runID,
 			"total_jobs", len(jobs),
@@ -196,6 +210,17 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	if err := maybeUpdateRunRepoFromExecution(ctx, st, runID, runStatus); err != nil {
 		// Log but don't fail — the run completion itself succeeded.
 		slog.Warn("multi-step run completed but failed to update linked run_repo",
+			"run_id", runID,
+			"status", runStatus,
+			"err", err,
+		)
+	}
+
+	// After the run reaches a terminal state, schedule a best-effort MR job
+	// when MR wiring is configured. MR jobs run after completion and must
+	// not influence the run's terminal status.
+	if err := maybeScheduleMRJobForRun(ctx, st, run, runID, runStatus); err != nil {
+		slog.Error("multi-step run completed but failed to schedule MR job",
 			"run_id", runID,
 			"status", runStatus,
 			"err", err,
