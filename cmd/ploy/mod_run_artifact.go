@@ -31,7 +31,7 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 		return fmt.Errorf("create artifact dir %s: %w", dir, err)
 	}
 	// Fetch run status to retrieve artifact CIDs.
-	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(runID)))
+	statusURL, err := url.JoinPath(base.String(), "v1", "runs", url.PathEscape(strings.TrimSpace(runID)), "status")
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func buildArtifactFilename(stage, name, cid, digest string) string {
 // fetchMRURL loads the run status and extracts the MR URL from metadata when present.
 // Returns empty string if the MR URL is not found or an error occurs.
 func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, runID string) (string, error) {
-	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(runID)))
+	statusURL, err := url.JoinPath(base.String(), "v1", "runs", url.PathEscape(strings.TrimSpace(runID)), "status")
 	if err != nil {
 		return "", err
 	}

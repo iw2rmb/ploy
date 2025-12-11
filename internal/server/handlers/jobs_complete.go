@@ -332,8 +332,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// For MR jobs that reported an MR URL in stats.metadata.mr_url, merge the
-		// URL into runs.stats.metadata.mr_url so that GET /v1/mods/{id} can expose
-		// it via RunStats.MRURL() and CLI commands can display it. This is a
+		// URL into runs.stats.metadata.mr_url so that GET /v1/runs/{id}/status can
+		// expose it via RunStats.MRURL() and CLI commands can display it. This is a
 		// best-effort update and does not affect run status.
 		if err == nil && mrURL != "" && strings.TrimSpace(job.ModType) == "mr" {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{

@@ -53,9 +53,9 @@ type RunSubmitRequest struct {
 	CreatedBy string          `json:"created_by,omitempty"`
 }
 
-// RunSummary is the canonical response type for both POST /v1/mods (submit)
-// and GET /v1/mods/{id} (status). No wrapper types are used — the JSON shape
-// is RunSummary directly (run_id, state, stages, etc.).
+// RunSummary is the canonical response type for POST /v1/mods (submit)
+// and GET /v1/runs/{id}/status (status). No wrapper types are used — the JSON
+// shape is RunSummary directly (run_id, state, stages, etc.).
 //
 // RunSummary summarises run lifecycle state and associated stages.
 // The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON.
@@ -92,7 +92,7 @@ type StageStatus struct {
 }
 
 // StageMetadata captures job-level metadata for Mods runs.
-// It mirrors information exposed via GET /v1/mods/{id} and is derived from
+// It mirrors information exposed via GET /v1/runs/{id}/status and is derived from
 // jobs and related artifacts rather than being tied to a specific storage
 // layout for jobs.meta JSONB.
 //
