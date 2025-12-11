@@ -26,18 +26,8 @@ func TestModRunBatchRouting(t *testing.T) {
 			wantErr: "run-name required",
 		},
 		{
-			name:    "start without run-name",
-			args:    []string{"mod", "run", "start"},
-			wantErr: "run-name required",
-		},
-		{
 			name:    "stop with empty run-name",
 			args:    []string{"mod", "run", "stop", ""},
-			wantErr: "run-name required",
-		},
-		{
-			name:    "start with empty run-name",
-			args:    []string{"mod", "run", "start", ""},
 			wantErr: "run-name required",
 		},
 	}
@@ -225,58 +215,6 @@ func TestModRunBatchStopCallsControlPlane(t *testing.T) {
 	}
 	if !strings.Contains(output, "Cancelled 3") {
 		t.Errorf("output should contain Cancelled 3: %s", output)
-	}
-}
-
-// TestModRunBatchStartCallsControlPlane validates start command calls the API.
-// Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchStartCallsControlPlane(t *testing.T) {
-	var called bool
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/batch-789/start" {
-			called = true
-
-			resp := struct {
-				RunID       string `json:"run_id"`
-				Started     int    `json:"started"`
-				AlreadyDone int    `json:"already_done"`
-				Pending     int    `json:"pending"`
-			}{
-				RunID:       "batch-789",
-				Started:     3,
-				AlreadyDone: 1,
-				Pending:     0,
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	useServerDescriptor(t, server.URL)
-
-	var buf bytes.Buffer
-	err := executeCmd([]string{"mod", "run", "start", "batch-789"}, &buf)
-	if err != nil {
-		t.Fatalf("mod run start error: %v", err)
-	}
-	if !called {
-		t.Fatal("expected POST /v1/runs/batch-789/start to be called")
-	}
-
-	output := buf.String()
-	if !strings.Contains(output, "batch-789") {
-		t.Errorf("output should contain batch-789: %s", output)
-	}
-	if !strings.Contains(output, "started 3") {
-		t.Errorf("output should contain started 3: %s", output)
-	}
-	if !strings.Contains(output, "1 already done") {
-		t.Errorf("output should contain 1 already done: %s", output)
 	}
 }
 

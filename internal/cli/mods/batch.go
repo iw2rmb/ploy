@@ -223,60 +223,6 @@ func (c StopBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	return summary, nil
 }
 
-// StartBatchCommand starts execution for pending repos in a batch run.
-// Uses domain type (RunID) for type-safe identification.
-type StartBatchCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	BatchID domaintypes.RunID // ID of the batch run to start (KSUID-backed)
-}
-
-// StartBatchResult contains the result of starting a batch run.
-// Uses domain type (RunID) for type-safe identification.
-type StartBatchResult struct {
-	RunID       domaintypes.RunID `json:"run_id"`       // Run ID (KSUID-backed)
-	Started     int               `json:"started"`      // Number of repos that started.
-	AlreadyDone int               `json:"already_done"` // Number of repos in terminal state.
-	Pending     int               `json:"pending"`      // Number of repos still pending.
-}
-
-// Run executes POST /v1/runs/{id}/start to start execution for pending repos.
-func (c StartBatchCommand) Run(ctx context.Context) (StartBatchResult, error) {
-	if c.Client == nil {
-		return StartBatchResult{}, fmt.Errorf("batch start: http client required")
-	}
-	if c.BaseURL == nil {
-		return StartBatchResult{}, fmt.Errorf("batch start: base url required")
-	}
-	// Use domain type's IsZero method for validation.
-	if c.BatchID.IsZero() {
-		return StartBatchResult{}, fmt.Errorf("batch start: batch id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String(), "start")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
-	if err != nil {
-		return StartBatchResult{}, fmt.Errorf("batch start: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return StartBatchResult{}, fmt.Errorf("batch start: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return StartBatchResult{}, decodeHTTPError(resp, "batch start")
-	}
-
-	var result StartBatchResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return StartBatchResult{}, fmt.Errorf("batch start: decode response: %w", err)
-	}
-
-	return result, nil
-}
-
 // decodeHTTPError reads and formats an error from a non-success HTTP response.
 // It attempts to extract an error message from the response body; otherwise,
 // falls back to the HTTP status text.

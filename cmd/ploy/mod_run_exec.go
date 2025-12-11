@@ -24,6 +24,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
@@ -161,7 +162,7 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 		if *flags.CapDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
 			if *flags.CancelOnCap {
 				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
-				_ = mods.CancelCommand{
+				_ = runs.CancelCommand{
 					BaseURL: base,
 					Client:  httpClient,
 					RunID:   domaintypes.RunID(runID),

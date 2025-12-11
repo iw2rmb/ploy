@@ -3,8 +3,6 @@ Usage: ploy mod <command>
 Commands:
   run         Submit a Mods run to the control plane
   run repo    Manage repos within a batch run (add/remove/restart/status)
-  cancel      Cancel a Mods run via the control plane
-  resume      Resume a paused Mods run
   inspect     Show summary for a Mods run
   artifacts   List run artifacts by stage
   diffs       List diffs or download newest patch

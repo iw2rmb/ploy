@@ -220,12 +220,12 @@ ploy mod run pull --origin upstream 2xK9mNpL
 
 ---
 
-`mod resume` requests resumption of a failed or canceled Mods run via the
-control plane `POST /v1/mods/{id}/resume` endpoint. This enables continuation
+`run resume` requests resumption of a failed or canceled Mods run via the
+control plane `POST /v1/runs/{id}/resume` endpoint. This enables continuation
 of previously interrupted workflows without resubmitting the entire spec.
 
 ```bash
-ploy mod resume <run-id>
+ploy run resume <run-id>
 # Output: Resume requested
 ```
 

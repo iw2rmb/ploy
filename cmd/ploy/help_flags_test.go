@@ -43,7 +43,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy mod --help",
 			args:           []string{"mod", "--help"},
-			expectContains: []string{"Usage: ploy mod", "run", "cancel", "resume", "inspect"},
+			expectContains: []string{"Usage: ploy mod", "run", "inspect"},
 			expectNoError:  true,
 		},
 		{
@@ -254,15 +254,12 @@ func TestWantsHelpFunction(t *testing.T) {
 func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mod", "--help"},
-		{"mods", "--help"},
-		{"runs", "--help"},
 		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
 		// NOTE: {"rollout", "--help"} removed — rollout re-rooted under cluster rollout.
 		// NOTE: {"token", "--help"} removed — token re-rooted under cluster token.
 		{"config", "--help"},
 		{"config", "gitlab", "--help"},
 		{"manifest", "--help"},
-		{"upload", "--help"},
 		{"cluster", "--help"},
 		{"cluster", "deploy", "--help"}, // Replaces ploy server --help
 		{"cluster", "node", "--help"},

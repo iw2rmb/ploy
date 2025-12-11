@@ -23,10 +23,6 @@ func handleMod(args []string, stderr io.Writer) error {
 		return handleModRun(args[1:], stderr)
 	case "fetch":
 		return handleModFetch(args[1:], stderr)
-	case "cancel":
-		return handleModCancel(args[1:], stderr)
-	case "resume":
-		return handleModResume(args[1:], stderr)
 	case "artifacts":
 		return handleModArtifacts(args[1:], stderr)
 	case "diffs":

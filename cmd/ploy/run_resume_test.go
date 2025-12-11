@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// TestModResumeCallsControlPlane verifies the CLI wires through to POST /v1/mods/{id}/resume
+// TestRunResumeCallsControlPlane verifies the CLI wires through to POST /v1/runs/{id}/resume
 // and handles a successful 202 Accepted response.
-func TestModResumeCallsControlPlane(t *testing.T) {
+func TestRunResumeCallsControlPlane(t *testing.T) {
 	var called bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/mods/run-9/resume" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-9/resume" {
 			called = true
 			w.WriteHeader(http.StatusAccepted)
 			_, _ = w.Write([]byte(`{"state":"running"}`))
@@ -25,12 +25,12 @@ func TestModResumeCallsControlPlane(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume", "run-9"}, buf)
+	err := executeCmd([]string{"run", "resume", "run-9"}, buf)
 	if err != nil {
-		t.Fatalf("mod resume error: %v", err)
+		t.Fatalf("run resume error: %v", err)
 	}
 	if !called {
-		t.Fatalf("expected /v1/mods/{id}/resume to be called")
+		t.Fatalf("expected /v1/runs/{id}/resume to be called")
 	}
 	// Verify success message is printed.
 	if !strings.Contains(buf.String(), "Resume requested") {
@@ -38,10 +38,10 @@ func TestModResumeCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModResumeIdempotent verifies the CLI handles 200 OK (idempotent resume) correctly.
-func TestModResumeIdempotent(t *testing.T) {
+// TestRunResumeIdempotent verifies the CLI handles 200 OK (idempotent resume) correctly.
+func TestRunResumeIdempotent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/mods/running-run/resume" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/running-run/resume" {
 			// 200 OK indicates run is already running (idempotent).
 			w.WriteHeader(http.StatusOK)
 			return
@@ -52,16 +52,16 @@ func TestModResumeIdempotent(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume", "running-run"}, buf)
+	err := executeCmd([]string{"run", "resume", "running-run"}, buf)
 	if err != nil {
-		t.Fatalf("mod resume should succeed on 200 OK: %v", err)
+		t.Fatalf("run resume should succeed on 200 OK: %v", err)
 	}
 }
 
-// TestModResumeNotFound verifies the CLI returns an error when the run does not exist.
-func TestModResumeNotFound(t *testing.T) {
+// TestRunResumeNotFound verifies the CLI returns an error when the run does not exist.
+func TestRunResumeNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/mods/nonexistent/resume" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/nonexistent/resume" {
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte("run not found"))
 			return
@@ -72,7 +72,7 @@ func TestModResumeNotFound(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume", "nonexistent"}, buf)
+	err := executeCmd([]string{"run", "resume", "nonexistent"}, buf)
 	if err == nil {
 		t.Fatal("expected error for nonexistent run")
 	}
@@ -81,11 +81,11 @@ func TestModResumeNotFound(t *testing.T) {
 	}
 }
 
-// TestModResumeConflict verifies the CLI returns an error when the run cannot be resumed
+// TestRunResumeConflict verifies the CLI returns an error when the run cannot be resumed
 // (e.g., run already succeeded).
-func TestModResumeConflict(t *testing.T) {
+func TestRunResumeConflict(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/mods/succeeded-run/resume" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/succeeded-run/resume" {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte("cannot resume succeeded run"))
 			return
@@ -96,7 +96,7 @@ func TestModResumeConflict(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume", "succeeded-run"}, buf)
+	err := executeCmd([]string{"run", "resume", "succeeded-run"}, buf)
 	if err == nil {
 		t.Fatal("expected error for non-resumable run")
 	}
@@ -105,11 +105,11 @@ func TestModResumeConflict(t *testing.T) {
 	}
 }
 
-// TestModResumeBadRequest verifies the CLI returns an error for invalid run ID format.
+// TestRunResumeBadRequest verifies the CLI returns an error for invalid run ID format.
 // Note: IDs are now KSUID strings (not UUIDs); the server returns a generic "invalid id" message.
-func TestModResumeBadRequest(t *testing.T) {
+func TestRunResumeBadRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/mods/") {
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/runs/") {
 			w.WriteHeader(http.StatusBadRequest)
 			// Server returns "invalid id" for malformed run IDs (KSUID strings).
 			_, _ = w.Write([]byte("invalid id: malformed run identifier"))
@@ -122,7 +122,7 @@ func TestModResumeBadRequest(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
 	// Use a clearly invalid ID format for testing error handling.
-	err := executeCmd([]string{"mod", "resume", "bad-id"}, buf)
+	err := executeCmd([]string{"run", "resume", "bad-id"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid run id")
 	}
@@ -131,10 +131,10 @@ func TestModResumeBadRequest(t *testing.T) {
 	}
 }
 
-// TestModResumeServerError verifies the CLI handles 5xx server errors gracefully.
-func TestModResumeServerError(t *testing.T) {
+// TestRunResumeServerError verifies the CLI handles 5xx server errors gracefully.
+func TestRunResumeServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/mods/run-err/resume" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-err/resume" {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte("database unavailable"))
 			return
@@ -145,7 +145,7 @@ func TestModResumeServerError(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume", "run-err"}, buf)
+	err := executeCmd([]string{"run", "resume", "run-err"}, buf)
 	if err == nil {
 		t.Fatal("expected error for server error")
 	}
@@ -154,10 +154,10 @@ func TestModResumeServerError(t *testing.T) {
 	}
 }
 
-// TestModResumeMissingRunID verifies the CLI validates that a run id argument is required.
-func TestModResumeMissingRunID(t *testing.T) {
+// TestRunResumeMissingRunID verifies the CLI validates that a run id argument is required.
+func TestRunResumeMissingRunID(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "resume"}, buf)
+	err := executeCmd([]string{"run", "resume"}, buf)
 	if err == nil {
 		t.Fatal("expected error when run id is missing")
 	}
