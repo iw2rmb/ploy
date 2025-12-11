@@ -5,7 +5,6 @@ set -euo pipefail
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}
-TARGET_REF=${PLOY_E2E_TARGET_REF:-mods-upgrade-java17-heal}
 
 # Artifacts directory: default to ./tmp/mods/scenario-orw-fail/<YYMMDDHHmmss>/
 TS=$(date +%y%m%d%H%M%S)
@@ -24,17 +23,16 @@ if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
   EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
 fi
 
-TICKET=$(dist/ploy mod run --json \
+RUN=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC" \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
-if [[ -n "${TICKET:-}" ]]; then
-  dist/ploy mod inspect "$TICKET" || true
+if [[ -n "${RUN:-}" ]]; then
+  dist/ploy mod inspect "$RUN" || true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

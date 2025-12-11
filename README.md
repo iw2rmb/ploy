@@ -16,7 +16,7 @@ Ploy uses a server/node split with PostgreSQL for state and mTLS for all control
   - Runs are stored in PostgreSQL along with jobs, logs, diffs, and artifact bundles.
 - Workers:
   - `ployd-node` claims jobs from the control plane, hydrates an ephemeral workspace, runs Mods/build/tests, and streams logs/diffs/artifacts to the server.
-  - Workers derive MR branches and repo metadata (e.g., `/mod/<run-id>` when `--repo-target-ref` is omitted) from the run they execute.
+  - Workers derive MR branches and repo metadata (e.g., `ploy/{run_name|run_id}` when `--repo-target-ref` is omitted) from the run they execute.
 - Security:
   - PKI-backed mTLS between CLI, server, and nodes; cluster CA and node/server certificates are managed by `ployd`.
   - Certificates carry roles (CLI, control‑plane, worker) via subject fields; authorization is enforced by the server.
