@@ -50,7 +50,7 @@ echo "  Target ref: $TARGET_REF"
 echo "  Spec:       $SPEC"
 echo ""
 
-TICKET=$(dist/ploy mod run --json \
+RUN=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
   --repo-target-ref "$TARGET_REF" \
@@ -58,10 +58,10 @@ TICKET=$(dist/ploy mod run --json \
   --follow \
   "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
 
-if [[ -n "${TICKET:-}" ]]; then
+if [[ -n "${RUN:-}" ]]; then
   echo ""
   echo "Inspecting run..."
-  dist/ploy run status "$TICKET" || true
+  dist/ploy run status "$RUN" || true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,16 +74,16 @@ VALIDATION_FAILED=0
 
 # 1. Verify the run succeeded (indicates image was resolved correctly).
 #    If the run failed with "no image specified for stack", the map form failed.
-if [[ -n "${TICKET:-}" ]]; then
+if [[ -n "${RUN:-}" ]]; then
   # Derive run status from `ploy run status` human-readable output.
-  TICKET_STATUS=$(dist/ploy run status "$TICKET" 2>/dev/null | awk -F': ' '/^Status:/ {print tolower($2)}' | tr -d ' ' || echo "unknown")
-  if [[ "$TICKET_STATUS" == "succeeded" ]]; then
+  RUN_STATUS=$(dist/ploy run status "$RUN" 2>/dev/null | awk -F': ' '/^Status:/ {print tolower($2)}' | tr -d ' ' || echo "unknown")
+  if [[ "$RUN_STATUS" == "succeeded" ]]; then
     echo "  Pass: Run succeeded (stack-aware image resolution worked)"
-  elif [[ "$TICKET_STATUS" == "failed" ]]; then
+  elif [[ "$RUN_STATUS" == "failed" ]]; then
     echo "  FAIL: Run failed - check if image resolution error occurred"
     VALIDATION_FAILED=1
   else
-    echo "  Note: Run status: $TICKET_STATUS"
+    echo "  Note: Run status: $RUN_STATUS"
   fi
   else
     echo "  FAIL: No run ID returned"
