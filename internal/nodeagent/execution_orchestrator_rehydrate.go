@@ -113,33 +113,16 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
-	// E3: Determine execution path identity for this job to drive path-local isolation.
-	//
-	//  1. For healing / re-gate jobs, infer path name from the job name
-	//     (e.g., "heal-codex-1-0" → "codex").
-	//  2. For downstream jobs (mod-0, post-gate) after a winning re-gate,
-	//     fall back to the run's active path so they rehydrate from the
-	//     healed baseline along the same execution path.
-	//  3. For runs without healing, or before any re-gate succeeds, there is
-	//     no active path and pathID remains empty (mainline behavior).
-	pathID := ExtractPathFromJobName(req.JobName)
-	if pathID == "" {
-		if active := r.getActivePath(req.RunID); active != "" {
-			pathID = active
-		}
-	}
-
 	// C2: Uniform rehydration query for ALL steps.
 	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).
 	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
-	// E3: Filter by path_id to maintain path workspace isolation.
-	gzippedDiffs, err := diffFetcher.FetchDiffsForPath(ctx, runID, stepIndex-1, pathID)
+	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, stepIndex-1)
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("fetch diffs for step: %w", err)
 	}
 
-	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "path_id", pathID, "diff_count", len(gzippedDiffs))
+	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "diff_count", len(gzippedDiffs))
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
 	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
@@ -202,7 +185,6 @@ func (r *runController) uploadDiffForStep(
 	// C2: Every diff is tagged with step_index + mod_type for unified rehydration.
 	// - step_index: Job step index for ordering and rehydration queries.
 	// - mod_type: "mod" for main mod diffs (healing diffs use "healing" in execution_healing.go).
-	// E3: path_id enables path-local workspace isolation for multi-strategy healing.
 	summary := types.DiffSummary{
 		"step_index": stepIndex,
 		"mod_type":   "mod", // Identifies this diff as a main mod step diff.
@@ -214,13 +196,6 @@ func (r *runController) uploadDiffForStep(
 			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
 			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 		},
-	}
-
-	// E3: Add path_id for multi-path healing isolation.
-	// For path jobs (e.g., "heal-path-a-1-0", "re-gate-path-a-1"), this enables
-	// rehydration to filter diffs by path, ensuring each path workspace is isolated.
-	if pathID := ExtractPathFromJobName(jobName); pathID != "" {
-		summary["path_id"] = pathID
 	}
 
 	// Upload diff with step metadata to control plane.

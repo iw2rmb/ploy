@@ -88,6 +88,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Validate stats field if provided (must be a valid JSON object).
+		// Also detect special healing warnings (e.g., no_workspace_changes) used
+		// for path-level healing control without altering exit codes.
 		statsBytes := []byte("{}")
 		var jobMetaBytes []byte
 		if len(req.Stats) > 0 {
@@ -119,6 +121,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					jobMetaBytes = metaBytes
 				}
 			}
+
 		}
 
 		// Look up the job by job_id using string ID directly.
@@ -250,6 +253,10 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				}
 			}
 		}
+
+		// NOTE: healingNoChange flag is currently only used for diagnostics.
+		// With parallel healing removed, a "successful" heal that makes no
+		// changes should be treated at the node or future slices, not here.
 
 		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
 		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {

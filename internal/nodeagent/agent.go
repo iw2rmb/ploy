@@ -30,9 +30,8 @@ type Agent struct {
 // New constructs a new node agent.
 func New(cfg Config) (*Agent, error) {
 	controller := &runController{
-		cfg:         cfg,
-		jobs:        make(map[string]*jobContext),
-		activePaths: make(map[string]string),
+		cfg:  cfg,
+		jobs: make(map[string]*jobContext),
 	}
 
 	server, err := NewServer(cfg, controller)

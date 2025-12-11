@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // runController implements the RunController interface for managing runs.
@@ -17,41 +15,12 @@ type runController struct {
 
 	// jobs tracks active jobs by job_id.
 	jobs map[string]*jobContext
-
-	// activePaths holds the selected execution path per run after a successful
-	// re-gate. Downstream jobs (mod-0, post-gate) without an explicit path in
-	// their job name use this to rehydrate from the healed baseline instead of
-	// the original failing baseline.
-	activePaths map[string]string // run_id -> path_id
 }
 
 type jobContext struct {
 	runID  string
 	jobID  string
 	cancel context.CancelFunc
-}
-
-// setActivePath records the selected execution path for a run after a
-// successful re-gate job.
-func (r *runController) setActivePath(runID types.RunID, pathID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.activePaths == nil {
-		r.activePaths = make(map[string]string)
-	}
-	r.activePaths[runID.String()] = pathID
-}
-
-// getActivePath returns the execution path selected for this run, if any.
-func (r *runController) getActivePath(runID types.RunID) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.activePaths == nil {
-		return ""
-	}
-	return r.activePaths[runID.String()]
 }
 
 // StartRun accepts a run start request and initiates execution.
