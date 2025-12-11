@@ -165,9 +165,9 @@ func (r *runController) uploadDiffForStep(
 	}
 
 	// Generate workspace diff for this step.
-	diffBytes, err := diffGenerator.Generate(ctx, workspace)
+	diffBytes, err := diffGenerator.GenerateBetween(ctx, workspace, workspace)
 	if err != nil {
-		slog.Error("failed to generate step diff", "run_id", runID, "step_index", stepIndex, "error", err)
+		slog.Error("failed to generate step diff (baseline-less GenerateBetween)", "run_id", runID, "step_index", stepIndex, "error", err)
 		return
 	}
 
