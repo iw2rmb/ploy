@@ -49,7 +49,8 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			RepoURL domaintypes.RepoURL `json:"repo_url"`
 			BaseRef domaintypes.GitRef  `json:"base_ref"`
 			// TargetRef is optional; when omitted, downstream components derive a default
-			// branch name when an MR is actually created (using the DB run ID).
+			// branch name when an MR is actually created (using the run name when set,
+			// otherwise the DB run ID).
 			TargetRef *domaintypes.GitRef    `json:"target_ref,omitempty"`
 			CommitSha *domaintypes.CommitSHA `json:"commit_sha,omitempty"`
 			Spec      *json.RawMessage       `json:"spec,omitempty"`

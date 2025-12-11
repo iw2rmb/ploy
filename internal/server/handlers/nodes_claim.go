@@ -153,7 +153,8 @@ func buildAndSendJobClaimResponse(
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
 	resp := struct {
-		RunID     domaintypes.RunID     `json:"id"`         // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		RunID     domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		Name      *string               `json:"name,omitempty"`
 		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 		ModType   domaintypes.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
@@ -170,6 +171,7 @@ func buildAndSendJobClaimResponse(
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
 		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
+		Name:      run.Name,
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
 		ModType:   domaintypes.ModType(job.ModType),
