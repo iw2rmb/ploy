@@ -15,7 +15,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	t.Helper()
 	runID := "run-artifacts"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+runID {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status" {
 			// Return RunSummary directly — the canonical response shape.
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 				RunID: domaintypes.RunID(runID),

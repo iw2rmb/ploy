@@ -565,7 +565,7 @@ fix. If re-gate passes, the DAG continues to the next mod.
 
 **CLI inspection:**
 
-Use `GET /v1/runs/{id}/status` to view job-level state:
+Use `GET /v1/runs/{id}/status` to view run-level state:
 
 ```bash
 $ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/mods-abc123/status" | jq .
@@ -583,7 +583,7 @@ dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
 
 **API response:**
 
-The `GET /v1/mods/{id}` endpoint returns `RunSummary` with:
+The `GET /v1/runs/{id}/status` endpoint returns `RunSummary` with:
 - `stages` — Map of job ID (KSUID string) to `StageStatus` (state, step_index, attempts)
 - `metadata["gate_summary"]` — Human-readable gate result
 - `metadata["mr_url"]` — Merge request URL if created

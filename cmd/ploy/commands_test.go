@@ -205,7 +205,6 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 				"mod",
 				"run",
 				"run repo",
-				"inspect",
 				"artifacts",
 				"diffs",
 			},
