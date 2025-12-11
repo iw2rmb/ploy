@@ -33,6 +33,8 @@ func handleRun(args []string, stderr io.Writer) error {
 		return handleRunResume(args[1:], stderr)
 	case "start":
 		return handleRunStart(args[1:], stderr)
+	case "stop":
+		return handleRunStop(args[1:], stderr)
 	case "status":
 		return handleRunStatus(args[1:], stderr)
 	case "events":

@@ -177,52 +177,6 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 	return result.Runs, nil
 }
 
-// StopBatchCommand stops a batch run and cancels all pending repos.
-// Uses domain type (RunID) for type-safe identification.
-type StopBatchCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	BatchID domaintypes.RunID // ID of the batch run to stop (KSUID-backed)
-}
-
-// Run executes POST /v1/runs/{id}/stop to stop the batch run.
-// Returns the updated batch summary on success.
-func (c StopBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
-	if c.Client == nil {
-		return BatchSummary{}, fmt.Errorf("batch stop: http client required")
-	}
-	if c.BaseURL == nil {
-		return BatchSummary{}, fmt.Errorf("batch stop: base url required")
-	}
-	// Use domain type's IsZero method for validation.
-	if c.BatchID.IsZero() {
-		return BatchSummary{}, fmt.Errorf("batch stop: batch id required")
-	}
-
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.BatchID.String(), "stop")
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
-	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch stop: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(httpReq)
-	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch stop: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return BatchSummary{}, decodeHTTPError(resp, "batch stop")
-	}
-
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		return BatchSummary{}, fmt.Errorf("batch stop: decode response: %w", err)
-	}
-
-	return summary, nil
-}
-
 // decodeHTTPError reads and formats an error from a non-success HTTP response.
 // It attempts to extract an error message from the response body; otherwise,
 // falls back to the HTTP status text.

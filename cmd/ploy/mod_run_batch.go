@@ -1,4 +1,4 @@
-// mod_run_batch.go implements batch run lifecycle CLI commands (list/stop/start).
+// mod_run_batch.go implements batch run list CLI commands.
 //
 // This file provides CLI handlers for managing batch runs as a whole, complementing
 // the repo-level operations in mod_run_repo.go. Batch commands delegate to the
@@ -6,7 +6,6 @@
 //
 // Command structure:
 //   - ploy mod run list [--limit N] [--offset N]
-//   - ploy mod run stop <run-name>
 package main
 
 import (
@@ -15,11 +14,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRunList implements `ploy mod run list [--limit N] [--offset N]`.
@@ -105,55 +102,3 @@ func printModRunListUsage(w io.Writer) {
 // NOTE: The `ploy mod run status` command has been removed.
 // Run-level status is now exposed via `ploy run status <run-id>`, which
 // reuses the richer status output previously implemented here.
-
-// handleModRunStop implements `ploy mod run stop <run-name>`.
-// Stops a batch run and cancels all pending repos.
-func handleModRunStop(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run stop", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	if err := fs.Parse(args); err != nil {
-		printModRunStopUsage(stderr)
-		return err
-	}
-
-	// Extract positional batch ID.
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printModRunStopUsage(stderr)
-		return errors.New("run-name required")
-	}
-	batchID := strings.TrimSpace(rest[0])
-
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Execute the stop command using the batch client.
-	cmd := mods.StopBatchCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		BatchID: domaintypes.RunID(batchID), // Convert to domain type
-	}
-
-	batch, err := cmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, _ = fmt.Fprintf(stderr, "Batch run %s stopped (status: %s)\n", batch.ID, batch.Status)
-	if batch.Counts != nil && batch.Counts.Cancelled > 0 {
-		_, _ = fmt.Fprintf(stderr, "Cancelled %d pending repo(s)\n", batch.Counts.Cancelled)
-	}
-
-	return nil
-}
-
-// printModRunStopUsage renders help for mod run stop.
-func printModRunStopUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run stop <run-name>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Stops a batch run and cancels all pending repos.")
-}
