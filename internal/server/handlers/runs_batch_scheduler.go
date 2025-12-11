@@ -58,7 +58,9 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 		// Create child execution run for this repo.
 		// The child run inherits the spec and commit_sha from the batch but has
 		// repo-specific URL/refs.
+		childRunID := domaintypes.NewRunID()
 		childRun, err := s.store.CreateRun(ctx, store.CreateRunParams{
+			ID:        string(childRunID),
 			Name:      nil, // Child runs don't need a name; batch name is on parent.
 			RepoUrl:   repo.RepoUrl,
 			Spec:      batchRun.Spec,
