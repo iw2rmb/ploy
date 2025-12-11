@@ -11,36 +11,11 @@ import (
 // NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
 
-// RunBatchSummary represents a run with aggregated repo status counts.
-// Used for list and detail responses.
-// Uses domain types (RunID, RepoURL, GitRef) for type-safe serialization
-// and validation at API boundaries.
-type RunBatchSummary struct {
-	ID         domaintypes.RunID   `json:"id"`
-	Name       *string             `json:"name,omitempty"`
-	Status     store.RunStatus     `json:"status"`
-	RepoURL    domaintypes.RepoURL `json:"repo_url"`
-	BaseRef    domaintypes.GitRef  `json:"base_ref"`
-	TargetRef  domaintypes.GitRef  `json:"target_ref"`
-	CreatedBy  *string             `json:"created_by,omitempty"`
-	CreatedAt  time.Time           `json:"created_at"`
-	StartedAt  *time.Time          `json:"started_at,omitempty"`
-	FinishedAt *time.Time          `json:"finished_at,omitempty"`
-	Counts     *RunRepoCounts      `json:"repo_counts,omitempty"`
-}
+// RunSummary aliases the canonical domain RunSummary for server handlers.
+type RunSummary = domaintypes.RunSummary
 
-// RunRepoCounts aggregates the count of repos by status within a batch.
-// DerivedStatus provides a single batch-level status derived from repo states.
-type RunRepoCounts struct {
-	Total         int32  `json:"total"`
-	Pending       int32  `json:"pending"`
-	Running       int32  `json:"running"`
-	Succeeded     int32  `json:"succeeded"`
-	Failed        int32  `json:"failed"`
-	Skipped       int32  `json:"skipped"`
-	Cancelled     int32  `json:"cancelled"`
-	DerivedStatus string `json:"derived_status"` // running, completed, failed, cancelled, pending
-}
+// RunRepoCounts aliases the canonical domain RunRepoCounts for server handlers.
+type RunRepoCounts = domaintypes.RunRepoCounts
 
 // Derived batch status constants exposed for API consumers.
 // These represent the batch-level state computed from repo statuses.
@@ -57,19 +32,19 @@ const (
 	DerivedStatusCancelled = "cancelled"
 )
 
-// runToSummary converts a store.Run to a RunBatchSummary.
+// runToSummary converts a store.Run to a RunSummary.
 // Wraps raw store strings in domain types for type-safe API output.
 // run.ID is now a string (KSUID), so no UUID conversion is needed.
-func runToSummary(run store.Run) RunBatchSummary {
-	summary := RunBatchSummary{
+func runToSummary(run store.Run) RunSummary {
+	summary := RunSummary{
 		// run.ID is now a string (KSUID); cast directly to domain type.
 		ID:     domaintypes.RunID(run.ID),
 		Name:   run.Name,
-		Status: run.Status,
-		// Wrap VCS fields in domain types; values are validated at input time.
-		RepoURL:   domaintypes.RepoURL(run.RepoUrl),
-		BaseRef:   domaintypes.GitRef(run.BaseRef),
-		TargetRef: domaintypes.GitRef(run.TargetRef),
+		Status: string(run.Status),
+		// Expose VCS fields as strings at the API boundary.
+		RepoURL:   run.RepoUrl,
+		BaseRef:   run.BaseRef,
+		TargetRef: run.TargetRef,
 		CreatedBy: run.CreatedBy,
 		CreatedAt: run.CreatedAt.Time,
 	}

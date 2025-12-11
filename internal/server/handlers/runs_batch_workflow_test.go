@@ -220,7 +220,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 		}
 
 		var resp struct {
-			Runs []RunBatchSummary `json:"runs"`
+			Runs []RunSummary `json:"runs"`
 		}
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("decode response: %v", err)
@@ -320,7 +320,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 			t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
 		}
 
-		var resp RunBatchSummary
+		var resp RunSummary
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -363,7 +363,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 			t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
 		}
 
-		var resp RunBatchSummary
+		var resp RunSummary
 		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}

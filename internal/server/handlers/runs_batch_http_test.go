@@ -127,7 +127,7 @@ func TestListRunsHandler(t *testing.T) {
 			// For successful responses, verify run count.
 			if tc.wantStatus == http.StatusOK {
 				var resp struct {
-					Runs []RunBatchSummary `json:"runs"`
+					Runs []RunSummary `json:"runs"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("decode response: %v", err)
@@ -234,7 +234,7 @@ func TestGetRunHandler(t *testing.T) {
 
 			// Verify response structure for successful requests.
 			if tc.wantStatus == http.StatusOK {
-				var resp RunBatchSummary
+				var resp RunSummary
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("decode response: %v", err)
 				}
@@ -242,8 +242,8 @@ func TestGetRunHandler(t *testing.T) {
 				if resp.ID.String() != tc.runID {
 					t.Errorf("id = %s, want %s", resp.ID.String(), tc.runID)
 				}
-				if resp.Status != tc.mockRun.Status {
-					t.Errorf("status = %s, want %s", resp.Status, tc.mockRun.Status)
+				if resp.Status != string(tc.mockRun.Status) {
+					t.Errorf("status = %s, want %s", resp.Status, string(tc.mockRun.Status))
 				}
 
 				// Check repo counts if expected.
