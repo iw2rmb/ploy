@@ -65,7 +65,7 @@ var (
 // This method performs the following steps:
 // 1. Validates GitLab credentials and normalizes the domain
 // 2. Extracts the project ID from the repository URL
-// 3. Creates a unique source branch name (ploy-<run-id>)
+// 3. Creates a unique source branch name (ploy/{run_name|run_id})
 // 4. Commits any workspace changes with a standard commit message
 // 5. Pushes the branch to origin using the provided PAT
 // 6. Creates a merge request via GitLab API with standardized metadata
@@ -102,12 +102,18 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 
 	// Determine source branch for MR:
 	//   - When TargetRef is provided, use it as-is (caller-managed branch name).
-	//   - When TargetRef is empty, derive a unique per-run branch: ploy/<run-id>.
+	//   - When TargetRef is empty, derive a unique per-run branch:
+	//       ploy/<run_name> when a run name is set,
+	//       otherwise ploy/<run-id>.
 	// This matches the control plane contract where missing target_ref signals that
-	// downstream components should synthesize a branch name based on the run ID.
+	// downstream components should synthesize a branch name based on the run identity.
 	sourceBranch := strings.TrimSpace(req.TargetRef.String())
 	if sourceBranch == "" {
-		sourceBranch = fmt.Sprintf("ploy/%s", req.RunID.String())
+		if runName := strings.TrimSpace(req.Name); runName != "" {
+			sourceBranch = fmt.Sprintf("ploy/%s", runName)
+		} else {
+			sourceBranch = fmt.Sprintf("ploy/%s", req.RunID.String())
+		}
 	}
 
 	// Create a commit with any workspace changes before pushing.

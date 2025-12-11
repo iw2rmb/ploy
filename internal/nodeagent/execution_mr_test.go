@@ -169,8 +169,61 @@ func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
 		t.Fatalf("mr url = %q, want fixed fake", gotURL)
 	}
 
-	// Expect default branch ploy/<run-id>.
+	// Expect default branch ploy/<run-id> when no run name is provided.
 	wantBranch := "ploy/" + runID.String()
+	if fakeP.opts.TargetRef != wantBranch {
+		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
+	}
+	if fakeMR.req.SourceBranch != wantBranch {
+		t.Fatalf("mr source branch = %q, want %q", fakeMR.req.SourceBranch, wantBranch)
+	}
+	if fakeMR.req.TargetBranch != req.BaseRef.String() {
+		t.Fatalf("mr target branch = %q, want %q", fakeMR.req.TargetBranch, req.BaseRef.String())
+	}
+}
+
+func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
+	// Swap in fakes and restore on exit.
+	origPusher := newPusher
+	origMRClient := newMRClient
+	defer func() {
+		newPusher = origPusher
+		newMRClient = origMRClient
+	}()
+
+	fakeP := &fakePusher{}
+	fakeMR := &fakeMRClient{url: "http://example/mr/3"}
+	newPusher = func() pusherIface { return fakeP }
+	newMRClient = func() mrCreator { return fakeMR }
+
+	runID := types.RunID("t-named-run")
+	runName := "batch-foo"
+
+	r := &runController{}
+	req := StartRunRequest{
+		RunID:     runID,
+		Name:      runName,
+		RepoURL:   types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: "", // Unspecified target ref.
+		Options:   map[string]any{},
+	}
+	manifest := contracts.StepManifest{Options: map[string]any{
+		"gitlab_pat":    "glpat-xyz",
+		"gitlab_domain": "gitlab.example.com",
+	}}
+
+	ctx := context.Background()
+	gotURL, err := r.createMR(ctx, req, manifest, ".")
+	if err != nil {
+		t.Fatalf("createMR error: %v", err)
+	}
+	if gotURL != "http://example/mr/3" {
+		t.Fatalf("mr url = %q, want fixed fake", gotURL)
+	}
+
+	// Expect default branch ploy/<run_name> when run name is provided.
+	wantBranch := "ploy/" + runName
 	if fakeP.opts.TargetRef != wantBranch {
 		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
 	}
