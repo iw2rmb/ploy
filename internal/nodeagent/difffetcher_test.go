@@ -327,63 +327,63 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 	}
 }
 
-// TestExtractBranchFromJobName verifies branch name extraction from job names.
-// E3: Branch-local rehydration relies on extracting branch IDs from healing job names.
-func TestExtractBranchFromJobName(t *testing.T) {
+// TestExtractPathFromJobName verifies path name extraction from job names.
+// E3: Path-local rehydration relies on extracting path IDs from healing job names.
+func TestExtractPathFromJobName(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		jobName    string
-		wantBranch string
+		name     string
+		jobName  string
+		wantPath string
 	}{
-		// Multi-branch healing job names (E3).
+		// Multi-path healing job names (E3).
 		{
-			name:       "heal job with branch-a",
-			jobName:    "heal-branch-a-1-0",
-			wantBranch: "branch-a",
+			name:     "heal job with path-a",
+			jobName:  "heal-branch-a-1-0",
+			wantPath: "branch-a",
 		},
 		{
-			name:       "heal job with codex-ai branch",
-			jobName:    "heal-codex-ai-1-0",
-			wantBranch: "codex-ai",
+			name:     "heal job with codex-ai path",
+			jobName:  "heal-codex-ai-1-0",
+			wantPath: "codex-ai",
 		},
 		{
-			name:       "re-gate job with branch-a",
-			jobName:    "re-gate-branch-a-1",
-			wantBranch: "branch-a",
+			name:     "re-gate job with path-a",
+			jobName:  "re-gate-branch-a-1",
+			wantPath: "branch-a",
 		},
 		{
-			name:       "heal job with multiple mods",
-			jobName:    "heal-static-patch-2-3",
-			wantBranch: "static-patch",
+			name:     "heal job with multiple mods",
+			jobName:  "heal-static-patch-2-3",
+			wantPath: "static-patch",
 		},
 		// Mainline jobs (not healing branches).
 		{
-			name:       "pre-gate job",
-			jobName:    "pre-gate",
-			wantBranch: "",
+			name:     "pre-gate job",
+			jobName:  "pre-gate",
+			wantPath: "",
 		},
 		{
-			name:       "mod job",
-			jobName:    "mod-0",
-			wantBranch: "",
+			name:     "mod job",
+			jobName:  "mod-0",
+			wantPath: "",
 		},
 		{
-			name:       "post-gate job",
-			jobName:    "post-gate",
-			wantBranch: "",
+			name:     "post-gate job",
+			jobName:  "post-gate",
+			wantPath: "",
 		},
 		// Edge cases.
 		{
-			name:       "empty job name",
-			jobName:    "",
-			wantBranch: "",
+			name:     "empty job name",
+			jobName:  "",
+			wantPath: "",
 		},
 		{
-			name:       "unrelated job name",
-			jobName:    "some-other-job",
-			wantBranch: "",
+			name:     "unrelated job name",
+			jobName:  "some-other-job",
+			wantPath: "",
 		},
 	}
 
@@ -391,39 +391,39 @@ func TestExtractBranchFromJobName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ExtractBranchFromJobName(tt.jobName)
-			if got != tt.wantBranch {
-				t.Errorf("ExtractBranchFromJobName(%q) = %q, want %q", tt.jobName, got, tt.wantBranch)
+			got := ExtractPathFromJobName(tt.jobName)
+			if got != tt.wantPath {
+				t.Errorf("ExtractPathFromJobName(%q) = %q, want %q", tt.jobName, got, tt.wantPath)
 			}
 		})
 	}
 }
 
-// TestDiffFetcher_FetchDiffsForBranch verifies branch-local diff filtering.
-// E3: Ensures branch workspaces are isolated by only including mainline + same-branch diffs.
-func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
+// TestDiffFetcher_FetchDiffsForPath verifies path-local diff filtering.
+// E3: Ensures execution-path workspaces are isolated by only including mainline + same-path diffs.
+func TestDiffFetcher_FetchDiffsForPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		runID        string
-		stepIndex    types.StepIndex
-		targetBranch string
-		diffs        []diffListItem
-		patches      map[string][]byte
-		wantCount    int
-		wantDiffIDs  []string // Expected diff IDs in order.
+		name        string
+		runID       string
+		stepIndex   types.StepIndex
+		targetPath  string
+		diffs       []diffListItem
+		patches     map[string][]byte
+		wantCount   int
+		wantDiffIDs []string // Expected diff IDs in order.
 	}{
 		{
-			name:         "mainline only (no branch filter)",
-			runID:        "run-mainline",
-			stepIndex:    2,
-			targetBranch: "", // Empty = mainline only.
+			name:       "mainline only (no path filter)",
+			runID:      "run-mainline",
+			stepIndex:  2,
+			targetPath: "", // Empty = mainline only.
 			diffs: []diffListItem{
 				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
 				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-2-a", JobID: "job-2a", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-2-b", JobID: "job-2b", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
+				{ID: "diff-2-a", JobID: "job-2a", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "path_id": "path-a"}},
+				{ID: "diff-2-b", JobID: "job-2b", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "path_id": "path-b"}},
 			},
 			patches: map[string][]byte{
 				"diff-0":   gzipBytesHelper(t, []byte("patch 0")),
@@ -431,59 +431,59 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 				"diff-2-a": gzipBytesHelper(t, []byte("patch 2a")),
 				"diff-2-b": gzipBytesHelper(t, []byte("patch 2b")),
 			},
-			wantCount:   2, // Only mainline diffs (no branch_id).
+			wantCount:   2, // Only mainline diffs (no path_id).
 			wantDiffIDs: []string{"diff-0", "diff-1"},
 		},
 		{
-			name:         "branch-a isolation (mainline + branch-a only)",
-			runID:        "run-branch-a",
-			stepIndex:    3,
-			targetBranch: "branch-a",
+			name:       "path-a isolation (mainline + path-a only)",
+			runID:      "run-path-a",
+			stepIndex:  3,
+			targetPath: "path-a",
 			diffs: []diffListItem{
 				{ID: "diff-mainline-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
 				{ID: "diff-mainline-1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-branch-a-2", JobID: "job-a2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-branch-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
-				{ID: "diff-branch-a-3", JobID: "job-a3", StepIndex: stepIndex(3), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
+				{ID: "diff-path-a-2", JobID: "job-a2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "path_id": "path-a"}},
+				{ID: "diff-path-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "path_id": "path-b"}},
+				{ID: "diff-path-a-3", JobID: "job-a3", StepIndex: stepIndex(3), Summary: map[string]any{"mod_type": "mod", "path_id": "path-a"}},
 			},
 			patches: map[string][]byte{
 				"diff-mainline-0": gzipBytesHelper(t, []byte("patch mainline 0")),
 				"diff-mainline-1": gzipBytesHelper(t, []byte("patch mainline 1")),
-				"diff-branch-a-2": gzipBytesHelper(t, []byte("patch branch-a 2")),
-				"diff-branch-b-2": gzipBytesHelper(t, []byte("patch branch-b 2")),
-				"diff-branch-a-3": gzipBytesHelper(t, []byte("patch branch-a 3")),
+				"diff-path-a-2":   gzipBytesHelper(t, []byte("patch path-a 2")),
+				"diff-path-b-2":   gzipBytesHelper(t, []byte("patch path-b 2")),
+				"diff-path-a-3":   gzipBytesHelper(t, []byte("patch path-a 3")),
 			},
-			wantCount:   4, // Mainline (2) + branch-a (2), excludes branch-b.
-			wantDiffIDs: []string{"diff-mainline-0", "diff-mainline-1", "diff-branch-a-2", "diff-branch-a-3"},
+			wantCount:   4, // Mainline (2) + path-a (2), excludes path-b.
+			wantDiffIDs: []string{"diff-mainline-0", "diff-mainline-1", "diff-path-a-2", "diff-path-a-3"},
 		},
 		{
-			name:         "branch-b isolation (mainline + branch-b only)",
-			runID:        "run-branch-b",
-			stepIndex:    3,
-			targetBranch: "branch-b",
+			name:       "path-b isolation (mainline + path-b only)",
+			runID:      "run-path-b",
+			stepIndex:  3,
+			targetPath: "path-b",
 			diffs: []diffListItem{
 				{ID: "diff-mainline-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-branch-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-branch-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-b"}},
+				{ID: "diff-path-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "path_id": "path-a"}},
+				{ID: "diff-path-b-2", JobID: "job-b2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod", "path_id": "path-b"}},
 			},
 			patches: map[string][]byte{
 				"diff-mainline-0": gzipBytesHelper(t, []byte("patch mainline 0")),
-				"diff-branch-a-1": gzipBytesHelper(t, []byte("patch branch-a 1")),
-				"diff-branch-b-2": gzipBytesHelper(t, []byte("patch branch-b 2")),
+				"diff-path-a-1":   gzipBytesHelper(t, []byte("patch path-a 1")),
+				"diff-path-b-2":   gzipBytesHelper(t, []byte("patch path-b 2")),
 			},
-			wantCount:   2, // Mainline (1) + branch-b (1), excludes branch-a.
-			wantDiffIDs: []string{"diff-mainline-0", "diff-branch-b-2"},
+			wantCount:   2, // Mainline (1) + path-b (1), excludes path-a.
+			wantDiffIDs: []string{"diff-mainline-0", "diff-path-b-2"},
 		},
 		{
-			name:         "healing diffs excluded regardless of branch",
-			runID:        "run-healing-excluded",
-			stepIndex:    2,
-			targetBranch: "branch-a",
+			name:       "healing diffs excluded regardless of path",
+			runID:      "run-healing-excluded",
+			stepIndex:  2,
+			targetPath: "path-a",
 			diffs: []diffListItem{
 				{ID: "diff-mod-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-heal-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
-				{ID: "diff-mod-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "branch_id": "branch-a"}},
-				{ID: "diff-heal-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "branch_id": "branch-a"}},
+				{ID: "diff-heal-0", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing", "path_id": "path-a"}},
+				{ID: "diff-mod-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod", "path_id": "path-a"}},
+				{ID: "diff-heal-a-1", JobID: "job-a1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "path_id": "path-a"}},
 			},
 			patches: map[string][]byte{
 				"diff-mod-0":    gzipBytesHelper(t, []byte("patch mod 0")),
@@ -537,9 +537,9 @@ func TestDiffFetcher_FetchDiffsForBranch(t *testing.T) {
 				t.Fatalf("NewDiffFetcher() failed: %v", err)
 			}
 
-			// Execute fetch with branch filter.
+			// Execute fetch with path filter.
 			ctx := context.Background()
-			patches, err := fetcher.FetchDiffsForBranch(ctx, tt.runID, tt.stepIndex, tt.targetBranch)
+			patches, err := fetcher.FetchDiffsForPath(ctx, tt.runID, tt.stepIndex, tt.targetPath)
 
 			if err != nil {
 				t.Fatalf("FetchDiffsForBranch() error = %v", err)

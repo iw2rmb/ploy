@@ -75,13 +75,13 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		gatePassed = gateResult.StaticChecks[0].Passed
 	}
 
-	// When a re-gate job passes, record the winning healing branch for this run.
+	// When a re-gate job passes, record the winning healing path for this run.
 	// Downstream jobs (e.g., mod-0, post-gate) will rehydrate workspaces using
-	// the active branch so they see the healed baseline along the same execution
+	// the active path so they see the healed baseline along the same execution
 	// path instead of the original failing baseline.
 	if gatePassed && req.ModType == types.ModTypeReGate {
-		if branch := ExtractBranchFromJobName(req.JobName); branch != "" {
-			r.setActiveBranch(req.RunID, branch)
+		if path := ExtractPathFromJobName(req.JobName); path != "" {
+			r.setActivePath(req.RunID, path)
 		}
 	}
 

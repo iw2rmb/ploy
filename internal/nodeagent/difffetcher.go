@@ -12,16 +12,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// healBranchPattern matches healing job names with branch identifiers.
-// Format: heal-{branch_name}-{attempt}-{mod_index} or re-gate-{branch_name}-{attempt}
-// Examples: "heal-branch-a-1-0", "heal-codex-ai-1-0", "re-gate-branch-a-1".
-var healBranchPattern = regexp.MustCompile(`^(?:heal|re-gate)-(.+?)-\d+(?:-\d+)?$`)
+// healPathPattern matches healing job names with execution path identifiers.
+// Format: heal-{path_name}-{attempt}-{mod_index} or re-gate-{path_name}-{attempt}
+// Examples: "heal-path-a-1-0", "heal-codex-ai-1-0", "re-gate-path-a-1".
+var healPathPattern = regexp.MustCompile(`^(?:heal|re-gate)-(.+?)-\d+(?:-\d+)?$`)
 
-// ExtractBranchFromJobName extracts the branch name from a healing job name.
-// Returns the branch name if the job is part of a branch-local healing strategy,
-// or empty string for mainline jobs (non-healing or non-branch names).
-func ExtractBranchFromJobName(jobName string) string {
-	matches := healBranchPattern.FindStringSubmatch(jobName)
+// ExtractPathFromJobName extracts the execution path name from a healing job name.
+// Returns the path name if the job is part of a path-local healing strategy,
+// or empty string for mainline jobs (non-healing or non-path names).
+func ExtractPathFromJobName(jobName string) string {
+	matches := healPathPattern.FindStringSubmatch(jobName)
 	if len(matches) < 2 {
 		return ""
 	}
@@ -142,25 +142,25 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 // Each per-step mod diff is incremental from the rehydrated baseline, so applying only
 // these diffs in step_index order reconstructs the workspace safely.
 func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex types.StepIndex) ([][]byte, error) {
-	// Delegate to branch-aware method with empty branch (mainline behavior).
-	return f.FetchDiffsForBranch(ctx, runID, stepIndex, "")
+	// Delegate to path-aware method with empty path (mainline behavior).
+	return f.FetchDiffsForPath(ctx, runID, stepIndex, "")
 }
 
-// FetchDiffsForBranch fetches gzipped patches for workspace rehydration with branch-local isolation.
-// This is the core E3 implementation that ensures branch workspaces are isolated.
+// FetchDiffsForPath fetches gzipped patches for workspace rehydration with path-local isolation.
+// This is the core E3 implementation that ensures execution-path workspaces are isolated.
 //
-// Branch isolation rules:
-//   - Mainline diffs (branch_id="" or absent) are included for all branches.
-//   - Branch-specific diffs (branch_id="branch-a") are only included when targetBranch matches.
-//   - If targetBranch is empty, only mainline diffs are included (single-branch behavior).
+// Path isolation rules:
+//   - Mainline diffs (path_id="" or absent) are included for all paths.
+//   - Path-specific diffs (path_id="path-a") are only included when targetPath matches.
+//   - If targetPath is empty, only mainline diffs are included (single-path behavior).
 //
-// This ensures that parallel healing branches (e.g., branch-a, branch-b) don't accidentally
-// apply each other's diffs during rehydration, keeping workspaces isolated per branch.
+// This ensures that parallel healing paths (e.g., path-a, path-b) don't accidentally
+// apply each other's diffs during rehydration, keeping workspaces isolated per path.
 //
 // Example workspace construction:
-//   - workspace_branch_a = base + mainline_diffs + diffs_branch_a
-//   - workspace_branch_b = base + mainline_diffs + diffs_branch_b
-func (f *DiffFetcher) FetchDiffsForBranch(ctx context.Context, runID string, stepIndex types.StepIndex, targetBranch string) ([][]byte, error) {
+//   - workspace_path_a = base + mainline_diffs + diffs_path_a
+//   - workspace_path_b = base + mainline_diffs + diffs_path_b
+func (f *DiffFetcher) FetchDiffsForPath(ctx context.Context, runID string, stepIndex types.StepIndex, targetPath string) ([][]byte, error) {
 	// Step 1: List all diffs for the run.
 	diffs, err := f.ListRunDiffs(ctx, runID)
 	if err != nil {
@@ -168,7 +168,7 @@ func (f *DiffFetcher) FetchDiffsForBranch(ctx context.Context, runID string, ste
 	}
 
 	// Step 2: Filter diffs up to the target step index (inclusive).
-	// Apply branch-local isolation: only include mainline diffs and same-branch diffs.
+	// Apply path-local isolation: only include mainline diffs and same-path diffs.
 	var relevantDiffs []diffListItem
 	for _, d := range diffs {
 		if d.StepIndex > stepIndex {
@@ -186,24 +186,24 @@ func (f *DiffFetcher) FetchDiffsForBranch(ctx context.Context, runID string, ste
 			}
 		}
 
-		// E3: Branch-local isolation — filter by branch_id in diff summary.
+		// E3: Path-local isolation — filter by path_id in diff summary.
 		// Include diff if:
-		//   1. Diff has no branch_id (mainline) → always included.
-		//   2. Diff has branch_id AND targetBranch matches → included (same branch).
-		//   3. Diff has branch_id AND targetBranch is empty → excluded (mainline-only mode).
-		//   4. Diff has branch_id AND targetBranch differs → excluded (different branch).
-		diffBranch := ""
+		//   1. Diff has no path_id (mainline) → always included.
+		//   2. Diff has path_id AND targetPath matches → included (same path).
+		//   3. Diff has path_id AND targetPath is empty → excluded (mainline-only mode).
+		//   4. Diff has path_id AND targetPath differs → excluded (different path).
+		diffPath := ""
 		if summary != nil {
-			if b, ok := summary["branch_id"].(string); ok {
-				diffBranch = b
+			if p, ok := summary["path_id"].(string); ok {
+				diffPath = p
 			}
 		}
 
-		// Mainline diffs (no branch_id) are always included.
-		// Branch diffs are only included if targetBranch matches.
-		if diffBranch != "" {
-			// Diff belongs to a branch. Only include if caller's branch matches.
-			if targetBranch == "" || diffBranch != targetBranch {
+		// Mainline diffs (no path_id) are always included.
+		// Path diffs are only included if targetPath matches.
+		if diffPath != "" {
+			// Diff belongs to a path. Only include if caller's path matches.
+			if targetPath == "" || diffPath != targetPath {
 				continue
 			}
 		}
