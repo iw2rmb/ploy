@@ -29,7 +29,7 @@ type ClaimResponse struct {
 	RunID     types.RunID     `json:"id"`         // Run ID (KSUID identifying the parent run)
 	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
 	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-	ModType   string          `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+	ModType   types.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
 	ModImage  string          `json:"mod_image"`  // Container image for mod/heal jobs
 	StepIndex types.StepIndex `json:"step_index"` // Job ordering index
 	RepoURL   string          `json:"repo_url"`

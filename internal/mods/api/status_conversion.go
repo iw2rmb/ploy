@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -142,6 +144,9 @@ func IsGateJob(meta []byte) bool {
 	if err := json.Unmarshal(meta, &sm); err != nil {
 		return false
 	}
+	modType := domaintypes.ModType(strings.TrimSpace(sm.ModType))
 	// Gate job types: pre_gate (initial), post_gate (after mods), re_gate (after healing).
-	return sm.ModType == "pre_gate" || sm.ModType == "post_gate" || sm.ModType == "re_gate"
+	return modType == domaintypes.ModTypePreGate ||
+		modType == domaintypes.ModTypePostGate ||
+		modType == domaintypes.ModTypeReGate
 }

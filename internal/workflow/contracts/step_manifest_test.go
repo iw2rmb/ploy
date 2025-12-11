@@ -10,8 +10,8 @@ import (
 
 func TestStepManifestValidate(t *testing.T) {
 	valid := StepManifest{
-		ID:         types.StepID("mods-orw-apply"),
-		Name:       "ORW Apply",
+		ID:         types.StepID("mods-sample-apply"),
+		Name:       "Sample Apply",
 		Image:      "ghcr.io/ploy/mods/openrewrite:latest",
 		Command:    []string{"/bin/run"},
 		Args:       []string{"--execute"},
