@@ -80,6 +80,77 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 	}
 }
 
+// TestOrwGradle_UsesExistingRewriteYAML verifies that when rewrite.yml is present
+// in the workspace, orw-gradle uses its top-level recipe name as the active recipe.
+func TestOrwGradle_UsesExistingRewriteYAML(t *testing.T) {
+	workspace := t.TempDir()
+
+	// Minimal Kotlin DSL Gradle build file.
+	buildGradlePath := filepath.Join(workspace, "build.gradle.kts")
+	if err := os.WriteFile(buildGradlePath, []byte(`plugins {
+}
+`), 0o644); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
+	}
+
+	// Stub ./gradlew so the script can invoke it without requiring real Gradle.
+	gradlewPath := filepath.Join(workspace, "gradlew")
+	gradlewScript := `#!/usr/bin/env bash
+echo "[gradle-stub] rewriteRun invoked with args: $@"
+`
+	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
+		t.Fatalf("write gradlew stub: %v", err)
+	}
+
+	// Provide rewrite.yml with a named recipe.
+	rewritePath := filepath.Join(workspace, "rewrite.yml")
+	rewriteContent := []byte(`type: specs.openrewrite.org/v1beta/recipe
+name: PloyYamlRecipe
+recipeList:
+  - org.openrewrite.java.migrate.UpgradeToJava17
+`)
+	if err := os.WriteFile(rewritePath, rewriteContent, 0o644); err != nil {
+		t.Fatalf("write rewrite.yml: %v", err)
+	}
+
+	outdir := t.TempDir()
+
+	// Use scenario script defaults for recipe coordinates.
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioBytes, err := os.ReadFile(scenarioPath)
+	if err != nil {
+		t.Fatalf("read scenario script: %v", err)
+	}
+	_, _, _, group, artifact, version, classname, _ := parseScenarioORWPass(string(scenarioBytes))
+
+	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	// Remove system gradle from PATH so the script uses ./gradlew.
+	filteredPath := filterPath("gradle")
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP="+group,
+		"RECIPE_ARTIFACT="+artifact,
+		"RECIPE_VERSION="+version,
+		"RECIPE_CLASSNAME="+classname,
+		"PATH="+filteredPath,
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-gradle (rewrite.yml) failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	// Verify that transform.log shows the YAML recipe name as active recipe.
+	logPath := filepath.Join(outdir, "transform.log")
+	logBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	if !strings.Contains(string(logBytes), "-Drewrite.activeRecipes=PloyYamlRecipe") {
+		t.Fatalf("transform.log does not show YAML recipe as active:\n%s", string(logBytes))
+	}
+}
+
 // TestOrwGradle_NonGradleWorkspace_Fails verifies that orw-gradle fails with exit 5
 // when the workspace does not contain build.gradle or build.gradle.kts.
 func TestOrwGradle_NonGradleWorkspace_Fails(t *testing.T) {
