@@ -81,6 +81,4 @@ fi
 cat > "$report" <<JSON
 {"success":true,"script":"$script_path","workspace":"$workspace","exit_code":0,"ts":"$ts"}
 JSON
-
 echo "[mod-shell] completed successfully"
-

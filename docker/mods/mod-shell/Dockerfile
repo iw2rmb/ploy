@@ -27,4 +27,3 @@ RUN ln -s /usr/local/bin/mod-shell /usr/local/bin/mods-shell
 
 ENTRYPOINT ["mod-shell"]
 CMD ["--dir", "/workspace", "--out", "/out"]
-
