@@ -19,7 +19,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
+            $ref: '../components/schemas/controlplane.yaml#/RunSummary'
     '400':
       description: Bad request (missing or empty run id)
       content:

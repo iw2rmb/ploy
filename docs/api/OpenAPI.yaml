@@ -162,8 +162,8 @@ components:
       $ref: './components/schemas/common.yaml#/Error'
     Run:
       $ref: './components/schemas/controlplane.yaml#/Run'
-    RunBatchSummary:
-      $ref: './components/schemas/controlplane.yaml#/RunBatchSummary'
+    RunSummary:
+      $ref: './components/schemas/controlplane.yaml#/RunSummary'
     RunRepo:
       $ref: './components/schemas/controlplane.yaml#/RunRepo'
     RunRepoCounts:
@@ -178,8 +178,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
     RunSubmitRequest:
       $ref: './components/schemas/controlplane.yaml#/RunSubmitRequest'
-    RunSummary:
-      $ref: './components/schemas/controlplane.yaml#/RunSummary'
+    ModsRunSummary:
+      $ref: './components/schemas/controlplane.yaml#/ModsRunSummary'
     StageStatus:
       $ref: './components/schemas/controlplane.yaml#/StageStatus'
     NodeClaimResponse:

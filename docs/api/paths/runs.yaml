@@ -34,7 +34,7 @@ get:
               runs:
                 type: array
                 items:
-                  $ref: '../components/schemas/controlplane.yaml#/RunBatchSummary'
+                  $ref: '../components/schemas/controlplane.yaml#/RunSummary'
             required: [runs]
     '400':
       description: Bad request (invalid pagination parameters)

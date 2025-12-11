@@ -1,7 +1,7 @@
 # POST /v1/mods — Submit a Mods run
 #
 # Canonical response: RunSummary (no wrapper types).
-# See docs/api/components/schemas/controlplane.yaml#/RunSummary for schema.
+# See docs/api/components/schemas/controlplane.yaml#/ModsRunSummary for schema.
 post:
   tags: [Control]
   summary: Submit Mods run
@@ -53,7 +53,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/RunSummary'
+            $ref: '../components/schemas/controlplane.yaml#/ModsRunSummary'
     '400':
       description: Bad request — missing or invalid fields in the request body.
       content:
