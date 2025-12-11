@@ -18,17 +18,17 @@ import (
 // testRunIDKSUID is a synthetic KSUID-like ID (27 characters) used for tests.
 const testRunIDKSUID = "123456789012345678901234567"
 
-func TestGetModEventsHandler_TicketNotFound(t *testing.T) {
+func TestGetRunLogsHandler_TicketNotFound(t *testing.T) {
 	t.Parallel()
 	eventsService, err := createTestEventsService()
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
 	st := &mockStore{getRunErr: pgx.ErrNoRows}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
 	runID := testRunIDKSUID
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -37,13 +37,13 @@ func TestGetModEventsHandler_TicketNotFound(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_InvalidRunID(t *testing.T) {
+func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	st := &mockStore{}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid/logs", nil)
 	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -55,13 +55,13 @@ func TestGetModEventsHandler_InvalidRunID(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_MissingID(t *testing.T) {
+func TestGetRunLogsHandler_MissingID(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	st := &mockStore{}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs//logs", nil)
 	req.SetPathValue("id", "")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -70,14 +70,14 @@ func TestGetModEventsHandler_MissingID(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_DatabaseError(t *testing.T) {
+func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	st := &mockStore{getRunErr: pgx.ErrTxClosed}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
 	runID := testRunIDKSUID
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -89,15 +89,15 @@ func TestGetModEventsHandler_DatabaseError(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_Success(t *testing.T) {
+func TestGetRunLogsHandler_Success(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
 	st := &mockStore{getRunResult: store.Run{ID: runID}}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
@@ -128,19 +128,19 @@ func TestGetModEventsHandler_Success(t *testing.T) {
 	}
 }
 
-func TestGetModEventsHandler_Resume(t *testing.T) {
+func TestGetRunLogsHandler_Resume(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
 	st := &mockStore{getRunResult: store.Run{ID: runID}}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
 	ctx := context.Background()
 	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
 	req.Header.Set("Last-Event-ID", "1")
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
@@ -171,12 +171,12 @@ func TestGetModEventsHandler_Resume(t *testing.T) {
 	}
 }
 
-// TestGetModEventsHandler_EnrichedLogPayload verifies that the SSE HTTP
+// TestGetRunLogsHandler_EnrichedLogPayload verifies that the SSE HTTP
 // handler preserves enriched log fields (node_id, job_id, mod_type,
 // step_index) in the JSON payload streamed to clients. This ensures the
 // HTTP layer does not strip or alter the enriched LogRecord shape used
 // by CLI consumers (run logs).
-func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
+func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	t.Parallel()
 
 	eventsService, err := createTestEventsService()
@@ -187,9 +187,9 @@ func TestGetModEventsHandler_EnrichedLogPayload(t *testing.T) {
 
 	runID := testRunIDKSUID
 	st := &mockStore{getRunResult: store.Run{ID: runID}}
-	h := getModEventsHandler(st, eventsService)
+	h := getRunLogsHandler(st, eventsService)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
 	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 

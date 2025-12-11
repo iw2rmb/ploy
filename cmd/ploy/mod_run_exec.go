@@ -121,7 +121,7 @@ func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, requ
 	return cmd.Run(ctx)
 }
 
-// followRunEvents streams run events until the run reaches a terminal state or timeout.
+// followRunEvents streams run logs/events until the run reaches a terminal state or timeout.
 // Returns the final run state and any errors encountered during streaming.
 // When --follow is used, streams both run/stage events and enriched log events using the
 // shared log printer for a unified, informative view of the Mods execution.

@@ -22,7 +22,7 @@ Flags for 'ploy mod run':
   --gitlab-domain <domain>   GitLab domain
   --mr-success               Create merge request on success
   --mr-fail                  Create merge request on failure
-  --follow                   Follow run events until completion
+  --follow                   Follow run logs until completion
   --cap <duration>           Time cap for --follow
   --cancel-on-cap            Cancel run if cap exceeded
   --artifact-dir <dir>       Download final artifacts

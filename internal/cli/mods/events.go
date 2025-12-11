@@ -62,7 +62,7 @@ type EventsCommand struct {
 	LogPrinter *logs.Printer
 }
 
-// Run consumes "run", "stage", and optionally "log" SSE events from /v1/runs/{id}/events.
+// Run consumes "run", "stage", and optionally "log" SSE events from /v1/runs/{id}/logs.
 // Unknown event types are ignored so the CLI remains forward compatible. Returns the final
 // run state. When LogPrinter is set, "log" events are rendered using the shared printer.
 func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
@@ -95,7 +95,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		logPrinter = logs.NewPrinter(logs.FormatStructured, out)
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "events")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "logs")
 	if err != nil {
 		return "", err
 	}

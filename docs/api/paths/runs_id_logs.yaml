@@ -1,4 +1,4 @@
-# GET /v1/runs/{id}/events — SSE stream for run events
+# GET /v1/runs/{id}/logs — SSE stream for run logs and events
 #
 # Event payloads:
 # - `event: run` → RunSummary (canonical schema, no wrapper)
@@ -25,7 +25,7 @@ parameters:
       example: "42"
 get:
   tags: [Control]
-  summary: Stream run events (SSE)
+  summary: Stream run logs (SSE)
   description: |
     Server-Sent Events stream for real-time run status and log updates.
     Supports `Last-Event-ID` header for resume after reconnection.
@@ -113,3 +113,4 @@ get:
       description: Not Found — run does not exist.
     '500':
       description: Internal Server Error.
+

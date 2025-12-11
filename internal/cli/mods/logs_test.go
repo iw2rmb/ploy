@@ -42,7 +42,7 @@ func TestLogsCommandStreamsStructured(t *testing.T) {
 		Output:  buf,
 	}
 	if err := cmd.Run(context.Background()); err != nil {
-		t.Fatalf("run events command: %v", err)
+		t.Fatalf("run logs command: %v", err)
 	}
 	got := buf.String()
 	want := "2025-10-22T10:00:00Z stdout line-1\nRetention: retained ttl=72h expires=2025-10-25T10:00:00Z cid=bafy-test\n"
@@ -59,7 +59,7 @@ type testEvent struct {
 func newModsStreamServer(t *testing.T, events []testEvent) *httptest.Server {
 	t.Helper()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/runs/test/events" {
+		if r.URL.Path != "/v1/runs/test/logs" {
 			http.NotFound(w, r)
 			return
 		}

@@ -777,7 +777,7 @@ response schema for:
 
 - `POST /v1/mods` (submit) — 201 response body.
 - `GET /v1/runs/{id}/status` (status) — 200 response body.
-- `event: run` SSE payloads on `/v1/runs/{id}/events`.
+- `event: run` SSE payloads on `/v1/runs/{id}/logs`.
 
 **Wire contract guarantees:**
 
@@ -951,8 +951,8 @@ value is a `StageStatus` object describing that job's execution state.
     - Run stats (MR URL, gate summary).
   - Returns `RunSummary` directly (Go type `modsapi.RunSummary`); the canonical JSON shape for run state.
 
-- `GET /v1/runs/{id}/events` — SSE event stream for a run.
-  - Handler: `getModEventsHandler`.
+- `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
+  - Handler: `getRunLogsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
     - `event:  run`, data: `RunSummary`.
@@ -1124,11 +1124,11 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Constructs `RunSubmitRequest` with stage definitions in
     `cmd/ploy/mod_run_exec.go`.
   - Submits via `internal/cli/mods.SubmitCommand`.
-  - Optional `--follow` streams  run events via
+  - Optional `--follow` streams run logs/events via
     `internal/cli/mods.EventsCommand`, backed by `internal/cli/stream`.
 
-- `ploy run events < run>`:
-  - Streams events from `/v1/runs/{id}/events`, focusing on `log` and
+- `ploy run logs < run>`:
+  - Streams logs/events from `/v1/runs/{id}/logs`, focusing on `log` and
     `retention` events (see `internal/cli/mods/logs.go`).
 
 - Run summaries (gate/MR/job graph) are exposed via:
@@ -1140,7 +1140,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 The event hub (`internal/stream/hub.go`) and HTTP wrapper (`internal/stream/http.go`)
 implement a minimal SSE protocol used by the Mods endpoints.
 
-**OpenAPI reference:** See `docs/api/paths/mods_id_events.yaml` for the formal
+**OpenAPI reference:** See `docs/api/paths/runs_id_logs.yaml` for the formal
 endpoint specification and event payload schemas.
 
 ### 7.1 Event types
@@ -1192,7 +1192,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
   hub-generated system events) or when context is unavailable.
 - `step_index` uses float values (1000, 2000, 3000) to allow dynamic insertion
   of healing jobs at midpoints (e.g., 1500 for heal-1).
-- CLI consumers (`ploy run events`) use the enriched fields
+- CLI consumers (`ploy run logs`) use the enriched fields
   to display contextual information in structured output format.
 
 ### 7.3 Clients
@@ -1202,7 +1202,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 - `internal/cli/mods.EventsCommand` handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
-- `internal/cli/runs.FollowCommand` and `ploy run events` focus on `"log"` and
+- `internal/cli/runs.FollowCommand` and `ploy run logs` focus on `"log"` and
   `"retention"` events for human-readable tails.
 - The shared log printer (`internal/cli/logs`) formats log records using
   enriched fields when available (see "Structured Log Format" below).

@@ -50,7 +50,7 @@ paths:
   # Control-plane CRUD
   # Jobs endpoints removed; use /v1/mods/* for control, legacy ingest under /v1/runs/{id}/*.
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
-  # SSE events are exposed under /v1/runs/{id}/events.
+  # SSE events are exposed under /v1/runs/{id}/logs.
   /v1/mods:
     $ref: './paths/mods.yaml'
   # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
@@ -58,8 +58,8 @@ paths:
     $ref: './paths/mods_id_graph.yaml'
   /v1/mods/{id}/cancel:
     $ref: './paths/mods_id_cancel.yaml'
-  /v1/runs/{id}/events:
-    $ref: './paths/mods_id_events.yaml'
+  /v1/runs/{id}/logs:
+    $ref: './paths/runs_id_logs.yaml'
   /v1/mods/{id}/logs:
     $ref: './paths/mods_id_logs.yaml'
   /v1/mods/{id}/diffs:

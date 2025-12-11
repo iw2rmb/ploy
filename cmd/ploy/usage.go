@@ -73,11 +73,11 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  list        List batch runs with pagination")
 	_, _ = fmt.Fprintln(w, "  status      Show status for a run")
-	_, _ = fmt.Fprintln(w, "  events      Stream run events (logs, retention)")
+	_, _ = fmt.Fprintln(w, "  logs        Stream run logs (SSE)")
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
 	_, _ = fmt.Fprintln(w, "  resume      Resume a failed or canceled run")
 	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
-	_, _ = fmt.Fprintln(w, "  diffs       List diffs or download newest patch for a run")
+	_, _ = fmt.Fprintln(w, "  diff        List diffs or download newest patch for a run")
 }
 
 // wantsHelp checks whether the given argument list represents a help request.

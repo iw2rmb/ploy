@@ -37,12 +37,12 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
 		{"/v1/pki/sign/client", "post"},
-		// Mods (run submit + status/events + ingest)
+		// Mods (run submit + status/logs + ingest)
 		{"/v1/mods", "post"},
 		// Legacy /v1/mods/{id} status endpoint has been replaced by /v1/runs/{id}/status.
 		{"/v1/mods/{id}/graph", "get"},
 		{"/v1/mods/{id}/cancel", "post"},
-		{"/v1/runs/{id}/events", "get"},
+		{"/v1/runs/{id}/logs", "get"},
 		{"/v1/mods/{id}/logs", "post"},
 		{"/v1/mods/{id}/diffs", "post"},
 		{"/v1/diffs/{id}", "get"},

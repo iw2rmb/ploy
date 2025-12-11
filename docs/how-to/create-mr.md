@@ -214,7 +214,7 @@ ploy mod run repo add \
   java17-fleet
 
 # 4. Follow batch progress.
-ploy run events java17-fleet
+ploy run logs java17-fleet
 ```
 
 ### Restart a Repo with a Hotfix Branch
