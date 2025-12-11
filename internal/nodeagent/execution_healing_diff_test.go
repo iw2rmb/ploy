@@ -236,3 +236,73 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 	//   - "timings": {...}
 	//   - E3: "path_id" (only present for multi-path jobs like "heal-path-a-1-0")
 }
+
+// trackingDiffGenerator is a test helper that records Generate/GenerateBetween calls.
+type trackingDiffGenerator struct {
+	diffContent     []byte
+	generateCalled  bool
+	generateBetween bool
+	lastBaseDir     string
+	lastModifiedDir string
+}
+
+func (t *trackingDiffGenerator) Generate(ctx context.Context, workspace string) ([]byte, error) {
+	t.generateCalled = true
+	return t.diffContent, nil
+}
+
+func (t *trackingDiffGenerator) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
+	t.generateBetween = true
+	t.lastBaseDir = baseDir
+	t.lastModifiedDir = modifiedDir
+	return t.diffContent, nil
+}
+
+// TestUploadHealingJobDiff_UsesGenerateBetween verifies that discrete healing jobs
+// use GenerateBetween (repo+diff semantics) and still publish mod_type="mod" diffs.
+func TestUploadHealingJobDiff_UsesGenerateBetween(t *testing.T) {
+	t.Parallel()
+
+	workspace, err := os.MkdirTemp("", "ploy-heal-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+
+	baseDir, err := os.MkdirTemp("", "ploy-heal-base-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(baseDir) }()
+
+	diffGen := &trackingDiffGenerator{
+		diffContent: []byte("healing-diff"),
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	result := step.Result{
+		ExitCode: 0,
+		Timings:  step.StageTiming{},
+	}
+
+	rc.uploadHealingJobDiff(context.Background(), "run-1", "job-1", "heal-1-0", diffGen, baseDir, workspace, result, 1500)
+
+	if !diffGen.generateBetween {
+		t.Fatalf("GenerateBetween was not called for healing job diff")
+	}
+	if diffGen.generateCalled {
+		t.Fatalf("Generate should not be called when baseline is provided")
+	}
+	if diffGen.lastBaseDir != baseDir {
+		t.Errorf("GenerateBetween baseDir = %q, want %q", diffGen.lastBaseDir, baseDir)
+	}
+	if diffGen.lastModifiedDir != workspace {
+		t.Errorf("GenerateBetween modifiedDir = %q, want %q", diffGen.lastModifiedDir, workspace)
+	}
+}
