@@ -79,7 +79,7 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	// Repository configuration
 	flags.RepoURL = fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
 	flags.RepoBaseRef = fs.String("repo-base-ref", "", "Git base ref used for materialisation")
-	flags.RepoTargetRef = fs.String("repo-target-ref", "", "Git target ref (branch) for the run; when omitted, the node derives a default of /mod/<run-id> for MR and workspace context")
+	flags.RepoTargetRef = fs.String("repo-target-ref", "", "Git target ref (branch) for the run; when omitted, the node derives a default of ploy/{run_name|run_id} for MR and workspace context")
 	flags.RepoWorkspaceHint = fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
 
 	// Follow/polling behavior
