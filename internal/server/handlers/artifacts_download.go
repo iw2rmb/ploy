@@ -124,10 +124,10 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 			CreatedAt string             `json:"created_at"`
 		}
 		// bundle.ID is still pgtype.UUID; run_id and job_id are now KSUID strings.
-		// Convert to domain types for type-safe API response.
+		// RunID and JobID are already domain types in the store model.
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
-			RunID: domaintypes.RunID(bundle.RunID), // Convert to domain type
+			RunID: bundle.RunID,
 			Size:  int64(len(bundle.Bundle)),
 		}
 		if bundle.JobID != nil && *bundle.JobID != "" {

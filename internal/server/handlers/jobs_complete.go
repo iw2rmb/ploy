@@ -160,7 +160,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Derive run_id from the job for run completion checks.
-		runID := domaintypes.RunID(job.RunID)
+		runID := job.RunID
 
 		// Derive node ID from required header. auth middleware already enforces
 		// presence for worker-role callers; this handler performs an additional
@@ -280,14 +280,15 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				)
 			} else {
 				modType := strings.TrimSpace(job.ModType)
-				if modType == "mr" {
+				switch modType {
+				case "mr":
 					// MR jobs are best-effort and must not trigger healing or
 					// cancellation of other jobs when they fail.
 					slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,
 					)
-				} else if modType == "pre_gate" || modType == "post_gate" || modType == "re_gate" {
+				case "pre_gate", "post_gate", "re_gate":
 					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
 						slog.Error("complete job: failed to create healing jobs",
 							"job_id", jobIDStr,
@@ -295,7 +296,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 							"err", healErr,
 						)
 					}
-				} else {
+				default:
 					if err := cancelRemainingJobsAfterFailure(ctx, st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
 						slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
 							"job_id", jobIDStr,

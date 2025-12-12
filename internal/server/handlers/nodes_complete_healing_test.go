@@ -98,7 +98,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesModType(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(reGateStepIndex), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(reGateStepIndex), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -185,7 +185,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCreateHealingJobs(ctx, st, run, domaintypes.RunID(runID), domaintypes.StepIndex(1000), jobs); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(1000), jobs); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -296,7 +296,7 @@ func TestMaybeCompleteMultiStepRun_MultiBranchWinner_Succeeds(t *testing.T) {
 		listJobsByRunResult: jobs,
 	}
 
-	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, domaintypes.RunID(runID)); err != nil {
+	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
 
