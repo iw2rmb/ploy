@@ -137,10 +137,10 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
 		// d.ID is still pgtype.UUID; d.RunID and d.JobID are now KSUID strings.
-		// Convert to domain types for type-safe API response.
+		// RunID and JobID are already domain types in the store model.
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
-			RunID:       domaintypes.RunID(d.RunID), // Convert to domain type
+			RunID:       d.RunID,
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,

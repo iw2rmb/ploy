@@ -184,7 +184,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:          domaintypes.RunID(run.RunID),
+				RunID:          run.RunID,
 				Name:           run.Name,
 				RunStatus:      string(run.RunStatus),
 				RepoStatus:     string(run.RepoStatus),

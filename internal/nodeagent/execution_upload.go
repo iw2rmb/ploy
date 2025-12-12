@@ -1,10 +1,10 @@
 // execution_upload.go centralizes artifact and status upload operations.
 //
-// This file handles diff upload, artifact bundling, /out directory upload,
-// and final status reporting to the control plane. Upload operations include
-// retry logic and error handling. Isolating uploads from execution orchestration
-// keeps the orchestrator focused on run lifecycle while this file owns all
-// HTTP interactions for result persistence.
+// This file handles artifact bundling, /out directory upload, and final status
+// reporting to the control plane. Upload operations include retry logic and
+// error handling. Isolating uploads from execution orchestration keeps the
+// orchestrator focused on run lifecycle while this file owns all HTTP
+// interactions for result persistence.
 package nodeagent
 
 import (
@@ -18,30 +18,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-// uploadDiffArtifact uploads the diff as an artifact bundle for client download.
-// Creates a temporary file, writes the diff content, and uploads as "diff" artifact.
-func (r *runController) uploadDiffArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte) {
-	diffFile, err := os.CreateTemp("", "ploy-diff-*.patch")
-	if err != nil {
-		return
-	}
-	defer func() { _ = os.Remove(diffFile.Name()) }()
-
-	_, _ = diffFile.Write(diffBytes)
-	_ = diffFile.Close()
-
-	artUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		return
-	}
-
-	if _, _, errU := artUploader.UploadArtifact(ctx, runID, jobID, []string{diffFile.Name()}, "diff"); errU != nil {
-		slog.Warn("failed to upload diff artifact bundle", "run_id", runID, "job_id", jobID, "error", errU)
-	} else {
-		slog.Info("diff artifact bundle uploaded", "run_id", runID, "job_id", jobID)
-	}
-}
 
 // uploadConfiguredArtifacts uploads artifact bundles specified in the typed RunOptions.
 // It resolves paths relative to the workspace, validates they exist, and bundles them

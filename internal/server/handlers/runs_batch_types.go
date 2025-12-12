@@ -180,8 +180,8 @@ func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
 	resp := RunRepoResponse{
 		// rr.ID is now a string (NanoID-backed); cast directly to domain type.
 		ID: domaintypes.RunRepoID(rr.ID),
-		// rr.RunID is a string (KSUID-backed); cast directly.
-		RunID: domaintypes.RunID(rr.RunID),
+		// rr.RunID is already a domain RunID in the store model.
+		RunID: rr.RunID,
 		// Wrap VCS fields in domain types; values are validated at input time.
 		RepoURL:   domaintypes.RepoURL(rr.RepoUrl),
 		BaseRef:   domaintypes.GitRef(rr.BaseRef),
