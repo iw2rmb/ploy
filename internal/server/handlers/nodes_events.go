@@ -22,9 +22,9 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeIDStr := r.PathValue("id")
-		if strings.TrimSpace(nodeIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		nodeID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -75,14 +75,14 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 		// Check if the node exists before processing.
 		var err error
-		_, err = st.GetNode(r.Context(), nodeIDStr)
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("node events: check failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("node events: check failed", "node_id", nodeID, "err", err)
 			return
 		}
 

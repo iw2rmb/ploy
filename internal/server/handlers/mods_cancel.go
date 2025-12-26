@@ -28,9 +28,9 @@ import (
 //   - 400 Bad Request for invalid id
 func cancelRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

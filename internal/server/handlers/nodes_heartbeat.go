@@ -19,14 +19,11 @@ import (
 func heartbeatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeIDStr := r.PathValue("id")
-		if strings.TrimSpace(nodeIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		nodeID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Use node ID directly as a string (no UUID parsing needed).
-		nodeID := nodeIDStr
 
 		// Decode request body.
 		var req struct {
@@ -45,7 +42,6 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the node exists before attempting to update.
-		var err error
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -53,7 +49,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("heartbeat: check failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("heartbeat: check failed", "node_id", nodeID, "err", err)
 			return
 		}
 
@@ -77,13 +73,13 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to update heartbeat: %v", err), http.StatusInternalServerError)
-			slog.Error("heartbeat: update failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("heartbeat: update failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
 		slog.Debug("heartbeat updated",
-			"node_id", nodeIDStr,
+			"node_id", nodeID,
 			"cpu_free_millis", req.CPUFreeMilli,
 			"mem_free_mb", req.MemFreeMB,
 			"disk_free_mb", req.DiskFreeMB,

@@ -35,20 +35,12 @@ import (
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeIDStr := r.PathValue("id")
-		if strings.TrimSpace(nodeIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		nodeID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
-		nodeID := strings.TrimSpace(nodeIDStr)
-		if nodeID == "" {
-			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
-			return
-		}
-
-		var err error
 		// Verify node exists before attempting to claim work.
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
@@ -57,7 +49,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("claim: node check failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("claim: node check failed", "node_id", nodeID, "err", err)
 			return
 		}
 
@@ -67,11 +59,11 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {
 				w.WriteHeader(http.StatusNoContent)
-				slog.Debug("claim: no work available", "node_id", nodeIDStr)
+				slog.Debug("claim: no work available", "node_id", nodeID)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to claim job: %v", err), http.StatusInternalServerError)
-			slog.Error("claim: database error", "node_id", nodeIDStr, "err", err)
+			slog.Error("claim: database error", "node_id", nodeID, "err", err)
 			return
 		}
 
@@ -79,7 +71,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		run, err := st.GetRun(r.Context(), job.RunID.String())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
-			slog.Error("claim: get run failed for job", "node_id", nodeIDStr, "job_id", job.ID, "err", err)
+			slog.Error("claim: get run failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
 			return
 		}
 
@@ -114,7 +106,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			"job_name", job.Name,
 			"run_id", run.ID, // Run IDs are KSUID strings.
 			"step_index", job.StepIndex,
-			"node_id", nodeIDStr,
+			"node_id", nodeID,
 		)
 	}
 }

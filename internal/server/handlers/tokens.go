@@ -216,14 +216,14 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 // Response: { "message": "Token revoked successfully" }
 func revokeAPITokenHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tokenID := r.PathValue("id")
-		if tokenID == "" {
-			http.Error(w, "token ID is required", http.StatusBadRequest)
+		tokenID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Revoke the token.
-		err := st.RevokeAPIToken(r.Context(), tokenID)
+		err = st.RevokeAPIToken(r.Context(), tokenID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to revoke token: %v", err), http.StatusInternalServerError)
 			slog.Error("revoke api token: database update failed", "token_id", tokenID, "err", err)

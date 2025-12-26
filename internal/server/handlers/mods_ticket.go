@@ -237,9 +237,9 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "run id is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

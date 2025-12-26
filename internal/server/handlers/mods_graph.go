@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -47,9 +46,9 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "run id is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -61,7 +60,7 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 
 		// Verify the run exists before fetching jobs using string ID directly.
 		// No UUID parsing needed; store accepts KSUID strings.
-		_, err := st.GetRun(r.Context(), runIDStr)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)

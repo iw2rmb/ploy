@@ -72,9 +72,9 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 // Otherwise, returns artifact metadata in JSON.
 func getArtifactHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := r.PathValue("id")
-		if strings.TrimSpace(idStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		idStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

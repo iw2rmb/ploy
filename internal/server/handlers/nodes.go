@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,16 +16,9 @@ import (
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeIDStr := r.PathValue("id")
-		if strings.TrimSpace(nodeIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
-		nodeID := strings.TrimSpace(nodeIDStr)
-		if nodeID == "" {
-			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
+		nodeID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -38,7 +30,7 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get node: %v", err), http.StatusInternalServerError)
-			slog.Error("drain node: lookup failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("drain node: lookup failed", "node_id", nodeID, "err", err)
 			return
 		}
 
@@ -52,28 +44,21 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to drain node: %v", err), http.StatusInternalServerError)
-			slog.Error("drain node: update failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("drain node: update failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("node drained", "node_id", nodeIDStr, "name", node.Name)
+		slog.Info("node drained", "node_id", nodeID, "name", node.Name)
 	}
 }
 
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeIDStr := r.PathValue("id")
-		if strings.TrimSpace(nodeIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
-			return
-		}
-
-		// Node IDs are now NanoID(6) strings; no UUID parsing needed.
-		nodeID := strings.TrimSpace(nodeIDStr)
-		if nodeID == "" {
-			http.Error(w, "invalid id: must be a non-empty string", http.StatusBadRequest)
+		nodeID, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -85,7 +70,7 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get node: %v", err), http.StatusInternalServerError)
-			slog.Error("undrain node: lookup failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("undrain node: lookup failed", "node_id", nodeID, "err", err)
 			return
 		}
 
@@ -99,12 +84,12 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to undrain node: %v", err), http.StatusInternalServerError)
-			slog.Error("undrain node: update failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("undrain node: update failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("node undrained", "node_id", nodeIDStr, "name", node.Name)
+		slog.Info("node undrained", "node_id", nodeID, "name", node.Name)
 	}
 }
 
