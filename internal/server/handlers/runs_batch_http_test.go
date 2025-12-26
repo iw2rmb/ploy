@@ -1194,6 +1194,7 @@ func TestStartRunHandler(t *testing.T) {
 		mockRun                       store.Run
 		mockRunErr                    error
 		mockAllRepos                  []store.RunRepo
+		mockAllReposErr               error
 		mockPendingRepos              []store.RunRepo
 		mockPendingErr                error
 		mockCreateRunResult           store.Run
@@ -1246,12 +1247,12 @@ func TestStartRunHandler(t *testing.T) {
 			wantStatus: http.StatusConflict,
 		},
 		{
-			name:           "list repos error",
-			runID:          sampleBatchRunID,
-			mockRun:        queuedBatchRun,
-			mockAllRepos:   nil,
-			mockPendingErr: pgx.ErrTxClosed,
-			wantStatus:     http.StatusInternalServerError,
+			name:            "list all repos error",
+			runID:           sampleBatchRunID,
+			mockRun:         queuedBatchRun,
+			mockAllRepos:    nil,
+			mockAllReposErr: pgx.ErrTxClosed,
+			wantStatus:      http.StatusInternalServerError,
 		},
 	}
 
@@ -1263,6 +1264,7 @@ func TestStartRunHandler(t *testing.T) {
 				getRunResult:                   tc.mockRun,
 				getRunErr:                      tc.mockRunErr,
 				listRunReposByRunResult:        tc.mockAllRepos,
+				listRunReposByRunErr:           tc.mockAllReposErr,
 				listPendingRunReposByRunResult: tc.mockPendingRepos,
 				listPendingRunReposByRunErr:    tc.mockPendingErr,
 				createRunResult:                tc.mockCreateRunResult,

@@ -146,13 +146,13 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		//    This creates a child execution run with jobs and links it via
 		//    run_repos.execution_run_id.
 		starter := NewBatchRepoStarter(st)
-		started, err := starter.StartPendingRepos(r.Context(), parentRun.ID)
+		startResult, err := starter.StartPendingRepos(r.Context(), parentRun.ID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to start repo execution: %v", err), http.StatusInternalServerError)
 			slog.Error("submit run: start pending repos failed", "run_id", parentRun.ID, "err", err)
 			return
 		}
-		if started == 0 {
+		if startResult.Started == 0 {
 			http.Error(w, "failed to start repo execution", http.StatusInternalServerError)
 			slog.Error("submit run: no repos started", "run_id", parentRun.ID, "repo_id", runRepo.ID)
 			return

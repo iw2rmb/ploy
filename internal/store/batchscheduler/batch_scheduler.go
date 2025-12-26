@@ -19,13 +19,25 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// StartPendingReposResult contains the result of starting pending repos in a batch run.
+// This type is defined here to avoid circular imports with the handlers package.
+// It mirrors handlers.StartPendingReposResult for interface compatibility.
+type StartPendingReposResult struct {
+	// Started is the number of repos that were successfully started in this call.
+	Started int
+	// AlreadyDone is the number of repos already in a terminal state.
+	AlreadyDone int
+	// Pending is the number of repos still in pending state after this call.
+	Pending int
+}
+
 // RepoStarter is the interface for starting execution of pending repos.
 // Implemented by handlers.BatchRepoStarter to decouple scheduler from HTTP layer.
 type RepoStarter interface {
 	// StartPendingRepos starts execution for all pending repos in a batch run.
 	// runID is a KSUID-backed string identifier for the batch run.
-	// Returns the number of repos that were started successfully.
-	StartPendingRepos(ctx context.Context, runID string) (started int, err error)
+	// Returns StartPendingReposResult with counts of started, already done, and pending repos.
+	StartPendingRepos(ctx context.Context, runID string) (StartPendingReposResult, error)
 }
 
 // Options configures the batch scheduler.
@@ -116,7 +128,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	// runIDs are KSUID-backed strings from ListBatchRunsWithPendingRepos.
 	var totalStarted int
 	for _, runID := range runIDs {
-		started, err := s.repoStarter.StartPendingRepos(ctx, runID)
+		result, err := s.repoStarter.StartPendingRepos(ctx, runID)
 		if err != nil {
 			s.logger.Error("batch-scheduler: failed to start repos",
 				"run_id", runID,
@@ -125,12 +137,14 @@ func (s *Scheduler) Run(ctx context.Context) error {
 			continue // Try other runs.
 		}
 
-		if started > 0 {
+		if result.Started > 0 {
 			s.logger.Info("batch-scheduler: started repos",
 				"run_id", runID,
-				"started", started,
+				"started", result.Started,
+				"already_done", result.AlreadyDone,
+				"pending", result.Pending,
 			)
-			totalStarted += started
+			totalStarted += result.Started
 		}
 	}
 
