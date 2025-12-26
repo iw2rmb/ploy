@@ -48,9 +48,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Extract job_id from URL path parameter.
 		// Job IDs are KSUID strings; treated as opaque identifiers.
-		jobIDStr := strings.TrimSpace(r.PathValue("job_id"))
-		if jobIDStr == "" {
-			http.Error(w, "job_id path parameter is required", http.StatusBadRequest)
+		jobIDStr, err := requiredPathParam(r, "job_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

@@ -79,9 +79,9 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 // Requires cli-admin role (enforced by middleware).
 func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := r.PathValue("key")
-		if key == "" {
-			http.Error(w, "missing key path parameter", http.StatusBadRequest)
+		key, err := requiredPathParam(r, "key")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -117,9 +117,9 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 // Requires cli-admin role (enforced by middleware).
 func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := r.PathValue("key")
-		if key == "" {
-			http.Error(w, "missing key path parameter", http.StatusBadRequest)
+		key, err := requiredPathParam(r, "key")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -190,9 +190,9 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 // Requires cli-admin role (enforced by middleware).
 func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := r.PathValue("key")
-		if key == "" {
-			http.Error(w, "missing key path parameter", http.StatusBadRequest)
+		key, err := requiredPathParam(r, "key")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

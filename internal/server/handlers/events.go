@@ -39,9 +39,9 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run ID from path parameter.
 		// Run IDs are KSUID strings (27 chars); treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -53,7 +53,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 
 		// Verify run exists in the database using string ID directly.
 		// No UUID parsing needed; store accepts KSUID strings.
-		_, err := st.GetRun(r.Context(), runIDStr)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):

@@ -119,9 +119,9 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the repo ID (URL-encoded repo_url) from the path.
-		repoIDEncoded := r.PathValue("repo_id")
-		if repoIDEncoded == "" {
-			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
+		repoIDEncoded, err := requiredPathParam(r, "repo_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

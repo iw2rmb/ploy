@@ -28,16 +28,16 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 	const maxBundleSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path parameter (KSUID string).
-		runIDStr := strings.TrimSpace(r.PathValue("run_id"))
-		if runIDStr == "" {
-			http.Error(w, "run_id path parameter is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "run_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Extract job_id from path parameter (KSUID string).
-		jobIDStr := strings.TrimSpace(r.PathValue("job_id"))
-		if jobIDStr == "" {
-			http.Error(w, "job_id path parameter is required", http.StatusBadRequest)
+		jobIDStr, err := requiredPathParam(r, "job_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -81,7 +81,6 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the run exists using string ID directly.
-		var err error
 		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

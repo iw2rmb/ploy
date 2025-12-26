@@ -22,9 +22,9 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxPatchSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr := r.PathValue("id")
-		if strings.TrimSpace(runIDStr) == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		runID := runIDStr
