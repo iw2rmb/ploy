@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -112,11 +111,10 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 // Run IDs are now KSUID-backed strings; no UUID parsing is performed.
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -160,11 +158,10 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 // Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func stopRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -264,11 +261,10 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 // Run IDs are KSUID strings; run_repo IDs are NanoID strings generated via NewRunRepoID().
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -361,16 +357,15 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 // Run IDs are KSUID strings; treated as opaque identifiers.
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Verify the run exists before listing repos.
-		_, err := st.GetRun(r.Context(), runIDStr)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -416,24 +411,22 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 // Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Parse the repo ID from the URL path parameter.
-		// Repo IDs are NanoID strings (8 chars); treated as opaque identifiers.
-		repoIDStr := strings.TrimSpace(r.PathValue("repo_id"))
-		if repoIDStr == "" {
-			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
+		// Parse the repo ID from the URL path parameter using the shared helper.
+		repoIDStr, err := requiredPathParam(r, "repo_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Verify the run exists.
-		_, err := st.GetRun(r.Context(), runIDStr)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -524,19 +517,17 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 // Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
 func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Parse the repo ID from the URL path parameter.
-		// Repo IDs are NanoID strings (8 chars); treated as opaque identifiers.
-		repoIDStr := strings.TrimSpace(r.PathValue("repo_id"))
-		if repoIDStr == "" {
-			http.Error(w, "repo_id path parameter is required", http.StatusBadRequest)
+		// Parse the repo ID from the URL path parameter using the shared helper.
+		repoIDStr, err := requiredPathParam(r, "repo_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -694,11 +685,10 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

@@ -20,10 +20,12 @@ import (
 func getRunTimingHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Accept id from path parameter first, then fallback to query parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
+		// Uses optionalPathParam since query fallback is supported.
+		runIDStr := ""
+		if idPtr := optionalPathParam(r, "id"); idPtr != nil {
+			runIDStr = *idPtr
+		} else if qID := strings.TrimSpace(r.URL.Query().Get("id")); qID != "" {
+			runIDStr = qID
 		}
 		if runIDStr == "" {
 			http.Error(w, "id query parameter is required", http.StatusBadRequest)
@@ -70,17 +72,16 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 // IDs are treated as opaque; validation is limited to non-empty checks.
 func deleteRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract id from path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Extract id from path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Check if the run exists before attempting to delete.
 		// No UUID parsing needed; store accepts KSUID strings.
-		_, err := st.GetRun(r.Context(), runIDStr)
+		_, err = st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
