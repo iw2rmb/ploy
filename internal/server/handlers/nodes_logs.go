@@ -123,7 +123,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		log, err := eventsService.CreateAndPublishLog(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
-			slog.Error("node logs: create failed", "node_id", nodeIDStr, "run_id", req.RunID, "chunk_no", req.ChunkNo, "err", err)
+			slog.Error("node logs: create failed", "node_id", nodeID, "run_id", req.RunID, "chunk_no", req.ChunkNo, "err", err)
 			return
 		}
 
@@ -139,7 +139,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		slog.Debug("log chunk stored",
-			"node_id", nodeIDStr,
+			"node_id", nodeID,
 			"run_id", req.RunID,
 			"chunk_no", req.ChunkNo,
 			"size", len(req.Data),
