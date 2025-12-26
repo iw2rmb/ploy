@@ -54,11 +54,16 @@ func jobToNode(job store.Job) *GraphNode {
 		finishedAt = &t
 	}
 
+	// Convert raw float64 from store.Job to domaintypes.StepIndex.
+	// This centralizes the type boundary between persistence (float64) and
+	// domain logic (domaintypes.StepIndex with validation invariants).
+	stepIndex := domaintypes.StepIndex(job.StepIndex)
+
 	return &GraphNode{
 		ID:         job.ID, // job.ID is now a string (KSUID-backed).
 		Name:       job.Name,
 		Type:       nodeType,
-		StepIndex:  job.StepIndex,
+		StepIndex:  stepIndex,
 		Status:     nodeStatus,
 		Attempt:    1, // Currently fixed; future retry support may vary.
 		Image:      job.ModImage,
