@@ -355,9 +355,13 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 	}
 
 	if err != nil {
-		// Log error but don't fail the request
-		// TODO: Add proper logging
-		_ = err
+		// Log the error but don't fail the request — token last-used updates
+		// are telemetry-only and should not block authentication.
+		a.logger.Warn("token last-used update failed",
+			"token_type", tokenType,
+			"token_id", tokenID,
+			"err", err,
+		)
 	}
 }
 
