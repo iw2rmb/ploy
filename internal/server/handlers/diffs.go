@@ -55,10 +55,10 @@ type diffGetResponse struct {
 // Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
 func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		idStr := strings.TrimSpace(r.PathValue("id"))
-		if idStr == "" {
-			http.Error(w, "run id is required", http.StatusBadRequest)
+		// Parse the run ID from the URL path parameter using the shared helper.
+		idStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -102,9 +102,10 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 // NOTE: diffs.id is still UUID; run_id and job_id are KSUID strings.
 func getDiffHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := strings.TrimSpace(r.PathValue("id"))
-		if idStr == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
+		// Parse the diff ID from the URL path parameter using the shared helper.
+		idStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		// diffs.id is still UUID (outside scope of this task).

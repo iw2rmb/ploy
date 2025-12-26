@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
@@ -33,11 +32,10 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run id from path parameter.
-		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runIDStr := strings.TrimSpace(r.PathValue("id"))
-		if runIDStr == "" {
-			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+		// Extract run id from path parameter using the shared helper.
+		runIDStr, err := requiredPathParam(r, "id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
