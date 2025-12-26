@@ -88,11 +88,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Validate stats field if provided (must be a valid JSON object).
-		// Also detect special healing warnings (e.g., no_workspace_changes) used
-		// for run-level healing control without altering exit codes.
 		statsBytes := []byte("{}")
 		var jobMetaBytes []byte
-		var healingWarning string
 		var mrURL string
 		if len(req.Stats) > 0 {
 			if !json.Valid(req.Stats) {
@@ -121,16 +118,6 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				}
 				if len(metaBytes) > 0 && string(metaBytes) != "{}" && string(metaBytes) != "null" {
 					jobMetaBytes = metaBytes
-				}
-			}
-
-			// Detect optional healing_warning used by nodeagent healing jobs to
-			// signal that no workspace changes were produced even though the
-			// container exited successfully. This is used to stop the run
-			// without mutating the job's exit code.
-			if hwRaw, ok := obj["healing_warning"]; ok && hwRaw != nil {
-				if hwStr, ok := hwRaw.(string); ok {
-					healingWarning = strings.TrimSpace(hwStr)
 				}
 			}
 
@@ -240,30 +227,6 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		if err != nil {
 			// Log error but don't fail the job completion (job is already marked complete).
 			slog.Error("complete job: get run failed", "job_id", jobIDStr, "run_id", runID, "err", err)
-		}
-
-		// When a healing job reports a no-change warning, treat this as a
-		// terminal healing failure for the run: cancel all remaining jobs
-		// after the healing step so the run can reach a failed terminal state.
-		// Exit code and job terminal status remain unchanged (per user contract).
-		if err == nil && healingWarning == "no_workspace_changes" && strings.TrimSpace(job.ModType) == "heal" {
-			jobs, jobsErr := st.ListJobsByRun(ctx, runID.String())
-			if jobsErr != nil {
-				slog.Error("complete job: failed to list jobs for healing no-change handling",
-					"job_id", jobIDStr,
-					"run_id", runID,
-					"err", jobsErr,
-				)
-			} else {
-				if cancelErr := cancelRemainingJobsAfterFailure(ctx, st, runID, domaintypes.StepIndex(job.StepIndex), jobs); cancelErr != nil {
-					slog.Error("complete job: failed to cancel remaining jobs after healing produced no changes",
-						"job_id", jobIDStr,
-						"run_id", runID,
-						"step_index", job.StepIndex,
-						"err", cancelErr,
-					)
-				}
-			}
 		}
 
 		// When a job fails, either:
