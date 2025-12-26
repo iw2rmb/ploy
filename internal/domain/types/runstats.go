@@ -13,30 +13,13 @@ import (
 type RunStats map[string]any
 
 // ExitCode returns the exit_code field as an int when present.
-// It accepts int, int64, and float64 (from JSON decoding) representations.
+// Delegates to IntFromAny for consistent JSON number coercion.
 func (s RunStats) ExitCode() (int, bool) {
 	v, ok := s["exit_code"]
-	if !ok || v == nil {
+	if !ok {
 		return 0, false
 	}
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int8:
-		return int(n), true
-	case int16:
-		return int(n), true
-	case int32:
-		return int(n), true
-	case int64:
-		return int(n), true
-	case float32:
-		return int(n), true
-	case float64:
-		return int(n), true
-	default:
-		return 0, false
-	}
+	return IntFromAny(v)
 }
 
 // Metadata returns a shallow copy of the metadata field interpreted as
@@ -73,22 +56,14 @@ func (s RunStats) MRURL() string {
 }
 
 // ResumeCount returns the number of times this run has been resumed.
-// Returns 0 if never resumed. Accepts int, int64, float64 representations.
+// Returns 0 if never resumed. Delegates to IntFromAny for consistent coercion.
 func (s RunStats) ResumeCount() int {
 	v, ok := s["resume_count"]
-	if !ok || v == nil {
+	if !ok {
 		return 0
 	}
-	switch n := v.(type) {
-	case int:
-		return n
-	case int64:
-		return int(n)
-	case float64:
-		return int(n)
-	default:
-		return 0
-	}
+	n, _ := IntFromAny(v)
+	return n
 }
 
 // LastResumedAt returns the RFC3339 timestamp of the last resume, or empty string if never resumed.
@@ -176,23 +151,12 @@ func extractGatePhase(gate map[string]any, phase string) string {
 // Format: "passed duration=123ms" or "failed pre-gate duration=45ms".
 func formatGatePhase(phaseMap map[string]any, label string) string {
 	passed, passedOK := phaseMap["passed"].(bool)
-	durationRaw, durationOK := phaseMap["duration_ms"]
-
 	if !passedOK {
 		return ""
 	}
 
-	var durationMs int64
-	if durationOK && durationRaw != nil {
-		switch d := durationRaw.(type) {
-		case int:
-			durationMs = int64(d)
-		case int64:
-			durationMs = d
-		case float64:
-			durationMs = int64(d)
-		}
-	}
+	// Use Int64FromAny for consistent JSON number coercion.
+	durationMs, _ := Int64FromAny(phaseMap["duration_ms"])
 
 	status := "passed"
 	if !passed {
