@@ -74,7 +74,6 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		// Check if the node exists before processing.
-		var err error
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -150,7 +149,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to create event: %v", err), http.StatusInternalServerError)
-				slog.Error("node events: create failed", "node_id", nodeIDStr, "run_id", req.RunID, "index", i, "err", err)
+				slog.Error("node events: create failed", "node_id", nodeID, "run_id", req.RunID, "index", i, "err", err)
 				return
 			}
 
@@ -165,7 +164,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		slog.Debug("node events created",
-			"node_id", nodeIDStr,
+			"node_id", nodeID,
 			"run_id", req.RunID,
 			"count", count,
 		)
