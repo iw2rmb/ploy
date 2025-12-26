@@ -353,8 +353,10 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			duration := time.Since(startTime)
 
 			// Determine whether this healing job produced any workspace changes.
-			// This does not affect the job's exit code or terminal status directly;
-			// it is surfaced via logs and stats for higher-level path control.
+			// A healing job that exits 0 but produces no diff is treated as a
+			// failure: the healing mod promised to fix something but didn't
+			// change anything. We set healingNoChange=true here and handle the
+			// failed status upload below.
 			healingNoChange := false
 			if runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
 				if postStatus, postErr := workspaceStatus(ctx, workspace); postErr != nil {
@@ -365,7 +367,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 					)
 				} else if postStatus == preStatus {
 					healingNoChange = true
-					slog.Warn("healing job produced no workspace changes; treating as failure",
+					slog.Warn("healing job produced no workspace changes",
 						"run_id", req.RunID,
 						"job_id", req.JobID,
 					)
@@ -374,8 +376,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 			// Upload diff for this healing step using the pre-healing baseline snapshot.
 			// E3: Pass job name for path-local diff tagging in multi-strategy healing.
-			// We still upload diffs for failing healing jobs so diagnostics are preserved,
-			// but a "successful" healing job with no workspace changes is treated as a failure below.
+			// We upload diffs even for healing jobs that will fail (due to no workspace
+			// changes or non-zero exit code) so diagnostics are preserved.
 			r.uploadHealingJobDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, healingBaselineDir, workspace, result, req.StepIndex)
 
 			// Upload /out artifacts.
@@ -408,8 +410,20 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 				return nil
 			}
 
+			// When healingNoChange is true the container exited 0 but produced
+			// no workspace diff. This is considered a failure: the healing mod
+			// promised to fix the issue but didn't actually change anything.
+			// We upload a failed status with exit code 1 and a stable stats
+			// marker so downstream observers can distinguish this from other
+			// failure modes.
 			if healingNoChange {
 				stats["healing_warning"] = "no_workspace_changes"
+				var exitCodeOne int32 = 1
+				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCodeOne, stats, req.StepIndex, req.JobID); uploadErr != nil {
+					slog.Error("failed to upload healing failure status (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+				}
+				slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)
+				return nil
 			}
 
 			var exitCodeZero int32 = 0
