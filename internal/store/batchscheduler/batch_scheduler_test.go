@@ -36,27 +36,27 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 // Uses string IDs (KSUID-backed) per the KSUID migration.
 type mockRepoStarter struct {
 	startCalls   []string
-	startResults map[string]int
+	startResults map[string]StartPendingReposResult
 	startErrors  map[string]error
 }
 
 func newMockRepoStarter() *mockRepoStarter {
 	return &mockRepoStarter{
 		startCalls:   []string{},
-		startResults: make(map[string]int),
+		startResults: make(map[string]StartPendingReposResult),
 		startErrors:  make(map[string]error),
 	}
 }
 
-func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID string) (int, error) {
+func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID string) (StartPendingReposResult, error) {
 	m.startCalls = append(m.startCalls, runID)
 	if err, ok := m.startErrors[runID]; ok && err != nil {
-		return 0, err
+		return StartPendingReposResult{}, err
 	}
 	if result, ok := m.startResults[runID]; ok {
 		return result, nil
 	}
-	return 0, nil
+	return StartPendingReposResult{}, nil
 }
 
 // newTestKSUID generates a new KSUID string for test IDs.
@@ -194,8 +194,8 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		mockStarter := newMockRepoStarter()
-		mockStarter.startResults[runID1] = 2
-		mockStarter.startResults[runID2] = 1
+		mockStarter.startResults[runID1] = StartPendingReposResult{Started: 2, AlreadyDone: 0, Pending: 0}
+		mockStarter.startResults[runID2] = StartPendingReposResult{Started: 1, AlreadyDone: 1, Pending: 0}
 
 		sched, err := New(Options{
 			Store:       mockSt,
@@ -238,7 +238,7 @@ func TestScheduler_Run(t *testing.T) {
 
 		mockStarter := newMockRepoStarter()
 		mockStarter.startErrors[runID1] = errors.New("failed to start repos")
-		mockStarter.startResults[runID2] = 3
+		mockStarter.startResults[runID2] = StartPendingReposResult{Started: 3, AlreadyDone: 0, Pending: 0}
 
 		sched, err := New(Options{
 			Store:       mockSt,
