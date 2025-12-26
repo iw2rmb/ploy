@@ -2,14 +2,31 @@ package types
 
 import "math"
 
+func int64FromFloat64(f float64) (int64, bool) {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	// Reject non-integer floats (e.g., 1.5).
+	if f != math.Trunc(f) {
+		return 0, false
+	}
+	// Avoid undefined behavior from out-of-range float->int64 conversions.
+	//
+	// Note: float64(math.MaxInt64) rounds to 2^63, so use a strict upper bound.
+	if f < float64(math.MinInt64) || f >= float64(math.MaxInt64) {
+		return 0, false
+	}
+	return int64(f), true
+}
+
 // IntFromAny coerces a value from a map-backed JSON payload to an int.
 //
 // JSON decoding produces float64 for numbers; this helper accepts integer-typed
 // values (int, int8, int16, int32, int64) and float32/float64 if and only if
 // the float represents a whole number (fractional part == 0).
 //
-// Returns (value, true) on success; (0, false) if v is nil, wrong type, or a
-// non-integer float (e.g., 1.5).
+// Returns (value, true) on success; (0, false) if v is nil, wrong type, a
+// non-integer float (e.g., 1.5), NaN/Inf, or out of int range.
 func IntFromAny(v any) (int, bool) {
 	if v == nil {
 		return 0, false
@@ -24,20 +41,22 @@ func IntFromAny(v any) (int, bool) {
 	case int32:
 		return int(n), true
 	case int64:
+		if n < int64(math.MinInt) || n > int64(math.MaxInt) {
+			return 0, false
+		}
 		return int(n), true
 	case float32:
-		// Reject non-integer floats (e.g., 1.5).
-		f := float64(n)
-		if f != math.Trunc(f) {
+		i64, ok := int64FromFloat64(float64(n))
+		if !ok || i64 < int64(math.MinInt) || i64 > int64(math.MaxInt) {
 			return 0, false
 		}
-		return int(n), true
+		return int(i64), true
 	case float64:
-		// Reject non-integer floats (e.g., 1.5).
-		if n != math.Trunc(n) {
+		i64, ok := int64FromFloat64(n)
+		if !ok || i64 < int64(math.MinInt) || i64 > int64(math.MaxInt) {
 			return 0, false
 		}
-		return int(n), true
+		return int(i64), true
 	default:
 		return 0, false
 	}
@@ -49,8 +68,8 @@ func IntFromAny(v any) (int, bool) {
 // values (int, int8, int16, int32, int64) and float32/float64 if and only if
 // the float represents a whole number (fractional part == 0).
 //
-// Returns (value, true) on success; (0, false) if v is nil, wrong type, or a
-// non-integer float (e.g., 1.5).
+// Returns (value, true) on success; (0, false) if v is nil, wrong type, a
+// non-integer float (e.g., 1.5), NaN/Inf, or out of int64 range.
 func Int64FromAny(v any) (int64, bool) {
 	if v == nil {
 		return 0, false
@@ -67,18 +86,9 @@ func Int64FromAny(v any) (int64, bool) {
 	case int64:
 		return n, true
 	case float32:
-		// Reject non-integer floats (e.g., 1.5).
-		f := float64(n)
-		if f != math.Trunc(f) {
-			return 0, false
-		}
-		return int64(n), true
+		return int64FromFloat64(float64(n))
 	case float64:
-		// Reject non-integer floats (e.g., 1.5).
-		if n != math.Trunc(n) {
-			return 0, false
-		}
-		return int64(n), true
+		return int64FromFloat64(n)
 	default:
 		return 0, false
 	}

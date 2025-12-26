@@ -32,6 +32,7 @@ func TestIntFromAny(t *testing.T) {
 		{name: "float32 fractional", input: float32(1.5), wantValue: 0, wantOK: false},
 		{name: "float64 fractional", input: float64(2.7), wantValue: 0, wantOK: false},
 		{name: "float64 small fraction", input: float64(3.0001), wantValue: 0, wantOK: false},
+		{name: "float64 out of int range", input: math.Pow(2, 63), wantValue: 0, wantOK: false},
 
 		// Nil and invalid types.
 		{name: "nil", input: nil, wantValue: 0, wantOK: false},
@@ -81,6 +82,8 @@ func TestInt64FromAny(t *testing.T) {
 		{name: "float32 fractional", input: float32(1.5), wantValue: 0, wantOK: false},
 		{name: "float64 fractional", input: float64(2.7), wantValue: 0, wantOK: false},
 		{name: "float64 small fraction", input: float64(3.0001), wantValue: 0, wantOK: false},
+		{name: "float64 min int64", input: float64(math.MinInt64), wantValue: math.MinInt64, wantOK: true},
+		{name: "float64 out of int64 range", input: math.Pow(2, 63), wantValue: 0, wantOK: false},
 
 		// Nil and invalid types.
 		{name: "nil", input: nil, wantValue: 0, wantOK: false},
@@ -102,8 +105,7 @@ func TestInt64FromAny(t *testing.T) {
 	}
 }
 
-// TestIntFromAny_SpecialFloats verifies handling of NaN and Inf values.
-func TestIntFromAny_SpecialFloats(t *testing.T) {
+func TestIntFromAny_SpecialFloatsRejected(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name  string
@@ -117,17 +119,31 @@ func TestIntFromAny_SpecialFloats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// NaN != math.Trunc(NaN), so it will be rejected.
-			// Inf == math.Trunc(Inf), but conversion to int overflows.
-			// Both should ideally return false. With current logic:
-			// NaN: NaN != Trunc(NaN) is true → rejects correctly.
-			// Inf: Inf == Trunc(Inf) is true → accepts but int(Inf) is undefined.
-			// For Inf, the behavior is technically undefined but the check
-			// is intended to catch fractional values; Inf passes through.
-			// This test documents current behavior.
 			gotValue, gotOK := IntFromAny(tt.input)
-			if tt.name == "NaN" && gotOK {
-				t.Errorf("IntFromAny(NaN) = (%d, %v), expected rejection", gotValue, gotOK)
+			if gotOK {
+				t.Errorf("IntFromAny(%s) = (%d, %v), expected rejection", tt.name, gotValue, gotOK)
+			}
+		})
+	}
+}
+
+func TestInt64FromAny_SpecialFloatsRejected(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input float64
+	}{
+		{name: "NaN", input: math.NaN()},
+		{name: "positive Inf", input: math.Inf(1)},
+		{name: "negative Inf", input: math.Inf(-1)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotValue, gotOK := Int64FromAny(tt.input)
+			if gotOK {
+				t.Errorf("Int64FromAny(%s) = (%d, %v), expected rejection", tt.name, gotValue, gotOK)
 			}
 		})
 	}
