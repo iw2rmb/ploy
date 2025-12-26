@@ -30,7 +30,7 @@ get:
             scope: "all"
             secret: true
     '400':
-      description: Bad request (missing key path parameter)
+      description: Bad request (key path parameter is required)
     '401':
       description: Unauthorized (missing or invalid mTLS client certificate)
     '403':
@@ -128,7 +128,7 @@ delete:
     '204':
       description: Deleted (or already absent)
     '400':
-      description: Bad request (missing key path parameter)
+      description: Bad request (key path parameter is required)
     '401':
       description: Unauthorized (missing or invalid mTLS client certificate)
     '403':
