@@ -4,7 +4,10 @@ package types
 // IDs are simple string newtypes that marshal to/from JSON as strings
 // and reject empty or whitespace-only values when decoded from text.
 
-import "encoding"
+import (
+	"encoding"
+	"math"
+)
 
 // RunID identifies a run instance (workflow execution).
 // This is the canonical identifier for workflow runs in the Mods system.
@@ -72,6 +75,23 @@ func (v StepIndex) Float64() float64 { return float64(v) }
 
 // IsZero reports whether the step index is zero.
 func (v StepIndex) IsZero() bool { return v == 0 }
+
+// Valid reports whether the StepIndex represents a valid step ordering value.
+// A valid StepIndex must:
+//   - Not be NaN or Inf (rejects special floating-point values)
+//   - Have a zero fractional part (e.g., 1000.0 is valid, 1000.5 is not)
+//
+// This centralizes invariants for step indices, ensuring they represent
+// discrete positions in the execution sequence (e.g., 1000, 2000, 1500).
+func (v StepIndex) Valid() bool {
+	f := float64(v)
+	// Reject NaN and Inf.
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return false
+	}
+	// Require integer-like value (no fractional part).
+	return f == math.Trunc(f)
+}
 
 // The following methods implement encoding.TextMarshaler/TextUnmarshaler and
 // JSON helpers for each ID type. Using small helpers avoids duplication while

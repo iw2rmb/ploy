@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -231,4 +232,97 @@ func isURLSafeChar(c rune) bool {
 		(c >= 'A' && c <= 'Z') ||
 		(c >= 'a' && c <= 'z') ||
 		c == '_' || c == '-'
+}
+
+// TestStepIndex_Valid verifies the StepIndex.Valid() method correctly
+// identifies valid and invalid step index values.
+func TestStepIndex_Valid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value float64
+		want  bool
+	}{
+		// Valid integer-like values (common step indices).
+		{"zero", 0, true},
+		{"positive_integer", 1000, true},
+		{"midpoint_healing", 1500, true},
+		{"large_integer", 9999999, true},
+		{"negative_integer", -1000, true},
+
+		// Invalid: NaN.
+		{"nan", math.NaN(), false},
+
+		// Invalid: positive/negative infinity.
+		{"positive_inf", math.Inf(1), false},
+		{"negative_inf", math.Inf(-1), false},
+
+		// Invalid: non-integer floats (fractional part).
+		{"fractional_half", 1000.5, false},
+		{"fractional_small", 1000.1, false},
+		{"fractional_large", 1000.999, false},
+		{"negative_fractional", -500.25, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			idx := StepIndex(tt.value)
+			got := idx.Valid()
+			if got != tt.want {
+				t.Errorf("StepIndex(%v).Valid() = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestStepIndex_Float64 verifies the Float64 accessor returns the correct value.
+func TestStepIndex_Float64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value float64
+	}{
+		{"zero", 0},
+		{"positive", 1000},
+		{"negative", -500},
+		{"large", 999999999},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			idx := StepIndex(tt.value)
+			if got := idx.Float64(); got != tt.value {
+				t.Errorf("StepIndex(%v).Float64() = %v, want %v", tt.value, got, tt.value)
+			}
+		})
+	}
+}
+
+// TestStepIndex_IsZero verifies the IsZero method.
+func TestStepIndex_IsZero(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value float64
+		want  bool
+	}{
+		{"zero", 0, true},
+		{"positive", 1000, false},
+		{"negative", -1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			idx := StepIndex(tt.value)
+			if got := idx.IsZero(); got != tt.want {
+				t.Errorf("StepIndex(%v).IsZero() = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
 }

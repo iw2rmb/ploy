@@ -66,10 +66,11 @@ type GraphNode struct {
 	// Type identifies the job phase (pre_gate, mod, heal, re_gate, post_gate).
 	Type NodeType `json:"type"`
 
-	// StepIndex is the float ordering value from jobs.step_index.
+	// StepIndex is the ordering value from jobs.step_index.
 	// Values like 1000, 2000, 3000 define main job sequence; midpoints
 	// (e.g., 1500, 1750) are used for dynamically inserted healing jobs.
-	StepIndex float64 `json:"step_index"`
+	// Using domaintypes.StepIndex centralizes validation invariants.
+	StepIndex domaintypes.StepIndex `json:"step_index"`
 
 	// Status is the current execution state of the job.
 	Status NodeStatus `json:"status"`
@@ -210,10 +211,11 @@ func (g *WorkflowGraph) sortedNodes() []*GraphNode {
 	}
 
 	// Sort by step_index using insertion sort (small N, stable).
+	// Use Float64() to compare the underlying values of domaintypes.StepIndex.
 	for i := 1; i < len(nodes); i++ {
 		key := nodes[i]
 		j := i - 1
-		for j >= 0 && nodes[j].StepIndex > key.StepIndex {
+		for j >= 0 && nodes[j].StepIndex.Float64() > key.StepIndex.Float64() {
 			nodes[j+1] = nodes[j]
 			j--
 		}
