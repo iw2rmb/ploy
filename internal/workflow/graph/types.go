@@ -211,11 +211,10 @@ func (g *WorkflowGraph) sortedNodes() []*GraphNode {
 	}
 
 	// Sort by step_index using insertion sort (small N, stable).
-	// Use Float64() to compare the underlying values of domaintypes.StepIndex.
 	for i := 1; i < len(nodes); i++ {
 		key := nodes[i]
 		j := i - 1
-		for j >= 0 && nodes[j].StepIndex.Float64() > key.StepIndex.Float64() {
+		for j >= 0 && nodes[j].StepIndex > key.StepIndex {
 			nodes[j+1] = nodes[j]
 			j--
 		}

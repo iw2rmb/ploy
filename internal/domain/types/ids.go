@@ -30,8 +30,9 @@ type NodeID string
 // Used in batch run handlers to provide type-safe repo identification.
 type RunRepoID string
 
-// StepIndex identifies a step's position within a job execution sequence.
-// It is a zero-based index representing the order of execution.
+// StepIndex identifies a job's ordering value within a run execution sequence.
+// It is stored/transported as a float64 (historically `jobs.step_index`) where
+// integer-like values (e.g., 1000, 2000, 1500) encode ordering.
 type StepIndex float64
 
 // String returns the underlying string value.

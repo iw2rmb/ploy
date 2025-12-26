@@ -83,7 +83,12 @@ func getModGraphHandler(st store.Store) http.HandlerFunc {
 		// Build the workflow graph from jobs.
 		// The graph materializes nodes from jobs and computes edges from
 		// step_index ordering. RunID is now a domaintypes.RunID (KSUID-backed).
-		workflowGraph := graph.BuildFromJobs(domaintypes.RunID(runIDStr), jobs)
+		workflowGraph, err := graph.BuildFromJobs(domaintypes.RunID(runIDStr), jobs)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to build workflow graph: %v", err), http.StatusInternalServerError)
+			slog.Error("get mod graph: build graph failed", "run_id", runIDStr, "err", err)
+			return
+		}
 
 		// Return the graph as JSON.
 		w.Header().Set("Content-Type", "application/json")

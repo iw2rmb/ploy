@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -57,7 +59,10 @@ func TestBuildFromJobs_SimpleRun(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 
 	// Verify run ID.
 	if graph.RunID.String() != runID {
@@ -134,7 +139,10 @@ func TestBuildFromJobs_WithHealing(t *testing.T) {
 		{ID: postGateID, RunID: domaintypes.RunID(runID), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 3000},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 
 	// Verify 5 nodes.
 	if graph.NodeCount() != 5 {
@@ -178,13 +186,56 @@ func TestBuildFromJobs_EmptyJobs(t *testing.T) {
 
 	runID := "run-empty"
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), []store.Job{})
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), []store.Job{})
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 
 	if graph.NodeCount() != 0 {
 		t.Errorf("NodeCount() = %d, want 0", graph.NodeCount())
 	}
 	if graph.RunID.String() != runID {
 		t.Errorf("RunID = %q, want %q", graph.RunID.String(), runID)
+	}
+}
+
+func TestBuildFromJobs_InvalidStepIndex(t *testing.T) {
+	t.Parallel()
+
+	runID := "run-invalid-stepindex"
+
+	tests := []struct {
+		name      string
+		stepIndex float64
+	}{
+		{"nan", math.NaN()},
+		{"inf", math.Inf(1)},
+		{"fractional", 1000.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			jobs := []store.Job{
+				{
+					ID:        "job-1",
+					RunID:     domaintypes.RunID(runID),
+					Name:      "job-1",
+					Status:    store.JobStatusPending,
+					ModType:   "mod",
+					StepIndex: tt.stepIndex,
+				},
+			}
+
+			_, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !errors.Is(err, ErrInvalidStepIndex) {
+				t.Fatalf("expected ErrInvalidStepIndex, got %v", err)
+			}
+		})
 	}
 }
 
@@ -198,7 +249,10 @@ func TestBuildFromJobs_InvalidRunID(t *testing.T) {
 		{ID: "job-1", RunID: domaintypes.RunID(invalidRunID), Name: "job-1", Status: store.JobStatusPending, ModType: "mod", StepIndex: 1000},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(invalidRunID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(invalidRunID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 
 	// Should still build graph, but RunID should be empty.
 	if graph.RunID.String() != "" {
@@ -237,7 +291,10 @@ func TestBuildFromJobs_StatusMapping(t *testing.T) {
 				{ID: jobID, RunID: domaintypes.RunID(runID), Name: "job", Status: tt.storeStatus, ModType: "mod", StepIndex: 1000},
 			}
 
-			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+			graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+			if err != nil {
+				t.Fatalf("BuildFromJobs() error = %v", err)
+			}
 			node := graph.GetNode(jobID)
 
 			if node.Status != tt.wantStatus {
@@ -275,7 +332,10 @@ func TestBuildFromJobs_TypeMapping(t *testing.T) {
 				{ID: jobID, RunID: domaintypes.RunID(runID), Name: "job", Status: store.JobStatusPending, ModType: tt.modType, StepIndex: 1000},
 			}
 
-			graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+			graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+			if err != nil {
+				t.Fatalf("BuildFromJobs() error = %v", err)
+			}
 			node := graph.GetNode(jobID)
 
 			if node.Type != tt.wantType {
@@ -310,7 +370,10 @@ func TestBuildFromJobs_TimestampMapping(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 	node := graph.GetNode(jobID)
 
 	if node.StartedAt == nil || !node.StartedAt.Equal(startedAt) {
@@ -346,7 +409,10 @@ func TestBuildFromJobs_NilTimestamps(t *testing.T) {
 		},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 	node := graph.GetNode(jobID)
 
 	if node.StartedAt != nil {
@@ -371,7 +437,10 @@ func TestBuildFromJobsWithEdgeStrategy(t *testing.T) {
 	}
 
 	// Use linear strategy (default).
-	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &LinearEdgeStrategy{})
+	graph, err := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &LinearEdgeStrategy{})
+	if err != nil {
+		t.Fatalf("BuildFromJobsWithEdgeStrategy() error = %v", err)
+	}
 
 	// Verify linear edges.
 	nodeA := graph.GetNode(job1ID)
@@ -392,7 +461,10 @@ func TestBuildFromJobsWithEdgeStrategy_NilStrategy(t *testing.T) {
 	}
 
 	// Nil strategy should not panic; uses default edges.
-	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, nil)
+	graph, err := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, nil)
+	if err != nil {
+		t.Fatalf("BuildFromJobsWithEdgeStrategy() error = %v", err)
+	}
 	if graph.NodeCount() != 1 {
 		t.Errorf("NodeCount() = %d, want 1", graph.NodeCount())
 	}
@@ -412,7 +484,10 @@ func TestHealingWindowEdgeStrategy(t *testing.T) {
 	}
 
 	// Healing window strategy should work (currently delegates to linear).
-	graph := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &HealingWindowEdgeStrategy{})
+	graph, err := BuildFromJobsWithEdgeStrategy(domaintypes.RunID(runID), jobs, &HealingWindowEdgeStrategy{})
+	if err != nil {
+		t.Fatalf("BuildFromJobsWithEdgeStrategy() error = %v", err)
+	}
 	if graph.NodeCount() != 2 {
 		t.Errorf("NodeCount() = %d, want 2", graph.NodeCount())
 	}
@@ -439,7 +514,10 @@ func TestBuildFromJobs_MultiStepRun(t *testing.T) {
 		{ID: postGateID, RunID: domaintypes.RunID(runID), Name: "post-gate", Status: store.JobStatusCreated, ModType: "post_gate", StepIndex: 5000},
 	}
 
-	graph := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	graph, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("BuildFromJobs() error = %v", err)
+	}
 
 	// Verify 5 nodes in linear chain.
 	if graph.NodeCount() != 5 {

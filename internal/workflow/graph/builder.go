@@ -1,11 +1,15 @@
 package graph
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+var ErrInvalidStepIndex = errors.New("invalid step index")
 
 // BuildFromJobs materializes a WorkflowGraph from a slice of jobs rows.
 // This is the primary entry point for constructing the graph view from
@@ -18,25 +22,28 @@ import (
 // graph for context. All jobs should belong to the same run.
 //
 // runID is now a domaintypes.RunID (KSUID-backed domain type); no UUID conversion needed.
-func BuildFromJobs(runID domaintypes.RunID, jobs []store.Job) *WorkflowGraph {
+func BuildFromJobs(runID domaintypes.RunID, jobs []store.Job) (*WorkflowGraph, error) {
 	graph := NewWorkflowGraph(runID)
 
 	// Phase 1: Create nodes from jobs.
 	for _, job := range jobs {
-		node := jobToNode(job)
+		node, err := jobToNode(job)
+		if err != nil {
+			return nil, err
+		}
 		graph.AddNode(node)
 	}
 
 	// Phase 2: Compute edges from step_index ordering.
 	graph.ComputeEdges()
 
-	return graph
+	return graph, nil
 }
 
 // jobToNode converts a store.Job to a GraphNode.
 // Maps database fields to graph node properties.
 // job.ID is now a string (KSUID-backed); no UUID conversion needed.
-func jobToNode(job store.Job) *GraphNode {
+func jobToNode(job store.Job) (*GraphNode, error) {
 	// Map job status to node status.
 	nodeStatus := mapJobStatus(job.Status)
 
@@ -58,6 +65,9 @@ func jobToNode(job store.Job) *GraphNode {
 	// This centralizes the type boundary between persistence (float64) and
 	// domain logic (domaintypes.StepIndex with validation invariants).
 	stepIndex := domaintypes.StepIndex(job.StepIndex)
+	if !stepIndex.Valid() {
+		return nil, fmt.Errorf("job %q has invalid step_index %v: %w", job.ID, job.StepIndex, ErrInvalidStepIndex)
+	}
 
 	return &GraphNode{
 		ID:         job.ID, // job.ID is now a string (KSUID-backed).
@@ -73,7 +83,7 @@ func jobToNode(job store.Job) *GraphNode {
 		ExitCode:   job.ExitCode,
 		ParentIDs:  []string{},
 		ChildIDs:   []string{},
-	}
+	}, nil
 }
 
 // mapJobStatus converts store.JobStatus to NodeStatus.
@@ -121,15 +131,18 @@ func mapModType(modType string) NodeType {
 // BuildFromJobsWithEdgeStrategy allows specifying a custom edge computation
 // strategy. This is provided for future extensibility. Currently delegates to
 // the standard linear edge computation. runID is now a domaintypes.RunID.
-func BuildFromJobsWithEdgeStrategy(runID domaintypes.RunID, jobs []store.Job, strategy EdgeStrategy) *WorkflowGraph {
-	graph := BuildFromJobs(runID, jobs)
+func BuildFromJobsWithEdgeStrategy(runID domaintypes.RunID, jobs []store.Job, strategy EdgeStrategy) (*WorkflowGraph, error) {
+	graph, err := BuildFromJobs(runID, jobs)
+	if err != nil {
+		return nil, err
+	}
 
 	// If a custom strategy is provided, re-compute edges.
 	if strategy != nil {
 		strategy.ComputeEdges(graph)
 	}
 
-	return graph
+	return graph, nil
 }
 
 // EdgeStrategy defines an interface for custom edge computation algorithms.
