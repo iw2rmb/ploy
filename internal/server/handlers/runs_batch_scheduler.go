@@ -77,7 +77,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 
 	// If no pending repos, return early with current counts.
 	if len(pendingRepos) == 0 {
-		result.Pending = 0
+		result.Pending = initialPending
 		return result, nil
 	}
 

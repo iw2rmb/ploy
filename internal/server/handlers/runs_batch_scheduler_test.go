@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -150,10 +151,10 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 		}
 	})
 
-	t.Run("returns multiple pending repos remaining when some fail to start", func(t *testing.T) {
+	t.Run("returns pending count when a repo fails to start", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a scenario where we have 2 pending repos but the createRun call fails for one.
+		// Create a scenario where we have 2 pending repos but the CreateRun call fails for one.
 		pendingRepo2 := store.RunRepo{
 			ID:        repo2ID.String(),
 			RunID:     domaintypes.RunID(batchRunID.String()),
@@ -167,6 +168,7 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 			listRunReposByRunResult:        []store.RunRepo{pendingRepo, pendingRepo2},
 			listPendingRunReposByRunResult: []store.RunRepo{pendingRepo, pendingRepo2},
 			createRunResult:                childRun,
+			createRunErrs:                  []error{nil, errors.New("create run failed")},
 		}
 
 		starter := NewBatchRepoStarter(m)
@@ -176,15 +178,24 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Both should start successfully in this case.
-		if result.Started != 2 {
-			t.Errorf("Started = %d, want 2", result.Started)
+		if result.Started != 1 {
+			t.Errorf("Started = %d, want 1", result.Started)
 		}
 		if result.AlreadyDone != 0 {
 			t.Errorf("AlreadyDone = %d, want 0", result.AlreadyDone)
 		}
-		if result.Pending != 0 {
-			t.Errorf("Pending = %d, want 0", result.Pending)
+		if result.Pending != 1 {
+			t.Errorf("Pending = %d, want 1", result.Pending)
+		}
+
+		if !m.createRunCalled {
+			t.Error("expected CreateRun to be called")
+		}
+		if len(m.setRunRepoExecutionRunParams) != 1 {
+			t.Errorf("SetRunRepoExecutionRun calls = %d, want 1", len(m.setRunRepoExecutionRunParams))
+		}
+		if !m.ackRunStartCalled {
+			t.Error("expected AckRunStart to be called")
 		}
 	})
 }
