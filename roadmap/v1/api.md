@@ -9,10 +9,11 @@ Creates a mod project.
 Request:
 
 - `name` (string, unique)
+- optional `spec` (object; JSON) — creates an initial spec variant
 
 Response:
 
-- `id`, `name`, `created_at`, `default_spec_id?`
+- `id`, `name`, `created_at`, optional `spec_id` (when `spec` is provided)
 
 ### `GET /v1/mods`
 
@@ -25,7 +26,45 @@ Query:
 
 ### `DELETE /v1/mods/{mod_id}`
 
-Archives (preferred) or deletes a mod.
+Deletes a mod.
+
+### `PATCH /v1/mods/{mod_id}/archive`
+
+Archives a mod.
+
+- When a mod is archived, it cannot be executed (any attempt to create a mod run must fail).
+- A mod cannot be archived while it has any running jobs.
+
+### `PATCH /v1/mods/{mod_id}/unarchive`
+
+Unarchives a mod.
+
+## Single-repo runs
+
+### `POST /v1/runs`
+
+Submits a single-repo run and immediately starts execution.
+
+This is the API behind `ploy run --spec ... --repo ...`.
+
+Side-effects:
+
+- Creates a mod project; the created mod has `name == id`.
+- Creates an initial spec variant for that mod from the provided `spec`.
+- Creates a mod repo row for the provided `repo_url` (identity within the mod).
+
+Request (suggested):
+
+- `repo_url`
+- `base_ref`
+- `target_ref`
+- `spec` (object; JSON)
+
+Response:
+
+- `run_id`
+- `mod_id`
+- `spec_id`
 
 ## Spec variants
 
@@ -87,18 +126,19 @@ Deletes a repo from the mod repo set.
 
 Creates a batch run from the mod + spec + selected repos and immediately starts it.
 
+This is the API behind `ploy mod run <mod> ...`.
+
 Request (suggested):
 
 - `spec_ref`:
   - `{ "id": "<spec_id>" }` or `{ "name": "<spec_name>" }`
-  - or `{ "inline": { ... } }`
 - `repo_selector`:
   - `{ "mode": "all" }`
   - `{ "mode": "failed" }`
-  - `{ "mode": "explicit", "repo_ids": ["<mod_repo_id>", ...] }`
+  - `{ "mode": "explicit", "repos": ["<repo_url>", ...] }`
 - optional per-run overrides:
   - `created_by`
-  - optional repo ref overrides when `mode=explicit` (exact shape TBD)
+  - optional ref overrides when `mode=explicit` (exact shape TBD)
 
 Response:
 

@@ -5,7 +5,8 @@
 Make docs consistent with the v1 CLI/API direction:
 
 - `ploy mod ...` manages **mod projects** (name, spec variants, repo set).
-- `ploy run ...` is the **execution surface** (submit single-repo runs, inspect runs, stream logs, etc.).
+- `ploy run ...` submits **single-repo runs** (immediate execution) and creates a mod project as a side-effect (`mod.name == mod.id`).
+- `ploy mod run <mod> ...` runs a **mod project** (immediate execution over the mod repo set).
 - Control-plane auth is **bearer token** in `Authorization: Bearer ...` (CLI + nodes).
 
 ## 1) Canonical docs tree (proposal)
@@ -64,7 +65,7 @@ Notes:
 ### Control plane server transport
 
 - The API server currently listens on plain TCP (no TLS in-process); TLS termination is expected outside the process (`internal/server/http/server.go`).
-- Server-side auth middleware accepts bearer tokens and has an mTLS fallback, but in the default server transport the mTLS path is not exercised (`internal/server/auth/authorizer.go`).
+- Server-side auth middleware prefers bearer tokens and has an mTLS fallback when `r.TLS` includes peer certificates (`internal/server/auth/authorizer.go`).
 
 ## 3) Required edits for v1 alignment
 
@@ -81,28 +82,25 @@ Notes:
 
 ### 3.2 Resolve `/v1/mods` collision before writing docs
 
-If v1 repurposes `mod` as a project:
+v1 repurposes `mod` as a **project**:
 
 - Current reality: `POST /v1/mods` submits a Mods run (`docs/api/paths/mods.yaml`, `internal/server/handlers/mods_ticket.go`).
-- v1 proposal: `POST /v1/mods` becomes “create mod project” (roadmap/v1/api.md).
+- v1 decision: `POST /v1/mods` creates a mod project (roadmap/v1/api.md).
 
-Docs must reflect the chosen outcome. Two viable directions:
+Docs and OpenAPI must be rewritten to match the chosen outcome:
 
-**Option A (recommended for v1):**
-- Move run submission from `POST /v1/mods` → `POST /v1/runs`.
-- Keep `/v1/mods/*` for mod project/spec/repo management.
-- Update CLI docs to use `ploy run --repo-url ... --spec ...` for immediate single-repo runs.
-
-**Option B:**
-- Keep run submission at `/v1/mods` and put mod-project APIs under a new prefix (e.g., `/v1/mod-projects`).
-- Keep CLI as `ploy mod run ...` for submission and introduce different term for project management.
+**Chosen direction (v1):**
+- Move single-repo run submission from `POST /v1/mods` → `POST /v1/runs` (used by `ploy run --spec --repo ...`).
+- Use `/v1/mods/*` for mod project/spec/repo management.
+- Add `POST /v1/mods/{mod_id}/runs` for executing a mod project (used by `ploy mod run <mod> ...`).
+- Use `PATCH /v1/mods/{mod_id}/archive` and `/unarchive` for mod lifecycle state; archived mods cannot be executed.
 
 ### 3.3 Update “batch run” docs to the new model
 
 Files with old semantics (examples to rewrite):
 
 - `docs/mods-lifecycle.md`: batch workflow section currently uses `ploy mod run --name ...` and `mod run repo add ...`.
-  - Replace with v1: `ploy mod add`, `ploy mod spec add`, `ploy mod repo import`, `ploy mod run <mod>`.
+  - Replace with v1: `ploy mod add`, `ploy mod spec add`, `ploy mod repo import|add`, `ploy mod run <mod>`.
 - `docs/how-to/deploy-a-cluster.md`: submission examples should match v1.
 - `docs/how-to/create-mr.md`: batch MR workflow should start from `ploy mod ...` project setup.
 - `cmd/ploy/README.md`: keep as developer-facing CLI reference, but align examples and remove stale subcommands.
@@ -111,9 +109,11 @@ Files with old semantics (examples to rewrite):
 
 - Add missing endpoints that the CLI already uses:
   - `POST /v1/runs/{id}/start` is implemented and used by CLI (`internal/server/handlers/runs_batch_http.go`, `internal/cli/runs/start.go`) but is not present in `docs/api/OpenAPI.yaml`.
-- If Option A is chosen:
-  - Add `POST /v1/runs` (submit single-repo run) and document response contract.
-  - Mark `POST /v1/mods` (run submission) as removed/renamed.
+- Add new endpoints required by v1:
+  - Add `POST /v1/runs` (submit single-repo run) and document request/response.
+  - Add `/v1/mods` CRUD for mod projects (create/list/delete).
+  - Add `POST /v1/mods/{mod_id}/runs` (execute mod project).
+  - Add mod project `specs` and `repos` endpoints as defined in roadmap/v1/api.md.
 
 ## 4) Redundant / low-value content (recommend prune or relocate)
 
@@ -126,8 +126,5 @@ Files with old semantics (examples to rewrite):
 
 ## 5) TODO decisions to unblock implementation
 
-- Does `ploy run --repo-url ... --spec ...` create a mod project/spec variant automatically?
-  - If yes: define naming/ID policy (avoid unbounded clutter).
-  - If no: make it explicitly “ad-hoc run” with no mod linkage.
-- Decide where run submission lives (`POST /v1/runs` vs `POST /v1/mods`), then rewrite docs accordingly.
-
+- `ploy run --spec ... --repo ...` creates a mod project; the created mod has `name == id`.
+- Run submission lives at `POST /v1/runs`; mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.
