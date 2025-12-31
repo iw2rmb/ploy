@@ -195,7 +195,7 @@ func buildSpecPayload(
 	// Resolve env_from_file references in top-level mods[] array (multi-step mods)
 	// This array holds sequential transformation steps that share the same global
 	// gate and healing policy. Each mod in the array has the same schema as the
-	// single mod section (image, command, env, env_from_file, retain_container).
+	// single-step top-level fields (image, command, env, env_from_file, retain_container).
 	if mods, ok := base["mods"].([]any); ok {
 		for i, m := range mods {
 			if modEntry, ok := m.(map[string]any); ok {

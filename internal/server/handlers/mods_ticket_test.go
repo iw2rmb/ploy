@@ -817,7 +817,7 @@ func TestSubmitRunHandlerMultiStepNoRunSteps(t *testing.T) {
 }
 
 // TestSubmitRunHandlerSingleStep verifies that submitting
-// a single-step spec (with mod section or legacy top-level) creates a single job.
+// a single-step spec (top-level fields, no mods[] array) creates a single job.
 func TestSubmitRunHandlerSingleStep(t *testing.T) {
 	cases := []struct {
 		name string
