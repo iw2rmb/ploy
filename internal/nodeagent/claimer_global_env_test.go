@@ -56,20 +56,19 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			},
 		},
 		{
-			// NOTE: The legacy "mod" object fallback has been removed. The "mod.env"
-			// fields are no longer merged into top-level env. Specs must use the
-			// canonical format with top-level env for single-step runs.
-			name: "legacy_mod_env_not_merged",
+			// parseSpec only extracts top-level env. Nested/unknown blocks must not
+			// be merged into the container env map.
+			name: "nested_env_not_merged",
 			spec: json.RawMessage(`{
-				"env": {
-					"GLOBAL_VAR": "global_value",
-					"SHARED_VAR": "top_level_value"
-				},
-				"mod": {
-					"image": "test/mod:latest",
 					"env": {
-						"MOD_VAR": "mod_value",
-						"SHARED_VAR": "mod_ignored"
+						"GLOBAL_VAR": "global_value",
+						"SHARED_VAR": "top_level_value"
+					},
+					"ignored": {
+						"image": "test/mod:latest",
+						"env": {
+							"MOD_VAR": "mod_value",
+							"SHARED_VAR": "mod_ignored"
 					}
 				}
 			}`),
