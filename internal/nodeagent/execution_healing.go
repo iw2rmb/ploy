@@ -99,10 +99,10 @@ import (
 //
 // ## Configuration
 //
-// Healing configuration is specified via build_gate_healing option in req.Options
-// using the canonical single-mod schema:
+// Healing configuration is specified via req.TypedOptions.Healing (derived from
+// build_gate_healing in the run spec) using the canonical single-mod schema:
 //   - retries (int): maximum number of healing attempts (default: 1)
-//   - mod (map): healing mod spec (image, command, env, retain_container)
+//   - mod (object): healing mod spec (image, command, env, retain_container)
 func (r *runController) runGateWithHealing(
 	ctx context.Context,
 	runner step.Runner,
