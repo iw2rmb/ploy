@@ -45,10 +45,6 @@ func EncodeCompilationToTOML(comp Compilation) ([]byte, error) {
 			Required: toTomlLanes(comp.Lanes.Required),
 			Allowed:  toTomlLanes(comp.Lanes.Allowed),
 		},
-		Aster: tomlAster{
-			Required: comp.Aster.Required,
-			Optional: comp.Aster.Optional,
-		},
 		Services:  toTomlServices(comp.Services),
 		Edges:     toTomlEdges(comp.Edges),
 		Exposures: toTomlExposures(comp.Exposures),
@@ -72,7 +68,6 @@ type tomlManifest struct {
 	Topology        tomlTopology   `toml:"topology"`
 	Fixtures        tomlFixtures   `toml:"fixtures"`
 	Lanes           tomlLanes      `toml:"lanes"`
-	Aster           tomlAster      `toml:"aster"`
 	Services        []tomlService  `toml:"services"`
 	Edges           []tomlEdge     `toml:"edges"`
 	Exposures       []tomlExposure `toml:"exposures,omitempty"`
@@ -109,11 +104,6 @@ type tomlLanes struct {
 type tomlLane struct {
 	Name   string `toml:"name"`
 	Reason string `toml:"reason,omitempty"`
-}
-
-type tomlAster struct {
-	Required []string `toml:"required,omitempty"`
-	Optional []string `toml:"optional,omitempty"`
 }
 
 type tomlService struct {

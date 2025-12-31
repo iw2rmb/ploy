@@ -18,7 +18,6 @@ type Compilation struct {
 	Exposures       []Exposure `json:"exposures"`
 	Fixtures        FixtureSet `json:"fixtures"`
 	Lanes           LaneSet    `json:"lanes"`
-	Aster           AsterSet   `json:"aster"`
 }
 
 type Metadata struct {
@@ -58,11 +57,6 @@ type LaneSet struct {
 type Lane struct {
 	Name   string `json:"name"`
 	Reason string `json:"reason,omitempty"`
-}
-
-type AsterSet struct {
-	Required []string `json:"required"`
-	Optional []string `json:"optional"`
 }
 
 // Service describes a workload participating in the manifest topology.
@@ -166,11 +160,6 @@ func compile(raw rawManifest) Compilation {
 		}
 	}
 
-	aster := AsterSet{
-		Required: normalizeToggles(raw.Aster.Required),
-		Optional: normalizeToggles(raw.Aster.Optional),
-	}
-
 	manifestVersion := strings.TrimSpace(raw.ManifestVersion)
 	if manifestVersion == "" {
 		manifestVersion = "v2"
@@ -189,30 +178,7 @@ func compile(raw rawManifest) Compilation {
 		Exposures:       normalizeExposures(raw.Exposures),
 		Fixtures:        fixtures,
 		Lanes:           lanes,
-		Aster:           aster,
 	}
-}
-
-// normalizeToggles deduplicates and sorts toggle names for deterministic JSON.
-func normalizeToggles(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-	set := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			set[trimmed] = struct{}{}
-		}
-	}
-	if len(set) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(set))
-	for value := range set {
-		result = append(result, value)
-	}
-	sort.Strings(result)
-	return result
 }
 
 // JSON marshals the compilation payload for downstream consumers.

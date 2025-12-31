@@ -16,7 +16,6 @@ type rawManifest struct {
 	Topology        rawTopology   `toml:"topology"`
 	Fixtures        rawFixtures   `toml:"fixtures"`
 	Lanes           rawLanes      `toml:"lanes"`
-	Aster           rawAster      `toml:"aster"`
 	Services        []rawService  `toml:"services"`
 	Edges           []rawEdge     `toml:"edges"`
 	Exposures       []rawExposure `toml:"exposures"`
@@ -53,11 +52,6 @@ type rawLanes struct {
 type rawLane struct {
 	Name   string `toml:"name"`
 	Reason string `toml:"reason"`
-}
-
-type rawAster struct {
-	Required []string `toml:"required"`
-	Optional []string `toml:"optional"`
 }
 
 type rawService struct {

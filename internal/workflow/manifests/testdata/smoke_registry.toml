@@ -92,10 +92,6 @@ reason = "build/test baseline"
 name = "python-slim"
 reason = "data tooling"
 
-[aster]
-required = ["plan"]
-optional = ["exec", "lint"]
-
 [[edges]]
 source = "mods-api"
 target = "mods-redis"

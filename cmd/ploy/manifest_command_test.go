@@ -66,10 +66,6 @@ reference = "snapshot:dev-db"
 name = "go-native"
 reason = "baseline"
 
-[aster]
-required = ["plan"]
-optional = []
-
 [[edges]]
 source = "mods-api"
 target = "mods-postgres"
@@ -150,10 +146,6 @@ reference = "snapshot:dev-db"
 [[lanes.required]]
 name = "go-native"
 reason = "baseline"
-
-[aster]
-required = ["plan"]
-optional = ["lint"]
 
 [[edges]]
 source = "mods-api"

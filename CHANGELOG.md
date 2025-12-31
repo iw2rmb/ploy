@@ -445,8 +445,8 @@
 ## [2025-09-27] Build Gate Stage Planning & Metadata
 
 - Added `build-gate` and `static-checks` stages to the default workflow planner
-  with new runner stage kinds, updating CLI Aster overrides and planner/runner
-  tests to reflect the build gate sequence.
+  with new runner stage kinds, updating planner/runner tests to reflect the
+  build gate sequence.
 - Introduced `internal/workflow/buildgate` for metadata sanitisation and
   extended workflow checkpoints/contracts with `build_gate` metadata (schema
   version `2025-09-27.1`).
@@ -597,8 +597,7 @@
 ## [2025-09-26] Integration Manifest Schema
 
 - Published `docs/schemas/integration_manifest.schema.json` capturing required
-  manifest fields and constraints for topology, fixtures, lanes, and Aster
-  toggles.
+  manifest fields and constraints for topology, fixtures, and lanes.
 - Added `ploy manifest schema` to surface the schema for downstream tooling and
   validation flows.
 - Updated documentation (`docs/MANIFESTS.md`, `docs/design/overview/README.md`,
@@ -664,24 +663,6 @@
   workflows and point contributors at the relevant guides.
 - Added `documentation_cleanup_test.go` to guard the roadmap status and README
   alignment for this slice.
-
-## [2025-09-26] Aster Hook Integration
-
-- Added `internal/workflow/aster` with a filesystem-backed locator that
-  discovers per-stage bundle metadata and surfaces
-  provenance data for Grid submissions.
-- Extended the workflow runner to require an Aster locator, attach sorted toggle
-  metadata to every stage, and honour per-stage disablement while keeping cache
-  keys deterministic.
-- Introduced `--aster` and `--aster-step` flags on `ploy mod run`, along
-  with post-run bundle summaries so operators can verify toggles before Grid
-  wiring lands.
-- Expanded CLI and runner test suites to cover bundle detection, metadata
-  propagation, per-stage overrides, and regression behaviour when Aster is
-  disabled.
-- Documented the workflow in `cmd/ploy/README.md`, `docs/MANIFESTS.md`, and
-  `docs/design/overview/README.md`; roadmap slice `07-aster-hook` marked
-  complete.
 
 ## [2025-09-26] Commit-Scoped Environments
 
