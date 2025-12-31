@@ -560,6 +560,48 @@ func TestModsSpec_ArtifactFields(t *testing.T) {
 	}
 }
 
+// TestParseModsSpecJSON_RejectsLegacyModShape tests that the parser rejects
+// the legacy top-level "mod" section shape. The canonical spec supports only:
+// 1. Single-step: top-level image/command/env/retain_container
+// 2. Multi-step: mods[] array
+// The legacy "mod: {image: ...}" shape is explicitly rejected to prevent
+// silent no-op parsing and ensure documentation-parser alignment.
+func TestParseModsSpecJSON_RejectsLegacyModShape(t *testing.T) {
+	// Legacy spec shape with top-level "mod" section (not supported).
+	input := `{
+		"mod": {
+			"image": "docker.io/user/mod:latest",
+			"command": "echo hello"
+		}
+	}`
+
+	_, err := ParseModsSpecJSON([]byte(input))
+	if err == nil {
+		t.Fatal("expected error for legacy 'mod' section shape")
+	}
+	wantErr := "mod: legacy spec shape is not supported; use top-level fields or mods[]"
+	if err.Error() != wantErr {
+		t.Errorf("error = %q, want %q", err.Error(), wantErr)
+	}
+}
+
+// TestParseModsSpecYAML_RejectsLegacyModShape tests YAML rejection of legacy shape.
+func TestParseModsSpecYAML_RejectsLegacyModShape(t *testing.T) {
+	input := `
+mod:
+  image: docker.io/user/mod:latest
+  command: echo hello
+`
+	_, err := ParseModsSpecYAML([]byte(input))
+	if err == nil {
+		t.Fatal("expected error for legacy 'mod' section shape in YAML")
+	}
+	wantErr := "mod: legacy spec shape is not supported; use top-level fields or mods[]"
+	if err.Error() != wantErr {
+		t.Errorf("error = %q, want %q", err.Error(), wantErr)
+	}
+}
+
 // TestParseModsSpecJSON_InvalidJSON tests error handling for invalid JSON.
 func TestParseModsSpecJSON_InvalidJSON(t *testing.T) {
 	_, err := ParseModsSpecJSON([]byte(`{invalid json`))

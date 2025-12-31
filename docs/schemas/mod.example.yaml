@@ -5,7 +5,7 @@ apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
-# SINGLE-STEP MOD (canonical)
+# SINGLE-STEP RUNS (canonical)
 ################################################################################
 # Main container to run against the hydrated repository at /workspace.
 # Single-step specs use top-level fields. For multi-step workflows, use the
@@ -61,7 +61,7 @@ retain_container: false
 # MULTI-STEP MODS (optional, for sequential transformations)
 ################################################################################
 # When you need multiple transformation steps executed sequentially, use mods[]
-# instead of the single mod section above. Each step runs with the same global
+# instead of top-level fields. Each step runs with the same global
 # build gate and healing policy. The diff from each step is captured before the
 # next step begins, enabling per-step rehydration and multi-node execution.
 #
@@ -71,7 +71,7 @@ retain_container: false
 # - Each mod step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
 #
-# Each entry in mods[] supports the same `image` field as the single mod section:
+# Each entry in mods[] supports the same `image` field as the single-step spec:
 # - String form: `image: docker.io/user/mod:latest` (universal, any stack)
 # - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
 #
@@ -129,9 +129,9 @@ build_gate:
 # - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
 
 ################################################################################
-# SINGLE-MOD HEALING
+# HEALING CONFIGURATION (build_gate_healing.mod)
 ################################################################################
-# Healing uses a single `mod` per gate:
+# Healing uses a single `mod` entry (not an array) per gate:
 #
 # build_gate_healing:
 #   retries: 2
@@ -167,7 +167,7 @@ mr_on_fail: true
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.
 #   * Resolution order: exact stack match → "default" key → error.
-#   * See the SINGLE-STEP MOD section above for full resolution rules.
+#   * See the SINGLE-STEP RUNS section above for full image resolution rules.
 #
 # - Multi-step semantics:
 #   * Mods execute in array order (sequential steps within one run).
