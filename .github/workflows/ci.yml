@@ -86,6 +86,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for map[string]any at API boundaries
         run: make lint-untyped-contracts
+      - name: Run guardrail unit tests
+        run: make test-untyped-contracts
 
   tests:
     name: Unit Tests & Coverage Threshold
