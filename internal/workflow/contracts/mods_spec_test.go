@@ -208,23 +208,21 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecYAML tests YAML parsing.
-func TestParseModsSpecYAML(t *testing.T) {
-	input := `
-apiVersion: ploy.mod/v1alpha1
-kind: ModRunSpec
-image: docker.io/user/mod:latest
-command: echo hello
-env:
-  FOO: bar
-build_gate:
-  enabled: true
-  profile: auto
-`
+// TestParseModsSpecJSON_APIVersionAndKind tests parsing of optional metadata fields.
+// These fields are informational (typically from YAML manifests converted to JSON).
+func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
+	input := `{
+		"apiVersion": "ploy.mod/v1alpha1",
+		"kind": "ModRunSpec",
+		"image": "docker.io/user/mod:latest",
+		"command": "echo hello",
+		"env": {"FOO": "bar"},
+		"build_gate": {"enabled": true, "profile": "auto"}
+	}`
 
-	spec, err := ParseModsSpecYAML([]byte(input))
+	spec, err := ParseModsSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecYAML failed: %v", err)
+		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
 	if spec.APIVersion != "ploy.mod/v1alpha1" {
@@ -238,53 +236,6 @@ build_gate:
 	}
 	if spec.Command.Shell != "echo hello" {
 		t.Errorf("command = %q, want %q", spec.Command.Shell, "echo hello")
-	}
-}
-
-// TestParseModsSpecYAML_MultiStep tests multi-step YAML parsing.
-func TestParseModsSpecYAML_MultiStep(t *testing.T) {
-	input := `
-mods:
-  - name: step-1
-    image: docker.io/user/mod1:latest
-    command: ["/bin/sh", "-c", "step1"]
-  - name: step-2
-    image:
-      default: docker.io/user/mod2:default
-      java-maven: docker.io/user/mod2:maven
-build_gate_healing:
-  retries: 2
-  mod:
-    image: docker.io/user/codex:latest
-`
-
-	spec, err := ParseModsSpecYAML([]byte(input))
-	if err != nil {
-		t.Fatalf("ParseModsSpecYAML failed: %v", err)
-	}
-
-	if len(spec.Mods) != 2 {
-		t.Fatalf("len(mods) = %d, want 2", len(spec.Mods))
-	}
-
-	// First mod: exec array command.
-	mod1 := spec.Mods[0]
-	if len(mod1.Command.Exec) != 3 {
-		t.Errorf("mods[0].command.Exec = %v, want 3 elements", mod1.Command.Exec)
-	}
-
-	// Second mod: stack-specific image.
-	mod2 := spec.Mods[1]
-	if !mod2.Image.IsStackSpecific() {
-		t.Errorf("mods[1].image should be stack-specific")
-	}
-
-	// Healing.
-	if spec.BuildGateHealing == nil {
-		t.Fatal("build_gate_healing is nil")
-	}
-	if spec.BuildGateHealing.Retries != 2 {
-		t.Errorf("build_gate_healing.retries = %d, want 2", spec.BuildGateHealing.Retries)
 	}
 }
 
@@ -585,42 +536,10 @@ func TestParseModsSpecJSON_RejectsLegacyModShape(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecYAML_RejectsLegacyModShape tests YAML rejection of legacy shape.
-func TestParseModsSpecYAML_RejectsLegacyModShape(t *testing.T) {
-	input := `
-mod:
-  image: docker.io/user/mod:latest
-  command: echo hello
-`
-	_, err := ParseModsSpecYAML([]byte(input))
-	if err == nil {
-		t.Fatal("expected error for legacy 'mod' section shape in YAML")
-	}
-	wantErr := "mod: legacy spec shape is not supported; use top-level fields or mods[]"
-	if err.Error() != wantErr {
-		t.Errorf("error = %q, want %q", err.Error(), wantErr)
-	}
-}
-
 // TestParseModsSpecJSON_InvalidJSON tests error handling for invalid JSON.
 func TestParseModsSpecJSON_InvalidJSON(t *testing.T) {
 	_, err := ParseModsSpecJSON([]byte(`{invalid json`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
-	}
-}
-
-// TestParseModsSpecYAML_InvalidYAML tests error handling for invalid YAML.
-func TestParseModsSpecYAML_InvalidYAML(t *testing.T) {
-	// This YAML has inconsistent indentation that causes parsing errors.
-	_, err := ParseModsSpecYAML([]byte(`
-mods:
-  - image: test
-    env:
-      KEY: value
-     BAD: indentation
-`))
-	if err == nil {
-		t.Fatal("expected error for invalid YAML")
 	}
 }
