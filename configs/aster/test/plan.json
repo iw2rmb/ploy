@@ -1,6 +1,0 @@
-{
-  "bundle_id": "test-plan-2025-09-26",
-  "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
-  "artifact_cid": "bafy-test-plan",
-  "source": "build/aster/test-plan.tar.zst"
-}

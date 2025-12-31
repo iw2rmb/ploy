@@ -18,15 +18,12 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
-ploy lanes describe --lane <lane-name> \
-  [--commit <sha>] [--manifest <version>] \
-  [--aster <toggle,...>]
 ploy mod run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap] \
   [--aster <toggle,...>] \
-	  [--aster-step <stage=toggle,...|stage=off>]
+		  [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ```
@@ -47,17 +44,9 @@ TICKET=$(ploy mod run --json \
   --follow | jq -r '.run_id')
 ```
 
-`lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
-displays the runtime family, build/test commands, surfaced job defaults (image,
-command, env, resources), and shows a deterministic cache-key preview that incorporates
-commit/manifest/Aster toggles. Aster inputs are only included when
-`PLOY_ASTER_ENABLE` is set so the unfinished bundle integration can stay hidden
-behind a feature flag. The preview mirrors what the workflow runner supplies to
-the runtime when dispatching stages.
-
 `mod run` submits a run to the control plane (server assigns the run id),
 materialises the repository passed via `--repo-*` flags (when provided),
-compiles the referenced integration manifest from `configs/manifests/`,
+compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
@@ -293,8 +282,6 @@ ploy completion <shell> --help
 
 ## Flags
 
-- `--lane` — Lane identifier defined under `configs/lanes` (used by
-  `lanes describe`).
 - `--commit` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
 - `--app` — Application identifier resolved to an integration manifest (required
@@ -304,7 +291,7 @@ ploy completion <shell> --help
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
 - `--aster` — Optional toggles to append to manifest-required Aster switches
-  (`lanes describe`, `mod run`, `environment materialize`). The flag is
+  (`mod run`, `environment materialize`). The flag is
   ignored unless `PLOY_ASTER_ENABLE` is set.
 - `--aster-step` — Stage-specific overrides for Aster behaviour when running
   workflows (`mod run`). Use `stage=toggle1,toggle2` to enable additional

@@ -1,6 +1,0 @@
-{
-  "bundle_id": "build-plan-2025-09-26",
-  "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-  "artifact_cid": "bafy-build-plan",
-  "source": "build/aster/build-plan.tar.zst"
-}
