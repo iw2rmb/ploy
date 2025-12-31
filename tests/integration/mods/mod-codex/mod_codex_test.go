@@ -31,6 +31,9 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if !have("docker") {
 		t.Skip("docker not found in PATH; skipping")
 	}
+	if out, err := exec.Command("docker", "info").CombinedOutput(); err != nil {
+		t.Skipf("docker daemon not available; skipping: %v: %s", err, strings.TrimSpace(string(out)))
+	}
 	if !have("git") {
 		t.Skip("git not found in PATH; skipping")
 	}

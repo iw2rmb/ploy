@@ -39,12 +39,12 @@ func NewDiffFetcher(cfg Config) (*DiffFetcher, error) {
 // diffListItem represents a single diff in the list response from the control plane.
 // This mirrors the diffItem struct from internal/server/handlers/handlers_diffs.go.
 type diffListItem struct {
-	ID        string          `json:"id"`
-	JobID     types.JobID     `json:"job_id"`
-	StepIndex types.StepIndex `json:"step_index"`
-	CreatedAt time.Time       `json:"created_at"`
-	Size      int             `json:"gzipped_size"`
-	Summary   any             `json:"summary,omitempty"` // DiffSummary is map[string]any
+	ID        string            `json:"id"`
+	JobID     types.JobID       `json:"job_id"`
+	StepIndex types.StepIndex   `json:"step_index"`
+	CreatedAt time.Time         `json:"created_at"`
+	Size      int               `json:"gzipped_size"`
+	Summary   types.DiffSummary `json:"summary,omitempty"`
 }
 
 // diffListResponse is the response structure for listing diffs.
@@ -139,14 +139,11 @@ func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepI
 			continue
 		}
 
-		summary, _ := d.Summary.(map[string]any)
-		if summary != nil {
-			// Skip healing diffs in the patch chain. Healing diffs share the same
-			// step_index for telemetry but represent intermediate workspace states
-			// that are already captured in the final per-step mod diff.
-			if modType, ok := summary["mod_type"].(string); ok && modType == "healing" {
-				continue
-			}
+		// Skip healing diffs in the patch chain. Healing diffs share the same
+		// step_index for telemetry but represent intermediate workspace states
+		// that are already captured in the final per-step mod diff.
+		if modType, ok := d.Summary["mod_type"].(string); ok && modType == "healing" {
+			continue
 		}
 
 		relevantDiffs = append(relevantDiffs, d)

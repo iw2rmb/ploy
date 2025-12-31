@@ -7,13 +7,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestNewGateExecutor_DefaultLocalDocker verifies that the factory returns a docker executor.
-func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
+func TestNewDockerGateExecutor_DefaultLocalDocker(t *testing.T) {
 	t.Parallel()
 
 	mockRT := &mockContainerRuntime{}
 
-	executor := NewGateExecutor(mockRT)
+	executor := NewDockerGateExecutor(mockRT)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor for empty mode")
@@ -30,11 +29,10 @@ func TestNewGateExecutor_DefaultLocalDocker(t *testing.T) {
 	}
 }
 
-// TestNewGateExecutor_NilRuntime verifies behavior with nil container runtime.
-func TestNewGateExecutor_NilRuntime(t *testing.T) {
+func TestNewDockerGateExecutor_NilRuntime(t *testing.T) {
 	t.Parallel()
 
-	executor := NewGateExecutor(nil)
+	executor := NewDockerGateExecutor(nil)
 
 	if executor == nil {
 		t.Fatal("expected non-nil executor even with nil runtime")

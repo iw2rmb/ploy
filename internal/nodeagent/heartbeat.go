@@ -81,9 +81,6 @@ func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
 
 // Start begins sending heartbeats.
 func (h *HeartbeatManager) Start(ctx context.Context) error {
-	ticker := time.NewTicker(h.cfg.Heartbeat.Interval)
-	defer ticker.Stop()
-
 	// Send initial heartbeat.
 	if err := h.sendHeartbeat(ctx); err != nil {
 		slog.Error("initial heartbeat failed", "err", err)
@@ -92,23 +89,36 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 		h.resetBackoff()
 	}
 
+	// Use a single timer to schedule both steady-state intervals and backoff delays.
+	// This avoids ticker drift/dropped ticks when a backoff sleep occurs, and avoids
+	// allocating a new timer on each backoff via time.After.
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+
 	for {
+		delay := h.cfg.Heartbeat.Interval
+
 		// If backoff is active (triggered by prior 5xx error), wait before next heartbeat.
 		if h.backoffActive {
-			backoffDuration := h.backoff.GetDuration()
-			slog.Warn("heartbeat backoff active", "duration", backoffDuration)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(backoffDuration):
-				// Backoff wait complete, continue.
-			}
+			delay = h.backoff.GetDuration()
+			slog.Warn("heartbeat backoff active", "duration", delay)
 		}
 
+		if delay < 0 {
+			delay = 0
+		}
+
+		timer.Reset(delay)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
+		case <-timer.C:
 			if err := h.sendHeartbeat(ctx); err != nil {
 				slog.Error("heartbeat failed", "err", err)
 				h.applyBackoff(err)

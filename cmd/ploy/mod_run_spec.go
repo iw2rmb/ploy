@@ -54,7 +54,8 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 	mergedEnv := make(map[string]any)
 
 	// First, process env_from_file if present (sibling syntax)
-	if envFromFile, ok := spec["env_from_file"].(map[string]any); ok {
+	switch envFromFile := spec["env_from_file"].(type) {
+	case map[string]any:
 		for k, v := range envFromFile {
 			path, ok := v.(string)
 			if !ok {
@@ -68,10 +69,20 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 		}
 		// Remove env_from_file after processing to keep spec clean
 		delete(spec, "env_from_file")
+	case map[string]string:
+		for k, path := range envFromFile {
+			content, err := resolveEnvFromFile(path)
+			if err != nil {
+				return fmt.Errorf("env_from_file[%s]: %w", k, err)
+			}
+			mergedEnv[k] = content
+		}
+		delete(spec, "env_from_file")
 	}
 
 	// Then, process env (including inline {from_file: path} syntax)
-	if env, ok := spec["env"].(map[string]any); ok {
+	switch env := spec["env"].(type) {
+	case map[string]any:
 		for k, v := range env {
 			switch val := v.(type) {
 			case string:
@@ -88,9 +99,23 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 				} else {
 					return fmt.Errorf("env[%s]: expected string or {from_file: path}, got unsupported map structure", k)
 				}
+			case map[string]string:
+				if fromFile, ok := val["from_file"]; ok {
+					content, err := resolveEnvFromFile(fromFile)
+					if err != nil {
+						return fmt.Errorf("env[%s].from_file: %w", k, err)
+					}
+					mergedEnv[k] = content
+				} else {
+					return fmt.Errorf("env[%s]: expected string or {from_file: path}, got unsupported map structure", k)
+				}
 			default:
 				return fmt.Errorf("env[%s]: expected string or {from_file: path}, got %T", k, v)
 			}
+		}
+	case map[string]string:
+		for k, v := range env {
+			mergedEnv[k] = v
 		}
 	}
 

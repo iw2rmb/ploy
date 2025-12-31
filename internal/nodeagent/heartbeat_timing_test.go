@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // TestSendHeartbeatRespectsTimeout verifies heartbeat request respects configured timeout.
@@ -251,5 +253,75 @@ func TestBackoffDoesNotApplyToNon5xxErrors(t *testing.T) {
 	// Backoff should still be inactive (4xx does not trigger backoff).
 	if mgr.backoffActive {
 		t.Errorf("backoffActive = true, want false for 4xx error")
+	}
+}
+
+func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
+	t.Parallel()
+
+	var (
+		first  time.Time
+		second time.Time
+		n      int
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n++
+		switch n {
+		case 1:
+			first = time.Now()
+			w.WriteHeader(http.StatusInternalServerError)
+		case 2:
+			second = time.Now()
+			w.WriteHeader(http.StatusOK)
+			cancel()
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := Config{
+		NodeID:    "test-node",
+		ServerURL: srv.URL,
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+		Heartbeat: HeartbeatConfig{
+			Interval: 120 * time.Millisecond,
+			Timeout:  5 * time.Second,
+		},
+	}
+
+	mgr, err := NewHeartbeatManager(cfg)
+	if err != nil {
+		t.Fatalf("NewHeartbeatManager error: %v", err)
+	}
+
+	mgr.backoff = backoff.NewStatefulBackoff(backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     10 * time.Millisecond,
+		Multiplier:      1.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	})
+
+	err = mgr.Start(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Start error = %v, want context.Canceled", err)
+	}
+
+	if n < 2 {
+		t.Fatalf("heartbeat requests = %d, want >= 2", n)
+	}
+
+	delta := second.Sub(first)
+	if delta >= 90*time.Millisecond {
+		t.Fatalf("second heartbeat delay = %v, want < 90ms (interval=%v)", delta, cfg.Heartbeat.Interval)
 	}
 }
