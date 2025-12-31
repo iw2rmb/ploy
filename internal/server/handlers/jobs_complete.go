@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // completeJobRequest represents the request body for job completion.
@@ -23,6 +24,69 @@ type completeJobRequest struct {
 	Status   string          `json:"status"`              // Terminal status: succeeded, failed, or canceled
 	ExitCode *int32          `json:"exit_code,omitempty"` // Exit code from job execution
 	Stats    json.RawMessage `json:"stats,omitempty"`     // Optional job statistics (must be JSON object)
+}
+
+// JobStatsPayload is the typed structure for the stats field in job completion.
+// This replaces untyped map[string]any decoding at the API boundary, providing
+// schema control over incoming stats payloads.
+//
+// Wire format example (per ROADMAP.md):
+//
+//	{
+//	  "job_meta": { "kind": "gate", "gate": { ... } },
+//	  "metadata": { "mr_url": "https://..." },
+//	  "duration_ms": 1234
+//	}
+//
+// The job_meta field, when present, must be valid per contracts.UnmarshalJobMeta.
+// The metadata field contains string key-value pairs for run-level metadata merging.
+type JobStatsPayload struct {
+	// JobMeta is the structured gate/build/mod metadata to persist in jobs.meta JSONB.
+	// When present, it is validated via contracts.UnmarshalJobMeta before persisting.
+	// Empty/null values are treated as "no job meta" (not persisted).
+	JobMeta json.RawMessage `json:"job_meta,omitempty"`
+
+	// Metadata contains optional string key-value pairs for run-level context.
+	// The mr_url key is used by MR jobs to report merge request URLs.
+	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// DurationMs is the job execution duration in milliseconds (informational).
+	DurationMs int64 `json:"duration_ms,omitempty"`
+}
+
+// MRURL returns the merge request URL from metadata, if present.
+// Returns empty string if metadata is nil or mr_url key is absent/empty.
+func (p JobStatsPayload) MRURL() string {
+	if p.Metadata == nil {
+		return ""
+	}
+	return strings.TrimSpace(p.Metadata["mr_url"])
+}
+
+// HasJobMeta returns true if job_meta is present and non-empty.
+// Empty JSON objects ("{}") and null are treated as "no job meta".
+func (p JobStatsPayload) HasJobMeta() bool {
+	if len(p.JobMeta) == 0 {
+		return false
+	}
+	s := string(p.JobMeta)
+	return s != "{}" && s != "null"
+}
+
+// ValidateJobMeta validates the job_meta field using contracts.UnmarshalJobMeta.
+// Returns nil if job_meta is absent/empty or if it passes validation.
+// Returns an error describing the validation failure if job_meta is invalid.
+func (p JobStatsPayload) ValidateJobMeta() error {
+	if !p.HasJobMeta() {
+		return nil
+	}
+	// Use the canonical JobMeta unmarshaler for structural validation.
+	// This ensures the job_meta adheres to the contracts.JobMeta schema
+	// (valid kind, consistent gate/build metadata presence, etc.).
+	if _, err := contracts.UnmarshalJobMeta(p.JobMeta); err != nil {
+		return fmt.Errorf("invalid job_meta: %w", err)
+	}
+	return nil
 }
 
 // completeJobHandler marks a job as completed with terminal status and stats.
@@ -87,49 +151,46 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Validate stats field if provided (must be a valid JSON object).
+		// Validate and parse stats field into typed JobStatsPayload.
+		// This replaces untyped map[string]any decoding with a structured approach
+		// that provides compile-time type safety and schema validation.
 		statsBytes := []byte("{}")
-		var jobMetaBytes []byte
-		var mrURL string
+		var statsPayload JobStatsPayload
 		if len(req.Stats) > 0 {
+			// First, validate that stats is valid JSON.
 			if !json.Valid(req.Stats) {
 				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
 				return
 			}
-			var tmp any
-			if err := json.Unmarshal(req.Stats, &tmp); err != nil {
+
+			// Verify stats is a JSON object (not array, string, number, etc.).
+			// We do a quick type check before unmarshaling into the typed struct.
+			var rawCheck json.RawMessage
+			if err := json.Unmarshal(req.Stats, &rawCheck); err != nil {
 				http.Error(w, "invalid stats JSON", http.StatusBadRequest)
 				return
 			}
-			obj, ok := tmp.(map[string]any)
-			if !ok {
+			// Trim whitespace and check first character for object delimiter.
+			trimmed := strings.TrimSpace(string(rawCheck))
+			if len(trimmed) == 0 || trimmed[0] != '{' {
 				http.Error(w, "stats must be a JSON object", http.StatusBadRequest)
+				return
+			}
+
+			// Unmarshal into typed JobStatsPayload struct.
+			// Unknown fields are silently ignored (forward compatibility).
+			if err := json.Unmarshal(req.Stats, &statsPayload); err != nil {
+				http.Error(w, fmt.Sprintf("invalid stats payload: %v", err), http.StatusBadRequest)
 				return
 			}
 			statsBytes = req.Stats
 
-			// Extract optional job_meta payload from stats so gate/build metadata
-			// can be persisted in jobs.meta JSONB.
-			if rawMeta, ok := obj["job_meta"]; ok && rawMeta != nil {
-				metaBytes, err := json.Marshal(rawMeta)
-				if err != nil {
-					http.Error(w, "stats.job_meta must be JSON-serializable", http.StatusBadRequest)
-					return
-				}
-				if len(metaBytes) > 0 && string(metaBytes) != "{}" && string(metaBytes) != "null" {
-					jobMetaBytes = metaBytes
-				}
-			}
-
-			// Detect optional MR URL under stats.metadata.mr_url for MR jobs.
-			if metaRaw, ok := obj["metadata"]; ok && metaRaw != nil {
-				if metaMap, ok := metaRaw.(map[string]any); ok {
-					if mrRaw, ok := metaMap["mr_url"]; ok && mrRaw != nil {
-						if mrStr, ok := mrRaw.(string); ok {
-							mrURL = strings.TrimSpace(mrStr)
-						}
-					}
-				}
+			// Validate job_meta via contracts.UnmarshalJobMeta when present.
+			// This ensures structured metadata conforms to the JobMeta schema
+			// before persisting to jobs.meta JSONB.
+			if err := statsPayload.ValidateJobMeta(); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 		}
 
@@ -188,12 +249,13 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Transition job status to terminal state.
 		// Sets finished_at timestamp, duration_ms, and exit_code.
 		// When job_meta is present in stats, persist it into jobs.meta JSONB.
-		if len(jobMetaBytes) > 0 {
+		// The job_meta has already been validated via ValidateJobMeta() above.
+		if statsPayload.HasJobMeta() {
 			err = st.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 				ID:       job.ID,
 				Status:   jobStatus,
 				ExitCode: req.ExitCode,
-				Meta:     jobMetaBytes,
+				Meta:     statsPayload.JobMeta,
 			})
 		} else {
 			err = st.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
@@ -299,6 +361,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// URL into runs.stats.metadata.mr_url so that GET /v1/runs/{id}/status can
 		// expose it via RunStats.MRURL() and CLI commands can display it. This is a
 		// best-effort update and does not affect run status.
+		// We use the typed statsPayload.MRURL() accessor instead of map[string]any casting.
+		mrURL := statsPayload.MRURL()
 		if err == nil && mrURL != "" && strings.TrimSpace(job.ModType) == "mr" {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
 				ID:    runID.String(),
