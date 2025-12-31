@@ -333,16 +333,24 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					"err", jobsErr,
 				)
 			} else {
-				modType := strings.TrimSpace(job.ModType)
+				modType := domaintypes.ModType(job.ModType)
+				if err := modType.Validate(); err != nil {
+					slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
+						"job_id", jobIDStr,
+						"mod_type", job.ModType,
+						"err", err,
+					)
+					modType = ""
+				}
 				switch modType {
-				case "mr":
+				case domaintypes.ModTypeMR:
 					// MR jobs are best-effort and must not trigger healing or
 					// cancellation of other jobs when they fail.
 					slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,
 					)
-				case "pre_gate", "post_gate", "re_gate":
+				case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
 					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
 						slog.Error("complete job: failed to create healing jobs",
 							"job_id", jobIDStr,
@@ -392,7 +400,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// best-effort update and does not affect run status.
 		// We use the typed statsPayload.MRURL() accessor instead of map[string]any casting.
 		mrURL := statsPayload.MRURL()
-		if err == nil && mrURL != "" && strings.TrimSpace(job.ModType) == "mr" {
+		jobModType := domaintypes.ModType(job.ModType)
+		if err == nil && mrURL != "" && jobModType.Validate() == nil && jobModType == domaintypes.ModTypeMR {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
 				ID:    runID.String(),
 				MrUrl: mrURL,

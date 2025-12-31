@@ -52,11 +52,14 @@ func maybeCreateHealingJobs(
 	}
 
 	// Only create healing for gate jobs.
-	modType := strings.TrimSpace(failedJob.ModType)
-	if modType != "pre_gate" && modType != "post_gate" && modType != "re_gate" {
+	modType := domaintypes.ModType(failedJob.ModType)
+	if err := modType.Validate(); err != nil {
+		return fmt.Errorf("invalid mod_type %q for failed job_id=%s: %w", failedJob.ModType, failedJob.ID, err)
+	}
+	if modType != domaintypes.ModTypePreGate && modType != domaintypes.ModTypePostGate && modType != domaintypes.ModTypeReGate {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
 			"run_id", runID,
-			"mod_type", modType,
+			"mod_type", modType.String(),
 		)
 		return nil
 	}
@@ -94,14 +97,17 @@ func maybeCreateHealingJobs(
 	// pre_gate/post_gate so that all healing jobs between that gate and the
 	// next non-gate/non-heal job share the same attempt counter.
 	baseGateIndex := failedStepIndex
-	if modType == "re_gate" {
+	if modType == domaintypes.ModTypeReGate {
 		var (
 			baseFound     bool
 			baseStepIndex float64
 		)
 		for _, job := range jobs {
-			mt := strings.TrimSpace(job.ModType)
-			if mt != "pre_gate" && mt != "post_gate" {
+			mt := domaintypes.ModType(job.ModType)
+			if err := mt.Validate(); err != nil {
+				return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+			}
+			if mt != domaintypes.ModTypePreGate && mt != domaintypes.ModTypePostGate {
 				continue
 			}
 			if job.StepIndex > float64(failedStepIndex) {
@@ -125,16 +131,19 @@ func maybeCreateHealingJobs(
 	var (
 		windowEnd     float64
 		hasWindowEnd  bool
-		isGateJobType = func(t string) bool {
-			return t == "pre_gate" || t == "post_gate" || t == "re_gate"
+		isGateJobType = func(t domaintypes.ModType) bool {
+			return t == domaintypes.ModTypePreGate || t == domaintypes.ModTypePostGate || t == domaintypes.ModTypeReGate
 		}
 	)
 	for _, job := range jobs {
 		if job.StepIndex <= windowStart {
 			continue
 		}
-		jt := strings.TrimSpace(job.ModType)
-		if jt == "heal" {
+		jt := domaintypes.ModType(job.ModType)
+		if err := jt.Validate(); err != nil {
+			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+		}
+		if jt == domaintypes.ModTypeHeal {
 			continue
 		}
 		if isGateJobType(jt) {
@@ -152,7 +161,11 @@ func maybeCreateHealingJobs(
 	// whose step_index lies within (baseGateIndex, windowEnd).
 	healingAttempts := 0
 	for _, job := range jobs {
-		if strings.TrimSpace(job.ModType) != "heal" {
+		jt := domaintypes.ModType(job.ModType)
+		if err := jt.Validate(); err != nil {
+			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+		}
+		if jt != domaintypes.ModTypeHeal {
 			continue
 		}
 		if job.StepIndex <= windowStart {
@@ -229,7 +242,7 @@ func maybeCreateHealingJobs(
 		ID:        string(domaintypes.NewJobID()),
 		RunID:     runID,
 		Name:      healJobName,
-		ModType:   "heal",
+		ModType:   domaintypes.ModTypeHeal.String(),
 		ModImage:  modImage,
 		Status:    store.JobStatusPending,
 		StepIndex: healStepIndex,
@@ -253,7 +266,7 @@ func maybeCreateHealingJobs(
 		ID:        string(domaintypes.NewJobID()),
 		RunID:     runID,
 		Name:      reGateName,
-		ModType:   "re_gate",
+		ModType:   domaintypes.ModTypeReGate.String(),
 		ModImage:  "",
 		Status:    store.JobStatusCreated,
 		StepIndex: reGateStepIndex,

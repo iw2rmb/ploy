@@ -8,32 +8,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// scopeMatches determines whether a global env var should be injected into a job
-// based on the job's mod_type and the env var's scope.
-//
-// This is a thin wrapper that converts string parameters to typed enums and
-// delegates to the typed MatchesModType method. The wrapper exists for backward
-// compatibility with call sites that still use string parameters (e.g., tests).
-//
-// Scope semantics:
-//   - "all"   → inject into every job type
-//   - "mods"  → inject into mod and post_gate jobs (code modification phases)
-//   - "heal"  → inject into heal and re_gate jobs (healing/retry phases)
-//   - "gate"  → inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
-//
-// Job types (mod_type):
-//   - "mod"       → main modification step
-//   - "heal"      → healing/retry step
-//   - "pre_gate"  → gate before mods
-//   - "re_gate"   → gate after healing
-//   - "post_gate" → gate after mods
-func scopeMatches(jobType, scope string) bool {
-	// Convert string parameters to typed enums for type-safe matching.
-	modType := domaintypes.ModType(strings.TrimSpace(jobType))
-	envScope := domaintypes.GlobalEnvScope(strings.TrimSpace(scope))
-	return envScope.MatchesModType(modType)
-}
-
 // mergeGlobalEnvIntoSpec injects global environment variables into the spec's "env" map.
 // Global env vars are only merged if their scope matches the job type.
 // Per-run env vars (already in spec) take precedence over global env — existing keys
@@ -42,10 +16,10 @@ func scopeMatches(jobType, scope string) bool {
 // Parameters:
 //   - spec: The job spec JSON, may contain an "env" map
 //   - env: Map of global env vars from ConfigHolder (uses typed GlobalEnvScope)
-//   - jobType: The job's mod_type as string (mod, heal, pre_gate, re_gate, post_gate)
+//   - modType: The job's mod_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
 //
 // Returns the modified spec with global env vars merged into the "env" field.
-func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType string) json.RawMessage {
+func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.ModType) json.RawMessage {
 	// If no global env vars exist, return spec unchanged.
 	if len(env) == 0 {
 		return spec
@@ -65,9 +39,6 @@ func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, j
 	if em == nil {
 		em = map[string]any{}
 	}
-
-	// Convert jobType string to typed ModType for scope matching.
-	modType := domaintypes.ModType(strings.TrimSpace(jobType))
 
 	// Merge global env vars that match the job scope.
 	// Per-run env vars take precedence — skip keys that already exist.

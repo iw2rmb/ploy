@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -67,8 +66,11 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	)
 
 	for _, job := range jobs {
-		modType := strings.TrimSpace(job.ModType)
-		if modType == "mr" {
+		modType := domaintypes.ModType(job.ModType)
+		if err := modType.Validate(); err != nil {
+			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+		}
+		if modType == domaintypes.ModTypeMR {
 			// MR jobs are auxiliary and do not participate in run completion
 			// status derivation. They must not block terminal state detection
 			// or change success/failure semantics for the run.
@@ -92,7 +94,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		}
 
 		// Determine if this is a gate job based on mod_type column.
-		isGate := modType == "pre_gate" || modType == "post_gate" || modType == "re_gate"
+		isGate := modType == domaintypes.ModTypePreGate || modType == domaintypes.ModTypePostGate || modType == domaintypes.ModTypeReGate
 
 		if isGate {
 			// Track the gate with the highest step_index (final gate result wins).

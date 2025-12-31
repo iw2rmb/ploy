@@ -100,7 +100,11 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Build and send response with job and run information.
-		buildAndSendJobClaimResponse(w, r, configHolder, run, job)
+		if err := buildAndSendJobClaimResponse(w, r, configHolder, run, job); err != nil {
+			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
+			http.Error(w, fmt.Sprintf("failed to build claim response: %v", err), http.StatusInternalServerError)
+			return
+		}
 		slog.Info("job claimed",
 			"job_id", job.ID, // Job IDs are KSUID strings.
 			"job_name", job.Name,
@@ -118,7 +122,12 @@ func buildAndSendJobClaimResponse(
 	configHolder *ConfigHolder,
 	run store.Run,
 	job store.Job,
-) {
+) error {
+	modType := domaintypes.ModType(job.ModType)
+	if err := modType.Validate(); err != nil {
+		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+	}
+
 	// Merge job_id into spec for downstream execution.
 	// Job IDs are now KSUID strings.
 	mergedSpec := mergeJobIDIntoSpec(run.Spec, job.ID)
@@ -140,7 +149,7 @@ func buildAndSendJobClaimResponse(
 	// Merge global env vars (CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, OPENAI_API_KEY, etc.)
 	// into spec.env based on job type and scope matching.
 	// Per-run env vars in spec take precedence over global env.
-	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), job.ModType)
+	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), modType)
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
@@ -166,7 +175,7 @@ func buildAndSendJobClaimResponse(
 		Name:      run.Name,
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
-		ModType:   domaintypes.ModType(job.ModType),
+		ModType:   modType,
 		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,
@@ -185,6 +194,7 @@ func buildAndSendJobClaimResponse(
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		slog.Error("claim: encode response failed", "err", err)
 	}
+	return nil
 }
 
 // mergeJobIDIntoSpec injects job_id into the spec JSONB for downstream execution.

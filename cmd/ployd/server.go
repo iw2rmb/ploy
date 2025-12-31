@@ -141,26 +141,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 	// Convert store entries to ConfigHolder's in-memory map.
 	// Parse scope strings from database into typed GlobalEnvScope values.
-	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(globalEnvEntries))
-	for _, e := range globalEnvEntries {
-		// Parse scope from database; defaults to "all" if empty/invalid.
-		// Invalid scopes in database are logged but default to "all" to avoid
-		// breaking existing data. The API boundary validates before writes.
-		scope, err := domaintypes.ParseGlobalEnvScope(e.Scope)
-		if err != nil {
-			slog.Warn("invalid scope in stored global env, defaulting to 'all'",
-				"key", e.Key,
-				"scope", e.Scope,
-				"err", err,
-			)
-			scope = domaintypes.GlobalEnvScopeAll
-		}
-		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
-			Value:  e.Value,
-			Scope:  scope, // Use parsed typed scope.
-			Secret: e.Secret,
-		}
-	}
+	globalEnvMap := globalEnvMapFromStoreEntries(globalEnvEntries)
 	slog.Info("loaded global env entries from store", "count", len(globalEnvMap))
 
 	// Initialize config holder for runtime configuration access.
@@ -241,4 +222,27 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 
 	return nil
+}
+
+func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string]handlers.GlobalEnvVar {
+	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(entries))
+	for _, e := range entries {
+		// Parse scope from database; empty defaults to "all".
+		// Invalid scopes are dropped to avoid injecting env vars under an unintended scope.
+		scope, err := domaintypes.ParseGlobalEnvScope(e.Scope)
+		if err != nil {
+			slog.Warn("invalid scope in stored global env, dropping entry",
+				"key", e.Key,
+				"scope", e.Scope,
+				"err", err,
+			)
+			continue
+		}
+		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
+			Value:  e.Value,
+			Scope:  scope,
+			Secret: e.Secret,
+		}
+	}
+	return globalEnvMap
 }
