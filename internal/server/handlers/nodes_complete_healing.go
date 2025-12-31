@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // maybeCreateHealingJobs creates a single healing job and a re-gate job when a gate job fails.
@@ -62,16 +62,13 @@ func maybeCreateHealingJobs(
 	}
 
 	// Parse run spec to get healing configuration.
-	var specMap map[string]any
-	if len(run.Spec) > 0 && json.Valid(run.Spec) {
-		if err := json.Unmarshal(run.Spec, &specMap); err != nil {
-			return fmt.Errorf("parse run spec: %w", err)
-		}
+	spec, err := contracts.ParseModsSpecJSON(run.Spec)
+	if err != nil {
+		return fmt.Errorf("parse run spec: %w", err)
 	}
 
 	// Check if healing is configured.
-	healingConfig, ok := specMap["build_gate_healing"].(map[string]any)
-	if !ok {
+	if spec.BuildGateHealing == nil || spec.BuildGateHealing.Mod == nil {
 		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
 			"run_id", runID,
 		)
@@ -85,26 +82,10 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Extract healing mod (canonical single-mod schema).
-	modMap, ok := healingConfig["mod"].(map[string]any)
-	if !ok || len(modMap) == 0 {
-		slog.Debug("maybeCreateHealingJobs: no healing mod configured, canceling remaining jobs",
-			"run_id", runID,
-		)
-		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
-			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing configured",
-				"run_id", runID,
-				"failed_step_index", failedStepIndex,
-				"err", err,
-			)
-		}
-		return nil
-	}
-
 	// Get retry limit (default to 1 if not specified).
-	retries := 1
-	if r, ok := healingConfig["retries"].(float64); ok && r > 0 {
-		retries = int(r)
+	retries := spec.BuildGateHealing.Retries
+	if retries <= 0 {
+		retries = 1
 	}
 
 	// Determine the base gate index used to count healing attempts.
@@ -238,8 +219,8 @@ func maybeCreateHealingJobs(
 	)
 
 	modImage := ""
-	if img, ok := modMap["image"].(string); ok {
-		modImage = strings.TrimSpace(img)
+	if spec.BuildGateHealing.Mod.Image.Universal != "" {
+		modImage = strings.TrimSpace(spec.BuildGateHealing.Mod.Image.Universal)
 	}
 
 	// Create a single healing job for this attempt.

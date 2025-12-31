@@ -383,9 +383,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 	// Parse spec using the canonical parser for structured validation.
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
-		// Fallback to legacy parsing for backwards compatibility with non-canonical specs.
-		// This preserves existing behavior for specs that don't conform to the canonical schema.
-		return createJobsFromSpecLegacy(ctx, st, runID, spec)
+		return fmt.Errorf("parse mods spec: %w", err)
 	}
 
 	// Check for multi-step run (mods[] array).
@@ -426,57 +424,6 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 	modImage := ""
 	if modsSpec.Image.Universal != "" {
 		modImage = strings.TrimSpace(modsSpec.Image.Universal)
-	}
-	return createSingleModJob(ctx, st, runID, modImage)
-}
-
-// createJobsFromSpecLegacy is the legacy parsing path for specs that don't conform
-// to the canonical schema. This preserves backwards compatibility.
-func createJobsFromSpecLegacy(ctx context.Context, st store.Store, runID domaintypes.RunID, spec []byte) error {
-	var specMap map[string]interface{}
-	if len(spec) > 0 && json.Valid(spec) {
-		if err := json.Unmarshal(spec, &specMap); err != nil {
-			// Invalid JSON; fallback to single mod job.
-			return createSingleModJob(ctx, st, runID, "")
-		}
-	}
-
-	// Check for mods[] array (multi-step run).
-	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
-		// Pre-gate job - pending (ready to be claimed immediately)
-		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
-			return fmt.Errorf("create pre-gate job: %w", err)
-		}
-
-		for i, modInterface := range mods {
-			modImage := ""
-			if modMap, ok := modInterface.(map[string]interface{}); ok {
-				if img, ok := modMap["image"].(string); ok {
-					modImage = strings.TrimSpace(img)
-				}
-			}
-			jobName := fmt.Sprintf("mod-%d", i)
-			stepIndex := domaintypes.StepIndex(2000 + i*1000)
-			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
-				return fmt.Errorf("create mod job %d: %w", i, err)
-			}
-		}
-
-		postGateIndex := domaintypes.StepIndex(2000 + len(mods)*1000)
-		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
-			return fmt.Errorf("create post-gate job: %w", err)
-		}
-		return nil
-	}
-
-	// Single-step run.
-	modImage := ""
-	if mod, ok := specMap["mod"].(map[string]interface{}); ok {
-		if img, ok := mod["image"].(string); ok {
-			modImage = strings.TrimSpace(img)
-		}
-	} else if img, ok := specMap["image"].(string); ok {
-		modImage = strings.TrimSpace(img)
 	}
 	return createSingleModJob(ctx, st, runID, modImage)
 }
