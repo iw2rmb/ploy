@@ -18,13 +18,20 @@
 //
 // ## Usage
 //
-// Parse specs using ParseModsSpecJSON or ParseModsSpecYAML:
+// Parse specs using ParseModsSpecJSON:
 //
 //	spec, err := contracts.ParseModsSpecJSON(jsonBytes)
 //	if err != nil {
 //	    return err // structured validation error
 //	}
 //	// Use typed fields: spec.Image, spec.Mods, spec.BuildGate, etc.
+//
+// ## YAML Support
+//
+// YAML files are accepted at the CLI boundary by loading into map[string]any,
+// marshaling to JSON, and validating via ParseModsSpecJSON. There is no
+// separate ParseModsSpecYAML function; this design keeps validation centralized
+// in a single parser and simplifies maintenance.
 //
 // ## Migration Path
 //
@@ -52,8 +59,8 @@ import (
 // for wire format compatibility.
 //
 // Validation: Use Validate() to check structural correctness after parsing.
-// The parser functions (ParseModsSpecJSON, ParseModsSpecYAML) call Validate()
-// automatically and return structured errors for invalid input.
+// ParseModsSpecJSON calls Validate() automatically and returns structured
+// errors for invalid input.
 type ModsSpec struct {
 	// --- Server-injected metadata (claim-time) ---
 	//
@@ -380,26 +387,6 @@ func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse mods spec json: %w", err)
-	}
-
-	return parseModsSpecFromMap(raw)
-}
-
-// ParseModsSpecYAML parses a Mods specification from YAML bytes.
-// Returns a validated ModsSpec or an error for invalid/malformed input.
-//
-// YAML-specific fields like apiVersion and kind are preserved in the result.
-// Empty input (nil or empty bytes) returns an empty but valid ModsSpec.
-func ParseModsSpecYAML(data []byte) (*ModsSpec, error) {
-	// Handle empty input.
-	if len(data) == 0 {
-		return &ModsSpec{}, nil
-	}
-
-	// Unmarshal into intermediate map to handle polymorphic fields.
-	var raw map[string]any
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parse mods spec yaml: %w", err)
 	}
 
 	return parseModsSpecFromMap(raw)
