@@ -158,7 +158,7 @@ func TestBatchRunWorkflow_HappyPath(t *testing.T) {
 		Name:      ptrString("integration-batch"),
 		RepoUrl:   "https://github.com/batch/placeholder.git",
 		Status:    store.RunStatusQueued,
-		Spec:      []byte(`{"mod":{"image":"test-image"}}`),
+		Spec:      []byte(`{"image":"test-image"}`),
 		BaseRef:   "main",
 		TargetRef: "feature",
 		CreatedBy: ptrString("test-user"),

@@ -638,12 +638,7 @@ func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 		wantNames []string
 	}{
 		{
-			name:      "mod section",
-			spec:      map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
-			wantNames: []string{"pre-gate", "mod-0", "post-gate"},
-		},
-		{
-			name:      "legacy top-level",
+			name:      "top-level image",
 			spec:      map[string]interface{}{"image": "legacy:latest"},
 			wantNames: []string{"pre-gate", "mod-0", "post-gate"},
 		},
@@ -728,6 +723,29 @@ func TestSubmitRunHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 	}
 }
 
+func TestSubmitRunHandlerRejectsLegacyModSection(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{}
+	handler := submitRunHandler(st, nil)
+
+	reqBody := map[string]interface{}{
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
+		"spec":       map[string]any{"mod": map[string]any{"image": "single:latest"}},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 // TestSubmitRunHandlerMultiStepNoRunSteps verifies that submitting
 // a multi-step spec (with mods[] array) creates jobs but NOT run_steps.
 // Run steps have been replaced by jobs in the new architecture.
@@ -806,11 +824,7 @@ func TestSubmitRunHandlerSingleStep(t *testing.T) {
 		spec map[string]interface{}
 	}{
 		{
-			name: "mod section",
-			spec: map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
-		},
-		{
-			name: "legacy top-level",
+			name: "top-level image",
 			spec: map[string]interface{}{"image": "legacy:latest"},
 		},
 		{
