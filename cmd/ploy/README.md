@@ -21,11 +21,9 @@ Common command patterns:
 ploy mod run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
-  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap] \
-  [--aster <toggle,...>] \
-		  [--aster-step <stage=toggle,...|stage=off>]
+  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
 ploy environment materialize <commit-sha> --app <app> \
-  [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
+  [--dry-run] [--manifest <name@version>]
 ```
 
 Run IDs (`<run-id>`) are KSUID-backed strings.
@@ -54,10 +52,7 @@ flow into stage metadata so the control plane can respect concurrency/timebox co
 time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
-stages before continuing to static checks and tests. When
-`PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
-successful run so developers can confirm which toggles/bundles were attached to
-each stage.
+stages before continuing to static checks and tests.
 
 When a followed run completes successfully, pass `--artifact-dir <dir>` to
 download referenced artifacts and generate `<dir>/manifest.json`. The manifest
@@ -282,7 +277,7 @@ ploy completion <shell> --help
 
 ## Flags
 
-- `--commit` / `--manifest` / `--aster` — Optional cache-key
+- `--commit` / `--manifest` — Optional cache-key
   preview inputs consumed by the lane engine.
 - `--app` — Application identifier resolved to an integration manifest (required
   for `environment materialize`).
@@ -290,13 +285,6 @@ ploy completion <shell> --help
   required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
-- `--aster` — Optional toggles to append to manifest-required Aster switches
-  (`mod run`, `environment materialize`). The flag is
-  ignored unless `PLOY_ASTER_ENABLE` is set.
-- `--aster-step` — Stage-specific overrides for Aster behaviour when running
-  workflows (`mod run`). Use `stage=toggle1,toggle2` to enable additional
-  toggles or `stage=off` to disable Aster for that stage. Overrides are ignored
-  unless `PLOY_ASTER_ENABLE` is set.
 - `--spec` — Path to a YAML/JSON spec file defining mod parameters, Build Gate settings,
   and healing configuration for `mod run`. CLI flags (e.g., `--mod-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical shapes:
@@ -587,9 +575,6 @@ See `internal/mods/api/types.go` for the full schema.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`; other adapters (e.g., `k8s`) can register here and
   unknown names cause the CLI to fail fast.
-- `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
-  When unset the CLI skips bundle lookups and omits Aster toggles from cache
-  keys, manifests, and summaries.
 
 ## Development
 

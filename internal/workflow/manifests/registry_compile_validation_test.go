@@ -62,9 +62,6 @@ reference = "y"
 [[lanes.required]]
 name = "go-native"
 reason = "build-gate"
-[aster]
-required = []
-optional = []
 `
 
 // TestRegistryCompileValidatesVersionMatch ensures compile rejects mismatched manifest versions.

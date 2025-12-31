@@ -49,12 +49,6 @@ func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 	if compiled.Lanes.Required[0].Name == "" || compiled.Lanes.Required[0].Reason == "" {
 		t.Fatalf("required lane missing fields: %+v", compiled.Lanes.Required[0])
 	}
-	if len(compiled.Aster.Required) != 1 || len(compiled.Aster.Optional) != 2 {
-		t.Fatalf("unexpected aster toggles: %+v", compiled.Aster)
-	}
-	if compiled.Aster.Optional[0] != "exec" || compiled.Aster.Optional[1] != "lint" {
-		t.Fatalf("expected sorted optional toggles, got %+v", compiled.Aster.Optional)
-	}
 
 	payload, err := compiled.JSON()
 	if err != nil {

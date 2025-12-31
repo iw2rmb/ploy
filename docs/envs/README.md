@@ -21,8 +21,6 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
-  integration. Current default: `unset` (Aster toggles stay disabled).
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
   default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
