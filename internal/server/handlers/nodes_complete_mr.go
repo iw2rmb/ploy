@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -61,7 +60,12 @@ func maybeScheduleMRJobForRun(
 		return fmt.Errorf("list jobs for MR scheduling: %w", err)
 	}
 	for _, job := range jobs {
-		if strings.TrimSpace(job.ModType) == "mr" {
+		modType := domaintypes.ModType(job.ModType)
+		if err := modType.Validate(); err != nil {
+			slog.Error("maybeScheduleMRJobForRun: invalid mod_type in job record", "run_id", runID, "job_id", job.ID, "mod_type", job.ModType, "err", err)
+			continue
+		}
+		if modType == domaintypes.ModTypeMR {
 			// MR job already scheduled or completed.
 			return nil
 		}
@@ -72,7 +76,7 @@ func maybeScheduleMRJobForRun(
 	// MR jobs are scheduled after the run reaches a terminal state, so they
 	// must be immediately claimable by workers. Use 'pending' status so that
 	// ClaimJob can pick them up without relying on ScheduleNextJob.
-	if err := createJobWithIndex(ctx, st, runID, "mr", "mr", domaintypes.StepIndex(mrStepIndex), "", store.JobStatusPending); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, domaintypes.ModTypeMR.String(), domaintypes.ModTypeMR.String(), domaintypes.StepIndex(mrStepIndex), "", store.JobStatusPending); err != nil {
 		return fmt.Errorf("create MR job: %w", err)
 	}
 

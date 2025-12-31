@@ -7,69 +7,16 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestScopeMatches tests the scope matching logic that determines whether
-// a global env var should be injected based on job type and env var scope.
-func TestScopeMatches(t *testing.T) {
-	tests := []struct {
-		name     string
-		jobType  string
-		scope    string
-		expected bool
-	}{
-		// "all" scope matches every job type.
-		{name: "all scope with mod job", jobType: "mod", scope: "all", expected: true},
-		{name: "all scope with heal job", jobType: "heal", scope: "all", expected: true},
-		{name: "all scope with pre_gate job", jobType: "pre_gate", scope: "all", expected: true},
-		{name: "all scope with re_gate job", jobType: "re_gate", scope: "all", expected: true},
-		{name: "all scope with post_gate job", jobType: "post_gate", scope: "all", expected: true},
-
-		// "mods" scope matches mod and post_gate jobs.
-		{name: "mods scope with mod job", jobType: "mod", scope: "mods", expected: true},
-		{name: "mods scope with post_gate job", jobType: "post_gate", scope: "mods", expected: true},
-		{name: "mods scope with heal job", jobType: "heal", scope: "mods", expected: false},
-		{name: "mods scope with pre_gate job", jobType: "pre_gate", scope: "mods", expected: false},
-		{name: "mods scope with re_gate job", jobType: "re_gate", scope: "mods", expected: false},
-
-		// "heal" scope matches heal and re_gate jobs.
-		{name: "heal scope with heal job", jobType: "heal", scope: "heal", expected: true},
-		{name: "heal scope with re_gate job", jobType: "re_gate", scope: "heal", expected: true},
-		{name: "heal scope with mod job", jobType: "mod", scope: "heal", expected: false},
-		{name: "heal scope with pre_gate job", jobType: "pre_gate", scope: "heal", expected: false},
-		{name: "heal scope with post_gate job", jobType: "post_gate", scope: "heal", expected: false},
-
-		// "gate" scope matches all gate-related jobs.
-		{name: "gate scope with pre_gate job", jobType: "pre_gate", scope: "gate", expected: true},
-		{name: "gate scope with re_gate job", jobType: "re_gate", scope: "gate", expected: true},
-		{name: "gate scope with post_gate job", jobType: "post_gate", scope: "gate", expected: true},
-		{name: "gate scope with mod job", jobType: "mod", scope: "gate", expected: false},
-		{name: "gate scope with heal job", jobType: "heal", scope: "gate", expected: false},
-
-		// Unknown scopes should not match.
-		{name: "unknown scope", jobType: "mod", scope: "unknown", expected: false},
-		{name: "empty scope", jobType: "mod", scope: "", expected: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := scopeMatches(tt.jobType, tt.scope)
-			if got != tt.expected {
-				t.Errorf("scopeMatches(%q, %q) = %v, want %v",
-					tt.jobType, tt.scope, got, tt.expected)
-			}
-		})
-	}
-}
-
 // TestMergeGlobalEnvIntoSpec_EmptyEnv verifies that when no global env vars
 // are provided, the spec is returned unchanged.
 func TestMergeGlobalEnvIntoSpec_EmptyEnv(t *testing.T) {
 	spec := json.RawMessage(`{"foo":"bar"}`)
-	result := mergeGlobalEnvIntoSpec(spec, nil, "mod")
+	result := mergeGlobalEnvIntoSpec(spec, nil, domaintypes.ModTypeMod)
 	if string(result) != string(spec) {
 		t.Errorf("expected spec unchanged, got %s", result)
 	}
 
-	result = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, "mod")
+	result = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, domaintypes.ModTypeMod)
 	if string(result) != string(spec) {
 		t.Errorf("expected spec unchanged, got %s", result)
 	}
@@ -83,7 +30,7 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 	}
 
 	// Test with nil spec.
-	result := mergeGlobalEnvIntoSpec(nil, env, "mod")
+	result := mergeGlobalEnvIntoSpec(nil, env, domaintypes.ModTypeMod)
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -97,7 +44,7 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 	}
 
 	// Test with empty JSON spec.
-	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, "mod")
+	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -122,37 +69,37 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		jobType    string
+		jobType    domaintypes.ModType
 		expectKeys []string
 		rejectKeys []string
 	}{
 		{
 			name:       "mod job gets all and mods",
-			jobType:    "mod",
+			jobType:    domaintypes.ModTypeMod,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY"},
 			rejectKeys: []string{"HEAL_KEY", "GATE_KEY"},
 		},
 		{
 			name:       "heal job gets all and heal",
-			jobType:    "heal",
+			jobType:    domaintypes.ModTypeHeal,
 			expectKeys: []string{"ALL_KEY", "HEAL_KEY"},
 			rejectKeys: []string{"MODS_KEY", "GATE_KEY"},
 		},
 		{
 			name:       "pre_gate job gets all and gate",
-			jobType:    "pre_gate",
+			jobType:    domaintypes.ModTypePreGate,
 			expectKeys: []string{"ALL_KEY", "GATE_KEY"},
 			rejectKeys: []string{"MODS_KEY", "HEAL_KEY"},
 		},
 		{
 			name:       "re_gate job gets all, heal, and gate",
-			jobType:    "re_gate",
+			jobType:    domaintypes.ModTypeReGate,
 			expectKeys: []string{"ALL_KEY", "HEAL_KEY", "GATE_KEY"},
 			rejectKeys: []string{"MODS_KEY"},
 		},
 		{
 			name:       "post_gate job gets all, mods, and gate",
-			jobType:    "post_gate",
+			jobType:    domaintypes.ModTypePostGate,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY", "GATE_KEY"},
 			rejectKeys: []string{"HEAL_KEY"},
 		},
@@ -170,14 +117,14 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 			// Check expected keys are present.
 			for _, key := range tt.expectKeys {
 				if _, ok := em[key]; !ok {
-					t.Errorf("expected key %q to be present for job type %q", key, tt.jobType)
+					t.Errorf("expected key %q to be present for job type %q", key, tt.jobType.String())
 				}
 			}
 
 			// Check rejected keys are absent.
 			for _, key := range tt.rejectKeys {
 				if _, ok := em[key]; ok {
-					t.Errorf("expected key %q to be absent for job type %q", key, tt.jobType)
+					t.Errorf("expected key %q to be absent for job type %q", key, tt.jobType.String())
 				}
 			}
 		})
@@ -195,7 +142,7 @@ func TestMergeGlobalEnvIntoSpec_PerRunEnvPrecedence(t *testing.T) {
 		"NEW_KEY": {Value: "new-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
-	result := mergeGlobalEnvIntoSpec(spec, env, "mod")
+	result := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -230,7 +177,7 @@ func TestMergeGlobalEnvIntoSpec_PreservesOtherSpecFields(t *testing.T) {
 		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
 	}
 
-	result := mergeGlobalEnvIntoSpec(spec, env, "mod")
+	result := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -262,7 +209,7 @@ func TestMergeGlobalEnvIntoSpec_InvalidJSON(t *testing.T) {
 	}
 
 	// Invalid JSON should not cause a crash; global env should still be injected.
-	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, "mod")
+	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, domaintypes.ModTypeMod)
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -283,7 +230,7 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test mod job should receive all three keys.
-	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, "mod")
+	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -301,7 +248,7 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test pre_gate job should only receive CA_CERTS_PEM_BUNDLE (scope=all).
-	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, "pre_gate")
+	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypePreGate)
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}

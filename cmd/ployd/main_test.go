@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	apiconfig "github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -165,6 +166,32 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 	err := <-errCh
 	if err != nil {
 		t.Fatalf("run() error: %v", err)
+	}
+}
+
+func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
+	entries := []store.ConfigEnv{
+		{Key: "A", Value: "1", Scope: "all", Secret: true},
+		{Key: "B", Value: "2", Scope: "", Secret: false},     // defaults to all
+		{Key: "C", Value: "3", Scope: "mod", Secret: false},  // invalid (typo)
+		{Key: "D", Value: "4", Scope: "mods", Secret: false}, // valid
+	}
+
+	got := globalEnvMapFromStoreEntries(entries)
+	if len(got) != 3 {
+		t.Fatalf("globalEnvMapFromStoreEntries() len=%d want 3", len(got))
+	}
+	if _, ok := got["C"]; ok {
+		t.Fatalf("expected invalid-scope entry to be dropped")
+	}
+	if got["A"].Scope != domaintypes.GlobalEnvScopeAll {
+		t.Fatalf("A scope=%q want %q", got["A"].Scope, domaintypes.GlobalEnvScopeAll)
+	}
+	if got["B"].Scope != domaintypes.GlobalEnvScopeAll {
+		t.Fatalf("B scope=%q want %q", got["B"].Scope, domaintypes.GlobalEnvScopeAll)
+	}
+	if got["D"].Scope != domaintypes.GlobalEnvScopeMods {
+		t.Fatalf("D scope=%q want %q", got["D"].Scope, domaintypes.GlobalEnvScopeMods)
 	}
 }
 

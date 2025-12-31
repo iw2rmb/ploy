@@ -14,7 +14,8 @@ import (
 //   - GlobalEnvScopeHeal: Inject into heal and re_gate jobs (healing/retry phases)
 //   - GlobalEnvScopeGate: Inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
 //
-// Unknown or empty values should be rejected at API boundaries using Validate().
+// Unknown values should be rejected at API boundaries using Validate() or ParseGlobalEnvScope().
+// Empty values may be treated as "all" by ParseGlobalEnvScope() to match the API default.
 type GlobalEnvScope string
 
 const (
