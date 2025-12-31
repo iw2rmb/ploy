@@ -10,11 +10,11 @@ import (
 // executeWithHealing can honor the configured heal → re-gate loop.
 func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	specJSON := `{
-        "build_gate_healing": {
-            "retries": 2,
-            "mods": [ { "image": "docker.io/test/heal:latest" } ]
-        }
-    }`
+	        "build_gate_healing": {
+	            "retries": 2,
+	            "mod": { "image": "docker.io/test/heal:latest" }
+	        }
+	    }`
 
 	var raw json.RawMessage = []byte(specJSON)
 	opts, _, _ := parseSpec(raw)
@@ -30,20 +30,24 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	}
 
 	// Check retries
-	r, ok := m["retries"].(float64)
-	if !ok || int(r) != 2 {
+	switch r := m["retries"].(type) {
+	case int:
+		if r != 2 {
+			t.Fatalf("expected retries=2, got %v (%T)", m["retries"], m["retries"])
+		}
+	case float64:
+		if int(r) != 2 {
+			t.Fatalf("expected retries=2, got %v (%T)", m["retries"], m["retries"])
+		}
+	default:
 		t.Fatalf("expected retries=2, got %v (%T)", m["retries"], m["retries"])
 	}
 
-	mods, ok := m["mods"].([]any)
-	if !ok || len(mods) != 1 {
-		t.Fatalf("expected mods array with 1 element, got %v", m["mods"])
-	}
-	mod0, ok := mods[0].(map[string]any)
+	mod, ok := m["mod"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[0] to be map, got %T", mods[0])
+		t.Fatalf("expected mod object, got %T", m["mod"])
 	}
-	if img, _ := mod0["image"].(string); img != "docker.io/test/heal:latest" {
+	if img, _ := mod["image"].(string); img != "docker.io/test/heal:latest" {
 		t.Fatalf("expected heal image docker.io/test/heal:latest, got %v", img)
 	}
 }
@@ -100,8 +104,7 @@ func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	opts, env, _ := parseSpec(raw)
 
-	// Verify that "mod" object fields are NOT extracted to top-level.
-	// The legacy fallback has been removed; specs must use canonical shapes.
+	// Legacy "mod" object is rejected by the canonical parser; parseSpec returns empty maps.
 	if _, hasImage := opts["image"]; hasImage {
 		t.Fatalf("expected image not to be extracted from legacy mod object")
 	}
@@ -110,14 +113,6 @@ func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
 	}
 	if len(env) > 0 {
 		t.Fatalf("expected env to be empty (mod.env should not be merged), got: %+v", env)
-	}
-
-	// build_gate should still be flattened (it's a top-level field, not part of mod).
-	if en, ok := opts["build_gate_enabled"].(bool); !ok || en != false {
-		t.Fatalf("build_gate_enabled not flattened: %v", opts["build_gate_enabled"])
-	}
-	if pr, ok := opts["build_gate_profile"].(string); !ok || pr != "java-maven" {
-		t.Fatalf("build_gate_profile not flattened: %v", opts["build_gate_profile"])
 	}
 }
 
