@@ -54,6 +54,39 @@ post:
               description: |
                 JSON object with job-level statistics/metrics. Must be a JSON object;
                 non-object values (string/number/array) are rejected.
+              additionalProperties: true
+              properties:
+                duration_ms:
+                  type: integer
+                  format: int64
+                  description: Job execution duration in milliseconds (informational).
+                metadata:
+                  type: object
+                  description: Optional string key-value metadata for the run/job.
+                  additionalProperties: { type: string }
+                job_meta:
+                  type: object
+                  nullable: true
+                  description: |
+                    Optional structured metadata persisted to `jobs.meta` (JSONB).
+                    When present and non-empty, it must include a valid `kind` and
+                    must match the `contracts.JobMeta` schema; invalid payloads are rejected (400).
+                    Empty objects (e.g., `{}` / `{ }`) and `null` are treated as absent (not persisted).
+                  required: [ kind ]
+                  properties:
+                    kind:
+                      type: string
+                      enum: [ mod, gate, build ]
+                    gate:
+                      type: object
+                      nullable: true
+                      description: Gate-stage metadata (only valid when kind is `gate`).
+                      additionalProperties: true
+                    build:
+                      type: object
+                      nullable: true
+                      description: Build-stage metadata (only valid when kind is `build`).
+                      additionalProperties: true
   responses:
     '204':
       description: Completed; job transitioned to terminal status
@@ -63,6 +96,7 @@ post:
         - Missing or empty `job_id` path parameter
         - Missing `status` or non-terminal status value
         - Malformed `stats` JSON (must be a JSON object)
+        - Invalid `stats.job_meta` (missing/invalid kind or structural mismatch)
     '401':
       description: Unauthorized — caller identity missing or invalid in context
     '403':
