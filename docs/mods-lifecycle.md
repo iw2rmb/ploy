@@ -1083,10 +1083,9 @@ Mods container images are standard OCI images with the following expectations:
     - `env_from_file` paths are resolved on the CLI side and injected as string
       values.
     - Supported on:
-      - top-level spec,
-      - `mod` section,
-      - each `mods[]` entry,
-      - `build_gate_healing.mods[]`.
+      - top-level spec (single-step runs),
+      - each `mods[]` entry (multi-step runs),
+      - `build_gate_healing.mod`.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
     env vars are filtered by scope (`all`, `mods`, `heal`, `gate`) to match job types:
