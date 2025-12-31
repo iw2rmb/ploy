@@ -31,10 +31,6 @@ fmt: ## Format Go source files
 lint-md: ## Lint Markdown documentation with markdownlint
 	npx --yes markdownlint --config .markdownlint.yaml $(shell git ls-files '*.md')
 
-.PHONY: lanes-validate
-lanes-validate: ## Validate bundled lane catalog
-	go run ./tools/lanesvalidate --dir configs/lanes
-
 .PHONY: test
 test: test-coverage-threshold test-coverage-critical test-binary-size ## Run all unit tests with coverage enforcement (≥60% overall, ≥90% critical) and binary size check
 

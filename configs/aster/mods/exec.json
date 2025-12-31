@@ -1,6 +1,0 @@
-{
-  "bundle_id": "mods-exec-2025-09-26",
-  "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-  "artifact_cid": "bafy-mods-exec",
-  "source": "build/aster/mods-exec.tar.zst"
-}

@@ -1,6 +1,0 @@
-{
-  "bundle_id": "test-lint-2025-09-26",
-  "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
-  "artifact_cid": "bafy-test-lint",
-  "source": "build/aster/test-lint.tar.zst"
-}

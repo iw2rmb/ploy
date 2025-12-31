@@ -202,9 +202,8 @@
   `docs/design/mods-grid-restoration/README.md`, `docs/design/mods/README.md`,
   `docs/design/event-contracts/README.md`, and `docs/design/workstation-roadmap/README.md`
   now describe repo materialisation, stage metadata, and healing behaviour.
-- Introduced `lanes/` catalog (mirrored to the shared registry) with a
-  `go run ./tools/lanesvalidate` helper and `make lanes-validate` target; CLI now
-  reads from this catalog by default.
+- Introduced `lanes/` catalog (mirrored to the shared registry) and updated the CLI
+  to read from this catalog by default.
 - Restored Mods E2E harness under `tests/e2e` so workstation runs validate
   simple, self-healing, and parallel scenarios against the in-memory Grid stub.
 - Verification:
@@ -387,14 +386,13 @@
 - Introduced `ploy manifest validate [--rewrite=v2]` to validate or rewrite
   manifests in place, preserving file permissions and mirroring Grid topology
   fixtures.
-- Migrated shipped manifests (`configs/manifests/commit-app.toml`,
-  `configs/manifests/smoke.toml`), refreshed `docs/MANIFESTS.md`, updated the v2
+- Migrated shipped manifests (commit-app, smoke), refreshed `docs/MANIFESTS.md`, updated the v2
   design record, and marked roadmap slice
   `docs/tasks/integration-manifests/01-schema-upgrade.md` complete.
 
 ## [2025-09-28] Workflow JobSpec Composition
 
-- Extended lane specs under `configs/lanes/*.toml` with validated `job` blocks
+- Extended lane specs with validated `job` blocks
   covering image, command, environment, resources, and optional priority
   defaults.
 - Introduced `runner.LaneJobComposer` plus CLI wiring so workstation runs
@@ -480,19 +478,19 @@
   workstation validation.
 - Documented the evaluation workflow across
   `docs/design/knowledge-base/README.md`, `cmd/ploy/README.md`,
-  `configs/knowledge-base/README.md`, and marked roadmap task
+  knowledge base docs, and marked roadmap task
   `docs/tasks/knowledge-base/03-cli-evaluate.md` complete.
 
 ## [2025-09-27] Knowledge Base CLI Ingest
 
 - Added `ploy knowledge-base ingest` to append incident fixtures into
-  `configs/knowledge-base/catalog.json`, rejecting duplicate IDs and summarising
+  the knowledge base catalog, rejecting duplicate IDs and summarising
   ingested incidents for operators.
 - Extended `internal/workflow/knowledgebase` with merge/save helpers (atomic
   writes + duplicate safeguards) and comprehensive unit tests, keeping package
   coverage at 90.3%.
 - Documented the workstation catalog workflow across `README.md`,
-  `docs/DOCS.md`, `configs/knowledge-base/README.md`, and marked roadmap task
+  `docs/DOCS.md`, knowledge base docs, and marked roadmap task
   `docs/tasks/knowledge-base/02-cli-ingest.md` complete.
 
 ## [2025-09-27] Knowledge Base Classifier Foundation
@@ -500,7 +498,7 @@
 - Introduced `internal/workflow/knowledgebase` with trigram TF-IDF and
   Levenshtein scoring, providing a catalog-backed advisor that feeds Mods
   planner recipes, human gates, and recommendations.
-- Wired `ploy mod run` to load `configs/knowledge-base/catalog.json` when
+- Wired `ploy mod run` to load the knowledge base catalog when
   present, enabling the workstation CLI to surface knowledge base guidance
   without changing behaviour when the catalog is absent.
 - Added high-coverage unit tests for the classifier, planner integration, and
@@ -646,14 +644,13 @@
 - Added `terminology_guard_test.go` to enforce the naming convention and block
   regressions.
 - Expanded `docs/RECIPES.md` with a detailed explanation of
-  `configs/recipes/kotlin-gradle.toml`.
+  the Kotlin/Gradle recipe.
 
 ## [2025-09-26] Recipe Pack Registry
 
 - Added `internal/recipes/packs` with a TOML loader that exposes pluggable
   recipe pack lists and language-aware lookups.
-- Published default specs (`configs/recipes/java-default.toml`,
-  `configs/recipes/kotlin-gradle.toml`) to seed Java and Kotlin/Gradle catalog
+- Published default recipe specs (java-default, kotlin-gradle) to seed Java and Kotlin/Gradle catalog
   coverage.
 - Documented the registry in `docs/RECIPES.md`, updated the README, and marked
   the roadmap item complete.
@@ -671,7 +668,7 @@
 ## [2025-09-26] Aster Hook Integration
 
 - Added `internal/workflow/aster` with a filesystem-backed locator that
-  discovers per-stage bundle metadata from `configs/aster/` and surfaces
+  discovers per-stage bundle metadata and surfaces
   provenance data for Grid submissions.
 - Extended the workflow runner to require an Aster locator, attach sorted toggle
   metadata to every stage, and honour per-stage disablement while keeping cache
@@ -693,7 +690,7 @@
 - Introduced `ploy environment materialize` CLI command with dry-run/execute
   modes, manifest override support, and human-readable summaries.
 - Published new snapshot specs (`commit-db`, `commit-cache`) and GPU lane
-  profile (`configs/lanes/gpu-ml.toml`) to back commit-scoped runs.
+  profile to back commit-scoped runs.
 - Documented the workflow in `README.md` and `cmd/ploy/README.md`; roadmap slice
   `06-commit-environments` marked complete.
 
@@ -704,7 +701,7 @@
 - Extended the workflow runner to require manifest compilation, attach compiled
   payloads to every stage, and let the in-memory Grid stub enforce lane
   allowlists.
-- Updated `ploy mod run` to load manifests from `configs/manifests/`,
+- Updated `ploy mod run` to load manifests,
   surface actionable validation errors, and documented the schema in
   `docs/MANIFESTS.md` alongside new sample manifests (`smoke`, `commit-app`).
 - Added CLI tests asserting manifest loader wiring and error propagation;
@@ -717,7 +714,7 @@
   hooks backed by in-memory IPFS/JetStream stubs.
 - Introduced `ploy snapshot plan` and `ploy snapshot capture` commands, plus CLI
   tests covering usage, summary output, and capture reporting.
-- Published default snapshot spec/fixture under `configs/snapshots/` to exercise
+- Published a default snapshot spec/fixture to exercise
   the toolkit locally.
 - Documented snapshot workflow in `README.md` and `cmd/ploy/README.md`; roadmap
   slice `04-snapshot-toolkit` marked complete with container replay hook
@@ -727,7 +724,7 @@
 
 - Added `internal/workflow/lanes` with TOML loader, cache-key composer,
   validation, and unit tests covering required fields and deterministic outputs.
-- Introduced `configs/lanes/node-wasm.toml` and `configs/lanes/go-native.toml`
+- Introduced node-wasm and go-native lane profiles
   as the first Grid-ready lane profiles.
 - Extended `cmd/ploy` with `lanes describe`, golden-style CLI tests, and richer
   top-level usage guidance.
