@@ -233,12 +233,12 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			runID:     "run-healing",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0-mod", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-0-heal", JobID: "job-0", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing"}},
-				{ID: "diff-1-mod", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-1-heal1", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
-				{ID: "diff-1-heal2", JobID: "job-1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
-				{ID: "diff-2-mod", JobID: "job-2", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-0-mod", JobID: "job-0", StepIndex: stepIndex(0), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
+				{ID: "diff-0-heal", JobID: "job-0", StepIndex: stepIndex(0), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
+				{ID: "diff-1-mod", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
+				{ID: "diff-1-heal1", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
+				{ID: "diff-1-heal2", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
+				{ID: "diff-2-mod", JobID: "job-2", StepIndex: stepIndex(2), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),

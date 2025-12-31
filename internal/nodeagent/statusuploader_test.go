@@ -260,10 +260,10 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 
 	ctx := context.Background()
 	exitCode := int32Ptr(1)
-	stats := types.RunStats{
-		"exit_code":   1,
-		"duration_ms": 1500,
-	}
+	stats := types.NewRunStatsBuilder().
+		ExitCode(1).
+		DurationMs(1500).
+		MustBuild()
 	jobID := types.JobID("test-job-id-uuid")
 
 	// Upload status via job-level endpoint.
@@ -341,10 +341,10 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 
 	ctx := context.Background()
 	exitCode := int32(0)
-	stats := types.RunStats{
-		"exit_code":   0,
-		"duration_ms": 1000,
-	}
+	stats := types.NewRunStatsBuilder().
+		ExitCode(0).
+		DurationMs(1000).
+		MustBuild()
 
 	err = uploader.UploadJobStatus(ctx, jobID, "succeeded", &exitCode, stats)
 	if err != nil {

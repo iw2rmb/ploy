@@ -142,7 +142,8 @@ func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepI
 		// Skip healing diffs in the patch chain. Healing diffs share the same
 		// step_index for telemetry but represent intermediate workspace states
 		// that are already captured in the final per-step mod diff.
-		if modType, ok := d.Summary["mod_type"].(string); ok && modType == "healing" {
+		// DiffSummary is now json.RawMessage-backed; use the accessor method.
+		if d.Summary.ModType() == "healing" {
 			continue
 		}
 

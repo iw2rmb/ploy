@@ -57,8 +57,9 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	if item.Size != 2 {
 		t.Errorf("gzipped_size=%d, want 2", item.Size)
 	}
-	if exitCode, ok := item.Summary["exit_code"].(float64); !ok || exitCode != 0 {
-		t.Errorf("summary[exit_code]=%v, want 0", item.Summary["exit_code"])
+	// DiffSummary is now json.RawMessage-backed; use accessor methods.
+	if exitCode, ok := item.Summary.ExitCode(); !ok || exitCode != 0 {
+		t.Errorf("summary.ExitCode()=%d, want 0", exitCode)
 	}
 }
 
@@ -136,11 +137,12 @@ func TestGetDiff_Metadata(t *testing.T) {
 	if resp.GzippedSize != 3 {
 		t.Errorf("gzipped_size=%d, want 3", resp.GzippedSize)
 	}
-	if exitCode, ok := resp.Summary["exit_code"].(float64); !ok || exitCode != 0 {
-		t.Errorf("summary[exit_code]=%v, want 0", resp.Summary["exit_code"])
+	// DiffSummary is now json.RawMessage-backed; use accessor methods.
+	if exitCode, ok := resp.Summary.ExitCode(); !ok || exitCode != 0 {
+		t.Errorf("summary.ExitCode()=%d, want 0", exitCode)
 	}
-	if filesChanged, ok := resp.Summary["files_changed"].(float64); !ok || filesChanged != 3 {
-		t.Errorf("summary[files_changed]=%v, want 3", resp.Summary["files_changed"])
+	if filesChanged, ok := resp.Summary.FilesChanged(); !ok || filesChanged != 3 {
+		t.Errorf("summary.FilesChanged()=%d, want 3", filesChanged)
 	}
 }
 

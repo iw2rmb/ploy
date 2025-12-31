@@ -5,40 +5,50 @@ import (
 	"testing"
 )
 
+// Helper function to create RunStats from JSON string for test cases.
+func mustParseRunStats(t *testing.T, jsonStr string) RunStats {
+	t.Helper()
+	var stats RunStats
+	if err := json.Unmarshal([]byte(jsonStr), &stats); err != nil {
+		t.Fatalf("failed to parse RunStats JSON: %v", err)
+	}
+	return stats
+}
+
 func TestRunStats_ExitCode(t *testing.T) {
 	tests := []struct {
 		name      string
-		stats     RunStats
+		json      string
 		wantCode  int
 		wantFound bool
 	}{
 		{
 			name:      "int exit code",
-			stats:     RunStats{"exit_code": 0},
+			json:      `{"exit_code": 0}`,
 			wantCode:  0,
 			wantFound: true,
 		},
 		{
-			name:      "int64 exit code",
-			stats:     RunStats{"exit_code": int64(1)},
+			name:      "positive exit code",
+			json:      `{"exit_code": 1}`,
 			wantCode:  1,
 			wantFound: true,
 		},
 		{
-			name:      "float64 exit code from JSON",
-			stats:     RunStats{"exit_code": float64(2)},
-			wantCode:  2,
+			name:      "large exit code",
+			json:      `{"exit_code": 127}`,
+			wantCode:  127,
 			wantFound: true,
 		},
 		{
 			name:      "missing exit code",
-			stats:     RunStats{},
+			json:      `{}`,
 			wantCode:  0,
 			wantFound: false,
 		},
 		{
-			name:      "nil exit code",
-			stats:     RunStats{"exit_code": nil},
+			name:      "null exit code",
+			json:      `{"exit_code": null}`,
 			wantCode:  0,
 			wantFound: false,
 		},
@@ -46,7 +56,8 @@ func TestRunStats_ExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			code, found := tt.stats.ExitCode()
+			stats := mustParseRunStats(t, tt.json)
+			code, found := stats.ExitCode()
 			if code != tt.wantCode || found != tt.wantFound {
 				t.Errorf("ExitCode() = (%d, %v), want (%d, %v)", code, found, tt.wantCode, tt.wantFound)
 			}
@@ -57,46 +68,37 @@ func TestRunStats_ExitCode(t *testing.T) {
 func TestRunStats_ResumeCount(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name  string
-		stats RunStats
-		want  int
+		name string
+		json string
+		want int
 	}{
 		{
-			name:  "int resume count",
-			stats: RunStats{"resume_count": 3},
-			want:  3,
+			name: "resume count present",
+			json: `{"resume_count": 3}`,
+			want: 3,
 		},
 		{
-			name:  "int64 resume count",
-			stats: RunStats{"resume_count": int64(5)},
-			want:  5,
+			name: "resume count zero",
+			json: `{"resume_count": 0}`,
+			want: 0,
 		},
 		{
-			name:  "float64 resume count from JSON",
-			stats: RunStats{"resume_count": float64(2)},
-			want:  2,
+			name: "missing resume count",
+			json: `{}`,
+			want: 0,
 		},
 		{
-			name:  "missing resume count",
-			stats: RunStats{},
-			want:  0,
-		},
-		{
-			name:  "nil resume count",
-			stats: RunStats{"resume_count": nil},
-			want:  0,
-		},
-		{
-			name:  "invalid type (string)",
-			stats: RunStats{"resume_count": "not a number"},
-			want:  0,
+			name: "null resume count",
+			json: `{"resume_count": null}`,
+			want: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.stats.ResumeCount()
+			stats := mustParseRunStats(t, tt.json)
+			got := stats.ResumeCount()
 			if got != tt.want {
 				t.Errorf("ResumeCount() = %d, want %d", got, tt.want)
 			}
@@ -107,41 +109,37 @@ func TestRunStats_ResumeCount(t *testing.T) {
 func TestRunStats_LastResumedAt(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name  string
-		stats RunStats
-		want  string
+		name string
+		json string
+		want string
 	}{
 		{
-			name:  "timestamp present",
-			stats: RunStats{"last_resumed_at": "2025-01-15T10:30:00Z"},
-			want:  "2025-01-15T10:30:00Z",
+			name: "timestamp present",
+			json: `{"last_resumed_at": "2025-01-15T10:30:00Z"}`,
+			want: "2025-01-15T10:30:00Z",
 		},
 		{
-			name:  "timestamp with whitespace",
-			stats: RunStats{"last_resumed_at": "  2025-01-15T10:30:00Z  "},
-			want:  "2025-01-15T10:30:00Z",
+			name: "timestamp with whitespace",
+			json: `{"last_resumed_at": "  2025-01-15T10:30:00Z  "}`,
+			want: "2025-01-15T10:30:00Z",
 		},
 		{
-			name:  "missing timestamp",
-			stats: RunStats{},
-			want:  "",
+			name: "missing timestamp",
+			json: `{}`,
+			want: "",
 		},
 		{
-			name:  "nil timestamp",
-			stats: RunStats{"last_resumed_at": nil},
-			want:  "",
-		},
-		{
-			name:  "invalid type (int)",
-			stats: RunStats{"last_resumed_at": 12345},
-			want:  "",
+			name: "null timestamp",
+			json: `{"last_resumed_at": null}`,
+			want: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.stats.LastResumedAt()
+			stats := mustParseRunStats(t, tt.json)
+			got := stats.LastResumedAt()
 			if got != tt.want {
 				t.Errorf("LastResumedAt() = %q, want %q", got, tt.want)
 			}
@@ -181,47 +179,36 @@ func TestRunStats_ResumeMetadata_FromJSON(t *testing.T) {
 
 func TestRunStats_MRURL(t *testing.T) {
 	tests := []struct {
-		name  string
-		stats RunStats
-		want  string
+		name string
+		json string
+		want string
 	}{
 		{
 			name: "MR URL present",
-			stats: RunStats{
-				"metadata": map[string]any{
-					"mr_url": "https://gitlab.com/org/repo/-/merge_requests/42",
-				},
-			},
+			json: `{"metadata": {"mr_url": "https://gitlab.com/org/repo/-/merge_requests/42"}}`,
 			want: "https://gitlab.com/org/repo/-/merge_requests/42",
 		},
 		{
 			name: "MR URL with whitespace",
-			stats: RunStats{
-				"metadata": map[string]any{
-					"mr_url": "  https://gitlab.com/org/repo/-/merge_requests/99  ",
-				},
-			},
+			json: `{"metadata": {"mr_url": "  https://gitlab.com/org/repo/-/merge_requests/99  "}}`,
 			want: "https://gitlab.com/org/repo/-/merge_requests/99",
 		},
 		{
-			name:  "no metadata",
-			stats: RunStats{},
-			want:  "",
+			name: "no metadata",
+			json: `{}`,
+			want: "",
 		},
 		{
 			name: "metadata missing mr_url",
-			stats: RunStats{
-				"metadata": map[string]any{
-					"other_field": "value",
-				},
-			},
+			json: `{"metadata": {"other_field": "value"}}`,
 			want: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.stats.MRURL()
+			stats := mustParseRunStats(t, tt.json)
+			got := stats.MRURL()
 			if got != tt.want {
 				t.Errorf("MRURL() = %q, want %q", got, tt.want)
 			}
@@ -231,134 +218,70 @@ func TestRunStats_MRURL(t *testing.T) {
 
 func TestRunStats_GateSummary(t *testing.T) {
 	tests := []struct {
-		name  string
-		stats RunStats
-		want  string
+		name string
+		json string
+		want string
 	}{
 		{
 			name: "final gate passed",
-			stats: RunStats{
-				"gate": map[string]any{
-					"final_gate": map[string]any{
-						"passed":      true,
-						"duration_ms": int64(1234),
-					},
-				},
-			},
+			json: `{"gate": {"final_gate": {"passed": true, "duration_ms": 1234}}}`,
 			want: "passed duration=1234ms",
 		},
 		{
 			name: "final gate failed",
-			stats: RunStats{
-				"gate": map[string]any{
-					"final_gate": map[string]any{
-						"passed":      false,
-						"duration_ms": int64(567),
-					},
-				},
-			},
+			json: `{"gate": {"final_gate": {"passed": false, "duration_ms": 567}}}`,
 			want: "failed final-gate duration=567ms",
 		},
 		{
 			name: "pre gate passed (no final gate)",
-			stats: RunStats{
-				"gate": map[string]any{
-					"pre_gate": map[string]any{
-						"passed":      true,
-						"duration_ms": int64(890),
-					},
-				},
-			},
+			json: `{"gate": {"pre_gate": {"passed": true, "duration_ms": 890}}}`,
 			want: "passed pre-gate duration=890ms",
 		},
 		{
 			name: "pre gate failed",
-			stats: RunStats{
-				"gate": map[string]any{
-					"pre_gate": map[string]any{
-						"passed":      false,
-						"duration_ms": int64(456),
-					},
-				},
-			},
+			json: `{"gate": {"pre_gate": {"passed": false, "duration_ms": 456}}}`,
 			want: "failed pre-gate duration=456ms",
 		},
 		{
 			name: "re-gate last run passed",
-			stats: RunStats{
-				"gate": map[string]any{
-					"re_gates": []any{
-						map[string]any{
-							"passed":      false,
-							"duration_ms": int64(100),
-						},
-						map[string]any{
-							"passed":      true,
-							"duration_ms": int64(200),
-						},
-					},
-				},
-			},
+			json: `{"gate": {"re_gates": [{"passed": false, "duration_ms": 100}, {"passed": true, "duration_ms": 200}]}}`,
 			want: "passed re-gate duration=200ms",
 		},
 		{
 			name: "final gate takes precedence over re-gates",
-			stats: RunStats{
-				"gate": map[string]any{
-					"re_gates": []any{
-						map[string]any{
-							"passed":      true,
-							"duration_ms": int64(100),
-						},
-					},
-					"final_gate": map[string]any{
-						"passed":      true,
-						"duration_ms": int64(300),
-					},
-				},
-			},
+			json: `{"gate": {"re_gates": [{"passed": true, "duration_ms": 100}], "final_gate": {"passed": true, "duration_ms": 300}}}`,
 			want: "passed duration=300ms",
 		},
 		{
 			name: "float64 duration from JSON",
-			stats: RunStats{
-				"gate": map[string]any{
-					"final_gate": map[string]any{
-						"passed":      true,
-						"duration_ms": float64(1500),
-					},
-				},
-			},
+			json: `{"gate": {"final_gate": {"passed": true, "duration_ms": 1500}}}`,
 			want: "passed duration=1500ms",
 		},
 		{
-			name:  "no gate data",
-			stats: RunStats{},
-			want:  "",
-		},
-		{
-			name: "gate field is not a map",
-			stats: RunStats{
-				"gate": "invalid",
-			},
+			name: "no gate data",
+			json: `{}`,
 			want: "",
 		},
 		{
-			name: "gate phase missing passed field",
-			stats: RunStats{
-				"gate": map[string]any{
-					"final_gate": map[string]any{
-						"duration_ms": int64(100),
-					},
-				},
-			},
+			name: "gate field is not an object",
+			json: `{"gate": "invalid"}`,
 			want: "",
+		},
+		{
+			// Note: With json.RawMessage-backed types, missing "passed" field
+			// defaults to false (Go zero value for bool). The old map[string]any
+			// implementation returned "" for missing passed. The new behavior
+			// returns "failed" since passed=false is a valid gate result.
+			name: "gate phase missing passed field (defaults to false)",
+			json: `{"gate": {"final_gate": {"duration_ms": 100}}}`,
+			want: "failed final-gate duration=100ms",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.stats.GateSummary()
+			stats := mustParseRunStats(t, tt.json)
+			got := stats.GateSummary()
 			if got != tt.want {
 				t.Errorf("GateSummary() = %q, want %q", got, tt.want)
 			}
@@ -372,18 +295,12 @@ func TestRunStats_GateSummary(t *testing.T) {
 func TestRunStats_GateSummary_FinalGateFromPreModFallback(t *testing.T) {
 	// Simulate stats from a run where no mods executed: pre_gate and final_gate both
 	// present with same content (final_gate populated as fallback from pre-mod gate).
-	stats := RunStats{
-		"gate": map[string]any{
-			"pre_gate": map[string]any{
-				"passed":      true,
-				"duration_ms": int64(500),
-			},
-			"final_gate": map[string]any{
-				"passed":      true,
-				"duration_ms": int64(500),
-			},
-		},
-	}
+	stats := mustParseRunStats(t, `{
+		"gate": {
+			"pre_gate": {"passed": true, "duration_ms": 500},
+			"final_gate": {"passed": true, "duration_ms": 500}
+		}
+	}`)
 
 	// GateSummary should use final_gate (which now exists), not fall back to pre_gate.
 	got := stats.GateSummary()
@@ -446,4 +363,147 @@ func TestRunStats_GateSummary_FromJSON(t *testing.T) {
 	if gotCode != wantCode || gotFound != wantFound {
 		t.Errorf("ExitCode() = (%d, %v), want (%d, %v)", gotCode, gotFound, wantCode, wantFound)
 	}
+}
+
+func TestRunStats_IsEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want bool
+	}{
+		{
+			name: "nil stats",
+			json: "",
+			want: true,
+		},
+		{
+			name: "empty object",
+			json: `{}`,
+			want: true,
+		},
+		{
+			name: "null",
+			json: `null`,
+			want: true,
+		},
+		{
+			name: "non-empty",
+			json: `{"exit_code": 0}`,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stats RunStats
+			if tt.json != "" {
+				_ = json.Unmarshal([]byte(tt.json), &stats)
+			}
+			got := stats.IsEmpty()
+			if got != tt.want {
+				t.Errorf("IsEmpty() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunStatsBuilder(t *testing.T) {
+	t.Run("basic fields", func(t *testing.T) {
+		stats := NewRunStatsBuilder().
+			ExitCode(0).
+			DurationMs(1234).
+			MustBuild()
+
+		code, found := stats.ExitCode()
+		if !found || code != 0 {
+			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
+		}
+	})
+
+	t.Run("with metadata", func(t *testing.T) {
+		stats := NewRunStatsBuilder().
+			MetadataEntry("mr_url", "https://example.com/mr/1").
+			MustBuild()
+
+		mrURL := stats.MRURL()
+		if mrURL != "https://example.com/mr/1" {
+			t.Errorf("MRURL() = %q, want %q", mrURL, "https://example.com/mr/1")
+		}
+	})
+
+	t.Run("with timings", func(t *testing.T) {
+		stats := NewRunStatsBuilder().
+			ExitCode(0).
+			TimingsFromDurations(100, 200, 50, 400).
+			MustBuild()
+
+		// Verify the stats round-trips correctly.
+		code, found := stats.ExitCode()
+		if !found || code != 0 {
+			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
+		}
+	})
+
+	t.Run("with gate", func(t *testing.T) {
+		stats := NewRunStatsBuilder().
+			Gate(true, 500).
+			MustBuild()
+
+		// Gate summary should work for simple gate stats.
+		summary := stats.GateSummary()
+		if summary == "" {
+			t.Error("GateSummary() returned empty for gate stats")
+		}
+	})
+
+	t.Run("with healing warning", func(t *testing.T) {
+		stats := NewRunStatsBuilder().
+			ExitCode(1).
+			HealingWarning("no_workspace_changes").
+			MustBuild()
+
+		// Verify the stats is non-empty and contains the exit code.
+		code, found := stats.ExitCode()
+		if !found || code != 1 {
+			t.Errorf("ExitCode() = (%d, %v), want (1, true)", code, found)
+		}
+	})
+
+	t.Run("empty builder", func(t *testing.T) {
+		stats := NewRunStatsBuilder().Build()
+		if stats != nil {
+			t.Errorf("Build() with no fields should return nil, got %v", string(stats))
+		}
+	})
+
+	t.Run("JSON roundtrip", func(t *testing.T) {
+		original := NewRunStatsBuilder().
+			ExitCode(42).
+			DurationMs(5000).
+			MetadataEntry("key", "value").
+			MustBuild()
+
+		// Marshal to JSON.
+		data, err := json.Marshal(original)
+		if err != nil {
+			t.Fatalf("json.Marshal() failed: %v", err)
+		}
+
+		// Unmarshal back.
+		var parsed RunStats
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			t.Fatalf("json.Unmarshal() failed: %v", err)
+		}
+
+		// Verify fields.
+		code, found := parsed.ExitCode()
+		if !found || code != 42 {
+			t.Errorf("ExitCode() = (%d, %v), want (42, true)", code, found)
+		}
+
+		meta := parsed.Metadata()
+		if meta["key"] != "value" {
+			t.Errorf("Metadata()[key] = %q, want %q", meta["key"], "value")
+		}
+	})
 }

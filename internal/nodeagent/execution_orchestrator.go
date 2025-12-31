@@ -177,17 +177,17 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		// Upload configured artifacts using typed RunOptions.
 		r.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
 
-		// Build stats.
-		stats := types.RunStats{
-			"exit_code":   result.ExitCode,
-			"duration_ms": duration.Milliseconds(),
-			"timings": map[string]interface{}{
-				"hydration_duration_ms": result.Timings.HydrationDuration.Milliseconds(),
-				"execution_duration_ms": result.Timings.ExecutionDuration.Milliseconds(),
-				"diff_duration_ms":      result.Timings.DiffDuration.Milliseconds(),
-				"total_duration_ms":     result.Timings.TotalDuration.Milliseconds(),
-			},
-		}
+		// Build stats using typed builder to eliminate map[string]any construction.
+		stats := types.NewRunStatsBuilder().
+			ExitCode(result.ExitCode).
+			DurationMs(duration.Milliseconds()).
+			TimingsFromDurations(
+				result.Timings.HydrationDuration.Milliseconds(),
+				result.Timings.ExecutionDuration.Milliseconds(),
+				result.Timings.DiffDuration.Milliseconds(),
+				result.Timings.TotalDuration.Milliseconds(),
+			).
+			MustBuild()
 
 		// Determine status.
 		if runErr != nil {
@@ -387,11 +387,11 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 				slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
 			}
 
-			// Build stats.
-			stats := types.RunStats{
-				"exit_code":   result.ExitCode,
-				"duration_ms": duration.Milliseconds(),
-			}
+			// Build stats using typed builder to eliminate map[string]any construction.
+			stats := types.NewRunStatsBuilder().
+				ExitCode(result.ExitCode).
+				DurationMs(duration.Milliseconds()).
+				MustBuild()
 
 			// Determine status.
 			if runErr != nil {
@@ -434,12 +434,20 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 // uploadHealingNoWorkspaceChangesFailure uploads a terminal failure status when a healing job
 // exits 0 but produces no workspace changes.
-func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Context, req StartRunRequest, stats types.RunStats, duration time.Duration) {
+func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Context, req StartRunRequest, baseStats types.RunStats, duration time.Duration) {
 	// This is considered a failure: the healing mod promised to fix the issue but
 	// didn't actually change anything. Upload a failed status with exit code 1 and
 	// a stable stats marker so downstream observers can distinguish this from other
 	// failure modes.
-	stats["healing_warning"] = "no_workspace_changes"
+	//
+	// Since RunStats is now json.RawMessage-backed, we build a new stats object
+	// with the healing_warning field included.
+	stats := types.NewRunStatsBuilder().
+		ExitCode(1).
+		DurationMs(duration.Milliseconds()).
+		HealingWarning("no_workspace_changes").
+		MustBuild()
+
 	var exitCodeOne int32 = 1
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCodeOne, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload healing failure status (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
@@ -523,10 +531,11 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
 	var exitCode int32 = -1 // -1 indicates pre-execution failure
-	stats := types.RunStats{
-		"duration_ms": duration.Milliseconds(),
-		"error":       err.Error(),
-	}
+	// Build stats using typed builder to eliminate map[string]any construction.
+	stats := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds()).
+		Error(err.Error()).
+		MustBuild()
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
@@ -621,33 +630,32 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 //
 //nolint:unused // used by finalizeRun for roadmap-aligned metrics, kept for future wiring
 func (r *runController) buildExecutionStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult, duration time.Duration, mrURL string) types.RunStats {
-	stats := types.RunStats{
-		"exit_code":   result.ExitCode,
-		"duration_ms": duration.Milliseconds(),
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
-		},
-	}
+	// Build stats using typed builder to eliminate map[string]any construction.
+	builder := types.NewRunStatsBuilder().
+		ExitCode(result.ExitCode).
+		DurationMs(duration.Milliseconds()).
+		TimingsWithGate(
+			result.Timings.HydrationDuration.Milliseconds(),
+			result.Timings.ExecutionDuration.Milliseconds(),
+			result.Timings.BuildGateDuration.Milliseconds(),
+			result.Timings.DiffDuration.Milliseconds(),
+			result.Timings.TotalDuration.Milliseconds(),
+		)
 
 	// Attach MR URL to metadata if created.
 	if mrURL != "" {
-		stats["metadata"] = map[string]interface{}{
-			"mr_url": mrURL,
-		}
+		builder.MetadataEntry("mr_url", mrURL)
 	}
 
 	// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
 	// Include pre-gate and re-gate runs when healing was attempted.
+	// GateRaw accepts map[string]any for complex gate structures built externally.
 	if execResult.PreGate != nil || len(execResult.ReGates) > 0 || result.BuildGate != nil {
 		gate := r.buildGateStats(runID, jobID, result, execResult)
-		stats["gate"] = gate
+		builder.GateRaw(gate)
 	}
 
-	return stats
+	return builder.MustBuild()
 }
 
 // mergeExecutionResults aggregates gate history across phases (pre-mod + per-step)

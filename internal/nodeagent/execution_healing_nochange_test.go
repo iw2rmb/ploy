@@ -56,10 +56,10 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 		StepIndex: types.StepIndex(0),
 	}
 
-	stats := types.RunStats{
-		"exit_code":   0,
-		"duration_ms": int64(123),
-	}
+	stats := types.NewRunStatsBuilder().
+		ExitCode(0).
+		DurationMs(123).
+		MustBuild()
 
 	rc.uploadHealingNoWorkspaceChangesFailure(context.Background(), req, stats, 123*time.Millisecond)
 

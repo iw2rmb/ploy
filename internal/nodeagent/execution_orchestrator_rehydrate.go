@@ -185,18 +185,18 @@ func (r *runController) uploadModDiffWithBaseline(
 	}
 
 	// Build diff summary with step metadata for database storage.
-	summary := types.DiffSummary{
-		"step_index": stepIndex,
-		"mod_type":   "mod",
-		"exit_code":  result.ExitCode,
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
-		},
-	}
+	// Uses typed builder to eliminate map[string]any construction.
+	summary := types.NewDiffSummaryBuilder().
+		StepIndex(int(stepIndex)).
+		ModType("mod").
+		ExitCode(result.ExitCode).
+		Timings(
+			result.Timings.HydrationDuration.Milliseconds(),
+			result.Timings.ExecutionDuration.Milliseconds(),
+			result.Timings.DiffDuration.Milliseconds(),
+			result.Timings.TotalDuration.Milliseconds(),
+		).
+		MustBuild()
 
 	diffUploader, err := NewDiffUploader(r.cfg)
 	if err != nil {
@@ -250,10 +250,12 @@ func (r *runController) uploadBaselineDiff(
 		return fmt.Errorf("healing produced empty diff but gate passed - possible flaky gate or healing made no changes")
 	}
 
-	summary := types.DiffSummary{
-		"step_index": stepIndex,
-		"mod_type":   modType,
-	}
+	// Build diff summary with step metadata for database storage.
+	// Uses typed builder to eliminate map[string]any construction.
+	summary := types.NewDiffSummaryBuilder().
+		StepIndex(int(stepIndex)).
+		ModType(modType).
+		MustBuild()
 
 	diffUploader, err := NewDiffUploader(r.cfg)
 	if err != nil {
