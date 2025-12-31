@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // maybeScheduleMRJobForRun inspects the run spec and terminal status to decide
@@ -33,25 +33,18 @@ func maybeScheduleMRJobForRun(
 	}
 
 	// Parse run spec to extract MR wiring.
-	var specMap map[string]any
-	if len(run.Spec) > 0 && json.Valid(run.Spec) {
-		if err := json.Unmarshal(run.Spec, &specMap); err != nil {
-			return fmt.Errorf("parse run spec for MR scheduling: %w", err)
-		}
-	}
-
-	// Extract mr_on_success / mr_on_fail flags when they are booleans.
 	mrOnSuccess := false
 	mrOnFail := false
-
-	if raw, ok := specMap["mr_on_success"]; ok {
-		if b, ok := raw.(bool); ok {
-			mrOnSuccess = b
+	if len(run.Spec) > 0 {
+		spec, err := contracts.ParseModsSpecJSON(run.Spec)
+		if err != nil {
+			return fmt.Errorf("parse run spec for MR scheduling: %w", err)
 		}
-	}
-	if raw, ok := specMap["mr_on_fail"]; ok {
-		if b, ok := raw.(bool); ok {
-			mrOnFail = b
+		if spec.MROnSuccess != nil {
+			mrOnSuccess = *spec.MROnSuccess
+		}
+		if spec.MROnFail != nil {
+			mrOnFail = *spec.MROnFail
 		}
 	}
 
