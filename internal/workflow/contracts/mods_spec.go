@@ -30,8 +30,8 @@
 //
 // YAML files are accepted at the CLI boundary by loading into map[string]any,
 // marshaling to JSON, and validating via ParseModsSpecJSON. There is no
-// separate ParseModsSpecYAML function; this design keeps validation centralized
-// in a single parser and simplifies maintenance.
+// separate YAML parser in this package; this design keeps validation
+// centralized in a single parser and simplifies maintenance.
 //
 // ## Migration Path
 //
