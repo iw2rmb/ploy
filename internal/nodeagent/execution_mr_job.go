@@ -47,16 +47,17 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 	mrURL, mrErr := r.createMR(ctx, req, manifest, workspace)
 	duration := time.Since(startTime)
 
-	stats := types.RunStats{
-		"duration_ms": duration.Milliseconds(),
-	}
+	// Build stats using typed builder to eliminate map[string]any construction.
+	builder := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds())
 	if mrURL != "" {
-		stats["metadata"] = map[string]any{"mr_url": mrURL}
+		builder.MetadataEntry("mr_url", mrURL)
 	}
 
 	if mrErr != nil {
 		// MR jobs are best-effort; surface failure via job status and logs.
-		stats["error"] = mrErr.Error()
+		builder.Error(mrErr.Error())
+		stats := builder.MustBuild()
 		var exitCode int32 = -1
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload MR job failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
@@ -65,6 +66,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		return
 	}
 
+	stats := builder.MustBuild()
 	var exitCodeZero int32 = 0
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload MR job success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)

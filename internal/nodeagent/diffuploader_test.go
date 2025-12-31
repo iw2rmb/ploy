@@ -15,6 +15,8 @@ import (
 )
 
 func TestDiffUploader_UploadDiff(t *testing.T) {
+	// Helper to create test summaries using the builder pattern.
+	// DiffSummary is now json.RawMessage-backed, so we use the builder.
 	tests := []struct {
 		name           string
 		diffContent    string
@@ -25,28 +27,26 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 		{
 			name:        "successful upload",
 			diffContent: "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old line\n+new line\n",
-			summary: types.DiffSummary{
-				"exit_code": 0,
-				"timings": map[string]interface{}{
-					"total_duration_ms": 1000,
-				},
-			},
+			summary: types.NewDiffSummaryBuilder().
+				ExitCode(0).
+				Timings(0, 0, 0, 1000).
+				MustBuild(),
 			wantStatusCode: http.StatusCreated,
 			wantErr:        false,
 		},
 		{
 			name:        "empty diff",
 			diffContent: "",
-			summary: types.DiffSummary{
-				"exit_code": 0,
-			},
+			summary: types.NewDiffSummaryBuilder().
+				ExitCode(0).
+				MustBuild(),
 			wantStatusCode: http.StatusCreated,
 			wantErr:        false,
 		},
 		{
 			name:           "server error",
 			diffContent:    "diff content",
-			summary:        types.DiffSummary{},
+			summary:        types.NewDiffSummaryBuilder().MustBuild(),
 			wantStatusCode: http.StatusInternalServerError,
 			wantErr:        true,
 		},
@@ -178,7 +178,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", rnd, types.DiffSummary{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", rnd, types.NewDiffSummaryBuilder().MustBuild())
 	if err == nil {
 		t.Fatal("expected error for oversized diff but got none")
 	}
@@ -245,7 +245,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(diffContent), types.DiffSummary{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(diffContent), types.NewDiffSummaryBuilder().MustBuild())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

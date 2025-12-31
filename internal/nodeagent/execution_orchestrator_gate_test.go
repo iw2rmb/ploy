@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -428,19 +429,22 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 
 	stats := rc.buildGateJobStats(gateMeta, 250*time.Millisecond)
 
-	raw, ok := stats["job_meta"]
-	if !ok {
-		t.Fatalf("expected job_meta key in gate stats, got %#v", stats)
+	// RunStats is now json.RawMessage-backed. Decode to access job_meta.
+	// Parse the stats as JSON and extract the job_meta field.
+	var decoded struct {
+		JobMeta *contracts.JobMeta `json:"job_meta"`
+	}
+	if err := json.Unmarshal(stats, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal stats: %v", err)
+	}
+	if decoded.JobMeta == nil {
+		t.Fatalf("expected job_meta key in gate stats, got nil")
 	}
 
-	meta, ok := raw.(*contracts.JobMeta)
-	if !ok {
-		t.Fatalf("job_meta has type %T, want *contracts.JobMeta", raw)
+	if decoded.JobMeta.Kind != contracts.JobKindGate {
+		t.Fatalf("job_meta.Kind = %q, want %q", decoded.JobMeta.Kind, contracts.JobKindGate)
 	}
-	if meta.Kind != contracts.JobKindGate {
-		t.Fatalf("job_meta.Kind = %q, want %q", meta.Kind, contracts.JobKindGate)
-	}
-	if meta.Gate == nil || meta.Gate.LogDigest != "sha256:test" {
-		t.Fatalf("job_meta.Gate.LogDigest = %#v, want sha256:test", meta.Gate)
+	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != "sha256:test" {
+		t.Fatalf("job_meta.Gate.LogDigest = %#v, want sha256:test", decoded.JobMeta.Gate)
 	}
 }

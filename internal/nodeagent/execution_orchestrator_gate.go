@@ -249,27 +249,25 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 }
 
 // buildGateJobStats constructs stats payload for gate job completion.
+// Uses typed builder to eliminate map[string]any construction.
 func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMetadata, duration time.Duration) types.RunStats {
-	stats := types.RunStats{
-		"duration_ms": duration.Milliseconds(),
-	}
+	builder := types.NewRunStatsBuilder().
+		DurationMs(duration.Milliseconds())
 
 	if gateResult != nil {
 		passed := false
 		if len(gateResult.StaticChecks) > 0 {
 			passed = gateResult.StaticChecks[0].Passed
 		}
-		stats["gate"] = map[string]any{
-			"passed":      passed,
-			"duration_ms": duration.Milliseconds(),
-		}
+		// Use Gate helper for simple gate stats.
+		builder.Gate(passed, duration.Milliseconds())
 
 		// Attach structured job metadata so the control plane can persist
 		// gate results in jobs.meta JSONB.
-		stats["job_meta"] = contracts.NewGateJobMeta(gateResult)
+		builder.JobMetaAny(contracts.NewGateJobMeta(gateResult))
 	}
 
-	return stats
+	return builder.MustBuild()
 }
 
 // buildGateStats constructs gate statistics including pre-gate, re-gates, and final gate runs.
