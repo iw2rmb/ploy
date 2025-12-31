@@ -216,8 +216,19 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 	}
 	if healing, ok := opts["build_gate_healing"].(map[string]any); !ok {
 		t.Errorf("expected build_gate_healing to be preserved")
-	} else if retries, _ := healing["retries"].(float64); int(retries) != 1 {
-		t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+	} else {
+		switch retries := healing["retries"].(type) {
+		case int:
+			if retries != 1 {
+				t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+			}
+		case float64:
+			if int(retries) != 1 {
+				t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+			}
+		default:
+			t.Errorf("expected build_gate_healing.retries to be numeric, got %T", healing["retries"])
+		}
 	}
 }
 

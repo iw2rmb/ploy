@@ -116,6 +116,14 @@ func commandSpecToAnyForNested(cmd contracts.CommandSpec) any {
 	return nil
 }
 
+func stringMapToAnyMap(m map[string]string) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
 // modsSpecToOptions converts a canonical ModsSpec to the internal opts/env format.
 func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]string) {
 	opts := make(map[string]any)
@@ -168,7 +176,7 @@ func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]str
 				mod["command"] = commandSpecToAnyForNested(spec.BuildGateHealing.Mod.Command)
 			}
 			if len(spec.BuildGateHealing.Mod.Env) > 0 {
-				mod["env"] = spec.BuildGateHealing.Mod.Env
+				mod["env"] = stringMapToAnyMap(spec.BuildGateHealing.Mod.Env)
 			}
 			if spec.BuildGateHealing.Mod.RetainContainer {
 				mod["retain_container"] = true
@@ -193,7 +201,7 @@ func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]str
 				m["command"] = commandSpecToAnyForNested(step.Command)
 			}
 			if len(step.Env) > 0 {
-				m["env"] = step.Env
+				m["env"] = stringMapToAnyMap(step.Env)
 			}
 			if step.RetainContainer {
 				m["retain_container"] = true
