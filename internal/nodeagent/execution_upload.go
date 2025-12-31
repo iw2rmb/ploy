@@ -122,7 +122,11 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 // distinguish pre-gate, re-gate, and final gate runs (e.g., "build-gate-pre.log").
 //
 // This allows clients to download detailed gate execution logs for debugging.
-func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.JobID, logsText, artifactNameSuffix string, gateStats map[string]any) {
+func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.JobID, logsText, artifactNameSuffix string, phase *types.RunStatsGatePhase) {
+	if phase == nil {
+		return
+	}
+
 	logFile, err := os.CreateTemp("", "ploy-gate-*.log")
 	if err != nil {
 		return
@@ -144,8 +148,8 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 
 	// Upload with background context to ensure logs are uploaded even if run context is cancelled.
 	if id, cid, uerr := artUploader.UploadArtifact(context.Background(), runID, jobID, []string{logFile.Name()}, artifactName); uerr == nil {
-		gateStats["logs_artifact_id"] = id
-		gateStats["logs_bundle_cid"] = cid
+		phase.LogsArtifactID = id
+		phase.LogsBundleCID = cid
 	} else {
 		slog.Warn("failed to upload "+artifactName, "run_id", runID, "job_id", jobID, "error", uerr)
 	}

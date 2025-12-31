@@ -29,47 +29,49 @@ type runStatsAccessor struct {
 	ResumeCount   *int              `json:"resume_count,omitempty"`
 	LastResumedAt *string           `json:"last_resumed_at,omitempty"`
 	Metadata      map[string]string `json:"metadata,omitempty"`
-	Gate          *runStatsGate     `json:"gate,omitempty"`
+	Gate          *RunStatsGate     `json:"gate,omitempty"`
 	JobMeta       json.RawMessage   `json:"job_meta,omitempty"`
 	Timings       *runStatsTimings  `json:"timings,omitempty"`
 }
 
-// runStatsGate represents the gate sub-structure in stats.
-type runStatsGate struct {
+// RunStatsGate represents the gate sub-structure in stats.
+type RunStatsGate struct {
 	Passed     *bool               `json:"passed,omitempty"`
 	DurationMs *int64              `json:"duration_ms,omitempty"`
-	PreGate    *runStatsGatePhase  `json:"pre_gate,omitempty"`
-	FinalGate  *runStatsGatePhase  `json:"final_gate,omitempty"`
-	ReGates    []runStatsGatePhase `json:"re_gates,omitempty"`
+	PreGate    *RunStatsGatePhase  `json:"pre_gate,omitempty"`
+	FinalGate  *RunStatsGatePhase  `json:"final_gate,omitempty"`
+	ReGates    []RunStatsGatePhase `json:"re_gates,omitempty"`
 }
 
-// runStatsGatePhase represents a single gate execution phase.
-type runStatsGatePhase struct {
-	Passed     bool                   `json:"passed"`
-	DurationMs int64                  `json:"duration_ms"`
-	Resources  *runStatsGateResources `json:"resources,omitempty"`
+// RunStatsGatePhase represents a single gate execution phase.
+type RunStatsGatePhase struct {
+	Passed         bool                   `json:"passed"`
+	DurationMs     int64                  `json:"duration_ms"`
+	LogsArtifactID string                 `json:"logs_artifact_id,omitempty"`
+	LogsBundleCID  string                 `json:"logs_bundle_cid,omitempty"`
+	Resources      *RunStatsGateResources `json:"resources,omitempty"`
 }
 
-// runStatsGateResources represents resource usage for a gate phase.
-type runStatsGateResources struct {
-	Limits *runStatsResourceLimits `json:"limits,omitempty"`
-	Usage  *runStatsResourceUsage  `json:"usage,omitempty"`
+// RunStatsGateResources represents resource usage for a gate phase.
+type RunStatsGateResources struct {
+	Limits *RunStatsResourceLimits `json:"limits,omitempty"`
+	Usage  *RunStatsResourceUsage  `json:"usage,omitempty"`
 }
 
-// runStatsResourceLimits represents resource limits.
-type runStatsResourceLimits struct {
+// RunStatsResourceLimits represents resource limits.
+type RunStatsResourceLimits struct {
 	NanoCPUs    int64 `json:"nano_cpus,omitempty"`
 	MemoryBytes int64 `json:"memory_bytes,omitempty"`
 }
 
-// runStatsResourceUsage represents resource usage.
-type runStatsResourceUsage struct {
-	CPUTotalNs      int64 `json:"cpu_total_ns,omitempty"`
-	MemUsageBytes   int64 `json:"mem_usage_bytes,omitempty"`
-	MemMaxBytes     int64 `json:"mem_max_bytes,omitempty"`
-	BlkioReadBytes  int64 `json:"blkio_read_bytes,omitempty"`
-	BlkioWriteBytes int64 `json:"blkio_write_bytes,omitempty"`
-	SizeRwBytes     int64 `json:"size_rw_bytes,omitempty"`
+// RunStatsResourceUsage represents resource usage.
+type RunStatsResourceUsage struct {
+	CPUTotalNs      uint64 `json:"cpu_total_ns,omitempty"`
+	MemUsageBytes   uint64 `json:"mem_usage_bytes,omitempty"`
+	MemMaxBytes     uint64 `json:"mem_max_bytes,omitempty"`
+	BlkioReadBytes  uint64 `json:"blkio_read_bytes,omitempty"`
+	BlkioWriteBytes uint64 `json:"blkio_write_bytes,omitempty"`
+	SizeRwBytes     int64  `json:"size_rw_bytes,omitempty"`
 }
 
 // runStatsTimings represents execution timing metadata.
@@ -103,7 +105,13 @@ func (s RunStats) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler for RunStats.
 func (s *RunStats) UnmarshalJSON(data []byte) error {
-	*s = RunStats(data)
+	if data == nil {
+		*s = nil
+		return nil
+	}
+	copied := make([]byte, len(data))
+	copy(copied, data)
+	*s = RunStats(copied)
 	return nil
 }
 
@@ -212,7 +220,7 @@ func (s RunStats) GateSummary() string {
 
 // formatGatePhaseTyped builds a summary string from a typed gate phase.
 // Format: "passed duration=123ms" or "failed pre-gate duration=45ms".
-func formatGatePhaseTyped(phase *runStatsGatePhase, label string) string {
+func formatGatePhaseTyped(phase *RunStatsGatePhase, label string) string {
 	if phase == nil {
 		return ""
 	}
@@ -323,10 +331,10 @@ func (b *RunStatsBuilder) TimingsWithGate(hydration, execution, gate, diff, tota
 // Gate sets the gate field for gate-only stats (simple pass/fail + duration).
 // The gate is stored as final_gate to align with GateSummary extraction logic.
 func (b *RunStatsBuilder) Gate(passed bool, durationMs int64) *RunStatsBuilder {
-	b.acc.Gate = &runStatsGate{
+	b.acc.Gate = &RunStatsGate{
 		Passed:     &passed,
 		DurationMs: &durationMs,
-		FinalGate: &runStatsGatePhase{
+		FinalGate: &RunStatsGatePhase{
 			Passed:     passed,
 			DurationMs: durationMs,
 		},
@@ -334,45 +342,18 @@ func (b *RunStatsBuilder) Gate(passed bool, durationMs int64) *RunStatsBuilder {
 	return b
 }
 
-// GateRaw sets the gate field to a raw map for complex gate structures.
-// This is a fallback for cases where the full gate structure is built externally.
-// The map will be marshaled inline.
-func (b *RunStatsBuilder) GateRaw(gate map[string]any) *RunStatsBuilder {
-	if gate == nil {
-		return b
-	}
-	// Marshal and unmarshal to convert to typed structure.
-	data, err := json.Marshal(gate)
-	if err != nil {
-		return b
-	}
-	var g runStatsGate
-	if err := json.Unmarshal(data, &g); err != nil {
-		// If unmarshaling to typed struct fails, we still want to preserve
-		// the raw gate data. We'll handle this by keeping the builder's
-		// custom marshal logic.
-		return b
-	}
-	b.acc.Gate = &g
+// GateDetails sets the full gate object (pre-gate, re-gates, final gate, resources, etc.).
+func (b *RunStatsBuilder) GateDetails(gate *RunStatsGate) *RunStatsBuilder {
+	b.acc.Gate = gate
 	return b
 }
 
 // JobMeta sets the job_meta field (raw JSON for job metadata).
 func (b *RunStatsBuilder) JobMeta(meta json.RawMessage) *RunStatsBuilder {
-	b.acc.JobMeta = meta
-	return b
-}
-
-// JobMetaAny sets the job_meta field from an arbitrary value that will be marshaled.
-func (b *RunStatsBuilder) JobMetaAny(meta any) *RunStatsBuilder {
-	if meta == nil {
+	if len(meta) == 0 {
 		return b
 	}
-	data, err := json.Marshal(meta)
-	if err != nil {
-		return b
-	}
-	b.acc.JobMeta = data
+	b.acc.JobMeta = append(json.RawMessage(nil), meta...)
 	return b
 }
 

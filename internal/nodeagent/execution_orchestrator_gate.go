@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -264,7 +265,9 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 
 		// Attach structured job metadata so the control plane can persist
 		// gate results in jobs.meta JSONB.
-		builder.JobMetaAny(contracts.NewGateJobMeta(gateResult))
+		if jobMetaBytes, err := json.Marshal(contracts.NewGateJobMeta(gateResult)); err == nil {
+			builder.JobMeta(jobMetaBytes)
+		}
 	}
 
 	return builder.MustBuild()
@@ -278,65 +281,81 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 //   - When no mods executed (no BuildGate), final_gate falls back to the pre-mod gate, ensuring
 //     CLI/API gate summaries always have a final_gate to report on.
 //   - This keeps gate summary behavior consistent: final_gate → last re-gate → pre_gate.
-func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult) map[string]any {
-	gate := map[string]any{}
+func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult) *types.RunStatsGate {
+	gate := &types.RunStatsGate{}
 
-	// Helper function to build gate metadata and upload logs.
-	buildGateMetadata := func(meta *contracts.BuildGateStageMetadata, durationMs int64, artifactNameSuffix string) map[string]any {
-		gateStats := map[string]any{
-			"duration_ms": durationMs,
+	// Helper function to build gate phase metadata and upload logs.
+	buildGatePhase := func(meta *contracts.BuildGateStageMetadata, durationMs int64, artifactNameSuffix string) *types.RunStatsGatePhase {
+		phase := &types.RunStatsGatePhase{
+			DurationMs: durationMs,
 		}
 
 		// Determine pass/fail.
-		passed := false
 		if meta != nil && len(meta.StaticChecks) > 0 {
-			passed = meta.StaticChecks[0].Passed
+			phase.Passed = meta.StaticChecks[0].Passed
 		}
-		gateStats["passed"] = passed
 
 		// Attach resource usage metrics when available.
 		if meta != nil && meta.Resources != nil {
 			ru := meta.Resources
-			gateStats["resources"] = map[string]any{
-				"limits": map[string]any{"nano_cpus": ru.LimitNanoCPUs, "memory_bytes": ru.LimitMemoryBytes},
-				"usage":  map[string]any{"cpu_total_ns": ru.CPUTotalNs, "mem_usage_bytes": ru.MemUsageBytes, "mem_max_bytes": ru.MemMaxBytes, "blkio_read_bytes": ru.BlkioReadBytes, "blkio_write_bytes": ru.BlkioWriteBytes, "size_rw_bytes": ru.SizeRwBytes},
+			var sizeRwBytes int64
+			if ru.SizeRwBytes != nil {
+				sizeRwBytes = *ru.SizeRwBytes
+			}
+			phase.Resources = &types.RunStatsGateResources{
+				Limits: &types.RunStatsResourceLimits{
+					NanoCPUs:    ru.LimitNanoCPUs,
+					MemoryBytes: ru.LimitMemoryBytes,
+				},
+				Usage: &types.RunStatsResourceUsage{
+					CPUTotalNs:      ru.CPUTotalNs,
+					MemUsageBytes:   ru.MemUsageBytes,
+					MemMaxBytes:     ru.MemMaxBytes,
+					BlkioReadBytes:  ru.BlkioReadBytes,
+					BlkioWriteBytes: ru.BlkioWriteBytes,
+					SizeRwBytes:     sizeRwBytes,
+				},
 			}
 		}
 
 		// Upload build logs as artifact when present.
 		if meta != nil && strings.TrimSpace(meta.LogsText) != "" {
-			r.uploadGateLogsArtifact(runID, jobID, meta.LogsText, artifactNameSuffix, gateStats)
+			r.uploadGateLogsArtifact(runID, jobID, meta.LogsText, artifactNameSuffix, phase)
 		}
 
-		return gateStats
+		return phase
 	}
 
 	// Include pre-gate stats if present.
 	if execResult.PreGate != nil {
-		gate["pre_gate"] = buildGateMetadata(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre")
+		gate.PreGate = buildGatePhase(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre")
 	}
 
 	// Include re-gate stats if present (healing attempts from both pre- and post-mod phases
 	// in chronological order).
 	if len(execResult.ReGates) > 0 {
-		reGatesList := make([]map[string]any, 0, len(execResult.ReGates))
+		gate.ReGates = make([]types.RunStatsGatePhase, 0, len(execResult.ReGates))
 		for i, rg := range execResult.ReGates {
 			suffix := fmt.Sprintf("re%d", i+1)
-			reGatesList = append(reGatesList, buildGateMetadata(rg.Metadata, rg.DurationMs, suffix))
+			if phase := buildGatePhase(rg.Metadata, rg.DurationMs, suffix); phase != nil {
+				gate.ReGates = append(gate.ReGates, *phase)
+			}
 		}
-		gate["re_gates"] = reGatesList
 	}
 
 	// Populate final_gate: use the post-mod gate (result.BuildGate) when present,
 	// otherwise fall back to the pre-mod gate (for runs where no mods executed).
 	// This ensures CLI/API gate summaries always have a final_gate to report on.
 	if result.BuildGate != nil {
-		gate["final_gate"] = buildGateMetadata(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
+		gate.FinalGate = buildGatePhase(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
 	} else if execResult.PreGate != nil {
 		// No post-mod gate executed (run terminated at pre-mod phase or no mods).
 		// Use the pre-mod gate as the final gate for consistent summary output.
-		gate["final_gate"] = buildGateMetadata(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre-as-final")
+		gate.FinalGate = buildGatePhase(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre-as-final")
 	}
 
+	if gate.PreGate == nil && gate.FinalGate == nil && len(gate.ReGates) == 0 {
+		return nil
+	}
 	return gate
 }

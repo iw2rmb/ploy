@@ -372,23 +372,22 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			// Build gate stats map to receive artifact IDs.
-			gateStats := map[string]any{}
+			phase := &types.RunStatsGatePhase{}
 
 			// Execute upload.
-			controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, gateStats)
+			controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, phase)
 
 			// Verify artifact ID attachment.
 			if tt.wantArtifactID {
-				if _, ok := gateStats["logs_artifact_id"]; !ok {
-					t.Error("logs_artifact_id not set in gateStats")
+				if phase.LogsArtifactID == "" {
+					t.Error("LogsArtifactID not set in gate phase")
 				}
-				if _, ok := gateStats["logs_bundle_cid"]; !ok {
-					t.Error("logs_bundle_cid not set in gateStats")
+				if phase.LogsBundleCID == "" {
+					t.Error("LogsBundleCID not set in gate phase")
 				}
 			} else {
-				if _, ok := gateStats["logs_artifact_id"]; ok {
-					t.Error("logs_artifact_id should not be set on upload failure")
+				if phase.LogsArtifactID != "" {
+					t.Error("LogsArtifactID should not be set on upload failure")
 				}
 			}
 		})
