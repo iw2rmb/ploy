@@ -11,20 +11,19 @@ import (
 
 // StartRunRequest describes a run start request from the server.
 //
-// Options keys (slice E — per-run wiring):
-//   - "gitlab_pat" (string, optional) — PAT override for this run (never log).
-//   - "gitlab_domain" (string, optional) — GitLab domain override.
-//   - "mr_on_success" (bool) — create MR on success when true.
-//   - "mr_on_fail" (bool) — create MR on failure when true.
-//   - "job_id" (string, optional) — server-provided job identifier for uploads.
-//   - "artifact_name" (string, optional) — custom name for uploaded artifact bundle(s).
+// TypedOptions contains all run configuration options in strongly-typed form.
+// This is the canonical source of truth for all option keys understood by the
+// nodeagent. Callers must use TypedOptions fields instead of raw map[string]any
+// access. The typed options include:
 //
-// Other options currently honoured by the node for execution shaping:
-//   - "image" (string) — container image to run (optional; default ubuntu:latest).
-//   - "command" (string|[]string) — container command override.
-//   - "retain_container" (bool) — retain container after run for debugging.
-//   - "artifact_paths" ([]string|[]any) — list of workspace‑relative files/dirs to upload as a bundle.
-//   - "build_gate_healing" (object) — healing policy: {retries:int, mod:{image,command,env,...}}.
+//   - BuildGate: enabled flag and profile for pre-mod gate validation.
+//   - Healing: heal → re-gate loop policy (retries, healing mod spec).
+//   - MRWiring: GitLab PAT, domain, and MR creation triggers (mr_on_success, mr_on_fail).
+//   - Execution: container image, command, and retention settings.
+//   - Artifacts: artifact name and workspace-relative paths to upload.
+//   - ServerMetadata: server-injected job ID for upload correlation.
+//   - Steps: multi-step mods array for sequential execution.
+//   - ModIndex/ModIndexSet: server-injected step index for multi-step runs.
 //
 // StepIndex field:
 //   - Identifies the job's step index for job-level execution tracking.
@@ -38,16 +37,20 @@ type StartRunRequest struct {
 	RepoURL types.RepoURL `json:"repo_url,omitempty"` // Repository URL for this run
 	// Name is an optional human-friendly run name provided by the control plane.
 	// When set (e.g., for batch runs), it can be used for branch naming in MR flows.
-	Name      string            `json:"name,omitempty"`
-	BaseRef   types.GitRef      `json:"base_ref,omitempty"`
-	TargetRef types.GitRef      `json:"target_ref,omitempty"`
-	CommitSHA types.CommitSHA   `json:"commit_sha,omitempty"`
-	StepIndex types.StepIndex   `json:"step_index"`          // Job step index for execution tracking
-	ModType   types.ModType     `json:"mod_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
-	ModImage  string            `json:"mod_image,omitempty"` // Container image for this job (for heal job dispatch)
-	JobName   string            `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
-	Options   map[string]any    `json:"options"`             // Flattened options from spec (image, command, build_gate_healing, etc.)
-	Env       map[string]string `json:"env"`                 // Environment variables merged from spec
+	Name      string          `json:"name,omitempty"`
+	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
+	TargetRef types.GitRef    `json:"target_ref,omitempty"`
+	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
+	StepIndex types.StepIndex `json:"step_index"`          // Job step index for execution tracking
+	ModType   types.ModType   `json:"mod_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
+	ModImage  string          `json:"mod_image,omitempty"` // Container image for this job (for heal job dispatch)
+	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	// TypedOptions contains strongly-typed run configuration. This is the canonical
+	// source of truth for all option keys understood by the nodeagent. Execution,
+	// healing, manifest building, and artifact upload paths all consume TypedOptions
+	// directly rather than parsing raw maps.
+	TypedOptions RunOptions        `json:"-"`   // Not serialized; populated by claimer_loop from parsed spec
+	Env          map[string]string `json:"env"` // Environment variables merged from spec
 }
 
 // StartRunResponse is returned when a run is accepted.

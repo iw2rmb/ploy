@@ -18,9 +18,9 @@ import (
 func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	// Parse options and build a minimal manifest so that GitLab options
+	// Build a minimal manifest using typed options so that GitLab options
 	// (gitlab_pat, gitlab_domain, mr_on_success/mr_on_fail) are available.
-	typedOpts := parseRunOptions(req.Options)
+	typedOpts := req.TypedOptions
 	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 	if err != nil {
 		slog.Error("failed to build manifest for MR job", "run_id", req.RunID, "job_id", req.JobID, "error", err)

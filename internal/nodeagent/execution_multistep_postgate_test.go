@@ -122,7 +122,7 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			// Multi-step mods array with 2 entries.
 			"mods": []any{
 				map[string]any{
@@ -132,11 +132,11 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 					"image": "test/mod-step1:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	// Build manifests for both steps with gate enabled.
-	typedOpts := parseRunOptions(req.Options)
+	typedOpts := req.TypedOptions
 
 	// Verify multi-step detection.
 	if len(typedOpts.Steps) != 2 {
@@ -326,7 +326,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"mods": []any{
 				map[string]any{
 					"image": "test/mod-step0:latest",
@@ -341,10 +341,10 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 					"image": "test/healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
-	typedOpts := parseRunOptions(req.Options)
+	typedOpts := req.TypedOptions
 
 	// Verify multi-step detection.
 	if len(typedOpts.Steps) != 2 {

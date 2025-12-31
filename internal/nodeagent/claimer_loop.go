@@ -120,8 +120,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	slog.Info("claimed job", "run_id", claim.RunID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
 
 	// Map claim response to StartRunRequest.
-	// Parse spec into options/env and typed RunOptions.
-	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
+	// Parse spec into typed RunOptions and environment variables.
+	// The typed RunOptions is the canonical source of truth; no raw map[string]any
+	// is passed to StartRunRequest.
+	_, envFromSpec, typedOpts := parseSpec(claim.Spec)
 
 	// Derive target ref: prefer server-provided value, otherwise default to
 	// ploy/{run_name|run_id} so MR branch and PLOY_TARGET_REF have a deterministic name.
@@ -139,18 +141,18 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	startReq := StartRunRequest{
-		RunID:     claim.RunID, // Already types.RunID from ClaimResponse
-		JobID:     claim.JobID, // Already types.JobID from ClaimResponse
-		RepoURL:   types.RepoURL(claim.RepoURL),
-		BaseRef:   types.GitRef(claim.BaseRef),
-		TargetRef: types.GitRef(targetRef),
-		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
-		StepIndex: claim.StepIndex, // Job step_index from server
-		ModType:   claim.ModType,
-		ModImage:  claim.ModImage,
-		JobName:   claim.JobName, // Job name for branch identification
-		Options:   optsFromSpec,
-		Env:       envFromSpec,
+		RunID:        claim.RunID, // Already types.RunID from ClaimResponse
+		JobID:        claim.JobID, // Already types.JobID from ClaimResponse
+		RepoURL:      types.RepoURL(claim.RepoURL),
+		BaseRef:      types.GitRef(claim.BaseRef),
+		TargetRef:    types.GitRef(targetRef),
+		CommitSHA:    types.CommitSHA(stringValue(claim.CommitSha)),
+		StepIndex:    claim.StepIndex, // Job step_index from server
+		ModType:      claim.ModType,
+		ModImage:     claim.ModImage,
+		JobName:      claim.JobName, // Job name for branch identification
+		TypedOptions: typedOpts,     // Strongly-typed run options (canonical source of truth)
+		Env:          envFromSpec,
 	}
 
 	// Invoke controller.StartRun to execute the claimed job.

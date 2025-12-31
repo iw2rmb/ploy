@@ -99,10 +99,10 @@ func TestEndToEndFlow(t *testing.T) {
 			JobID:   types.JobID("test-job-e2e"),
 			RepoURL: types.RepoURL("https://github.com/iw2rmb/ploy-nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"image":   "alpine:latest",
 				"command": "echo 'test execution'",
-			},
+			}),
 		}
 
 		// Start the run in a background context with timeout.

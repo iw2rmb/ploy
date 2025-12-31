@@ -89,11 +89,11 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 	// Minimal run controller.
 	r := &runController{}
 	req := StartRunRequest{
-		RunID:     types.RunID("t-123"),
-		RepoURL:   types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature"),
-		Options:   map[string]any{},
+		RunID:        types.RunID("t-123"),
+		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    types.GitRef("feature"),
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",
@@ -149,11 +149,11 @@ func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
 	runID := types.RunID("t-empty-target")
 	r := &runController{}
 	req := StartRunRequest{
-		RunID:     runID,
-		RepoURL:   types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: "", // Unspecified target ref.
-		Options:   map[string]any{},
+		RunID:        runID,
+		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    "", // Unspecified target ref.
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",
@@ -201,12 +201,12 @@ func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
 
 	r := &runController{}
 	req := StartRunRequest{
-		RunID:     runID,
-		Name:      runName,
-		RepoURL:   types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: "", // Unspecified target ref.
-		Options:   map[string]any{},
+		RunID:        runID,
+		Name:         runName,
+		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    "", // Unspecified target ref.
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",

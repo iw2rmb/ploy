@@ -72,8 +72,8 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:   types.RunID("test-postgate-pass"),
-		Options: map[string]any{},
+		RunID:        types.RunID("test-postgate-pass"),
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -83,8 +83,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
 		},
-		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
-		Options: req.Options,
+		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
@@ -219,14 +218,14 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-postgate-heal"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -236,8 +235,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
 		},
-		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
-		Options: req.Options,
+		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)

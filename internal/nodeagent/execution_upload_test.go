@@ -111,14 +111,14 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			}
 			opts["artifact_name"] = "test-artifact"
 
-			req := StartRunRequest{
-				RunID:   types.RunID("test-run-123"),
-				JobID:   "test-job-id",
-				Options: opts,
-			}
-
 			// Parse options into typed RunOptions.
-			typedOpts := parseRunOptions(req.Options)
+			typedOpts := parseRunOptions(opts)
+
+			req := StartRunRequest{
+				RunID:        types.RunID("test-run-123"),
+				JobID:        "test-job-id",
+				TypedOptions: typedOpts,
+			}
 
 			manifest := contracts.StepManifest{
 				Image:   "test-image",

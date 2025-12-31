@@ -14,14 +14,14 @@ func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 		RunID:   types.RunID("run-opts-1"),
 		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
 		BaseRef: types.GitRef("main"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"job_id":        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
 			"artifact_name": "custom-bundle",
-		},
+		}),
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	m, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+	m, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}

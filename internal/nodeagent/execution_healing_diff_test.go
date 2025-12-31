@@ -104,14 +104,14 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		TargetRef: types.GitRef("mods-upgrade-java17"),
 		CommitSHA: types.CommitSHA("abc123"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "test/codex-healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -130,7 +130,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
+		Options: map[string]any{},
 	}
 
 	result, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
