@@ -111,6 +111,46 @@ Behavior:
   - created `run_id`
   - counts: started/already done/pending (matching existing `run start` summary)
 
+## Pulling diffs locally
+
+### `ploy run pull <run-id>`
+
+Pull Mods-generated diffs into the current git worktree.
+
+Behavior:
+
+- Pulls diffs for the specified `run-id`.
+- Safety check against base ref drift:
+  - If the associated mod repo `base_ref` currently resolves to a different commit SHA than the run’s recorded base commit SHA:
+    - if the mod is archived: error
+    - else: run the mod for this repo and pull the new run’s diffs instead
+
+### `ploy run diff [--repo <repo>] <run-id>`
+
+Show the aggregated diff for a run, optionally scoped to a single repo within a multi-repo run.
+
+Repo selection when `--repo` is omitted:
+
+- If the run has exactly one repo: show diff for that repo.
+- Else if invoked from a git worktree whose `origin` URL matches a repo in the run: show diff for that repo.
+- Else: error (repo must be specified).
+
+### `ploy mod pull [--last | --last-failed | --last-succeeded] [<mod-name|id>]`
+
+Behavior:
+
+- Selects a run relative to a mod project and pulls its diffs into the current git worktree.
+- If `<mod-name|id>` is provided, it is used to select the mod.
+- If `<mod-name|id>` is omitted, the CLI infers the mod from the current repository:
+  - Find all **non-archived** mods that include this repo URL in their repo set.
+  - If exactly one mod matches: select that mod.
+  - If multiple mods match: error and print the matching mods (IDs + names).
+- Default (no selector flags): behave as `--last-succeeded`.
+- Safety check against base ref drift / missing execution:
+  - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than the selected run’s recorded base commit SHA:
+    - if the mod is archived: error
+    - else: run the mod for this repo and pull the new run’s diffs instead
+
 ## Name/ID resolution rules
 
 - `<mod-id|name>`: prefer exact ID match; else unique name match; else error with suggestions.
