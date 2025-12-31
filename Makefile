@@ -99,8 +99,12 @@ staticcheck: ## Run staticcheck
 		exit 1; \
 	fi
 
+.PHONY: lint-untyped-contracts
+lint-untyped-contracts: ## Check for map[string]any at API boundaries (type safety guardrail)
+	@./scripts/check-untyped-contracts.sh
+
 .PHONY: ci-check
-ci-check: fmt vet staticcheck test-coverage-threshold test-coverage-critical test-binary-size ## Run core CI checks locally (includes binary size guardrail)
+ci-check: fmt vet staticcheck lint-untyped-contracts test-coverage-threshold test-coverage-critical test-binary-size ## Run core CI checks locally (includes binary size guardrail)
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install
@@ -151,6 +155,7 @@ help: ## Show available targets
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
+	@echo "  make lint-untyped-contracts     # Check for map[string]any at API boundaries"
 	@echo "  make ci-check                   # Run all CI checks locally (RED → GREEN workflow)"
 	@echo "  make pre-commit-install         # Install pre-commit hooks"
 	@echo "  make vps-lab-walkthrough        # Run VPS lab deployment walkthrough (requires SSH access)"
