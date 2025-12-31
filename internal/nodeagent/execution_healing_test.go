@@ -120,14 +120,14 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "test/healer-final-gate:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -146,7 +146,6 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
@@ -284,7 +283,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
@@ -294,7 +293,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 					},
 				},
 			},
-		},
+		}),
 	}
 
 	// Build main manifest with gate enabled.
@@ -314,7 +313,6 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	// Execute with healing.
@@ -436,14 +434,14 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
 		Env:       map[string]string{},
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "test/healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -462,7 +460,6 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	if _, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0); err != nil {
@@ -527,13 +524,13 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:     types.RunID("test-run-no-healing"),
-		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("test-branch"),
-		Options:   map[string]any{
+		RunID:        types.RunID("test-run-no-healing"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    types.GitRef("test-branch"),
+		TypedOptions: parseRunOptions(map[string]any{
 			// No build_gate_healing configured
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -552,7 +549,6 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
@@ -654,11 +650,11 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 
 	// Request without healing (gate passes, so no healing needed).
 	req := StartRunRequest{
-		RunID:     types.RunID("test-run-no-runner-gate"),
-		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("test-branch"),
-		Options:   map[string]any{},
+		RunID:        types.RunID("test-run-no-runner-gate"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    types.GitRef("test-branch"),
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	// Manifest with gate enabled — but executeWithHealing should disable it before
@@ -684,7 +680,6 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	// Execute with the tracking runner to capture manifests.
@@ -870,14 +865,14 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -895,7 +890,6 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)

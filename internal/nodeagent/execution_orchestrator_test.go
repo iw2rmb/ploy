@@ -115,11 +115,11 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:     "test-gate-contract",
-		RepoURL:   "https://gitlab.com/test/repo.git",
-		BaseRef:   "main",
-		TargetRef: "test-branch",
-		Options:   map[string]any{},
+		RunID:        "test-gate-contract",
+		RepoURL:      "https://gitlab.com/test/repo.git",
+		BaseRef:      "main",
+		TargetRef:    "test-branch",
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	// Create manifest with Gate.Enabled=true.
@@ -131,7 +131,6 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	// Reset counters before test.
@@ -235,11 +234,11 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:     "test-gate-disabled-runner",
-		RepoURL:   "https://gitlab.com/test/repo.git",
-		BaseRef:   "main",
-		TargetRef: "test-branch",
-		Options:   map[string]any{},
+		RunID:        "test-gate-disabled-runner",
+		RepoURL:      "https://gitlab.com/test/repo.git",
+		BaseRef:      "main",
+		TargetRef:    "test-branch",
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	// Create manifest with Gate.Enabled=true to verify it gets disabled for Runner.Run.
@@ -251,7 +250,6 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	_, err := rc.executeWithHealing(

@@ -29,9 +29,9 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 	defer func() { _ = logStreamer.Close() }()
 
-	// Parse options and build manifest.
-	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
-	typedOpts := parseRunOptions(req.Options)
+	// Build manifest using typed options from request.
+	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
+	typedOpts := req.TypedOptions
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)

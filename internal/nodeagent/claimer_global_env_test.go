@@ -156,12 +156,12 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
-		RunID:     types.RunID("run-e2e-env-test"),
-		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/global-env"),
-		Options:   opts,
-		Env:       env, // Global env vars flow here.
+		RunID:        types.RunID("run-e2e-env-test"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:      types.GitRef("main"),
+		TargetRef:    types.GitRef("feature/global-env"),
+		TypedOptions: parseRunOptions(opts),
+		Env:          env, // Global env vars flow here.
 	}
 
 	// Step 3: Build manifest (simulates manifest.go).
@@ -225,11 +225,11 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	opts, env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run-gate-env-test"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-		Options: opts,
-		Env:     env,
+		RunID:        types.RunID("run-gate-env-test"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:      types.GitRef("main"),
+		TypedOptions: parseRunOptions(opts),
+		Env:          env,
 	}
 
 	// Build gate manifest (should not fail on stack-aware image map).
@@ -303,10 +303,10 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	opts, env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run-multi-step-env"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		Options: opts,
-		Env:     env, // Global env from spec.
+		RunID:        types.RunID("run-multi-step-env"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		TypedOptions: parseRunOptions(opts),
+		Env:          env, // Global env from spec.
 	}
 
 	// Build manifest for step 0 (should have step override).
@@ -428,10 +428,10 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 	opts, env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run-no-filter-test"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		Options: opts,
-		Env:     env,
+		RunID:        types.RunID("run-no-filter-test"),
+		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
+		TypedOptions: parseRunOptions(opts),
+		Env:          env,
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.

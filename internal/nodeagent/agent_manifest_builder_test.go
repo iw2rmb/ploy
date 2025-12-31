@@ -16,18 +16,19 @@ import (
 func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("valid request with all fields", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:     types.RunID("run-123"),
-			RepoURL:   types.RepoURL("https://github.com/example/repo.git"),
-			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("feature-branch"),
-			CommitSHA: types.CommitSHA("abc123"),
+			RunID:        types.RunID("run-123"),
+			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
+			BaseRef:      types.GitRef("main"),
+			TargetRef:    types.GitRef("feature-branch"),
+			CommitSHA:    types.CommitSHA("abc123"),
+			TypedOptions: parseRunOptions(nil), // Use empty options for defaults
 			Env: map[string]string{
 				"FOO": "bar",
 			},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -86,11 +87,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("missing run_id", func(t *testing.T) {
 		req := StartRunRequest{
-			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		_, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err == nil {
 			t.Fatal("expected error for missing run_id")
 		}
@@ -101,11 +103,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("missing repo_url", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID: types.RunID("run-123"),
+			RunID:        types.RunID("run-123"),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		_, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err == nil {
 			t.Fatal("expected error for missing repo_url")
 		}
@@ -116,13 +119,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("defaults target_ref from base_ref", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   types.RunID("run-123"),
-			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			BaseRef: types.GitRef("main"),
+			RunID:        types.RunID("run-123"),
+			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
+			BaseRef:      types.GitRef("main"),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -134,13 +138,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("validates manifest", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:     types.RunID("run-123"),
-			RepoURL:   types.RepoURL("https://github.com/example/repo.git"),
-			TargetRef: types.GitRef("main"),
+			RunID:        types.RunID("run-123"),
+			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
+			TargetRef:    types.GitRef("main"),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -155,13 +160,13 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"command": "echo hi",
-			},
+			}),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -183,12 +188,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"image": "docker.io/example/mods-openrewrite:latest",
-			},
+			}),
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -202,11 +207,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("placeholder command injected only for default ubuntu image", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   types.RunID("run-456"),
-			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+			RunID:        types.RunID("run-456"),
+			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
+			TypedOptions: parseRunOptions(nil), // Empty options to use defaults
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -225,16 +231,16 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-789"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"gitlab_pat":       "glpat-secret-token",
 				"gitlab_domain":    "gitlab.example.com",
 				"mr_on_success":    true,
 				"mr_on_fail":       false,
 				"retain_container": true,
-			},
+			}),
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -261,14 +267,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-890"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"gitlab_pat":    "  trimmed-token  ",
 				"gitlab_domain": "",
 				"mr_on_success": true,
-			},
+			}),
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -288,7 +294,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			BaseRef: types.GitRef("main"),
 			Env:     map[string]string{"BASE_VAR": "base_value"},
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"mods": []any{
 					map[string]any{
 						"image":   "mods-orw:latest",
@@ -301,10 +307,10 @@ func TestBuildManifestFromRequest(t *testing.T) {
 						"env":     map[string]any{"STEP_VAR": "step1"},
 					},
 				},
-			},
+			}),
 		}
 
-		typedOpts := parseRunOptions(req.Options)
+		typedOpts := req.TypedOptions
 		if len(typedOpts.Steps) != 2 {
 			t.Fatalf("expected 2 steps, got %d", len(typedOpts.Steps))
 		}
@@ -365,17 +371,17 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:   types.RunID("run-multi-456"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Env:     map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"},
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"mods": []any{
 					map[string]any{
 						"image": "mods-step:latest",
 						"env":   map[string]any{"SHARED_VAR": "step_override"},
 					},
 				},
-			},
+			}),
 		}
 
-		typedOpts := parseRunOptions(req.Options)
+		typedOpts := req.TypedOptions
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 		if err != nil {
@@ -394,14 +400,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-789"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"mods": []any{
 					map[string]any{"image": "mods-step:latest"},
 				},
-			},
+			}),
 		}
 
-		typedOpts := parseRunOptions(req.Options)
+		typedOpts := req.TypedOptions
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		_, err := buildManifestFromRequest(req, typedOpts, 1, contracts.ModStackUnknown) // Index 1 out of range (only 1 step).
 		if err == nil {
@@ -416,13 +422,13 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-single-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"image":   "single-mod:latest",
 				"command": "run-single",
-			},
+			}),
 		}
 
-		typedOpts := parseRunOptions(req.Options)
+		typedOpts := req.TypedOptions
 		if len(typedOpts.Steps) != 0 {
 			t.Fatalf("expected single-step run (len(Steps)=0), got %d", len(typedOpts.Steps))
 		}
@@ -457,16 +463,16 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate ref from CommitSHA when available", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:     types.RunID("run-gate-001"),
-			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("feature/gate-wiring"),
-			CommitSHA: types.CommitSHA("abc123def456"),
-			Options:   map[string]any{},
+			RunID:        types.RunID("run-gate-001"),
+			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef:      types.GitRef("main"),
+			TargetRef:    types.GitRef("feature/gate-wiring"),
+			CommitSHA:    types.CommitSHA("abc123def456"),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -490,16 +496,16 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate ref from TargetRef when no CommitSHA", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:     types.RunID("run-gate-002"),
-			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("feature/gate-wiring"),
+			RunID:        types.RunID("run-gate-002"),
+			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef:      types.GitRef("main"),
+			TargetRef:    types.GitRef("feature/gate-wiring"),
+			TypedOptions: parseRunOptions(nil),
 			// No CommitSHA.
-			Options: map[string]any{},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -513,15 +519,15 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate ref from BaseRef as fallback", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:   types.RunID("run-gate-003"),
-			RepoURL: types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			BaseRef: types.GitRef("main"),
+			RunID:        types.RunID("run-gate-003"),
+			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef:      types.GitRef("main"),
+			TypedOptions: parseRunOptions(nil),
 			// No TargetRef or CommitSHA.
-			Options: map[string]any{},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -535,14 +541,14 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate ref empty when no refs provided", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:   types.RunID("run-gate-004"),
-			RepoURL: types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			RunID:        types.RunID("run-gate-004"),
+			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			TypedOptions: parseRunOptions(nil),
 			// No refs at all.
-			Options: map[string]any{},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -559,14 +565,14 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	t.Run("gate repo metadata trimmed of whitespace", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:     types.RunID("run-gate-005"),
-			RepoURL:   types.RepoURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
-			CommitSHA: types.CommitSHA("  abc123  "),
-			Options:   map[string]any{},
+			RunID:        types.RunID("run-gate-005"),
+			RepoURL:      types.RepoURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
+			CommitSHA:    types.CommitSHA("  abc123  "),
+			TypedOptions: parseRunOptions(nil),
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -588,13 +594,13 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			RunID:     types.RunID("run-gate-006"),
 			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			TargetRef: types.GitRef("main"),
-			Options: map[string]any{
+			TypedOptions: parseRunOptions(map[string]any{
 				"build_gate_enabled": true,
 				"build_gate_profile": "java-maven",
-			},
+			}),
 		}
 
-		typedOpts := parseRunOptions(req.Options)
+		typedOpts := req.TypedOptions
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
 		if err != nil {
@@ -629,7 +635,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 		RunID:   types.RunID("run-gate-stack-aware"),
 		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		BaseRef: types.GitRef("main"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_enabled": true,
 			"mods": []any{
 				map[string]any{
@@ -642,10 +648,10 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 					},
 				},
 			},
-		},
+		}),
 	}
 
-	typedOpts := parseRunOptions(req.Options)
+	typedOpts := req.TypedOptions
 
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {

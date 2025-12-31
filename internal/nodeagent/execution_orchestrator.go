@@ -92,13 +92,13 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// ModStackUnknown which falls back to "default" in stack maps.
 	stack := r.loadPersistedStack(req.RunID)
 
-	// Parse options and build manifest with stack-aware image resolution.
+	// Build manifest with stack-aware image resolution using typed options.
 	// stepIndex is derived from server-injected mod_index for multi-step runs;
 	// when absent, defaults to 0 (single-step or legacy behavior).
-	typedOpts := parseRunOptions(req.Options)
+	typedOpts := req.TypedOptions
 	stepIdx := 0
 	if len(typedOpts.Steps) > 0 && typedOpts.ModIndexSet {
-		// Use typed ModIndex from RunOptions (already parsed from raw map).
+		// Use typed ModIndex from RunOptions (passed in from claimer_loop).
 		if typedOpts.ModIndex >= 0 && typedOpts.ModIndex < len(typedOpts.Steps) {
 			stepIdx = typedOpts.ModIndex
 		} else {
@@ -246,9 +246,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// ModStackUnknown which falls back to "default" in stack maps.
 	stack := r.loadPersistedStack(req.RunID)
 
-	// Parse options and build manifest with stack-aware image resolution.
-	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
-	typedOpts := parseRunOptions(req.Options)
+	// Build manifest with stack-aware image resolution using typed options.
+	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
+	typedOpts := req.TypedOptions
 
 	var manifest contracts.StepManifest
 

@@ -92,14 +92,14 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-no-diff-healing"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -245,8 +245,8 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:   types.RunID("test-gate-fail-no-heal"),
-		Options: map[string]any{},
+		RunID:        types.RunID("test-gate-fail-no-heal"),
+		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -341,14 +341,14 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-heal-success"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -358,7 +358,6 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
@@ -439,21 +438,20 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-heal-exhausted"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:      types.StepID(req.RunID),
-		Name:    "Test",
-		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
-		Options: req.Options,
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
 
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
@@ -546,14 +544,14 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -571,7 +569,6 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	preGate, reGates, gateErr := rc.runGateWithHealing(
@@ -663,14 +660,14 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 2,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
@@ -688,7 +685,6 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 			Enabled: true,
 			Profile: "java",
 		},
-		Options: req.Options,
 	}
 
 	preGate, reGates, gateErr := rc.runGateWithHealing(
@@ -767,19 +763,18 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-premod-pass"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mods":    []any{map[string]any{"image": "healer:latest"}},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:      types.StepID(req.RunID),
-		Name:    "Test",
-		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
-		Options: req.Options,
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
 
 	preGate, reGates, gateErr := rc.runGateWithHealing(
@@ -964,21 +959,20 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-http-regate"),
-		Options: map[string]any{
+		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_healing": map[string]any{
 				"retries": 1,
 				"mod": map[string]any{
 					"image": "healer:latest",
 				},
 			},
-		},
+		}),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:      types.StepID(req.RunID),
-		Name:    "Test",
-		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
-		Options: req.Options,
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
 
 	_, _, gateErr := rc.runGateWithHealing(

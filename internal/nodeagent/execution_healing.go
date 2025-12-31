@@ -146,8 +146,8 @@ func (r *runController) runGateWithHealing(
 		return initialGate, nil, nil
 	}
 
-	// Gate failed. Check if healing is configured.
-	typedOpts := parseRunOptions(req.Options)
+	// Gate failed. Check if healing is configured using typed options from request.
+	typedOpts := req.TypedOptions
 	if typedOpts.Healing == nil {
 		// No healing configured; return the gate failure.
 		slog.Info("gate failed, no healing configured", "run_id", req.RunID, "phase", gatePhase)
