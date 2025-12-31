@@ -40,8 +40,8 @@ and no further mods execute.
 > `run_repos` entry. See § 1.4 (Batched Mods Runs) for the parent/child run
 > model and how single-repo runs fit into the unified architecture.
 
-When the spec contains a single `mod` entry (or uses the legacy top-level
-image/command), the execution sequence is:
+When the spec does **not** contain a `mods[]` array (single-step run using
+top-level `image`/`command`/`env`), the execution sequence is:
 
 ```
 pre-gate(+healing) → mod → post-gate(+healing)
@@ -1012,7 +1012,7 @@ artifacts/diffs to the correct node.
 
 ### 4.1 Single-step runs
 
-For a spec without `mods[]` (single `mod` or legacy top-level image):
+For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
 
 1. CLI (`ploy mod run`) builds a `RunSubmitRequest` in
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in

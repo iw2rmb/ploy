@@ -71,8 +71,9 @@ Role model (bearer token claims):
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
 - `--spec` — Path to a YAML/JSON spec file for `ploy mod run` defining mod parameters,
   Build Gate settings, and healing configuration. The spec supports:
-  - `mod.env` — Inline environment variables for the main mod container
-  - `mod.env_from_file` — File-based secrets (CLI reads and inlines content before submit)
+  - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
+  - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
+  - `mods[]` — Multi-step spec steps (each with its own image/command/env/retain_container)
   - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mod.example.yaml` for the full schema
