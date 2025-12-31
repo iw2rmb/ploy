@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
@@ -139,11 +140,24 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		}
 	}
 	// Convert store entries to ConfigHolder's in-memory map.
+	// Parse scope strings from database into typed GlobalEnvScope values.
 	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(globalEnvEntries))
 	for _, e := range globalEnvEntries {
+		// Parse scope from database; defaults to "all" if empty/invalid.
+		// Invalid scopes in database are logged but default to "all" to avoid
+		// breaking existing data. The API boundary validates before writes.
+		scope, err := domaintypes.ParseGlobalEnvScope(e.Scope)
+		if err != nil {
+			slog.Warn("invalid scope in stored global env, defaulting to 'all'",
+				"key", e.Key,
+				"scope", e.Scope,
+				"err", err,
+			)
+			scope = domaintypes.GlobalEnvScopeAll
+		}
 		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
 			Value:  e.Value,
-			Scope:  e.Scope,
+			Scope:  scope, // Use parsed typed scope.
 			Secret: e.Secret,
 		}
 	}

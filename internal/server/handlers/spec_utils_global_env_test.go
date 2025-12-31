@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestScopeMatches tests the scope matching logic that determines whether
@@ -77,7 +79,7 @@ func TestMergeGlobalEnvIntoSpec_EmptyEnv(t *testing.T) {
 // spec correctly creates the env map.
 func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 	env := map[string]GlobalEnvVar{
-		"API_KEY": {Value: "secret123", Scope: "all", Secret: true},
+		"API_KEY": {Value: "secret123", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
 	}
 
 	// Test with nil spec.
@@ -112,10 +114,10 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 // with matching scopes are merged into the spec.
 func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 	env := map[string]GlobalEnvVar{
-		"ALL_KEY":  {Value: "all-value", Scope: "all", Secret: false},
-		"MODS_KEY": {Value: "mods-value", Scope: "mods", Secret: false},
-		"HEAL_KEY": {Value: "heal-value", Scope: "heal", Secret: false},
-		"GATE_KEY": {Value: "gate-value", Scope: "gate", Secret: false},
+		"ALL_KEY":  {Value: "all-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
+		"MODS_KEY": {Value: "mods-value", Scope: domaintypes.GlobalEnvScopeMods, Secret: false},
+		"HEAL_KEY": {Value: "heal-value", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false},
+		"GATE_KEY": {Value: "gate-value", Scope: domaintypes.GlobalEnvScopeGate, Secret: false},
 	}
 
 	tests := []struct {
@@ -189,8 +191,8 @@ func TestMergeGlobalEnvIntoSpec_PerRunEnvPrecedence(t *testing.T) {
 	spec := json.RawMessage(`{"env":{"API_KEY":"per-run-value","OTHER":"existing"}}`)
 
 	env := map[string]GlobalEnvVar{
-		"API_KEY": {Value: "global-value", Scope: "all", Secret: true},
-		"NEW_KEY": {Value: "new-value", Scope: "all", Secret: false},
+		"API_KEY": {Value: "global-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
+		"NEW_KEY": {Value: "new-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
 	result := mergeGlobalEnvIntoSpec(spec, env, "mod")
@@ -225,7 +227,7 @@ func TestMergeGlobalEnvIntoSpec_PreservesOtherSpecFields(t *testing.T) {
 	spec := json.RawMessage(`{"repo":"github.com/test","timeout":300,"env":{"EXISTING":"yes"}}`)
 
 	env := map[string]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Scope: "all", Secret: true},
+		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
 	}
 
 	result := mergeGlobalEnvIntoSpec(spec, env, "mod")
@@ -256,7 +258,7 @@ func TestMergeGlobalEnvIntoSpec_PreservesOtherSpecFields(t *testing.T) {
 // are handled gracefully by creating a new map.
 func TestMergeGlobalEnvIntoSpec_InvalidJSON(t *testing.T) {
 	env := map[string]GlobalEnvVar{
-		"KEY": {Value: "value", Scope: "all", Secret: false},
+		"KEY": {Value: "value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
 	// Invalid JSON should not cause a crash; global env should still be injected.
@@ -275,9 +277,9 @@ func TestMergeGlobalEnvIntoSpec_InvalidJSON(t *testing.T) {
 // used global env keys like CA_CERTS_PEM_BUNDLE and CODEX_AUTH_JSON.
 func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	env := map[string]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\nMIID...", Scope: "all", Secret: true},
-		"CODEX_AUTH_JSON":     {Value: `{"token":"xxx"}`, Scope: "mods", Secret: true},
-		"OPENAI_API_KEY":      {Value: "sk-...", Scope: "mods", Secret: true},
+		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\nMIID...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
+		"CODEX_AUTH_JSON":     {Value: `{"token":"xxx"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true},
+		"OPENAI_API_KEY":      {Value: "sk-...", Scope: domaintypes.GlobalEnvScopeMods, Secret: true},
 	}
 
 	// Test mod job should receive all three keys.

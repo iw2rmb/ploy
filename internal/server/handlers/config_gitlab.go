@@ -7,15 +7,18 @@ import (
 	"net/http"
 	"sync"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
 // GlobalEnvVar represents a single global environment variable with its metadata.
 // Used by ConfigHolder to track global env entries in memory.
+// The Scope field uses a typed enum (GlobalEnvScope) to prevent typo-class bugs
+// in scope routing logic.
 type GlobalEnvVar struct {
-	Value  string `json:"value"`
-	Scope  string `json:"scope"`
-	Secret bool   `json:"secret"`
+	Value  string                     `json:"value"`
+	Scope  domaintypes.GlobalEnvScope `json:"scope"`
+	Secret bool                       `json:"secret"`
 }
 
 // ConfigHolder provides thread-safe access to runtime configuration, including
