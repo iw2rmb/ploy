@@ -291,6 +291,62 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
+// job_meta object (even if it contains whitespace like "{ }") is treated as absent
+// and does not cause a 400 nor trigger jobs.meta persistence.
+func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID.String(),
+		RunID:     runID,
+		NodeID:    &nodeIDStr,
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusRunning,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	// NOTE: Do not use json.Marshal here; we need whitespace inside job_meta ("{ }").
+	body := `{"status":"succeeded","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader([]byte(body)))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobCompletionCalled {
+		t.Fatal("expected UpdateJobCompletion to be called")
+	}
+	if st.updateJobCompletionWithMetaCalled {
+		t.Fatal("did not expect UpdateJobCompletionWithMeta to be called")
+	}
+}
+
 // TestCompleteJob_MissingJobID returns 400 when job_id is not in the path.
 func TestCompleteJob_MissingJobID(t *testing.T) {
 	t.Parallel()
@@ -1667,6 +1723,11 @@ func TestJobStatsPayload_HasJobMeta(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "empty object job_meta with whitespace",
+			payload:  JobStatsPayload{JobMeta: []byte("{ }")},
+			expected: false,
+		},
+		{
 			name:     "null job_meta",
 			payload:  JobStatsPayload{JobMeta: []byte("null")},
 			expected: false,
@@ -1701,6 +1762,11 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 		{
 			name:    "empty job_meta",
 			payload: JobStatsPayload{JobMeta: []byte("{}")},
+			wantErr: false, // Empty is treated as "no job_meta".
+		},
+		{
+			name:    "empty job_meta with whitespace",
+			payload: JobStatsPayload{JobMeta: []byte("{ }")},
 			wantErr: false, // Empty is treated as "no job_meta".
 		},
 		{

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,24 +67,52 @@ func (p JobStatsPayload) MRURL() string {
 // HasJobMeta returns true if job_meta is present and non-empty.
 // Empty JSON objects ("{}") and null are treated as "no job meta".
 func (p JobStatsPayload) HasJobMeta() bool {
-	if len(p.JobMeta) == 0 {
+	trimmed := bytes.TrimSpace(p.JobMeta)
+	if len(trimmed) == 0 {
 		return false
 	}
-	s := string(p.JobMeta)
-	return s != "{}" && s != "null"
+	if bytes.Equal(trimmed, []byte("null")) {
+		return false
+	}
+	if bytes.Equal(trimmed, []byte("{}")) {
+		return false
+	}
+
+	// Treat any empty object form as "no job meta", even if whitespace is present ("{ }").
+	// This keeps the API forgiving for clients that emit pretty-printed JSON.
+	if trimmed[0] == '{' {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(trimmed, &obj); err == nil && len(obj) == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateJobMeta validates the job_meta field using contracts.UnmarshalJobMeta.
 // Returns nil if job_meta is absent/empty or if it passes validation.
 // Returns an error describing the validation failure if job_meta is invalid.
 func (p JobStatsPayload) ValidateJobMeta() error {
-	if !p.HasJobMeta() {
+	trimmed := bytes.TrimSpace(p.JobMeta)
+	if len(trimmed) == 0 {
 		return nil
 	}
+	if bytes.Equal(trimmed, []byte("null")) {
+		return nil
+	}
+
+	// Treat any empty object form as "no job meta", even if whitespace is present ("{ }").
+	if trimmed[0] == '{' {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(trimmed, &obj); err == nil && len(obj) == 0 {
+			return nil
+		}
+	}
+
 	// Use the canonical JobMeta unmarshaler for structural validation.
 	// This ensures the job_meta adheres to the contracts.JobMeta schema
 	// (valid kind, consistent gate/build metadata presence, etc.).
-	if _, err := contracts.UnmarshalJobMeta(p.JobMeta); err != nil {
+	if _, err := contracts.UnmarshalJobMeta(trimmed); err != nil {
 		return fmt.Errorf("invalid job_meta: %w", err)
 	}
 	return nil
