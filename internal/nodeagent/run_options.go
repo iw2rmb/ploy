@@ -25,8 +25,9 @@ import (
 // It aggregates build gate configuration, healing policy, MR creation wiring,
 // execution shaping parameters, and artifact collection settings.
 //
-// RunOptions is populated from StartRunRequest.Options by parseRunOptions and
-// consumed by buildManifestFromRequest and execution orchestration phases.
+// RunOptions is derived from the run spec at the nodeagent boundary (see parseSpec)
+// and is passed through StartRunRequest.TypedOptions into manifest building and
+// execution orchestration paths.
 //
 // This type is the canonical source of truth for run options. Raw map[string]any
 // access should not be used; all option keys understood by the nodeagent are
