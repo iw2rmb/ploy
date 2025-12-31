@@ -58,7 +58,13 @@ func (d DiffSummary) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler for DiffSummary.
 func (d *DiffSummary) UnmarshalJSON(data []byte) error {
-	*d = DiffSummary(data)
+	if data == nil {
+		*d = nil
+		return nil
+	}
+	copied := make([]byte, len(data))
+	copy(copied, data)
+	*d = DiffSummary(copied)
 	return nil
 }
 

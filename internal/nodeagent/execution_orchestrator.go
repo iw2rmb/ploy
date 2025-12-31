@@ -649,10 +649,9 @@ func (r *runController) buildExecutionStats(runID types.RunID, jobID types.JobID
 
 	// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
 	// Include pre-gate and re-gate runs when healing was attempted.
-	// GateRaw accepts map[string]any for complex gate structures built externally.
 	if execResult.PreGate != nil || len(execResult.ReGates) > 0 || result.BuildGate != nil {
 		gate := r.buildGateStats(runID, jobID, result, execResult)
-		builder.GateRaw(gate)
+		builder.GateDetails(gate)
 	}
 
 	return builder.MustBuild()

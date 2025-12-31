@@ -22,17 +22,12 @@ func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
 	}
 	execRes := executionResult{}
 
-	got := rc.buildGateStats("run-x", "stage-y", result, execRes)
-
-	if _, has := got["duration_ms"]; has {
-		t.Fatalf("unexpected flat stats at root; want nested 'final_gate'")
+	got := rc.buildGateStats(types.RunID("run-x"), types.JobID("stage-y"), result, execRes)
+	if got == nil || got.FinalGate == nil {
+		t.Fatalf("missing final_gate in gate stats")
 	}
-	fg, has := got["final_gate"]
-	if !has {
-		t.Fatalf("missing final_gate key in gate stats")
-	}
-	if m, ok := fg.(map[string]any); !ok || m["passed"] != true {
-		t.Fatalf("final_gate stats malformed or missing passed=true: %#v", fg)
+	if got.FinalGate.Passed != true {
+		t.Fatalf("final_gate passed=%v, want true", got.FinalGate.Passed)
 	}
 }
 
@@ -133,30 +128,23 @@ func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
 	// No BuildGate in result (no mods executed).
 	result := step.Result{}
 
-	got := rc.buildGateStats("run-fallback", "stage-fallback", result, execRes)
-
-	// Verify pre_gate is present.
-	if _, hasPre := got["pre_gate"]; !hasPre {
-		t.Fatalf("expected pre_gate in gate stats, got: %#v", got)
+	got := rc.buildGateStats(types.RunID("run-fallback"), types.JobID("stage-fallback"), result, execRes)
+	if got == nil {
+		t.Fatalf("expected gate stats, got nil")
 	}
-
-	// Verify final_gate is populated from the pre-mod gate fallback.
-	fg, hasFinal := got["final_gate"]
-	if !hasFinal {
-		t.Fatalf("expected final_gate to be populated from pre-mod gate fallback, got: %#v", got)
+	if got.PreGate == nil {
+		t.Fatalf("expected pre_gate in gate stats")
 	}
-
-	fgMap, ok := fg.(map[string]any)
-	if !ok {
-		t.Fatalf("final_gate has unexpected type %T", fg)
+	if got.FinalGate == nil {
+		t.Fatalf("expected final_gate to be populated from pre-mod gate fallback")
 	}
 
 	// Verify final_gate content matches pre-mod gate.
-	if fgMap["passed"] != true {
-		t.Errorf("final_gate passed=%v, want true", fgMap["passed"])
+	if got.FinalGate.Passed != true {
+		t.Errorf("final_gate passed=%v, want true", got.FinalGate.Passed)
 	}
-	if fgMap["duration_ms"] != int64(500) {
-		t.Errorf("final_gate duration_ms=%v, want 500", fgMap["duration_ms"])
+	if got.FinalGate.DurationMs != int64(500) {
+		t.Errorf("final_gate duration_ms=%d, want 500", got.FinalGate.DurationMs)
 	}
 }
 
@@ -190,25 +178,19 @@ func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
 		Timings:   step.StageTiming{BuildGateDuration: 700 * time.Millisecond},
 	}
 
-	got := rc.buildGateStats("run-precedence", "stage-precedence", result, execRes)
+	got := rc.buildGateStats(types.RunID("run-precedence"), types.JobID("stage-precedence"), result, execRes)
 
 	// Verify final_gate uses the post-mod gate (result.BuildGate), not the pre-mod fallback.
-	fg, hasFinal := got["final_gate"]
-	if !hasFinal {
-		t.Fatalf("expected final_gate in gate stats, got: %#v", got)
-	}
-
-	fgMap, ok := fg.(map[string]any)
-	if !ok {
-		t.Fatalf("final_gate has unexpected type %T", fg)
+	if got == nil || got.FinalGate == nil {
+		t.Fatalf("expected final_gate in gate stats")
 	}
 
 	// Post-mod gate had passed=false, duration=700ms.
-	if fgMap["passed"] != false {
-		t.Errorf("final_gate passed=%v, want false (from post-mod gate)", fgMap["passed"])
+	if got.FinalGate.Passed != false {
+		t.Errorf("final_gate passed=%v, want false (from post-mod gate)", got.FinalGate.Passed)
 	}
-	if fgMap["duration_ms"] != int64(700) {
-		t.Errorf("final_gate duration_ms=%v, want 700 (from post-mod gate)", fgMap["duration_ms"])
+	if got.FinalGate.DurationMs != int64(700) {
+		t.Errorf("final_gate duration_ms=%d, want 700 (from post-mod gate)", got.FinalGate.DurationMs)
 	}
 }
 
