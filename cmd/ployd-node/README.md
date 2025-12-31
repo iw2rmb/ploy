@@ -1,13 +1,14 @@
 # ployd-node - Node Agent
 
-The `ployd-node` binary is the node agent that runs on worker nodes in the Ploy cluster. It receives run requests from the control-plane server and executes them.
+The `ployd-node` binary is the node agent that runs on worker nodes in the Ploy cluster. It polls the control-plane server for jobs and executes them.
 
 ## Features
 
 - **HTTPS server with mTLS**: Secure communication with the control-plane using mutual TLS authentication
-- **Run management endpoints**:
-  - `POST /v1/run/start`: Start a new run
-  - `POST /v1/run/stop`: Stop/cancel a running job
+- **Claim loop (canonical execution path)**: Polls the control-plane for jobs via `POST /v1/nodes/{id}/claim`
+- **Run management endpoints** (primarily for local/manual use):
+  - `POST /v1/run/start`: Start a run/job via the node HTTP API
+  - `POST /v1/run/stop`: Stop/cancel a running job via the node HTTP API
   - `GET /health`: Health check endpoint
 - **Heartbeat mechanism**: Periodically sends resource snapshots to the control-plane server
 - **Resource monitoring**: Tracks CPU, memory, and disk usage using the existing lifecycle collector
@@ -68,10 +69,10 @@ ployd-node -config /path/to/config.yaml
 
 ### Run Lifecycle
 
-1. Server sends `POST /v1/run/start` with run details
-2. Node agent accepts the run and returns HTTP 202 Accepted
-3. Run is tracked in memory (execution logic to be implemented in next phase)
-4. Server can cancel via `POST /v1/run/stop`
+1. Node agent polls `POST /v1/nodes/{id}/claim` for work
+2. Server returns `204 No Content` when no work is available, or `200 OK` with a claimed job payload (including `spec`)
+3. Node agent parses the spec into typed execution inputs and executes the claimed job
+4. Node agent reports job status and uploads artifacts/diffs back to the control-plane
 
 ### Security & Logging
 
@@ -91,8 +92,4 @@ go test -race -cover ./internal/nodeagent/...
 
 ## Next Steps
 
-The skeleton implementation provides the foundation for:
-- Node execution contract (ephemeral workspaces, git cloning, build execution)
-- Log streaming to server
-- Diff and artifact upload
-- Build gate execution
+See `ROADMAP.md` for current and upcoming work.
