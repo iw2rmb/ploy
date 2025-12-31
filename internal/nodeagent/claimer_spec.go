@@ -1,14 +1,16 @@
 // claimer_spec.go isolates spec JSON payload parsing from claim orchestration.
 //
 // This file contains parseSpec which decodes run specifications from the
-// control plane claim response. It flattens nested structures (build_gate,
-// env, options) and extracts configuration for healing, MR creation, and
-// mod execution. Separating spec parsing from claim logic enables focused
-// testing of the decoding contract without coupling to HTTP claim mechanics.
+// control plane claim response. It uses the canonical contracts.ParseModsSpecJSON
+// parser for structured validation and then converts to the internal RunOptions
+// format. Separating spec parsing from claim logic enables focused testing of
+// the decoding contract without coupling to HTTP claim mechanics.
 package nodeagent
 
 import (
 	"encoding/json"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // stringValue safely dereferences a string pointer, returning empty string if nil.
@@ -20,6 +22,9 @@ func stringValue(s *string) string {
 }
 
 // parseSpec splits a spec JSON payload into options and environment maps.
+// It uses the canonical contracts.ParseModsSpecJSON parser for structured
+// validation, then converts to the internal RunOptions format.
+//
 // The spec is expected to contain fields like "image", "command", "env",
 // "build_gate", "mods", and other configuration values. This function extracts
 // and flattens nested structures according to the following rules:
@@ -64,14 +69,155 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	if len(spec) == 0 {
 		return opts, env, typedOpts
 	}
-	var root any
-	if err := json.Unmarshal(spec, &root); err != nil {
-		return opts, env, typedOpts
+
+	// Parse using the canonical parser for structural validation.
+	// We still need the raw map for server-injected fields (job_id, mod_index)
+	// that aren't part of the canonical spec schema.
+	modsSpec, err := contracts.ParseModsSpecJSON(spec)
+	if err != nil {
+		// Fallback to raw map parsing for backwards compatibility.
+		// This allows specs with server-injected fields to still be processed.
+		var root any
+		if jsonErr := json.Unmarshal(spec, &root); jsonErr != nil {
+			return opts, env, typedOpts
+		}
+		m, ok := root.(map[string]any)
+		if !ok {
+			return map[string]any{"spec": root}, env, typedOpts
+		}
+		// Use legacy parsing path for malformed specs.
+		return parseSpecFromRawMap(m)
 	}
-	m, ok := root.(map[string]any)
-	if !ok {
-		return map[string]any{"spec": root}, env, typedOpts
+
+	// Also parse raw map to extract server-injected fields not in canonical schema.
+	var rawMap map[string]any
+	if err := json.Unmarshal(spec, &rawMap); err != nil {
+		rawMap = map[string]any{}
 	}
+
+	// Convert canonical ModsSpec to internal options format.
+	opts, env = modsSpecToOptions(modsSpec, rawMap)
+
+	// Parse typed options from the flattened opts map.
+	typedOpts = parseRunOptions(opts)
+
+	return opts, env, typedOpts
+}
+
+// modsSpecToOptions converts a canonical ModsSpec to the internal opts/env format.
+// It also extracts server-injected fields (job_id, mod_index) from rawMap.
+//
+// This function preserves the original types from rawMap where possible to maintain
+// backwards compatibility with existing test expectations (e.g., float64 for retries,
+// []any for command arrays).
+func modsSpecToOptions(spec *contracts.ModsSpec, rawMap map[string]any) (map[string]any, map[string]string) {
+	opts := make(map[string]any)
+	env := make(map[string]string)
+
+	// Extract env from spec (single-step runs).
+	for k, v := range spec.Env {
+		env[k] = v
+	}
+
+	// Convert image to opts format.
+	if !spec.Image.IsEmpty() {
+		if spec.Image.Universal != "" {
+			opts["image"] = spec.Image.Universal
+		} else if len(spec.Image.ByStack) > 0 {
+			imgMap := make(map[string]any, len(spec.Image.ByStack))
+			for k, v := range spec.Image.ByStack {
+				imgMap[string(k)] = v
+			}
+			opts["image"] = imgMap
+		}
+	}
+
+	// Convert command to opts format.
+	// Preserve []any for exec arrays (backwards compat with JSON unmarshaling).
+	if !spec.Command.IsEmpty() {
+		if len(spec.Command.Exec) > 0 {
+			// Convert to []any for backwards compatibility with JSON unmarshaling.
+			cmdSlice := make([]any, len(spec.Command.Exec))
+			for i, s := range spec.Command.Exec {
+				cmdSlice[i] = s
+			}
+			opts["command"] = cmdSlice
+		} else if spec.Command.Shell != "" {
+			opts["command"] = spec.Command.Shell
+		}
+	}
+
+	// Retain container.
+	if spec.RetainContainer {
+		opts["retain_container"] = true
+	}
+
+	// Build gate - flatten enabled/profile and set enabled even when false.
+	if spec.BuildGate != nil {
+		// Always set build_gate_enabled when BuildGate is present (including false).
+		opts["build_gate_enabled"] = spec.BuildGate.Enabled
+		if spec.BuildGate.Profile != "" {
+			opts["build_gate_profile"] = spec.BuildGate.Profile
+		}
+	}
+
+	// Build gate healing - preserve original types from rawMap for backwards compat.
+	// Tests expect float64 for retries and []any for command arrays.
+	if healing, ok := rawMap["build_gate_healing"].(map[string]any); ok && len(healing) > 0 {
+		opts["build_gate_healing"] = healing
+	}
+
+	// Multi-step mods - preserve original mods[] array from rawMap.
+	// Tests expect []any with map[string]any entries preserving original types.
+	if modsSlice, ok := rawMap["mods"].([]any); ok && len(modsSlice) > 0 {
+		opts["mods"] = modsSlice
+	}
+
+	// GitLab integration.
+	if spec.GitLabPAT != "" {
+		opts["gitlab_pat"] = spec.GitLabPAT
+	}
+	if spec.GitLabDomain != "" {
+		opts["gitlab_domain"] = spec.GitLabDomain
+	}
+	if spec.MROnSuccess {
+		opts["mr_on_success"] = true
+	}
+	if spec.MROnFail {
+		opts["mr_on_fail"] = true
+	}
+
+	// Artifact configuration.
+	if spec.ArtifactName != "" {
+		opts["artifact_name"] = spec.ArtifactName
+	}
+	if len(spec.ArtifactPaths) > 0 {
+		opts["artifact_paths"] = spec.ArtifactPaths
+	}
+
+	// Extract server-injected fields from raw map (not part of canonical spec).
+	if jid, ok := rawMap["job_id"].(string); ok && jid != "" {
+		opts["job_id"] = jid
+	}
+	if mi, ok := rawMap["mod_index"]; ok {
+		switch v := mi.(type) {
+		case float64:
+			opts["mod_index"] = int(v)
+		case int:
+			opts["mod_index"] = v
+		}
+	}
+
+	return opts, env
+}
+
+// parseSpecFromRawMap is the legacy parsing path used when canonical parsing fails.
+// This preserves backwards compatibility with specs that have server-injected fields
+// or other non-canonical structures.
+func parseSpecFromRawMap(m map[string]any) (map[string]any, map[string]string, RunOptions) {
+	opts := map[string]any{}
+	env := map[string]string{}
+
 	// Extract known fields at top level.
 	// Image may be a string (universal) or a map (stack-aware).
 	if v, ok := m["image"]; ok && v != nil {
@@ -119,7 +265,7 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	if jid, ok := m["job_id"].(string); ok && jid != "" {
 		opts["job_id"] = jid
 	}
-	// Pass through GitLab config (PAT and domain) if present (server injects defaults on claim).
+	// Pass through GitLab config (PAT and domain) if present.
 	if pat, ok := m["gitlab_pat"].(string); ok && pat != "" {
 		opts["gitlab_pat"] = pat
 	}
@@ -134,34 +280,23 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 		opts["mr_on_fail"] = mrFail
 	}
 
-	// Pass through build_gate_healing block if present so the agent can
-	// execute the heal → re‑gate loop when the initial gate fails.
-	// Accept either a map (decoded object) or arbitrary JSON; store as-is.
+	// Pass through build_gate_healing block if present.
 	if healing, ok := m["build_gate_healing"]; ok {
-		// Only include non-empty objects/arrays to avoid confusing downstream logic.
 		switch h := healing.(type) {
 		case map[string]any:
 			if len(h) > 0 {
 				opts["build_gate_healing"] = h
 			}
 		case []any:
-			// Unlikely, but preserve if provided (defensive).
 			if len(h) > 0 {
 				opts["build_gate_healing"] = h
 			}
 		default:
-			// Preserve scalar values only when not empty.
 			if healing != nil {
 				opts["build_gate_healing"] = healing
 			}
 		}
 	}
-
-	// NOTE: Legacy "mod" object fallback has been removed. Specs must use either:
-	// - Top-level fields (image, command, env, etc.) for single-step runs, OR
-	// - The mods[] array for multi-step runs.
-	// The "mod" object (e.g., {"mod": {"image": "...", "env": {...}}}) is no longer
-	// processed; such specs must be migrated to the canonical shapes above.
 
 	// Flatten build_gate.enabled/profile for manifest builder to honor.
 	if bg, ok := m["build_gate"].(map[string]any); ok {
@@ -174,14 +309,11 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	}
 
 	// Pass through mods[] array for multi-step run execution.
-	// For multi-step runs (mods[] in spec), preserve the array for step-by-step execution.
-	// Each entry in mods[] defines a gate+mod step with its own image, command, and env.
 	if modsSlice, ok := m["mods"].([]any); ok && len(modsSlice) > 0 {
 		opts["mods"] = modsSlice
 	}
 
-	// Pass through mod_index when present. This is a server-injected per-job
-	// index that maps mod jobs to mods[mod_index] in multi-step specs.
+	// Pass through mod_index when present.
 	if mi, ok := m["mod_index"]; ok {
 		switch v := mi.(type) {
 		case float64:
@@ -192,10 +324,7 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	}
 
 	// Parse typed options from the flattened opts map.
-	// RunOptions is the canonical source of truth; all consumers should use
-	// typed fields instead of raw map access. The raw map is an internal
-	// intermediate representation for bridging JSON parsing.
-	typedOpts = parseRunOptions(opts)
+	typedOpts := parseRunOptions(opts)
 
 	return opts, env, typedOpts
 }

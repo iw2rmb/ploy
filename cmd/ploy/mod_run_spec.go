@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -298,5 +299,16 @@ func buildSpecPayload(
 	}
 
 	// Marshal to JSON for submission
-	return json.Marshal(base)
+	jsonBytes, err := json.Marshal(base)
+	if err != nil {
+		return nil, fmt.Errorf("marshal spec: %w", err)
+	}
+
+	// Validate spec using the canonical parser to catch structural issues early.
+	// This ensures the CLI surfaces validation errors before submission.
+	if _, err := contracts.ParseModsSpecJSON(jsonBytes); err != nil {
+		return nil, fmt.Errorf("validate spec: %w", err)
+	}
+
+	return jsonBytes, nil
 }

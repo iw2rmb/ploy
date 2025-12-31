@@ -18,6 +18,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
@@ -366,6 +367,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 // createJobsFromSpec parses the run spec and creates jobs for the execution pipeline.
+// It uses the canonical contracts.ParseModsSpecJSON parser for structured validation.
 // Jobs are created with float step_index for ordered execution with dynamic insertion support.
 //
 // Default job layout:
@@ -378,7 +380,59 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 //
 // runID is a KSUID-backed domain type; job IDs are generated using domaintypes.NewJobID().
 func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, spec []byte) error {
-	// Parse spec to detect multi-step vs single-step.
+	// Parse spec using the canonical parser for structured validation.
+	modsSpec, err := contracts.ParseModsSpecJSON(spec)
+	if err != nil {
+		// Fallback to legacy parsing for backwards compatibility with non-canonical specs.
+		// This preserves existing behavior for specs that don't conform to the canonical schema.
+		return createJobsFromSpecLegacy(ctx, st, runID, spec)
+	}
+
+	// Check for multi-step run (mods[] array).
+	if modsSpec.IsMultiStep() {
+		// Multi-step run: create pre-gate, one job per mod, and post-gate.
+		// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
+		// Pre-gate job - pending (ready to be claimed immediately)
+		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
+			return fmt.Errorf("create pre-gate job: %w", err)
+		}
+
+		// Mod jobs: step_index starts at 2000, increment by 1000
+		// All mod jobs start as 'created' - server will schedule them after prior job completes.
+		for i, mod := range modsSpec.Mods {
+			// Extract image string (use universal form or empty for stack-aware).
+			// Stack-aware images are resolved at execution time by the node agent.
+			modImage := ""
+			if mod.Image.Universal != "" {
+				modImage = strings.TrimSpace(mod.Image.Universal)
+			}
+			jobName := fmt.Sprintf("mod-%d", i)
+			stepIndex := domaintypes.StepIndex(2000 + i*1000)
+			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
+				return fmt.Errorf("create mod job %d: %w", i, err)
+			}
+		}
+
+		// Post-gate job: after all mods - starts as 'created'
+		postGateIndex := domaintypes.StepIndex(2000 + len(modsSpec.Mods)*1000)
+		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
+			return fmt.Errorf("create post-gate job: %w", err)
+		}
+		return nil
+	}
+
+	// Single-step run: create pre-gate, single mod, and post-gate.
+	// Extract image from top-level spec (universal form only; stack-aware resolved at execution).
+	modImage := ""
+	if modsSpec.Image.Universal != "" {
+		modImage = strings.TrimSpace(modsSpec.Image.Universal)
+	}
+	return createSingleModJob(ctx, st, runID, modImage)
+}
+
+// createJobsFromSpecLegacy is the legacy parsing path for specs that don't conform
+// to the canonical schema. This preserves backwards compatibility.
+func createJobsFromSpecLegacy(ctx context.Context, st store.Store, runID domaintypes.RunID, spec []byte) error {
 	var specMap map[string]interface{}
 	if len(spec) > 0 && json.Valid(spec) {
 		if err := json.Unmarshal(spec, &specMap); err != nil {
@@ -389,15 +443,11 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 
 	// Check for mods[] array (multi-step run).
 	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
-		// Multi-step run: create pre-gate, one job per mod, and post-gate.
-		// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
 		// Pre-gate job - pending (ready to be claimed immediately)
 		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
-		// Mod jobs: step_index starts at 2000, increment by 1000
-		// All mod jobs start as 'created' - server will schedule them after prior job completes.
 		for i, modInterface := range mods {
 			modImage := ""
 			if modMap, ok := modInterface.(map[string]interface{}); ok {
@@ -412,7 +462,6 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 			}
 		}
 
-		// Post-gate job: after all mods - starts as 'created'
 		postGateIndex := domaintypes.StepIndex(2000 + len(mods)*1000)
 		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
 			return fmt.Errorf("create post-gate job: %w", err)
@@ -420,7 +469,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 		return nil
 	}
 
-	// Single-step run: create pre-gate, single mod, and post-gate.
+	// Single-step run.
 	modImage := ""
 	if mod, ok := specMap["mod"].(map[string]interface{}); ok {
 		if img, ok := mod["image"].(string); ok {
