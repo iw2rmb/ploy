@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
@@ -14,8 +15,8 @@ import (
 // returns all entries sorted by key, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Scope: "all", Secret: true},
-		"API_KEY":             {Value: "sk-abc123", Scope: "mods", Secret: false},
+		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
+		"API_KEY":             {Value: "sk-abc123", Scope: domaintypes.GlobalEnvScopeMods, Secret: false},
 	})
 
 	handler := listGlobalEnvHandler(holder)
@@ -57,7 +58,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 // returns full value (including for secrets) for admin access.
 func TestConfigEnvGetReturnsEntry(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CODEX_AUTH_JSON": {Value: `{"token":"secret"}`, Scope: "mods", Secret: true},
+		"CODEX_AUTH_JSON": {Value: `{"token":"secret"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true},
 	})
 
 	handler := getGlobalEnvHandler(holder)
@@ -226,7 +227,7 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &mockStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "old-value", Scope: "all", Secret: false},
+		"OLD_KEY": {Value: "old-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
@@ -396,7 +397,7 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 		deleteGlobalEnvErr: errMockDatabase,
 	}
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "val", Scope: "all", Secret: false},
+		"OLD_KEY": {Value: "val", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)

@@ -174,17 +174,17 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	configHolder := &ConfigHolder{}
 	configHolder.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{
 		Value:  "global-cert",
-		Scope:  "all",
+		Scope:  domaintypes.GlobalEnvScopeAll, // Typed scope for type safety.
 		Secret: true,
 	})
 	configHolder.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{
 		Value:  `{"token":"xxx"}`,
-		Scope:  "mods",
+		Scope:  domaintypes.GlobalEnvScopeMods, // Typed scope for type safety.
 		Secret: true,
 	})
 	configHolder.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{
 		Value:  "heal-env",
-		Scope:  "heal",
+		Scope:  domaintypes.GlobalEnvScopeHeal, // Typed scope for type safety.
 		Secret: false,
 	})
 

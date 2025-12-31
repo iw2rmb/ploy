@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"sort"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // globalEnvListItem represents an entry in the GET /v1/config/env list response.
 // For secrets, the value is redacted to prevent accidental exposure.
+// Scope is serialized as string for wire compatibility.
 type globalEnvListItem struct {
 	Key    string `json:"key"`
 	Value  string `json:"value,omitempty"` // Omitted (empty) for secrets in list view.
@@ -21,6 +23,7 @@ type globalEnvListItem struct {
 
 // globalEnvResponse represents the response for GET /v1/config/env/{key} and PUT /v1/config/env/{key}.
 // Full value is returned since these endpoints are admin-only and accessed via mTLS.
+// Scope is serialized as string for wire compatibility.
 type globalEnvResponse struct {
 	Key    string `json:"key"`
 	Value  string `json:"value"`
@@ -29,9 +32,10 @@ type globalEnvResponse struct {
 }
 
 // globalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
+// Scope is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvScope().
 type globalEnvPutRequest struct {
 	Value  string `json:"value"`
-	Scope  string `json:"scope"`
+	Scope  string `json:"scope"`  // Raw string from wire; validated via ParseGlobalEnvScope.
 	Secret *bool  `json:"secret"` // Pointer to distinguish explicit false from missing (defaults to true).
 }
 
@@ -54,7 +58,7 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			v := envMap[k]
 			item := globalEnvListItem{
 				Key:    k,
-				Scope:  v.Scope,
+				Scope:  v.Scope.String(), // Convert typed scope to string for wire format.
 				Secret: v.Secret,
 			}
 			// Redact value for secrets in list view.
@@ -94,7 +98,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  v.Value,
-			Scope:  v.Scope,
+			Scope:  v.Scope.String(), // Convert typed scope to string for wire format.
 			Secret: v.Secret,
 		}
 
@@ -106,7 +110,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 
 		slog.Info("config env get: returned entry",
 			"key", key,
-			"scope", v.Scope,
+			"scope", v.Scope.String(),
 			"secret", v.Secret,
 		)
 	}
@@ -129,13 +133,12 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			return
 		}
 
-		// Validate scope — must be one of: all, mods, heal, gate.
-		validScopes := map[string]bool{"all": true, "mods": true, "heal": true, "gate": true}
-		if req.Scope == "" {
-			req.Scope = "all" // Default to "all" if not specified.
-		}
-		if !validScopes[req.Scope] {
-			http.Error(w, fmt.Sprintf("invalid scope: %s (must be one of: all, mods, heal, gate)", req.Scope), http.StatusBadRequest)
+		// Parse and validate scope at API boundary using typed enum.
+		// ParseGlobalEnvScope handles empty string (defaults to "all") and validates
+		// against known values (all, mods, heal, gate).
+		scope, err := domaintypes.ParseGlobalEnvScope(req.Scope)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -146,10 +149,11 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		// Persist to the store first (fail-fast if database is down).
+		// Store uses string scope for wire compatibility.
 		if err := st.UpsertGlobalEnv(r.Context(), store.UpsertGlobalEnvParams{
 			Key:    key,
 			Value:  req.Value,
-			Scope:  req.Scope,
+			Scope:  scope.String(), // Convert typed scope to string for database storage.
 			Secret: secret,
 		}); err != nil {
 			slog.Error("config env put: store upsert failed", "err", err, "key", key)
@@ -158,16 +162,17 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		// Update in-memory holder after successful persistence.
+		// In-memory representation uses typed scope.
 		holder.SetGlobalEnvVar(key, GlobalEnvVar{
 			Value:  req.Value,
-			Scope:  req.Scope,
+			Scope:  scope, // Use validated typed scope.
 			Secret: secret,
 		})
 
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  req.Value,
-			Scope:  req.Scope,
+			Scope:  scope.String(), // Convert typed scope to string for wire format.
 			Secret: secret,
 		}
 
@@ -179,7 +184,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 
 		slog.Info("config env put: upserted entry",
 			"key", key,
-			"scope", req.Scope,
+			"scope", scope.String(),
 			"secret", secret,
 		)
 	}
