@@ -76,10 +76,11 @@ test_detects_new_violations() {
     cat > "$test_file" << 'EOF'
 package handlers
 
-// ViolatingHandler uses untyped map at API boundary.
-func ViolatingHandler() map[string]any {
-    return map[string]any{"error": "bad"}
-}
+// ViolatingHandlerAny uses untyped map at API boundary.
+func ViolatingHandlerAny() map[string]any { return nil }
+
+// ViolatingHandlerIface uses untyped map at API boundary.
+func ViolatingHandlerIface() map[string]interface{} { return nil }
 EOF
 
     cd "$REPO_ROOT"
@@ -89,10 +90,10 @@ EOF
     # Cleanup.
     rm -f "$test_file"
 
-    if [ "$count" -gt 0 ]; then
+    if [ "$count" = "2" ]; then
         pass "Detected $count violation(s) in test file"
     else
-        fail "Expected violations but found 0" ""
+        fail "Expected 2 violations, got $count" ""
     fi
 }
 

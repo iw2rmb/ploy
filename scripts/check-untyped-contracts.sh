@@ -123,12 +123,9 @@ build_exclusions() {
     exclusions+=" --glob '!*_test.go'"
     exclusions+=" --glob '!*_fuzz_test.go'"
 
-    # Exclude approved parsing modules.
+    # Exclude approved parsing modules by full path (avoid accidental exclusions via basename collisions).
     for file in "${APPROVED_FILES[@]}"; do
-        # Extract just the filename for glob matching.
-        local basename
-        basename=$(basename "$file")
-        exclusions+=" --glob '!$basename'"
+        exclusions+=" --glob '!$file'"
     done
 
     echo "$exclusions"
@@ -191,8 +188,9 @@ main() {
     violations=${violations:-0}
 
     # Get violation lines (all lines except the last count line).
+    # Use sed for portability (BSD head does not support `head -n -1`).
     local violation_lines
-    violation_lines=$(echo "$output" | head -n -1)
+    violation_lines=$(printf '%s\n' "$output" | sed '$d')
 
     case "$mode" in
         count)
@@ -201,7 +199,7 @@ main() {
             ;;
         list)
             if [ -n "$violation_lines" ]; then
-                echo "$violation_lines"
+                printf '%s\n' "$violation_lines"
             fi
             [ "$violations" -eq 0 ] && exit 0 || exit 1
             ;;
@@ -210,7 +208,7 @@ main() {
                 echo -e "${RED}ERROR: Found $violations untyped contract(s) at API boundaries${NC}"
                 echo ""
                 echo -e "${YELLOW}Violations:${NC}"
-                echo "$violation_lines"
+                printf '%s\n' "$violation_lines"
                 echo ""
                 echo -e "${YELLOW}Resolution:${NC}"
                 echo "  1. Use typed structs instead of map[string]any at API boundaries."
