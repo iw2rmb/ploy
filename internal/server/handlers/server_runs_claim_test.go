@@ -43,6 +43,7 @@ func TestClaimJob_Success(t *testing.T) {
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
 			StepIndex: 2000,
 			Meta:      []byte("{}"),
+			ModType:   "mod",
 		},
 		getRunResult: store.Run{
 			ID:        runID.String(),
@@ -350,6 +351,7 @@ func TestClaimJob_AcksRunStart(t *testing.T) {
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
 			StepIndex: 1000,
 			Meta:      []byte("{}"),
+			ModType:   "pre_gate",
 		},
 		getRunResult: store.Run{
 			ID:        runID.String(),
@@ -411,6 +413,7 @@ func TestClaimJob_PublishesRunningEvent(t *testing.T) {
 			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
 			StepIndex: 2000,
 			Meta:      []byte("{}"),
+			ModType:   "mod",
 		},
 		getRunResult: store.Run{
 			ID:        runID.String(),

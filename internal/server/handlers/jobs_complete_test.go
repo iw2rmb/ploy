@@ -37,7 +37,9 @@ func TestCompleteJob_Success(t *testing.T) {
 		ID:        jobID.String(),
 		RunID:     runID,
 		NodeID:    &nodeIDStr,
+		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
+		ModType:   "mod",
 		StepIndex: 1000,
 	}
 
@@ -96,7 +98,9 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 		ID:        jobID.String(),
 		RunID:     runID,
 		NodeID:    &nodeIDStr,
+		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
+		ModType:   "mod",
 		StepIndex: 1000,
 	}
 
@@ -779,7 +783,9 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 		ID:        jobID.String(),
 		RunID:     runID,
 		NodeID:    &nodeIDStr,
+		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
+		ModType:   "mod",
 		StepIndex: 1000,
 	}
 
