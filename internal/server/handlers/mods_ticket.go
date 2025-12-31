@@ -94,6 +94,10 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		if req.Spec != nil && len(*req.Spec) > 0 {
 			spec = *req.Spec
 		}
+		if _, err := contracts.ParseModsSpecJSON(spec); err != nil {
+			http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+			return
+		}
 
 		// Convert domain types to strings for storage layer.
 		// Generate KSUID-backed parent run ID using central helper.

@@ -28,7 +28,7 @@ func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
 	queuedBatch := store.Run{
 		ID:        batchRunID.String(),
 		Status:    store.RunStatusQueued,
-		Spec:      []byte(`{"mod":{"image":"test"}}`),
+		Spec:      []byte(`{"image":"test"}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 

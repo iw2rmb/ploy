@@ -225,7 +225,7 @@ func maybeCreateHealingJobs(
 
 	// Create a single healing job for this attempt.
 	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
-	_, err := st.CreateJob(ctx, store.CreateJobParams{
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:        string(domaintypes.NewJobID()),
 		RunID:     runID,
 		Name:      healJobName,
