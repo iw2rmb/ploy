@@ -6,13 +6,16 @@ Support “code modification projects” where:
 
 - A **mod** is a long-lived project with a unique name.
 - A mod has **spec variants** (Mods YAML/JSON) to iterate on approach (ORW recipes, LLM model/prompt, etc.).
-- A mod has a managed **repo set** that changes over time.
+- A mod has a managed **repo set** (identified by `repo_url`) that changes over time.
 - A **run** executes a chosen spec variant over:
   - one repo,
   - a selected subset of repos,
   - or the mod’s repos whose last run state is `failed`.
 
-`ploy mod run ...` creates a batch run and immediately starts execution.
+Run entrypoints:
+
+- `ploy run --spec ... --repo ...` creates a run and immediately starts execution (single-repo). It also creates a mod project as a side-effect; the created mod has `name == id`.
+- `ploy mod run <mod> ...` creates a run for a mod project and immediately starts execution over the mod’s repo set.
 
 ## Terms (no new nouns)
 
@@ -32,11 +35,12 @@ Support “code modification projects” where:
 
 - **Immutability**: a run links to the exact spec variant used.
 - **Stable grouping**: grouping is by `mods.name` (unique) and `runs.mod_id` (no `runs.name`).
+- **Archiving**: archived mods cannot be executed.
 - **Repo selection**:
   - `--repo ...` → explicit repos
   - `--failed` → repos whose most recent terminal per-repo status is `failed`
-  - default → all enabled repos for the mod
-- **Immediate start**: `ploy mod run` starts pending repos right away (equivalent to current `ploy run start` behavior).
+  - default → all repos in the mod repo set
+- **Immediate start**: both `ploy run` and `ploy mod run` start pending work right away.
 
 ## Minimal blast radius
 

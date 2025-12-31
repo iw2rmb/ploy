@@ -16,6 +16,11 @@ Indexes:
 - unique on `name`
 - optional partial index on active mods: `WHERE archived_at IS NULL`
 
+Archiving semantics:
+
+- When `archived_at` is non-NULL, creating new runs for the mod must fail.
+- Archiving must be refused when the mod has any jobs in a running state.
+
 ### `mod_specs`
 
 - `id TEXT PRIMARY KEY` (NanoID(6), app-generated)
