@@ -19,11 +19,12 @@ Notes:
 
 - Creates a mod with unique `<name>`.
 - If `--spec` is provided, also creates an initial spec variant for the mod.
+- If `--spec` is provided, sets `mods.spec_id` to the created `spec_id`.
 - Prints `mod_id` and name; if `--spec` is provided, also prints `spec_id`.
 
 ### `ploy mod list`
 
-- Lists mods: `ID`, `NAME`, `CREATED_AT`, `ARCHIVED_AT`, optional `DEFAULT_SPEC`.
+- Lists mods: `ID`, `NAME`, `CREATED_AT`, `ARCHIVED_AT`.
 
 ### `ploy mod remove <mod-id|name>`
 
@@ -53,6 +54,7 @@ Behavior:
 
 - Stores the parsed spec JSON (from YAML/JSON input).
 - Validates spec shape.
+- Inserts a new `specs` row and updates `mods.spec_id` to that new `spec_id`.
 - Returns `spec_id`.
 
 ### `ploy mod spec list <mod-id|name>`
@@ -62,10 +64,6 @@ Behavior:
 ### `ploy mod spec remove <mod-id|name> <spec-id|name>`
 
 - Archives or deletes a spec variant.
-
-### `ploy mod spec default <mod-id|name> <spec-id|name>`
-
-- Sets the mod’s default spec used by `ploy mod run` when `--spec` is omitted.
 
 ## Repo set management
 
@@ -78,12 +76,10 @@ Behavior:
 
 - Lists repos in the mod: `ID`, `REPO_URL`, `BASE_REF`, `TARGET_REF`, `ADDED_AT`.
 
-### `ploy mod repo remove <mod-id|name> --repo-id <mod_repo_id> [--force]`
+### `ploy mod repo remove <mod-id|name> --repo-id <mod_repo_id>`
 
 - Deletes the repo row from the mod’s repo set.
-- If there are historical executions referencing this repo (`run_repos.mod_repo_id` exists), require `--force`:
-  - without `--force`: return a clear error
-  - with `--force`: delete the row and preserve history via FK `ON DELETE SET NULL`
+- Refuse deletion if there are historical executions referencing this repo (`run_repos.repo_id` exists).
 
 ### `ploy mod repo import <mod-id|name> --file <path>`
 
@@ -101,7 +97,8 @@ Behavior:
 - Refuses when the mod is archived.
 - Resolves the chosen spec:
   - `--spec <id|name>` → stored spec variant
-  - omitted → mod default spec (error if none)
+  - omitted → use `mods.spec_id` (error if NULL)
+- If `--spec` is provided, also updates `mods.spec_id` to that spec for future runs.
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
   - `--failed` → repos with last terminal state `failed`
