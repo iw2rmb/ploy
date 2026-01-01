@@ -15,6 +15,10 @@ Response:
 
 - `id`, `name`, `created_at`, optional `spec_id` (when `spec` is provided)
 
+Behavior:
+
+- If `spec` is provided, set `mods.spec_id` to the created `spec_id`.
+
 ### `GET /v1/mods`
 
 Lists mods.
@@ -74,12 +78,16 @@ Creates a spec variant for a mod.
 
 Request:
 
-- `name` (string, unique within mod)
+- `name` (string)
 - `spec` (object; JSON)
 
 Response:
 
 - `id`, `name`, `created_at`
+
+Behavior:
+
+- Update `mods.spec_id` to the created `spec_id`.
 
 ### `GET /v1/mods/{mod_id}/specs`
 
@@ -88,10 +96,6 @@ Lists spec variants for a mod.
 ### `DELETE /v1/mods/{mod_id}/specs/{spec_id}`
 
 Archives or deletes a spec variant.
-
-### `POST /v1/mods/{mod_id}/specs/{spec_id}/default`
-
-Sets mod default spec.
 
 ## Repo set
 
@@ -113,12 +117,11 @@ Response:
 
 Lists repos for a mod.
 
-### `DELETE /v1/mods/{mod_id}/repos/{mod_repo_id}?force=true`
+### `DELETE /v1/mods/{mod_id}/repos/{mod_repo_id}`
 
 Deletes a repo from the mod repo set.
 
-- If the repo has historical executions (referenced by `run_repos.mod_repo_id`), require `force=true`.
-- Without `force=true`, return a clear error explaining that the repo has run history.
+- Refuse deletion if the repo has historical executions (referenced by `run_repos.repo_id`).
 
 ## Running a mod
 
@@ -130,7 +133,7 @@ This is the API behind `ploy mod run <mod> ...`.
 
 Request (suggested):
 
-- `spec_ref`:
+- optional `spec_ref`:
   - `{ "id": "<spec_id>" }` or `{ "name": "<spec_name>" }`
 - `repo_selector`:
   - `{ "mode": "all" }`
@@ -140,6 +143,11 @@ Request (suggested):
   - `created_by`
   - optional ref overrides when `mode=explicit` (exact shape TBD)
 
+Behavior:
+
+- If `spec_ref` is omitted, use `mods.spec_id`; if `mods.spec_id` is NULL, return an error that spec is required.
+- If `spec_ref` is provided, update `mods.spec_id` to the resolved `spec_id` for future runs.
+
 Response:
 
 - `run_id`
@@ -147,5 +155,5 @@ Response:
 
 ## Schema/docs updates
 
-- Add OpenAPI schemas for `Mod`, `ModSpec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
+- Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
