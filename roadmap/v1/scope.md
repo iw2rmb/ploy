@@ -61,6 +61,7 @@ Current server routes under `/v1/mods/*` are run-scoped (see `internal/server/ha
 - `POST /v1/mods` (run submission) must move to `POST /v1/runs`.
 - Run-scoped routes under `/v1/mods/{run_id}/*` must move under `/v1/runs/{run_id}/*`:
   - examples: `GET /v1/mods/{run_id}/diffs`, `GET /v1/mods/{run_id}/graph`, `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
+ - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
 
 Current codebase behavior (to remove):
 
@@ -75,7 +76,7 @@ v1 behavior (to implement):
 - Jobs become repo-scoped by adding `jobs.repo_id` and `jobs.repo_base_ref` (copied from `run_repos`).
 - Logs/diffs/events remain addressed by `run_id`, but repo attribution comes from `job_id → jobs.repo_id`.
 - Base commit SHA recording moves from `runs.commit_sha` to `run_repos.commit_sha`.
-  - v1 rule: resolved by the server before starting the first job; not provided by CLI.
+  - v1 rule: resolved by the server before starting the first job; not provided by CLI. If resolution fails, mark the repo `Failed` without starting jobs.
 
 Code pointers for the refactor:
 

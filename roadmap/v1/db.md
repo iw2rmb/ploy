@@ -88,14 +88,13 @@ Change entry: reshape execution model to `runs` → `run_repos` and make jobs re
 ### `runs.status` (`run_status`)
 
 - `Started`
-- `Stopped`
+- `Cancelled`
 - `Finished`
 
 ### `run_repos.status` (`run_repo_status`)
 
 - `Pending`
 - `Running`
-- `Stopped`
 - `Cancelled`
 - `Failed`
 - `Success`
@@ -146,8 +145,8 @@ Constraints / indexes:
 
 ### `runs.status`
 
-- `Started` → `Finished` when all `run_repos` are terminal (`Failed`, `Success`, `Cancelled`, or `Stopped`).
-- `Started` ↔ `Stopped` via `ploy run stop` and `ploy run start`.
+- `Started` → `Finished` when all `run_repos` are terminal (`Failed`, `Success`, or `Cancelled`).
+- `Started` → `Cancelled` via `ploy run cancel`.
 
 ### `run_repos.status`
 
@@ -155,9 +154,9 @@ Constraints / indexes:
 - `Running` when there is at least one repo-scoped job with `jobs.status IN ('pending','running')` for `(run_id, repo_id)`.
 - Terminal:
   - `Success` when repo execution succeeded.
-  - `Failed` when repo execution did not succeed (and was not stopped).
+  - `Failed` when repo execution did not succeed (and was not cancelled).
   - `Cancelled` when repo execution was cancelled (treated as terminal for `runs.status` aggregation).
-  - `Stopped` via `ploy run stop --repo <mod_repo_id>`.
+  - `Cancelled` via repo cancellation endpoint (see `roadmap/v1/api.md`).
 
 ### `jobs` (updated)
 
@@ -186,10 +185,11 @@ Notes:
   - `UNIQUE (run_id, repo_id, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
 - v1 rule: `run_repos.commit_sha` is resolved by the server before starting the first job and is not accepted from CLI input.
+  - If commit SHA resolution fails, set `run_repos.status = Failed` and populate `run_repos.last_error` (no jobs are started).
 
 ## Derived “failed repos” selection
 
-Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Stopped, Failed, Success, Cancelled)` and selecting those where status=`Failed`.
+Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Failed, Success, Cancelled)` and selecting those where status=`Failed`.
 
 ## Notes
 

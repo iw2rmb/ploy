@@ -8,7 +8,8 @@ Change entry: repurpose `/v1/mods` from “run submission” to “mod project C
 - Proposed (v1): `/v1/mods` becomes mod project CRUD (create/list/delete/archive), and mod runs are created under `/v1/mods/{mod_id}/runs`.
 - Where: new handlers under `internal/server/handlers/*` + OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking API change; no backward compatibility required.
-- Unchanged: `/v1/runs/*` remains the run execution/history surface (start/stop/status/SSE), updated to support repo scoping for multi-repo runs.
+- Unchanged: `/v1/runs/*` remains the run execution/history surface (start/cancel/status/SSE), updated to support repo scoping for multi-repo runs.
+  - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel` (see current `stopRunHandler` in `internal/server/handlers/runs_batch_http.go`).
 
 ### `POST /v1/mods`
 
@@ -46,6 +47,34 @@ Behavior:
 
 - Refuse deletion if any runs exist for the mod (`runs.mod_id == mod_id`).
 
+## Pulling diffs for a mod repo
+
+### `POST /v1/mods/{mod_id}/pull`
+
+Selects the latest run for a specific repo in a mod and returns the repo-scoped execution identifiers needed to pull diffs.
+
+This is the API behind `ploy mod pull`.
+
+Request:
+
+- `repo_url`
+- optional `mode`:
+  - `last` (default): newest terminal (`Success`, `Failed`, `Cancelled`)
+  - `last-failed`: newest terminal `Failed`
+  - `last-succeeded`: newest terminal `Success`
+
+Response:
+
+- `run_id`
+- `repo_id` (`mod_repos.id`, aka `mod_repo_id`)
+- `commit_sha` (`run_repos.commit_sha`)
+- `repo_target_ref` (`run_repos.repo_target_ref`)
+
+Notes:
+
+- Server performs the lookup using `mod_id + repo_url` → `mod_repos.id`, then selects the appropriate `run_repos` by `run_repos.created_at DESC` (joining through `runs` by `runs.id` and filtering by `runs.mod_id`).
+- Diffs are then listed via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and downloaded via `GET /v1/diffs/{diff_id}?download=true`.
+
 ### `PATCH /v1/mods/{mod_id}/archive`
 
 Archives a mod.
@@ -65,7 +94,8 @@ Change entry: add `POST /v1/runs` for single-repo submission.
 - Proposed (v1): `POST /v1/runs` submits a single-repo run and starts execution; it may create a mod project as a side-effect.
 - Where: new handler under `internal/server/handlers/*`, CLI callers under `cmd/ploy/*` and `internal/cli/*`, OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking for clients that submit runs via `POST /v1/mods`; no backward compatibility required.
-- Unchanged: existing batch lifecycle endpoints under `/v1/runs/*` remain (start/stop/status/SSE).
+- Unchanged: existing batch lifecycle endpoints under `/v1/runs/*` remain (start/cancel/status/SSE).
+  - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
 
 ### `POST /v1/runs`
 
@@ -194,7 +224,8 @@ Response:
   - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — list diffs for this repo execution in this run.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/logs` — SSE logs/events stream for this repo execution.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts` — list artifacts produced by jobs for this repo execution.
-  - `DELETE /v1/runs/{run_id}/repos/{repo_id}` — cancel/stop this repo execution (HEAD reference: `deleteRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
+  - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`).
+  - `DELETE /v1/runs/{run_id}/repos/{repo_id}` — delete the `run_repos` record (only allowed when there were no jobs; otherwise refuse).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
 
