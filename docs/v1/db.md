@@ -42,6 +42,10 @@ Constraints / indexes:
 
 - index on `(created_at)`
 
+Notes:
+
+- A `specs` row must not be hard-deleted if it is referenced by any `runs.spec_id`.
+
 ### `mod_repos`
 
 - `id TEXT PRIMARY KEY` (app-generated string ID; choose NanoID length during implementation)
@@ -59,7 +63,7 @@ Constraints / indexes:
 Notes:
 
 - `mod_repos.base_ref` and `mod_repos.target_ref` are mutable (e.g., `repo import` updates refs in-place).
-- Run history remains stable because `run_repos.repo_base_ref` snapshots the base ref at run creation time.
+- Run history remains stable because `run_repos.repo_base_ref` and `run_repos.repo_target_ref` snapshot refs at run creation time.
 
 ## Updated execution tables
 
@@ -105,6 +109,7 @@ Per-repo execution state within a run.
 - `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
 - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
 - `repo_base_ref TEXT NOT NULL` (copied from `mod_repos.base_ref` at creation time)
+- `repo_target_ref TEXT NOT NULL` (copied from `mod_repos.target_ref` at creation time)
 - `status run_repo_status NOT NULL DEFAULT 'Pending'`
 - `attempt INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1)`
 - `last_error TEXT NULL`
@@ -119,13 +124,45 @@ Constraints / indexes:
 - partial index on `status` for scheduling: `WHERE status IN ('Pending','Running')`
 - index on `(repo_id, created_at)`
 
+## Status semantics (v1)
+
+### `runs.status`
+
+- `Started` → `Finished` when all `run_repos` are terminal (`Failed` or `Success`).
+- `Started` ↔ `Stopped` via `ploy run stop` and `ploy run start`.
+
+### `run_repos.status`
+
+- Initial status is `Pending`.
+- `Running` when there is a repo-scoped job running or queued.
+- Terminal:
+  - `Success` when repo execution succeeded.
+  - `Failed` when repo execution did not succeed (and was not stopped).
+  - `Stopped` via `ploy run stop --repo <mod_repo_id>`.
+
 ### `jobs` (updated)
 
 Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to a repo.
 
-- Add:
-  - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
-  - `repo_base_ref TEXT NOT NULL` (copied from `run_repos.repo_base_ref` at job creation time)
+- `id TEXT PRIMARY KEY` (KSUID(27), app-generated; same as current `jobs.id`)
+- `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
+- `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
+- `repo_base_ref TEXT NOT NULL` (copied from `run_repos.repo_base_ref` at job creation time)
+- `name TEXT NOT NULL`
+- `status job_status NOT NULL DEFAULT 'created'`
+- `mod_type TEXT NOT NULL DEFAULT ''`
+- `mod_image TEXT NOT NULL DEFAULT ''`
+- `step_index FLOAT NOT NULL DEFAULT 0`
+- `node_id TEXT NULL REFERENCES nodes(id) ON DELETE SET NULL`
+- `exit_code INT NULL`
+- `started_at TIMESTAMPTZ NULL`
+- `finished_at TIMESTAMPTZ NULL`
+- `duration_ms BIGINT NOT NULL DEFAULT 0`
+- `meta JSONB NOT NULL DEFAULT '{}'::jsonb`
+
+Notes:
+
+- Repo attribution for `events` / `diffs` / `logs` / `artifact_bundles` is derived via `job_id → jobs.repo_id`.
 
 ## Derived “failed repos” selection
 
