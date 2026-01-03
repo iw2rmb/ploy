@@ -1,11 +1,5 @@
 # Roadmap v1 — Docs
 
-## Deltas vs HEAD
-
-- Change: separate “implemented docs” from “planned docs”.
-  - Where: move v1 planned docs from `docs/` to `roadmap/v1/` and keep `docs/` normative for current behavior.
-  - Compatibility impact: none (documentation-only), but links and references must be updated.
-
 ## 0) Primary goal
 
 Make docs consistent with the v1 CLI/API direction:
@@ -13,6 +7,14 @@ Make docs consistent with the v1 CLI/API direction:
 - `ploy mod ...` manages **mod projects** (name, spec variants, repo set).
 - `ploy run ...` submits **single-repo runs** (immediate execution) and creates a mod project as a side-effect (`mod.name == mod.id`).
 - `ploy mod run <mod> ...` runs a **mod project** (immediate execution over the mod repo set).
+
+Change entry: keep `docs/` normative for HEAD, keep v1 plans under `roadmap/v1/`.
+
+- Current (HEAD): implemented behavior is documented in `docs/` (and OpenAPI in `docs/api/OpenAPI.yaml`).
+- Proposed (v1): all planned/unimplemented behavior for v1 stays under `roadmap/v1/` until implemented, then moves into `docs/` and `roadmap/v1/` is deleted.
+- Where: documentation-only; policy is defined in `AGENTS.md` (“Documentation Layout Policy”).
+- Compatibility: none (docs layout only).
+- Unchanged: `docs/` remains the source of truth for current behavior at HEAD.
 
 ## 1) Canonical docs tree (proposal)
 

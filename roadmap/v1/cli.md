@@ -1,18 +1,14 @@
 # Roadmap v1 — CLI
 
-## Deltas vs HEAD
-
-- Change: add a `ploy mod ...` surface for mod project CRUD (mods, specs, repo set) and a batch runner `ploy mod run`.
-  - Where: CLI commands under `cmd/ploy/*` and HTTP clients under `internal/cli/*`.
-  - Compatibility impact: breaking CLI surface (new commands and semantics); no backward compatibility required.
-- Change: `ploy mod repo import` CSV rules are fully specified (comma delimiter, optional quoting, unicode, continue-on-error).
-  - Where: `cmd/ploy/*` implementation and tests; server endpoints and validation under `internal/server/handlers/*`.
-  - Compatibility impact: none for existing behavior (new feature), but input parsing becomes strict.
-- Change: multi-repo runs require repo selection by `repo_id` for repo-scoped commands.
-  - Where: `cmd/ploy/run_diff.go` (or v1 equivalent), repo-scoped APIs under `/v1/runs/{run_id}/repos/{repo_id}/...`.
-  - Compatibility impact: breaking for workflows relying on implicit repo inference for multi-repo runs.
-
 ## Run submission (single-repo)
+
+Change entry: move single-repo submission from `ploy mod run` to `ploy run`.
+
+- Current (HEAD): single-repo run submission uses `ploy mod run ...` and calls `POST /v1/mods` (see `internal/server/handlers/register.go`, and CLI docs in `docs/mods-lifecycle.md`).
+- Proposed (v1): `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` calls `POST /v1/runs` (see `roadmap/v1/api.md`).
+- Where: CLI routing under `cmd/ploy/*` and HTTP client under `internal/cli/*`.
+- Compatibility: breaking CLI/API surface; no backward compatibility required.
+- Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/start/stop/logs) remain, with repo scoping added for multi-repo runs.
 
 ### `ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|->`
 
@@ -81,6 +77,14 @@ Behavior:
 - Else: delete the `specs` row.
 
 ## Repo set management
+
+Change entry: `ploy mod repo import` CSV parsing is fully specified.
+
+- Current (HEAD): no bulk import command exists for mod repo sets.
+- Proposed (v1): `ploy mod repo import` parses strict CSV with comma delimiter, optional quoting, unicode support, and continues on per-line errors.
+- Where: CLI parsing/validation under `cmd/ploy/*` + server endpoint under `internal/server/handlers/*`.
+- Compatibility: new feature; no backward compatibility required.
+- Unchanged: repo identity remains `(mod_id, repo_url)` and imports rewrite refs in-place.
 
 ### `ploy mod repo add <mod-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>`
 
@@ -162,6 +166,14 @@ v0 reference:
 
 - Today the CLI implements `ploy run diffs` (see `cmd/ploy/run_diff.go`) which is run-scoped and downloads the newest diff for a run.
 - v1 `ploy run diff` is repo-scoped for multi-repo runs and requires `--repo` when the run has more than one repo.
+
+Change entry: multi-repo runs require explicit repo selection for repo-scoped commands.
+
+- Current (HEAD): `ploy run diffs` is run-scoped and downloads the newest diff for a run (see `cmd/ploy/run_diff.go` and `internal/cli/runs/diffs.go`).
+- Proposed (v1): repo-scoped commands live under `/v1/runs/{run_id}/repos/{repo_id}/...` and require `--repo <repo-id>` when a run has multiple repos.
+- Where: CLI flags under `cmd/ploy/*` and repo-scoped endpoints under `internal/server/handlers/*` (see `roadmap/v1/api.md`).
+- Compatibility: breaking for workflows relying on implicit repo inference; no backward compatibility required.
+- Unchanged: diff download by diff id (`GET /v1/diffs/{id}?download=true`) may remain.
 
 Repo selection when `--repo` is omitted:
 
