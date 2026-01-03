@@ -207,7 +207,7 @@ The Homebrew tap requires a separate repository and GitHub token.
    git init
    git add .
    git commit -m "Initial commit"
-   git remote add origin git@github.com:iw2rmb/homebrew-ploy.git
+   git remote add origin https://github.com/iw2rmb/homebrew-ploy.git
    git push -u origin main
    ```
 
@@ -273,7 +273,7 @@ If the Homebrew tap wasn't updated:
 3. Manually update the formula if needed:
    ```bash
    cd /tmp
-   git clone git@github.com:iw2rmb/homebrew-ploy.git
+   git clone https://github.com/iw2rmb/homebrew-ploy.git
    cd homebrew-ploy
    # Edit Formula/ploy.rb
    # Update version and sha256

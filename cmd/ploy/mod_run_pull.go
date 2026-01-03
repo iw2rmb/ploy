@@ -400,7 +400,7 @@ func resolveGitRemoteURL(ctx context.Context, remoteName string) (string, error)
 //
 //	"https://github.com/org/repo.git"  -> "https://github.com/org/repo"
 //	"https://github.com/org/repo/"    -> "https://github.com/org/repo"
-//	"git@github.com:org/repo.git"     -> "git@github.com:org/repo"
+//	"ssh://git@github.com/org/repo.git" -> "ssh://git@github.com/org/repo"
 func normalizeRepoURLForCLI(raw string) string {
 	normalized := strings.TrimSpace(raw)
 	normalized = strings.TrimSuffix(normalized, "/")

@@ -39,7 +39,7 @@ Run entrypoints:
 Repo URL note (v0 reference):
 
 - Current repo URL validation accepts only `https://`, `ssh://`, and `file://` URLs (see `internal/domain/types/vcs.go`, `RepoURL.Validate`).
-- v0 `ploy mod run pull` normalization examples include scp-style `git@host:owner/repo` (see `cmd/ploy/mod_run_pull.go`, `normalizeRepoURLForCLI`), but v0 server-side repo endpoints validate `RepoURL` (see `internal/server/handlers/repos.go`).
+- Keep CLI examples aligned with server-side `RepoURL` validation rules: use `https://...` or `ssh://...` (not scp-style `git@host:owner/repo`).
 
 ## Non-goals (v1)
 
