@@ -144,8 +144,7 @@ Show the aggregated diff for a run, optionally scoped to a single repo within a 
 Repo selection when `--repo` is omitted:
 
 - If the run has exactly one repo: show diff for that repo.
-- Else if invoked from a git worktree whose `origin` URL matches a repo in the run: show diff for that repo.
-- Else: error (repo must be specified).
+- Else: error (`--repo` is required when the run has more than one repo).
 
 Notes:
 
