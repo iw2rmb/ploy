@@ -164,6 +164,8 @@ Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to
 Notes:
 
 - Repo attribution for `events` / `diffs` / `logs` / `artifact_bundles` is derived via `job_id → jobs.repo_id`.
+- Uniqueness must be per-repo within a run:
+  - `UNIQUE (run_id, repo_id, name, step_index)`
 
 ## Derived “failed repos” selection
 
