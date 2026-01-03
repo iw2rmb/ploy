@@ -166,6 +166,7 @@ Notes:
 - Repo attribution for `events` / `diffs` / `logs` / `artifact_bundles` is derived via `job_id → jobs.repo_id`.
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, name, step_index)`
+- v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
 
 ## Derived “failed repos” selection
 

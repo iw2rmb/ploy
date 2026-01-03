@@ -129,6 +129,11 @@ Behavior:
 
 Pull Mods-generated diffs into the current git worktree.
 
+v0 reference:
+
+- Today the CLI implements `ploy mod run pull` (see `cmd/ploy/mod_run_pull.go`) which relies on `run_repos.execution_run_id`.
+- v1 removes `execution_run_id`, so pull must be based on `run_id + repo_id` (`run_repos`) and the repo-scoped run artifacts APIs.
+
 Behavior:
 
 - Pulls diffs for the specified `run-id`.
@@ -140,6 +145,11 @@ Behavior:
 ### `ploy run diff [--repo <repo-id>] <run-id>`
 
 Show the aggregated diff for a run, optionally scoped to a single repo within a multi-repo run.
+
+v0 reference:
+
+- Today the CLI implements `ploy run diffs` (see `cmd/ploy/run_diff.go`) which is run-scoped and downloads the newest diff for a run.
+- v1 `ploy run diff` is repo-scoped for multi-repo runs and requires `--repo` when the run has more than one repo.
 
 Repo selection when `--repo` is omitted:
 
@@ -181,6 +191,7 @@ Behavior:
 Notes:
 
 - `ploy mod pull` is executed from a repo folder and selects diffs for the current repo by looking up the matching `run_repos` entry in the chosen run.
+- Repo URL matching for “current repository” inference should use the same normalization as v0 `ploy mod run pull` (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
 
 ## Name/ID resolution rules
 

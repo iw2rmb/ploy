@@ -49,6 +49,14 @@ Run entrypoints:
 
 Codebase must switch from “root-run → per-repo execution runs” to “run → run_repos”.
 
+## `/v1/mods/*` route collisions (v0 reference)
+
+Current server routes under `/v1/mods/*` are run-scoped (see `internal/server/handlers/register.go`) and collide with v1’s “mods are projects” direction.
+
+- `POST /v1/mods` (run submission) must move to `POST /v1/runs`.
+- Run-scoped routes under `/v1/mods/{run_id}/*` must move under `/v1/runs/{run_id}/*`:
+  - examples: `GET /v1/mods/{run_id}/diffs`, `GET /v1/mods/{run_id}/graph`, `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
+
 Current codebase behavior (to remove):
 
 - `runs` row acts as a batch root and stores repo_url/refs/spec.
