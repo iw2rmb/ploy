@@ -93,6 +93,12 @@ Behavior:
 
 Lists spec variants for a mod.
 
+Notes:
+
+- Returned set can be derived from:
+  - current `mods.spec_id` (if non-NULL)
+  - historical `runs.spec_id` values for runs with `runs.mod_id == mod_id`
+
 ### `DELETE /v1/mods/{mod_id}/specs/{spec_id}`
 
 Archives or deletes a spec variant.
@@ -134,7 +140,7 @@ This is the API behind `ploy mod run <mod> ...`.
 Request (suggested):
 
 - optional `spec_ref`:
-  - `{ "id": "<spec_id>" }` or `{ "name": "<spec_name>" }`
+  - `{ "id": "<spec_id>" }`
 - `repo_selector`:
   - `{ "mode": "all" }`
   - `{ "mode": "failed" }`

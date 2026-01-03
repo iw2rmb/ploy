@@ -36,13 +36,43 @@ Run entrypoints:
 - **Immutability**: a run links to the exact spec variant used.
 - **Stable grouping**: grouping is by `mods.name` (unique) and `runs.mod_id` (no `runs.name`).
 - **Archiving**: archived mods cannot be executed.
+- **Repo refs over time**:
+  - `mod_repos` rows are mutable (e.g., CSV import can rewrite refs).
+  - `run_repos.repo_base_ref` snapshots the base ref used for that repo in that run.
 - **Repo selection**:
   - `--repo ...` → explicit repos
   - `--failed` → repos whose most recent terminal per-repo status is `failed`
   - default → all repos in the mod repo set
 - **Immediate start**: both `ploy run` and `ploy mod run` start pending work right away.
 
-## Minimal blast radius
+## Execution model shift (required)
 
-- New storage for mod/spec/repo management.
-- Link existing `runs` / `run_repos` to mod/spec/repo rows for history and filtering.
+Codebase must switch from “root-run → per-repo execution runs” to “run → run_repos”.
+
+Current codebase behavior (to remove):
+
+- `runs` row acts as a batch root and stores repo_url/refs/spec.
+- Each `run_repos` row may point to a separate execution run via `run_repos.execution_run_id` (this linkage is removed in v1).
+- Jobs, logs, diffs, and events are attached to the execution run ID, not the `(run_id, repo_id)` pair.
+
+v1 behavior (to implement):
+
+- One `runs` row represents the run (mod + spec) and holds `runs.mod_id` + `runs.spec_id`.
+- Per-repo execution state is represented by `run_repos` rows (scoped to `runs.id`).
+- Jobs become repo-scoped by adding `jobs.repo_id` and `jobs.repo_base_ref` (copied from `run_repos`).
+- Logs/diffs/events remain addressed by `run_id`, but repo attribution comes from `job_id → jobs.repo_id`.
+
+Code pointers for the refactor:
+
+- `internal/server/handlers/mods_ticket.go`: `submitRunHandler` currently creates a parent run, inserts `run_repos`, then relies on `StartPendingRepos` which expects `execution_run_id`.
+- `internal/server/handlers/runs_batch_scheduler.go`: currently creates a child run per repo, calls `createJobsFromSpec` on the child run, and stores `execution_run_id`.
+- `internal/server/handlers/nodes_complete_run.go`: completion logic derives run status by listing jobs for a run ID; in v1, completion must also update `run_repos.status` per repo.
+- `internal/store/schema.sql` + `internal/store/queries/run_repos.sql`: contain `execution_run_id` and related queries/indexes that must be removed.
+
+Implementation checklist:
+
+- Remove the “execution run” concept (`run_repos.execution_run_id`) and stop creating child runs per repo.
+- Create jobs directly for `(runs.id, run_repos.repo_id)`; persist `jobs.repo_id` + `jobs.repo_base_ref`.
+- When a job completes, update:
+  - `run_repos.status` for that repo (derived from repo-scoped jobs)
+  - `runs.status` for the run (derived from all repos)
