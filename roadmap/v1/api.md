@@ -59,14 +59,13 @@ Request:
 
 - `repo_url`
 - optional `mode`:
-  - `last-failed`: newest terminal `Failed`
+  - `last-failed`: newest terminal `Fail`
   - `last-succeeded` (default): newest terminal `Success`
 
 Response:
 
 - `run_id`
 - `repo_id` (`mod_repos.id`, aka `mod_repo_id`)
-- `commit_sha` (`run_repos.commit_sha`)
 - `repo_target_ref` (`run_repos.repo_target_ref`)
 
 Notes:
@@ -204,7 +203,7 @@ Request:
 
 - `repo_selector`:
   - `{ "mode": "all" }`
-  - `{ "mode": "failed" }` (repos whose last terminal state is `Failed`)
+  - `{ "mode": "failed" }` (repos whose last terminal state is `Fail`)
   - `{ "mode": "explicit", "repos": ["<repo_url>", ...] }`
 - optional `created_by`
 
@@ -231,6 +230,13 @@ Response:
   - `DELETE /v1/runs/{run_id}/repos/{repo_id}` — delete the `run_repos` record (only allowed when there were no jobs; otherwise refuse).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
+
+## Node job claiming (unchanged, v1)
+
+v1 keeps the existing node claim flow:
+
+- `POST /v1/nodes/{id}/claim` remains a **global** “next job” claim endpoint (no repo selector).
+- Repo-scoped execution ordering is enforced by server-side progression rules (see `roadmap/v1/db.md` “Repo-scoped scheduling invariant (v1)”).
 
 ## v0 → v1 endpoint mapping notes (codebase reference)
 
