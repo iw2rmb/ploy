@@ -99,14 +99,15 @@ Behavior:
 
 ## Run execution
 
-### `ploy mod run <mod-id|name> [--spec <id>] [--repo <repo-url> ...] [--failed]`
+### `ploy mod run <mod-id|name> [--spec <spec-id|path|->] [--repo <repo-url> ...] [--failed]`
 
 Behavior:
 
 - Resolves `<mod-id|name>` to a mod.
 - Refuses when the mod is archived.
 - Resolves the chosen spec:
-  - `--spec <id>` → set as the mod’s current spec (`mods.spec_id`)
+  - `--spec <spec-id>` → use that spec id (not restricted to the mod’s current spec); also set as `mods.spec_id`
+  - `--spec <path|->` → create a new spec row from the provided file/stdin, use it, and set `mods.spec_id` to the created `spec_id`
   - omitted → use `mods.spec_id` (error if NULL)
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
@@ -127,8 +128,7 @@ Behavior:
 
 - Pulls diffs for the specified `run-id`.
 - Safety check against base ref drift:
-  - (requires v1 decision on where “recorded base commit SHA” lives; see docs/v1/docs.md)
-  - If the associated mod repo `base_ref` currently resolves to a different commit SHA than the run’s recorded base commit SHA:
+  - If the associated mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in this run:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
 
@@ -166,8 +166,7 @@ Behavior:
   - If multiple mods match: error and print the matching mods (IDs + names).
 - Default (no selector flags): behave as `--last-succeeded`.
 - Safety check against base ref drift / missing execution:
-  - (requires v1 decision on where “recorded base commit SHA” lives; see docs/v1/docs.md)
-  - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than the selected run’s recorded base commit SHA:
+  - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in the selected run:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
 

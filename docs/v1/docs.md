@@ -52,7 +52,8 @@ v1 repurposes `mod` as a **project**:
 
 This also collides with existing “run artifacts” endpoints that currently live under `/v1/mods/{run_id}/*`:
 
-- `GET /v1/mods/{run_id}/diffs` (and other `/v1/mods/{run_id}/*` run-scoped routes) must move under `/v1/runs/{run_id}/*` or an equivalent run-scoped namespace.
+- `GET /v1/mods/{run_id}/diffs` (and other `/v1/mods/{run_id}/*` run-scoped routes) must move under `/v1/runs/{run_id}/*`.
+- For multi-repo runs, repo-scoped artifacts must be addressed under `/v1/runs/{run_id}/repos/{repo_id}/...`.
 
 Docs and OpenAPI must be rewritten to match the chosen outcome:
 
@@ -95,6 +96,5 @@ Files with old semantics (examples to rewrite):
 
 - `ploy run --spec ... --repo ...` creates a mod project; the created mod has `name == id`.
 - Run submission lives at `POST /v1/runs`; mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.
-- Define where per-repo “recorded base commit SHA” lives in v1 (currently exposed via `runs.commit_sha`; v1 run data is `run_repos`-scoped).
 - Define v1 run artifacts APIs for multi-repo runs:
   - how `ploy mod pull` (repo-scoped) selects diffs/logs/events for a single repo in a run (`run_id + repo_id`).

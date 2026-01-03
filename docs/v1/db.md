@@ -110,6 +110,7 @@ Per-repo execution state within a run.
 - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
 - `repo_base_ref TEXT NOT NULL` (copied from `mod_repos.base_ref` at creation time)
 - `repo_target_ref TEXT NOT NULL` (copied from `mod_repos.target_ref` at creation time)
+- `commit_sha TEXT NULL` (recorded base commit SHA for this repo execution; derived from `repo_base_ref` at scheduling time)
 - `status run_repo_status NOT NULL DEFAULT 'Pending'`
 - `attempt INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1)`
 - `last_error TEXT NULL`
@@ -134,7 +135,7 @@ Constraints / indexes:
 ### `run_repos.status`
 
 - Initial status is `Pending`.
-- `Running` when there is a repo-scoped job running or queued.
+- `Running` when there is at least one repo-scoped job with `jobs.status IN ('pending','running')` for `(run_id, repo_id)`.
 - Terminal:
   - `Success` when repo execution succeeded.
   - `Failed` when repo execution did not succeed (and was not stopped).
