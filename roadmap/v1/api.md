@@ -34,11 +34,17 @@ Lists mods.
 Query:
 
 - `limit`, `offset`
-- optional filters: `name_substring`, `archived` (exact set TBD)
+- optional filters:
+  - `name_substring` (substring match on `mods.name`)
+  - `archived` (`true` → only archived, `false` → only active)
 
 ### `DELETE /v1/mods/{mod_id}`
 
 Deletes a mod.
+
+Behavior:
+
+- Refuse deletion if any runs exist for the mod (`runs.mod_id == mod_id`).
 
 ### `PATCH /v1/mods/{mod_id}/archive`
 
@@ -73,7 +79,7 @@ Side-effects:
 - Creates an initial spec variant for that mod from the provided `spec`.
 - Creates a mod repo row for the provided `repo_url` (identity within the mod).
 
-Request (suggested):
+Request:
 
 - `repo_url`
 - `base_ref`
@@ -157,7 +163,7 @@ Creates a batch run from the mod + spec + selected repos and immediately starts 
 
 This is the API behind `ploy mod run <mod> ...`.
 
-Request (suggested):
+Request:
 
 - optional `spec_ref`:
   - `{ "id": "<spec_id>" }`
@@ -165,15 +171,14 @@ Request (suggested):
   - `{ "mode": "all" }`
   - `{ "mode": "failed" }` (repos whose last terminal state is `Failed`)
   - `{ "mode": "explicit", "repos": ["<repo_url>", ...] }`
-- optional per-run overrides:
-  - `created_by`
-  - optional ref overrides when `mode=explicit` (exact shape TBD)
+- optional `created_by`
 
 Behavior:
 
 - If `spec_ref` is omitted, use `mods.spec_id`; if `mods.spec_id` is NULL, return an error that spec is required.
 - If `spec_ref` is provided, it may reference any `specs.id` (not restricted to the mod’s current spec id).
 - If `spec_ref` is provided, update `mods.spec_id` to the resolved `spec_id` for future runs.
+- v1: no per-run ref overrides; `run_repos.repo_base_ref` / `run_repos.repo_target_ref` are copied from `mod_repos` at run creation time.
 
 Response:
 
@@ -185,10 +190,12 @@ Response:
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
 - Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace to avoid colliding with `/v1/mods` (mod projects).
 - For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
-- Repo-scoped endpoints required for CLI workflows (names TBD, but must exist under the repo-scoped namespace):
-  - diffs: list + download
-  - logs/events: stream (SSE) and/or list (repo attribution comes from `jobs.repo_id`)
-  - artifacts: list + download (job-produced bundles)
+- Repo-scoped endpoints required for CLI workflows (must exist under the repo-scoped namespace):
+  - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — list diffs for this repo execution in this run.
+  - `GET /v1/runs/{run_id}/repos/{repo_id}/logs` — SSE logs/events stream for this repo execution.
+  - `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts` — list artifacts produced by jobs for this repo execution.
+  - `DELETE /v1/runs/{run_id}/repos/{repo_id}` — cancel/stop this repo execution (HEAD reference: `deleteRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
+  - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
 
 ## v0 → v1 endpoint mapping notes (codebase reference)

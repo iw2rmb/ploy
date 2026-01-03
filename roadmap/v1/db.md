@@ -96,6 +96,7 @@ Change entry: reshape execution model to `runs` → `run_repos` and make jobs re
 - `Pending`
 - `Running`
 - `Stopped`
+- `Cancelled`
 - `Failed`
 - `Success`
 
@@ -145,7 +146,7 @@ Constraints / indexes:
 
 ### `runs.status`
 
-- `Started` → `Finished` when all `run_repos` are terminal (`Failed` or `Success`).
+- `Started` → `Finished` when all `run_repos` are terminal (`Failed`, `Success`, `Cancelled`, or `Stopped`).
 - `Started` ↔ `Stopped` via `ploy run stop` and `ploy run start`.
 
 ### `run_repos.status`
@@ -155,6 +156,7 @@ Constraints / indexes:
 - Terminal:
   - `Success` when repo execution succeeded.
   - `Failed` when repo execution did not succeed (and was not stopped).
+  - `Cancelled` when repo execution was cancelled (treated as terminal for `runs.status` aggregation).
   - `Stopped` via `ploy run stop --repo <mod_repo_id>`.
 
 ### `jobs` (updated)
@@ -183,10 +185,11 @@ Notes:
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
+- v1 rule: `run_repos.commit_sha` is resolved by the server before starting the first job and is not accepted from CLI input.
 
 ## Derived “failed repos” selection
 
-Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Stopped, Failed, Success)` and selecting those where status=`Failed`.
+Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Stopped, Failed, Success, Cancelled)` and selecting those where status=`Failed`.
 
 ## Notes
 
