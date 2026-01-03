@@ -11,7 +11,7 @@ Support “code modification projects” where:
 - A **run** executes the mod’s current spec (copied from `mods.spec_id`) over:
   - one repo,
   - a selected subset of repos,
-  - or the mod’s repos whose last run state is `Failed`.
+  - or the mod’s repos whose last run state is `Fail`.
 
 Run entrypoints:
 
@@ -47,13 +47,22 @@ Repo URL note (v0 reference):
   - `run_repos.repo_base_ref` and `run_repos.repo_target_ref` snapshot refs used for that repo in that run.
 - **Repo selection**:
   - `--repo ...` → explicit repos
-  - `--failed` → repos whose most recent terminal per-repo status is `Failed`
+  - `--failed` → repos whose most recent terminal per-repo status is `Fail`
   - default → all repos in the mod repo set
 - **Immediate start**: both `ploy run` and `ploy mod run` start pending work right away.
 
 ## Execution model shift (required)
 
 Codebase must switch from “root-run → per-repo execution runs” to “run → run_repos”.
+
+### Job claiming vs repo progression (v1 invariant)
+
+- **Claiming stays global**: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
+- **Progression is repo-scoped**: “next job” selection is always within a single repo execution:
+  - filter by `(run_id, repo_id)`
+  - order by `jobs.step_index`
+- **Single-pending invariant**: for each `(run_id, repo_id)`, the server must ensure there is at most one job in `jobs.status='Pending'` at any time (the repo’s next job by step_index).
+  - This allows global claiming to remain correct while preserving per-repo ordering.
 
 ## `/v1/mods/*` route collisions (v0 reference)
 
@@ -78,8 +87,6 @@ v1 behavior (to implement):
 - Per-repo execution state is represented by `run_repos` rows (scoped to `runs.id`).
 - Jobs become repo-scoped by adding `jobs.repo_id` and `jobs.repo_base_ref` (copied from `run_repos`).
 - Logs/diffs/events remain addressed by `run_id`, but repo attribution comes from `job_id → jobs.repo_id`.
-- Base commit SHA recording moves from `runs.commit_sha` to `run_repos.commit_sha`.
-  - v1 rule: resolved by the server before starting the first job; not provided by CLI. If resolution fails, mark the repo `Failed` without starting jobs.
 
 Code pointers for the refactor:
 
@@ -99,4 +106,4 @@ Implementation checklist:
 
 Status derivation note:
 
-- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('pending','running')` for `(run_id, repo_id)`.
+- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('Pending','Running')` for `(run_id, repo_id)`.

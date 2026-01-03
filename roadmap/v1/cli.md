@@ -111,7 +111,7 @@ Behavior:
   - `ploy mod run <mod>` always uses the current `mods.spec_id` (error if NULL)
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
-  - `--failed` → repos with last terminal state `Failed`
+  - `--failed` → repos with last terminal state `Fail`
   - omitted → all repos in the mod repo set
 - Creates a mod-scoped run via `POST /v1/mods/{mod_id}/runs` and immediately starts execution.
 - Prints:
@@ -132,10 +132,6 @@ v0 reference:
 Behavior:
 
 - Pulls diffs for the specified `run-id`.
-- Safety check against base ref drift:
-  - If the associated mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in this run:
-    - if the mod is archived: error
-    - else: run the mod for this repo and pull the new run’s diffs instead
 
 ## Run control
 
@@ -160,18 +156,14 @@ Behavior:
 - Default (no selector flags): behave as `--last-succeeded`.
 - Run selection for the current repo uses run history by `(runs.mod_id, run_repos.repo_id)`:
   - Find the newest run for this mod+repo by ordering `run_repos.created_at DESC` (joining through `runs.id`) and select according to the chosen flag:
-    - `--last-failed`: newest terminal `Failed`
+    - `--last-failed`: newest terminal `Fail`
     - `--last-succeeded`: newest terminal `Success`
-  - Safety check against base ref drift / missing execution:
-    - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in the selected run:
-      - if the mod is archived: error
-      - else: run the mod for this repo and pull the new run’s diffs instead
 
 Notes:
 
 - `ploy mod pull` is executed from a repo folder and selects diffs for the current repo by looking up the matching `run_repos` entry in the chosen run.
 - Repo URL matching for “current repository” inference should use the same normalization as v0 `ploy mod run pull` (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
-- Server-side selection endpoint: `POST /v1/mods/{mod_id}/pull` performs the run selection and returns `run_id`, `repo_id`, `commit_sha`, and `repo_target_ref` (see `roadmap/v1/api.md`).
+- Server-side selection endpoint: `POST /v1/mods/{mod_id}/pull` performs the run selection and returns `run_id`, `repo_id`, and `repo_target_ref` (see `roadmap/v1/api.md`).
 
 ## Name/ID resolution rules
 

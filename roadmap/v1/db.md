@@ -84,7 +84,18 @@ Change entry: reshape execution model to `runs` → `run_repos` and make jobs re
 - Proposed (v1): remove per-repo execution runs; use a single `runs` row with per-repo `run_repos` rows, and add `jobs.repo_id` + `jobs.repo_base_ref` to attribute artifacts to repos.
 - Where: `internal/store/schema.sql` (`runs`, `run_repos`, `jobs`) and refactors in `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/nodes_complete_run.go`.
 - Compatibility: breaking DB + scheduling semantics; no backward compatibility required.
-- Unchanged: job lifecycle states and ingestion endpoints remain job-addressed (see current `job_status` in `internal/store/schema.sql`).
+- Unchanged: job lifecycle ingestion remains job-addressed (jobs are still completed via job ID), but v1 renames status strings per `roadmap/v1/statuses.md`.
+
+## Repo-scoped scheduling invariant (v1)
+
+v1 keeps **global job claiming** but makes **job progression repo-scoped**.
+
+- Claiming stays global: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
+- Progression is repo-scoped: whenever the server computes “next job” (or “adjacent step” for healing insertion), it must:
+  - filter by `(run_id, repo_id)`
+  - order by `jobs.step_index`
+- Single-pending invariant: for each `(run_id, repo_id)`, the server must ensure there is at most one `jobs` row with `status='Pending'` at any time (the repo’s next job by step_index).
+  - This preserves per-repo ordering without requiring repo-scoped claim APIs.
 
 ## Enums (v1)
 
@@ -96,10 +107,10 @@ Change entry: reshape execution model to `runs` → `run_repos` and make jobs re
 
 ### `run_repos.status` (`run_repo_status`)
 
-- `Pending`
+- `Queued`
 - `Running`
 - `Cancelled`
-- `Failed`
+- `Fail`
 - `Success`
 
 ### `runs`
@@ -129,8 +140,7 @@ Per-repo execution state within a run.
 - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
 - `repo_base_ref TEXT NOT NULL` (copied from `mod_repos.base_ref` at creation time)
 - `repo_target_ref TEXT NOT NULL` (copied from `mod_repos.target_ref` at creation time)
-- `commit_sha TEXT NULL` (recorded base commit SHA for this repo execution; derived from `repo_base_ref` at scheduling time)
-- `status run_repo_status NOT NULL DEFAULT 'Pending'`
+- `status run_repo_status NOT NULL DEFAULT 'Queued'`
 - `attempt INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1)`
 - `last_error TEXT NULL`
 - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
@@ -141,23 +151,23 @@ Constraints / indexes:
 
 - `PRIMARY KEY (run_id, repo_id)`
 - index on `(run_id)`
-- partial index on `status` for scheduling: `WHERE status IN ('Pending','Running')`
+- partial index on `status` for scheduling: `WHERE status IN ('Queued','Running')`
 - index on `(repo_id, created_at)`
 
 ## Status semantics (v1)
 
 ### `runs.status`
 
-- `Started` → `Finished` when all `run_repos` are terminal (`Failed`, `Success`, or `Cancelled`).
+- `Started` → `Finished` when all `run_repos` are terminal (`Fail`, `Success`, or `Cancelled`).
 - `Started` → `Cancelled` via `ploy run cancel`.
 
 ### `run_repos.status`
 
-- Initial status is `Pending`.
-- `Running` when there is at least one repo-scoped job with `jobs.status IN ('pending','running')` for `(run_id, repo_id)`.
+- Initial status is `Queued`.
+- `Running` when there is at least one repo-scoped job with `jobs.status IN ('Pending','Running')` for `(run_id, repo_id)`.
 - Terminal:
   - `Success` when repo execution succeeded.
-  - `Failed` when repo execution did not succeed (and was not cancelled).
+  - `Fail` when repo execution did not succeed (and was not cancelled).
   - `Cancelled` when repo execution was cancelled (treated as terminal for `runs.status` aggregation).
   - `Cancelled` via repo cancellation endpoint (see `roadmap/v1/api.md`).
 
@@ -170,7 +180,7 @@ Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to
 - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
 - `repo_base_ref TEXT NOT NULL` (copied from `run_repos.repo_base_ref` at job creation time)
 - `name TEXT NOT NULL`
-- `status job_status NOT NULL DEFAULT 'created'`
+- `status job_status NOT NULL DEFAULT 'Created'`
 - `mod_type TEXT NOT NULL DEFAULT ''`
 - `mod_image TEXT NOT NULL DEFAULT ''`
 - `step_index FLOAT NOT NULL DEFAULT 0`
@@ -187,8 +197,6 @@ Notes:
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
-- v1 rule: `run_repos.commit_sha` is resolved by the server before starting the first job and is not accepted from CLI input.
-  - If commit SHA resolution fails, set `run_repos.status = Failed` and populate `run_repos.last_error` (no jobs are started).
 
 ### Repo restarts / attempts (TODO decision)
 
@@ -203,7 +211,7 @@ Pick one concrete approach before implementation:
 
 ## Derived “failed repos” selection
 
-Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Failed, Success, Cancelled)` and selecting those where status=`Failed`.
+Define “last terminal state” per `repo_id` by looking at the newest `run_repos` row where status in `(Fail, Success, Cancelled)` and selecting those where status=`Fail`.
 
 ## Notes
 
