@@ -106,6 +106,11 @@ Behavior:
 - Resolves `<mod-id|name>` to a mod.
 - Refuses when the mod is archived.
 - Resolves the chosen spec:
+  - Disambiguation rules for `--spec <arg>`:
+    - If `<arg>` is `-`: read from stdin (YAML/JSON).
+    - Else if `<arg>` ends with `.yaml` or `.yml`: treat as a file path.
+    - Else if `<arg>` contains `/`: error (looks like a path but is not a YAML file).
+    - Else: treat as a `spec_id`.
   - `--spec <spec-id>` → use that spec id (not restricted to the mod’s current spec); also set as `mods.spec_id`
   - `--spec <path|->` → create a new spec row from the provided file/stdin, use it, and set `mods.spec_id` to the created `spec_id`
   - omitted → use `mods.spec_id` (error if NULL)
