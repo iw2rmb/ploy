@@ -7,7 +7,6 @@ Make docs consistent with the v1 CLI/API direction:
 - `ploy mod ...` manages **mod projects** (name, spec variants, repo set).
 - `ploy run ...` submits **single-repo runs** (immediate execution) and creates a mod project as a side-effect (`mod.name == mod.id`).
 - `ploy mod run <mod> ...` runs a **mod project** (immediate execution over the mod repo set).
-- Control-plane auth is **bearer token** in `Authorization: Bearer ...` (CLI + nodes).
 
 ## 1) Canonical docs tree (proposal)
 
@@ -18,7 +17,6 @@ docs/
   README.md
 
   architecture/
-    auth.md
     data-model.md
     mods-lifecycle.md
 
@@ -40,47 +38,12 @@ docs/
 ```
 
 Notes:
-- Keep OpenAPI under `docs/api/` as-is, but align its auth + paths.
+- Keep OpenAPI under `docs/api/` as-is, but align its paths + semantics.
 - Move long CLI usage prose out of architecture docs.
 
-## 2) Auth: what the code actually does (must match docs)
+## 2) Required edits for v1 alignment
 
-### CLI → control plane
-
-- CLI loads the default cluster descriptor (`internal/cli/config`) and injects:
-  - `Authorization: Bearer <token>` when descriptor `token` is set (`cmd/ploy/common_http.go`).
-- CLI does **not** present a client certificate (no mTLS from CLI).
-- CLI TLS: if the descriptor address is `https://...`, it uses standard TLS without custom RootCAs (`cmd/ploy/common_http.go`).
-
-### Node → control plane
-
-- Nodes send `Authorization: Bearer <token>` and `PLOY_NODE_UUID: <node_id>` on requests (`internal/nodeagent/diffuploader.go`).
-- Nodes *may* also use TLS client certs if node config enables TLS (`internal/nodeagent/config.go`):
-  - Outgoing client TLS config loads `{cert,key,ca}` and sets RootCAs (`internal/nodeagent/diffuploader.go`).
-
-### Node bootstrap
-
-- Bootstrap uses a short-lived **bootstrap bearer token** (JWT) to call `POST /v1/pki/bootstrap` and exchange CSR for a cert (`internal/server/handlers/bootstrap.go`, `internal/nodeagent/agent.go`).
-
-### Control plane server transport
-
-- The API server currently listens on plain TCP (no TLS in-process); TLS termination is expected outside the process (`internal/server/http/server.go`).
-- Server-side auth middleware prefers bearer tokens and has an mTLS fallback when `r.TLS` includes peer certificates (`internal/server/auth/authorizer.go`).
-
-## 3) Required edits for v1 alignment
-
-### 3.1 Fix auth inconsistencies (blocking)
-
-- `docs/api/OpenAPI.yaml`:
-  - Replace `mutualTLS` security scheme with HTTP bearer auth (or document both, but make bearer primary).
-  - Update the introductory description: it currently says “mutual TLS … bearer removed”.
-- `docs/envs/README.md`:
-  - Remove/replace the pivot section that claims mTLS client auth was replaced, while other docs/API say otherwise.
-  - Keep only *environment variables*; move CLI flags out.
-- `docs/how-to/create-mr.md`:
-  - Remove references to `(removed) PLOY_CONTROL_PLANE_URL` and replace with descriptor-derived control plane URL guidance.
-
-### 3.2 Resolve `/v1/mods` collision before writing docs
+### 2.1 Resolve `/v1/mods` collision before writing docs
 
 v1 repurposes `mod` as a **project**:
 
@@ -95,7 +58,7 @@ Docs and OpenAPI must be rewritten to match the chosen outcome:
 - Add `POST /v1/mods/{mod_id}/runs` for executing a mod project (used by `ploy mod run <mod> ...`).
 - Use `PATCH /v1/mods/{mod_id}/archive` and `/unarchive` for mod lifecycle state; archived mods cannot be executed.
 
-### 3.3 Update “batch run” docs to the new model
+### 2.2 Update “batch run” docs to the new model
 
 Files with old semantics (examples to rewrite):
 
@@ -105,7 +68,7 @@ Files with old semantics (examples to rewrite):
 - `docs/how-to/create-mr.md`: batch MR workflow should start from `ploy mod ...` project setup.
 - `cmd/ploy/README.md`: keep as developer-facing CLI reference, but align examples and remove stale subcommands.
 
-### 3.4 OpenAPI coverage gaps
+### 2.3 OpenAPI coverage gaps
 
 - Add missing endpoints that the CLI already uses:
   - `POST /v1/runs/{id}/start` is implemented and used by CLI (`internal/server/handlers/runs_batch_http.go`, `internal/cli/runs/start.go`) but is not present in `docs/api/OpenAPI.yaml`.
@@ -115,7 +78,7 @@ Files with old semantics (examples to rewrite):
   - Add `POST /v1/mods/{mod_id}/runs` (execute mod project).
   - Add mod project `specs` and `repos` endpoints as defined in docs/v1/api.md.
 
-## 4) Redundant / low-value content (recommend prune or relocate)
+## 3) Redundant / low-value content (recommend prune or relocate)
 
 - `docs/envs/README.md` includes CLI flag documentation (e.g., `--spec`, `--name`).
   - Move to CLI reference docs (`docs/cli/*.md` or `cmd/ploy/README.md`).
@@ -124,7 +87,7 @@ Files with old semantics (examples to rewrite):
 - Any doc that duplicates Cobra `--help` output verbatim.
   - Prefer “concept + link to `ploy <cmd> --help`”.
 
-## 5) TODO decisions to unblock implementation
+## 4) TODO decisions to unblock implementation
 
 - `ploy run --spec ... --repo ...` creates a mod project; the created mod has `name == id`.
 - Run submission lives at `POST /v1/runs`; mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.

@@ -61,7 +61,7 @@ Behavior:
 
 - Lists spec variants for the mod: `ID`, `NAME`, `CREATED_AT`, `ARCHIVED`.
 
-### `ploy mod spec remove <mod-id|name> <spec-id|name>`
+### `ploy mod spec remove <mod-id|name> <spec-id>`
 
 - Archives or deletes a spec variant.
 
@@ -85,20 +85,26 @@ Behavior:
 
 - Imports repos in bulk from CSV.
 - CSV columns: `repo_url,base_ref,target_ref` (header required).
-- Creates/updates repos; reports counts and per-line errors.
+- Parsing:
+  - delimiter: `,`
+  - UTF-8 text; unicode characters allowed
+  - fields may be quoted with `"` (CSV-style)
+  - within quoted fields, `"` is escaped as `""`
+- Upserts by `repo_url` within the mod (updates `base_ref`/`target_ref` for existing rows).
+- Does not affect historical run data (existing `run_repos.repo_base_ref` snapshots remain unchanged).
+- Reports counts and per-line errors.
 
 ## Run execution
 
-### `ploy mod run <mod-id|name> [--spec <id|name>] [--repo <repo-url> ...] [--failed]`
+### `ploy mod run <mod-id|name> [--spec <id>] [--repo <repo-url> ...] [--failed]`
 
 Behavior:
 
 - Resolves `<mod-id|name>` to a mod.
 - Refuses when the mod is archived.
 - Resolves the chosen spec:
-  - `--spec <id|name>` → stored spec variant
+  - `--spec <id>` → set as the mod’s current spec (`mods.spec_id`)
   - omitted → use `mods.spec_id` (error if NULL)
-- If `--spec` is provided, also updates `mods.spec_id` to that spec for future runs.
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
   - `--failed` → repos with last terminal state `failed`
@@ -151,4 +157,4 @@ Behavior:
 ## Name/ID resolution rules
 
 - `<mod-id|name>`: prefer exact ID match; else unique name match; else error with suggestions.
-- `<spec-id|name>`: scoped to the mod; prefer ID match; else unique name match.
+- `<spec-id>`: must be a spec ID.
