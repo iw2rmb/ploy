@@ -108,7 +108,7 @@ Behavior:
 - Resolves the chosen spec:
   - Disambiguation rules for `--spec <arg>`:
     - If `<arg>` is `-`: read from stdin (YAML/JSON).
-    - Else if `<arg>` ends with `.yaml` or `.yml`: treat as a file path.
+    - Else if `<arg>` ends with `.yaml`, `.yml`, or `.json`: treat as a file path.
     - Else if `<arg>` contains `/`: error (looks like a path but is not a YAML file).
     - Else: treat as a `spec_id`.
   - `--spec <spec-id>` → use that spec id (not restricted to the mod’s current spec); also set as `mods.spec_id`
