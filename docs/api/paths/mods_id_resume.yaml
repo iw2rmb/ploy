@@ -1,0 +1,25 @@
+post:
+  tags: [Control]
+  summary: Resume Mods run
+  description: |
+    Resumes a failed or canceled Mods run by requeueing eligible jobs.
+    This endpoint is idempotent for in-progress runs.
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema: { type: string }
+      description: Run ID (KSUID string, 27 characters).
+  responses:
+    '202':
+      description: Accepted — resume initiated.
+    '200':
+      description: OK — already running/queued (idempotent) or nothing to do.
+    '400':
+      description: Bad request
+    '404':
+      description: Run not found
+    '409':
+      description: Conflict — run is not resumable
+    '500':
+      description: Server error

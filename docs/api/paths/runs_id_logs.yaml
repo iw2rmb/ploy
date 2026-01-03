@@ -113,3 +113,50 @@ get:
       description: Not Found — run does not exist.
     '500':
       description: Internal Server Error.
+
+post:
+  tags: [Control]
+  summary: Upload run log chunk (legacy alias)
+  description: |
+    Uploads a gzipped log chunk for a run with an optional job association.
+
+    Note: this is a legacy alias of `POST /v1/mods/{id}/logs` in the current API.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            job_id:
+              type: string
+              nullable: true
+              description: Optional job ID (KSUID string).
+            chunk_no:
+              type: integer
+              format: int32
+              description: Monotonic chunk number per (run_id, job_id).
+            data:
+              type: string
+              format: byte
+              description: Base64-encoded gzipped log bytes (<= 1 MiB decoded).
+          required: [chunk_no, data]
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id: { type: integer, format: int64 }
+              chunk_no: { type: integer, format: int32 }
+            required: [id, chunk_no]
+    '400':
+      description: Bad request
+    '404':
+      description: Run not found
+    '413':
+      description: Payload too large
+    '500':
+      description: Server error

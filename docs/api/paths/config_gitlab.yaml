@@ -3,7 +3,7 @@ get:
   summary: Get GitLab configuration
   description: |
     Returns the current GitLab configuration, including domain and token.
-    Requires mTLS with cli-admin role.
+    Requires `cli-admin` role.
   responses:
     '200':
       description: OK
@@ -22,7 +22,7 @@ get:
               - domain
               - token
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '500':
@@ -33,7 +33,7 @@ put:
   summary: Update GitLab configuration
   description: |
     Updates the GitLab configuration with new domain and token values.
-    The configuration is stored in memory only. Requires mTLS with cli-admin role.
+    The configuration is stored in memory only. Requires `cli-admin` role.
   requestBody:
     required: true
     content:
@@ -70,7 +70,7 @@ put:
     '400':
       description: Bad request (invalid JSON)
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '500':

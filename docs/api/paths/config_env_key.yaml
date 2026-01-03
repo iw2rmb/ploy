@@ -5,7 +5,7 @@ get:
   description: |
     Returns a single global environment variable entry identified by its key.
     The response includes the value even for secret entries; callers must use
-    mTLS with cli-admin role.
+    `cli-admin` role.
 
     Use this endpoint to retrieve the full value of a secret variable that is
     redacted in the list response.
@@ -32,7 +32,7 @@ get:
     '400':
       description: Bad request (key path parameter is required)
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '404':
@@ -56,7 +56,7 @@ put:
       `/root/.codex/auth.json` by mod-codex images.
     - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated mods.
 
-    Requires mTLS with cli-admin role.
+    Requires `cli-admin` role.
   parameters:
     - in: path
       name: key
@@ -100,7 +100,7 @@ put:
     '400':
       description: Bad request (invalid JSON or invalid scope)
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '500':
@@ -115,7 +115,7 @@ delete:
     from the in-memory config holder. This is an idempotent operation; deleting
     a non-existent key does not return an error.
 
-    Requires mTLS with cli-admin role.
+    Requires `cli-admin` role.
   parameters:
     - in: path
       name: key
@@ -130,7 +130,7 @@ delete:
     '400':
       description: Bad request (key path parameter is required)
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '500':

@@ -21,7 +21,7 @@ get:
     **Precedence:** Per-run env vars (in spec or CLI flags) take precedence over
     global env. Existing keys in the spec are never overwritten.
 
-    Requires mTLS with cli-admin role.
+    Requires `cli-admin` role.
   responses:
     '200':
       description: OK
@@ -40,7 +40,7 @@ get:
               scope: "all"
               secret: false
     '401':
-      description: Unauthorized (missing or invalid mTLS client certificate)
+      description: Unauthorized
     '403':
       description: Forbidden (requires cli-admin role)
     '500':
