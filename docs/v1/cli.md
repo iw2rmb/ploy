@@ -60,10 +60,13 @@ Behavior:
 ### `ploy mod spec list <mod-id|name>`
 
 - Lists spec variants for the mod: `ID`, `NAME`, `CREATED_AT`, `ARCHIVED`.
+- Returned set includes only specs that were actually used in at least one run for this mod.
 
 ### `ploy mod spec remove <mod-id|name> <spec-id>`
 
 - Archives or deletes a spec variant.
+- If `<spec-id>` is referenced by any `runs.spec_id`: archive (set `specs.archived_at`).
+- Else: delete the `specs` row.
 
 ## Repo set management
 
@@ -91,8 +94,8 @@ Behavior:
   - fields may be quoted with `"` (CSV-style)
   - within quoted fields, `"` is escaped as `""`
 - Upserts by `repo_url` within the mod (updates `base_ref`/`target_ref` for existing rows).
-- Does not affect historical run data (existing `run_repos.repo_base_ref` snapshots remain unchanged).
-- Reports counts and per-line errors.
+- Does not affect historical run data (existing `run_repos.repo_base_ref` / `run_repos.repo_target_ref` snapshots remain unchanged).
+- Continues on errors; may partially apply; reports counts and per-line errors.
 
 ## Run execution
 
@@ -107,7 +110,7 @@ Behavior:
   - omitted → use `mods.spec_id` (error if NULL)
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
-  - `--failed` → repos with last terminal state `failed`
+  - `--failed` → repos with last terminal state `Failed`
   - omitted → all repos in the mod repo set
 - Creates a mod-scoped run via `POST /v1/mods/{mod_id}/runs` and immediately starts execution.
 - Prints:
@@ -124,6 +127,7 @@ Behavior:
 
 - Pulls diffs for the specified `run-id`.
 - Safety check against base ref drift:
+  - (requires v1 decision on where “recorded base commit SHA” lives; see docs/v1/docs.md)
   - If the associated mod repo `base_ref` currently resolves to a different commit SHA than the run’s recorded base commit SHA:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
@@ -138,6 +142,18 @@ Repo selection when `--repo` is omitted:
 - Else if invoked from a git worktree whose `origin` URL matches a repo in the run: show diff for that repo.
 - Else: error (repo must be specified).
 
+## Run control
+
+### `ploy run stop <run-id> [--repo <repo-id>]`
+
+- Stops a run (`runs.status` → `Stopped`).
+- When `--repo <repo-id>` is provided, stops that repo in the run (`run_repos.status` → `Stopped`).
+  - `<repo-id>` is `mod_repos.id` (aka `mod_repo_id`).
+
+### `ploy run start <run-id>`
+
+- Starts or resumes a run (`runs.status` → `Started`).
+
 ### `ploy mod pull [--last | --last-failed | --last-succeeded] [<mod-name|id>]`
 
 Behavior:
@@ -150,9 +166,14 @@ Behavior:
   - If multiple mods match: error and print the matching mods (IDs + names).
 - Default (no selector flags): behave as `--last-succeeded`.
 - Safety check against base ref drift / missing execution:
+  - (requires v1 decision on where “recorded base commit SHA” lives; see docs/v1/docs.md)
   - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than the selected run’s recorded base commit SHA:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
+
+Notes:
+
+- `ploy mod pull` is executed from a repo folder and selects diffs for the current repo by looking up the matching `run_repos` entry in the chosen run.
 
 ## Name/ID resolution rules
 

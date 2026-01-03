@@ -10,7 +10,7 @@ Support “code modification projects” where:
 - A **run** executes a chosen spec variant over:
   - one repo,
   - a selected subset of repos,
-  - or the mod’s repos whose last run state is `failed`.
+  - or the mod’s repos whose last run state is `Failed`.
 
 Run entrypoints:
 
@@ -38,10 +38,10 @@ Run entrypoints:
 - **Archiving**: archived mods cannot be executed.
 - **Repo refs over time**:
   - `mod_repos` rows are mutable (e.g., CSV import can rewrite refs).
-  - `run_repos.repo_base_ref` snapshots the base ref used for that repo in that run.
+  - `run_repos.repo_base_ref` and `run_repos.repo_target_ref` snapshot refs used for that repo in that run.
 - **Repo selection**:
   - `--repo ...` → explicit repos
-  - `--failed` → repos whose most recent terminal per-repo status is `failed`
+  - `--failed` → repos whose most recent terminal per-repo status is `Failed`
   - default → all repos in the mod repo set
 - **Immediate start**: both `ploy run` and `ploy mod run` start pending work right away.
 
@@ -67,6 +67,7 @@ Code pointers for the refactor:
 - `internal/server/handlers/mods_ticket.go`: `submitRunHandler` currently creates a parent run, inserts `run_repos`, then relies on `StartPendingRepos` which expects `execution_run_id`.
 - `internal/server/handlers/runs_batch_scheduler.go`: currently creates a child run per repo, calls `createJobsFromSpec` on the child run, and stores `execution_run_id`.
 - `internal/server/handlers/nodes_complete_run.go`: completion logic derives run status by listing jobs for a run ID; in v1, completion must also update `run_repos.status` per repo.
+- `internal/server/handlers/repos.go`: repo-centric endpoints currently expose `execution_run_id`; v1 must remove that field and switch to `run_id + repo_id` addressing.
 - `internal/store/schema.sql` + `internal/store/queries/run_repos.sql`: contain `execution_run_id` and related queries/indexes that must be removed.
 
 Implementation checklist:

@@ -95,13 +95,17 @@ Lists spec variants for a mod.
 
 Notes:
 
-- Returned set can be derived from:
-  - current `mods.spec_id` (if non-NULL)
-  - historical `runs.spec_id` values for runs with `runs.mod_id == mod_id`
+- Returned set includes only specs that were actually used in at least one run:
+  - distinct `runs.spec_id` values where `runs.mod_id == mod_id`
 
 ### `DELETE /v1/mods/{mod_id}/specs/{spec_id}`
 
 Archives or deletes a spec variant.
+
+Behavior:
+
+- If `spec_id` is referenced by any `runs.spec_id`: set `specs.archived_at` (do not hard-delete).
+- Else: delete the `specs` row.
 
 ## Repo set
 
@@ -143,7 +147,7 @@ Request (suggested):
   - `{ "id": "<spec_id>" }`
 - `repo_selector`:
   - `{ "mode": "all" }`
-  - `{ "mode": "failed" }`
+  - `{ "mode": "failed" }` (repos whose last terminal state is `Failed`)
   - `{ "mode": "explicit", "repos": ["<repo_url>", ...] }`
 - optional per-run overrides:
   - `created_by`
@@ -162,4 +166,5 @@ Response:
 ## Schema/docs updates
 
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
+- Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace (e.g. `/v1/runs/{run_id}/*`) to avoid colliding with `/v1/mods` (mod projects).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
