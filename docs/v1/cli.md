@@ -137,7 +137,7 @@ Behavior:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
 
-### `ploy run diff [--repo <repo>] <run-id>`
+### `ploy run diff [--repo <repo-id>] <run-id>`
 
 Show the aggregated diff for a run, optionally scoped to a single repo within a multi-repo run.
 
@@ -146,6 +146,10 @@ Repo selection when `--repo` is omitted:
 - If the run has exactly one repo: show diff for that repo.
 - Else if invoked from a git worktree whose `origin` URL matches a repo in the run: show diff for that repo.
 - Else: error (repo must be specified).
+
+Notes:
+
+- `--repo <repo-id>` uses `mod_repos.id` (aka `mod_repo_id`).
 
 ## Run control
 

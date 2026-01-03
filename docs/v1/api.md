@@ -169,4 +169,9 @@ Response:
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
 - Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace to avoid colliding with `/v1/mods` (mod projects).
 - For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
+- Repo-scoped endpoints required for CLI workflows (names TBD, but must exist under the repo-scoped namespace):
+  - diffs: list + download
+  - events: list/stream (used for progress/diagnostics)
+  - logs: list/stream (scoped by `job_id`, but repo attribution comes from `jobs.repo_id`)
+  - artifacts: list + download (job-produced bundles)
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
