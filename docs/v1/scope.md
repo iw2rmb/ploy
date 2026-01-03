@@ -61,6 +61,7 @@ v1 behavior (to implement):
 - Per-repo execution state is represented by `run_repos` rows (scoped to `runs.id`).
 - Jobs become repo-scoped by adding `jobs.repo_id` and `jobs.repo_base_ref` (copied from `run_repos`).
 - Logs/diffs/events remain addressed by `run_id`, but repo attribution comes from `job_id → jobs.repo_id`.
+- Base commit SHA recording moves from `runs.commit_sha` to `run_repos.commit_sha`.
 
 Code pointers for the refactor:
 
@@ -77,3 +78,7 @@ Implementation checklist:
 - When a job completes, update:
   - `run_repos.status` for that repo (derived from repo-scoped jobs)
   - `runs.status` for the run (derived from all repos)
+
+Status derivation note:
+
+- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('pending','running')` for `(run_id, repo_id)`.

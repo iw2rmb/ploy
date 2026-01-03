@@ -156,6 +156,7 @@ Request (suggested):
 Behavior:
 
 - If `spec_ref` is omitted, use `mods.spec_id`; if `mods.spec_id` is NULL, return an error that spec is required.
+- If `spec_ref` is provided, it may reference any `specs.id` (not restricted to the mod’s current spec id).
 - If `spec_ref` is provided, update `mods.spec_id` to the resolved `spec_id` for future runs.
 
 Response:
@@ -166,5 +167,6 @@ Response:
 ## Schema/docs updates
 
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
-- Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace (e.g. `/v1/runs/{run_id}/*`) to avoid colliding with `/v1/mods` (mod projects).
+- Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace to avoid colliding with `/v1/mods` (mod projects).
+- For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
