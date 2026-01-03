@@ -357,10 +357,6 @@ sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
    CREATE INDEX IF NOT EXISTS idx_bootstrap_tokens_token_id ON bootstrap_tokens(token_id);
    ```
 
-3. Enable token caching (future enhancement):
-   - Cache token validation results for 60 seconds in memory
-   - Reduces database queries for repeated requests
-
 ### High Database Load
 
 **Symptom**: PostgreSQL CPU/disk usage is high during peak traffic.

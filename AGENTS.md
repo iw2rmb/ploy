@@ -26,6 +26,22 @@ Unless otherwise specified, the following policies apply when planning changes:
    - `docs/how-to/update-a-cluster.md` — Update `ployd` across VPS nodes.
    - `docs/envs/README.md` — Canonical environment variables.
 
+## Documentation Layout Policy
+
+1. `docs/` is normative for the CURRENT IMPLEMENTED state at HEAD only.
+   - Planned/unimplemented behavior MUST NOT live under `docs/`.
+   - If behavior is not implemented, it MUST live under `roadmap/`.
+2. Planned / next-version documentation MUST live under `roadmap/vN/` (e.g. `roadmap/v1/`).
+   - Version folders under `docs/` are not allowed for planned work.
+3. In documents in `roadmap/vN/`:
+   - List deltas vs current implemented behavior with references.
+   - Prefer references to code (file paths + symbols where applicable).
+   - Otherwise reference `docs/` headings (path + heading).
+   - Each change entry MUST state: what changes, where it will be implemented, and any compatibility impact.
+4. When a roadmap version is implemented:
+   - All implemented behavior MUST be incorporated into `docs/` (and update any existing code comments that cite spec paths).
+   - The corresponding `roadmap/vN/` folder MUST be deleted in the same change to avoid misinterpretation.
+
 ## Development
 
 ### TDD Framework (CRITICAL)

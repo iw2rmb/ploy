@@ -211,10 +211,9 @@ ssh root@45.130.213.91 'systemctl status --no-pager ployd-node'
 ssh root@45.130.213.91 'journalctl -u ployd-node -n 50 --no-pager'
 ```
 
-Check that all nodes are undrained and reporting heartbeats via the API (future):
+Check that all nodes are undrained and reporting heartbeats via the API:
 
 ```bash
-# Future: GET /v1/nodes will show drained=false and recent last_heartbeat
 curl -sk https://45.9.42.212:8443/v1/nodes | jq '.[] | {name, drained, last_heartbeat}'
 ```
 
@@ -372,8 +371,8 @@ ssh root@<node-ip> 'systemctl status ployd-node --no-pager'
 # 4. Check node agent logs for errors.
 ssh root@<node-ip> 'journalctl -u ployd-node -n 20 --no-pager'
 
-# 5. Verify the node is sending heartbeats (future: via API).
-#    For now, check logs for "heartbeat sent" or similar messages.
+# 5. Verify the node is sending heartbeats.
+#    Check logs for "heartbeat sent" or similar messages, and/or use `GET /v1/nodes`.
 ```
 
 ### Rollback (Emergency)

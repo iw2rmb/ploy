@@ -1,5 +1,17 @@
 # Roadmap v1 — API
 
+## Deltas vs HEAD
+
+- Change: repurpose `/v1/mods` from “run submission” to “mod project CRUD”.
+  - Where: `internal/server/handlers/register.go` (`POST /v1/mods`), `internal/server/handlers/mods_ticket.go` (replace/retire `submitRunHandler`), `docs/api/OpenAPI.yaml` (paths + descriptions).
+  - Compatibility impact: breaking API change; no backward compatibility required.
+- Change: add `POST /v1/runs` as the single-repo run submission API (used by `ploy run ...`).
+  - Where: new handler under `internal/server/handlers/*`, CLI callers under `cmd/ploy/*` and `internal/cli/*`, OpenAPI updates in `docs/api/OpenAPI.yaml`.
+  - Compatibility impact: breaking for clients that submit runs via `POST /v1/mods`; no backward compatibility required.
+- Change: add repo-scoped run artifacts under `/v1/runs/{run_id}/repos/{repo_id}/...`.
+  - Where: new handlers under `internal/server/handlers/*`; repo attribution via `jobs.repo_id` and `run_repos` (see `roadmap/v1/db.md`).
+  - Compatibility impact: breaking for clients that read diffs under `/v1/mods/{run_id}/diffs`; no backward compatibility required.
+
 ## Mod projects
 
 ### `POST /v1/mods`

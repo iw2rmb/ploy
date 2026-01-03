@@ -1,5 +1,11 @@
 # Roadmap v1 — Docs
 
+## Deltas vs HEAD
+
+- Change: separate “implemented docs” from “planned docs”.
+  - Where: move v1 planned docs from `docs/` to `roadmap/v1/` and keep `docs/` normative for current behavior.
+  - Compatibility impact: none (documentation-only), but links and references must be updated.
+
 ## 0) Primary goal
 
 Make docs consistent with the v1 CLI/API direction:
@@ -48,7 +54,7 @@ Notes:
 v1 repurposes `mod` as a **project**:
 
 - Current reality: `POST /v1/mods` submits a Mods run (`docs/api/paths/mods.yaml`, `internal/server/handlers/mods_ticket.go`).
-- v1 decision: `POST /v1/mods` creates a mod project (docs/v1/api.md).
+- v1 decision: `POST /v1/mods` creates a mod project (`roadmap/v1/api.md`).
 
 This also collides with existing “run artifacts” endpoints that currently live under `/v1/mods/{run_id}/*`:
 
@@ -81,7 +87,7 @@ Files with old semantics (examples to rewrite):
   - Add `POST /v1/runs` (submit single-repo run) and document request/response.
   - Add `/v1/mods` CRUD for mod projects (create/list/delete).
   - Add `POST /v1/mods/{mod_id}/runs` (execute mod project).
-  - Add mod project `specs` and `repos` endpoints as defined in docs/v1/api.md.
+  - Add mod project `specs` and `repos` endpoints as defined in `roadmap/v1/api.md`.
 
 ## 3) Redundant / low-value content (recommend prune or relocate)
 
