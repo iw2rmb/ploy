@@ -1,17 +1,16 @@
 # Roadmap v2 — Scope
 
-## Deltas vs HEAD
-
-- Change: allow repo-scoped HTTP endpoints to accept repo selectors by URL identity (e.g. `domain/owner/repo`) instead of `repo_id` (`mod_repos.id`).
-  - Where: route parsing and lookup logic in `internal/server/handlers/*` for `/v1/runs/{run_id}/repos/{repo_selector}/...`.
-  - Compatibility impact: breaking if `repo_id` addressing is removed; otherwise additive if both selectors are accepted.
-- Change: allow CLI repo scoping by repo URL (human input), not internal ids.
-  - Where: `cmd/ploy/*` flag parsing and normalization (see v0 normalization in `cmd/ploy/mod_run_pull.go`).
-  - Compatibility impact: breaking if `--repo <repo-id>` is removed; otherwise additive if both are accepted.
-
 ## Repo selectors by URL (not id)
 
 v2 extends the repo-scoped run surface to support repo selection by `repo_url` identity (e.g. `domain/owner/repo`) instead of `repo_id` (`mod_repos.id`).
+
+Change entry: allow repo selectors by URL (human input), not internal ids.
+
+- Current (HEAD): repo scoping uses `repo_id` (`mod_repos.id`) in `/v1/runs/{run_id}/repos/{repo_id}/...` and in CLI flags (see `roadmap/v1/cli.md`).
+- Proposed (v2): allow repo selection by repo URL identity (`domain/owner/repo` or equivalent normalized form) for both API and CLI.
+- Where: route parsing and lookup logic in `internal/server/handlers/*` for `/v1/runs/{run_id}/repos/{repo_selector}/...`, plus CLI flag parsing/normalization under `cmd/ploy/*` (use v0 normalization patterns from `cmd/ploy/mod_run_pull.go`).
+- Compatibility: breaking if `repo_id` addressing is removed; additive if both selectors are accepted.
+- Unchanged: underlying storage still keys repos by `mod_repos.id`; URL selectors only change how callers identify the repo.
 
 Goal:
 

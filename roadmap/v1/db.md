@@ -1,18 +1,14 @@
 # Roadmap v1 — DB
 
-## Deltas vs HEAD
-
-- Change: introduce `mods`, `specs`, `mod_repos` as the mod/spec/repo management model.
-  - Where: `internal/store/schema.sql` (new tables), `internal/store/queries/*`, `internal/server/handlers/*` for CRUD.
-  - Compatibility impact: breaking schema change; no migrations/back-compat required (fresh deploy).
-- Change: reshape execution model to `runs` → `run_repos` (remove per-repo execution runs).
-  - Where: `internal/store/schema.sql` (`runs`, `run_repos`), `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/nodes_complete_run.go`.
-  - Compatibility impact: breaking for existing runs/run_repos semantics; no migrations/back-compat required.
-- Change: make jobs repo-scoped and de-duplicate by `(run_id, repo_id, name, step_index)`.
-  - Where: `internal/store/schema.sql` (`jobs`), any job creation/query logic under `internal/server/*` and `internal/store/*`.
-  - Compatibility impact: breaking schema change; no migrations/back-compat required.
-
 ## New tables
+
+Change entry: introduce `mods`, `specs`, `mod_repos` for project/spec/repo management.
+
+- Current (HEAD): run-centric schema lives in `internal/store/schema.sql` (`runs`, `run_repos`, `jobs`, `events`, `diffs`, `logs`, `artifact_bundles`).
+- Proposed (v1): add `mods`, `specs`, `mod_repos` tables as the new source of truth for mod project state.
+- Where: `internal/store/schema.sql` + `internal/store/queries/*` + new CRUD handlers under `internal/server/handlers/*`.
+- Compatibility: breaking schema change; no migrations/back-compat required (fresh deploy).
+- Unchanged: artifacts/logs/events remain persisted and addressed by `run_id` and `job_id` (repo attribution becomes `job_id → jobs.repo_id`).
 
 ### `mods`
 
@@ -78,6 +74,14 @@ Notes:
 - Run history remains stable because `run_repos.repo_base_ref` and `run_repos.repo_target_ref` snapshot refs at run creation time.
 
 ## Updated execution tables
+
+Change entry: reshape execution model to `runs` → `run_repos` and make jobs repo-scoped.
+
+- Current (HEAD): batch execution uses `run_repos.execution_run_id` (child “execution run” per repo) and jobs/diffs/logs/events attach to that child run (see `internal/store/schema.sql`, `internal/store/queries/run_repos.sql`, and scheduling in `internal/server/handlers/runs_batch_scheduler.go`).
+- Proposed (v1): remove per-repo execution runs; use a single `runs` row with per-repo `run_repos` rows, and add `jobs.repo_id` + `jobs.repo_base_ref` to attribute artifacts to repos.
+- Where: `internal/store/schema.sql` (`runs`, `run_repos`, `jobs`) and refactors in `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/nodes_complete_run.go`.
+- Compatibility: breaking DB + scheduling semantics; no backward compatibility required.
+- Unchanged: job lifecycle states and ingestion endpoints remain job-addressed (see current `job_status` in `internal/store/schema.sql`).
 
 ## Enums (v1)
 

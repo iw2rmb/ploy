@@ -34,10 +34,16 @@ Unless otherwise specified, the following policies apply when planning changes:
 2. Planned / next-version documentation MUST live under `roadmap/vN/` (e.g. `roadmap/v1/`).
    - Version folders under `docs/` are not allowed for planned work.
 3. In documents in `roadmap/vN/`:
-   - List deltas vs current implemented behavior with references.
-   - Prefer references to code (file paths + symbols where applicable).
-   - Otherwise reference `docs/` headings (path + heading).
-   - Each change entry MUST state: what changes, where it will be implemented, and any compatibility impact.
+   - Do not write a standalone “deltas vs HEAD” section.
+   - Every proposed change MUST be explained in-place where it is relevant (API/DB/CLI/etc).
+   - Each proposed change MUST make it clear what remains unchanged by anchoring to the current behavior:
+     - Prefer references to code (file paths + symbols where applicable).
+     - Otherwise reference `docs/` headings (path + heading).
+   - Each change entry MUST state:
+     - what changes (vN behavior),
+     - where it will be implemented (paths + likely symbols/handlers/sql),
+     - compatibility impact (explicit; “none required” when applicable),
+     - and what remains unchanged (usually a reference to the current behavior).
 4. When a roadmap version is implemented:
    - All implemented behavior MUST be incorporated into `docs/` (and update any existing code comments that cite spec paths).
    - The corresponding `roadmap/vN/` folder MUST be deleted in the same change to avoid misinterpretation.
