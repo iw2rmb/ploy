@@ -75,6 +75,7 @@ v1 behavior (to implement):
 - Jobs become repo-scoped by adding `jobs.repo_id` and `jobs.repo_base_ref` (copied from `run_repos`).
 - Logs/diffs/events remain addressed by `run_id`, but repo attribution comes from `job_id → jobs.repo_id`.
 - Base commit SHA recording moves from `runs.commit_sha` to `run_repos.commit_sha`.
+  - v1 rule: resolved by the server before starting the first job; not provided by CLI.
 
 Code pointers for the refactor:
 

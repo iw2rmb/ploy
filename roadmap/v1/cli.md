@@ -37,6 +37,7 @@ Notes:
 ### `ploy mod remove <mod-id|name>`
 
 - Deletes a mod.
+- Refuses if the mod has any runs.
 
 ### `ploy mod archive <mod-id|name>`
 
@@ -158,32 +159,6 @@ Behavior:
     - if the mod is archived: error
     - else: run the mod for this repo and pull the new run’s diffs instead
 
-### `ploy run diff [--repo <repo-id>] <run-id>`
-
-Show the aggregated diff for a run, optionally scoped to a single repo within a multi-repo run.
-
-v0 reference:
-
-- Today the CLI implements `ploy run diffs` (see `cmd/ploy/run_diff.go`) which is run-scoped and downloads the newest diff for a run.
-- v1 `ploy run diff` is repo-scoped for multi-repo runs and requires `--repo` when the run has more than one repo.
-
-Change entry: multi-repo runs require explicit repo selection for repo-scoped commands.
-
-- Current (HEAD): `ploy run diffs` is run-scoped and downloads the newest diff for a run (see `cmd/ploy/run_diff.go` and `internal/cli/runs/diffs.go`).
-- Proposed (v1): repo-scoped commands live under `/v1/runs/{run_id}/repos/{repo_id}/...` and require `--repo <repo-id>` when a run has multiple repos.
-- Where: CLI flags under `cmd/ploy/*` and repo-scoped endpoints under `internal/server/handlers/*` (see `roadmap/v1/api.md`).
-- Compatibility: breaking for workflows relying on implicit repo inference; no backward compatibility required.
-- Unchanged: diff download by diff id (`GET /v1/diffs/{id}?download=true`) may remain.
-
-Repo selection when `--repo` is omitted:
-
-- If the run has exactly one repo: show diff for that repo.
-- Else: error (`--repo` is required when the run has more than one repo).
-
-Notes:
-
-- `--repo <repo-id>` uses `mod_repos.id` (aka `mod_repo_id`).
-
 ## Run control
 
 ### `ploy run stop <run-id> [--repo <repo-id>]`
@@ -207,6 +182,11 @@ Behavior:
   - If exactly one mod matches: select that mod.
   - If multiple mods match: error and print the matching mods (IDs + names).
 - Default (no selector flags): behave as `--last-succeeded`.
+- Run selection for the current repo uses run history by `(runs.mod_id, run_repos.repo_id)`:
+  - Find the newest run for this mod+repo by ordering `run_repos.created_at DESC` (joining through `runs.id`) and select according to the chosen flag:
+    - `--last`: newest terminal (`Success`, `Failed`, `Cancelled`, `Stopped`)
+    - `--last-failed`: newest terminal `Failed`
+    - `--last-succeeded`: newest terminal `Success`
 - Safety check against base ref drift / missing execution:
   - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in the selected run:
     - if the mod is archived: error
