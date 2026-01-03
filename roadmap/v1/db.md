@@ -1,5 +1,17 @@
 # Roadmap v1 — DB
 
+## Deltas vs HEAD
+
+- Change: introduce `mods`, `specs`, `mod_repos` as the mod/spec/repo management model.
+  - Where: `internal/store/schema.sql` (new tables), `internal/store/queries/*`, `internal/server/handlers/*` for CRUD.
+  - Compatibility impact: breaking schema change; no migrations/back-compat required (fresh deploy).
+- Change: reshape execution model to `runs` → `run_repos` (remove per-repo execution runs).
+  - Where: `internal/store/schema.sql` (`runs`, `run_repos`), `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/nodes_complete_run.go`.
+  - Compatibility impact: breaking for existing runs/run_repos semantics; no migrations/back-compat required.
+- Change: make jobs repo-scoped and de-duplicate by `(run_id, repo_id, name, step_index)`.
+  - Where: `internal/store/schema.sql` (`jobs`), any job creation/query logic under `internal/server/*` and `internal/store/*`.
+  - Compatibility impact: breaking schema change; no migrations/back-compat required.
+
 ## New tables
 
 ### `mods`

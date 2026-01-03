@@ -1,5 +1,14 @@
 # Roadmap v2 — Scope
 
+## Deltas vs HEAD
+
+- Change: allow repo-scoped HTTP endpoints to accept repo selectors by URL identity (e.g. `domain/owner/repo`) instead of `repo_id` (`mod_repos.id`).
+  - Where: route parsing and lookup logic in `internal/server/handlers/*` for `/v1/runs/{run_id}/repos/{repo_selector}/...`.
+  - Compatibility impact: breaking if `repo_id` addressing is removed; otherwise additive if both selectors are accepted.
+- Change: allow CLI repo scoping by repo URL (human input), not internal ids.
+  - Where: `cmd/ploy/*` flag parsing and normalization (see v0 normalization in `cmd/ploy/mod_run_pull.go`).
+  - Compatibility impact: breaking if `--repo <repo-id>` is removed; otherwise additive if both are accepted.
+
 ## Repo selectors by URL (not id)
 
 v2 extends the repo-scoped run surface to support repo selection by `repo_url` identity (e.g. `domain/owner/repo`) instead of `repo_id` (`mod_repos.id`).

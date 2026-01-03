@@ -1,5 +1,17 @@
 # Roadmap v1 — CLI
 
+## Deltas vs HEAD
+
+- Change: add a `ploy mod ...` surface for mod project CRUD (mods, specs, repo set) and a batch runner `ploy mod run`.
+  - Where: CLI commands under `cmd/ploy/*` and HTTP clients under `internal/cli/*`.
+  - Compatibility impact: breaking CLI surface (new commands and semantics); no backward compatibility required.
+- Change: `ploy mod repo import` CSV rules are fully specified (comma delimiter, optional quoting, unicode, continue-on-error).
+  - Where: `cmd/ploy/*` implementation and tests; server endpoints and validation under `internal/server/handlers/*`.
+  - Compatibility impact: none for existing behavior (new feature), but input parsing becomes strict.
+- Change: multi-repo runs require repo selection by `repo_id` for repo-scoped commands.
+  - Where: `cmd/ploy/run_diff.go` (or v1 equivalent), repo-scoped APIs under `/v1/runs/{run_id}/repos/{repo_id}/...`.
+  - Compatibility impact: breaking for workflows relying on implicit repo inference for multi-repo runs.
+
 ## Run submission (single-repo)
 
 ### `ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|->`

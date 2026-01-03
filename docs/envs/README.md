@@ -262,8 +262,7 @@ ploy mod run --mr-success \
 
 ## gapi
 
-- No environment variables are active for gapi within this codebase; record
-  future additions here once the API slices land.
+- No environment variables are active for gapi within this codebase.
 
 ## Control Plane
 

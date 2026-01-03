@@ -1,5 +1,17 @@
 # Roadmap v1 — Scope
 
+## Deltas vs HEAD
+
+- Change: treat “mods” as long-lived projects (name/specs/repo set) instead of “run submission”.
+  - Where: server routes in `internal/server/handlers/register.go` and new handlers for `/v1/mods/*` project CRUD.
+  - Compatibility impact: breaking API; no backward compatibility required.
+- Change: remove “execution run per repo” (`run_repos.execution_run_id`) and model execution as `runs` → `run_repos`.
+  - Where: `internal/store/schema.sql`, `internal/store/queries/run_repos.sql`, `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/mods_ticket.go`.
+  - Compatibility impact: breaking DB + scheduling semantics; no backward compatibility required.
+- Change: make run artifacts repo-scoped under `/v1/runs/{run_id}/repos/{repo_id}/...` and derive repo attribution from `job_id → jobs.repo_id`.
+  - Where: `internal/server/handlers/events.go` (SSE today is run-scoped), `internal/server/handlers/diffs.go` (diffs today are `/v1/mods/{run_id}/diffs`), plus new repo-scoped handlers.
+  - Compatibility impact: breaking for clients; no backward compatibility required.
+
 ## Goal
 
 Support “code modification projects” where:
@@ -23,6 +35,11 @@ Run entrypoints:
 - **Spec**: a Mods spec variant (stored as JSONB; authored as YAML/JSON).
 - **Repo**: a repo participating in a mod (repo_url + refs).
 - **Run**: an execution attempt; produces run-level and per-repo status, artifacts, logs, diffs.
+
+Repo URL note (v0 reference):
+
+- Current repo URL validation accepts only `https://`, `ssh://`, and `file://` URLs (see `internal/domain/types/vcs.go`, `RepoURL.Validate`).
+- v0 `ploy mod run pull` normalization examples include scp-style `git@host:owner/repo` (see `cmd/ploy/mod_run_pull.go`, `normalizeRepoURLForCLI`), but v0 server-side repo endpoints validate `RepoURL` (see `internal/server/handlers/repos.go`).
 
 ## Non-goals (v1)
 
