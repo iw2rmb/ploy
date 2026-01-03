@@ -8,7 +8,7 @@ Change entry: move single-repo submission from `ploy mod run` to `ploy run`.
 - Proposed (v1): `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` calls `POST /v1/runs` (see `roadmap/v1/api.md`).
 - Where: CLI routing under `cmd/ploy/*` and HTTP client under `internal/cli/*`.
 - Compatibility: breaking CLI/API surface; no backward compatibility required.
-- Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/start/stop/logs) remain, with repo scoping added for multi-repo runs.
+- Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/start/cancel/logs) remain, with repo scoping added for multi-repo runs.
 
 ### `ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|->`
 
@@ -161,15 +161,13 @@ Behavior:
 
 ## Run control
 
-### `ploy run stop <run-id> [--repo <repo-id>]`
+### `ploy run cancel <run-id>`
 
-- Stops a run (`runs.status` → `Stopped`).
-- When `--repo <repo-id>` is provided, stops that repo in the run (`run_repos.status` → `Stopped`).
-  - `<repo-id>` is `mod_repos.id` (aka `mod_repo_id`).
+- Cancels a run (`runs.status` → `Cancelled`).
 
 ### `ploy run start <run-id>`
 
-- Starts or resumes a run (`runs.status` → `Started`).
+- Starts pending work for a run (creates jobs for pending repos). Refuses when run is `Finished` or `Cancelled`.
 
 ### `ploy mod pull [--last | --last-failed | --last-succeeded] [<mod-name|id>]`
 
@@ -184,18 +182,19 @@ Behavior:
 - Default (no selector flags): behave as `--last-succeeded`.
 - Run selection for the current repo uses run history by `(runs.mod_id, run_repos.repo_id)`:
   - Find the newest run for this mod+repo by ordering `run_repos.created_at DESC` (joining through `runs.id`) and select according to the chosen flag:
-    - `--last`: newest terminal (`Success`, `Failed`, `Cancelled`, `Stopped`)
+    - `--last`: newest terminal (`Success`, `Failed`, `Cancelled`)
     - `--last-failed`: newest terminal `Failed`
     - `--last-succeeded`: newest terminal `Success`
-- Safety check against base ref drift / missing execution:
-  - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in the selected run:
-    - if the mod is archived: error
-    - else: run the mod for this repo and pull the new run’s diffs instead
+  - Safety check against base ref drift / missing execution:
+    - If the mod has never been executed for this repo **or** the mod repo `base_ref` currently resolves to a different commit SHA than `run_repos.commit_sha` for this repo in the selected run:
+      - if the mod is archived: error
+      - else: run the mod for this repo and pull the new run’s diffs instead
 
 Notes:
 
 - `ploy mod pull` is executed from a repo folder and selects diffs for the current repo by looking up the matching `run_repos` entry in the chosen run.
 - Repo URL matching for “current repository” inference should use the same normalization as v0 `ploy mod run pull` (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
+- Server-side selection endpoint: `POST /v1/mods/{mod_id}/pull` performs the run selection and returns `run_id`, `repo_id`, `commit_sha`, and `repo_target_ref` (see `roadmap/v1/api.md`).
 
 ## Name/ID resolution rules
 
