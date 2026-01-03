@@ -31,7 +31,7 @@ Full URL: https://github.com/iw2rmb/homebrew-ploy
 
 ```bash
 # Clone the new repository
-git clone git@github.com:iw2rmb/homebrew-ploy.git
+git clone https://github.com/iw2rmb/homebrew-ploy.git
 cd homebrew-ploy
 
 # Create Formula directory
