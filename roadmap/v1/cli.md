@@ -26,7 +26,7 @@ Notes:
 ### `ploy mod add --name <name> [--spec <path|->]`
 
 - Creates a mod with unique `<name>`.
-- If `--spec` is provided, also creates an initial spec variant for the mod.
+- If `--spec` is provided, also creates an initial spec row for the mod.
 - If `--spec` is provided, sets `mods.spec_id` to the created `spec_id`.
 - Prints `mod_id` and name; if `--spec` is provided, also prints `spec_id`.
 
@@ -48,16 +48,9 @@ Notes:
 
 - Unarchives a mod.
 
-## Spec variants
+## Setting a mod spec
 
-Mod is always a required positional argument for spec management.
-
-### `ploy mod spec add --name <spec-name> <mod-id|name> <path|->`
-
-Suggested concrete shape:
-
-- `ploy mod spec add --name <spec-name> <mod-id|name> <path>`
-- `ploy mod spec add --name <spec-name> <mod-id|name> -` (read spec from stdin)
+### `ploy mod spec set <mod-id|name> <path|->`
 
 Behavior:
 
@@ -65,17 +58,6 @@ Behavior:
 - Validates spec shape.
 - Inserts a new `specs` row and updates `mods.spec_id` to that new `spec_id`.
 - Returns `spec_id`.
-
-### `ploy mod spec list <mod-id|name>`
-
-- Lists spec variants for the mod: `ID`, `NAME`, `CREATED_AT`, `ARCHIVED`.
-- Returned set includes only specs that were actually used in at least one run for this mod.
-
-### `ploy mod spec remove <mod-id|name> <spec-id>`
-
-- Archives or deletes a spec variant.
-- If `<spec-id>` is referenced by any `runs.spec_id`: archive (set `specs.archived_at`).
-- Else: delete the `specs` row.
 
 ## Repo set management
 
@@ -110,27 +92,23 @@ Change entry: `ploy mod repo import` CSV parsing is fully specified.
   - UTF-8 text; unicode characters allowed
   - fields may be quoted with `"` (CSV-style)
   - within quoted fields, `"` is escaped as `""`
+- Calls `POST /v1/mods/{mod_id}/repos/bulk` with `Content-Type: text/csv`.
 - Upserts by `repo_url` within the mod (updates `base_ref`/`target_ref` for existing rows).
 - Does not affect historical run data (existing `run_repos.repo_base_ref` / `run_repos.repo_target_ref` snapshots remain unchanged).
 - Continues on errors; may partially apply; reports counts and per-line errors.
 
 ## Run execution
 
-### `ploy mod run <mod-id|name> [--spec <spec-id|path|->] [--repo <repo-url> ...] [--failed]`
+### `ploy mod run <mod-id|name> [--repo <repo-url> ...] [--failed]`
 
 Behavior:
 
 - Resolves `<mod-id|name>` to a mod.
 - Refuses when the mod is archived.
-- Resolves the chosen spec:
-  - Disambiguation rules for `--spec <arg>`:
-    - If `<arg>` is `-`: read from stdin (YAML/JSON).
-    - Else if `<arg>` ends with `.yaml`, `.yml`, or `.json`: treat as a file path.
-    - Else if `<arg>` contains `/`: error (looks like a path but is not a YAML file).
-    - Else: treat as a `spec_id`.
-  - `--spec <spec-id>` → use that spec id (not restricted to the mod’s current spec); also set as `mods.spec_id`
-  - `--spec <path|->` → create a new spec row from the provided file/stdin, use it, and set `mods.spec_id` to the created `spec_id`
-  - omitted → use `mods.spec_id` (error if NULL)
+- Uses `mods.spec_id` as the run’s `spec_id` (copied onto the created run).
+- Spec changes are mod-scoped only:
+  - `ploy mod spec set <mod> <path|->` updates `mods.spec_id`
+  - `ploy mod run <mod>` always uses the current `mods.spec_id` (error if NULL)
 - Selects repos:
   - `--repo ...` → explicit repos (by repo_url identity within the mod)
   - `--failed` → repos with last terminal state `Failed`
@@ -169,7 +147,7 @@ Behavior:
 
 - Starts pending work for a run (creates jobs for pending repos). Refuses when run is `Finished` or `Cancelled`.
 
-### `ploy mod pull [--last | --last-failed | --last-succeeded] [<mod-name|id>]`
+### `ploy mod pull [--last-failed | --last-succeeded] [<mod-name|id>]`
 
 Behavior:
 
@@ -182,7 +160,6 @@ Behavior:
 - Default (no selector flags): behave as `--last-succeeded`.
 - Run selection for the current repo uses run history by `(runs.mod_id, run_repos.repo_id)`:
   - Find the newest run for this mod+repo by ordering `run_repos.created_at DESC` (joining through `runs.id`) and select according to the chosen flag:
-    - `--last`: newest terminal (`Success`, `Failed`, `Cancelled`)
     - `--last-failed`: newest terminal `Failed`
     - `--last-succeeded`: newest terminal `Success`
   - Safety check against base ref drift / missing execution:

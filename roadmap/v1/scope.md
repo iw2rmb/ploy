@@ -5,9 +5,10 @@
 Support “code modification projects” where:
 
 - A **mod** is a long-lived project with a unique name.
-- A mod has **spec variants** (Mods YAML/JSON) to iterate on approach (ORW recipes, LLM model/prompt, etc.).
+- A mod has a single **current spec** (Mods YAML/JSON), referenced by `mods.spec_id`.
+  - Setting/updating a mod spec creates a new `specs` row and updates `mods.spec_id`.
 - A mod has a managed **repo set** (identified by `repo_url`) that changes over time.
-- A **run** executes a chosen spec variant over:
+- A **run** executes the mod’s current spec (copied from `mods.spec_id`) over:
   - one repo,
   - a selected subset of repos,
   - or the mod’s repos whose last run state is `Failed`.
@@ -20,7 +21,7 @@ Run entrypoints:
 ## Terms (no new nouns)
 
 - **Mod**: project container (unique name).
-- **Spec**: a Mods spec variant (stored as JSONB; authored as YAML/JSON).
+- **Spec**: the current Mods spec referenced by a mod (`mods.spec_id` → `specs.id`).
 - **Repo**: a repo participating in a mod (repo_url + refs).
 - **Run**: an execution attempt; produces run-level and per-repo status, artifacts, logs, diffs.
 
@@ -38,7 +39,7 @@ Repo URL note (v0 reference):
 
 ## Key behaviors
 
-- **Immutability**: a run links to the exact spec variant used.
+- **Immutability**: a run links to the exact spec used (`runs.spec_id`).
 - **Stable grouping**: grouping is by `mods.name` (unique) and `runs.mod_id` (no `runs.name`).
 - **Archiving**: archived mods cannot be executed.
 - **Repo refs over time**:
@@ -59,9 +60,11 @@ Codebase must switch from “root-run → per-repo execution runs” to “run �
 Current server routes under `/v1/mods/*` are run-scoped (see `internal/server/handlers/register.go`) and collide with v1’s “mods are projects” direction.
 
 - `POST /v1/mods` (run submission) must move to `POST /v1/runs`.
-- Run-scoped routes under `/v1/mods/{run_id}/*` must move under `/v1/runs/{run_id}/*`:
-  - examples: `GET /v1/mods/{run_id}/diffs`, `GET /v1/mods/{run_id}/graph`, `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
- - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
+- Run lifecycle routes under `/v1/mods/{run_id}/*` must move under `/v1/runs/{run_id}/*`:
+  - examples: `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
+- Repo-specific artifacts must move under the repo-scoped namespace:
+  - example: `GET /v1/mods/{run_id}/diffs` → `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`
+- Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
 
 Current codebase behavior (to remove):
 

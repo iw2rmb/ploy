@@ -31,16 +31,18 @@ Archiving semantics:
 
 ### `specs`
 
-Dictionary of all specs uploaded to Spok. Mod “spec variants” are represented by
-multiple `specs` rows over time; the mod’s current spec is `mods.spec_id`.
+Dictionary of all specs. Mods do not “own” specs; a mod just points at a single
+current spec via `mods.spec_id`.
 
 Notes:
 
 - `specs` exists to support stable `runs.spec_id` references over time.
-- This is not a “spec sharing” feature between mods.
+- There is no v1 concept of “spec variants” as a first-class per-mod set.
+  - Setting/updating a mod spec means: insert a new `specs` row and update `mods.spec_id`.
+  - Old `specs` rows remain for historical `runs.spec_id` references.
 
 - `id TEXT PRIMARY KEY` (NanoID(8), app-generated)
-- `name TEXT NOT NULL`
+- `name TEXT NOT NULL DEFAULT ''` (optional human label)
 - `spec JSONB NOT NULL` (canonical Mods spec JSON)
 - `created_by TEXT NULL`
 - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`
@@ -53,6 +55,7 @@ Constraints / indexes:
 Notes:
 
 - A `specs` row must not be hard-deleted if it is referenced by any `runs.spec_id`.
+  v1 does not require any spec-deletion API; treat `specs` as append-only storage.
 
 ### `mod_repos`
 
@@ -186,6 +189,17 @@ Notes:
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
 - v1 rule: `run_repos.commit_sha` is resolved by the server before starting the first job and is not accepted from CLI input.
   - If commit SHA resolution fails, set `run_repos.status = Failed` and populate `run_repos.last_error` (no jobs are started).
+
+### Repo restarts / attempts (TODO decision)
+
+v1 introduces `run_repos.attempt` but the `jobs` uniqueness constraint above does
+not allow creating a second set of jobs for the same `(run_id, repo_id)` unless
+we also encode attempt into job identity.
+
+Pick one concrete approach before implementation:
+
+- Option A (recommended): add `jobs.attempt INTEGER NOT NULL` copied from `run_repos.attempt` at job creation time and change uniqueness to `UNIQUE (run_id, repo_id, attempt, name, step_index)`.
+- Option B: keep `jobs` attempt-less, but on repo restart, hard-delete all repo-scoped jobs (and repo-scoped artifacts) for that `(run_id, repo_id)` before re-creating jobs.
 
 ## Derived “failed repos” selection
 

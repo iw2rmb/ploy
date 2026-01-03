@@ -18,7 +18,7 @@ Creates a mod project.
 Request:
 
 - `name` (string, unique)
-- optional `spec` (object; JSON) — creates an initial spec variant
+- optional `spec` (object; JSON) — creates an initial spec row and sets `mods.spec_id`
 
 Response:
 
@@ -59,9 +59,8 @@ Request:
 
 - `repo_url`
 - optional `mode`:
-  - `last` (default): newest terminal (`Success`, `Failed`, `Cancelled`)
   - `last-failed`: newest terminal `Failed`
-  - `last-succeeded`: newest terminal `Success`
+  - `last-succeeded` (default): newest terminal `Success`
 
 Response:
 
@@ -72,7 +71,7 @@ Response:
 
 Notes:
 
-- Server performs the lookup using `mod_id + repo_url` → `mod_repos.id`, then selects the appropriate `run_repos` by `run_repos.created_at DESC` (joining through `runs` by `runs.id` and filtering by `runs.mod_id`).
+- Server performs the lookup using `mod_id + repo_url` → `mod_repos.id`, then selects the appropriate `run_repos` by `run_repos.created_at DESC` (joining through `runs` by `runs.id` and filtering by `runs.mod_id`) and filtering by the requested terminal status.
 - Diffs are then listed via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and downloaded via `GET /v1/diffs/{diff_id}?download=true`.
 
 ### `PATCH /v1/mods/{mod_id}/archive`
@@ -106,7 +105,7 @@ This is the API behind `ploy run --spec ... --repo ...`.
 Side-effects:
 
 - Creates a mod project; the created mod has `name == id`.
-- Creates an initial spec variant for that mod from the provided `spec`.
+- Creates an initial spec row for that mod from the provided `spec` and sets `mods.spec_id`.
 - Creates a mod repo row for the provided `repo_url` (identity within the mod).
 
 Request:
@@ -122,42 +121,28 @@ Response:
 - `mod_id`
 - `spec_id`
 
-## Spec variants
+## Specs
+
+Change entry: specs are stored globally; mods point at a single `spec_id`.
+
+- Current (HEAD): no spec storage outside `runs.spec` JSONB.
+- Proposed (v1): specs are stored in `specs` (global dictionary); `mods.spec_id` points at the current spec.
+- Where: `internal/store/schema.sql` (`specs`, `mods.spec_id`) + mod CRUD handlers.
+- Compatibility: breaking; no backward compatibility required.
+- Unchanged: runs are immutable and reference the exact `spec_id` that was current on the mod at run creation time.
 
 ### `POST /v1/mods/{mod_id}/specs`
 
-Creates a spec variant for a mod.
+Creates a new `specs` row and updates `mods.spec_id` to point at it.
 
 Request:
 
-- `name` (string)
+- optional `name` (string)
 - `spec` (object; JSON)
 
 Response:
 
-- `id`, `name`, `created_at`
-
-Behavior:
-
-- Update `mods.spec_id` to the created `spec_id`.
-
-### `GET /v1/mods/{mod_id}/specs`
-
-Lists spec variants for a mod.
-
-Notes:
-
-- Returned set includes only specs that were actually used in at least one run:
-  - distinct `runs.spec_id` values where `runs.mod_id == mod_id`
-
-### `DELETE /v1/mods/{mod_id}/specs/{spec_id}`
-
-Archives or deletes a spec variant.
-
-Behavior:
-
-- If `spec_id` is referenced by any `runs.spec_id`: set `specs.archived_at` (do not hard-delete).
-- Else: delete the `specs` row.
+- `id` (`spec_id`), `created_at`
 
 ## Repo set
 
@@ -174,6 +159,28 @@ Request:
 Response:
 
 - `id` (mod_repo_id), plus stored fields.
+
+### `POST /v1/mods/{mod_id}/repos/bulk`
+
+Bulk upsert repos for a mod from CSV.
+
+Request:
+
+- `Content-Type: text/csv`
+- Body is UTF-8 CSV with header row: `repo_url,base_ref,target_ref`
+
+Behavior:
+
+- Continues on per-line errors; may partially apply.
+- Upserts by `(mod_id, repo_url)`:
+  - inserts new `mod_repos` rows
+  - updates `base_ref` / `target_ref` for existing rows
+- Does not affect historical run data (`run_repos.repo_base_ref` / `run_repos.repo_target_ref` snapshots remain unchanged).
+
+Response:
+
+- counts: `created`, `updated`, `failed`
+- `errors`: array of `{line, message}`
 
 ### `GET /v1/mods/{mod_id}/repos`
 
@@ -195,8 +202,6 @@ This is the API behind `ploy mod run <mod> ...`.
 
 Request:
 
-- optional `spec_ref`:
-  - `{ "id": "<spec_id>" }`
 - `repo_selector`:
   - `{ "mode": "all" }`
   - `{ "mode": "failed" }` (repos whose last terminal state is `Failed`)
@@ -205,9 +210,7 @@ Request:
 
 Behavior:
 
-- If `spec_ref` is omitted, use `mods.spec_id`; if `mods.spec_id` is NULL, return an error that spec is required.
-- If `spec_ref` is provided, it may reference any `specs.id` (not restricted to the mod’s current spec id).
-- If `spec_ref` is provided, update `mods.spec_id` to the resolved `spec_id` for future runs.
+- Use `mods.spec_id`; if `mods.spec_id` is NULL, return an error that spec is required.
 - v1: no per-run ref overrides; `run_repos.repo_base_ref` / `run_repos.repo_target_ref` are copied from `mod_repos` at run creation time.
 
 Response:

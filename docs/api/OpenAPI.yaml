@@ -4,7 +4,8 @@ info:
   version: "0.1.0"
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
-    require mutual TLS authentication. Bearer token auth has been removed.
+    require authentication. The server supports both mutual TLS and JWT bearer
+    tokens (`Authorization: Bearer ...`) depending on client and deployment.
     Primary endpoints expose the Mods facade under `/v1/mods` (run submission,
     status, events, and artifact/log/diff uploads). The old `/v1/mods/crud` and
     legacy `/v1/runs/*` read/stream endpoints have been removed; new batch-level
@@ -31,6 +32,7 @@ tags:
   - name: Artifacts
     description: Artifact bundles, diffs, and logs stored in PostgreSQL.
 security:
+  - bearerAuth: []
   - mtls: []
 paths:
   # Config endpoints
@@ -40,6 +42,16 @@ paths:
     $ref: './paths/config_env.yaml'
   /v1/config/env/{key}:
     $ref: './paths/config_env_key.yaml'
+  # Token management (JWT bearer tokens)
+  /v1/tokens:
+    $ref: './paths/tokens.yaml'
+  /v1/tokens/{id}:
+    $ref: './paths/tokens_id.yaml'
+  # Bootstrap tokens and node enrollment
+  /v1/bootstrap/tokens:
+    $ref: './paths/bootstrap_tokens.yaml'
+  /v1/pki/bootstrap:
+    $ref: './paths/pki_bootstrap.yaml'
   # PKI endpoints
   /v1/pki/sign:
     $ref: './paths/pki_sign.yaml'
@@ -58,6 +70,8 @@ paths:
     $ref: './paths/mods_id_graph.yaml'
   /v1/mods/{id}/cancel:
     $ref: './paths/mods_id_cancel.yaml'
+  /v1/mods/{id}/resume:
+    $ref: './paths/mods_id_resume.yaml'
   /v1/runs/{id}/logs:
     $ref: './paths/runs_id_logs.yaml'
   /v1/mods/{id}/logs:
@@ -106,8 +120,12 @@ paths:
     $ref: './paths/runs_id.yaml'
   /v1/runs/{id}/status:
     $ref: './paths/mods_id.yaml'
+  /v1/runs/{id}/start:
+    $ref: './paths/runs_id_start.yaml'
   /v1/runs/{id}/stop:
     $ref: './paths/runs_id_stop.yaml'
+  /v1/runs/{id}/timing:
+    $ref: './paths/runs_id_timing.yaml'
   /v1/runs/{id}/repos:
     $ref: './paths/runs_id_repos.yaml'
   /v1/runs/{id}/repos/{repo_id}:
@@ -125,6 +143,9 @@ paths:
   # Job artifact bundle upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/artifact:
     $ref: './paths/runs_run_id_jobs_job_id_artifact.yaml'
+  # Legacy control-plane diff ingestion endpoint (alias of /v1/mods/{id}/diffs POST)
+  /v1/runs/{id}/diffs:
+    $ref: './paths/runs_id_diffs.yaml'
   # Build Gate HTTP service removed: gate runs as jobs in the Mods pipeline.
   # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
@@ -137,6 +158,12 @@ components:
         Mutual TLS authentication using certificates issued by the cluster CA.
         The server verifies client certificates during the TLS handshake.
         Node certificates are issued via the `/v1/pki/sign` endpoint.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT bearer token authentication using `Authorization: Bearer <token>`.
   parameters: {}
   schemas:
     # PKI schemas

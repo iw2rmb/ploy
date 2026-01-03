@@ -1,0 +1,42 @@
+post:
+  tags: [Security]
+  summary: Exchange bootstrap token for certificate
+  description: |
+    Exchanges a bootstrap token for a signed node certificate.
+
+    Authentication: `Authorization: Bearer <bootstrap-token>`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            csr:
+              type: string
+              description: PEM-encoded CSR.
+          required: [csr]
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              certificate: { type: string, description: PEM-encoded certificate }
+              ca_bundle: { type: string, description: PEM-encoded CA bundle }
+              serial: { type: string }
+              fingerprint: { type: string }
+              not_before: { type: string, format: date-time }
+              not_after: { type: string, format: date-time }
+              bearer_token: { type: string, description: Long-lived worker bearer token }
+            required: [certificate, ca_bundle, serial, fingerprint, not_before, not_after, bearer_token]
+    '400':
+      description: Bad request
+    '401':
+      description: Unauthorized (missing/invalid/expired bootstrap token)
+    '503':
+      description: PKI not configured
+    '500':
+      description: Server error
