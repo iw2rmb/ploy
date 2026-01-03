@@ -171,7 +171,23 @@ Response:
 - For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
 - Repo-scoped endpoints required for CLI workflows (names TBD, but must exist under the repo-scoped namespace):
   - diffs: list + download
-  - events: list/stream (used for progress/diagnostics)
-  - logs: list/stream (scoped by `job_id`, but repo attribution comes from `jobs.repo_id`)
+  - logs/events: stream (SSE) and/or list (repo attribution comes from `jobs.repo_id`)
   - artifacts: list + download (job-produced bundles)
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
+
+## v0 → v1 endpoint mapping notes (codebase reference)
+
+These are concrete v0 routes that currently exist in the server (see `internal/server/handlers/register.go`) and how v1 needs to reinterpret them.
+
+- v0 run submission:
+  - v0: `POST /v1/mods` submits a single-repo run.
+  - v1: `POST /v1/mods` creates a mod project; run submission is `POST /v1/runs`.
+- v0 run “artifacts” surface under `/v1/mods/{run_id}/*`:
+  - v0: `GET /v1/mods/{run_id}/diffs` lists diffs for a run.
+  - v1: list diffs under `/v1/runs/{run_id}/repos/{repo_id}/diffs` (repo-scoped).
+  - v0 server note: there is no `GET /v1/runs/{run_id}/diffs` route registered today; list is under `/v1/mods/{run_id}/diffs`.
+  - v0: `GET /v1/diffs/{diff_id}?download=true` downloads a diff.
+  - v1: download may remain global by `diff_id` (repo scoping comes from the listing endpoint).
+- v0 run logs/events streaming:
+  - v0: `GET /v1/runs/{run_id}/logs` is an SSE stream of logs + events for a run.
+  - v1: add `/v1/runs/{run_id}/repos/{repo_id}/logs` SSE to stream only logs/events for jobs in that repo.
