@@ -227,7 +227,6 @@ Response:
   - `GET /v1/runs/{run_id}/repos/{repo_id}/logs` — SSE logs/events stream for this repo execution.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts` — list artifacts produced by jobs for this repo execution.
   - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`).
-  - `DELETE /v1/runs/{run_id}/repos/{repo_id}` — delete the `run_repos` record (only allowed when there were no jobs; otherwise refuse).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
 

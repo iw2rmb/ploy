@@ -179,6 +179,7 @@ Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to
 - `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
 - `repo_id TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT`
 - `repo_base_ref TEXT NOT NULL` (copied from `run_repos.repo_base_ref` at job creation time)
+- `attempt INTEGER NOT NULL` (copied from `run_repos.attempt` at job creation time)
 - `name TEXT NOT NULL`
 - `status job_status NOT NULL DEFAULT 'Created'`
 - `mod_type TEXT NOT NULL DEFAULT ''`
@@ -197,19 +198,17 @@ Notes:
 - v1 queueing rule: for each `(run_id, repo_id)`, the first job is inserted as `jobs.status='Queued'` and all later jobs are inserted as `jobs.status='Created'`.
   - On job success, the server promotes the next job for that repo (`Created → Queued`) by `jobs.step_index`.
 - Uniqueness must be per-repo within a run:
-  - `UNIQUE (run_id, repo_id, name, step_index)`
+  - `UNIQUE (run_id, repo_id, attempt, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
 
-### Repo restarts / attempts (TODO decision)
+### Repo restarts / attempts
 
-v1 introduces `run_repos.attempt` but the `jobs` uniqueness constraint above does
-not allow creating a second set of jobs for the same `(run_id, repo_id)` unless
-we also encode attempt into job identity.
+v1 introduces `run_repos.attempt` and uses attempt-scoped job identity.
 
-Pick one concrete approach before implementation:
+Decision (v1): use attempt-scoped jobs.
 
-- Option A (recommended): add `jobs.attempt INTEGER NOT NULL` copied from `run_repos.attempt` at job creation time and change uniqueness to `UNIQUE (run_id, repo_id, attempt, name, step_index)`.
-- Option B: keep `jobs` attempt-less, but on repo restart, hard-delete all repo-scoped jobs (and repo-scoped artifacts) for that `(run_id, repo_id)` before re-creating jobs.
+- Add `jobs.attempt INTEGER NOT NULL` copied from `run_repos.attempt` at job creation time.
+- Change uniqueness to `UNIQUE (run_id, repo_id, attempt, name, step_index)`.
 
 ## Derived “failed repos” selection
 

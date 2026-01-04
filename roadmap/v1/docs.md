@@ -98,9 +98,16 @@ Files with old semantics (examples to rewrite):
 - Any doc that duplicates Cobra `--help` output verbatim.
   - Prefer “concept + link to `ploy <cmd> --help`”.
 
-## 4) TODO decisions to unblock implementation
+## 4) Decisions (v1)
 
-- `ploy run --spec ... --repo ...` creates a mod project; the created mod has `name == id`.
-- Run submission lives at `POST /v1/runs`; mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.
+- `POST /v1/runs` submits a single-repo run and immediately starts execution; it creates a mod project as a side-effect (`mod.name == mod.id`).
+- Mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.
+- No `/v1/runs/{id}/start` in v1 and no `ploy run start` (runs start immediately on creation).
+- Status model (v1): `runs.status` is `Started|Cancelled|Finished`; `run_repos.status` is `Queued|Running|Cancelled|Fail|Success`.
+- Job queueing (v1): `jobs.status` uses `Created` for non-claimable and `Queued` for claimable; promotion is repo-scoped (`Created → Queued` on success).
+- Repo execution ordering is enforced by repo-scoped promotion; claiming remains global (`POST /v1/nodes/{id}/claim`).
+
+## 5) Remaining TODOs
+
 - Define v1 run artifacts APIs for multi-repo runs:
   - how `ploy mod pull` (repo-scoped) selects diffs/logs/events for a single repo in a run (`run_id + repo_id`).
