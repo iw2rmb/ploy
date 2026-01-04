@@ -65,7 +65,8 @@ Current server routes under `/v1/mods/*` are run-scoped (see `internal/server/ha
 
 - `POST /v1/mods` (run submission) must move to `POST /v1/runs`.
 - Run lifecycle routes under `/v1/mods/{run_id}/*` must move under `/v1/runs/{run_id}/*`:
-  - examples: `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
+  - example: `POST /v1/mods/{run_id}/cancel` → `POST /v1/runs/{run_id}/cancel`.
+  - v0 `POST /v1/mods/{run_id}/resume` is removed in v1; use repo-level `POST /v1/runs/{run_id}/repos/{repo_id}/restart` instead (see `roadmap/v1/api.md`).
 - Repo-specific artifacts must move under the repo-scoped namespace:
   - example: `GET /v1/mods/{run_id}/diffs` → `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`
 - Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel`.
