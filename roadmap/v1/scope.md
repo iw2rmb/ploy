@@ -28,7 +28,7 @@ Run entrypoints:
 ## Repo URL rules (v1)
 
 - Validation: accept only `https://`, `ssh://`, and `file://` (see `internal/domain/types/vcs.go`, `RepoURL.Validate`).
-- Normalization for comparisons: use `internal/worker/hydration/git_fetcher.go` `normalizeRepoURL` (strip trailing `/` and `.git`).
+- Normalization for comparisons: use `internal/vcs/repourl.go` `vcs.NormalizeRepoURL` (trim whitespace, strip trailing `/` and `.git`).
   - Reuse this helper for all server-side `repo_url` matching; do not re-implement per endpoint.
 
 ## Non-goals (v1)
