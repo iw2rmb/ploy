@@ -322,7 +322,7 @@ Behavior (v1, attempt-scoped jobs):
 v1 keeps the existing node claim flow:
 
 - `POST /v1/nodes/{id}/claim` remains a **global** “next job” claim endpoint (no repo selector).
-- Repo-scoped execution ordering is enforced by server-side progression rules (see `roadmap/v1/db.md` “Repo-scoped scheduling invariant (v1)”).
+- Repo-scoped execution ordering is enforced by server-side progression rules (see `roadmap/v1/statuses.md` “Job queueing rules (v1)”).
 
 ## v0 → v1 endpoint mapping notes (codebase reference)
 
