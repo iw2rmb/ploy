@@ -14,6 +14,9 @@ func TestIDs_Basics(t *testing.T) {
 			d StepID
 			e ClusterID
 			f RunRepoID
+			g ModID
+			h SpecID
+			i ModRepoID
 		)
 		if !a.IsZero() || a.String() != "" {
 			t.Fatalf("RunID zero failed")
@@ -26,6 +29,15 @@ func TestIDs_Basics(t *testing.T) {
 		}
 		if !f.IsZero() || f.String() != "" {
 			t.Fatalf("RunRepoID zero failed")
+		}
+		if !g.IsZero() || g.String() != "" {
+			t.Fatalf("ModID zero failed")
+		}
+		if !h.IsZero() || h.String() != "" {
+			t.Fatalf("SpecID zero failed")
+		}
+		if !i.IsZero() || i.String() != "" {
+			t.Fatalf("ModRepoID zero failed")
 		}
 	})
 
@@ -46,6 +58,18 @@ func TestIDs_Basics(t *testing.T) {
 		if rr1 != rr2 || rr1.String() != "rr1" {
 			t.Fatalf("RunRepoID compare/string failed")
 		}
+		m1, m2 := ModID("m1"), ModID("m1")
+		if m1 != m2 || m1.String() != "m1" {
+			t.Fatalf("ModID compare/string failed")
+		}
+		sp1, sp2 := SpecID("sp1"), SpecID("sp1")
+		if sp1 != sp2 || sp1.String() != "sp1" {
+			t.Fatalf("SpecID compare/string failed")
+		}
+		mr1, mr2 := ModRepoID("mr1"), ModRepoID("mr1")
+		if mr1 != mr2 || mr1.String() != "mr1" {
+			t.Fatalf("ModRepoID compare/string failed")
+		}
 	})
 
 }
@@ -57,6 +81,9 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		step StepID
 		cid  ClusterID
 		rrid RunRepoID
+		mid  ModID
+		sid  SpecID
+		mrid ModRepoID
 	)
 
 	// Test RunID text/JSON round-trip (covers run identifier serialization).
@@ -91,8 +118,26 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	if err := rrid.UnmarshalText([]byte(" repo-1 ")); err != nil {
 		t.Fatalf("runrepo UnmarshalText: %v", err)
 	}
+	// Test v1 ID types text round-trip.
+	if err := mid.UnmarshalText([]byte(" mod-1 ")); err != nil {
+		t.Fatalf("mod UnmarshalText: %v", err)
+	}
+	if err := sid.UnmarshalText([]byte(" spec-1 ")); err != nil {
+		t.Fatalf("spec UnmarshalText: %v", err)
+	}
+	if err := mrid.UnmarshalText([]byte(" modrepo-1 ")); err != nil {
+		t.Fatalf("modrepo UnmarshalText: %v", err)
+	}
 
-	for name, v := range map[string]any{"run": rid, "step": step, "cluster": cid, "runrepo": rrid} {
+	for name, v := range map[string]any{
+		"run":     rid,
+		"step":    step,
+		"cluster": cid,
+		"runrepo": rrid,
+		"mod":     mid,
+		"spec":    sid,
+		"modrepo": mrid,
+	} {
 		bb, err := json.Marshal(v)
 		if err != nil {
 			t.Fatalf("%s marshal: %v", name, err)
@@ -113,6 +158,9 @@ func TestIDs_RejectEmpty(t *testing.T) {
 		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
 		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},
 		{"runrepo", func(b []byte) error { var v RunRepoID; return v.UnmarshalText(b) }},
+		{"mod", func(b []byte) error { var v ModID; return v.UnmarshalText(b) }},
+		{"spec", func(b []byte) error { var v SpecID; return v.UnmarshalText(b) }},
+		{"modrepo", func(b []byte) error { var v ModRepoID; return v.UnmarshalText(b) }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,6 +267,95 @@ func TestIDGenerators(t *testing.T) {
 			newID := NewNodeKey()
 			if _, exists := seen[newID]; exists {
 				t.Fatalf("NewNodeKey produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	// v1 ID generators: ModID, SpecID, ModRepoID (per roadmap/v1/db.md:94).
+
+	t.Run("NewModID", func(t *testing.T) {
+		// Verify non-empty output with expected NanoID length (6 characters).
+		// Per roadmap/v1/db.md:15: mods.id is NanoID(6).
+		id := NewModID()
+		if id.IsZero() {
+			t.Fatal("NewModID returned zero value")
+		}
+		if len(id.String()) != 6 {
+			t.Fatalf("NewModID length = %d, want 6", len(id.String()))
+		}
+
+		// Verify characters are from the expected URL-safe alphabet.
+		for _, c := range id.String() {
+			if !isURLSafeChar(c) {
+				t.Fatalf("NewModID contains invalid character: %c", c)
+			}
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[ModID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewModID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewModID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewSpecID", func(t *testing.T) {
+		// Verify non-empty output with expected NanoID length (8 characters).
+		// Per roadmap/v1/db.md:44: specs.id is NanoID(8).
+		id := NewSpecID()
+		if id.IsZero() {
+			t.Fatal("NewSpecID returned zero value")
+		}
+		if len(id.String()) != 8 {
+			t.Fatalf("NewSpecID length = %d, want 8", len(id.String()))
+		}
+
+		// Verify characters are from the expected URL-safe alphabet.
+		for _, c := range id.String() {
+			if !isURLSafeChar(c) {
+				t.Fatalf("NewSpecID contains invalid character: %c", c)
+			}
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[SpecID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewSpecID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewSpecID produced duplicate ID after %d calls", i)
+			}
+			seen[newID] = struct{}{}
+		}
+	})
+
+	t.Run("NewModRepoID", func(t *testing.T) {
+		// Verify non-empty output with expected NanoID length (8 characters).
+		// Per roadmap/v1/db.md:62: mod_repos.id is NanoID(8).
+		id := NewModRepoID()
+		if id.IsZero() {
+			t.Fatal("NewModRepoID returned zero value")
+		}
+		if len(id.String()) != 8 {
+			t.Fatalf("NewModRepoID length = %d, want 8", len(id.String()))
+		}
+
+		// Verify characters are from the expected URL-safe alphabet.
+		for _, c := range id.String() {
+			if !isURLSafeChar(c) {
+				t.Fatalf("NewModRepoID contains invalid character: %c", c)
+			}
+		}
+
+		// Verify multiple calls produce different values.
+		seen := make(map[ModRepoID]struct{})
+		for i := 0; i < 100; i++ {
+			newID := NewModRepoID()
+			if _, exists := seen[newID]; exists {
+				t.Fatalf("NewModRepoID produced duplicate ID after %d calls", i)
 			}
 			seen[newID] = struct{}{}
 		}
