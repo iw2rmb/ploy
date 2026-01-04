@@ -99,9 +99,9 @@ Note: all lowercase status strings mentioned below are HEAD literals from `inter
 
 - Run submission / job creation:
   - `internal/server/handlers/mods_ticket.go` (creates runs with `RunStatusQueued`; creates jobs with `JobStatusQueued/Created`)
-- Cancel/resume:
+- Cancel/resume (HEAD):
   - `internal/server/handlers/mods_cancel.go` (sets `runs.status=canceled` [HEAD literal]; cancels jobs)
-  - `internal/server/handlers/mods_resume.go` (resets jobs; sets `runs.status=queued` [HEAD literal]; branches on HEAD literals: `queued`, `assigned`, `running`, `succeeded`, `failed`, `canceled`)
+  - `internal/server/handlers/mods_resume.go` (run-level resume) is removed in v1; use repo-level restart (`POST /v1/runs/{run_id}/repos/{repo_id}/restart`, see `roadmap/v1/api.md`).
 - Completion paths that set or interpret job/run terminal states:
   - `internal/server/handlers/nodes_complete_healing.go` (inserts healing jobs; branches on terminal job statuses)
   - `internal/server/handlers/nodes_complete_mr.go` (MR creation logic currently branches on `runs.status` terminal values)
