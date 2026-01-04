@@ -81,7 +81,7 @@ MR note (align with HEAD semantics):
 ### Run repo status transitions
 
 - Initial: `Queued`.
-- `Queued` → `Running` when the repo’s first job becomes `Queued` (claimable).
+- `Queued` → `Running` when a job for that repo is claimed (i.e. when some `jobs.status` transitions to `Running` for that `(run_id, repo_id, attempt)`), and the repo is not already `Running`.
 - `Running` → terminal:
   - `Success` if the repo’s job sequence completes successfully.
   - `Fail` if the repo’s job sequence fails (and is not cancelled).
