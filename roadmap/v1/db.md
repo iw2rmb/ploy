@@ -92,9 +92,9 @@ v1 keeps **global job claiming** but makes **job progression repo-scoped**.
 
 - Claiming stays global: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
 - Progression is repo-scoped: whenever the server computes “next job” (or “adjacent step” for healing insertion), it must:
-  - filter by `(run_id, repo_id)`
+  - filter by `(run_id, repo_id, attempt=run_repos.attempt)`
   - order by `jobs.step_index`
-- Single-queued invariant: for each `(run_id, repo_id)`, the server must ensure there is at most one `jobs` row with `status='Queued'` at any time (the repo’s next job by step_index).
+- Single-queued invariant: for each `(run_id, repo_id, attempt)`, the server must ensure there is at most one `jobs` row with `status='Queued'` at any time (the repo’s next job by step_index for the current attempt).
   - This preserves per-repo ordering without requiring repo-scoped claim APIs.
 
 ## Enums (v1)
@@ -195,8 +195,8 @@ Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to
 Notes:
 
 - Repo attribution for `events` / `diffs` / `logs` / `artifact_bundles` is derived via `job_id → jobs.repo_id`.
-- v1 queueing rule: for each `(run_id, repo_id)`, the first job is inserted as `jobs.status='Queued'` and all later jobs are inserted as `jobs.status='Created'`.
-  - On job success, the server promotes the next job for that repo (`Created → Queued`) by `jobs.step_index`.
+- v1 queueing rule: for each `(run_id, repo_id, attempt)`, the first job is inserted as `jobs.status='Queued'` and all later jobs are inserted as `jobs.status='Created'`.
+  - On job success, the server promotes the next job for that repo attempt (`Created → Queued`) by `jobs.step_index`.
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, attempt, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{run_id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
