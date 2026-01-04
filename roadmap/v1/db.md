@@ -171,6 +171,11 @@ Constraints / indexes:
   - `Cancelled` when repo execution was cancelled (treated as terminal for `runs.status` aggregation).
   - `Cancelled` via repo cancellation endpoint (see `roadmap/v1/api.md`).
 
+Timestamps:
+
+- `run_repos.started_at` is set when `run_repos.status` changes `Queued → Running`.
+- `run_repos.finished_at` is set when `run_repos.status` changes to a terminal state (`Fail`, `Success`, `Cancelled`).
+
 ### `jobs` (updated)
 
 Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to a repo.
