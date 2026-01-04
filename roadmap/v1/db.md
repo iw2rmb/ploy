@@ -91,6 +91,12 @@ Execution semantics:
 - Status enums and transitions: see `roadmap/v1/statuses.md`.
 - Repo progression invariant: see `roadmap/v1/scope.md`.
 
+### Identifier conventions (v1)
+
+- `repo_id` refers to `mod_repos.id` (the repo identity within a mod).
+- `run_repos.repo_id` and `jobs.repo_id` reference `mod_repos.id`.
+- In CLI flags and some legacy naming, this may be called `mod_repo_id`. Prefer `repo_id` in v1 docs.
+
 ### `runs`
 
 Run is the execution of one `spec_id` over a specific set of repos.
@@ -169,7 +175,7 @@ Notes:
 - Job queueing and promotion rules: see `roadmap/v1/statuses.md` (“Job queueing rules (v1)”).
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, attempt, name, step_index)`
-- v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{run_id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
+- v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{run_id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (see “Identifier conventions (v1)” above).
 
 ### Repo restarts / attempts
 

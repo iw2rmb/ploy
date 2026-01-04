@@ -4,7 +4,7 @@
 
 Define a new status model that:
 
-- Removes `assigned` (run-level node assignment is obsolete when each job can be claimed by different nodes).
+- Removes `assigned` (HEAD literal; run-level node assignment is obsolete when each job can be claimed by different nodes).
 - Keeps run status high-level and repo-aggregate.
 - Makes repo status the authoritative per-repo execution state.
 
@@ -16,28 +16,28 @@ This document is a design note for what must change in code to implement the new
 
 Canonical values:
 
-- `Started` (replaces HEAD `running` / “active run”)
+- `Started` (replaces HEAD literal `running` / “active run”)
 - `Cancelled` (new terminal; set by `POST /v1/runs/{run_id}/cancel`)
 - `Finished` (new terminal; set when all repos are terminal)
 
 Notes:
 
 - There is no `Queued` run status in v1. A run exists in `Started` even if it has repos that are still `Queued`.
-- `assigned` must be removed entirely (DB enum + store + query assumptions).
+- `assigned` must be removed entirely (HEAD literal; DB enum + store + query assumptions).
 
 ### `run_repos.status` (new `run_repo_status`)
 
 Canonical values:
 
-- `Queued` (renamed from HEAD `pending`)
-- `Running` (same meaning as HEAD `running`)
-- `Cancelled` (harmonize spelling across all status enums; HEAD mixes `canceled` and `cancelled`)
-- `Fail` (renamed from HEAD `failed`)
-- `Success` (renamed from HEAD `succeeded`)
+- `Queued` (renamed from HEAD literal `pending`)
+- `Running` (same meaning as HEAD literal `running`)
+- `Cancelled` (harmonize spelling across all status enums; HEAD mixes literals `canceled` and `cancelled`)
+- `Fail` (renamed from HEAD `failed` literal)
+- `Success` (renamed from HEAD `succeeded` literal)
 
 Notes:
 
-- v1 removes `skipped` from `run_repo_status`.
+- v1 removes HEAD literal `skipped` from `run_repo_status`.
   - HEAD uses `skipped` only for repo removal (`DELETE /v1/runs/{run_id}/repos/{repo_id}` in `internal/server/handlers/runs_batch_http.go`).
   - v1 removes that endpoint, so there is no “repo removal → skipped” behavior to preserve.
 
@@ -93,13 +93,15 @@ Timestamps: see `roadmap/v1/db.md`.
 
 ### Additional status-dependent codepaths (HEAD)
 
-These files currently branch on the HEAD status enums and will need updates (or removal) as part of the v1 status model change:
+These files currently branch on the HEAD status enums and will need updates (or removal) as part of the v1 status model change.
+
+Note: all lowercase status strings mentioned below are HEAD literals from `internal/store/schema.sql`.
 
 - Run submission / job creation:
   - `internal/server/handlers/mods_ticket.go` (creates runs with `RunStatusQueued`; creates jobs with `JobStatusQueued/Created`)
 - Cancel/resume:
-  - `internal/server/handlers/mods_cancel.go` (sets `runs.status=canceled`; cancels jobs)
-  - `internal/server/handlers/mods_resume.go` (resets jobs; sets `runs.status=queued`; branches on `queued/assigned/running/succeeded/failed/canceled`)
+  - `internal/server/handlers/mods_cancel.go` (sets `runs.status=canceled` [HEAD literal]; cancels jobs)
+  - `internal/server/handlers/mods_resume.go` (resets jobs; sets `runs.status=queued` [HEAD literal]; branches on HEAD literals: `queued`, `assigned`, `running`, `succeeded`, `failed`, `canceled`)
 - Completion paths that set or interpret job/run terminal states:
   - `internal/server/handlers/nodes_complete_healing.go` (inserts healing jobs; branches on terminal job statuses)
   - `internal/server/handlers/nodes_complete_mr.go` (MR creation logic currently branches on `runs.status` terminal values)
@@ -109,10 +111,10 @@ These files currently branch on the HEAD status enums and will need updates (or 
 Update `internal/store/schema.sql`:
 
 - Replace `run_status` enum:
-  - remove: `queued`, `assigned`, `running`, `succeeded`, `failed`, `canceled`
+  - remove (HEAD literals): `queued`, `assigned`, `running`, `succeeded`, `failed`, `canceled`
   - add: `Started`, `Cancelled`, `Finished`
 - Replace `run_repo_status` enum:
-  - remove: `pending`, `skipped`, `cancelled`, `succeeded`, `failed`
+  - remove (HEAD literals): `pending`, `skipped`, `cancelled`, `succeeded`, `failed`
   - add: `Queued`, `Running`, `Cancelled`, `Fail`, `Success`
 - Remove (or deprecate) `runs.node_id`:
   - HEAD still has `runs.node_id` and `RunStatusAssigned`; both reflect “run assigned to a node”.
@@ -134,7 +136,7 @@ Update `internal/store/schema.sql` `job_status` enum:
 - Rename `succeeded` → `Success`.
 - Rename `failed` → `Fail`.
 - Remove `skipped` from `job_status` entirely.
-  - HEAD note: `skipped` is treated as terminal in a few places, but there is no request path that sets it today (job completion only accepts `succeeded|failed|canceled`).
+  - HEAD note: `skipped` is treated as terminal in a few places, but there is no request path that sets it today (job completion only accepts HEAD literals `succeeded`/`failed`/`canceled`).
 
 Supporting code to remove/update when `skipped` is removed:
 
@@ -153,16 +155,16 @@ Update these to match v1 canonical values:
 
 ### Store SQL queries that depend on run status strings
 
-Update these to stop referencing `queued/assigned/running/succeeded/failed/canceled` and to use v1 values:
+Update these to stop referencing HEAD literals `queued`/`assigned`/`running`/`succeeded`/`failed`/`canceled` and to use v1 values:
 
 - `internal/store/queries/runs.sql`
-  - `AckRunStart` currently transitions `queued/assigned` → `running`.
+  - `AckRunStart` currently transitions `queued`/`assigned` → `running` (HEAD literals).
   - v1 does not need this transition at run level; runs are created `Started`.
 - `internal/store/queries/run_repos.sql`
-  - multiple queries hardcode `pending/running/succeeded/failed/skipped/cancelled` and set `finished_at` based on those strings.
+  - multiple queries hardcode `pending`/`running`/`succeeded`/`failed`/`skipped`/`cancelled` (HEAD literals) and set `finished_at` based on those strings.
   - v1 must update these to `Queued/Running/Cancelled/Fail/Success` and ensure timestamps follow the new model.
 - `internal/store/queries/jobs.sql`
-  - `ClaimJob` currently allows claims only when `runs.status IN ('queued','running')` (and special-cases MR jobs).
+  - `ClaimJob` currently allows claims only when `runs.status IN ('queued','running')` (HEAD literals; and special-cases MR jobs).
   - v1 should allow claims only when `runs.status='Started'` for normal jobs.
   - v1 must keep the MR special-case aligned with HEAD:
     - MR jobs are claimable after the run is terminal (v1: when `runs.status='Finished'`), and MR failures do not change `runs.status`/`run_repos.status`.
@@ -175,17 +177,17 @@ Run status updates / endpoint naming:
 - `internal/server/handlers/register.go`
   - rename `POST /v1/runs/{run_id}/stop` → `POST /v1/runs/{run_id}/cancel` (v1 API).
 - `internal/server/handlers/runs_batch_http.go`
-  - `stopRunHandler` currently sets `runs.status=canceled` and marks only `run_repos.status='pending'` repos as `cancelled` (it does not cancel running repos).
+  - `stopRunHandler` currently sets `runs.status=canceled` (HEAD literal) and marks only `run_repos.status='pending'` repos as `cancelled` (HEAD literals; it does not cancel running repos).
   - v1 cancel must:
     - set `runs.status=Cancelled`
     - cancel all repos (`Queued`/`Running` → `Cancelled`)
     - cancel/remove waiting jobs from the queue
 - `internal/server/handlers/nodes_claim.go`
-  - today a successful claim may call `AckRunStart` to transition `runs.status` to `running`.
+  - today a successful claim may call `AckRunStart` to transition `runs.status` to `running` (HEAD literal).
   - v1 must remove that transition (run is created `Started`) and ensure claim logic does not depend on queued/assigned.
   - v1 must set `run_repos.status=Running` for the claimed job’s `(run_id, repo_id, attempt)` (idempotent); timestamps are defined in `roadmap/v1/db.md`.
 - `internal/server/handlers/runs_batch_scheduler.go`
-  - today it finds runs with `run_repos.status='pending'` repos via `ListBatchRunsWithPendingRepos` (which filters by `runs.status IN ('queued','assigned','running')`).
+  - today it finds runs with `run_repos.status='pending'` repos via `ListBatchRunsWithPendingRepos` (HEAD literals; filters by `runs.status IN ('queued','assigned','running')`).
   - v1 must update scheduling to the new run status model (`Started/Cancelled/Finished`).
 
 Run completion:
@@ -193,13 +195,13 @@ Run completion:
 - `internal/server/handlers/jobs_complete.go`
   - currently:
     - schedules next job with `ScheduleNextJob(run_id)` (run-scoped),
-    - then calls `maybeCompleteMultiStepRun` to set run terminal status (`succeeded/failed/canceled`).
+    - then calls `maybeCompleteMultiStepRun` to set run terminal status (`succeeded`/`failed`/`canceled` are HEAD literals).
   - v1 must change the terminal computation:
     - compute and persist the repo terminal status (`run_repos.status`) when a repo’s last job completes
     - compute `runs.status` (`Finished`) by aggregating repo statuses
     - remove any run-level `succeeded/failed` transitions; success/failure becomes repo-scoped.
 - `internal/server/handlers/nodes_complete_run.go`
-  - `maybeCompleteMultiStepRun` currently derives run terminal state from jobs and writes `runs.status=succeeded/failed/canceled`.
+  - `maybeCompleteMultiStepRun` currently derives run terminal state from jobs and writes `runs.status=succeeded`/`failed`/`canceled` (HEAD literals).
   - v1 must be rewritten (or replaced) to update:
     - `run_repos.status` for the repo whose job completed
     - `runs.status=Finished` only when all repos are terminal
