@@ -64,9 +64,7 @@ Claiming stays global, but “what becomes claimable next” is repo-scoped.
 - Initial: `Started` (on run creation).
 - `Started` → `Cancelled`:
   - triggered by `POST /v1/runs/{run_id}/cancel`.
-  - must cancel all running jobs and remove waiting jobs from the queue:
-    - “waiting” jobs: `jobs.status IN ('Created','Queued')` → set to `jobs.status='Cancelled'`
-    - “running” jobs: `jobs.status='Running'` → best-effort transition to `jobs.status='Cancelled'` (nodes may race to complete)
+  - endpoint behavior: see `roadmap/v1/api.md` (`POST /v1/runs/{run_id}/cancel`).
 - `Started` → `Finished`:
   - checked after a job completes **when it is the last job for that repo**.
   - set to `Finished` only when all repos are terminal:

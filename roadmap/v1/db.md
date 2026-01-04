@@ -86,32 +86,10 @@ Change entry: reshape execution model to `runs` → `run_repos` and make jobs re
 - Compatibility: breaking DB + scheduling semantics; no backward compatibility required.
 - Unchanged: job lifecycle ingestion remains job-addressed (jobs are still completed via job ID), but v1 renames status strings per `roadmap/v1/statuses.md`.
 
-## Repo-scoped scheduling invariant (v1)
+Execution semantics:
 
-v1 keeps **global job claiming** but makes **job progression repo-scoped**.
-
-- Claiming stays global: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
-- Progression is repo-scoped: whenever the server computes “next job” (or “adjacent step” for healing insertion), it must:
-  - filter by `(run_id, repo_id, attempt=run_repos.attempt)`
-  - order by `jobs.step_index`
-- Single-queued invariant: for each `(run_id, repo_id, attempt)`, the server must ensure there is at most one `jobs` row with `status='Queued'` at any time (the repo’s next job by step_index for the current attempt).
-  - This preserves per-repo ordering without requiring repo-scoped claim APIs.
-
-## Enums (v1)
-
-### `runs.status` (`run_status`)
-
-- `Started`
-- `Cancelled`
-- `Finished`
-
-### `run_repos.status` (`run_repo_status`)
-
-- `Queued`
-- `Running`
-- `Cancelled`
-- `Fail`
-- `Success`
+- Status enums and transitions: see `roadmap/v1/statuses.md`.
+- Repo progression invariant: see `roadmap/v1/scope.md`.
 
 ### `runs`
 
@@ -159,23 +137,6 @@ Constraints / indexes:
 - partial index on `status` for scheduling: `WHERE status IN ('Queued','Running')`
 - index on `(repo_id, created_at)`
 
-## Status semantics (v1)
-
-### `runs.status`
-
-- `Started` → `Finished` when all `run_repos` are terminal (`Fail`, `Success`, or `Cancelled`).
-- `Started` → `Cancelled` via `ploy run cancel`.
-
-### `run_repos.status`
-
-- Initial status is `Queued`.
-- `Running` when a job is claimed for that repo (i.e. when some `jobs.status` becomes `Running` for `(run_id, repo_id, attempt)`).
-- Terminal:
-  - `Success` when repo execution succeeded.
-  - `Fail` when repo execution did not succeed (and was not cancelled).
-  - `Cancelled` when repo execution was cancelled (treated as terminal for `runs.status` aggregation).
-  - `Cancelled` via repo cancellation endpoint (see `roadmap/v1/api.md`).
-
 Timestamps:
 
 - `run_repos.started_at` is set when `run_repos.status` changes `Queued → Running`.
@@ -205,8 +166,7 @@ Job rows must be repo-scoped so logs/diffs/events for a run can be attributed to
 Notes:
 
 - Repo attribution for `events` / `diffs` / `logs` / `artifact_bundles` is derived via `job_id → jobs.repo_id`.
-- v1 queueing rule: for each `(run_id, repo_id, attempt)`, the first job is inserted as `jobs.status='Queued'` and all later jobs are inserted as `jobs.status='Created'`.
-  - On job success, the server promotes the next job for that repo attempt (`Created → Queued`) by `jobs.step_index`.
+- Job queueing and promotion rules: see `roadmap/v1/statuses.md` (“Job queueing rules (v1)”).
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, attempt, name, step_index)`
 - v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{run_id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).

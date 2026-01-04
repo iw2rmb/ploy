@@ -42,8 +42,7 @@ Query:
 
 Notes:
 
-- `repo_url` matching must reuse the canonical repo URL normalization used for hydration/cache keys (strip trailing `/` and `.git`; see `internal/worker/hydration/git_fetcher.go`, `normalizeRepoURL`).
-  - v1 must not re-implement this per-endpoint; reuse one helper for all repo_url comparisons.
+- Repo URL normalization: see `roadmap/v1/scope.md`.
 
 ### `DELETE /v1/mods/{mod_id}`
 
@@ -77,7 +76,7 @@ Response:
 Notes:
 
 - Server performs the lookup using `mod_id + repo_url` → `mod_repos.id`, then selects the appropriate `run_repos` by `run_repos.created_at DESC` (joining through `runs` by `runs.id` and filtering by `runs.mod_id`) and filtering by the requested terminal status.
-- `repo_url` matching must reuse the canonical repo URL normalization (strip trailing `/` and `.git`; see `internal/worker/hydration/git_fetcher.go`, `normalizeRepoURL`).
+- Repo URL normalization: see `roadmap/v1/scope.md`.
 - Diffs are then listed via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and downloaded via `GET /v1/diffs/{diff_id}?download=true`.
 
 ### `PATCH /v1/mods/{mod_id}/archive`
@@ -246,7 +245,7 @@ Notes:
 - Server matches the repo by:
   - joining `run_repos` to `mod_repos` by `repo_id`,
   - filtering by `run_id`,
-  - matching `repo_url` using the canonical repo URL normalization (strip trailing `/` and `.git`; see `internal/worker/hydration/git_fetcher.go`, `normalizeRepoURL`).
+  - Repo URL normalization: see `roadmap/v1/scope.md`.
 - If no repo matches: error.
 - If multiple repos match: error.
 
@@ -281,7 +280,8 @@ Cancels an entire run.
 Behavior:
 
 - Set `runs.status='Cancelled'`.
-- Cancel all repos for the run (`run_repos.status='Cancelled'`).
+- Cancel all non-terminal repos for the run:
+  - `run_repos.status IN ('Queued','Running')` → set to `run_repos.status='Cancelled'` (idempotent).
 - Timestamps are set by status transitions (see `roadmap/v1/db.md`).
 - Cancel all jobs:
   - `jobs.status IN ('Created','Queued','Running')` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
@@ -292,7 +292,7 @@ Cancels a single repo execution within a run.
 
 Behavior:
 
-- Set `run_repos.status='Cancelled'` for that repo.
+- Set `run_repos.status='Cancelled'` for that repo if it is not already terminal (idempotent).
 - Cancel jobs for that repo execution (attempt-scoped):
   - `jobs.status IN ('Created','Queued','Running')` for `(run_id, repo_id, attempt=run_repos.attempt)` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
 
