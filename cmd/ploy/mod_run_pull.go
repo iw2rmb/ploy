@@ -11,9 +11,9 @@
 //
 //	ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>
 //
-// The origin URL is normalized using normalizeRepoURLForCLI to enable consistent
-// matching against server-side repo identifiers. The normalization strips trailing
-// slashes and .git suffixes, matching the semantics in internal/worker/hydration/git_fetcher.go.
+// The origin URL is normalized using vcs.NormalizeRepoURL to enable consistent
+// matching against server-side repo identifiers. The normalization trims whitespace
+// and strips trailing slashes and .git suffixes.
 //
 // Run resolution uses the repo-centric API (/v1/repos/{repo_id}/runs) to locate
 // the correct run for the current repository, honoring both UUIDs and human-readable
