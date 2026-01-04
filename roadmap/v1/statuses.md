@@ -38,8 +38,8 @@ Canonical values:
 Notes:
 
 - v1 removes `skipped` from `run_repo_status`.
-  - HEAD uses `skipped` in repo removal (`DELETE /v1/runs/{id}/repos/{repo_id}` in `internal/server/handlers/runs_batch_http.go`).
-  - v1 must replace that behavior (either remove the endpoint, or map “remove” to `Cancelled`).
+  - HEAD uses `skipped` only for repo removal (`DELETE /v1/runs/{id}/repos/{repo_id}` in `internal/server/handlers/runs_batch_http.go`).
+  - v1 removes that endpoint, so there is no “repo removal → skipped” behavior to preserve.
 
 ## Transition rules (v1)
 
@@ -126,9 +126,19 @@ v1 also changes job status strings.
 
 Update `internal/store/schema.sql` `job_status` enum:
 
-- Capitalize all values (e.g. `Created`, `Queued`, `Running`, `Success`, `Fail`, `Skipped`).
+- Capitalize all values (e.g. `Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 - Rename `canceled` → `Cancelled`.
 - Rename `pending` → `Queued`.
+- Remove `skipped` from `job_status` entirely.
+  - HEAD note: `skipped` is treated as terminal in a few places, but there is no request path that sets it today (job completion only accepts `succeeded|failed|canceled`).
+
+Supporting code to remove/update when `skipped` is removed:
+
+- `internal/store/models.go` + `internal/store/status_conversion.go` (+ tests) — drop `JobStatusSkipped` and `"skipped"` conversion/validation.
+- `internal/server/handlers/nodes_complete_run.go` — remove `JobStatusSkipped` from terminal aggregation.
+- `internal/server/handlers/jobs_complete.go` — remove `JobStatusSkipped` from “schedule next job” logic.
+- `internal/mods/api/status_conversion.go` — remove `JobStatusSkipped` mapping (status no longer exists).
+- `internal/workflow/graph/types.go` (+ any builders) — remove `NodeStatusSkipped`.
 
 ### Store status conversion helpers
 
