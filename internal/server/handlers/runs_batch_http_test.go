@@ -502,9 +502,25 @@ func TestAddRunRepoHandler(t *testing.T) {
 			wantCallStore: true,
 		},
 		{
-			name:       "invalid repo_url scheme",
+			name:       "invalid repo_url scheme (ftp)",
 			runID:      sampleRunID,
 			body:       `{"repo_url":"ftp://example.com/repo.git","base_ref":"main","target_ref":"feature"}`,
+			mockRun:    runningRun,
+			wantStatus: http.StatusBadRequest,
+		},
+		// git:// and http:// are rejected per v1 repo URL rules (roadmap/v1/scope.md:30).
+		// Only https://, ssh://, and file:// schemes are allowed.
+		{
+			name:       "invalid repo_url scheme (git)",
+			runID:      sampleRunID,
+			body:       `{"repo_url":"git://github.com/example/repo.git","base_ref":"main","target_ref":"feature"}`,
+			mockRun:    runningRun,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid repo_url scheme (http non-TLS)",
+			runID:      sampleRunID,
+			body:       `{"repo_url":"http://github.com/example/repo.git","base_ref":"main","target_ref":"feature"}`,
 			mockRun:    runningRun,
 			wantStatus: http.StatusBadRequest,
 		},

@@ -317,6 +317,39 @@ func TestListRunsForRepoHandler_InvalidRepoID(t *testing.T) {
 	}
 }
 
+// TestListRunsForRepoHandler_InvalidRepoURLScheme verifies that repo URLs with
+// disallowed schemes (git://, http://) are rejected with HTTP 400.
+// Per v1 rules (roadmap/v1/scope.md:30), only https://, ssh://, and file:// are allowed.
+func TestListRunsForRepoHandler_InvalidRepoURLScheme(t *testing.T) {
+	st := &mockStore{}
+	handler := listRunsForRepoHandler(st)
+
+	// Test cases for disallowed URL schemes per v1 validation rules.
+	cases := []struct {
+		name    string
+		repoURL string
+	}{
+		{"git scheme", "git://github.com/org/repo.git"},
+		{"http scheme (non-TLS)", "http://github.com/org/repo.git"},
+		{"ftp scheme", "ftp://example.com/repo.git"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			encodedRepoURL := url.PathEscape(tc.repoURL)
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+encodedRepoURL+"/runs", nil)
+			req.SetPathValue("repo_id", encodedRepoURL)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400 for %s, got %d: %s", tc.repoURL, rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
 func TestListRunsForRepoHandler_InvalidLimit(t *testing.T) {
 	// Test that invalid limit parameter returns 400.
 	st := &mockStore{}
