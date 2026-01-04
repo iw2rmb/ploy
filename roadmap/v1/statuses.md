@@ -72,10 +72,7 @@ Claiming stays global, but “what becomes claimable next” is repo-scoped.
   - set to `Finished` only when all repos are terminal:
     - terminal repo statuses: `Cancelled`, `Fail`, `Success`
 
-Timestamps:
-
-- Set `runs.started_at` on run creation.
-- Set `runs.finished_at` when the run transitions to a terminal state (`Cancelled` or `Finished`).
+Timestamps: see `roadmap/v1/db.md`.
 
 MR note (align with HEAD semantics):
 
@@ -92,10 +89,7 @@ MR note (align with HEAD semantics):
   - `Fail` if the repo’s job sequence fails (and is not cancelled).
   - `Cancelled` if the repo is cancelled, or the parent run is cancelled.
 
-Timestamps:
-
-- Set `run_repos.started_at` when the repo transitions `Queued → Running` (first claim).
-- Set `run_repos.finished_at` when the repo transitions to a terminal state (`Success`, `Fail`, `Cancelled`).
+Timestamps: see `roadmap/v1/db.md`.
 
 ## Required code changes (by area)
 
@@ -189,7 +183,7 @@ Run status updates / endpoint naming:
 - `internal/server/handlers/nodes_claim.go`
   - today a successful claim may call `AckRunStart` to transition `runs.status` to `running`.
   - v1 must remove that transition (run is created `Started`) and ensure claim logic does not depend on queued/assigned.
-  - v1 must set `run_repos.status=Running` for the claimed job’s `(run_id, repo_id, attempt)` (idempotent) and set `run_repos.started_at` on first transition from `Queued`.
+  - v1 must set `run_repos.status=Running` for the claimed job’s `(run_id, repo_id, attempt)` (idempotent); timestamps are defined in `roadmap/v1/db.md`.
 - `internal/server/handlers/runs_batch_scheduler.go`
   - today it finds runs with `run_repos.status='pending'` repos via `ListBatchRunsWithPendingRepos` (which filters by `runs.status IN ('queued','assigned','running')`).
   - v1 must update scheduling to the new run status model (`Started/Cancelled/Finished`).

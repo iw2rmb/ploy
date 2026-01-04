@@ -281,9 +281,8 @@ Cancels an entire run.
 Behavior:
 
 - Set `runs.status='Cancelled'`.
-- Set `runs.finished_at` when transitioning to `Cancelled`.
 - Cancel all repos for the run (`run_repos.status='Cancelled'`).
-  - Set `run_repos.finished_at` when transitioning to `Cancelled`.
+- Timestamps are set by status transitions (see `roadmap/v1/db.md`).
 - Cancel all jobs:
   - `jobs.status IN ('Created','Queued','Running')` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
 
@@ -294,7 +293,6 @@ Cancels a single repo execution within a run.
 Behavior:
 
 - Set `run_repos.status='Cancelled'` for that repo.
-  - Set `run_repos.finished_at` when transitioning to `Cancelled`.
 - Cancel jobs for that repo execution (attempt-scoped):
   - `jobs.status IN ('Created','Queued','Running')` for `(run_id, repo_id, attempt=run_repos.attempt)` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
 
