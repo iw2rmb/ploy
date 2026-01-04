@@ -116,7 +116,7 @@ Behavior:
 - Creates a mod-scoped run via `POST /v1/mods/{mod_id}/runs` and immediately starts execution.
 - Prints:
   - created `run_id`
-  - counts: started/already done/queued (matching the existing batch “start pending repos” response shape)
+  - prints only `run_id` (run starts immediately; no separate “start” operation)
 
 ## Pulling diffs locally
 

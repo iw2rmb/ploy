@@ -215,7 +215,6 @@ Behavior:
 Response:
 
 - `run_id`
-- `started`, `already_done`, `queued`
 
 ## Schema/docs updates
 
@@ -229,6 +228,27 @@ Response:
   - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
+
+### `POST /v1/runs/{run_id}/repos/{repo_id}/restart`
+
+Restarts a single repo execution within a non-terminal run.
+
+Constraints:
+
+- Refuse when `runs.status` is terminal (`Finished` or `Cancelled`).
+- Refuse unless the repo is terminal (`run_repos.status IN ('Cancelled','Fail','Success')`).
+
+Behavior (v1, attempt-scoped jobs):
+
+- Increment `run_repos.attempt` and reset execution fields:
+  - `run_repos.status='Queued'`
+  - clear `run_repos.last_error`
+  - reset `run_repos.started_at` / `run_repos.finished_at`
+- Optionally update `run_repos.repo_base_ref` / `run_repos.repo_target_ref` from the request body.
+- Create a new set of jobs for the new attempt:
+  - insert jobs with `jobs.attempt = run_repos.attempt`
+  - insert the first job (lowest `step_index`) as `jobs.status='Queued'`
+  - insert all later jobs as `jobs.status='Created'`
 
 ## Node job claiming (unchanged, v1)
 

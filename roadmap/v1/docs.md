@@ -107,10 +107,7 @@ Files with old semantics (examples to rewrite):
 - Job queueing (v1): `jobs.status` uses `Created` for non-claimable and `Queued` for claimable; promotion is repo-scoped (`Created → Queued` on success).
 - Repo execution ordering is enforced by repo-scoped promotion; claiming remains global (`POST /v1/nodes/{id}/claim`).
 
-## 5) Remaining TODOs
-
-- Define v1 run artifacts APIs for multi-repo runs:
-  - how `ploy mod pull` (repo-scoped) selects diffs/logs/events for a single repo in a run (`run_id + repo_id`).
+## 5) Open items (v1)
 
 Selection rules (v1):
 
