@@ -17,7 +17,7 @@ This document is a design note for what must change in code to implement the new
 Canonical values:
 
 - `Started` (replaces HEAD `running` / “active run”)
-- `Cancelled` (new terminal; set by `POST /v1/runs/{id}/cancel`)
+- `Cancelled` (new terminal; set by `POST /v1/runs/{run_id}/cancel`)
 - `Finished` (new terminal; set when all repos are terminal)
 
 Notes:
@@ -38,7 +38,7 @@ Canonical values:
 Notes:
 
 - v1 removes `skipped` from `run_repo_status`.
-  - HEAD uses `skipped` only for repo removal (`DELETE /v1/runs/{id}/repos/{repo_id}` in `internal/server/handlers/runs_batch_http.go`).
+  - HEAD uses `skipped` only for repo removal (`DELETE /v1/runs/{run_id}/repos/{repo_id}` in `internal/server/handlers/runs_batch_http.go`).
   - v1 removes that endpoint, so there is no “repo removal → skipped” behavior to preserve.
 
 ## Transition rules (v1)
@@ -63,7 +63,7 @@ Claiming stays global, but “what becomes claimable next” is repo-scoped.
 
 - Initial: `Started` (on run creation).
 - `Started` → `Cancelled`:
-  - triggered by `POST /v1/runs/{id}/cancel`.
+  - triggered by `POST /v1/runs/{run_id}/cancel`.
   - must cancel all running jobs and remove waiting jobs from the queue:
     - “waiting” jobs: `jobs.status IN ('Created','Queued')` → set to `jobs.status='Cancelled'`
     - “running” jobs: `jobs.status='Running'` → best-effort transition to `jobs.status='Cancelled'` (nodes may race to complete)
@@ -169,7 +169,7 @@ Update these to stop referencing `queued/assigned/running/succeeded/failed/cance
 Run status updates / endpoint naming:
 
 - `internal/server/handlers/register.go`
-  - rename `POST /v1/runs/{id}/stop` → `POST /v1/runs/{id}/cancel` (v1 API).
+  - rename `POST /v1/runs/{run_id}/stop` → `POST /v1/runs/{run_id}/cancel` (v1 API).
 - `internal/server/handlers/runs_batch_http.go`
   - `stopRunHandler` currently sets `runs.status=canceled` and marks only `run_repos.status='pending'` repos as `cancelled` (it does not cancel running repos).
   - v1 cancel must:
@@ -209,8 +209,8 @@ Batch status helpers:
 
 Not implemented in this doc, but required for consistency:
 
-- Server endpoint rename: `POST /v1/runs/{id}/cancel` (not `/stop`).
-- OpenAPI path file currently documents `/v1/runs/{id}/stop` at HEAD (`docs/api/paths/runs_id_stop.yaml`).
+- Server endpoint rename: `POST /v1/runs/{run_id}/cancel` (not `/stop`).
+- OpenAPI path file currently documents `/v1/runs/{run_id}/stop` at HEAD (`docs/api/paths/runs_id_stop.yaml`).
 - `internal/mods/api/status_conversion.go`
   - converts between store status enums and the external Mods API types (`RunState`, `StageState`).
   - v1 status renames/casing must be reflected in these conversions.

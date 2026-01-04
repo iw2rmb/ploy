@@ -131,7 +131,13 @@ v0 reference:
 
 Behavior:
 
-- Pulls diffs for the specified `run-id`.
+- `ploy run pull` is executed from inside a repo folder; the CLI derives the current repo identity from the configured git remote URL (`origin` by default).
+- Resolve `repo_id` for this run:
+  - Call `GET /v1/runs/{run_id}/repos` to list repos in the run.
+  - Find the repo whose `repo_url` matches the current repo URL (same normalization as v0: strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
+  - If no repo matches: error.
+  - If multiple repos match: error.
+- Pull diffs for `(run_id, repo_id)` via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and download via `GET /v1/diffs/{diff_id}?download=true`.
 
 ## Run control
 

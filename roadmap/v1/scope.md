@@ -74,7 +74,7 @@ Current server routes under `/v1/mods/*` are run-scoped (see `internal/server/ha
   - examples: `POST /v1/mods/{run_id}/cancel`, `POST /v1/mods/{run_id}/resume`.
 - Repo-specific artifacts must move under the repo-scoped namespace:
   - example: `GET /v1/mods/{run_id}/diffs` → `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`
-- Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
+- Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel`.
 
 Current codebase behavior (to remove):
 
