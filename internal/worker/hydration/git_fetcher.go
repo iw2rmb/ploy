@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/vcs"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -101,7 +102,7 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 				output, err := cmd.CombinedOutput()
 				if err == nil {
 					remoteURL := strings.TrimSpace(string(output))
-					if normalizeRepoURL(remoteURL) == normalizeRepoURL(url) {
+					if vcs.NormalizeRepoURL(remoteURL) == vcs.NormalizeRepoURL(url) {
 						// Destination repo already matches requested URL; treat as hydrated.
 						return nil
 					}
@@ -185,7 +186,8 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 // collision-resistant identifiers that remain stable across runs.
 func computeCacheKey(url, baseRef, commitSHA string) string {
 	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
-	normalized := normalizeRepoURL(url)
+	// Uses the shared vcs.NormalizeRepoURL helper per roadmap/v1/scope.md:28.
+	normalized := vcs.NormalizeRepoURL(url)
 
 	// Include base_ref and commit_sha in the key for cache isolation.
 	// Different base_ref or commit_sha values result in different cache entries.
@@ -193,15 +195,6 @@ func computeCacheKey(url, baseRef, commitSHA string) string {
 
 	hash := sha256.Sum256([]byte(keyInput))
 	return hex.EncodeToString(hash[:])
-}
-
-// normalizeRepoURL normalizes a git repository URL for comparison and cache keys.
-// It trims whitespace, trailing slashes, and a .git suffix to produce a stable form.
-func normalizeRepoURL(raw string) string {
-	normalized := strings.TrimSpace(raw)
-	normalized = strings.TrimSuffix(normalized, "/")
-	normalized = strings.TrimSuffix(normalized, ".git")
-	return normalized
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.
