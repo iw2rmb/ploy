@@ -8,7 +8,7 @@ Change entry: repurpose `/v1/mods` from “run submission” to “mod project C
 - Proposed (v1): `/v1/mods` becomes mod project CRUD (create/list/delete/archive), and mod runs are created under `/v1/mods/{mod_id}/runs`.
 - Where: new handlers under `internal/server/handlers/*` + OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking API change; no backward compatibility required.
-- Unchanged: `/v1/runs/*` remains the run execution/history surface (start/cancel/status/SSE), updated to support repo scoping for multi-repo runs.
+- Unchanged: `/v1/runs/*` remains the run execution/history surface (cancel/status/SSE), updated to support repo scoping for multi-repo runs.
   - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel` (see current `stopRunHandler` in `internal/server/handlers/runs_batch_http.go`).
 
 ### `POST /v1/mods`
@@ -92,7 +92,7 @@ Change entry: add `POST /v1/runs` for single-repo submission.
 - Proposed (v1): `POST /v1/runs` submits a single-repo run and starts execution; it may create a mod project as a side-effect.
 - Where: new handler under `internal/server/handlers/*`, CLI callers under `cmd/ploy/*` and `internal/cli/*`, OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking for clients that submit runs via `POST /v1/mods`; no backward compatibility required.
-- Unchanged: existing batch lifecycle endpoints under `/v1/runs/*` remain (start/cancel/status/SSE).
+- Unchanged: existing batch lifecycle endpoints under `/v1/runs/*` remain (cancel/status/SSE).
   - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
 
 ### `POST /v1/runs`
