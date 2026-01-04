@@ -59,7 +59,7 @@ Notes:
 
 ### `mod_repos`
 
-- `id TEXT PRIMARY KEY` (app-generated string ID; choose NanoID length during implementation)
+- `id TEXT PRIMARY KEY` (NanoID(8), app-generated)
 - `mod_id TEXT NOT NULL REFERENCES mods(id) ON DELETE CASCADE`
 - `repo_url TEXT NOT NULL`
 - `base_ref TEXT NOT NULL`
