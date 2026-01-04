@@ -131,6 +131,8 @@ Update `internal/store/schema.sql` `job_status` enum:
 - Capitalize all values (e.g. `Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 - Rename `canceled` → `Cancelled`.
 - Rename `pending` → `Queued`.
+- Rename `succeeded` → `Success`.
+- Rename `failed` → `Fail`.
 - Remove `skipped` from `job_status` entirely.
   - HEAD note: `skipped` is treated as terminal in a few places, but there is no request path that sets it today (job completion only accepts `succeeded|failed|canceled`).
 
