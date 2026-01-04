@@ -111,3 +111,11 @@ Files with old semantics (examples to rewrite):
 
 - Define v1 run artifacts APIs for multi-repo runs:
   - how `ploy mod pull` (repo-scoped) selects diffs/logs/events for a single repo in a run (`run_id + repo_id`).
+
+Selection rules (v1):
+
+- `ploy mod pull` is executed from inside a repo folder; the CLI derives the current repo identity from the configured git remote URL (`origin` by default) and passes `repo_url` to the server.
+- The server resolves `repo_url` to `repo_id` (`mod_repos.id`) within the selected mod.
+- `--last-succeeded`: select the newest terminal `run_repos` row for that `(mod_id, repo_id)` with `run_repos.status=Success` (order by `run_repos.created_at DESC`).
+- `--last-failed`: select the newest terminal `run_repos` row for that `(mod_id, repo_id)` with `run_repos.status=Fail` (order by `run_repos.created_at DESC`).
+- `Cancelled` is terminal but ignored by these selectors: if the newest terminal is `Cancelled`, keep searching back for `Fail`/`Success`.
