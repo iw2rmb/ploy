@@ -133,7 +133,7 @@ Behavior:
 
 - `ploy run pull` is executed from inside a repo folder; the CLI derives the current repo identity from the configured git remote URL (`origin` by default).
 - Resolve repo execution for this run on the server:
-  - Call `POST /v1/runs/{run_id}/pull` with `repo_url` for the current repo (same normalization as v0: strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
+  - Call `POST /v1/runs/{run_id}/pull` with `repo_url` for the current repo (see `roadmap/v1/scope.md` “Repo URL rules (v1)”).
   - Server returns `repo_id` and `repo_target_ref`.
 - Pull diffs for `(run_id, repo_id)` via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and download via `GET /v1/diffs/{diff_id}?download=true`.
 
@@ -154,17 +154,16 @@ Behavior:
   - Find all **non-archived** mods that include this repo URL in their repo set.
   - If exactly one mod matches: select that mod.
   - If multiple mods match: error and print the matching mods (IDs + names).
-- Default (no selector flags): behave as `--last-succeeded`.
-- Run selection for the current repo uses run history by `(runs.mod_id, run_repos.repo_id)`:
-  - Find the newest run for this mod+repo by ordering `run_repos.created_at DESC` (joining through `runs.id`) and select according to the chosen flag:
-    - `--last-failed`: newest terminal `Fail`
-    - `--last-succeeded`: newest terminal `Success`
+- Call `POST /v1/mods/{mod_id}/pull` with:
+  - `repo_url` for the current repo (see `roadmap/v1/scope.md` “Repo URL rules (v1)”),
+  - and the selected mode (`last-succeeded` default, or `last-failed`).
+  - Server returns `run_id`, `repo_id`, `repo_target_ref` (see `roadmap/v1/api.md`).
+- Pull diffs for `(run_id, repo_id)` via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and download via `GET /v1/diffs/{diff_id}?download=true`.
 
 Notes:
 
 - `ploy mod pull` is executed from a repo folder and selects diffs for the current repo by looking up the matching `run_repos` entry in the chosen run.
-- Repo URL matching for “current repository” inference should use the same normalization as v0 `ploy mod run pull` (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`).
-- Server-side selection endpoint: `POST /v1/mods/{mod_id}/pull` performs the run selection and returns `run_id`, `repo_id`, and `repo_target_ref` (see `roadmap/v1/api.md`).
+- Repo URL matching must follow `roadmap/v1/scope.md` (“Repo URL rules (v1)”).
 
 ## Name/ID resolution rules
 

@@ -25,10 +25,11 @@ Run entrypoints:
 - **Repo**: a repo participating in a mod (repo_url + refs).
 - **Run**: an execution attempt; produces run-level and per-repo status, artifacts, logs, diffs.
 
-Repo URL note (v0 reference):
+## Repo URL rules (v1)
 
-- Current repo URL validation accepts only `https://`, `ssh://`, and `file://` URLs (see `internal/domain/types/vcs.go`, `RepoURL.Validate`).
-- Keep CLI examples aligned with server-side `RepoURL` validation rules: use `https://...` or `ssh://...` (not scp-style `git@host:owner/repo`).
+- Validation: accept only `https://`, `ssh://`, and `file://` (see `internal/domain/types/vcs.go`, `RepoURL.Validate`).
+- Normalization for comparisons: use `internal/worker/hydration/git_fetcher.go` `normalizeRepoURL` (strip trailing `/` and `.git`).
+  - Reuse this helper for all server-side `repo_url` matching; do not re-implement per endpoint.
 
 ## Non-goals (v1)
 
@@ -46,9 +47,7 @@ Repo URL note (v0 reference):
   - `mod_repos` rows are mutable (e.g., CSV import can rewrite refs).
   - `run_repos.repo_base_ref` and `run_repos.repo_target_ref` snapshot refs used for that repo in that run.
 - **Repo selection**:
-  - `--repo ...` → explicit repos
-  - `--failed` → repos whose most recent terminal per-repo status is `Fail`
-  - default → all repos in the mod repo set
+  - CLI and API details: see `roadmap/v1/cli.md` (`ploy mod run`) and `roadmap/v1/api.md` (`POST /v1/mods/{mod_id}/runs`).
 - **Immediate start**: both `ploy run` and `ploy mod run` start queued work right away.
 
 ## Execution model shift (required)
@@ -57,13 +56,8 @@ Codebase must switch from “root-run → per-repo execution runs” to “run �
 
 ### Job claiming vs repo progression (v1 invariant)
 
-- **Claiming stays global**: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
-- **Progression is repo-scoped**: “next job” selection is always within a single repo execution:
-  - filter by `(run_id, repo_id, attempt=run_repos.attempt)`
-  - order by `jobs.step_index`
-- **Single-queued invariant**: for each `(run_id, repo_id, attempt)`, the server must ensure there is at most one job in `jobs.status='Queued'` at any time (the repo’s next job by step_index for the current attempt).
-  - This allows global claiming to remain correct while preserving per-repo ordering.
-- **Promotion rule**: on job success, promote the next repo job `Created → Queued`; on failure, do not promote (healing may insert a new `Queued` job instead).
+- Claiming stays global: nodes call `POST /v1/nodes/{id}/claim` with no repo selector.
+- Progression rules (promotion + attempt scoping): see `roadmap/v1/statuses.md` “Job queueing rules (v1)” and `roadmap/v1/db.md` (`jobs.repo_id`, `jobs.attempt`).
 
 ## `/v1/mods/*` route collisions (v0 reference)
 
@@ -105,6 +99,4 @@ Implementation checklist:
   - `run_repos.status` for that repo (derived from repo-scoped jobs)
   - `runs.status` for the run (derived from all repos)
 
-Status derivation note:
-
-- A `run_repos` row becomes `Running` when a job is claimed for that repo (i.e. when some `jobs.status` becomes `Running` for `(run_id, repo_id, attempt)`).
+Status derivation note: see `roadmap/v1/statuses.md`.
