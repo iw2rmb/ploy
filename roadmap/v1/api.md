@@ -281,6 +281,7 @@ Cancels an entire run.
 Behavior:
 
 - Set `runs.status='Cancelled'`.
+- Set `runs.finished_at` when transitioning to `Cancelled`.
 - Cancel all repos for the run (`run_repos.status='Cancelled'`).
   - Set `run_repos.finished_at` when transitioning to `Cancelled`.
 - Cancel all jobs:
