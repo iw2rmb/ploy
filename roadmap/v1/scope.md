@@ -63,6 +63,7 @@ Codebase must switch from “root-run → per-repo execution runs” to “run �
   - order by `jobs.step_index`
 - **Single-queued invariant**: for each `(run_id, repo_id)`, the server must ensure there is at most one job in `jobs.status='Queued'` at any time (the repo’s next job by step_index).
   - This allows global claiming to remain correct while preserving per-repo ordering.
+- **Promotion rule**: on job success, promote the next repo job `Created → Queued`; on failure, do not promote (healing may insert a new `Queued` job instead).
 
 ## `/v1/mods/*` route collisions (v0 reference)
 

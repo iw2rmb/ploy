@@ -43,6 +43,22 @@ Notes:
 
 ## Transition rules (v1)
 
+### Job queueing rules (v1)
+
+Claiming stays global, but “what becomes claimable next” is repo-scoped.
+
+- Claimable jobs have `jobs.status='Queued'`.
+- Non-claimable jobs have `jobs.status='Created'`.
+- On job creation for a repo:
+  - the first job (lowest `step_index`) is inserted as `Queued`
+  - all later jobs are inserted as `Created`
+- On job success:
+  - find the next job for the same repo by `(run_id, repo_id) ORDER BY step_index`
+  - promote it `Created → Queued`
+- On job failure:
+  - do not promote the next “normal” step
+  - if healing inserts a job, that healing job is inserted as `Queued`
+
 ### Run status transitions
 
 - Initial: `Started` (on run creation).
