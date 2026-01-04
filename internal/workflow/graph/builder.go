@@ -87,22 +87,21 @@ func jobToNode(job store.Job) (*GraphNode, error) {
 }
 
 // mapJobStatus converts store.JobStatus to NodeStatus.
+// v1 status model (see roadmap/v1/statuses.md:127).
 func mapJobStatus(status store.JobStatus) NodeStatus {
 	switch status {
 	case store.JobStatusCreated:
 		return NodeStatusCreated
-	case store.JobStatusPending:
-		return NodeStatusPending
+	case store.JobStatusQueued:
+		return NodeStatusQueued
 	case store.JobStatusRunning:
 		return NodeStatusRunning
-	case store.JobStatusSucceeded:
-		return NodeStatusSucceeded
-	case store.JobStatusFailed:
-		return NodeStatusFailed
-	case store.JobStatusSkipped:
-		return NodeStatusSkipped
-	case store.JobStatusCanceled:
-		return NodeStatusCanceled
+	case store.JobStatusSuccess:
+		return NodeStatusSuccess
+	case store.JobStatusFail:
+		return NodeStatusFail
+	case store.JobStatusCancelled:
+		return NodeStatusCancelled
 	default:
 		// Fallback for unknown status; treat as created.
 		return NodeStatusCreated

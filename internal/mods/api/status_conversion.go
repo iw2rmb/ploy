@@ -12,29 +12,26 @@ import (
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
-// Mapping:
+// v1 status model (see roadmap/v1/statuses.md:127):
 //   - store.JobStatusCreated -> StageStatePending (created jobs are pending from API perspective)
-//   - store.JobStatusPending -> StageStatePending (pending jobs are pending from API perspective)
+//   - store.JobStatusQueued -> StageStatePending (queued jobs are pending from API perspective)
 //   - store.JobStatusRunning -> StageStateRunning
-//   - store.JobStatusSucceeded -> StageStateSucceeded
-//   - store.JobStatusFailed -> StageStateFailed
-//   - store.JobStatusSkipped -> StageStateFailed (skipped jobs are represented as failed in mods API)
-//   - store.JobStatusCanceled -> StageStateCancelled (UK spelling for mods API)
+//   - store.JobStatusSuccess -> StageStateSucceeded
+//   - store.JobStatusFail -> StageStateFailed
+//   - store.JobStatusCancelled -> StageStateCancelled
+//
+// Removed in v1: skipped (see roadmap/v1/statuses.md:138).
 func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
-	case store.JobStatusCreated, store.JobStatusPending:
+	case store.JobStatusCreated, store.JobStatusQueued:
 		return StageStatePending
 	case store.JobStatusRunning:
 		return StageStateRunning
-	case store.JobStatusSucceeded:
+	case store.JobStatusSuccess:
 		return StageStateSucceeded
-	case store.JobStatusFailed:
+	case store.JobStatusFail:
 		return StageStateFailed
-	case store.JobStatusSkipped:
-		// Skipped jobs don't have a direct mods API equivalent;
-		// map to failed for API consistency.
-		return StageStateFailed
-	case store.JobStatusCanceled:
+	case store.JobStatusCancelled:
 		return StageStateCancelled
 	default:
 		// Default to pending for unknown states (defensive).
@@ -46,30 +43,26 @@ func StageStatusFromStore(status store.JobStatus) StageState {
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
-// Mapping:
-//   - store.RunStatusQueued -> RunStatePending
-//   - store.RunStatusAssigned -> RunStatePending (assigned runs are still pending from API perspective)
-//   - store.RunStatusRunning -> RunStateRunning
-//   - store.RunStatusSucceeded -> RunStateSucceeded
-//   - store.RunStatusFailed -> RunStateFailed
-//   - store.RunStatusCanceled -> RunStateCancelled (UK spelling for mods API)
+// v1 status model (see roadmap/v1/statuses.md:113):
+//   - store.RunStatusStarted -> RunStateRunning (started runs are running from API perspective)
+//   - store.RunStatusCancelled -> RunStateCancelled
+//   - store.RunStatusFinished -> RunStateSucceeded (finished runs are treated as succeeded by default)
+//
+// Removed in v1: queued, assigned, running, succeeded, failed (see roadmap/v1/statuses.md:114).
 func RunStatusFromStore(status store.RunStatus) RunState {
 	switch status {
-	case store.RunStatusQueued, store.RunStatusAssigned:
-		// Both queued and assigned map to pending in the mods API
-		// since assignment is an internal scheduler state.
-		return RunStatePending
-	case store.RunStatusRunning:
+	case store.RunStatusStarted:
+		// v1 Started means the run is active; map to Running for API.
 		return RunStateRunning
-	case store.RunStatusSucceeded:
+	case store.RunStatusFinished:
+		// v1 Finished is terminal; map to Succeeded for API.
+		// NOTE: Future work may inspect repo-level outcomes to distinguish success/failure.
 		return RunStateSucceeded
-	case store.RunStatusFailed:
-		return RunStateFailed
-	case store.RunStatusCanceled:
+	case store.RunStatusCancelled:
 		return RunStateCancelled
 	default:
-		// Default to pending for unknown states (defensive).
-		return RunStatePending
+		// Default to running for unknown states (defensive).
+		return RunStateRunning
 	}
 }
 
@@ -77,12 +70,12 @@ func RunStatusFromStore(status store.RunStatus) RunState {
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
-// Mapping:
+// v1 status model (see roadmap/v1/statuses.md:127):
 //   - StageStatePending/StageStateQueued -> store.JobStatusCreated
 //   - StageStateRunning -> store.JobStatusRunning
-//   - StageStateSucceeded -> store.JobStatusSucceeded
-//   - StageStateFailed -> store.JobStatusFailed
-//   - StageStateCancelling/StageStateCancelled -> store.JobStatusCanceled
+//   - StageStateSucceeded -> store.JobStatusSuccess
+//   - StageStateFailed -> store.JobStatusFail
+//   - StageStateCancelling/StageStateCancelled -> store.JobStatusCancelled
 func StageStatusToStore(state StageState) store.JobStatus {
 	switch state {
 	case StageStatePending, StageStateQueued:
@@ -90,11 +83,11 @@ func StageStatusToStore(state StageState) store.JobStatus {
 	case StageStateRunning:
 		return store.JobStatusRunning
 	case StageStateSucceeded:
-		return store.JobStatusSucceeded
+		return store.JobStatusSuccess
 	case StageStateFailed:
-		return store.JobStatusFailed
+		return store.JobStatusFail
 	case StageStateCancelling, StageStateCancelled:
-		return store.JobStatusCanceled
+		return store.JobStatusCancelled
 	default:
 		// Default to created for unknown states (defensive).
 		return store.JobStatusCreated
@@ -105,27 +98,25 @@ func StageStatusToStore(state StageState) store.JobStatus {
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
-// Mapping:
-//   - RunStatePending -> store.RunStatusQueued
-//   - RunStateRunning -> store.RunStatusRunning
-//   - RunStateSucceeded -> store.RunStatusSucceeded
-//   - RunStateFailed -> store.RunStatusFailed
-//   - RunStateCancelling/RunStateCancelled -> store.RunStatusCanceled
+// v1 status model (see roadmap/v1/statuses.md:113):
+//   - RunStatePending -> store.RunStatusStarted (v1 has no pending state)
+//   - RunStateRunning -> store.RunStatusStarted
+//   - RunStateSucceeded -> store.RunStatusFinished
+//   - RunStateFailed -> store.RunStatusFinished
+//   - RunStateCancelling/RunStateCancelled -> store.RunStatusCancelled
 func RunStatusToStore(state RunState) store.RunStatus {
 	switch state {
-	case RunStatePending:
-		return store.RunStatusQueued
-	case RunStateRunning:
-		return store.RunStatusRunning
-	case RunStateSucceeded:
-		return store.RunStatusSucceeded
-	case RunStateFailed:
-		return store.RunStatusFailed
+	case RunStatePending, RunStateRunning:
+		// v1 has no pending/running distinction; both map to Started.
+		return store.RunStatusStarted
+	case RunStateSucceeded, RunStateFailed:
+		// v1 Finished is the terminal state for both success and failure.
+		return store.RunStatusFinished
 	case RunStateCancelling, RunStateCancelled:
-		return store.RunStatusCanceled
+		return store.RunStatusCancelled
 	default:
-		// Default to queued for unknown states (defensive).
-		return store.RunStatusQueued
+		// Default to started for unknown states (defensive).
+		return store.RunStatusStarted
 	}
 }
 

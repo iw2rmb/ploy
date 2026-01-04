@@ -252,14 +252,14 @@ WHERE id = $1
 `
 
 type UpdateRunStatsMRURLParams struct {
-	ID    string `json:"id"`
-	MrUrl string `json:"mr_url"`
+	ID               string      `json:"id"`
+	JsonbBuildObject interface{} `json:"jsonb_build_object"`
 }
 
-// UpdateRunStatsMRURL merges an MR URL into runs.stats.metadata.mr_url without altering other fields.
-// It preserves existing stats and metadata keys via JSONB merge.
+// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
+// Preserves existing stats and metadata keys via JSONB merge.
 func (q *Queries) UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error {
-	_, err := q.db.Exec(ctx, updateRunStatsMRURL, arg.ID, arg.MrUrl)
+	_, err := q.db.Exec(ctx, updateRunStatsMRURL, arg.ID, arg.JsonbBuildObject)
 	return err
 }
 

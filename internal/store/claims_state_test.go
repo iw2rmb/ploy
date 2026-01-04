@@ -15,7 +15,7 @@ import (
 // ClaimRun was removed; jobs are now the unified execution unit.
 
 // TestClaimJob_Basic tests the basic ClaimJob operation:
-// - Creates a run in queued status with a pending job
+// - Creates a run in Started status with a Queued job (v1 model)
 // - Claims the job for a node
 // - Verifies the job is assigned with correct node_id and started_at
 func TestClaimJob_Basic(t *testing.T) {
@@ -31,13 +31,13 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run directly (no separate repo/mod creation needed).
+	// Create a Started run directly (v1 status model: runs are created as Started).
 	// ID is now KSUID-backed; generate via types.NewRunID().
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/repo",
 		Spec:      []byte(`{"type":"test"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -45,19 +45,19 @@ func TestClaimJob_Basic(t *testing.T) {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
 
-	if run.Status != RunStatusQueued {
-		t.Errorf("Expected status queued, got %s", run.Status)
+	if run.Status != RunStatusStarted {
+		t.Errorf("Expected status Started, got %s", run.Status)
 	}
 
-	// Create a pending job for the run.
+	// Create a Queued job for the run (v1 status model: Queued replaces pending).
 	// Job ID is now KSUID-backed; generate via types.NewJobID().
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -126,7 +126,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/fifo",
 		Spec:      []byte(`{"type":"fifo"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -137,11 +137,11 @@ func TestClaimJob_FIFO(t *testing.T) {
 	// Create three pending jobs with different step_index values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-1",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -151,11 +151,11 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-2",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 2000,
 		Meta:      []byte(`{}`),
 	})
@@ -165,11 +165,11 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-3",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 3000,
 		Meta:      []byte(`{}`),
 	})
@@ -251,7 +251,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/skip-locked",
 		Spec:      []byte(`{"type":"concurrent"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "concurrent",
 	})
@@ -265,11 +265,11 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	for i := 0; i < numJobs; i++ {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:        string(types.NewJobID()),
-			RunID:     types.RunID(run.ID),
+			RunID:     run.ID,
 			Name:      "job-" + strconv.Itoa(i),
 			ModType:   "",
 			ModImage:  "",
-			Status:    JobStatusPending,
+			Status:    JobStatusQueued,
 			StepIndex: float64(1000 + i*100),
 			Meta:      []byte(`{}`),
 		})
@@ -408,7 +408,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/ackstart",
 		Spec:      []byte(`{"type":"acktest"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -419,11 +419,11 @@ func TestAckRunStart_Basic(t *testing.T) {
 	// Create a pending job for the run.
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -465,7 +465,7 @@ func TestAckRunStart_Basic(t *testing.T) {
 	}
 
 	// Verify the run is now in running status.
-	if updatedRun.Status != RunStatusRunning {
+	if updatedRun.Status != RunStatusStarted {
 		t.Errorf("Expected status running after ack, got %s", updatedRun.Status)
 	}
 }
@@ -489,7 +489,7 @@ func TestAckRunStart_WrongStatus(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/wrongstatus",
 		Spec:      []byte(`{"type":"wrongstatustest"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -510,7 +510,7 @@ func TestAckRunStart_WrongStatus(t *testing.T) {
 	}
 
 	// Verify the run is still in queued status (not changed).
-	if fetchedRun.Status != RunStatusQueued {
+	if fetchedRun.Status != RunStatusStarted {
 		t.Errorf("Expected status to remain queued, got %s", fetchedRun.Status)
 	}
 }
@@ -535,7 +535,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/drained",
 		Spec:      []byte(`{"type":"draintest"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -545,11 +545,11 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -612,7 +612,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/undrained",
 		Spec:      []byte(`{"type":"undraintest"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -622,11 +622,11 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "test-job",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -697,7 +697,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/step-order",
 		Spec:      []byte(`{"type":"step-order"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -708,11 +708,11 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	// Create jobs in reverse step_index order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-3",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 3000,
 		Meta:      []byte(`{}`),
 	})
@@ -722,11 +722,11 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-1",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 1000,
 		Meta:      []byte(`{}`),
 	})
@@ -736,11 +736,11 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "job-2",
 		ModType:   "",
 		ModImage:  "",
-		Status:    JobStatusPending,
+		Status:    JobStatusQueued,
 		StepIndex: 2000,
 		Meta:      []byte(`{}`),
 	})
@@ -804,7 +804,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		ID:        string(types.NewRunID()),
 		RepoUrl:   "https://github.com/test/only-pending",
 		Spec:      []byte(`{"type":"only-pending"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -815,7 +815,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	// Create a non-pending job (already running).
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		ID:        string(types.NewJobID()),
-		RunID:     types.RunID(run.ID),
+		RunID:     run.ID,
 		Name:      "running-job",
 		Status:    JobStatusRunning,
 		ModType:   "",

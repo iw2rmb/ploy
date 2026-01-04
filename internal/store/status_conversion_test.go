@@ -5,7 +5,9 @@ import (
 )
 
 // TestConvertToJobStatus verifies that ConvertToJobStatus correctly maps
-// various string representations to canonical store.JobStatus values.
+// v1 canonical strings to store.JobStatus values.
+// v1 status model: Created, Queued, Running, Success, Fail, Cancelled.
+// Removed in v1: skipped (see roadmap/v1/statuses.md:138).
 func TestConvertToJobStatus(t *testing.T) {
 	t.Parallel()
 
@@ -15,21 +17,24 @@ func TestConvertToJobStatus(t *testing.T) {
 		want    JobStatus
 		wantErr bool
 	}{
-		// Direct matches
-		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
-		{name: "pending", input: "pending", want: JobStatusPending, wantErr: false},
-		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: JobStatusSkipped, wantErr: false},
-		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Created", input: "Created", want: JobStatusCreated, wantErr: false},
+		{name: "Queued", input: "Queued", want: JobStatusQueued, wantErr: false},
+		{name: "Running", input: "Running", want: JobStatusRunning, wantErr: false},
+		{name: "Success", input: "Success", want: JobStatusSuccess, wantErr: false},
+		{name: "Fail", input: "Fail", want: JobStatusFail, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: JobStatusCancelled, wantErr: false},
 
-		// Non-canonical aliases should now be rejected
-		{name: "queued alias rejected", input: "queued", want: "", wantErr: true},
-		{name: "cancelled alias rejected", input: "cancelled", want: "", wantErr: true},
-		{name: "cancelling alias rejected", input: "cancelling", want: "", wantErr: true},
+		// v0 lowercase values should be rejected in v1
+		{name: "v0 created rejected", input: "created", want: "", wantErr: true},
+		{name: "v0 pending rejected", input: "pending", want: "", wantErr: true},
+		{name: "v0 running rejected", input: "running", want: "", wantErr: true},
+		{name: "v0 succeeded rejected", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed rejected", input: "failed", want: "", wantErr: true},
+		{name: "v0 skipped rejected", input: "skipped", want: "", wantErr: true},
+		{name: "v0 canceled rejected", input: "canceled", want: "", wantErr: true},
 
-		// Error cases
+		// Other invalid inputs
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
 		{name: "invalid", input: "invalid-status", want: "", wantErr: true},
@@ -51,7 +56,9 @@ func TestConvertToJobStatus(t *testing.T) {
 }
 
 // TestConvertToRunStatus verifies that ConvertToRunStatus correctly maps
-// various string representations to canonical store.RunStatus values.
+// v1 canonical strings to store.RunStatus values.
+// v1 status model: Started, Cancelled, Finished.
+// Removed in v1: queued, assigned, running, succeeded, failed (see roadmap/v1/statuses.md:114).
 func TestConvertToRunStatus(t *testing.T) {
 	t.Parallel()
 
@@ -61,20 +68,20 @@ func TestConvertToRunStatus(t *testing.T) {
 		want    RunStatus
 		wantErr bool
 	}{
-		// Direct matches
-		{name: "queued", input: "queued", want: RunStatusQueued, wantErr: false},
-		{name: "assigned", input: "assigned", want: RunStatusAssigned, wantErr: false},
-		{name: "running", input: "running", want: RunStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: RunStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: RunStatusFailed, wantErr: false},
-		{name: "canceled", input: "canceled", want: RunStatusCanceled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Started", input: "Started", want: RunStatusStarted, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: RunStatusCancelled, wantErr: false},
+		{name: "Finished", input: "Finished", want: RunStatusFinished, wantErr: false},
 
-		// Non-canonical aliases should now be rejected
-		{name: "pending alias rejected", input: "pending", want: "", wantErr: true},
-		{name: "cancelled alias rejected", input: "cancelled", want: "", wantErr: true},
-		{name: "cancelling alias rejected", input: "cancelling", want: "", wantErr: true},
+		// v0 lowercase values should be rejected in v1
+		{name: "v0 queued rejected", input: "queued", want: "", wantErr: true},
+		{name: "v0 assigned rejected", input: "assigned", want: "", wantErr: true},
+		{name: "v0 running rejected", input: "running", want: "", wantErr: true},
+		{name: "v0 succeeded rejected", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed rejected", input: "failed", want: "", wantErr: true},
+		{name: "v0 canceled rejected", input: "canceled", want: "", wantErr: true},
 
-		// Error cases
+		// Other invalid inputs
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
 		{name: "invalid", input: "invalid-status", want: "", wantErr: true},
@@ -96,7 +103,8 @@ func TestConvertToRunStatus(t *testing.T) {
 }
 
 // TestValidateJobStatus verifies that ValidateJobStatus correctly validates
-// canonical store.JobStatus values.
+// v1 canonical store.JobStatus values.
+// v1 status model: Created, Queued, Running, Success, Fail, Cancelled.
 func TestValidateJobStatus(t *testing.T) {
 	t.Parallel()
 
@@ -106,18 +114,21 @@ func TestValidateJobStatus(t *testing.T) {
 		want    JobStatus
 		wantErr bool
 	}{
-		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
-		{name: "pending", input: "pending", want: JobStatusPending, wantErr: false},
-		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: JobStatusSkipped, wantErr: false},
-		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Created", input: "Created", want: JobStatusCreated, wantErr: false},
+		{name: "Queued", input: "Queued", want: JobStatusQueued, wantErr: false},
+		{name: "Running", input: "Running", want: JobStatusRunning, wantErr: false},
+		{name: "Success", input: "Success", want: JobStatusSuccess, wantErr: false},
+		{name: "Fail", input: "Fail", want: JobStatusFail, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: JobStatusCancelled, wantErr: false},
 
-		// These should fail validation (non-canonical values)
-		{name: "queued invalid", input: "queued", want: "", wantErr: true},
-		{name: "cancelled invalid", input: "cancelled", want: "", wantErr: true},
-		{name: "cancelling invalid", input: "cancelling", want: "", wantErr: true},
+		// v0 lowercase values should fail validation in v1
+		{name: "v0 created invalid", input: "created", want: "", wantErr: true},
+		{name: "v0 pending invalid", input: "pending", want: "", wantErr: true},
+		{name: "v0 succeeded invalid", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed invalid", input: "failed", want: "", wantErr: true},
+		{name: "v0 skipped invalid", input: "skipped", want: "", wantErr: true},
+		{name: "v0 canceled invalid", input: "canceled", want: "", wantErr: true},
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
 	}
@@ -138,7 +149,8 @@ func TestValidateJobStatus(t *testing.T) {
 }
 
 // TestValidateRunStatus verifies that ValidateRunStatus correctly validates
-// canonical store.RunStatus values.
+// v1 canonical store.RunStatus values.
+// v1 status model: Started, Cancelled, Finished.
 func TestValidateRunStatus(t *testing.T) {
 	t.Parallel()
 
@@ -148,17 +160,18 @@ func TestValidateRunStatus(t *testing.T) {
 		want    RunStatus
 		wantErr bool
 	}{
-		{name: "queued", input: "queued", want: RunStatusQueued, wantErr: false},
-		{name: "assigned", input: "assigned", want: RunStatusAssigned, wantErr: false},
-		{name: "running", input: "running", want: RunStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: RunStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: RunStatusFailed, wantErr: false},
-		{name: "canceled", input: "canceled", want: RunStatusCanceled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Started", input: "Started", want: RunStatusStarted, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: RunStatusCancelled, wantErr: false},
+		{name: "Finished", input: "Finished", want: RunStatusFinished, wantErr: false},
 
-		// These should fail validation (non-canonical values)
-		{name: "pending invalid", input: "pending", want: "", wantErr: true},
-		{name: "cancelled invalid", input: "cancelled", want: "", wantErr: true},
-		{name: "cancelling invalid", input: "cancelling", want: "", wantErr: true},
+		// v0 lowercase values should fail validation in v1
+		{name: "v0 queued invalid", input: "queued", want: "", wantErr: true},
+		{name: "v0 assigned invalid", input: "assigned", want: "", wantErr: true},
+		{name: "v0 running invalid", input: "running", want: "", wantErr: true},
+		{name: "v0 succeeded invalid", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed invalid", input: "failed", want: "", wantErr: true},
+		{name: "v0 canceled invalid", input: "canceled", want: "", wantErr: true},
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
 	}
@@ -179,7 +192,8 @@ func TestValidateRunStatus(t *testing.T) {
 }
 
 // TestValidateRunRepoStatus verifies that ValidateRunRepoStatus correctly validates
-// canonical store.RunRepoStatus values for per-repo execution state in batched runs.
+// v1 canonical store.RunRepoStatus values for per-repo execution state in batched runs.
+// v1 status model: Queued, Running, Cancelled, Fail, Success.
 func TestValidateRunRepoStatus(t *testing.T) {
 	t.Parallel()
 
@@ -189,17 +203,20 @@ func TestValidateRunRepoStatus(t *testing.T) {
 		want    RunRepoStatus
 		wantErr bool
 	}{
-		{name: "pending", input: "pending", want: RunRepoStatusPending, wantErr: false},
-		{name: "running", input: "running", want: RunRepoStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: RunRepoStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: RunRepoStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: RunRepoStatusSkipped, wantErr: false},
-		{name: "cancelled", input: "cancelled", want: RunRepoStatusCancelled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Queued", input: "Queued", want: RunRepoStatusQueued, wantErr: false},
+		{name: "Running", input: "Running", want: RunRepoStatusRunning, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: RunRepoStatusCancelled, wantErr: false},
+		{name: "Fail", input: "Fail", want: RunRepoStatusFail, wantErr: false},
+		{name: "Success", input: "Success", want: RunRepoStatusSuccess, wantErr: false},
 
-		// Invalid cases (non-canonical values)
-		{name: "canceled invalid", input: "canceled", want: "", wantErr: true},
-		{name: "created invalid", input: "created", want: "", wantErr: true},
-		{name: "queued invalid", input: "queued", want: "", wantErr: true},
+		// v0 lowercase values should fail validation in v1
+		{name: "v0 pending invalid", input: "pending", want: "", wantErr: true},
+		{name: "v0 running invalid", input: "running", want: "", wantErr: true},
+		{name: "v0 succeeded invalid", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed invalid", input: "failed", want: "", wantErr: true},
+		{name: "v0 skipped invalid", input: "skipped", want: "", wantErr: true},
+		{name: "v0 cancelled invalid", input: "cancelled", want: "", wantErr: true},
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
 	}
@@ -220,7 +237,8 @@ func TestValidateRunRepoStatus(t *testing.T) {
 }
 
 // TestConvertToRunRepoStatus verifies that ConvertToRunRepoStatus correctly maps
-// various string representations to canonical store.RunRepoStatus values.
+// v1 canonical strings to store.RunRepoStatus values.
+// v1 status model: Queued, Running, Cancelled, Fail, Success.
 func TestConvertToRunRepoStatus(t *testing.T) {
 	t.Parallel()
 
@@ -230,22 +248,24 @@ func TestConvertToRunRepoStatus(t *testing.T) {
 		want    RunRepoStatus
 		wantErr bool
 	}{
-		// Direct matches
-		{name: "pending", input: "pending", want: RunRepoStatusPending, wantErr: false},
-		{name: "running", input: "running", want: RunRepoStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: RunRepoStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: RunRepoStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: RunRepoStatusSkipped, wantErr: false},
-		{name: "cancelled", input: "cancelled", want: RunRepoStatusCancelled, wantErr: false},
+		// v1 canonical values (capitalized)
+		{name: "Queued", input: "Queued", want: RunRepoStatusQueued, wantErr: false},
+		{name: "Running", input: "Running", want: RunRepoStatusRunning, wantErr: false},
+		{name: "Cancelled", input: "Cancelled", want: RunRepoStatusCancelled, wantErr: false},
+		{name: "Fail", input: "Fail", want: RunRepoStatusFail, wantErr: false},
+		{name: "Success", input: "Success", want: RunRepoStatusSuccess, wantErr: false},
 
-		// US spelling should now be rejected
-		{name: "canceled (US) rejected", input: "canceled", want: "", wantErr: true},
+		// v0 lowercase values should be rejected in v1
+		{name: "v0 pending rejected", input: "pending", want: "", wantErr: true},
+		{name: "v0 running rejected", input: "running", want: "", wantErr: true},
+		{name: "v0 succeeded rejected", input: "succeeded", want: "", wantErr: true},
+		{name: "v0 failed rejected", input: "failed", want: "", wantErr: true},
+		{name: "v0 skipped rejected", input: "skipped", want: "", wantErr: true},
+		{name: "v0 cancelled rejected", input: "cancelled", want: "", wantErr: true},
 
-		// Error cases
+		// Other invalid inputs
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
 		{name: "empty", input: "", want: "", wantErr: true},
-		{name: "created", input: "created", want: "", wantErr: true},
-		{name: "queued", input: "queued", want: "", wantErr: true},
 	}
 
 	for _, tt := range tests {

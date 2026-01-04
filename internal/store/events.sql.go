@@ -8,7 +8,6 @@ package store
 import (
 	"context"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,7 +18,7 @@ RETURNING id, run_id, job_id, time, level, message, meta
 `
 
 type CreateEventParams struct {
-	RunID   domaintypes.RunID  `json:"run_id"`
+	RunID   string             `json:"run_id"`
 	JobID   *string            `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
@@ -110,8 +109,8 @@ ORDER BY time ASC, id ASC
 `
 
 type ListEventsByRunSinceParams struct {
-	RunID domaintypes.RunID `json:"run_id"`
-	ID    int64             `json:"id"`
+	RunID string `json:"run_id"`
+	ID    int64  `json:"id"`
 }
 
 func (q *Queries) ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error) {

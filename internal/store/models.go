@@ -10,20 +10,17 @@ import (
 	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type JobStatus string
 
 const (
-	JobStatusCreated   JobStatus = "created"
-	JobStatusPending   JobStatus = "pending"
-	JobStatusRunning   JobStatus = "running"
-	JobStatusSucceeded JobStatus = "succeeded"
-	JobStatusFailed    JobStatus = "failed"
-	JobStatusSkipped   JobStatus = "skipped"
-	JobStatusCanceled  JobStatus = "canceled"
+	JobStatusCreated   JobStatus = "Created"
+	JobStatusQueued    JobStatus = "Queued"
+	JobStatusRunning   JobStatus = "Running"
+	JobStatusSuccess   JobStatus = "Success"
+	JobStatusFail      JobStatus = "Fail"
+	JobStatusCancelled JobStatus = "Cancelled"
 )
 
 func (e *JobStatus) Scan(src interface{}) error {
@@ -64,12 +61,11 @@ func (ns NullJobStatus) Value() (driver.Value, error) {
 type RunRepoStatus string
 
 const (
-	RunRepoStatusPending   RunRepoStatus = "pending"
-	RunRepoStatusRunning   RunRepoStatus = "running"
-	RunRepoStatusSucceeded RunRepoStatus = "succeeded"
-	RunRepoStatusFailed    RunRepoStatus = "failed"
-	RunRepoStatusSkipped   RunRepoStatus = "skipped"
-	RunRepoStatusCancelled RunRepoStatus = "cancelled"
+	RunRepoStatusQueued    RunRepoStatus = "Queued"
+	RunRepoStatusRunning   RunRepoStatus = "Running"
+	RunRepoStatusCancelled RunRepoStatus = "Cancelled"
+	RunRepoStatusFail      RunRepoStatus = "Fail"
+	RunRepoStatusSuccess   RunRepoStatus = "Success"
 )
 
 func (e *RunRepoStatus) Scan(src interface{}) error {
@@ -110,12 +106,9 @@ func (ns NullRunRepoStatus) Value() (driver.Value, error) {
 type RunStatus string
 
 const (
-	RunStatusQueued    RunStatus = "queued"
-	RunStatusAssigned  RunStatus = "assigned"
-	RunStatusRunning   RunStatus = "running"
-	RunStatusSucceeded RunStatus = "succeeded"
-	RunStatusFailed    RunStatus = "failed"
-	RunStatusCanceled  RunStatus = "canceled"
+	RunStatusStarted   RunStatus = "Started"
+	RunStatusCancelled RunStatus = "Cancelled"
+	RunStatusFinished  RunStatus = "Finished"
 )
 
 func (e *RunStatus) Scan(src interface{}) error {
@@ -170,7 +163,7 @@ type ApiToken struct {
 
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     domaintypes.RunID  `json:"run_id"`
+	RunID     string             `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
@@ -203,7 +196,7 @@ type ConfigEnv struct {
 
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     domaintypes.RunID  `json:"run_id"`
+	RunID     string             `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
@@ -212,7 +205,7 @@ type Diff struct {
 
 type Event struct {
 	ID      int64              `json:"id"`
-	RunID   domaintypes.RunID  `json:"run_id"`
+	RunID   string             `json:"run_id"`
 	JobID   *string            `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
@@ -222,7 +215,7 @@ type Event struct {
 
 type Job struct {
 	ID         string             `json:"id"`
-	RunID      domaintypes.RunID  `json:"run_id"`
+	RunID      string             `json:"run_id"`
 	Name       string             `json:"name"`
 	Status     JobStatus          `json:"status"`
 	ModType    string             `json:"mod_type"`
@@ -238,7 +231,7 @@ type Job struct {
 
 type Log struct {
 	ID        int64              `json:"id"`
-	RunID     domaintypes.RunID  `json:"run_id"`
+	RunID     string             `json:"run_id"`
 	JobID     *string            `json:"job_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
@@ -297,7 +290,7 @@ type Run struct {
 
 type RunRepo struct {
 	ID             string             `json:"id"`
-	RunID          domaintypes.RunID  `json:"run_id"`
+	RunID          string             `json:"run_id"`
 	RepoUrl        string             `json:"repo_url"`
 	BaseRef        string             `json:"base_ref"`
 	TargetRef      string             `json:"target_ref"`

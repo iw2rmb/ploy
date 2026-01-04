@@ -10,18 +10,28 @@ SET search_path TO ploy, public;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Enums
+--
+-- v1 status model (see roadmap/v1/statuses.md):
+-- - run_status: Started | Cancelled | Finished
+-- - run_repo_status: Queued | Running | Cancelled | Fail | Success
+-- - job_status: Created | Queued | Running | Success | Fail | Cancelled
+--
+-- Capitalized values are canonical; no aliases.
+-- 'skipped' removed from job_status per roadmap/v1/statuses.md:138.
+-- 'assigned' removed from run_status per roadmap/v1/statuses.md:26.
 CREATE TYPE run_status AS ENUM (
-  'queued', 'assigned', 'running', 'succeeded', 'failed', 'canceled'
+  'Started', 'Cancelled', 'Finished'
 );
 
 CREATE TYPE job_status AS ENUM (
-  'created', 'pending', 'running', 'succeeded', 'failed', 'skipped', 'canceled'
+  'Created', 'Queued', 'Running', 'Success', 'Fail', 'Cancelled'
 );
 
 -- RunRepoStatus tracks per-repo execution state within a batched run.
--- Mirrors job_status without 'created' since repos enter as 'pending'.
+-- v1 model: Queued (was pending), Running, Cancelled, Fail (was failed), Success (was succeeded).
+-- 'skipped' removed per roadmap/v1/statuses.md:40.
 CREATE TYPE run_repo_status AS ENUM (
-  'pending', 'running', 'succeeded', 'failed', 'skipped', 'cancelled'
+  'Queued', 'Running', 'Cancelled', 'Fail', 'Success'
 );
 
 
@@ -70,7 +80,7 @@ CREATE TABLE IF NOT EXISTS runs (
   repo_url     TEXT NOT NULL,
   spec         JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_by   TEXT,
-  status       run_status NOT NULL DEFAULT 'queued',
+  status       run_status NOT NULL DEFAULT 'Started',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   started_at   TIMESTAMPTZ,
   finished_at  TIMESTAMPTZ,
@@ -96,7 +106,7 @@ CREATE TABLE IF NOT EXISTS run_repos (
   repo_url         TEXT NOT NULL,
   base_ref         TEXT NOT NULL,
   target_ref       TEXT NOT NULL,
-  status           run_repo_status NOT NULL DEFAULT 'pending',
+  status           run_repo_status NOT NULL DEFAULT 'Queued',
   attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error       TEXT,
   execution_run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,  -- Child run for this repo's execution; KSUID string.
@@ -106,8 +116,8 @@ CREATE TABLE IF NOT EXISTS run_repos (
 );
 -- Index for listing repos by run (batch lookups).
 CREATE INDEX IF NOT EXISTS run_repos_run_idx ON run_repos(run_id);
--- Partial index for scheduling: find pending/running repos efficiently.
-CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE status IN ('pending','running');
+-- Partial index for scheduling: find Queued/Running repos efficiently (v1 status values).
+CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE status IN ('Queued','Running');
 -- Index for finding run_repos by execution_run_id (for completion callbacks).
 CREATE INDEX IF NOT EXISTS run_repos_execution_run_idx ON run_repos(execution_run_id) WHERE execution_run_id IS NOT NULL;
 
@@ -145,7 +155,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   UNIQUE (run_id, name)
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
-CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'pending';
+-- v1: 'Queued' replaces 'pending' as claimable job status (see roadmap/v1/statuses.md:50).
+CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
 
 -- Events (append-only)
@@ -281,17 +292,8 @@ CREATE TABLE IF NOT EXISTS config_env (
 CREATE INDEX IF NOT EXISTS config_env_scope_idx ON config_env(scope);
 
 -- Advisory lock usage (documentation only)
---   Assignment query sketch:
---   WITH cte AS (
---     SELECT id FROM runs
---     WHERE status = 'queued'
---     ORDER BY created_at
---     FOR UPDATE SKIP LOCKED
---     LIMIT 1
---   )
---   UPDATE runs r SET status='assigned', node_id=$1, started_at=now()
---   FROM cte WHERE r.id = cte.id
---   RETURNING r.*;
+-- Note: v1 model does not use run-level assignment; runs are created with status='Started'.
+-- Jobs are claimed individually at the job level; see ClaimJob query in jobs.sql.
 
 -- Optional convenience view for timing
 CREATE OR REPLACE VIEW runs_timing AS

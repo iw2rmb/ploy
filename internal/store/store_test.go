@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestNewStore verifies that Store creation works with a valid DSN.
@@ -58,7 +56,7 @@ func TestCreateRun_WithAndWithoutName(t *testing.T) {
 			Name:      nil, // No batch name.
 			RepoUrl:   "https://github.com/test/no-name",
 			Spec:      []byte(`{"type":"unnamed-run"}`),
-			Status:    RunStatusQueued,
+			Status:    RunStatusStarted,
 			BaseRef:   "main",
 			TargetRef: "feature/unnamed",
 		})
@@ -88,7 +86,7 @@ func TestCreateRun_WithAndWithoutName(t *testing.T) {
 			Name:      &batchName,
 			RepoUrl:   "https://github.com/test/with-name",
 			Spec:      []byte(`{"type":"named-run"}`),
-			Status:    RunStatusQueued,
+			Status:    RunStatusStarted,
 			BaseRef:   "main",
 			TargetRef: "feature/named",
 		})
@@ -172,7 +170,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		Name:      &batchName,
 		RepoUrl:   "https://github.com/test/batch-parent",
 		Spec:      []byte(`{"type":"batch"}`),
-		Status:    RunStatusQueued,
+		Status:    RunStatusStarted,
 		BaseRef:   "main",
 		TargetRef: "feature/batch",
 	})
@@ -183,7 +181,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	// Subtest: CreateRunRepo creates a repo entry with 'pending' status.
 	t.Run("create_run_repo", func(t *testing.T) {
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-a",
 			BaseRef:   "main",
 			TargetRef: "feature/a",
@@ -193,8 +191,8 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		}
 
 		// Verify defaults: status='pending', attempt=1.
-		if repo.Status != RunRepoStatusPending {
-			t.Errorf("expected status=%q, got %q", RunRepoStatusPending, repo.Status)
+		if repo.Status != RunRepoStatusQueued {
+			t.Errorf("expected status=%q, got %q", RunRepoStatusQueued, repo.Status)
 		}
 		if repo.Attempt != 1 {
 			t.Errorf("expected attempt=1, got %d", repo.Attempt)
@@ -217,7 +215,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("list_run_repos_by_run", func(t *testing.T) {
 		// Add a second repo.
 		_, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-b",
 			BaseRef:   "main",
 			TargetRef: "feature/b",
@@ -246,7 +244,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("status_transitions_pending_to_running_to_succeeded", func(t *testing.T) {
 		// Create a fresh repo for isolated testing.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-transition",
 			BaseRef:   "main",
 			TargetRef: "feature/transition",
@@ -282,7 +280,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		// Transition: running → succeeded.
 		err = db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
 			ID:     repo.ID,
-			Status: RunRepoStatusSucceeded,
+			Status: RunRepoStatusSuccess,
 		})
 		if err != nil {
 			t.Fatalf("UpdateRunRepoStatus(succeeded) failed: %v", err)
@@ -293,8 +291,8 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetRunRepo() failed: %v", err)
 		}
-		if succeeded.Status != RunRepoStatusSucceeded {
-			t.Errorf("expected status=%q, got %q", RunRepoStatusSucceeded, succeeded.Status)
+		if succeeded.Status != RunRepoStatusSuccess {
+			t.Errorf("expected status=%q, got %q", RunRepoStatusSuccess, succeeded.Status)
 		}
 		if !succeeded.FinishedAt.Valid {
 			t.Error("expected finished_at to be set after terminal status")
@@ -329,8 +327,8 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		}
 
 		// Verify succeeded count is at least 1.
-		if countMap[RunRepoStatusSucceeded] < 1 {
-			t.Errorf("expected at least 1 succeeded repo, got %d", countMap[RunRepoStatusSucceeded])
+		if countMap[RunRepoStatusSuccess] < 1 {
+			t.Errorf("expected at least 1 succeeded repo, got %d", countMap[RunRepoStatusSuccess])
 		}
 	})
 
@@ -338,7 +336,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("update_run_repo_error", func(t *testing.T) {
 		// Create a repo for error testing.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-error",
 			BaseRef:   "main",
 			TargetRef: "feature/error",
@@ -359,7 +357,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 
 		err = db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
 			ID:     repo.ID,
-			Status: RunRepoStatusFailed,
+			Status: RunRepoStatusFail,
 		})
 		if err != nil {
 			t.Fatalf("UpdateRunRepoStatus(failed) failed: %v", err)
@@ -373,8 +371,8 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		if failed.LastError == nil || *failed.LastError != errMsg {
 			t.Errorf("expected last_error=%q, got %v", errMsg, failed.LastError)
 		}
-		if failed.Status != RunRepoStatusFailed {
-			t.Errorf("expected status=%q, got %q", RunRepoStatusFailed, failed.Status)
+		if failed.Status != RunRepoStatusFail {
+			t.Errorf("expected status=%q, got %q", RunRepoStatusFail, failed.Status)
 		}
 	})
 
@@ -382,7 +380,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	t.Run("increment_run_repo_attempt", func(t *testing.T) {
 		// Create a repo and transition to failed.
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-retry",
 			BaseRef:   "main",
 			TargetRef: "feature/retry",
@@ -395,7 +393,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		_ = db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{ID: repo.ID, Status: RunRepoStatusRunning})
 		errMsg := "transient failure"
 		_ = db.UpdateRunRepoError(ctx, UpdateRunRepoErrorParams{ID: repo.ID, LastError: &errMsg})
-		_ = db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{ID: repo.ID, Status: RunRepoStatusFailed})
+		_ = db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{ID: repo.ID, Status: RunRepoStatusFail})
 
 		// Verify current state before retry.
 		beforeRetry, _ := db.GetRunRepo(ctx, repo.ID)
@@ -417,8 +415,8 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 		if afterRetry.Attempt != 2 {
 			t.Errorf("expected attempt=2 after retry, got %d", afterRetry.Attempt)
 		}
-		if afterRetry.Status != RunRepoStatusPending {
-			t.Errorf("expected status=%q after retry, got %q", RunRepoStatusPending, afterRetry.Status)
+		if afterRetry.Status != RunRepoStatusQueued {
+			t.Errorf("expected status=%q after retry, got %q", RunRepoStatusQueued, afterRetry.Status)
 		}
 		if afterRetry.LastError != nil {
 			t.Errorf("expected last_error=nil after retry, got %q", *afterRetry.LastError)
@@ -434,7 +432,7 @@ func TestRunRepo_CRUDAndStateTransitions(t *testing.T) {
 	// Subtest: DeleteRunRepo removes the repo entry.
 	t.Run("delete_run_repo", func(t *testing.T) {
 		repo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-			RunID:     domaintypes.RunID(parentRun.ID),
+			RunID:     parentRun.ID,
 			RepoUrl:   "https://github.com/org/repo-delete",
 			BaseRef:   "main",
 			TargetRef: "feature/delete",
