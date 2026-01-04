@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // TestModRunPullRouting validates that `ploy mod run pull` routes to handleModRunPull.
@@ -549,7 +551,9 @@ func TestResolveGitRemoteURL_CustomOrigin(t *testing.T) {
 // URL Normalization Tests
 // =============================================================================
 
-// TestNormalizeRepoURLForCLI validates the URL normalization function.
+// TestNormalizeRepoURLForCLI validates that the shared vcs.NormalizeRepoURL function
+// is correctly integrated and accessible from the CLI package.
+// The comprehensive unit tests for NormalizeRepoURL are in internal/vcs/repourl_test.go.
 func TestNormalizeRepoURLForCLI(t *testing.T) {
 	t.Parallel()
 
@@ -613,9 +617,10 @@ func TestNormalizeRepoURLForCLI(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			result := normalizeRepoURLForCLI(tc.input)
+			// Uses the shared vcs.NormalizeRepoURL helper per roadmap/v1/scope.md:28.
+			result := vcs.NormalizeRepoURL(tc.input)
 			if result != tc.expected {
-				t.Errorf("normalizeRepoURLForCLI(%q) = %q, expected %q", tc.input, result, tc.expected)
+				t.Errorf("vcs.NormalizeRepoURL(%q) = %q, expected %q", tc.input, result, tc.expected)
 			}
 		})
 	}
@@ -636,11 +641,12 @@ func TestNormalizeRepoURLForCLI_Consistency(t *testing.T) {
 		"  https://github.com/org/repo.git  ",
 	}
 
-	expected := normalizeRepoURLForCLI(equivalentURLs[0])
+	// Uses the shared vcs.NormalizeRepoURL helper per roadmap/v1/scope.md:28.
+	expected := vcs.NormalizeRepoURL(equivalentURLs[0])
 	for _, url := range equivalentURLs[1:] {
-		result := normalizeRepoURLForCLI(url)
+		result := vcs.NormalizeRepoURL(url)
 		if result != expected {
-			t.Errorf("normalizeRepoURLForCLI(%q) = %q, expected %q (should match first URL)", url, result, expected)
+			t.Errorf("vcs.NormalizeRepoURL(%q) = %q, expected %q (should match first URL)", url, result, expected)
 		}
 	}
 }

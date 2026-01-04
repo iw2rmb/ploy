@@ -42,6 +42,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleModRunPull implements `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`.
@@ -124,7 +125,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 
 	// Normalize the origin URL for comparison/logging purposes.
 	// The raw URL is used for API calls to match stored run_repos.repo_url values.
-	normalizedOriginURL := normalizeRepoURLForCLI(rawOriginURL)
+	// Uses the shared vcs.NormalizeRepoURL helper per roadmap/v1/scope.md:28.
+	normalizedOriginURL := vcs.NormalizeRepoURL(rawOriginURL)
 
 	// Step 4: Resolve the run via the repo-centric API.
 	// Use the raw origin URL as repo_id (URL-encoded for path segment) to match
@@ -382,30 +384,6 @@ func resolveGitRemoteURL(ctx context.Context, remoteName string) (string, error)
 	}
 
 	return rawURL, nil
-}
-
-// normalizeRepoURLForCLI normalizes a git repository URL for comparison with
-// server-side repo identifiers. The normalization removes artifacts that may
-// differ between equivalent URLs:
-//   - Trailing whitespace
-//   - Trailing slashes
-//   - Trailing .git suffix
-//
-// This matches the normalization semantics in internal/worker/hydration/git_fetcher.go::normalizeRepoURL.
-//
-// The raw URL should be preserved for exact matching where required (e.g., when
-// calling /v1/repos/{repo_id}/runs where repo_id must match stored run_repos.repo_url).
-//
-// Examples:
-//
-//	"https://github.com/org/repo.git"  -> "https://github.com/org/repo"
-//	"https://github.com/org/repo/"    -> "https://github.com/org/repo"
-//	"ssh://git@github.com/org/repo.git" -> "ssh://git@github.com/org/repo"
-func normalizeRepoURLForCLI(raw string) string {
-	normalized := strings.TrimSpace(raw)
-	normalized = strings.TrimSuffix(normalized, "/")
-	normalized = strings.TrimSuffix(normalized, ".git")
-	return normalized
 }
 
 // printModRunPullUsage renders the usage help for `ploy mod run pull`.
