@@ -72,13 +72,13 @@ Change entry: `ploy mod repo import` CSV parsing is fully specified.
 ### `ploy mod repo add <mod-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>`
 
 - Adds a repo to the mod repo set (identity is `repo_url` within a mod).
-- Returns `mod_repo_id`.
+- Returns `repo_id` (see `roadmap/v1/db.md` “Identifier conventions (v1)”).
 
 ### `ploy mod repo list <mod-id|name>`
 
 - Lists repos in the mod: `ID`, `REPO_URL`, `BASE_REF`, `TARGET_REF`, `ADDED_AT`.
 
-### `ploy mod repo remove <mod-id|name> --repo-id <mod_repo_id>`
+### `ploy mod repo remove <mod-id|name> --repo-id <repo_id>`
 
 - Deletes the repo row from the mod’s repo set.
 - Refuse deletion if there are historical executions referencing this repo (`run_repos.repo_id` exists).

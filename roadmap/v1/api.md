@@ -70,7 +70,7 @@ Request:
 Response:
 
 - `run_id`
-- `repo_id` (`mod_repos.id`, aka `mod_repo_id`)
+- `repo_id` (see `roadmap/v1/db.md` “Identifier conventions (v1)”)
 - `repo_target_ref` (`run_repos.repo_target_ref`)
 
 Notes:
@@ -163,7 +163,7 @@ Request:
 
 Response:
 
-- `id` (mod_repo_id), plus stored fields.
+- `id` (see `roadmap/v1/db.md` “Identifier conventions (v1)”), plus stored fields.
 
 ### `POST /v1/mods/{mod_id}/repos/bulk`
 
@@ -191,7 +191,7 @@ Response:
 
 Lists repos for a mod.
 
-### `DELETE /v1/mods/{mod_id}/repos/{mod_repo_id}`
+### `DELETE /v1/mods/{mod_id}/repos/{repo_id}`
 
 Deletes a repo from the mod repo set.
 
@@ -237,7 +237,7 @@ Request:
 Response:
 
 - `run_id`
-- `repo_id` (`mod_repos.id`, aka `mod_repo_id`)
+- `repo_id` (see `roadmap/v1/db.md` “Identifier conventions (v1)”)
 - `repo_target_ref` (`run_repos.repo_target_ref`)
 
 Notes:
@@ -253,7 +253,7 @@ Notes:
 
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
 - Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace to avoid colliding with `/v1/mods` (mod projects).
-- For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
+- For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` (see `roadmap/v1/db.md` “Identifier conventions (v1)”).
 - List repos in a run:
   - `GET /v1/runs/{run_id}/repos` — list repos (includes `repo_id` and `repo_url`).
   - Used by CLI/UIs to show run membership and `repo_id` values.
