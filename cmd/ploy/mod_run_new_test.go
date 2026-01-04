@@ -89,7 +89,10 @@ func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 
 	useServerDescriptor(t, server.URL)
 
-	if err := executeModRun([]string{}, io.Discard); err != nil {
+	if err := executeModRun([]string{
+		"--repo-url", "https://example.com/repo.git",
+		"--repo-base-ref", "main",
+	}, io.Discard); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
 }

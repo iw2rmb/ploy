@@ -33,11 +33,17 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if c.BaseURL == nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: base url required")
 	}
+
+	reqBody := c.Request
+	reqBody.RepoURL = strings.TrimSpace(reqBody.RepoURL)
+	if err := domaintypes.RepoURL(reqBody.RepoURL).Validate(); err != nil {
+		return modsapi.RunSummary{}, fmt.Errorf("mods submit: repo_url: %w", err)
+	}
 	// Control-plane submission endpoint: POST /v1/mods
 	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
 
 	// Marshal the canonical submit request.
-	payload, err := json.Marshal(c.Request)
+	payload, err := json.Marshal(reqBody)
 	if err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: marshal request: %w", err)
 	}

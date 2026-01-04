@@ -97,7 +97,12 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 
 	dir := t.TempDir()
 	buf := &bytes.Buffer{}
-	args := []string{"--follow", "--artifact-dir", dir}
+	args := []string{
+		"--repo-url", "https://example.com/repo.git",
+		"--repo-base-ref", "main",
+		"--follow",
+		"--artifact-dir", dir,
+	}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
@@ -212,7 +217,11 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	args := []string{"--follow"}
+	args := []string{
+		"--repo-url", "https://example.com/repo.git",
+		"--repo-base-ref", "main",
+		"--follow",
+	}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
@@ -310,7 +319,12 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	args := []string{"--follow", "--log-format", "raw"}
+	args := []string{
+		"--repo-url", "https://example.com/repo.git",
+		"--repo-base-ref", "main",
+		"--follow",
+		"--log-format", "raw",
+	}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}

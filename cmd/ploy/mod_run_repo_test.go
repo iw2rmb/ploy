@@ -145,6 +145,39 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 	}
 }
 
+// TestModRunRepoAddRejectsInvalidRepoURLScheme verifies that the CLI rejects invalid repo_url
+// schemes at the input boundary (roadmap/v1/scope.md:30) and does not call the control plane.
+// Note: Not parallel because useServerDescriptor uses t.Setenv.
+func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
+	var called bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := executeCmd([]string{
+		"mod", "run", "repo", "add",
+		"--repo-url", "http://github.com/org/repo.git",
+		"--base-ref", "main",
+		"--target-ref", "feature-branch",
+		"2NxO0FEXAMPLE4Rn",
+	}, buf)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--repo-url") {
+		t.Fatalf("expected error to mention --repo-url, got %q", err.Error())
+	}
+	if called {
+		t.Fatal("expected no control plane request for invalid repo URL scheme")
+	}
+}
+
 // TestModRunRepoRemoveCallsControlPlane verifies that `mod run repo remove` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
