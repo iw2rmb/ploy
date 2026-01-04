@@ -9,7 +9,7 @@ Change entry: repurpose `/v1/mods` from “run submission” to “mod project C
 - Where: new handlers under `internal/server/handlers/*` + OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking API change; no backward compatibility required.
 - Unchanged: `/v1/runs/*` remains the run execution/history surface (cancel/status/SSE), updated to support repo scoping for multi-repo runs.
-  - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel` (see current `stopRunHandler` in `internal/server/handlers/runs_batch_http.go`).
+  - Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel` (see current `stopRunHandler` in `internal/server/handlers/runs_batch_http.go`).
 
 ### `POST /v1/mods`
 
@@ -98,7 +98,7 @@ Change entry: add `POST /v1/runs` for single-repo submission.
 - Where: new handler under `internal/server/handlers/*`, CLI callers under `cmd/ploy/*` and `internal/cli/*`, OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking for clients that submit runs via `POST /v1/mods`; no backward compatibility required.
 - Unchanged: existing batch lifecycle endpoints under `/v1/runs/*` remain (cancel/status/SSE).
-  - Endpoint rename: `POST /v1/runs/{id}/stop` becomes `POST /v1/runs/{id}/cancel`.
+  - Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel`.
 
 ### `POST /v1/runs`
 
@@ -226,18 +226,21 @@ Response:
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
 - Move run-scoped “artifacts” endpoints that currently live under `/v1/mods/{run_id}/*` to a run-scoped namespace to avoid colliding with `/v1/mods` (mod projects).
 - For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
+- List repos in a run:
+  - `GET /v1/runs/{run_id}/repos` — list repos (includes `repo_id` and `repo_url`).
+  - Used by CLI to resolve `repo_id` from the current repo when given only `run_id` (see `roadmap/v1/cli.md` `ploy run pull`).
 - Repo-scoped endpoints required for CLI workflows (must exist under the repo-scoped namespace):
   - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — list diffs for this repo execution in this run.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/logs` — SSE logs/events stream for this repo execution.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts` — list artifacts produced by jobs for this repo execution.
-  - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`).
+  - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{run_id}/repos/{repo_id}`).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
 
 Repo-scoped artifacts response contracts (v1):
 
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`: response JSON shape is unchanged from HEAD `GET /v1/mods/{id}/diffs` (see `listRunDiffsHandler` / `diffListResponse` in `internal/server/handlers/diffs.go`); v1 only filters the returned rows to the repo execution.
-- `GET /v1/runs/{run_id}/repos/{repo_id}/logs`: SSE event types/payloads are unchanged from HEAD run logs (`GET /v1/runs/{id}/logs`; see `docs/api/paths/runs_id_logs.yaml`); v1 only filters the stream to jobs belonging to the repo execution.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/logs`: SSE event types/payloads are unchanged from HEAD run logs (`GET /v1/runs/{run_id}/logs`; see `docs/api/paths/runs_id_logs.yaml`); v1 only filters the stream to jobs belonging to the repo execution.
 - `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts`: response JSON shape is unchanged from HEAD artifact listing (`GET /v1/artifacts?cid=...`; see `listArtifactsByCIDHandler` in `internal/server/handlers/artifacts_download.go`); v1 only filters the returned bundles to jobs belonging to the repo execution.
 
 ### `POST /v1/runs/{run_id}/cancel`

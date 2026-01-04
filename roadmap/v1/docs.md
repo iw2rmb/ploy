@@ -102,7 +102,7 @@ Files with old semantics (examples to rewrite):
 
 - `POST /v1/runs` submits a single-repo run and immediately starts execution; it creates a mod project as a side-effect (`mod.name == mod.id`).
 - Mod projects live at `POST /v1/mods`; executing a mod project is `POST /v1/mods/{mod_id}/runs`.
-- No `/v1/runs/{id}/start` in v1 and no `ploy run start` (runs start immediately on creation).
+- No `/v1/runs/{run_id}/start` in v1 and no `ploy run start` (runs start immediately on creation).
 - Status model (v1): `runs.status` is `Started|Cancelled|Finished`; `run_repos.status` is `Queued|Running|Cancelled|Fail|Success`.
 - Job queueing (v1): `jobs.status` uses `Created` for non-claimable and `Queued` for claimable; promotion is repo-scoped (`Created → Queued` on success).
 - Repo execution ordering is enforced by repo-scoped promotion; claiming remains global (`POST /v1/nodes/{id}/claim`).

@@ -199,7 +199,7 @@ Notes:
   - On job success, the server promotes the next job for that repo (`Created → Queued`) by `jobs.step_index`.
 - Uniqueness must be per-repo within a run:
   - `UNIQUE (run_id, repo_id, attempt, name, step_index)`
-- v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
+- v0 reference: current server-side batch tables use `run_repos.id` as the “repo id” in HTTP paths like `/v1/runs/{run_id}/repos/{repo_id}`; v1 repurposes `repo_id` to mean `mod_repos.id` (aka `mod_repo_id`).
 
 ### Repo restarts / attempts
 
