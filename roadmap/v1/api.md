@@ -234,6 +234,12 @@ Response:
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
 
+Repo-scoped artifacts response contracts (v1):
+
+- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`: response JSON shape is unchanged from HEAD `GET /v1/mods/{id}/diffs` (see `listRunDiffsHandler` / `diffListResponse` in `internal/server/handlers/diffs.go`); v1 only filters the returned rows to the repo execution.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/logs`: SSE event types/payloads are unchanged from HEAD run logs (`GET /v1/runs/{id}/logs`; see `docs/api/paths/runs_id_logs.yaml`); v1 only filters the stream to jobs belonging to the repo execution.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/artifacts`: response JSON shape is unchanged from HEAD artifact listing (`GET /v1/artifacts?cid=...`; see `listArtifactsByCIDHandler` in `internal/server/handlers/artifacts_download.go`); v1 only filters the returned bundles to jobs belonging to the repo execution.
+
 ### `POST /v1/runs/{run_id}/cancel`
 
 Cancels an entire run.
