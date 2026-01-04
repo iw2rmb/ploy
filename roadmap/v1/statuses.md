@@ -72,6 +72,11 @@ Claiming stays global, but “what becomes claimable next” is repo-scoped.
   - set to `Finished` only when all repos are terminal:
     - terminal repo statuses: `Cancelled`, `Fail`, `Success`
 
+Timestamps:
+
+- Set `runs.started_at` on run creation.
+- Set `runs.finished_at` when the run transitions to a terminal state (`Cancelled` or `Finished`).
+
 MR note (align with HEAD semantics):
 
 - MR jobs (`jobs.mod_type='mr'`) are **auxiliary post-run jobs** and must not affect `run_repos.status` or `runs.status`.

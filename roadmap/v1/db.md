@@ -131,6 +131,11 @@ Notes:
 
 - No `node_id`: jobs are balanced across nodes; run is not “owned” by a node.
 
+Timestamps:
+
+- `runs.started_at` is set on run creation.
+- `runs.finished_at` is set when `runs.status` transitions to a terminal state (`Finished` or `Cancelled`).
+
 ### `run_repos`
 
 Per-repo execution state within a run.
