@@ -146,6 +146,7 @@ Behavior:
 - Selects a run relative to a mod project and pulls its diffs into the current git worktree.
 - If `<mod-name|id>` is provided, it is used to select the mod.
 - If `<mod-name|id>` is omitted, the CLI infers the mod from the current repository:
+  - Call `GET /v1/mods?repo_url=<current_repo_url>&archived=false` to find candidate mods that include this repo URL in their repo set.
   - Find all **non-archived** mods that include this repo URL in their repo set.
   - If exactly one mod matches: select that mod.
   - If multiple mods match: error and print the matching mods (IDs + names).

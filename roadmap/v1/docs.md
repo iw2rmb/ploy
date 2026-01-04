@@ -107,7 +107,7 @@ Files with old semantics (examples to rewrite):
 - Job queueing (v1): `jobs.status` uses `Created` for non-claimable and `Queued` for claimable; promotion is repo-scoped (`Created → Queued` on success).
 - Repo execution ordering is enforced by repo-scoped promotion; claiming remains global (`POST /v1/nodes/{id}/claim`).
 
-## 5) Open items (v1)
+## 5) Mod pull selection rules (v1)
 
 Selection rules (v1):
 

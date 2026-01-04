@@ -38,6 +38,11 @@ Query:
 - optional filters:
   - `name_substring` (substring match on `mods.name`)
   - `archived` (`true` → only archived, `false` → only active)
+  - `repo_url` (only mods whose repo set includes this repo URL)
+
+Notes:
+
+- `repo_url` matching must use the same normalization as v0 CLI matching (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`, `normalizeRepoURLForCLI`).
 
 ### `DELETE /v1/mods/{mod_id}`
 
@@ -228,6 +233,27 @@ Response:
   - `POST /v1/runs/{run_id}/repos/{repo_id}/cancel` — cancel this repo execution (v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`).
   - `POST /v1/runs/{run_id}/repos/{repo_id}/restart` — restart a repo execution (HEAD reference: `restartRunRepoHandler` in `internal/server/handlers/runs_batch_http.go`).
 - Keep existing `/v1/runs/*` APIs as the run execution/history surface; mod APIs are just project/spec/repo management + run creation.
+
+### `POST /v1/runs/{run_id}/cancel`
+
+Cancels an entire run.
+
+Behavior:
+
+- Set `runs.status='Cancelled'`.
+- Cancel all repos for the run (`run_repos.status='Cancelled'`).
+- Cancel all jobs:
+  - `jobs.status IN ('Created','Queued','Running')` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
+
+### `POST /v1/runs/{run_id}/repos/{repo_id}/cancel`
+
+Cancels a single repo execution within a run.
+
+Behavior:
+
+- Set `run_repos.status='Cancelled'` for that repo.
+- Cancel jobs for that repo execution (attempt-scoped):
+  - `jobs.status IN ('Created','Queued','Running')` for `(run_id, repo_id, attempt=run_repos.attempt)` → set to `jobs.status='Cancelled'` (best-effort; nodes may race to complete).
 
 ### `POST /v1/runs/{run_id}/repos/{repo_id}/restart`
 
