@@ -215,7 +215,7 @@ Behavior:
 Response:
 
 - `run_id`
-- `started`, `already_done`, `pending`
+- `started`, `already_done`, `queued`
 
 ## Schema/docs updates
 
