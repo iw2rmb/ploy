@@ -59,9 +59,9 @@ Codebase must switch from “root-run → per-repo execution runs” to “run �
 
 - **Claiming stays global**: nodes continue to call `POST /v1/nodes/{id}/claim` with no repo selector.
 - **Progression is repo-scoped**: “next job” selection is always within a single repo execution:
-  - filter by `(run_id, repo_id)`
+  - filter by `(run_id, repo_id, attempt=run_repos.attempt)`
   - order by `jobs.step_index`
-- **Single-queued invariant**: for each `(run_id, repo_id)`, the server must ensure there is at most one job in `jobs.status='Queued'` at any time (the repo’s next job by step_index).
+- **Single-queued invariant**: for each `(run_id, repo_id, attempt)`, the server must ensure there is at most one job in `jobs.status='Queued'` at any time (the repo’s next job by step_index for the current attempt).
   - This allows global claiming to remain correct while preserving per-repo ordering.
 - **Promotion rule**: on job success, promote the next repo job `Created → Queued`; on failure, do not promote (healing may insert a new `Queued` job instead).
 

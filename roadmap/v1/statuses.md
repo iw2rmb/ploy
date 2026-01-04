@@ -53,7 +53,7 @@ Claiming stays global, but “what becomes claimable next” is repo-scoped.
   - the first job (lowest `step_index`) is inserted as `Queued`
   - all later jobs are inserted as `Created`
 - On job success:
-  - find the next job for the same repo by `(run_id, repo_id) ORDER BY step_index`
+  - find the next job for the same repo attempt by `(run_id, repo_id, attempt) ORDER BY step_index`
   - promote it `Created → Queued`
 - On job failure:
   - do not promote the next “normal” step
