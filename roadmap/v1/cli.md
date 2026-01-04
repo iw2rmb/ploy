@@ -116,7 +116,7 @@ Behavior:
 - Creates a mod-scoped run via `POST /v1/mods/{mod_id}/runs` and immediately starts execution.
 - Prints:
   - created `run_id`
-  - counts: started/already done/pending (matching existing `run start` summary)
+  - counts: started/already done/queued (matching existing `run start` summary)
 
 ## Pulling diffs locally
 
@@ -141,7 +141,7 @@ Behavior:
 
 ### `ploy run start <run-id>`
 
-- Starts pending work for a run (creates jobs for pending repos). Refuses when run is `Finished` or `Cancelled`.
+- Starts queued work for a run (creates jobs for queued repos). Refuses when run is `Finished` or `Cancelled`.
 
 ### `ploy mod pull [--last-failed | --last-succeeded] [<mod-name|id>]`
 

@@ -94,7 +94,7 @@ v1 keeps **global job claiming** but makes **job progression repo-scoped**.
 - Progression is repo-scoped: whenever the server computes “next job” (or “adjacent step” for healing insertion), it must:
   - filter by `(run_id, repo_id)`
   - order by `jobs.step_index`
-- Single-pending invariant: for each `(run_id, repo_id)`, the server must ensure there is at most one `jobs` row with `status='Pending'` at any time (the repo’s next job by step_index).
+- Single-queued invariant: for each `(run_id, repo_id)`, the server must ensure there is at most one `jobs` row with `status='Queued'` at any time (the repo’s next job by step_index).
   - This preserves per-repo ordering without requiring repo-scoped claim APIs.
 
 ## Enums (v1)
@@ -164,7 +164,7 @@ Constraints / indexes:
 ### `run_repos.status`
 
 - Initial status is `Queued`.
-- `Running` when there is at least one repo-scoped job with `jobs.status IN ('Pending','Running')` for `(run_id, repo_id)`.
+- `Running` when there is at least one repo-scoped job with `jobs.status IN ('Queued','Running')` for `(run_id, repo_id)`.
 - Terminal:
   - `Success` when repo execution succeeded.
   - `Fail` when repo execution did not succeed (and was not cancelled).

@@ -49,17 +49,23 @@ Notes:
 - `Started` → `Cancelled`:
   - triggered by `POST /v1/runs/{id}/cancel`.
   - must cancel all running jobs and remove waiting jobs from the queue:
-    - “waiting” jobs: `jobs.status IN ('Created','Pending')` → set to `jobs.status='Cancelled'`
+    - “waiting” jobs: `jobs.status IN ('Created','Queued')` → set to `jobs.status='Cancelled'`
     - “running” jobs: `jobs.status='Running'` → best-effort transition to `jobs.status='Cancelled'` (nodes may race to complete)
 - `Started` → `Finished`:
   - checked after a job completes **when it is the last job for that repo**.
   - set to `Finished` only when all repos are terminal:
     - terminal repo statuses: `Cancelled`, `Fail`, `Success`
 
+MR note (align with HEAD semantics):
+
+- MR jobs (`jobs.mod_type='mr'`) are **auxiliary post-run jobs** and must not affect `run_repos.status` or `runs.status`.
+  - HEAD reference: `maybeScheduleMRJobForRun` comment in `internal/server/handlers/nodes_complete_mr.go`.
+- “Run is Finished” must therefore ignore MR jobs in any terminal-state aggregation.
+
 ### Run repo status transitions
 
 - Initial: `Queued`.
-- `Queued` → `Running` when the first repo-scoped job becomes claimable and is claimed.
+- `Queued` → `Running` when the repo’s first job becomes `Queued` (claimable).
 - `Running` → terminal:
   - `Success` if the repo’s job sequence completes successfully.
   - `Fail` if the repo’s job sequence fails (and is not cancelled).
@@ -72,7 +78,7 @@ Notes:
 These files currently branch on the HEAD status enums and will need updates (or removal) as part of the v1 status model change:
 
 - Run submission / job creation:
-  - `internal/server/handlers/mods_ticket.go` (creates runs with `RunStatusQueued`; creates jobs with `JobStatusPending/Created`)
+  - `internal/server/handlers/mods_ticket.go` (creates runs with `RunStatusQueued`; creates jobs with `JobStatusQueued/Created`)
 - Cancel/resume:
   - `internal/server/handlers/mods_cancel.go` (sets `runs.status=canceled`; cancels jobs)
   - `internal/server/handlers/mods_resume.go` (resets jobs; sets `runs.status=queued`; branches on `queued/assigned/running/succeeded/failed/canceled`)
@@ -104,8 +110,9 @@ v1 also changes job status strings.
 
 Update `internal/store/schema.sql` `job_status` enum:
 
-- Capitalize all values (e.g. `Created`, `Pending`, `Running`, `Success`, `Fail`, `Skipped`).
+- Capitalize all values (e.g. `Created`, `Queued`, `Running`, `Success`, `Fail`, `Skipped`).
 - Rename `canceled` → `Cancelled`.
+- Rename `pending` → `Queued`.
 
 ### Store status conversion helpers
 
@@ -126,7 +133,10 @@ Update these to stop referencing `queued/assigned/running/succeeded/failed/cance
   - v1 must update these to `Queued/Running/Cancelled/Fail/Success` and ensure timestamps follow the new model.
 - `internal/store/queries/jobs.sql`
   - `ClaimJob` currently allows claims only when `runs.status IN ('queued','running')` (and special-cases MR jobs).
-  - v1 should allow claims only when `runs.status='Started'`.
+  - v1 should allow claims only when `runs.status='Started'` for normal jobs.
+  - v1 must keep the MR special-case aligned with HEAD:
+    - MR jobs are claimable after the run is terminal (v1: when `runs.status='Finished'`), and MR failures do not change `runs.status`/`run_repos.status`.
+    - HEAD reference: `internal/store/queries/jobs.sql` `mod_type='mr'` branch + `internal/server/handlers/nodes_complete_mr.go`.
 
 ### Server handlers
 
@@ -135,7 +145,7 @@ Run status updates / endpoint naming:
 - `internal/server/handlers/register.go`
   - rename `POST /v1/runs/{id}/stop` → `POST /v1/runs/{id}/cancel` (v1 API).
 - `internal/server/handlers/runs_batch_http.go`
-  - `stopRunHandler` currently sets `runs.status=canceled` and marks only pending repos `cancelled`.
+  - `stopRunHandler` currently sets `runs.status=canceled` and marks only `run_repos.status='pending'` repos as `cancelled` (it does not cancel running repos).
   - v1 cancel must:
     - set `runs.status=Cancelled`
     - cancel all repos (`Queued`/`Running` → `Cancelled`)
@@ -144,7 +154,7 @@ Run status updates / endpoint naming:
   - today a successful claim may call `AckRunStart` to transition `runs.status` to `running`.
   - v1 must remove that transition (run is created `Started`) and ensure claim logic does not depend on queued/assigned.
 - `internal/server/handlers/runs_batch_scheduler.go`
-  - today it finds runs with pending repos via `ListBatchRunsWithPendingRepos` (which filters by `runs.status IN ('queued','assigned','running')`).
+  - today it finds runs with `run_repos.status='pending'` repos via `ListBatchRunsWithPendingRepos` (which filters by `runs.status IN ('queued','assigned','running')`).
   - v1 must update scheduling to the new run status model (`Started/Cancelled/Finished`).
 
 Run completion:

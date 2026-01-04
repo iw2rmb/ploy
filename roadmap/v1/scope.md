@@ -49,7 +49,7 @@ Repo URL note (v0 reference):
   - `--repo ...` → explicit repos
   - `--failed` → repos whose most recent terminal per-repo status is `Fail`
   - default → all repos in the mod repo set
-- **Immediate start**: both `ploy run` and `ploy mod run` start pending work right away.
+- **Immediate start**: both `ploy run` and `ploy mod run` start queued work right away.
 
 ## Execution model shift (required)
 
@@ -61,7 +61,7 @@ Codebase must switch from “root-run → per-repo execution runs” to “run �
 - **Progression is repo-scoped**: “next job” selection is always within a single repo execution:
   - filter by `(run_id, repo_id)`
   - order by `jobs.step_index`
-- **Single-pending invariant**: for each `(run_id, repo_id)`, the server must ensure there is at most one job in `jobs.status='Pending'` at any time (the repo’s next job by step_index).
+- **Single-queued invariant**: for each `(run_id, repo_id)`, the server must ensure there is at most one job in `jobs.status='Queued'` at any time (the repo’s next job by step_index).
   - This allows global claiming to remain correct while preserving per-repo ordering.
 
 ## `/v1/mods/*` route collisions (v0 reference)
@@ -106,4 +106,4 @@ Implementation checklist:
 
 Status derivation note:
 
-- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('Pending','Running')` for `(run_id, repo_id)`.
+- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('Queued','Running')` for `(run_id, repo_id)`.
