@@ -164,7 +164,7 @@ Constraints / indexes:
 ### `run_repos.status`
 
 - Initial status is `Queued`.
-- `Running` when there is at least one repo-scoped job with `jobs.status IN ('Queued','Running')` for `(run_id, repo_id)`.
+- `Running` when a job is claimed for that repo (i.e. when some `jobs.status` becomes `Running` for `(run_id, repo_id, attempt)`).
 - Terminal:
   - `Success` when repo execution succeeded.
   - `Fail` when repo execution did not succeed (and was not cancelled).

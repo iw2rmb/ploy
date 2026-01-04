@@ -107,4 +107,4 @@ Implementation checklist:
 
 Status derivation note:
 
-- A `run_repos` row is `Running` while it has any jobs with `jobs.status IN ('Queued','Running')` for `(run_id, repo_id)`.
+- A `run_repos` row becomes `Running` when a job is claimed for that repo (i.e. when some `jobs.status` becomes `Running` for `(run_id, repo_id, attempt)`).
