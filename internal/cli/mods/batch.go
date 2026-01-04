@@ -54,6 +54,11 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 		return BatchSummary{}, fmt.Errorf("batch create: base url required")
 	}
 
+	repoURL := strings.TrimSpace(c.RepoURL)
+	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
+		return BatchSummary{}, fmt.Errorf("batch create: repo_url: %w", err)
+	}
+
 	// Build the request payload matching server's expected format.
 	// Server uses /v1/mods for initial creation with repo_url/base_ref/target_ref + spec.
 	req := struct {
@@ -65,7 +70,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 		CreatedBy *string          `json:"created_by,omitempty"`
 	}{
 		Name:      c.Name,
-		RepoURL:   c.RepoURL,
+		RepoURL:   repoURL,
 		BaseRef:   c.BaseRef,
 		TargetRef: c.TargetRef,
 		CreatedBy: c.CreatedBy,

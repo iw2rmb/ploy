@@ -195,7 +195,7 @@ func TestRunListInvalidLimit(t *testing.T) {
 	}
 }
 
-// TestModRunBatchStatusNotFound validates status command handles 404.
+// TestModRunBatchStatusNotFound validates run status command handles 404.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunBatchStatusNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +210,7 @@ func TestModRunBatchStatusNotFound(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"mod", "run", "status", "nonexistent"}, &buf)
+	err := executeCmd([]string{"run", "status", "nonexistent"}, &buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}

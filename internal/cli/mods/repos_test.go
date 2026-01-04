@@ -112,6 +112,30 @@ func TestListRunsForRepoCommand_EmptyRepoURL(t *testing.T) {
 	}
 }
 
+func TestListRunsForRepoCommand_InvalidRepoURLScheme(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
+	}))
+	defer ts.Close()
+
+	baseURL, _ := url.Parse(ts.URL)
+	cmd := ListRunsForRepoCommand{
+		Client:  ts.Client(),
+		BaseURL: baseURL,
+		RepoURL: "http://github.com/org/repo.git",
+	}
+
+	_, err := cmd.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error for invalid repo URL scheme")
+	}
+	if !strings.Contains(err.Error(), "repo_url") {
+		t.Fatalf("expected error to mention repo_url, got %q", err.Error())
+	}
+}
+
 // TestListRunsForRepoCommand_HTTPError tests error handling for non-200 responses.
 func TestListRunsForRepoCommand_HTTPError(t *testing.T) {
 	t.Parallel()

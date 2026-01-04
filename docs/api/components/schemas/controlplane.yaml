@@ -59,7 +59,9 @@ Run:
   # Note: run IDs are now KSUID-backed strings (27 characters); format: uuid removed.
   properties:
     id: { type: string, description: "Run ID (KSUID string)" }
-    repo_url: { type: string }
+    repo_url:
+      type: string
+      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     spec: {}
     created_by: { type: string, nullable: true }
     status: { type: string }
@@ -256,7 +258,9 @@ RunSummary:
 CreateRunRequest:
   type: object
   properties:
-    repo_url: { type: string }
+    repo_url:
+      type: string
+      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
@@ -274,7 +278,9 @@ CreateRunResponse:
 RunSubmitRequest:
   type: object
   properties:
-    repo_url: { type: string }
+    repo_url:
+      type: string
+      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
@@ -440,7 +446,9 @@ NodeClaimResponse:
     mod_image:
       type: string
       description: Container image for this job (may be empty for non-container jobs)
-    repo_url: { type: string }
+    repo_url:
+      type: string
+      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     status: { type: string }
     node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }

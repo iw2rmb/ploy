@@ -94,13 +94,18 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 	batchID := strings.TrimSpace(rest[0])
 
 	// Validate required flags.
-	if strings.TrimSpace(*repoURL) == "" {
+	trimmedRepoURL := strings.TrimSpace(*repoURL)
+	if trimmedRepoURL == "" {
 		printModRunRepoUsage(stderr)
 		return errors.New("--repo-url required")
 	}
 	if strings.TrimSpace(*baseRef) == "" {
 		printModRunRepoUsage(stderr)
 		return errors.New("--base-ref required")
+	}
+	if err := domaintypes.RepoURL(trimmedRepoURL).Validate(); err != nil {
+		printModRunRepoUsage(stderr)
+		return fmt.Errorf("--repo-url: %w", err)
 	}
 
 	ctx := context.Background()
@@ -111,7 +116,7 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 
 	// Build and send the request to POST /v1/runs/{id}/repos.
 	reqBody := runRepoAddRequest{
-		RepoURL:   strings.TrimSpace(*repoURL),
+		RepoURL:   trimmedRepoURL,
 		BaseRef:   strings.TrimSpace(*baseRef),
 		TargetRef: strings.TrimSpace(*targetRef),
 	}

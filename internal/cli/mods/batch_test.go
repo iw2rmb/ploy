@@ -340,6 +340,36 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 	}
 }
 
+func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
+	}))
+	t.Cleanup(srv.Close)
+
+	baseURL, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+
+	cmd := CreateBatchCommand{
+		Client:    srv.Client(),
+		BaseURL:   baseURL,
+		RepoURL:   "http://github.com/org/repo.git",
+		BaseRef:   "main",
+		TargetRef: "feature",
+	}
+
+	_, err = cmd.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error for invalid repo URL scheme")
+	}
+	if !strings.Contains(err.Error(), "repo_url") {
+		t.Fatalf("expected error to mention repo_url, got %q", err.Error())
+	}
+}
+
 // TestBatchCommand_Errors validates error handling for missing required fields.
 func TestBatchCommand_Errors(t *testing.T) {
 	t.Parallel()

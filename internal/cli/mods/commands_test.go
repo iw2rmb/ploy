@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,6 +103,32 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	}
 }
 
+func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL)
+
+	_, err := (SubmitCommand{
+		Client:  srv.Client(),
+		BaseURL: base,
+		Request: modsapi.RunSubmitRequest{
+			RepoURL:   "http://example.com/repo.git",
+			BaseRef:   "main",
+			TargetRef: "feature",
+		},
+	}).Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error for invalid repo URL scheme")
+	}
+	if !strings.Contains(err.Error(), "repo_url") {
+		t.Fatalf("expected error to mention repo_url, got %q", err.Error())
+	}
+}
+
 func TestEventsCommandStreamsToTerminal(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -159,7 +186,15 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
 	// Submit
-	if _, err := (SubmitCommand{Client: srv.Client(), BaseURL: base}).Run(context.Background()); err == nil {
+	if _, err := (SubmitCommand{
+		Client:  srv.Client(),
+		BaseURL: base,
+		Request: modsapi.RunSubmitRequest{
+			RepoURL:   "https://example.com/repo.git",
+			BaseRef:   "main",
+			TargetRef: "feature",
+		},
+	}).Run(context.Background()); err == nil {
 		t.Fatal("expected submit error")
 	}
 	// Cancel

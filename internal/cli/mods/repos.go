@@ -77,13 +77,17 @@ func (c ListRunsForRepoCommand) Run(ctx context.Context) ([]RepoRunSummary, erro
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("list runs for repo: base url required")
 	}
-	if strings.TrimSpace(c.RepoURL) == "" {
+	repoURL := strings.TrimSpace(c.RepoURL)
+	if repoURL == "" {
 		return nil, fmt.Errorf("list runs for repo: repo url required")
+	}
+	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
+		return nil, fmt.Errorf("list runs for repo: repo_url: %w", err)
 	}
 
 	// URL-encode the repo URL for the path segment per ROADMAP.md specification.
 	// The server expects the raw repo URL as the repo_id, URL-encoded in the path.
-	encodedRepoURL := url.PathEscape(c.RepoURL)
+	encodedRepoURL := url.PathEscape(repoURL)
 
 	// Build endpoint: /v1/repos/{repo_id}/runs
 	endpoint := c.BaseURL.JoinPath("/v1/repos", encodedRepoURL, "runs")
