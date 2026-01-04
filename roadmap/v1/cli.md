@@ -8,7 +8,7 @@ Change entry: move single-repo submission from `ploy mod run` to `ploy run`.
 - Proposed (v1): `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` calls `POST /v1/runs` (see `roadmap/v1/api.md`).
 - Where: CLI routing under `cmd/ploy/*` and HTTP client under `internal/cli/*`.
 - Compatibility: breaking CLI/API surface; no backward compatibility required.
-- Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/start/cancel/logs) remain, with repo scoping added for multi-repo runs.
+- Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/cancel/logs) remain, with repo scoping added for multi-repo runs.
 
 ### `ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|->`
 
@@ -116,7 +116,7 @@ Behavior:
 - Creates a mod-scoped run via `POST /v1/mods/{mod_id}/runs` and immediately starts execution.
 - Prints:
   - created `run_id`
-  - counts: started/already done/queued (matching existing `run start` summary)
+  - counts: started/already done/queued (matching the existing batch “start pending repos” response shape)
 
 ## Pulling diffs locally
 
@@ -138,10 +138,6 @@ Behavior:
 ### `ploy run cancel <run-id>`
 
 - Cancels a run (`runs.status` → `Cancelled`).
-
-### `ploy run start <run-id>`
-
-- Starts queued work for a run (creates jobs for queued repos). Refuses when run is `Finished` or `Cancelled`.
 
 ### `ploy mod pull [--last-failed | --last-succeeded] [<mod-name|id>]`
 
