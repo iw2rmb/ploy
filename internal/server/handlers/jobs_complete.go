@@ -161,22 +161,23 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Validate and convert status to canonical RunStatus type.
+		// Validate and convert status to canonical JobStatus type.
+		// v1 uses capitalized job status values: Success, Fail, Cancelled.
 		if strings.TrimSpace(req.Status) == "" {
 			http.Error(w, "status is required", http.StatusBadRequest)
 			return
 		}
-		normalizedStatus, err := store.ConvertToRunStatus(strings.ToLower(strings.TrimSpace(req.Status)))
+		normalizedStatus, err := store.ConvertToJobStatus(strings.TrimSpace(req.Status))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid status: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		// Validate that status is a terminal state (succeeded, failed, or canceled).
-		if normalizedStatus != store.RunStatusSucceeded &&
-			normalizedStatus != store.RunStatusFailed &&
-			normalizedStatus != store.RunStatusCanceled {
-			http.Error(w, fmt.Sprintf("status must be succeeded, failed, or canceled, got %s", req.Status), http.StatusBadRequest)
+		// Validate that status is a terminal job state (Success, Fail, or Cancelled).
+		if normalizedStatus != store.JobStatusSuccess &&
+			normalizedStatus != store.JobStatusFail &&
+			normalizedStatus != store.JobStatusCancelled {
+			http.Error(w, fmt.Sprintf("status must be Success, Fail, or Cancelled, got %s", req.Status), http.StatusBadRequest)
 			return
 		}
 
@@ -256,24 +257,15 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Verify the job is in 'running' status before transitioning to terminal state.
+		// Verify the job is in 'Running' status before transitioning to terminal state.
+		// v1 uses capitalized status values.
 		if job.Status != store.JobStatusRunning {
-			http.Error(w, fmt.Sprintf("job status is %s, expected running", job.Status), http.StatusConflict)
+			http.Error(w, fmt.Sprintf("job status is %s, expected Running", job.Status), http.StatusConflict)
 			return
 		}
 
-		// Map run terminal status (succeeded/failed/canceled) to JobStatus.
-		var jobStatus store.JobStatus
-		switch normalizedStatus {
-		case store.RunStatusSucceeded:
-			jobStatus = store.JobStatusSucceeded
-		case store.RunStatusFailed:
-			jobStatus = store.JobStatusFailed
-		case store.RunStatusCanceled:
-			jobStatus = store.JobStatusCanceled
-		default:
-			jobStatus = store.JobStatusFailed
-		}
+		// Use the validated job status directly (already a JobStatus type).
+		jobStatus := normalizedStatus
 
 		// Transition job status to terminal state.
 		// Sets finished_at timestamp, duration_ms, and exit_code.
@@ -325,7 +317,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		//   jobs or cancel remaining jobs when healing is not configured or exhausted).
 		// - If it is a non-gate job (mod/heal), cancel remaining non-terminal jobs so the run
 		//   can reach a terminal state instead of leaving jobs stranded.
-		if jobStatus == store.JobStatusFailed && err == nil {
+		// v1 uses Fail instead of failed.
+		if jobStatus == store.JobStatusFail && err == nil {
 			jobs, jobsErr := st.ListJobsByRun(ctx, runID.String())
 			if jobsErr != nil {
 				slog.Error("complete job: failed to list jobs for failure handling",
@@ -370,8 +363,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
-		// Server-driven scheduling: after job succeeds or is skipped, schedule the next job.
-		if jobStatus == store.JobStatusSucceeded || jobStatus == store.JobStatusSkipped {
+		// Server-driven scheduling: after job succeeds, schedule the next job.
+		// v1 removes skipped status (see roadmap/v1/statuses.md:138).
+		if jobStatus == store.JobStatusSuccess {
 			if _, err := st.ScheduleNextJob(ctx, runID.String()); err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to schedule next job",

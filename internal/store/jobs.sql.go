@@ -8,7 +8,6 @@ package store
 import (
 	"context"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,7 +18,9 @@ WITH eligible AS (
   WHERE j.status = 'pending'
     AND j.node_id IS NULL
     AND (
+      -- Normal jobs: only when run is queued or running.
       r.status IN ('queued', 'running') OR
+      -- MR jobs: allowed after run has reached a terminal state.
       (j.mod_type = 'mr' AND r.status IN ('succeeded', 'failed'))
     )
   ORDER BY j.step_index ASC
@@ -75,8 +76,8 @@ WHERE run_id = $1 AND status = $2
 `
 
 type CountJobsByRunAndStatusParams struct {
-	RunID  domaintypes.RunID `json:"run_id"`
-	Status JobStatus         `json:"status"`
+	RunID  string    `json:"run_id"`
+	Status JobStatus `json:"status"`
 }
 
 // Counts jobs for a run with a specific status.
@@ -94,14 +95,14 @@ RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, ex
 `
 
 type CreateJobParams struct {
-	ID        string            `json:"id"`
-	RunID     domaintypes.RunID `json:"run_id"`
-	Name      string            `json:"name"`
-	Status    JobStatus         `json:"status"`
-	ModType   string            `json:"mod_type"`
-	ModImage  string            `json:"mod_image"`
-	StepIndex float64           `json:"step_index"`
-	Meta      []byte            `json:"meta"`
+	ID        string    `json:"id"`
+	RunID     string    `json:"run_id"`
+	Name      string    `json:"name"`
+	Status    JobStatus `json:"status"`
+	ModType   string    `json:"mod_type"`
+	ModImage  string    `json:"mod_image"`
+	StepIndex float64   `json:"step_index"`
+	Meta      []byte    `json:"meta"`
 }
 
 // Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().

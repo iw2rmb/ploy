@@ -8,7 +8,6 @@ package store
 import (
 	"context"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,10 +18,10 @@ RETURNING id, run_id, job_id, chunk_no, data, created_at
 `
 
 type CreateLogParams struct {
-	RunID   domaintypes.RunID `json:"run_id"`
-	JobID   *string           `json:"job_id"`
-	ChunkNo int32             `json:"chunk_no"`
-	Data    []byte            `json:"data"`
+	RunID   string  `json:"run_id"`
+	JobID   *string `json:"job_id"`
+	ChunkNo int32   `json:"chunk_no"`
+	Data    []byte  `json:"data"`
 }
 
 // Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
@@ -124,8 +123,8 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobParams struct {
-	RunID domaintypes.RunID `json:"run_id"`
-	JobID *string           `json:"job_id"`
+	RunID string  `json:"run_id"`
+	JobID *string `json:"job_id"`
 }
 
 func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
@@ -162,9 +161,9 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobSinceParams struct {
-	RunID domaintypes.RunID `json:"run_id"`
-	JobID *string           `json:"job_id"`
-	ID    int64             `json:"id"`
+	RunID string  `json:"run_id"`
+	JobID *string `json:"job_id"`
+	ID    int64   `json:"id"`
 }
 
 func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
@@ -201,8 +200,8 @@ ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunSinceParams struct {
-	RunID domaintypes.RunID `json:"run_id"`
-	ID    int64             `json:"id"`
+	RunID string `json:"run_id"`
+	ID    int64  `json:"id"`
 }
 
 func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {

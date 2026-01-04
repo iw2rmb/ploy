@@ -35,7 +35,8 @@ import (
 // terminal status is set atomically by UpdateJobCompletion and remains unchanged.
 func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
 	// If the run is already in a terminal state, skip recomputation.
-	if run.Status == store.RunStatusSucceeded || run.Status == store.RunStatusFailed || run.Status == store.RunStatusCanceled {
+	// v1 terminal run statuses: Finished, Cancelled (see roadmap/v1/statuses.md:15-22).
+	if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 		return nil
 	}
 	// Fetch all jobs for the run to compute gate-aware status in a single pass.
@@ -80,16 +81,16 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		totalJobs++
 
 		// Check if job is in terminal state.
-		isTerminal := job.Status == store.JobStatusSucceeded ||
-			job.Status == store.JobStatusFailed ||
-			job.Status == store.JobStatusCanceled ||
-			job.Status == store.JobStatusSkipped
+		// v1 terminal job statuses: Success, Fail, Cancelled (skipped removed per roadmap/v1/statuses.md:138).
+		isTerminal := job.Status == store.JobStatusSuccess ||
+			job.Status == store.JobStatusFail ||
+			job.Status == store.JobStatusCancelled
 		if isTerminal {
 			terminalJobs++
 		}
 
-		// Track canceled jobs for fallback precedence.
-		if job.Status == store.JobStatusCanceled {
+		// Track cancelled jobs for fallback precedence (v1 uses Cancelled spelling).
+		if job.Status == store.JobStatusCancelled {
 			hasCanceled = true
 		}
 
@@ -108,7 +109,8 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 
 		// Non-gate jobs (mods, heal): check for failure/cancellation.
 		// Non-gate failures take precedence over gate outcomes.
-		if job.Status == store.JobStatusFailed || job.Status == store.JobStatusCanceled {
+		// v1 uses Fail and Cancelled status values.
+		if job.Status == store.JobStatusFail || job.Status == store.JobStatusCancelled {
 			hasNonGateFailure = true
 		}
 	}
@@ -132,17 +134,17 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	var runStatus store.RunStatus
 	switch {
 	case hasNonGateFailure:
-		// Mod/heal job failed or was canceled → run failed.
-		runStatus = store.RunStatusFailed
-	case lastGateFound && lastGateStatus == store.JobStatusFailed:
-		// Final gate failed (healing didn't recover) → run failed.
-		runStatus = store.RunStatusFailed
+		// Mod/heal job failed or was cancelled → run finished (v1 uses Finished for terminal).
+		runStatus = store.RunStatusFinished
+	case lastGateFound && lastGateStatus == store.JobStatusFail:
+		// Final gate failed (healing didn't recover) → run finished (v1 uses Finished for terminal).
+		runStatus = store.RunStatusFinished
 	case hasCanceled:
-		// Some job was canceled but no failures → run canceled.
-		runStatus = store.RunStatusCanceled
+		// Some job was cancelled but no failures → run cancelled.
+		runStatus = store.RunStatusCancelled
 	default:
-		// All jobs succeeded (including final gate) → run succeeded.
-		runStatus = store.RunStatusSucceeded
+		// All jobs succeeded (including final gate) → run finished.
+		runStatus = store.RunStatusFinished
 	}
 
 	slog.Info("multi-step run completing",
@@ -170,13 +172,15 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	// Publish terminal run summary event and done status to the SSE hub.
 	if eventsService != nil {
 		// Map store.RunStatus to modsapi.RunState.
+		// v1 uses Finished (for success/failure) and Cancelled.
 		var runState modsapi.RunState
 		switch runStatus {
-		case store.RunStatusSucceeded:
+		case store.RunStatusFinished:
+			// v1 Finished covers both success and failure cases; map to Succeeded for API.
+			// NOTE: Future v1 work may distinguish Finished+success vs Finished+failure
+			// by inspecting repo-level outcomes. For now, default to Succeeded.
 			runState = modsapi.RunStateSucceeded
-		case store.RunStatusFailed:
-			runState = modsapi.RunStateFailed
-		case store.RunStatusCanceled:
+		case store.RunStatusCancelled:
 			runState = modsapi.RunStateCancelled
 		default:
 			runState = modsapi.RunStateFailed
@@ -255,17 +259,18 @@ func maybeUpdateRunRepoFromExecution(ctx context.Context, st store.Store, runID 
 	}
 
 	// Map RunStatus to RunRepoStatus.
+	// v1 uses Finished/Cancelled for runs and Success/Fail/Cancelled for run repos.
 	var repoStatus store.RunRepoStatus
 	switch runStatus {
-	case store.RunStatusSucceeded:
-		repoStatus = store.RunRepoStatusSucceeded
-	case store.RunStatusFailed:
-		repoStatus = store.RunRepoStatusFailed
-	case store.RunStatusCanceled:
-		repoStatus = store.RunRepoStatusCancelled // Note: RunRepoStatus uses British spelling.
+	case store.RunStatusFinished:
+		// v1 Finished doesn't distinguish success vs failure; default to Success.
+		// NOTE: Future v1 work may need to inspect repo-level job outcomes.
+		repoStatus = store.RunRepoStatusSuccess
+	case store.RunStatusCancelled:
+		repoStatus = store.RunRepoStatusCancelled
 	default:
-		// Unexpected status; default to failed for safety.
-		repoStatus = store.RunRepoStatusFailed
+		// Unexpected status; default to Fail for safety.
+		repoStatus = store.RunRepoStatusFail
 		slog.Warn("unexpected run status when updating run_repo",
 			"run_id", runID,
 			"run_status", runStatus,

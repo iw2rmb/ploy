@@ -33,24 +33,24 @@ const (
 )
 
 // NodeStatus represents the execution state of a graph node.
-// These values align with the job_status enum in the database.
+// These values align with the v1 job_status enum in the database.
+// v1 status model (see roadmap/v1/statuses.md:127).
 type NodeStatus string
 
 const (
 	// NodeStatusCreated indicates the job is created but not yet scheduled.
-	NodeStatusCreated NodeStatus = "created"
-	// NodeStatusPending indicates the job is ready to be claimed.
-	NodeStatusPending NodeStatus = "pending"
+	NodeStatusCreated NodeStatus = "Created"
+	// NodeStatusQueued indicates the job is ready to be claimed (replaces v0 pending).
+	NodeStatusQueued NodeStatus = "Queued"
 	// NodeStatusRunning indicates the job is currently executing.
-	NodeStatusRunning NodeStatus = "running"
-	// NodeStatusSucceeded indicates the job completed successfully.
-	NodeStatusSucceeded NodeStatus = "succeeded"
-	// NodeStatusFailed indicates the job execution failed.
-	NodeStatusFailed NodeStatus = "failed"
-	// NodeStatusSkipped indicates the job was skipped (not executed).
-	NodeStatusSkipped NodeStatus = "skipped"
-	// NodeStatusCanceled indicates the job was canceled.
-	NodeStatusCanceled NodeStatus = "canceled"
+	NodeStatusRunning NodeStatus = "Running"
+	// NodeStatusSuccess indicates the job completed successfully (replaces v0 succeeded).
+	NodeStatusSuccess NodeStatus = "Success"
+	// NodeStatusFail indicates the job execution failed (replaces v0 failed).
+	NodeStatusFail NodeStatus = "Fail"
+	// NodeStatusCancelled indicates the job was cancelled (UK spelling, replaces v0 canceled).
+	NodeStatusCancelled NodeStatus = "Cancelled"
+	// NOTE: NodeStatusSkipped removed in v1 per roadmap/v1/statuses.md:138.
 )
 
 // GraphNode represents a single job as a node in the workflow graph.
