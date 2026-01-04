@@ -221,6 +221,33 @@ Response:
 
 - `run_id`
 
+## Pulling diffs for a run repo
+
+### `POST /v1/runs/{run_id}/pull`
+
+Resolves the repo execution for a given run and returns identifiers needed to pull diffs for the current repo.
+
+This is the API behind `ploy run pull`.
+
+Request:
+
+- `repo_url`
+
+Response:
+
+- `run_id`
+- `repo_id` (`mod_repos.id`, aka `mod_repo_id`)
+- `repo_target_ref` (`run_repos.repo_target_ref`)
+
+Notes:
+
+- Server matches the repo by:
+  - joining `run_repos` to `mod_repos` by `repo_id`,
+  - filtering by `run_id`,
+  - matching `repo_url` using the same normalization as v0 CLI matching (strip trailing `/` and `.git`; see `cmd/ploy/mod_run_pull.go`, `normalizeRepoURLForCLI`).
+- If no repo matches: error.
+- If multiple repos match: error.
+
 ## Schema/docs updates
 
 - Add OpenAPI schemas for `Mod`, `Spec`, `ModRepo`, `CreateModRunRequest`, `CreateModRunResponse`.
@@ -228,7 +255,9 @@ Response:
 - For multi-repo runs, repo-scoped artifacts are addressed under `/v1/runs/{run_id}/repos/{repo_id}/...` where `repo_id` is `mod_repos.id` (aka `mod_repo_id`).
 - List repos in a run:
   - `GET /v1/runs/{run_id}/repos` — list repos (includes `repo_id` and `repo_url`).
-  - Used by CLI to resolve `repo_id` from the current repo when given only `run_id` (see `roadmap/v1/cli.md` `ploy run pull`).
+  - Used by CLI/UIs to show run membership and `repo_id` values.
+- Resolve the current repo for a run:
+  - `POST /v1/runs/{run_id}/pull` — server-side selection of `repo_id` for `ploy run pull`.
 - Repo-scoped endpoints required for CLI workflows (must exist under the repo-scoped namespace):
   - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — list diffs for this repo execution in this run.
   - `GET /v1/runs/{run_id}/repos/{repo_id}/logs` — SSE logs/events stream for this repo execution.
