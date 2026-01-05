@@ -75,7 +75,6 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  status      Show status for a run")
 	_, _ = fmt.Fprintln(w, "  logs        Stream run logs (SSE)")
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
-	_, _ = fmt.Fprintln(w, "  resume      Resume a failed or canceled run")
 	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
 	_, _ = fmt.Fprintln(w, "  diff        List diffs or download newest patch for a run")
 }

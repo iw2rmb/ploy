@@ -40,8 +40,9 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// Runs (single-repo submit + batch lifecycle)
 		{"/v1/runs", "post"},
 		// Legacy /v1/mods/{id} status endpoint has been replaced by /v1/runs/{id}/status.
+		// Legacy /v1/mods/{id}/cancel has been moved to /v1/runs/{id}/cancel (v1 API).
+		// Legacy /v1/mods/{id}/resume has been removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
 		{"/v1/mods/{id}/graph", "get"},
-		{"/v1/mods/{id}/cancel", "post"},
 		{"/v1/runs/{id}/logs", "get"},
 		{"/v1/mods/{id}/logs", "post"},
 		{"/v1/mods/{id}/diffs", "post"},

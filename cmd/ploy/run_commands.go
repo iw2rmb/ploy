@@ -31,8 +31,6 @@ func handleRun(args []string, stderr io.Writer) error {
 		return handleRunList(args[1:], stderr)
 	case "cancel":
 		return handleRunCancel(args[1:], stderr)
-	case "resume":
-		return handleRunResume(args[1:], stderr)
 	case "start":
 		return handleRunStart(args[1:], stderr)
 	case "stop":

@@ -86,9 +86,6 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	mux.HandleFunc("/v1/runs/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	})
-	mux.HandleFunc("/v1/runs/t2/resume", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusAccepted)
-	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
@@ -110,10 +107,6 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	// Cancel
 	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
 		t.Fatalf("cancel err=%v", err)
-	}
-	// Resume
-	if err := (runs.ResumeCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
-		t.Fatalf("resume err=%v", err)
 	}
 }
 
@@ -195,7 +188,6 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 	})
 	mux.HandleFunc("/v1/runs/t/status", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("/v1/runs/t/cancel", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
-	mux.HandleFunc("/v1/runs/t/resume", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
 	mux.HandleFunc("/v1/mods/t", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -216,10 +208,6 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 	// Cancel
 	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
 		t.Fatal("expected cancel error")
-	}
-	// Resume
-	if err := (runs.ResumeCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
-		t.Fatal("expected resume error")
 	}
 }
 

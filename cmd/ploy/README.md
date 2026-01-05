@@ -203,25 +203,6 @@ fetching stored diffs from the control plane and applying them to a new branch.
 
 ---
 
-`run resume` requests resumption of a failed or canceled Mods run via the
-control plane `POST /v1/runs/{id}/resume` endpoint. This enables continuation
-of previously interrupted workflows without resubmitting the entire spec.
-
-```bash
-ploy run resume <run-id>
-# Output: Resume requested
-```
-
-The command handles the following server responses:
-- **202 Accepted**: Resume successfully initiated; eligible jobs are requeued.
-- **200 OK**: Run is already running (idempotent) or all jobs succeeded.
-- **404 Not Found**: Run does not exist.
-- **409 Conflict**: Run state is not resumable (e.g., already succeeded).
-- **400 Bad Request**: Invalid run ID format.
-
-Only runs in `Finished` or `Cancelled` state can be resumed. `Started` runs
-return 200 OK (idempotent).
-
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
