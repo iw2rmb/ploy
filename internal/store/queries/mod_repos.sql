@@ -8,6 +8,12 @@ SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
 FROM mod_repos
 WHERE id = $1;
 
+-- name: GetModRepoByURL :one
+-- Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
+SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
+FROM mod_repos
+WHERE mod_id = $1 AND repo_url = $2;
+
 -- name: ListModReposByMod :many
 SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
 FROM mod_repos
@@ -19,6 +25,25 @@ UPDATE mod_repos
 SET base_ref = $2,
     target_ref = $3
 WHERE id = $1;
+
+-- name: DeleteModRepo :exec
+-- Deletes a mod_repo by id.
+-- Per roadmap/v1/db.md:63, this will CASCADE to related run_repos and jobs due to ON DELETE RESTRICT.
+-- Caller must ensure no active runs reference this repo.
+DELETE FROM mod_repos
+WHERE id = $1;
+
+-- name: UpsertModRepo :one
+-- Bulk upsert a mod_repo by normalized repo_url.
+-- Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+-- If a row exists, update refs; otherwise insert.
+INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (mod_id, repo_url)
+DO UPDATE SET
+  base_ref = EXCLUDED.base_ref,
+  target_ref = EXCLUDED.target_ref
+RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at;
 
 -- name: ListDistinctRepos :many
 -- v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.

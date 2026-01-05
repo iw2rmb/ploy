@@ -60,3 +60,44 @@ func (q *Queries) GetSpec(ctx context.Context, id string) (Spec, error) {
 	)
 	return i, err
 }
+
+const listSpecs = `-- name: ListSpecs :many
+SELECT id, name, spec, created_by, created_at, archived_at
+FROM specs
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListSpecsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+// Lists specs ordered by created_at descending (most recent first).
+// Per roadmap/v1/db.md:53, there is an index on created_at for this query.
+func (q *Queries) ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error) {
+	rows, err := q.db.Query(ctx, listSpecs, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Spec{}
+	for rows.Next() {
+		var i Spec
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Spec,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

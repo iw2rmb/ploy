@@ -45,6 +45,19 @@ func (q *Queries) CreateModRepo(ctx context.Context, arg CreateModRepoParams) (M
 	return i, err
 }
 
+const deleteModRepo = `-- name: DeleteModRepo :exec
+DELETE FROM mod_repos
+WHERE id = $1
+`
+
+// Deletes a mod_repo by id.
+// Per roadmap/v1/db.md:63, this will CASCADE to related run_repos and jobs due to ON DELETE RESTRICT.
+// Caller must ensure no active runs reference this repo.
+func (q *Queries) DeleteModRepo(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteModRepo, id)
+	return err
+}
+
 const getModRepo = `-- name: GetModRepo :one
 SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
 FROM mod_repos
@@ -53,6 +66,32 @@ WHERE id = $1
 
 func (q *Queries) GetModRepo(ctx context.Context, id string) (ModRepo, error) {
 	row := q.db.QueryRow(ctx, getModRepo, id)
+	var i ModRepo
+	err := row.Scan(
+		&i.ID,
+		&i.ModID,
+		&i.RepoUrl,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getModRepoByURL = `-- name: GetModRepoByURL :one
+SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
+FROM mod_repos
+WHERE mod_id = $1 AND repo_url = $2
+`
+
+type GetModRepoByURLParams struct {
+	ModID   string `json:"mod_id"`
+	RepoUrl string `json:"repo_url"`
+}
+
+// Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
+func (q *Queries) GetModRepoByURL(ctx context.Context, arg GetModRepoByURLParams) (ModRepo, error) {
+	row := q.db.QueryRow(ctx, getModRepoByURL, arg.ModID, arg.RepoUrl)
 	var i ModRepo
 	err := row.Scan(
 		&i.ID,
@@ -168,4 +207,45 @@ type UpdateModRepoRefsParams struct {
 func (q *Queries) UpdateModRepoRefs(ctx context.Context, arg UpdateModRepoRefsParams) error {
 	_, err := q.db.Exec(ctx, updateModRepoRefs, arg.ID, arg.BaseRef, arg.TargetRef)
 	return err
+}
+
+const upsertModRepo = `-- name: UpsertModRepo :one
+INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (mod_id, repo_url)
+DO UPDATE SET
+  base_ref = EXCLUDED.base_ref,
+  target_ref = EXCLUDED.target_ref
+RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at
+`
+
+type UpsertModRepoParams struct {
+	ID        string `json:"id"`
+	ModID     string `json:"mod_id"`
+	RepoUrl   string `json:"repo_url"`
+	BaseRef   string `json:"base_ref"`
+	TargetRef string `json:"target_ref"`
+}
+
+// Bulk upsert a mod_repo by normalized repo_url.
+// Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+// If a row exists, update refs; otherwise insert.
+func (q *Queries) UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error) {
+	row := q.db.QueryRow(ctx, upsertModRepo,
+		arg.ID,
+		arg.ModID,
+		arg.RepoUrl,
+		arg.BaseRef,
+		arg.TargetRef,
+	)
+	var i ModRepo
+	err := row.Scan(
+		&i.ID,
+		&i.ModID,
+		&i.RepoUrl,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.CreatedAt,
+	)
+	return i, err
 }
