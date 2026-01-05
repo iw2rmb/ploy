@@ -27,8 +27,6 @@ import (
 // - Creates a run and starts execution immediately.
 //
 // This handler replaces the previous POST /v1/mods endpoint for run submission.
-// The old submitRunHandler in mods_ticket.go remains for backward compatibility
-// or will be removed once all clients migrate to POST /v1/runs.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body with domain types for VCS fields.

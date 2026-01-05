@@ -26,15 +26,16 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	// Minimal control-plane emulator.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
 			var req modsapi.RunSubmitRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
-			// Server returns 201 Created with canonical submit response.
+			// Server returns 201 Created with {run_id, mod_id, spec_id}.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  domaintypes.RunID `json:"run_id"`
-				Status string            `json:"status"`
-			}{RunID: domaintypes.RunID(runID), Status: "running"})
+				RunID  string `json:"run_id"`
+				ModID  string `json:"mod_id"`
+				SpecID string `json:"spec_id"`
+			}{RunID: runID, ModID: "m1", SpecID: "s1"})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream: run running -> run succeeded
@@ -100,6 +101,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	args := []string{
 		"--repo-url", "https://example.com/repo.git",
 		"--repo-base-ref", "main",
+		"--repo-target-ref", "feature",
 		"--follow",
 		"--artifact-dir", dir,
 	}
@@ -156,13 +158,22 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	// Control-plane emulator that sends run, stage, and log events.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			// Server returns 201 Created with canonical submit response.
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			// Server returns 201 Created with {run_id, mod_id, spec_id}.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  domaintypes.RunID `json:"run_id"`
-				Status string            `json:"status"`
-			}{RunID: domaintypes.RunID(runID), Status: "running"})
+				RunID  string `json:"run_id"`
+				ModID  string `json:"mod_id"`
+				SpecID string `json:"spec_id"`
+			}{RunID: runID, ModID: "m2", SpecID: "s2"})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
+			// Minimal RunSummary status response used by the submit command.
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateRunning,
+			})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream with run, stage, and log events.
@@ -220,6 +231,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	args := []string{
 		"--repo-url", "https://example.com/repo.git",
 		"--repo-base-ref", "main",
+		"--repo-target-ref", "feature",
 		"--follow",
 	}
 	if err := executeModRun(args, buf); err != nil {
@@ -267,13 +279,22 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
-			// Server returns 201 Created with canonical submit response.
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			// Server returns 201 Created with {run_id, mod_id, spec_id}.
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
-				RunID  domaintypes.RunID `json:"run_id"`
-				Status string            `json:"status"`
-			}{RunID: domaintypes.RunID(runID), Status: "running"})
+				RunID  string `json:"run_id"`
+				ModID  string `json:"mod_id"`
+				SpecID string `json:"spec_id"`
+			}{RunID: runID, ModID: "m3", SpecID: "s3"})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
+			// Minimal RunSummary status response used by the submit command.
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				RunID: domaintypes.RunID(runID),
+				State: modsapi.RunStateRunning,
+			})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -322,6 +343,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 	args := []string{
 		"--repo-url", "https://example.com/repo.git",
 		"--repo-base-ref", "main",
+		"--repo-target-ref", "feature",
 		"--follow",
 		"--log-format", "raw",
 	}

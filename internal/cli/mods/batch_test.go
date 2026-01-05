@@ -256,19 +256,22 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
-				case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
 					// Decode and verify request body.
 					var req struct {
-						Name      *string `json:"name,omitempty"`
-						RepoURL   string  `json:"repo_url"`
-						BaseRef   string  `json:"base_ref"`
-						TargetRef string  `json:"target_ref"`
+						RepoURL   string `json:"repo_url"`
+						BaseRef   string `json:"base_ref"`
+						TargetRef string `json:"target_ref"`
+						Spec      any    `json:"spec"`
 					}
 					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 						t.Errorf("decode request body: %v", err)
 					}
 					if req.RepoURL != tc.repoURL {
 						t.Errorf("request repo_url = %q, want %q", req.RepoURL, tc.repoURL)
+					}
+					if req.Spec == nil {
+						t.Errorf("request spec should be present")
 					}
 
 					resp := struct {
@@ -306,6 +309,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 				Client:    client,
 				BaseURL:   baseURL,
 				Name:      tc.batchName,
+				Spec:      []byte("{}"),
 				RepoURL:   tc.repoURL,
 				BaseRef:   tc.baseRef,
 				TargetRef: tc.targetRef,
