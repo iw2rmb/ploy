@@ -12,6 +12,84 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+type v1RunFixture struct {
+	Spec    store.Spec
+	Mod     store.Mod
+	ModRepo store.ModRepo
+	Run     store.Run
+	RunRepo store.RunRepo
+}
+
+func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL, baseRef, targetRef string, specJSON []byte) v1RunFixture {
+	t.Helper()
+
+	createdBy := "smoke-test"
+
+	specID := domaintypes.NewSpecID().String()
+	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
+		ID:        specID,
+		Name:      "smoke-workflow",
+		Spec:      specJSON,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateSpec() failed: %v", err)
+	}
+
+	modID := domaintypes.NewModID().String()
+	mod, err := db.CreateMod(ctx, store.CreateModParams{
+		ID:        modID,
+		Name:      "smoke-" + modID,
+		SpecID:    &spec.ID,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	modRepoID := domaintypes.NewModRepoID().String()
+	modRepo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
+		ID:        modRepoID,
+		ModID:     modID,
+		RepoUrl:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateModRepo() failed: %v", err)
+	}
+
+	runID := domaintypes.NewRunID().String()
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		ID:        runID,
+		ModID:     modID,
+		SpecID:    spec.ID,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
+		ModID:         modID,
+		RunID:         runID,
+		RepoID:        modRepoID,
+		RepoBaseRef:   baseRef,
+		RepoTargetRef: targetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunRepo() failed: %v", err)
+	}
+
+	return v1RunFixture{
+		Spec:    spec,
+		Mod:     mod,
+		ModRepo: modRepo,
+		Run:     run,
+		RunRepo: runRepo,
+	}
+}
+
 // TestSmokeWorkflow_EndToEnd validates a complete workflow combining multiple operations:
 // 1. Create run (queued)
 // 2. Create jobs (build, test, deploy)
@@ -39,7 +117,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a run representing a mod execution workflow.
+	// Step 1: Create a v1 run representing a mod execution workflow.
 	modSpec := []byte(`{
 		"type": "smoke-workflow",
 		"image": "docker.io/example/mod-test:latest",
@@ -49,29 +127,26 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 			"profile": "java-maven"
 		}
 	}`)
+	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", "feature/smoke-workflow", modSpec)
+	run := fixture.Run
+	runRepo := fixture.RunRepo
 
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		RepoUrl:   "https://github.com/example/smoke-workflow",
-		Spec:      modSpec,
-		Status:    store.RunStatusQueued,
-		BaseRef:   "main",
-		TargetRef: "feature/smoke-workflow",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
 	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
 
 	// Step 2: Create multiple jobs representing the workflow phases.
 	// Stage 1: Build Gate (pre-validation)
 	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     domaintypes.RunID(run.ID),
-		Name:      "build-gate",
-		Status:    store.JobStatusRunning,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 0,
-		Meta:      []byte(`{"type":"build-gate","profile":"java-maven"}`),
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "build-gate",
+		Status:      store.JobStatusRunning,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   0,
+		Meta:        []byte(`{"type":"build-gate","profile":"java-maven"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(build-gate) failed: %v", err)
@@ -80,13 +155,17 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 2: Main mod execution
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     domaintypes.RunID(run.ID),
-		Name:      "main",
-		Status:    store.JobStatusCreated,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 0,
-		Meta:      []byte(`{"type":"mod","lane":"main"}`),
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "main",
+		Status:      store.JobStatusCreated,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   1,
+		Meta:        []byte(`{"type":"mod","lane":"main"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(main) failed: %v", err)
@@ -95,13 +174,17 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 3: Post-processing (e.g., artifact upload)
 	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     domaintypes.RunID(run.ID),
-		Name:      "post-process",
-		Status:    store.JobStatusCreated,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 0,
-		Meta:      []byte(`{"type":"post-process","action":"upload-artifacts"}`),
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "post-process",
+		Status:      store.JobStatusCreated,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   2,
+		Meta:        []byte(`{"type":"post-process","action":"upload-artifacts"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(post-process) failed: %v", err)
@@ -112,7 +195,8 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Build Gate logs
 	buildGateLog := []byte("INFO: Starting build gate validation\nINFO: Running Maven build\nINFO: Build gate passed\n")
 	log1, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
+		JobID:   &jobBuildGate.ID,
 		ChunkNo: 0,
 		Data:    buildGateLog,
 	})
@@ -124,7 +208,8 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Main job logs
 	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
+		JobID:   &jobMain.ID,
 		ChunkNo: 1,
 		Data:    mainLog,
 	})
@@ -136,7 +221,8 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Post-processing logs
 	postLog := []byte("INFO: Uploading artifacts\nINFO: Artifacts uploaded successfully\n")
 	log3, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
+		JobID:   &jobPost.ID,
 		ChunkNo: 2,
 		Data:    postLog,
 	})
@@ -162,7 +248,7 @@ index abc1234..def5678 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
 		JobID:   &jobMain.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
@@ -177,7 +263,7 @@ index abc1234..def5678 100644
 
 	// Event 1: Run started
 	event1, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now,
 			Valid: true,
@@ -193,7 +279,7 @@ index abc1234..def5678 100644
 
 	// Event 2: Build gate passed
 	event2, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(10 * time.Second),
 			Valid: true,
@@ -209,7 +295,7 @@ index abc1234..def5678 100644
 
 	// Event 3: Main mod completed
 	event3, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(30 * time.Second),
 			Valid: true,
@@ -225,7 +311,7 @@ index abc1234..def5678 100644
 
 	// Event 4: Run completed
 	event4, err := db.CreateEvent(ctx, store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(40 * time.Second),
 			Valid: true,
@@ -243,12 +329,12 @@ index abc1234..def5678 100644
 	// In a real workflow, the runner would update job statuses and then the run status.
 	err = db.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
 		ID:     run.ID,
-		Status: store.RunStatusSucceeded,
+		Status: store.RunStatusFinished,
 	})
 	if err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
 	}
-	t.Logf("✓ Updated run status to succeeded")
+	t.Logf("✓ Updated run status to finished")
 
 	// Step 7: Verify all data is correctly persisted and retrievable.
 	// Verify run retrieval
@@ -256,8 +342,8 @@ index abc1234..def5678 100644
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetchedRun.Status != store.RunStatusSucceeded {
-		t.Errorf("Fetched run status mismatch: expected 'succeeded', got %s", fetchedRun.Status)
+	if fetchedRun.Status != store.RunStatusFinished {
+		t.Errorf("Fetched run status mismatch: expected 'Finished', got %s", fetchedRun.Status)
 	}
 	t.Logf("✓ Verified run status: %s", fetchedRun.Status)
 
@@ -342,7 +428,7 @@ index abc1234..def5678 100644
 
 	// Verify ListEventsByRunSince works correctly
 	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		ID:    event2.ID, // Get events after build-gate-passed
 	})
 	if err != nil {
@@ -382,32 +468,47 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create a run for the healing diff test.
 	modSpec := []byte(`{"type": "healing-test"}`)
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		RepoUrl:   "https://github.com/example/healing-test",
-		Spec:      modSpec,
-		Status:    store.RunStatusQueued,
-		BaseRef:   "main",
-		TargetRef: "feature/healing-test",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/healing-test", "main", "feature/healing-test", modSpec)
+	run := fixture.Run
+	runRepo := fixture.RunRepo
 	t.Logf("✓ Created run: id=%v", run.ID)
 
-	// Create a job.
-	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     domaintypes.RunID(run.ID),
-		Name:      "main",
-		Status:    store.JobStatusRunning,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 0,
-		Meta:      []byte(`{"type":"mod"}`),
+	// Create jobs for step 0 and step 1 so ListDiffsBeforeStep can filter by jobs.step_index.
+	jobStep0, err := db.CreateJob(ctx, store.CreateJobParams{
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "main-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   0,
+		Meta:        []byte(`{"type":"mod"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
 	}
-	t.Logf("✓ Created job: id=%v", job.ID)
+	t.Logf("✓ Created step 0 job: id=%v", jobStep0.ID)
+
+	jobStep1, err := db.CreateJob(ctx, store.CreateJobParams{
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "main-1",
+		Status:      store.JobStatusRunning,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   1,
+		Meta:        []byte(`{"type":"mod"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateJob(step 1) failed: %v", err)
+	}
+	t.Logf("✓ Created step 1 job: id=%v", jobStep1.ID)
 
 	// C2: Create diffs with step_index and mod_type in summary.
 	// Step 0: mod diff + healing diff
@@ -420,8 +521,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 0 mod diff.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
-		JobID:   &job.ID,
+		RunID:   run.ID,
+		JobID:   &jobStep0.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
 		Summary: step0ModSummary,
 	})
@@ -432,8 +533,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 0 healing diff with same step_index.
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
-		JobID:   &job.ID,
+		RunID:   run.ID,
+		JobID:   &jobStep0.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x02},
 		Summary: step0HealSummary,
 	})
@@ -444,8 +545,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 1 mod diff.
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
-		JobID:   &job.ID,
+		RunID:   run.ID,
+		JobID:   &jobStep1.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x03},
 		Summary: step1ModSummary,
 	})
@@ -456,8 +557,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
-		JobID:   &job.ID,
+		RunID:   run.ID,
+		JobID:   &jobStep1.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x04},
 		Summary: step1Heal1Summary,
 	})
@@ -467,8 +568,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 1 healing diff 1: id=%v", step1Heal1Diff.ID)
 
 	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
-		JobID:   &job.ID,
+		RunID:   run.ID,
+		JobID:   &jobStep1.ID,
 		Patch:   []byte{0x1f, 0x8b, 0x05},
 		Summary: step1Heal2Summary,
 	})
@@ -490,7 +591,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// C2: Verify ListDiffsBeforeStep returns correct subset.
 	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).
 	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID:     run.ID,
+		StepIndex: 0,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
@@ -502,7 +604,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Query for step_index <= 1 should return 5 diffs (all).
 	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID:     run.ID,
+		StepIndex: 1,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)

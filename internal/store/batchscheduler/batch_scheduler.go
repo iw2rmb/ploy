@@ -1,12 +1,12 @@
-// Package batchscheduler provides a background worker for scheduling pending repos within batch runs.
+// Package batchscheduler provides a background worker for scheduling queued repos within batch runs.
 //
 // The batch scheduler continuously monitors batch runs (parent runs with associated run_repos)
-// and starts execution for any pending repos. This eliminates the need for manual POST /v1/runs/{id}/start
+// and starts execution for any queued repos. This eliminates the need for manual POST /v1/runs/{id}/start
 // calls and ensures repos are processed automatically after being added to a batch.
 //
 // State transitions:
-//   - Batch run: queued → running (when first repo starts) → succeeded/failed/canceled (when all repos complete)
-//   - Run repo: pending → running (when execution starts) → succeeded/failed/skipped/cancelled (on completion)
+//   - Batch run: Started → Finished/Cancelled (terminal)
+//   - Run repo: Queued → Running → Success/Fail/Cancelled (terminal)
 //
 // The scheduler focuses on per-batch processing without cross-batch FIFO ordering.
 package batchscheduler
@@ -110,10 +110,10 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		return nil
 	}
 
-	// Find batch runs with pending repos.
-	runIDs, err := s.store.ListBatchRunsWithPendingRepos(ctx)
+	// Find runs with queued repos.
+	runIDs, err := s.store.ListRunsWithQueuedRepos(ctx)
 	if err != nil {
-		s.logger.Error("batch-scheduler: failed to list runs with pending repos", "err", err)
+		s.logger.Error("batch-scheduler: failed to list runs with queued repos", "err", err)
 		return nil // Non-fatal; retry on next cycle.
 	}
 

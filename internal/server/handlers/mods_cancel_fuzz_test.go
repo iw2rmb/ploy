@@ -32,7 +32,7 @@ func FuzzCancelRun_Body(f *testing.F) {
 		if useValidID {
 			runID := domaintypes.NewRunID()
 			idStr = runID.String()
-			st.getRunResult = store.Run{ID: runID.String(), Status: store.RunStatusRunning}
+			st.getRunResult = store.Run{ID: runID.String(), Status: store.RunStatusStarted}
 		} else {
 			idStr = "not-a-uuid"
 		}

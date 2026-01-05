@@ -160,22 +160,21 @@ After a batch run completes, you can pull the Mods-generated changes into your l
 repository using `mod run pull`. This command reconstructs the Mods branch locally by
 fetching stored diffs from the control plane and applying them to a new branch.
 
-```bash
-# From a repo that participated in a Mods batch:
-cd service-a
-ploy mod run pull java17-fleet
-```
+	```bash
+	# From a repo that participated in a Mods batch:
+	cd service-a
+	ploy mod run pull 2xK9mNpL2pY6jYk3kQwY6a7HkKk
+	```
 
 **How it works:**
-1. Resolves `<run-name|run-id>` against the current git remote (default: `origin`).
+1. Resolves `<run-id>` against the current git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Fetches the pinned `commit_sha` from the origin remote.
-4. Creates a new branch at that commit using the run's `target_ref`.
+3. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
+4. Creates a new branch at the fetched commit using the run's `target_ref`.
 5. Downloads and applies all stored Mods diffs via `git apply`.
 
 **Arguments:**
-- `<run-name|run-id>` — The batch name (passed via `--name`) or run ID (KSUID string).
-  When multiple runs match the same name, the most recent one is selected.
+- `<run-id>` — Run ID (KSUID string).
 
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
@@ -185,22 +184,22 @@ ploy mod run pull java17-fleet
 
 **Examples:**
 
-```bash
-# Pull changes from a named batch run.
-ploy mod run pull java17-fleet
-
-# Preview what would be pulled without making changes.
-ploy mod run pull --dry-run my-batch
-
-# Pull from a run using a specific remote.
-ploy mod run pull --origin upstream 2xK9mNpL
-```
+	```bash
+	# Pull changes from a run ID.
+	ploy mod run pull 2xK9mNpL2pY6jYk3kQwY6a7HkKk
+	
+	# Preview what would be pulled without making changes.
+	ploy mod run pull --dry-run 2xK9mNpL2pY6jYk3kQwY6a7HkKk
+	
+	# Pull from a run using a specific remote.
+	ploy mod run pull --origin upstream 2xK9mNpL2pY6jYk3kQwY6a7HkKk
+	```
 
 **Requirements:**
 - Must be run inside a git repository.
 - Working tree must be clean (commit or stash changes first).
 - The origin remote URL must match the `repo_url` used when the run was created.
-- The run must have completed execution (`execution_run_id` must be set).
+- The run must exist and have diffs available.
 
 ---
 
@@ -220,8 +219,8 @@ The command handles the following server responses:
 - **409 Conflict**: Run state is not resumable (e.g., already succeeded).
 - **400 Bad Request**: Invalid run ID format.
 
-Only runs in `failed` or `canceled` state can be resumed. Succeeded runs
-cannot be resumed since there are no jobs to requeue.
+Only runs in `Finished` or `Cancelled` state can be resumed. `Started` runs
+return 200 OK (idempotent).
 
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and

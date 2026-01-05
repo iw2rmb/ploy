@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 // RepoSummary represents a repository with its last run metadata.
 // Used in the GET /v1/repos response to show known repositories.
 type RepoSummary struct {
+	RepoID     string     `json:"repo_id"`
 	RepoURL    string     `json:"repo_url"`
 	LastRunAt  *time.Time `json:"last_run_at,omitempty"`
 	LastStatus *string    `json:"last_status,omitempty"`
@@ -38,7 +38,7 @@ type RepoSummary struct {
 // Used in the GET /v1/repos/{repo_id}/runs response.
 type RepoRunSummary struct {
 	RunID      domaintypes.RunID `json:"run_id"`
-	Name       *string           `json:"name,omitempty"`
+	ModID      string            `json:"mod_id"`
 	RunStatus  string            `json:"run_status"`
 	RepoStatus string            `json:"repo_status"`
 	BaseRef    string            `json:"base_ref"`
@@ -46,10 +46,6 @@ type RepoRunSummary struct {
 	Attempt    int32             `json:"attempt"`
 	StartedAt  *time.Time        `json:"started_at,omitempty"`
 	FinishedAt *time.Time        `json:"finished_at,omitempty"`
-	// ExecutionRunID is the child execution run id (KSUID-backed string) for this repo
-	// within the batch. It links to the Mods run that was created to process this repo.
-	// Used by `ploy mod run pull` to fetch diffs and status for the specific repo execution.
-	ExecutionRunID *string `json:"execution_run_id,omitempty"`
 }
 
 // -------------------------------------------------------------------------
@@ -78,6 +74,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoSummary, 0, len(repos))
 		for _, repo := range repos {
 			summary := RepoSummary{
+				RepoID:  repo.RepoID,
 				RepoURL: repo.RepoUrl,
 			}
 			// Include last run timing if available.
@@ -86,9 +83,17 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 				summary.LastRunAt = &t
 			}
 			// Include last status if the row has a valid status.
-			if repo.LastStatus != "" {
-				s := string(repo.LastStatus)
-				summary.LastStatus = &s
+			if repo.LastStatus != nil {
+				switch v := repo.LastStatus.(type) {
+				case string:
+					if v != "" {
+						summary.LastStatus = &v
+					}
+				case []byte:
+					if s := string(v); s != "" {
+						summary.LastStatus = &s
+					}
+				}
 			}
 			summaries = append(summaries, summary)
 		}
@@ -111,34 +116,20 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 // listRunsForRepoHandler returns an HTTP handler that lists runs for a given repository.
 // GET /v1/repos/{repo_id}/runs — Returns runs associated with the repo_url.
 // Path parameters:
-//   - repo_id: URL-encoded repository URL (e.g., https%3A%2F%2Fgithub.com%2Forg%2Frepo.git)
+//   - repo_id: repository identifier (mod_repos.id, NanoID string)
 //
 // Query parameters:
 //   - limit: max number of runs to return (default 50, max 100)
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the repo ID (URL-encoded repo_url) from the path.
-		repoIDEncoded, err := requiredPathParam(r, "repo_id")
+		repoID, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// URL-decode the repo_id to get the original repo_url.
-		repoURL, err := url.PathUnescape(repoIDEncoded)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid repo_id encoding: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// Validate that the decoded URL is a valid RepoURL according to domain rules.
-		if repoURL == "" {
+		if repoID == "" {
 			http.Error(w, "repo_id cannot be empty", http.StatusBadRequest)
-			return
-		}
-		if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
-			http.Error(w, "repo_id must be a valid repository URL", http.StatusBadRequest)
 			return
 		}
 
@@ -170,13 +161,13 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Fetch runs for this repository from the store.
 		runs, err := st.ListRunsForRepo(r.Context(), store.ListRunsForRepoParams{
-			RepoUrl: repoURL,
-			Lim:     limit,
-			Off:     offset,
+			RepoID: repoID,
+			Limit:  limit,
+			Offset: offset,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list runs for repo: %v", err), http.StatusInternalServerError)
-			slog.Error("list runs for repo: fetch failed", "err", err, "repo_url", repoURL)
+			slog.Error("list runs for repo: fetch failed", "err", err, "repo_id", repoID)
 			return
 		}
 
@@ -184,14 +175,13 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:          run.RunID,
-				Name:           run.Name,
-				RunStatus:      string(run.RunStatus),
-				RepoStatus:     string(run.RepoStatus),
-				BaseRef:        run.BaseRef,
-				TargetRef:      run.TargetRef,
-				Attempt:        run.Attempt,
-				ExecutionRunID: run.ExecutionRunID, // Nullable; populated when execution started.
+				RunID:      domaintypes.RunID(run.RunID),
+				ModID:      run.ModID,
+				RunStatus:  string(run.RunStatus),
+				RepoStatus: string(run.RepoStatus),
+				BaseRef:    run.RepoBaseRef,
+				TargetRef:  run.RepoTargetRef,
+				Attempt:    run.Attempt,
 			}
 			if run.StartedAt.Valid {
 				t := run.StartedAt.Time

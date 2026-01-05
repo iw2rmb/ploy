@@ -1,31 +1,29 @@
 -- name: GetRun :one
-SELECT * FROM runs
+SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+FROM runs
 WHERE id = $1;
 
 -- name: ListRuns :many
-SELECT * FROM runs
+SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+FROM runs
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CreateRun :one
--- Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
--- Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
-INSERT INTO runs (id, name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING *;
+-- v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
+-- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
+INSERT INTO runs (id, mod_id, spec_id, created_by, status, started_at)
+VALUES ($1, $2, $3, $4, 'Started', now())
+RETURNING id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats;
 
 -- name: UpdateRunStatus :exec
 UPDATE runs
-SET status = $2, finished_at = $3
+SET status = $2,
+    finished_at = CASE
+      WHEN $2 IN ('Cancelled', 'Finished') THEN COALESCE(finished_at, now())
+      ELSE NULL
+    END
 WHERE id = $1;
-
--- name: AckRunStart :exec
--- Transitions run status to 'running' when execution starts.
--- Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
--- the first job starts execution.
-UPDATE runs
-SET status = 'running'
-WHERE id = $1 AND status IN ('assigned', 'queued');
 
 -- name: UpdateRunCompletion :exec
 UPDATE runs
@@ -49,12 +47,12 @@ WHERE id = $1;
 -- name: UpdateRunStatsMRURL :exec
 -- Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
 -- Preserves existing stats and metadata keys via JSONB merge.
-UPDATE runs
-SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
-    'metadata',
-    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', $2)
-)
-WHERE id = $1;
+	UPDATE runs
+	SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
+	    'metadata',
+	    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', sqlc.arg(mr_url))
+	)
+	WHERE id = $1;
 
 -- name: GetRunTiming :one
 SELECT id,

@@ -68,21 +68,17 @@ func handleRunList(args []string, stderr io.Writer) error {
 
 	// Print results in tabular format.
 	tw := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tREPOS\tDERIVED STATUS")
+	_, _ = fmt.Fprintln(tw, "ID\tSTATUS\tMOD\tSPEC\tREPOS\tDERIVED STATUS")
 	for _, b := range batches {
-		name := "-"
-		if b.Name != nil && *b.Name != "" {
-			name = *b.Name
-		}
 		repos := "-"
 		derived := "-"
 		if b.Counts != nil {
 			// Format repo counts as: succeeded/total (e.g., "3/5").
-			repos = fmt.Sprintf("%d/%d", b.Counts.Succeeded, b.Counts.Total)
+			repos = fmt.Sprintf("%d/%d", b.Counts.Success, b.Counts.Total)
 			derived = b.Counts.DerivedStatus
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			b.ID, name, b.Status, repos, derived)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			b.ID, b.Status, b.ModID, b.SpecID, repos, derived)
 	}
 	_ = tw.Flush()
 	return nil

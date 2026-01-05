@@ -31,10 +31,20 @@ func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
 	run store.Run,
-	runID domaintypes.RunID, // KSUID-backed string ID after run ID migration.
+	runID string,
+	repoID string,
+	attempt int32,
 	failedStepIndex domaintypes.StepIndex,
-	jobs []store.Job,
 ) error {
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: attempt,
+	})
+	if err != nil {
+		return fmt.Errorf("list jobs for repo attempt: %w", err)
+	}
+
 	// Find the failed gate job by step_index.
 	var failedJob *store.Job
 	for i := range jobs {
@@ -64,8 +74,11 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	// Parse run spec to get healing configuration.
-	spec, err := contracts.ParseModsSpecJSON(run.Spec)
+	specRow, err := st.GetSpec(ctx, run.SpecID)
+	if err != nil {
+		return fmt.Errorf("get spec: %w", err)
+	}
+	spec, err := contracts.ParseModsSpecJSON(specRow.Spec)
 	if err != nil {
 		return fmt.Errorf("parse run spec: %w", err)
 	}
@@ -75,7 +88,7 @@ func maybeCreateHealingJobs(
 		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
 			"run_id", runID,
 		)
-		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
+		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, repoID, attempt, failedStepIndex); err != nil {
 			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing configured",
 				"run_id", runID,
 				"failed_step_index", failedStepIndex,
@@ -191,7 +204,7 @@ func maybeCreateHealingJobs(
 		// all remaining non-terminal jobs for the run so the control plane
 		// can derive a terminal run state and avoid leaving mods/post-gate
 		// jobs stranded in created/pending state.
-		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, failedStepIndex, jobs); err != nil {
+		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, repoID, attempt, failedStepIndex); err != nil {
 			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs after exhausted healing",
 				"run_id", runID,
 				"failed_step_index", failedStepIndex,
@@ -239,14 +252,17 @@ func maybeCreateHealingJobs(
 	// Create a single healing job for this attempt.
 	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:        string(domaintypes.NewJobID()),
-		RunID:     runID,
-		Name:      healJobName,
-		ModType:   domaintypes.ModTypeHeal.String(),
-		ModImage:  modImage,
-		Status:    store.JobStatusPending,
-		StepIndex: healStepIndex,
-		Meta:      []byte(`{}`),
+		ID:          string(domaintypes.NewJobID()),
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     attempt,
+		Name:        healJobName,
+		ModType:     domaintypes.ModTypeHeal.String(),
+		ModImage:    modImage,
+		Status:      store.JobStatusQueued,
+		StepIndex:   healStepIndex,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		return fmt.Errorf("create healing job %s: %w", healJobName, err)
@@ -256,21 +272,24 @@ func maybeCreateHealingJobs(
 		"run_id", runID,
 		"job_name", healJobName,
 		"step_index", healStepIndex,
-		"status", store.JobStatusPending,
+		"status", store.JobStatusQueued,
 		"image", modImage,
 	)
 
 	// Create a single re-gate job for this attempt.
 	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:        string(domaintypes.NewJobID()),
-		RunID:     runID,
-		Name:      reGateName,
-		ModType:   domaintypes.ModTypeReGate.String(),
-		ModImage:  "",
-		Status:    store.JobStatusCreated,
-		StepIndex: reGateStepIndex,
-		Meta:      []byte(`{}`),
+		ID:          string(domaintypes.NewJobID()),
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     attempt,
+		Name:        reGateName,
+		ModType:     domaintypes.ModTypeReGate.String(),
+		ModImage:    "",
+		Status:      store.JobStatusCreated,
+		StepIndex:   reGateStepIndex,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job %s: %w", reGateName, err)
@@ -293,11 +312,21 @@ func maybeCreateHealingJobs(
 func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
-	runID domaintypes.RunID, // KSUID-backed string ID after run ID migration.
+	runID string,
+	repoID string,
+	attempt int32,
 	failedStepIndex domaintypes.StepIndex,
-	jobs []store.Job,
 ) error {
 	now := time.Now().UTC()
+
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: attempt,
+	})
+	if err != nil {
+		return fmt.Errorf("list jobs for repo attempt: %w", err)
+	}
 
 	for _, job := range jobs {
 		if job.StepIndex <= float64(failedStepIndex) {
@@ -305,7 +334,7 @@ func cancelRemainingJobsAfterFailure(
 		}
 
 		switch job.Status {
-		case store.JobStatusSucceeded, store.JobStatusFailed, store.JobStatusCanceled, store.JobStatusSkipped:
+		case store.JobStatusSuccess, store.JobStatusFail, store.JobStatusCancelled:
 			continue
 		}
 
@@ -325,7 +354,7 @@ func cancelRemainingJobsAfterFailure(
 
 		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
 			ID:         job.ID,
-			Status:     store.JobStatusCanceled,
+			Status:     store.JobStatusCancelled,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 			DurationMs: durationMs,

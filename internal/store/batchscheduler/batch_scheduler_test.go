@@ -16,14 +16,14 @@ import (
 // Uses string IDs (KSUID-backed) per the KSUID migration.
 type mockStore struct {
 	store.Store
-	listRunsWithPendingReposResult []string
-	listRunsWithPendingReposErr    error
-	listRunsWithPendingReposCalled bool
+	listRunsWithQueuedReposResult []string
+	listRunsWithQueuedReposErr    error
+	listRunsWithQueuedReposCalled bool
 }
 
-func (m *mockStore) ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, error) {
-	m.listRunsWithPendingReposCalled = true
-	return m.listRunsWithPendingReposResult, m.listRunsWithPendingReposErr
+func (m *mockStore) ListRunsWithQueuedRepos(ctx context.Context) ([]string, error) {
+	m.listRunsWithQueuedReposCalled = true
+	return m.listRunsWithQueuedReposResult, m.listRunsWithQueuedReposErr
 }
 
 func (m *mockStore) Close() {}
@@ -159,7 +159,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("no runs with pending repos", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []string{},
+			listRunsWithQueuedReposResult: []string{},
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -175,8 +175,8 @@ func TestScheduler_Run(t *testing.T) {
 			t.Errorf("expected no error, got %v", err)
 		}
 
-		if !mockSt.listRunsWithPendingReposCalled {
-			t.Error("expected ListBatchRunsWithPendingRepos to be called")
+		if !mockSt.listRunsWithQueuedReposCalled {
+			t.Error("expected ListRunsWithQueuedRepos to be called")
 		}
 
 		if len(mockStarter.startCalls) != 0 {
@@ -190,7 +190,7 @@ func TestScheduler_Run(t *testing.T) {
 		runID2 := newTestKSUID()
 
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []string{runID1, runID2},
+			listRunsWithQueuedReposResult: []string{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()
@@ -233,7 +233,7 @@ func TestScheduler_Run(t *testing.T) {
 		runID2 := newTestKSUID()
 
 		mockSt := &mockStore{
-			listRunsWithPendingReposResult: []string{runID1, runID2},
+			listRunsWithQueuedReposResult: []string{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()
@@ -261,7 +261,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("handles list error gracefully", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithPendingReposErr: errors.New("database error"),
+			listRunsWithQueuedReposErr: errors.New("database error"),
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -279,8 +279,8 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		// List was called but no starts should happen.
-		if !mockSt.listRunsWithPendingReposCalled {
-			t.Error("expected ListBatchRunsWithPendingRepos to be called")
+		if !mockSt.listRunsWithQueuedReposCalled {
+			t.Error("expected ListRunsWithQueuedRepos to be called")
 		}
 		if len(mockStarter.startCalls) != 0 {
 			t.Errorf("expected no StartPendingRepos calls, got %d", len(mockStarter.startCalls))

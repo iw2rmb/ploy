@@ -11,19 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const clearRunRepoExecutionRun = `-- name: ClearRunRepoExecutionRun :exec
-UPDATE run_repos
-SET execution_run_id = NULL
-WHERE id = $1
-`
-
-// Clears the execution_run_id for a run_repo (e.g., when restarting).
-// Also called by IncrementRunRepoAttempt to prepare for a new execution.
-func (q *Queries) ClearRunRepoExecutionRun(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, clearRunRepoExecutionRun, id)
-	return err
-}
-
 const countRunReposByStatus = `-- name: CountRunReposByStatus :many
 SELECT status, COUNT(*)::int AS count
 FROM run_repos
@@ -36,8 +23,6 @@ type CountRunReposByStatusRow struct {
 	Count  int32         `json:"count"`
 }
 
-// Aggregates run_repos counts by status for a given run.
-// Used to derive batch-level status (e.g., all succeeded = batch succeeded).
 func (q *Queries) CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error) {
 	rows, err := q.db.Query(ctx, countRunReposByStatus, runID)
 	if err != nil {
@@ -59,41 +44,39 @@ func (q *Queries) CountRunReposByStatus(ctx context.Context, runID string) ([]Co
 }
 
 const createRunRepo = `-- name: CreateRunRepo :one
-INSERT INTO run_repos (id, run_id, repo_url, base_ref, target_ref, status)
-VALUES ($1, $2, $3, $4, $5, 'pending')
-RETURNING id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at
+INSERT INTO run_repos (mod_id, run_id, repo_id, repo_base_ref, repo_target_ref)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 `
 
 type CreateRunRepoParams struct {
-	ID        string `json:"id"`
-	RunID     string `json:"run_id"`
-	RepoUrl   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	ModID         string `json:"mod_id"`
+	RunID         string `json:"run_id"`
+	RepoID        string `json:"repo_id"`
+	RepoBaseRef   string `json:"repo_base_ref"`
+	RepoTargetRef string `json:"repo_target_ref"`
 }
 
-// Creates a new run_repo entry for batched runs.
-// Each run_repo represents one repository within a batch (parent run).
-// The id parameter is a NanoID-backed string generated via NewRunRepoID().
+// v1: Creates a new run_repos row scoped to (run_id, repo_id).
+// Note: attempt defaults to 1; status defaults to 'Queued'.
 func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, createRunRepo,
-		arg.ID,
+		arg.ModID,
 		arg.RunID,
-		arg.RepoUrl,
-		arg.BaseRef,
-		arg.TargetRef,
+		arg.RepoID,
+		arg.RepoBaseRef,
+		arg.RepoTargetRef,
 	)
 	var i RunRepo
 	err := row.Scan(
-		&i.ID,
+		&i.ModID,
 		&i.RunID,
-		&i.RepoUrl,
-		&i.BaseRef,
-		&i.TargetRef,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.RepoTargetRef,
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
-		&i.ExecutionRunID,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -103,59 +86,42 @@ func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (R
 
 const deleteRunRepo = `-- name: DeleteRunRepo :exec
 DELETE FROM run_repos
-WHERE id = $1
+WHERE run_id = $1 AND repo_id = $2
 `
 
-func (q *Queries) DeleteRunRepo(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteRunRepo, id)
+type DeleteRunRepoParams struct {
+	RunID  string `json:"run_id"`
+	RepoID string `json:"repo_id"`
+}
+
+func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error {
+	_, err := q.db.Exec(ctx, deleteRunRepo, arg.RunID, arg.RepoID)
 	return err
 }
 
 const getRunRepo = `-- name: GetRunRepo :one
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
-WHERE id = $1
+SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+FROM run_repos
+WHERE run_id = $1 AND repo_id = $2
 `
 
-func (q *Queries) GetRunRepo(ctx context.Context, id string) (RunRepo, error) {
-	row := q.db.QueryRow(ctx, getRunRepo, id)
-	var i RunRepo
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.RepoUrl,
-		&i.BaseRef,
-		&i.TargetRef,
-		&i.Status,
-		&i.Attempt,
-		&i.LastError,
-		&i.ExecutionRunID,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.FinishedAt,
-	)
-	return i, err
+type GetRunRepoParams struct {
+	RunID  string `json:"run_id"`
+	RepoID string `json:"repo_id"`
 }
 
-const getRunRepoByExecutionRun = `-- name: GetRunRepoByExecutionRun :one
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
-WHERE execution_run_id = $1
-`
-
-// Finds the run_repo entry linked to a given execution run.
-// Used by completion callbacks to update repo status when execution completes.
-func (q *Queries) GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (RunRepo, error) {
-	row := q.db.QueryRow(ctx, getRunRepoByExecutionRun, executionRunID)
+func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error) {
+	row := q.db.QueryRow(ctx, getRunRepo, arg.RunID, arg.RepoID)
 	var i RunRepo
 	err := row.Scan(
-		&i.ID,
+		&i.ModID,
 		&i.RunID,
-		&i.RepoUrl,
-		&i.BaseRef,
-		&i.TargetRef,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.RepoTargetRef,
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
-		&i.ExecutionRunID,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -166,36 +132,182 @@ func (q *Queries) GetRunRepoByExecutionRun(ctx context.Context, executionRunID *
 const incrementRunRepoAttempt = `-- name: IncrementRunRepoAttempt :exec
 UPDATE run_repos
 SET attempt = attempt + 1,
-    status = 'pending',
+    status = 'Queued',
     last_error = NULL,
-    execution_run_id = NULL,
     started_at = NULL,
     finished_at = NULL
-WHERE id = $1
+WHERE run_id = $1 AND repo_id = $2
 `
 
-// Increments the attempt counter and resets status to 'pending' for retry.
-// Clears timing fields and execution_run_id to prepare for a fresh execution attempt.
-func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, incrementRunRepoAttempt, id)
+type IncrementRunRepoAttemptParams struct {
+	RunID  string `json:"run_id"`
+	RepoID string `json:"repo_id"`
+}
+
+// Increments attempt and resets status/timing for a fresh repo execution attempt.
+func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error {
+	_, err := q.db.Exec(ctx, incrementRunRepoAttempt, arg.RunID, arg.RepoID)
 	return err
 }
 
-const listBatchRunsWithPendingRepos = `-- name: ListBatchRunsWithPendingRepos :many
+const listQueuedRunReposByRun = `-- name: ListQueuedRunReposByRun :many
+SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+FROM run_repos
+WHERE run_id = $1 AND status = 'Queued'
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
+	rows, err := q.db.Query(ctx, listQueuedRunReposByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RunRepo{}
+	for rows.Next() {
+		var i RunRepo
+		if err := rows.Scan(
+			&i.ModID,
+			&i.RunID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.RepoTargetRef,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunReposByRun = `-- name: ListRunReposByRun :many
+SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+FROM run_repos
+WHERE run_id = $1
+ORDER BY created_at ASC
+`
+
+// Lists all repos associated with a run, ordered by creation time.
+func (q *Queries) ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
+	rows, err := q.db.Query(ctx, listRunReposByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RunRepo{}
+	for rows.Next() {
+		var i RunRepo
+		if err := rows.Scan(
+			&i.ModID,
+			&i.RunID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.RepoTargetRef,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsForRepo = `-- name: ListRunsForRepo :many
+SELECT
+  r.id AS run_id,
+  r.mod_id,
+  r.status AS run_status,
+  rr.status AS repo_status,
+  rr.repo_base_ref,
+  rr.repo_target_ref,
+  rr.attempt,
+  rr.started_at,
+  rr.finished_at
+FROM run_repos rr
+JOIN runs r ON rr.run_id = r.id
+WHERE rr.repo_id = $1
+ORDER BY rr.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListRunsForRepoParams struct {
+	RepoID string `json:"repo_id"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+}
+
+type ListRunsForRepoRow struct {
+	RunID         string             `json:"run_id"`
+	ModID         string             `json:"mod_id"`
+	RunStatus     RunStatus          `json:"run_status"`
+	RepoStatus    RunRepoStatus      `json:"repo_status"`
+	RepoBaseRef   string             `json:"repo_base_ref"`
+	RepoTargetRef string             `json:"repo_target_ref"`
+	Attempt       int32              `json:"attempt"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
+}
+
+// Lists runs for a given repo_id (mod_repos.id).
+func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
+	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunsForRepoRow{}
+	for rows.Next() {
+		var i ListRunsForRepoRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.ModID,
+			&i.RunStatus,
+			&i.RepoStatus,
+			&i.RepoBaseRef,
+			&i.RepoTargetRef,
+			&i.Attempt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsWithQueuedRepos = `-- name: ListRunsWithQueuedRepos :many
 SELECT DISTINCT r.id
 FROM runs r
-INNER JOIN run_repos rr ON r.id = rr.run_id
-WHERE r.status IN ('queued', 'assigned', 'running')
-  AND rr.status = 'pending'
+JOIN run_repos rr ON r.id = rr.run_id
+WHERE r.status = 'Started'
+  AND rr.status = 'Queued'
 ORDER BY r.id
 `
 
-// Lists batch runs that have at least one pending run_repo entry.
-// Used by the batch scheduler to find runs that need repos to be started.
-// Returns distinct run IDs for runs in non-terminal states (queued, assigned, running)
-// that have pending repos ready for execution.
-func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, listBatchRunsWithPendingRepos)
+// Lists runs that have queued work (at least one Queued run_repos row).
+func (q *Queries) ListRunsWithQueuedRepos(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRunsWithQueuedRepos)
 	if err != nil {
 		return nil, err
 	}
@@ -214,275 +326,66 @@ func (q *Queries) ListBatchRunsWithPendingRepos(ctx context.Context) ([]string, 
 	return items, nil
 }
 
-const listDistinctRepos = `-- name: ListDistinctRepos :many
-SELECT DISTINCT ON (rr.repo_url)
-    rr.repo_url,
-    rr.started_at AS last_run_at,
-    rr.status AS last_status
-FROM run_repos rr
-WHERE
-    -- Optional substring filter: if @filter is NULL or empty, match all.
-    ($1::text IS NULL OR $1 = '' OR rr.repo_url ILIKE '%' || $1 || '%')
-ORDER BY rr.repo_url, rr.started_at DESC NULLS LAST
-`
-
-type ListDistinctReposRow struct {
-	RepoUrl    string             `json:"repo_url"`
-	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
-	LastStatus RunRepoStatus      `json:"last_status"`
-}
-
-// Lists distinct repository URLs from run_repos with optional substring filter.
-// Returns repo_url along with the most recent run timestamp and status for each repo.
-// Used by GET /v1/repos to provide a repo-centric view of batch activity.
-func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error) {
-	rows, err := q.db.Query(ctx, listDistinctRepos, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDistinctReposRow{}
-	for rows.Next() {
-		var i ListDistinctReposRow
-		if err := rows.Scan(&i.RepoUrl, &i.LastRunAt, &i.LastStatus); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPendingRunReposByRun = `-- name: ListPendingRunReposByRun :many
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
-WHERE run_id = $1 AND status = 'pending'
-ORDER BY created_at ASC
-`
-
-// Lists all pending repos for a run (batch), ordered by creation time.
-// Used by the batch orchestrator to find repos ready to start execution.
-func (q *Queries) ListPendingRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
-	rows, err := q.db.Query(ctx, listPendingRunReposByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []RunRepo{}
-	for rows.Next() {
-		var i RunRepo
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.RepoUrl,
-			&i.BaseRef,
-			&i.TargetRef,
-			&i.Status,
-			&i.Attempt,
-			&i.LastError,
-			&i.ExecutionRunID,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRunReposByRun = `-- name: ListRunReposByRun :many
-SELECT id, run_id, repo_url, base_ref, target_ref, status, attempt, last_error, execution_run_id, created_at, started_at, finished_at FROM run_repos
-WHERE run_id = $1
-ORDER BY created_at ASC
-`
-
-// Lists all repos associated with a run (batch), ordered by creation time.
-func (q *Queries) ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
-	rows, err := q.db.Query(ctx, listRunReposByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []RunRepo{}
-	for rows.Next() {
-		var i RunRepo
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.RepoUrl,
-			&i.BaseRef,
-			&i.TargetRef,
-			&i.Status,
-			&i.Attempt,
-			&i.LastError,
-			&i.ExecutionRunID,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRunsForRepo = `-- name: ListRunsForRepo :many
-SELECT
-    r.id AS run_id,
-    r.name,
-    r.status AS run_status,
-    rr.status AS repo_status,
-    rr.base_ref,
-    rr.target_ref,
-    rr.attempt,
-    rr.started_at,
-    rr.finished_at,
-    rr.execution_run_id
-FROM run_repos rr
-INNER JOIN runs r ON rr.run_id = r.id
-WHERE rr.repo_url = $1
-ORDER BY rr.created_at DESC
-LIMIT $3
-OFFSET $2
-`
-
-type ListRunsForRepoParams struct {
-	RepoUrl string `json:"repo_url"`
-	Off     int32  `json:"off"`
-	Lim     int32  `json:"lim"`
-}
-
-type ListRunsForRepoRow struct {
-	RunID          string             `json:"run_id"`
-	Name           *string            `json:"name"`
-	RunStatus      RunStatus          `json:"run_status"`
-	RepoStatus     RunRepoStatus      `json:"repo_status"`
-	BaseRef        string             `json:"base_ref"`
-	TargetRef      string             `json:"target_ref"`
-	Attempt        int32              `json:"attempt"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
-	ExecutionRunID *string            `json:"execution_run_id"`
-}
-
-// Lists all runs (via run_repos) for a given repository URL.
-// Returns run details joined with run_repo status and timing for repo-centric view.
-// Used by GET /v1/repos/{repo_id}/runs to show run history for a specific repo.
-// The execution_run_id field links to the child Mods run for this repo within the batch.
-func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
-	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoUrl, arg.Off, arg.Lim)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListRunsForRepoRow{}
-	for rows.Next() {
-		var i ListRunsForRepoRow
-		if err := rows.Scan(
-			&i.RunID,
-			&i.Name,
-			&i.RunStatus,
-			&i.RepoStatus,
-			&i.BaseRef,
-			&i.TargetRef,
-			&i.Attempt,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.ExecutionRunID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const setRunRepoExecutionRun = `-- name: SetRunRepoExecutionRun :exec
-UPDATE run_repos
-SET execution_run_id = $2,
-    status = 'running',
-    started_at = CASE WHEN started_at IS NULL THEN now() ELSE started_at END
-WHERE id = $1
-`
-
-type SetRunRepoExecutionRunParams struct {
-	ID             string  `json:"id"`
-	ExecutionRunID *string `json:"execution_run_id"`
-}
-
-// Links a run_repo to its child execution run and transitions status to 'running'.
-// Called when starting execution for a repo entry within a batch.
-func (q *Queries) SetRunRepoExecutionRun(ctx context.Context, arg SetRunRepoExecutionRunParams) error {
-	_, err := q.db.Exec(ctx, setRunRepoExecutionRun, arg.ID, arg.ExecutionRunID)
-	return err
-}
-
 const updateRunRepoError = `-- name: UpdateRunRepoError :exec
 UPDATE run_repos
-SET last_error = $2
-WHERE id = $1
+SET last_error = $3
+WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoErrorParams struct {
-	ID        string  `json:"id"`
+	RunID     string  `json:"run_id"`
+	RepoID    string  `json:"repo_id"`
 	LastError *string `json:"last_error"`
 }
 
-// Updates a run_repo's last_error field (e.g., on failure).
 func (q *Queries) UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error {
-	_, err := q.db.Exec(ctx, updateRunRepoError, arg.ID, arg.LastError)
+	_, err := q.db.Exec(ctx, updateRunRepoError, arg.RunID, arg.RepoID, arg.LastError)
 	return err
 }
 
 const updateRunRepoRefs = `-- name: UpdateRunRepoRefs :exec
 UPDATE run_repos
-SET base_ref = $2,
-    target_ref = $3
-WHERE id = $1
+SET repo_base_ref = $3,
+    repo_target_ref = $4
+WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoRefsParams struct {
-	ID        string `json:"id"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	RunID         string `json:"run_id"`
+	RepoID        string `json:"repo_id"`
+	RepoBaseRef   string `json:"repo_base_ref"`
+	RepoTargetRef string `json:"repo_target_ref"`
 }
 
-// Updates a run_repo's base_ref and target_ref (e.g., when restarting with new refs).
+// Updates snapshot refs for the run repo (used when restarting with new refs).
 func (q *Queries) UpdateRunRepoRefs(ctx context.Context, arg UpdateRunRepoRefsParams) error {
-	_, err := q.db.Exec(ctx, updateRunRepoRefs, arg.ID, arg.BaseRef, arg.TargetRef)
+	_, err := q.db.Exec(ctx, updateRunRepoRefs,
+		arg.RunID,
+		arg.RepoID,
+		arg.RepoBaseRef,
+		arg.RepoTargetRef,
+	)
 	return err
 }
 
 const updateRunRepoStatus = `-- name: UpdateRunRepoStatus :exec
 UPDATE run_repos
-SET status = $2,
-    started_at = CASE WHEN $2 = 'running' AND started_at IS NULL THEN now() ELSE started_at END,
-    finished_at = CASE WHEN $2 IN ('succeeded', 'failed', 'skipped', 'cancelled') THEN now() ELSE finished_at END
-WHERE id = $1
+SET status = $3,
+    started_at = CASE WHEN $3 = 'Running' AND started_at IS NULL THEN now() ELSE started_at END,
+    finished_at = CASE WHEN $3 IN ('Success', 'Fail', 'Cancelled') THEN COALESCE(finished_at, now()) ELSE finished_at END
+WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoStatusParams struct {
-	ID     string        `json:"id"`
+	RunID  string        `json:"run_id"`
+	RepoID string        `json:"repo_id"`
 	Status RunRepoStatus `json:"status"`
 }
 
-// Updates a run_repo's status along with timing fields.
-// started_at is set when transitioning to 'running'.
-// finished_at is set when transitioning to a terminal status.
+// Updates repo status + timing fields.
+// started_at: set when transitioning to Running.
+// finished_at: set when transitioning to a terminal status.
 func (q *Queries) UpdateRunRepoStatus(ctx context.Context, arg UpdateRunRepoStatusParams) error {
-	_, err := q.db.Exec(ctx, updateRunRepoStatus, arg.ID, arg.Status)
+	_, err := q.db.Exec(ctx, updateRunRepoStatus, arg.RunID, arg.RepoID, arg.Status)
 	return err
 }

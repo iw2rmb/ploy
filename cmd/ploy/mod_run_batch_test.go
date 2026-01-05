@@ -29,58 +29,50 @@ func TestRunListCallsControlPlane(t *testing.T) {
 				t.Errorf("expected offset=5, got %s", offset)
 			}
 
-			name := "test-batch"
 			now := time.Now()
 			resp := struct {
 				Runs []struct {
 					ID        string    `json:"id"`
-					Name      *string   `json:"name,omitempty"`
 					Status    string    `json:"status"`
-					RepoURL   string    `json:"repo_url"`
-					BaseRef   string    `json:"base_ref"`
-					TargetRef string    `json:"target_ref"`
+					ModID     string    `json:"mod_id"`
+					SpecID    string    `json:"spec_id"`
 					CreatedAt time.Time `json:"created_at"`
 					Counts    *struct {
 						Total         int32  `json:"total"`
-						Succeeded     int32  `json:"succeeded"`
+						Success       int32  `json:"success"`
 						DerivedStatus string `json:"derived_status"`
 					} `json:"repo_counts,omitempty"`
 				} `json:"runs"`
 			}{
 				Runs: []struct {
 					ID        string    `json:"id"`
-					Name      *string   `json:"name,omitempty"`
 					Status    string    `json:"status"`
-					RepoURL   string    `json:"repo_url"`
-					BaseRef   string    `json:"base_ref"`
-					TargetRef string    `json:"target_ref"`
+					ModID     string    `json:"mod_id"`
+					SpecID    string    `json:"spec_id"`
 					CreatedAt time.Time `json:"created_at"`
 					Counts    *struct {
 						Total         int32  `json:"total"`
-						Succeeded     int32  `json:"succeeded"`
+						Success       int32  `json:"success"`
 						DerivedStatus string `json:"derived_status"`
 					} `json:"repo_counts,omitempty"`
 				}{
 					{
 						ID:        "batch-001",
-						Name:      &name,
-						Status:    "running",
-						RepoURL:   "https://github.com/org/repo.git",
-						BaseRef:   "main",
-						TargetRef: "feature",
+						Status:    "Started",
+						ModID:     "mod-001",
+						SpecID:    "spec-001",
 						CreatedAt: now,
 						Counts: &struct {
 							Total         int32  `json:"total"`
-							Succeeded     int32  `json:"succeeded"`
+							Success       int32  `json:"success"`
 							DerivedStatus string `json:"derived_status"`
-						}{Total: 5, Succeeded: 2, DerivedStatus: "running"},
+						}{Total: 5, Success: 2, DerivedStatus: "running"},
 					},
 					{
 						ID:        "batch-002",
-						Status:    "completed",
-						RepoURL:   "https://github.com/org/repo2.git",
-						BaseRef:   "main",
-						TargetRef: "hotfix",
+						Status:    "Finished",
+						ModID:     "mod-002",
+						SpecID:    "spec-002",
 						CreatedAt: now,
 					},
 				},
@@ -109,11 +101,11 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	if !strings.Contains(output, "batch-001") {
 		t.Errorf("output should contain batch-001: %s", output)
 	}
-	if !strings.Contains(output, "test-batch") {
-		t.Errorf("output should contain test-batch: %s", output)
+	if !strings.Contains(output, "Started") {
+		t.Errorf("output should contain Started: %s", output)
 	}
 	if !strings.Contains(output, "running") {
-		t.Errorf("output should contain running: %s", output)
+		t.Errorf("output should contain derived status running: %s", output)
 	}
 }
 

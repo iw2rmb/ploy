@@ -9,21 +9,18 @@
 //
 // Command structure:
 //
-//	ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>
+//	ploy mod run pull [--origin <remote>] [--dry-run] <run-id>
 //
 // The origin URL is normalized using vcs.NormalizeRepoURL to enable consistent
 // matching against server-side repo identifiers. The normalization trims whitespace
 // and strips trailing slashes and .git suffixes.
 //
 // Run resolution uses the repo-centric API (/v1/repos/{repo_id}/runs) to locate
-// the correct run for the current repository, honoring both UUIDs and human-readable
-// run names while selecting the first matching result.
+// the correct run for the current repository and resolves the requested run_id.
 //
 // The pull workflow then:
-//   - Uses RepoRunSummary.ExecutionRunID to locate the execution Mods run.
-//   - Fetches commit_sha, base_ref, and target_ref for the execution run.
-//   - Verifies commit reachability via `git fetch <origin> <commit_sha> --depth=1`.
-//   - Creates the target branch at the pinned commit and checks it out.
+//   - Fetches base_ref from the repo snapshot and performs `git fetch <origin> <base_ref> --depth=1`.
+//   - Creates the target branch at the fetched commit and checks it out.
 //   - Downloads all Mods diffs and applies them via `git apply`, or prints the
 //     planned actions when --dry-run is set.
 package main
@@ -45,17 +42,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
-// handleModRunPull implements `ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>`.
+// handleModRunPull implements `ploy mod run pull [--origin <remote>] [--dry-run] <run-id>`.
 // Parses CLI flags, validates arguments, enforces git worktree preconditions, and resolves the run.
 //
 // The function performs the following steps in order:
-//  1. Parses --origin and --dry-run flags, extracts <run-name|run-id> positional argument
+//  1. Parses --origin and --dry-run flags, extracts <run-id> positional argument
 //  2. Verifies current directory is inside a git worktree
 //  3. Verifies working tree is clean (no staged or unstaged changes)
 //  4. Resolves and validates the specified git remote URL
 //  5. Calls the repo-centric API to list runs for the repository
-//  6. Resolves <run-name|run-id> to a unique run, preferring RunID match over Name match
-//  7. Captures ExecutionRunID, base_ref, target_ref, and attempt for subsequent steps
+//  6. Resolves <run-id> to a unique run
+//  7. Uses repo-scoped refs (base_ref/target_ref) and diffs for subsequent steps
 //
 // Arguments:
 //   - args: remaining arguments after "pull" has been stripped (e.g., ["--dry-run", "my-run"])
@@ -82,11 +79,11 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// After flag parsing, remaining args should contain the run identifier.
-	// The final positional argument is <run-name|run-id>.
+	// The final positional argument is <run-id>.
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunPullUsage(stderr)
-		return errors.New("run-name or run-id required")
+		return errors.New("run-id required")
 	}
 
 	// Extract the run identifier (first non-flag argument).
@@ -129,8 +126,6 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	normalizedOriginURL := vcs.NormalizeRepoURL(rawOriginURL)
 
 	// Step 4: Resolve the run via the repo-centric API.
-	// Use the raw origin URL as repo_id (URL-encoded for path segment) to match
-	// the stored run_repos.repo_url value populated via CreateRunRepoParams.RepoUrl.
 	resolvedRun, err := resolveRunForPull(ctx, rawOriginURL, runNameOrID)
 	if err != nil {
 		return err
@@ -138,59 +133,38 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 
 	// Log resolved run information for user visibility.
 	_, _ = fmt.Fprintf(stderr, "mod run pull: resolved run %q from origin %q\n", runNameOrID, *origin)
-	if resolvedRun.Name != nil && *resolvedRun.Name != "" {
-		_, _ = fmt.Fprintf(stderr, "  run name: %s\n", *resolvedRun.Name)
-	}
 	_, _ = fmt.Fprintf(stderr, "  run ID: %s\n", resolvedRun.RunID)
 	_, _ = fmt.Fprintf(stderr, "  repo status: %s\n", resolvedRun.RepoStatus)
 
-	// Step 5: Validate ExecutionRunID is set.
-	// Per ROADMAP.md: If ExecutionRunID is nil or empty, return a clear error.
-	if resolvedRun.ExecutionRunID == nil || strings.TrimSpace(*resolvedRun.ExecutionRunID) == "" {
-		return fmt.Errorf("mod run pull: execution run id missing for %q (repo may not have started)", runNameOrID)
-	}
-	executionRunID := domaintypes.RunID(strings.TrimSpace(*resolvedRun.ExecutionRunID))
-	_, _ = fmt.Fprintf(stderr, "  execution run ID: %s\n", executionRunID.String())
+	// v1: No per-repo execution run IDs. The resolved RunID is the execution identifier.
+	executionRunID := resolvedRun.RunID
 
-	// Step 6: Fetch run details to obtain commit_sha.
-	// Use the execution run ID to get the run record with commit_sha.
-	runDetails, err := fetchRunDetails(ctx, executionRunID)
-	if err != nil {
-		return err
+	// Base snapshot: use the per-repo base_ref snapshot from RepoRunSummary.
+	baseRef := strings.TrimSpace(resolvedRun.BaseRef)
+	if baseRef == "" {
+		return errors.New("mod run pull: base_ref is not available for this run")
 	}
-
-	// Surface repository URL and base_ref from the execution run for diagnostics.
-	if strings.TrimSpace(runDetails.RepoURL) != "" {
-		_, _ = fmt.Fprintf(stderr, "  run repository: %s\n", runDetails.RepoURL)
-	}
-	if strings.TrimSpace(runDetails.BaseRef) != "" {
-		_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", runDetails.BaseRef)
-	}
-
-	// Validate that commit_sha is available.
-	// Per ROADMAP.md: If commit_sha is empty, treat as a hard error.
-	if runDetails.CommitSHA == nil || strings.TrimSpace(*runDetails.CommitSHA) == "" {
-		return errors.New("mod run pull: commit_sha is not available for this run; pull requires a pinned commit")
-	}
-	commitSHA := strings.TrimSpace(*runDetails.CommitSHA)
-	_, _ = fmt.Fprintf(stderr, "  commit SHA: %s\n", commitSHA)
+	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
 	// Determine the target branch name.
-	// Per ROADMAP.md: Prefer the per-repo target_ref from RepoRunSummary.TargetRef when present;
-	// otherwise, fall back to the execution run's target_ref from RunDetails.
-	targetRef := resolvedRun.TargetRef
-	if strings.TrimSpace(targetRef) == "" {
-		targetRef = runDetails.TargetRef
-	}
-	if strings.TrimSpace(targetRef) == "" {
+	targetRef := strings.TrimSpace(resolvedRun.TargetRef)
+	if targetRef == "" {
 		return errors.New("mod run pull: target_ref is not available for this run")
 	}
 	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", targetRef)
 
-	// Step 7: Verify commit SHA reachability on the origin remote.
-	// Per ROADMAP.md: Run `git fetch <origin> <commit_sha> --depth=1`.
-	if err := verifyCommitReachable(ctx, *origin, commitSHA, stderr, *dryRun); err != nil {
+	// Step 7: Fetch the base ref from the origin remote and resolve the fetched commit.
+	if err := fetchRef(ctx, *origin, baseRef, stderr, *dryRun); err != nil {
 		return err
+	}
+	baseCommit := ""
+	if !*dryRun {
+		commit, err := resolveFetchHeadSHA(ctx)
+		if err != nil {
+			return err
+		}
+		baseCommit = commit
+		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
 	}
 
 	// Step 8: Check for branch collisions (local and remote).
@@ -209,8 +183,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	// Step 10: Handle --dry-run mode.
 	// Per ROADMAP.md: For --dry-run, do not execute git branch/checkout/apply calls.
 	if *dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %s (origin %q) and apply %d Mods diff(s)\n",
-			targetRef, commitSHA, *origin, len(diffs))
+		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Mods diff(s)\n",
+			targetRef, baseRef, *origin, len(diffs))
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
 				i+1, diff.ID, diff.Size)
@@ -218,9 +192,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Step 11: Create the target branch at the commit SHA.
-	// Per ROADMAP.md: git branch <target_ref> <commit_sha>, then git checkout <target_ref>.
-	if err := createAndCheckoutBranch(ctx, targetRef, commitSHA, stderr); err != nil {
+	// Step 11: Create the target branch at the fetched base commit.
+	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
 		return err
 	}
 
@@ -240,17 +213,12 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 }
 
 // resolveRunForPull fetches runs for the given repository URL from the control plane
-// and resolves <run-name|run-id> to a unique run using the resolution rules from ROADMAP.md:
-//  1. First, try to match by RunID (exact string equality).
-//  2. If no RunID match, match against Name (after trimming spaces).
-//  3. Filter only runs whose RepoStatus indicates execution ran (succeeded, failed, skipped).
-//  4. If multiple results match the same name, select the first entry (API returns DESC by created_at).
-//  5. If no match found, return error.
+// and resolves <run-id> to a unique run.
 //
 // Parameters:
 //   - ctx: context for timeout and cancellation
-//   - repoURL: raw repository URL from git remote (used as repo_id in API call)
-//   - runNameOrID: the <run-name|run-id> argument from CLI
+//   - repoURL: raw repository URL from git remote (used for repo_id resolution)
+//   - runNameOrID: the <run-id> argument from CLI
 //
 // Returns the resolved RepoRunSummary on success, or an error if resolution fails.
 func resolveRunForPull(ctx context.Context, repoURL, runNameOrID string) (*mods.RepoRunSummary, error) {
@@ -389,49 +357,27 @@ func resolveGitRemoteURL(ctx context.Context, remoteName string) (string, error)
 // printModRunPullUsage renders the usage help for `ploy mod run pull`.
 // Follows the pattern of other printModRun*Usage helpers in the codebase.
 func printModRunPullUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run pull [--origin <remote>] [--dry-run] <run-name|run-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run pull [--origin <remote>] [--dry-run] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Pulls Mods diffs from a run into the current git repository.")
 	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Arguments:")
-	_, _ = fmt.Fprintln(w, "  <run-name|run-id>  Name or ID of the Mods run to pull")
+	_, _ = fmt.Fprintln(w, "  <run-id>  Run ID (KSUID string)")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
 	_, _ = fmt.Fprintln(w, "  --origin <remote>  Git remote to match (default: origin)")
 	_, _ = fmt.Fprintln(w, "  --dry-run          Validate and print actions without mutating the repo")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy mod run pull java17-fleet")
-	_, _ = fmt.Fprintln(w, "  ploy mod run pull --dry-run my-batch")
-	_, _ = fmt.Fprintln(w, "  ploy mod run pull --origin upstream 2xK9mNpL")
+	_, _ = fmt.Fprintln(w, "  ploy mod run pull 2xK9mNpL2pY6jYk3kQwY6a7HkKk")
+	_, _ = fmt.Fprintln(w, "  ploy mod run pull --dry-run 2xK9mNpL2pY6jYk3kQwY6a7HkKk")
+	_, _ = fmt.Fprintln(w, "  ploy mod run pull --origin upstream 2xK9mNpL2pY6jYk3kQwY6a7HkKk")
 }
 
 // =============================================================================
 // Diff Retrieval, Branch Creation, and Patch Application Helpers
 // =============================================================================
-
-// fetchRunDetails fetches the full run record including commit_sha via the API.
-// This uses the runs endpoint (GET /v1/runs/{id}) which exposes commit_sha.
-func fetchRunDetails(ctx context.Context, runID domaintypes.RunID) (*mods.RunDetails, error) {
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("mod run pull: %w", err)
-	}
-
-	cmd := mods.FetchRunWithCommitSHA{
-		Client:  httpClient,
-		BaseURL: base,
-		RunID:   runID,
-	}
-
-	details, err := cmd.Run(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("mod run pull: failed to fetch run details: %w", err)
-	}
-
-	return details, nil
-}
 
 // fetchAllDiffs fetches all diffs for the given execution run.
 // Returns diffs sorted by step_index for correct application order.
@@ -455,16 +401,15 @@ func fetchAllDiffs(ctx context.Context, executionRunID domaintypes.RunID) ([]mod
 	return diffs, nil
 }
 
-// verifyCommitReachable verifies that the given commit SHA is reachable from the origin remote.
-// Uses `git fetch <origin> <commit_sha> --depth=1` to fetch the specific commit.
-//
-// Per ROADMAP.md: If fetch fails with "couldn't find remote ref" or similar, return an error.
-func verifyCommitReachable(ctx context.Context, origin, commitSHA string, stderr io.Writer, dryRun bool) error {
-	_, _ = fmt.Fprintf(stderr, "  verifying commit %s is reachable from %s...\n", commitSHA, origin)
+// fetchRef fetches the given ref from the origin remote using a shallow fetch.
+// The fetched commit is available as FETCH_HEAD.
+func fetchRef(ctx context.Context, origin, ref string, stderr io.Writer, dryRun bool) error {
+	_, _ = fmt.Fprintf(stderr, "  fetching %q from %s...\n", ref, origin)
+	if dryRun {
+		return nil
+	}
 
-	// Run: git fetch <origin> <commit_sha> --depth=1
-	// This fetches the specific commit without a full clone.
-	cmd := exec.CommandContext(ctx, "git", "fetch", origin, commitSHA, "--depth=1")
+	cmd := exec.CommandContext(ctx, "git", "fetch", origin, ref, "--depth=1")
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -472,18 +417,35 @@ func verifyCommitReachable(ctx context.Context, origin, commitSHA string, stderr
 	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Run(); err != nil {
-		// Check for common error patterns indicating the commit is not reachable.
 		stderrStr := stderrBuf.String()
 		if strings.Contains(stderrStr, "couldn't find remote ref") ||
 			strings.Contains(stderrStr, "not found") ||
 			strings.Contains(stderrStr, "invalid refspec") {
-			return fmt.Errorf("mod run pull: commit %s not reachable from origin %q (force-push or mirror mismatch)", commitSHA, origin)
+			return fmt.Errorf("mod run pull: ref %q not reachable from origin %q", ref, origin)
 		}
-		// Generic error.
-		return fmt.Errorf("mod run pull: failed to verify commit reachability: %w (stderr: %s)", err, stderrStr)
+		return fmt.Errorf("mod run pull: git fetch failed: %w (stderr: %s)", err, stderrStr)
 	}
 
 	return nil
+}
+
+func resolveFetchHeadSHA(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "FETCH_HEAD")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("mod run pull: failed to resolve FETCH_HEAD: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+	}
+
+	sha := strings.TrimSpace(stdout.String())
+	if sha == "" {
+		return "", fmt.Errorf("mod run pull: FETCH_HEAD resolved to empty sha")
+	}
+	return sha, nil
 }
 
 // checkBranchCollision checks if a branch with the given name already exists locally or remotely.
@@ -516,8 +478,7 @@ func checkBranchCollision(ctx context.Context, origin, targetRef string, stderr 
 	return nil
 }
 
-// createAndCheckoutBranch creates a new branch at the given commit SHA and checks it out.
-// Per ROADMAP.md: `git branch <target_ref> <commit_sha>` followed by `git checkout <target_ref>`.
+// createAndCheckoutBranch creates a new branch at the given commit and checks it out.
 func createAndCheckoutBranch(ctx context.Context, targetRef, commitSHA string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  creating branch %q at %s...\n", targetRef, commitSHA)
 

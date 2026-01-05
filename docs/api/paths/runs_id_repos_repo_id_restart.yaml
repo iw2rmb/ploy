@@ -3,7 +3,7 @@ post:
   summary: Restart a repo within a batch run
   description: |
     Restart execution for a single repo within a batch run. The handler resets
-    the repo's status to `pending`, increments the attempt counter, and clears
+    the repo's status to `Queued`, increments the attempt counter, and clears
     timing fields. Optionally, callers may supply new `base_ref` and/or
     `target_ref` values in the request body to update the tracked refs for the
     repo before the next attempt.

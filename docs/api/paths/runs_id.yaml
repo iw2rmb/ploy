@@ -3,7 +3,7 @@ get:
   summary: Inspect a batch run
   description: |
     Return a detailed summary for a single batch run identified by its run ID.
-    The response includes run metadata (repo_url, refs, status, timestamps) and
+    The response includes run metadata (mod_id, spec_id, status, timestamps) and
     optional aggregated repo status counts from `run_repos`.
   parameters:
     - in: path

@@ -31,35 +31,27 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a Started run directly (v1 status model: runs are created as Started).
-	// ID is now KSUID-backed; generate via types.NewRunID().
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/repo",
-		Spec:      []byte(`{"type":"test"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", "feature", []byte(`{"type":"test"}`))
+	run := fx.Run
 
 	if run.Status != RunStatusStarted {
-		t.Errorf("Expected status Started, got %s", run.Status)
+		t.Errorf("expected status Started, got %s", run.Status)
 	}
 
 	// Create a Queued job for the run (v1 status model: Queued replaces pending).
 	// Job ID is now KSUID-backed; generate via types.NewJobID().
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "test-job",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "test-job",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
@@ -121,57 +113,56 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/fifo",
-		Spec:      []byte(`{"type":"fifo"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/fifo", "main", "feature", []byte(`{"type":"fifo"}`))
+	run := fx.Run
 
 	// Create three pending jobs with different step_index values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-1",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-1",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() 1 failed: %v", err)
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-2",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 2000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-2",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   2000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() 2 failed: %v", err)
 	}
 
 	job3, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-3",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 3000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-3",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   3000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() 3 failed: %v", err)
@@ -246,32 +237,25 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/skip-locked",
-		Spec:      []byte(`{"type":"concurrent"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "concurrent",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked", "main", "concurrent", []byte(`{"type":"concurrent"}`))
+	run := fx.Run
 
 	// Create multiple pending jobs for concurrent claiming.
 	const numJobs = 10
 	jobs := make([]Job, numJobs)
 	for i := 0; i < numJobs; i++ {
 		job, err := db.CreateJob(ctx, CreateJobParams{
-			ID:        string(types.NewJobID()),
-			RunID:     run.ID,
-			Name:      "job-" + strconv.Itoa(i),
-			ModType:   "",
-			ModImage:  "",
-			Status:    JobStatusQueued,
-			StepIndex: float64(1000 + i*100),
-			Meta:      []byte(`{}`),
+			ID:          string(types.NewJobID()),
+			RunID:       run.ID,
+			RepoID:      fx.ModRepo.ID,
+			RepoBaseRef: fx.RunRepo.RepoBaseRef,
+			Attempt:     fx.RunRepo.Attempt,
+			Name:        "job-" + strconv.Itoa(i),
+			ModType:     "",
+			ModImage:    "",
+			Status:      JobStatusQueued,
+			StepIndex:   float64(1000 + i*100),
+			Meta:        []byte(`{}`),
 		})
 		if err != nil {
 			t.Fatalf("CreateJob() %d failed: %v", i, err)
@@ -385,136 +369,6 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 	}
 }
 
-// TestAckRunStart_Basic tests the acknowledgement of run start:
-// - Creates a run in queued status with a pending job
-// - Claims the job for a node
-// - Acknowledges run start (transitions run to running)
-// - Verifies the run status is updated correctly
-func TestAckRunStart_Basic(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-
-	// Create a queued run directly.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/ackstart",
-		Spec:      []byte(`{"type":"acktest"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
-
-	// Create a pending job for the run.
-	_, err = db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "test-job",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob() failed: %v", err)
-	}
-
-	// Create a test node.
-	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
-		Name:      "test-node-ack",
-		IpAddress: mustParseAddr(t, "192.168.5.100"),
-	})
-	if err != nil {
-		t.Fatalf("CreateNode() failed: %v", err)
-	}
-
-	// Claim the job for the node.
-	claimedJob, err := db.ClaimJob(ctx, &node.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() failed: %v", err)
-	}
-
-	// Verify the job is in assigned status.
-	if claimedJob.Status != JobStatusRunning {
-		t.Errorf("Expected job status assigned, got %s", claimedJob.Status)
-	}
-
-	// Acknowledge run start (transitions run from queued to running).
-	err = db.AckRunStart(ctx, run.ID)
-	if err != nil {
-		t.Fatalf("AckRunStart() failed: %v", err)
-	}
-
-	// Fetch the run to verify status transition.
-	updatedRun, err := db.GetRun(ctx, run.ID)
-	if err != nil {
-		t.Fatalf("GetRun() failed: %v", err)
-	}
-
-	// Verify the run is now in running status.
-	if updatedRun.Status != RunStatusStarted {
-		t.Errorf("Expected status running after ack, got %s", updatedRun.Status)
-	}
-}
-
-// TestAckRunStart_WrongStatus tests that AckRunStart only transitions from assigned.
-func TestAckRunStart_WrongStatus(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-
-	// Create a queued run (not assigned).
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/wrongstatus",
-		Spec:      []byte(`{"type":"wrongstatustest"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
-
-	// Try to acknowledge run start without claiming first.
-	err = db.AckRunStart(ctx, run.ID)
-	if err != nil {
-		t.Fatalf("AckRunStart() returned error: %v", err)
-	}
-
-	// Fetch the run to verify no status change occurred.
-	fetchedRun, err := db.GetRun(ctx, run.ID)
-	if err != nil {
-		t.Fatalf("GetRun() failed: %v", err)
-	}
-
-	// Verify the run is still in queued status (not changed).
-	if fetchedRun.Status != RunStatusStarted {
-		t.Errorf("Expected status to remain queued, got %s", fetchedRun.Status)
-	}
-}
-
 // TestClaimJob_DrainedNode tests that drained nodes cannot claim jobs.
 // Note: ClaimJob does not currently check node drained status; this test is a placeholder.
 func TestClaimJob_DrainedNode(t *testing.T) {
@@ -530,28 +384,21 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run with a pending job.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/drained",
-		Spec:      []byte(`{"type":"draintest"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/drained", "main", "feature", []byte(`{"type":"draintest"}`))
+	run := fx.Run
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "test-job",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "test-job",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
@@ -607,28 +454,21 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run with a pending job.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/undrained",
-		Spec:      []byte(`{"type":"undraintest"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/undrained", "main", "feature", []byte(`{"type":"undraintest"}`))
+	run := fx.Run
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "test-job",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "test-job",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
@@ -692,57 +532,56 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/step-order",
-		Spec:      []byte(`{"type":"step-order"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/step-order", "main", "feature", []byte(`{"type":"step-order"}`))
+	run := fx.Run
 
 	// Create jobs in reverse step_index order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-3",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 3000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-3",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   3000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(3) failed: %v", err)
 	}
 
 	job1, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-1",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-1",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(1) failed: %v", err)
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "job-2",
-		ModType:   "",
-		ModImage:  "",
-		Status:    JobStatusQueued,
-		StepIndex: 2000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "job-2",
+		ModType:     "",
+		ModImage:    "",
+		Status:      JobStatusQueued,
+		StepIndex:   2000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(2) failed: %v", err)
@@ -799,29 +638,22 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a queued run.
-	run, err := db.CreateRun(ctx, CreateRunParams{
-		ID:        string(types.NewRunID()),
-		RepoUrl:   "https://github.com/test/only-pending",
-		Spec:      []byte(`{"type":"only-pending"}`),
-		Status:    RunStatusStarted,
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateRun() failed: %v", err)
-	}
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/only-pending", "main", "feature", []byte(`{"type":"only-pending"}`))
+	run := fx.Run
 
 	// Create a non-pending job (already running).
 	_, err = db.CreateJob(ctx, CreateJobParams{
-		ID:        string(types.NewJobID()),
-		RunID:     run.ID,
-		Name:      "running-job",
-		Status:    JobStatusRunning,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 1000,
-		Meta:      []byte(`{}`),
+		ID:          string(types.NewJobID()),
+		RunID:       run.ID,
+		RepoID:      fx.ModRepo.ID,
+		RepoBaseRef: fx.RunRepo.RepoBaseRef,
+		Attempt:     fx.RunRepo.Attempt,
+		Name:        "running-job",
+		Status:      JobStatusRunning,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   1000,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)

@@ -35,7 +35,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	// Set up mock to return job via GetJob.
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
@@ -46,7 +46,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -56,7 +56,7 @@ func TestCompleteJob_Success(t *testing.T) {
 
 	// Request body only contains status (no run_id, job_id, or step_index needed).
 	body, _ := json.Marshal(map[string]any{
-		"status": "succeeded",
+		"status": "Success",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
@@ -96,7 +96,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
@@ -107,7 +107,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -117,7 +117,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 
 	exitCode := int32(0)
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": exitCode,
 		"stats":     map[string]any{"duration_ms": 1234},
 	})
@@ -158,7 +158,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 9000,
@@ -170,7 +170,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusSucceeded,
+			Status: store.RunStatusFinished,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -179,7 +179,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"duration_ms": 500,
@@ -229,7 +229,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -238,7 +238,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -248,7 +248,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 
 	// Embed JobMeta-shaped payload under stats.job_meta.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"duration_ms": 500,
@@ -308,7 +308,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -317,7 +317,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -326,7 +326,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	handler := completeJobHandler(st, nil)
 
 	// NOTE: Do not use json.Marshal here; we need whitespace inside job_meta ("{ }").
-	body := `{"status":"succeeded","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
+	body := `{"status":"Success","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader([]byte(body)))
 	req.SetPathValue("job_id", jobID.String())
@@ -359,7 +359,7 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", "") // Empty job_id
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -387,7 +387,7 @@ func TestCompleteJob_EmptyJobID(t *testing.T) {
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	// Note: "not-a-uuid" is now a valid KSUID string ID, so we only test empty ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", "   ") // Whitespace ID
@@ -415,7 +415,7 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	// No identity injected into context.
@@ -440,7 +440,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -449,7 +449,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -457,7 +457,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	// Note: "not-a-uuid" is now a valid NanoID string ID, so we test empty header.
@@ -491,7 +491,7 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -500,7 +500,7 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -508,7 +508,7 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 
@@ -543,7 +543,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	// Job is assigned to a different node (otherNode).
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &otherNodeStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -556,7 +556,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -590,9 +590,9 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	// Job is in 'pending' status (not 'running').
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
-		Status:    store.JobStatusPending, // Not 'running'
+		Status:    store.JobStatusCreated, // Not 'running'
 		StepIndex: 1000,
 	}
 
@@ -603,7 +603,7 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "failed"})
+	body, _ := json.Marshal(map[string]any{"status": "Fail"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -697,7 +697,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -712,7 +712,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 
 	// stats provided as a string, which is valid JSON but not an object.
 	body, _ := json.Marshal(map[string]any{
-		"status": "failed",
+		"status": "Fail",
 		"stats":  "oops",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
@@ -749,7 +749,7 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "failed"})
+	body, _ := json.Marshal(map[string]any{"status": "Fail"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -781,7 +781,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Name:      "mod-0",
 		Status:    store.JobStatusRunning,
@@ -792,12 +792,14 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID.String(),
-			Status:    store.RunStatusRunning,
-			RepoUrl:   "https://github.com/user/repo.git",
+			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
+		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+			{Status: store.RunRepoStatusSuccess, Count: 1},
+		},
 	}
 
 	eventsService, _ := events.New(events.Options{
@@ -807,7 +809,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	handler := completeJobHandler(st, eventsService)
 
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats":     map[string]any{"duration_ms": 500},
 	})
@@ -869,7 +871,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -877,7 +879,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 
 	nextJob := store.Job{
 		ID:        nextJobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000,
 	}
@@ -885,7 +887,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:          job,
 		listJobsByRunResult:   []store.Job{job, nextJob},
@@ -894,7 +896,7 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -930,7 +932,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -939,7 +941,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -947,7 +949,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "failed"})
+	body, _ := json.Marshal(map[string]any{"status": "Fail"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -980,49 +982,63 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	nodeID := domaintypes.NewNodeKey()
 	nodeIDStr := nodeID
 	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID().String()
 	modJobID := domaintypes.NewJobID()
 	postJobID := domaintypes.NewJobID()
 
 	// Jobs: pre-gate succeeded, mod failed, post-gate created.
 	jobs := []store.Job{
 		{
-			ID:        domaintypes.NewJobID().String(),
-			RunID:     runID,
-			NodeID:    &nodeIDStr,
-			Status:    store.JobStatusSucceeded,
-			StepIndex: 1000,
-			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+			ID:          domaintypes.NewJobID().String(),
+			RunID:       runID.String(),
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeIDStr,
+			Status:      store.JobStatusSuccess,
+			ModType:     domaintypes.ModTypePreGate.String(),
+			StepIndex:   1000,
+			Meta:        []byte(`{}`),
 		},
 		{
-			ID:        modJobID.String(),
-			RunID:     runID,
-			NodeID:    &nodeIDStr,
-			Status:    store.JobStatusRunning,
-			StepIndex: 2000,
-			Meta:      []byte(`{"mod_type":"mod"}`),
+			ID:          modJobID.String(),
+			RunID:       runID.String(),
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeIDStr,
+			Status:      store.JobStatusRunning,
+			ModType:     domaintypes.ModTypeMod.String(),
+			StepIndex:   2000,
+			Meta:        []byte(`{}`),
 		},
 		{
-			ID:        postJobID.String(),
-			RunID:     runID,
-			Status:    store.JobStatusCreated,
-			StepIndex: 3000,
-			Meta:      []byte(`{"mod_type":"post_gate"}`),
+			ID:          postJobID.String(),
+			RunID:       runID.String(),
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			Status:      store.JobStatusCreated,
+			ModType:     domaintypes.ModTypePostGate.String(),
+			StepIndex:   3000,
+			Meta:        []byte(`{}`),
 		},
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
-		getJobResult:        jobs[1], // mod job
-		listJobsByRunResult: jobs,
+		getJobResult:                   jobs[1], // mod job
+		listJobsByRunResult:            jobs,
+		listJobsByRunRepoAttemptResult: jobs,
 	}
 
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{
-		"status":    "failed",
+		"status":    "Fail",
 		"exit_code": 1,
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+modJobID.String()+"/complete", bytes.NewReader(body))
@@ -1061,7 +1077,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	for _, call := range st.updateJobStatusCalls {
 		if call.ID == jobs[2].ID {
 			foundPostCancel = true
-			if call.Status != store.JobStatusCanceled {
+			if call.Status != store.JobStatusCancelled {
 				t.Fatalf("expected post-gate job to be canceled, got status %s", call.Status)
 			}
 		}
@@ -1082,7 +1098,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -1091,7 +1107,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1099,7 +1115,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"status": "canceled"})
+	body, _ := json.Marshal(map[string]any{"status": "Cancelled"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -1119,7 +1135,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	if !st.updateJobCompletionCalled {
 		t.Fatal("expected UpdateJobCompletion to be called")
 	}
-	if st.updateJobCompletionParams.Status != store.JobStatusCanceled {
+	if st.updateJobCompletionParams.Status != store.JobStatusCancelled {
 		t.Fatalf("expected job status canceled, got %s", st.updateJobCompletionParams.Status)
 	}
 }
@@ -1139,7 +1155,7 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -1148,7 +1164,7 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1158,7 +1174,7 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 
 	// job_meta without required "kind" field should be rejected.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1203,7 +1219,7 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -1212,7 +1228,7 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1222,7 +1238,7 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 
 	// job_meta with invalid "kind" value should be rejected.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1268,7 +1284,7 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -1277,7 +1293,7 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1287,7 +1303,7 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 
 	// job_meta with kind="mod" but gate metadata should be rejected (structural mismatch).
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1330,7 +1346,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
@@ -1339,7 +1355,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1349,7 +1365,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 
 	// Valid gate job_meta with proper kind and gate metadata.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1408,7 +1424,7 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
@@ -1417,7 +1433,7 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1427,7 +1443,7 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 
 	// Valid mod job_meta (kind only, no gate/build metadata).
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1477,7 +1493,7 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1500,
@@ -1486,7 +1502,7 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1496,7 +1512,7 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 
 	// Valid build job_meta with kind and build metadata.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
@@ -1551,7 +1567,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
@@ -1560,7 +1576,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1570,7 +1586,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 
 	// Empty job_meta object should NOT trigger UpdateJobCompletionWithMeta.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta":    map[string]any{}, // Empty object
@@ -1615,7 +1631,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 
 	job := store.Job{
 		ID:        jobID.String(),
-		RunID:     runID,
+		RunID:     runID.String(),
 		NodeID:    &nodeIDStr,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
@@ -1624,7 +1640,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     runID.String(),
-			Status: store.RunStatusRunning,
+			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
@@ -1634,7 +1650,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 
 	// Null job_meta should NOT trigger UpdateJobCompletionWithMeta.
 	body, _ := json.Marshal(map[string]any{
-		"status":    "succeeded",
+		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta":    nil,

@@ -11,9 +11,9 @@ post:
   summary: Cancel a Mods run
   description: |
     Control-plane cancel request for a Mods run identified by its `id`.
-    Transitions the run and any in-flight or pending stages to `canceled` status.
+    Transitions the run and any in-flight or pending stages to `cancelled` status.
     The request is idempotent: if the run is already in a terminal state, returns
-    `200 OK`; otherwise, transitions to `canceled` and returns `202 Accepted`.
+    `200 OK`; otherwise, transitions to `cancelled` and returns `202 Accepted`.
     An optional `reason` may be provided in the request body to explain the cancellation.
   requestBody:
     required: false
@@ -28,7 +28,7 @@ post:
               description: Optional human-readable cancellation reason
   responses:
     '202':
-      description: Accepted; run and stages transitioned to canceled
+      description: Accepted; run and stages transitioned to cancelled
     '200':
       description: OK; run was already in a terminal state (idempotent)
     '400':

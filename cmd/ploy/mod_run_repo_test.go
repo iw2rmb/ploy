@@ -31,9 +31,9 @@ func TestModRunRepoRouting(t *testing.T) {
 			wantErr: `unknown mod run repo action "unknown"`,
 		},
 		{
-			name:    "add without run-name",
+			name:    "add without run-id",
 			args:    []string{"mod", "run", "repo", "add"},
-			wantErr: "run-name required",
+			wantErr: "run-id required",
 		},
 		{
 			name:    "add without repo-url",
@@ -46,9 +46,9 @@ func TestModRunRepoRouting(t *testing.T) {
 			wantErr: "--base-ref required",
 		},
 		{
-			name:    "remove without run-name",
+			name:    "remove without run-id",
 			args:    []string{"mod", "run", "repo", "remove"},
-			wantErr: "run-name required",
+			wantErr: "run-id required",
 		},
 		{
 			name:    "remove without repo-id",
@@ -56,9 +56,9 @@ func TestModRunRepoRouting(t *testing.T) {
 			wantErr: "--repo-id required",
 		},
 		{
-			name:    "restart without run-name",
+			name:    "restart without run-id",
 			args:    []string{"mod", "run", "repo", "restart"},
-			wantErr: "run-name required",
+			wantErr: "run-id required",
 		},
 		{
 			name:    "restart without repo-id",
@@ -66,9 +66,9 @@ func TestModRunRepoRouting(t *testing.T) {
 			wantErr: "--repo-id required",
 		},
 		{
-			name:    "status without run-name",
+			name:    "status without run-id",
 			args:    []string{"mod", "run", "repo", "status"},
-			wantErr: "run-name required",
+			wantErr: "run-id required",
 		},
 	}
 
@@ -106,7 +106,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 				RepoURL:   receivedBody["repo_url"],
 				BaseRef:   receivedBody["base_ref"],
 				TargetRef: receivedBody["target_ref"],
-				Status:    "pending",
+				Status:    "Queued",
 				Attempt:   1,
 				CreatedAt: time.Now(),
 			}
@@ -120,7 +120,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-name argument for flag parsing.
+	// Note: Flags must come before the positional run-id argument for flag parsing.
 	err := executeCmd([]string{
 		"mod", "run", "repo", "add",
 		"--repo-url", "https://github.com/org/repo.git",
@@ -195,7 +195,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
-				Status:    "skipped",
+				Status:    "Cancelled",
 				Attempt:   1,
 				CreatedAt: time.Now(),
 			}
@@ -209,7 +209,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-name argument for flag parsing.
+	// Note: Flags must come before the positional run-id argument for flag parsing.
 	err := executeCmd([]string{
 		"mod", "run", "repo", "remove",
 		"--repo-id", "a1b2c3d4",
@@ -242,7 +242,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch-v2",
-				Status:    "pending",
+				Status:    "Queued",
 				Attempt:   2,
 				CreatedAt: time.Now(),
 			}
@@ -256,7 +256,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-name argument for flag parsing.
+	// Note: Flags must come before the positional run-id argument for flag parsing.
 	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
@@ -293,7 +293,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 					RepoURL:   "https://github.com/org/repo1.git",
 					BaseRef:   "main",
 					TargetRef: "feature-1",
-					Status:    "succeeded",
+					Status:    "Success",
 					Attempt:   1,
 					CreatedAt: time.Now(),
 				},
@@ -303,7 +303,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 					RepoURL:   "https://github.com/org/repo2.git",
 					BaseRef:   "main",
 					TargetRef: "feature-2",
-					Status:    "pending",
+					Status:    "Queued",
 					Attempt:   1,
 					CreatedAt: time.Now(),
 				},
@@ -375,7 +375,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	// Note: Flags must come before the positional run-name argument for flag parsing.
+	// Note: Flags must come before the positional run-id argument for flag parsing.
 	err := executeCmd([]string{
 		"mod", "run", "repo", "add",
 		"--repo-url", "https://github.com/org/repo.git",
@@ -493,7 +493,7 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-branch",
-				Status:    "pending",
+				Status:    "Queued",
 				Attempt:   2,
 				CreatedAt: time.Now(),
 			}
@@ -539,7 +539,7 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-v2",
-				Status:    "pending",
+				Status:    "Queued",
 				Attempt:   2,
 				CreatedAt: time.Now(),
 			}

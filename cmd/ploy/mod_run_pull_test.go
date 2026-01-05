@@ -30,14 +30,14 @@ func TestModRunPullRouting(t *testing.T) {
 		needRemote string // remote name needed (empty = use "origin")
 	}{
 		{
-			name:    "pull without run-name",
+			name:    "pull without run-id",
 			args:    []string{"mod", "run", "pull"},
-			wantErr: "run-name or run-id required",
+			wantErr: "run-id required",
 		},
 		{
-			name:    "pull with empty run-name",
+			name:    "pull with empty run-id",
 			args:    []string{"mod", "run", "pull", "   "},
-			wantErr: "run-name or run-id required",
+			wantErr: "run-id required",
 		},
 		// Note: Tests that previously checked for placeholder output are now
 		// integration tests that require a running control plane. Since the
@@ -176,8 +176,8 @@ func TestModRunPullUsageHelp(t *testing.T) {
 	}
 
 	// Verify argument is documented.
-	if !strings.Contains(output, "<run-name|run-id>") {
-		t.Errorf("usage should document run-name|run-id argument, got %q", output)
+	if !strings.Contains(output, "<run-id>") {
+		t.Errorf("usage should document run-id argument, got %q", output)
 	}
 
 	// Verify examples are present.

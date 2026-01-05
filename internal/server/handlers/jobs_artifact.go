@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -105,7 +104,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the job belongs to the provided run.
-		if job.RunID.String() != runIDStr {
+		if strings.TrimSpace(job.RunID) != runIDStr {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
@@ -129,7 +128,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Create artifact bundle params using domain RunID.
 		params := store.CreateArtifactBundleParams{
-			RunID:  domaintypes.RunID(runIDStr),
+			RunID:  runIDStr,
 			JobID:  &jobIDStr,
 			Name:   req.Name,
 			Bundle: req.Bundle,

@@ -13,22 +13,22 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// claimJobHandler allows nodes to claim a pending job for execution.
+// claimJobHandler allows nodes to claim a queued job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
 //
-// Server-driven scheduling: only 'pending' jobs can be claimed. When a job completes,
-// the server schedules the next 'created' job by transitioning it to 'pending'.
+// v1:
+// - claimable jobs have status='Queued'
+// - repo progression is attempt-scoped (run_id, repo_id, attempt)
 //
 // Jobs are claimed from a single unified queue (FIFO by step_index). There is no
 // separate Build Gate queue or claim path — all job types (pre-gate, mod, heal,
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
-// Jobs transition directly from 'pending' to 'running' on claim (no 'assigned' intermediate state).
+// Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
 //
 // When the run transitions from 'queued' to 'running' on first job claim, the handler
 // publishes an SSE "running" event so clients can track run lifecycle in real-time.
@@ -67,40 +67,43 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			return
 		}
 
-		// Fetch parent run metadata. Run IDs are KSUID strings.
-		run, err := st.GetRun(r.Context(), job.RunID.String())
+		// Mark the claimed repo as Running (idempotent), setting started_at if needed.
+		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
+			RunID:  job.RunID,
+			RepoID: job.RepoID,
+			Status: store.RunRepoStatusRunning,
+		})
+
+		run, err := st.GetRun(r.Context(), job.RunID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
 			slog.Error("claim: get run failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
 			return
 		}
 
-		// Transition run to 'running' if it's still queued. This is the canonical
-		// place for run status transition — no separate ack endpoint is needed.
-		// When the transition succeeds, publish an SSE "running" event so clients
-		// can track run lifecycle in real-time.
-		if run.Status == store.RunStatusQueued {
-			if err := st.AckRunStart(r.Context(), run.ID); err != nil {
-				slog.Warn("claim: failed to ack run start", "run_id", run.ID, "err", err)
-			} else if eventsService != nil {
-				// Publish SSE "running" event for real-time client updates.
-				// Build a RunSummary with the new running state.
-				runSummary := modsapi.RunSummary{
-					RunID:      domaintypes.RunID(run.ID),
-					State:      modsapi.RunStateRunning,
-					Repository: run.RepoUrl,
-					CreatedAt:  run.CreatedAt.Time,
-					UpdatedAt:  time.Now().UTC(),
-					Stages:     make(map[string]modsapi.StageStatus),
-				}
-				if err := eventsService.PublishRun(r.Context(), domaintypes.RunID(run.ID), runSummary); err != nil {
-					slog.Error("claim: publish run event failed", "run_id", run.ID, "err", err)
-				}
-			}
+		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: job.RunID, RepoID: job.RepoID})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get run repo for claimed job: %v", err), http.StatusInternalServerError)
+			slog.Error("claim: get run repo failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
+			return
+		}
+
+		modRepo, err := st.GetModRepo(r.Context(), job.RepoID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get repo for claimed job: %v", err), http.StatusInternalServerError)
+			slog.Error("claim: get mod repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
+			return
+		}
+
+		spec, err := st.GetSpec(r.Context(), run.SpecID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get spec for claimed job: %v", err), http.StatusInternalServerError)
+			slog.Error("claim: get spec failed for job", "node_id", nodeID, "job_id", job.ID, "spec_id", run.SpecID, "err", err)
+			return
 		}
 
 		// Build and send response with job and run information.
-		if err := buildAndSendJobClaimResponse(w, r, configHolder, run, job); err != nil {
+		if err := buildAndSendJobClaimResponse(w, r, configHolder, run, spec.Spec, rr, modRepo, job); err != nil {
 			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 			http.Error(w, fmt.Sprintf("failed to build claim response: %v", err), http.StatusInternalServerError)
 			return
@@ -121,6 +124,9 @@ func buildAndSendJobClaimResponse(
 	r *http.Request,
 	configHolder *ConfigHolder,
 	run store.Run,
+	spec []byte,
+	runRepo store.RunRepo,
+	modRepo store.ModRepo,
 	job store.Job,
 ) error {
 	modType := domaintypes.ModType(job.ModType)
@@ -130,7 +136,7 @@ func buildAndSendJobClaimResponse(
 
 	// Merge job_id into spec for downstream execution.
 	// Job IDs are now KSUID strings.
-	mergedSpec := mergeJobIDIntoSpec(run.Spec, job.ID)
+	mergedSpec := mergeJobIDIntoSpec(spec, job.ID)
 
 	// For mod jobs (names following "mod-N" pattern), inject a numeric
 	// mod_index derived from job name so the node agent can map this job
@@ -156,6 +162,8 @@ func buildAndSendJobClaimResponse(
 	resp := struct {
 		RunID     domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
 		Name      *string               `json:"name,omitempty"`
+		RepoID    string                `json:"repo_id"`
+		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 		ModType   domaintypes.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
@@ -166,24 +174,24 @@ func buildAndSendJobClaimResponse(
 		NodeID    domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
 		BaseRef   string                `json:"base_ref"`
 		TargetRef string                `json:"target_ref"`
-		CommitSha *string               `json:"commit_sha,omitempty"`
 		StartedAt string                `json:"started_at"`
 		CreatedAt string                `json:"created_at"`
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
 		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
-		Name:      run.Name,
+		Name:      nil,
+		RepoID:    job.RepoID,
+		Attempt:   job.Attempt,
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
 		ModType:   modType,
 		ModImage:  job.ModImage,
 		StepIndex: domaintypes.StepIndex(job.StepIndex),
-		RepoURL:   run.RepoUrl,
+		RepoURL:   modRepo.RepoUrl,
 		Status:    run.Status,
 		NodeID:    domaintypes.NodeID(stringPtrOrEmpty(job.NodeID)), // Convert to domain type
-		BaseRef:   run.BaseRef,
-		TargetRef: run.TargetRef,
-		CommitSha: run.CommitSha,
+		BaseRef:   job.RepoBaseRef,
+		TargetRef: runRepo.RepoTargetRef,
 		StartedAt: run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:      mergedSpec,

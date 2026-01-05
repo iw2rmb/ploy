@@ -7,71 +7,40 @@ package store
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const ackRunStart = `-- name: AckRunStart :exec
-UPDATE runs
-SET status = 'running'
-WHERE id = $1 AND status IN ('assigned', 'queued')
-`
-
-// Transitions run status to 'running' when execution starts.
-// Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
-// the first job starts execution.
-func (q *Queries) AckRunStart(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, ackRunStart, id)
-	return err
-}
-
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (id, name, repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
+INSERT INTO runs (id, mod_id, spec_id, created_by, status, started_at)
+VALUES ($1, $2, $3, $4, 'Started', now())
+RETURNING id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 `
 
 type CreateRunParams struct {
-	ID        string    `json:"id"`
-	Name      *string   `json:"name"`
-	RepoUrl   string    `json:"repo_url"`
-	Spec      []byte    `json:"spec"`
-	CreatedBy *string   `json:"created_by"`
-	Status    RunStatus `json:"status"`
-	BaseRef   string    `json:"base_ref"`
-	TargetRef string    `json:"target_ref"`
-	CommitSha *string   `json:"commit_sha"`
+	ID        string  `json:"id"`
+	ModID     string  `json:"mod_id"`
+	SpecID    string  `json:"spec_id"`
+	CreatedBy *string `json:"created_by"`
 }
 
-// Creates a new run record. The `name` column is optional; pass NULL for unnamed runs.
-// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
+// v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
+// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
 		arg.ID,
-		arg.Name,
-		arg.RepoUrl,
-		arg.Spec,
+		arg.ModID,
+		arg.SpecID,
 		arg.CreatedBy,
-		arg.Status,
-		arg.BaseRef,
-		arg.TargetRef,
-		arg.CommitSha,
 	)
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.Name,
-		&i.RepoUrl,
-		&i.Spec,
+		&i.ModID,
+		&i.SpecID,
 		&i.CreatedBy,
 		&i.Status,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-		&i.NodeID,
-		&i.BaseRef,
-		&i.TargetRef,
-		&i.CommitSha,
 		&i.Stats,
 	)
 	return i, err
@@ -88,7 +57,8 @@ func (q *Queries) DeleteRun(ctx context.Context, id string) error {
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+FROM runs
 WHERE id = $1
 `
 
@@ -97,18 +67,13 @@ func (q *Queries) GetRun(ctx context.Context, id string) (Run, error) {
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.Name,
-		&i.RepoUrl,
-		&i.Spec,
+		&i.ModID,
+		&i.SpecID,
 		&i.CreatedBy,
 		&i.Status,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-		&i.NodeID,
-		&i.BaseRef,
-		&i.TargetRef,
-		&i.CommitSha,
 		&i.Stats,
 	)
 	return i, err
@@ -130,7 +95,8 @@ func (q *Queries) GetRunTiming(ctx context.Context, id string) (RunsTiming, erro
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT id, name, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+FROM runs
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -151,18 +117,13 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
-			&i.Name,
-			&i.RepoUrl,
-			&i.Spec,
+			&i.ModID,
+			&i.SpecID,
 			&i.CreatedBy,
 			&i.Status,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
-			&i.NodeID,
-			&i.BaseRef,
-			&i.TargetRef,
-			&i.CommitSha,
 			&i.Stats,
 		); err != nil {
 			return nil, err
@@ -243,39 +204,42 @@ func (q *Queries) UpdateRunResume(ctx context.Context, id string) error {
 }
 
 const updateRunStatsMRURL = `-- name: UpdateRunStatsMRURL :exec
-UPDATE runs
-SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
-    'metadata',
-    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', $2)
-)
-WHERE id = $1
+	UPDATE runs
+	SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
+	    'metadata',
+	    COALESCE(stats->'metadata', '{}'::jsonb) || jsonb_build_object('mr_url', $2)
+	)
+	WHERE id = $1
 `
 
 type UpdateRunStatsMRURLParams struct {
-	ID               string      `json:"id"`
-	JsonbBuildObject interface{} `json:"jsonb_build_object"`
+	ID    string      `json:"id"`
+	MrUrl interface{} `json:"mr_url"`
 }
 
 // Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
 // Preserves existing stats and metadata keys via JSONB merge.
 func (q *Queries) UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error {
-	_, err := q.db.Exec(ctx, updateRunStatsMRURL, arg.ID, arg.JsonbBuildObject)
+	_, err := q.db.Exec(ctx, updateRunStatsMRURL, arg.ID, arg.MrUrl)
 	return err
 }
 
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
-SET status = $2, finished_at = $3
+SET status = $2,
+    finished_at = CASE
+      WHEN $2 IN ('Cancelled', 'Finished') THEN COALESCE(finished_at, now())
+      ELSE NULL
+    END
 WHERE id = $1
 `
 
 type UpdateRunStatusParams struct {
-	ID         string             `json:"id"`
-	Status     RunStatus          `json:"status"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	ID     string    `json:"id"`
+	Status RunStatus `json:"status"`
 }
 
 func (q *Queries) UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error {
-	_, err := q.db.Exec(ctx, updateRunStatus, arg.ID, arg.Status, arg.FinishedAt)
+	_, err := q.db.Exec(ctx, updateRunStatus, arg.ID, arg.Status)
 	return err
 }

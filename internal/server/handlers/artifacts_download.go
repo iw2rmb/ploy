@@ -127,7 +127,7 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		// RunID and JobID are already domain types in the store model.
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
-			RunID: bundle.RunID,
+			RunID: domaintypes.RunID(bundle.RunID),
 			Size:  int64(len(bundle.Bundle)),
 		}
 		if bundle.JobID != nil && *bundle.JobID != "" {

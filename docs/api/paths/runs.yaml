@@ -3,7 +3,7 @@ get:
   summary: List batch runs
   description: |
     Return a paginated list of batch runs backed by the `runs` table. Each
-    entry exposes basic run metadata (id, repo_url, refs, status, timestamps)
+    entry exposes basic run metadata (id, mod_id, spec_id, status, timestamps)
     and optional per-repo status counts aggregated from `run_repos`.
   parameters:
     - in: query

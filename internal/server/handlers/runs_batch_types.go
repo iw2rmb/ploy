@@ -20,11 +20,11 @@ type RunRepoCounts = domaintypes.RunRepoCounts
 // Derived batch status constants exposed for API consumers.
 // These represent the batch-level state computed from repo statuses.
 const (
-	// DerivedStatusPending indicates no repos have started (all pending or no repos).
+	// DerivedStatusPending indicates no repos have started (all queued or no repos).
 	DerivedStatusPending = "pending"
 	// DerivedStatusRunning indicates at least one repo is currently running.
 	DerivedStatusRunning = "running"
-	// DerivedStatusCompleted indicates all repos finished with succeeded or skipped.
+	// DerivedStatusCompleted indicates all repos finished with no failures.
 	DerivedStatusCompleted = "completed"
 	// DerivedStatusFailed indicates at least one repo failed (and none running).
 	DerivedStatusFailed = "failed"
@@ -38,13 +38,10 @@ const (
 func runToSummary(run store.Run) RunSummary {
 	summary := RunSummary{
 		// run.ID is now a string (KSUID); cast directly to domain type.
-		ID:     domaintypes.RunID(run.ID),
-		Name:   run.Name,
-		Status: string(run.Status),
-		// Expose VCS fields as strings at the API boundary.
-		RepoURL:   run.RepoUrl,
-		BaseRef:   run.BaseRef,
-		TargetRef: run.TargetRef,
+		ID:        domaintypes.RunID(run.ID),
+		Status:    string(run.Status),
+		ModID:     run.ModID,
+		SpecID:    run.SpecID,
 		CreatedBy: run.CreatedBy,
 		CreatedAt: run.CreatedAt.Time,
 	}
@@ -71,16 +68,14 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
-		case store.RunRepoStatusPending:
-			counts.Pending = row.Count
+		case store.RunRepoStatusQueued:
+			counts.Queued = row.Count
 		case store.RunRepoStatusRunning:
 			counts.Running = row.Count
-		case store.RunRepoStatusSucceeded:
-			counts.Succeeded = row.Count
-		case store.RunRepoStatusFailed:
-			counts.Failed = row.Count
-		case store.RunRepoStatusSkipped:
-			counts.Skipped = row.Count
+		case store.RunRepoStatusSuccess:
+			counts.Success = row.Count
+		case store.RunRepoStatusFail:
+			counts.Fail = row.Count
 		case store.RunRepoStatusCancelled:
 			counts.Cancelled = row.Count
 		}
@@ -97,7 +92,7 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 //  1. cancelled — if any repo is cancelled (batch was explicitly stopped).
 //  2. running — if any repo is currently running.
 //  3. failed — if none running, and at least one repo failed.
-//  4. completed — if all repos are in terminal states (succeeded/skipped) with no failures.
+//  4. completed — if all repos are in terminal states (success/cancelled) with no failures.
 //  5. pending — if no repos have started yet (all pending, or no repos).
 func deriveBatchStatus(counts *RunRepoCounts) string {
 	// No repos in batch — treat as pending (batch has no work yet).
@@ -118,27 +113,25 @@ func deriveBatchStatus(counts *RunRepoCounts) string {
 
 	// At this point, no repos are running or cancelled.
 	// Check if any repos failed — if so, the batch failed.
-	if counts.Failed > 0 {
+	if counts.Fail > 0 {
 		return DerivedStatusFailed
 	}
 
-	// Calculate terminal repos (succeeded + skipped + failed + cancelled).
-	// We already checked Failed and Cancelled above, so only succeeded/skipped remain.
-	terminalCount := counts.Succeeded + counts.Skipped + counts.Failed + counts.Cancelled
+	terminalCount := counts.Success + counts.Fail + counts.Cancelled
 
 	// If all repos are in terminal state and none failed, batch completed successfully.
 	if terminalCount == counts.Total {
 		return DerivedStatusCompleted
 	}
 
-	// Some repos are still pending (not started), batch is pending/waiting.
+	// Some repos are still queued (not started), batch is pending/waiting.
 	return DerivedStatusPending
 }
 
 // isTerminalRunStatus returns true if the run status is terminal (no further transitions).
 func isTerminalRunStatus(status store.RunStatus) bool {
 	switch status {
-	case store.RunStatusSucceeded, store.RunStatusFailed, store.RunStatusCanceled:
+	case store.RunStatusFinished, store.RunStatusCancelled:
 		return true
 	default:
 		return false
@@ -148,7 +141,7 @@ func isTerminalRunStatus(status store.RunStatus) bool {
 // isTerminalRunRepoStatus returns true if the run repo status is terminal.
 func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 	switch status {
-	case store.RunRepoStatusSucceeded, store.RunRepoStatusFailed, store.RunRepoStatusSkipped, store.RunRepoStatusCancelled:
+	case store.RunRepoStatusSuccess, store.RunRepoStatusFail, store.RunRepoStatusCancelled:
 		return true
 	default:
 		return false
@@ -160,33 +153,28 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 // Uses domain types (RunRepoID, RunID, RepoURL, GitRef) for type-safe
 // serialization at API boundaries.
 type RunRepoResponse struct {
-	ID         domaintypes.RunRepoID `json:"id"`
-	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoURL    domaintypes.RepoURL   `json:"repo_url"`
-	BaseRef    domaintypes.GitRef    `json:"base_ref"`
-	TargetRef  domaintypes.GitRef    `json:"target_ref"`
-	Status     store.RunRepoStatus   `json:"status"`
-	Attempt    int32                 `json:"attempt"`
-	LastError  *string               `json:"last_error,omitempty"`
-	CreatedAt  time.Time             `json:"created_at"`
-	StartedAt  *time.Time            `json:"started_at,omitempty"`
-	FinishedAt *time.Time            `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID   `json:"run_id"`
+	RepoID     string              `json:"repo_id"`
+	RepoURL    string              `json:"repo_url"`
+	BaseRef    string              `json:"base_ref"`
+	TargetRef  string              `json:"target_ref"`
+	Status     store.RunRepoStatus `json:"status"`
+	Attempt    int32               `json:"attempt"`
+	LastError  *string             `json:"last_error,omitempty"`
+	CreatedAt  time.Time           `json:"created_at"`
+	StartedAt  *time.Time          `json:"started_at,omitempty"`
+	FinishedAt *time.Time          `json:"finished_at,omitempty"`
 }
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
-// rr.ID is now a string (NanoID); rr.RunID is a string (KSUID).
-func runRepoToResponse(rr store.RunRepo) RunRepoResponse {
+func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
 	resp := RunRepoResponse{
-		// rr.ID is now a string (NanoID-backed); cast directly to domain type.
-		ID: domaintypes.RunRepoID(rr.ID),
-		// rr.RunID is already a domain RunID in the store model.
-		RunID: rr.RunID,
-		// Wrap VCS fields in domain types; values are validated at input time.
-		RepoURL:   domaintypes.RepoURL(rr.RepoUrl),
-		BaseRef:   domaintypes.GitRef(rr.BaseRef),
-		TargetRef: domaintypes.GitRef(rr.TargetRef),
-		// Use typed status instead of raw string for type safety.
+		RunID:     domaintypes.RunID(rr.RunID),
+		RepoID:    rr.RepoID,
+		RepoURL:   repoURL,
+		BaseRef:   rr.RepoBaseRef,
+		TargetRef: rr.RepoTargetRef,
 		Status:    rr.Status,
 		Attempt:   rr.Attempt,
 		LastError: rr.LastError,

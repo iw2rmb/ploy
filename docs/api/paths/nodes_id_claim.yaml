@@ -6,9 +6,9 @@ parameters:
     description: Node ID (NanoID 6-character string)
 post:
   tags: [Control]
-  summary: Claim a pending job from the unified jobs queue (node → server)
+  summary: Claim a queued job from the unified jobs queue (node → server)
   description: |
-    Nodes poll this endpoint to claim the next pending job for execution. The
+    Nodes poll this endpoint to claim the next queued job for execution. The
     server performs an atomic assignment using `FOR UPDATE SKIP LOCKED` over the
     unified `jobs` queue (FIFO by `step_index`) and returns job + parent run
     details when work is available. When no jobs are available, the server
@@ -21,7 +21,7 @@ post:
           schema:
             $ref: '../OpenAPI.yaml#/components/schemas/NodeClaimResponse'
     '204':
-      description: No pending jobs available to claim
+      description: No queued jobs available to claim
     '400':
       description: Bad Request (invalid node ID)
     '404':

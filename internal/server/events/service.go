@@ -102,7 +102,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 	}
 
 	// Use runID string directly as streamID (KSUID-backed).
-	streamID := strings.TrimSpace(params.RunID.String())
+	streamID := strings.TrimSpace(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
@@ -135,7 +135,7 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 	}
 
 	// Use runID string directly as streamID (KSUID-backed).
-	streamID := strings.TrimSpace(params.RunID.String())
+	streamID := strings.TrimSpace(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
