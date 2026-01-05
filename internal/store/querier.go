@@ -69,8 +69,8 @@ type Querier interface {
 	// Deletes a mod. Use with caution; should only be called when safe to remove.
 	DeleteMod(ctx context.Context, id string) error
 	// Deletes a mod_repo by id.
-	// Per roadmap/v1/db.md:63, this will CASCADE to related run_repos and jobs due to ON DELETE RESTRICT.
-	// Caller must ensure no active runs reference this repo.
+	// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT (roadmap/v1/db.md).
+	// This DELETE will fail if any run_repos/jobs rows still reference the repo.
 	DeleteModRepo(ctx context.Context, id string) error
 	DeleteNode(ctx context.Context, id string) error
 	DeleteRun(ctx context.Context, id string) error
@@ -135,8 +135,8 @@ type Querier interface {
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	ListModReposByMod(ctx context.Context, modID string) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
-	// @archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
-	// @name_filter: if non-empty, filter by name substring (case-insensitive).
+	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 	ListMods(ctx context.Context, arg ListModsParams) ([]Mod, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
