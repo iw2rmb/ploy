@@ -94,7 +94,10 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 	}
 }
 
-func TestStopRunHandler_CancelsRunAndWork(t *testing.T) {
+// TestCancelRunHandlerV1_CancelsRunAndWork verifies that POST /v1/runs/{id}/cancel
+// cancels the run, cancels Queued/Running repos, and cancels Created/Queued/Running jobs.
+// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
+func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID().String()
@@ -118,11 +121,11 @@ func TestStopRunHandler_CancelsRunAndWork(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/stop", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/cancel", nil)
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 
-	stopRunHandler(st).ServeHTTP(rr, req)
+	cancelRunHandlerV1(st).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
@@ -133,11 +136,13 @@ func TestStopRunHandler_CancelsRunAndWork(t *testing.T) {
 	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusCancelled {
 		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
 	}
+	// Should cancel the Queued repo (not the Success repo).
 	if len(st.updateRunRepoStatusParams) != 1 {
-		t.Fatalf("expected 1 repo status update, got %d", len(st.updateRunRepoStatusParams))
+		t.Fatalf("expected 1 repo status update (for Queued repo), got %d", len(st.updateRunRepoStatusParams))
 	}
+	// Should cancel the Created job (not the Success job).
 	if len(st.updateJobStatusCalls) != 1 {
-		t.Fatalf("expected 1 job status update, got %d", len(st.updateJobStatusCalls))
+		t.Fatalf("expected 1 job status update (for Created job), got %d", len(st.updateJobStatusCalls))
 	}
 }
 

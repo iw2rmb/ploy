@@ -56,7 +56,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},
 		{"/v1/runs/{id}/status", "get"},
-		{"/v1/runs/{id}/stop", "post"},
+		{"/v1/runs/{id}/cancel", "post"},
 		// RunRepo handlers (repos within a batch)
 		{"/v1/runs/{id}/repos", "get"},
 		{"/v1/runs/{id}/repos", "post"},
