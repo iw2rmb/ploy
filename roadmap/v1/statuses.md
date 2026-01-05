@@ -177,11 +177,7 @@ Run status updates / endpoint naming:
 - `internal/server/handlers/register.go`
   - rename `POST /v1/runs/{run_id}/stop` → `POST /v1/runs/{run_id}/cancel` (v1 API).
 - `internal/server/handlers/runs_batch_http.go`
-  - `stopRunHandler` currently sets `runs.status=canceled` (HEAD literal) and marks only `run_repos.status='pending'` repos as `cancelled` (HEAD literals; it does not cancel running repos).
-  - v1 cancel must:
-    - set `runs.status=Cancelled`
-    - cancel all repos (`Queued`/`Running` → `Cancelled`)
-    - cancel/remove waiting jobs from the queue
+  - `cancelRunHandlerV1` sets `runs.status=Cancelled`, cancels all repos (`Queued`/`Running` → `Cancelled`), and cancels/removes `Created`/`Queued`/`Running` jobs (v1 requirement).
 - `internal/server/handlers/nodes_claim.go`
   - today a successful claim may call `AckRunStart` to transition `runs.status` to `running` (HEAD literal).
   - v1 must remove that transition (run is created `Started`) and ensure claim logic does not depend on queued/assigned.
@@ -217,7 +213,7 @@ Batch status helpers:
 Not implemented in this doc, but required for consistency:
 
 - Server endpoint rename: `POST /v1/runs/{run_id}/cancel` (not `/stop`).
-- OpenAPI path file currently documents `/v1/runs/{run_id}/stop` at HEAD (`docs/api/paths/runs_id_stop.yaml`).
+- OpenAPI path file is `docs/api/paths/runs_id_cancel.yaml` at HEAD.
 - `internal/mods/api/status_conversion.go`
   - converts between store status enums and the external Mods API types (`RunState`, `StageState`).
   - v1 status renames/casing must be reflected in these conversions.
