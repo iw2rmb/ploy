@@ -22,7 +22,7 @@ import (
 // This is a simpler contract than the node-based endpoint since job_id
 // is in the URL path and node identity comes from mTLS.
 type completeJobRequest struct {
-	Status   string          `json:"status"`              // Terminal status: succeeded, failed, or canceled
+	Status   string          `json:"status"`              // Terminal status: Success, Fail, or Cancelled
 	ExitCode *int32          `json:"exit_code,omitempty"` // Exit code from job execution
 	Stats    json.RawMessage `json:"stats,omitempty"`     // Optional job statistics (must be JSON object)
 }
@@ -129,7 +129,7 @@ func (p JobStatsPayload) ValidateJobMeta() error {
 // Request body:
 //
 //	{
-//	  "status": "succeeded" | "failed" | "canceled",
+//	  "status": "Success" | "Fail" | "Cancelled",
 //	  "exit_code": 0,
 //	  "stats": { ... }
 //	}
@@ -306,7 +306,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		)
 
 		// Fetch the run for post-completion processing.
-		run, err := st.GetRun(ctx, runID.String())
+		run, err := st.GetRun(ctx, runID)
 		if err != nil {
 			// Log error but don't fail the job completion (job is already marked complete).
 			slog.Error("complete job: get run failed", "job_id", jobIDStr, "run_id", runID, "err", err)
@@ -319,46 +319,38 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		//   can reach a terminal state instead of leaving jobs stranded.
 		// v1 uses Fail instead of failed.
 		if jobStatus == store.JobStatusFail && err == nil {
-			jobs, jobsErr := st.ListJobsByRun(ctx, runID.String())
-			if jobsErr != nil {
-				slog.Error("complete job: failed to list jobs for failure handling",
+			modType := domaintypes.ModType(job.ModType)
+			if err := modType.Validate(); err != nil {
+				slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
 					"job_id", jobIDStr,
-					"err", jobsErr,
+					"mod_type", job.ModType,
+					"err", err,
 				)
-			} else {
-				modType := domaintypes.ModType(job.ModType)
-				if err := modType.Validate(); err != nil {
-					slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
-						"job_id", jobIDStr,
-						"mod_type", job.ModType,
-						"err", err,
-					)
-					modType = ""
-				}
-				switch modType {
-				case domaintypes.ModTypeMR:
-					// MR jobs are best-effort and must not trigger healing or
-					// cancellation of other jobs when they fail.
-					slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
+				modType = ""
+			}
+			switch modType {
+			case domaintypes.ModTypeMR:
+				// MR jobs are best-effort and must not trigger healing or
+				// cancellation of other jobs when they fail.
+				slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
+					"job_id", jobIDStr,
+					"step_index", job.StepIndex,
+				)
+			case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
+				if healErr := maybeCreateHealingJobs(ctx, st, run, job.RunID, job.RepoID, job.Attempt, domaintypes.StepIndex(job.StepIndex)); healErr != nil {
+					slog.Error("complete job: failed to create healing jobs",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,
+						"err", healErr,
 					)
-				case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
-					if healErr := maybeCreateHealingJobs(ctx, st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); healErr != nil {
-						slog.Error("complete job: failed to create healing jobs",
-							"job_id", jobIDStr,
-							"step_index", job.StepIndex,
-							"err", healErr,
-						)
-					}
-				default:
-					if err := cancelRemainingJobsAfterFailure(ctx, st, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
-						slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
-							"job_id", jobIDStr,
-							"step_index", job.StepIndex,
-							"err", err,
-						)
-					}
+				}
+			default:
+				if err := cancelRemainingJobsAfterFailure(ctx, st, job.RunID, job.RepoID, job.Attempt, domaintypes.StepIndex(job.StepIndex)); err != nil {
+					slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
+						"job_id", jobIDStr,
+						"step_index", job.StepIndex,
+						"err", err,
+					)
 				}
 			}
 		}
@@ -366,7 +358,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Server-driven scheduling: after job succeeds, schedule the next job.
 		// v1 removes skipped status (see roadmap/v1/statuses.md:138).
 		if jobStatus == store.JobStatusSuccess {
-			if _, err := st.ScheduleNextJob(ctx, runID.String()); err != nil {
+			if _, err := st.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: job.RunID, RepoID: job.RepoID, Attempt: job.Attempt}); err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to schedule next job",
 						"job_id", jobIDStr,
@@ -379,7 +371,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// After completing a job, check if the run should transition to terminal state.
 		if err == nil {
-			if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, runID); completeErr != nil {
+			if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, domaintypes.RunID(runID)); completeErr != nil {
 				slog.Error("complete job: failed to check run completion",
 					"job_id", jobIDStr,
 					"step_index", job.StepIndex,
@@ -397,7 +389,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		jobModType := domaintypes.ModType(job.ModType)
 		if err == nil && mrURL != "" && jobModType.Validate() == nil && jobModType == domaintypes.ModTypeMR {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
-				ID:    runID.String(),
+				ID:    runID,
 				MrUrl: mrURL,
 			}); updateErr != nil {
 				slog.Error("complete job: failed to merge MR URL into run stats",

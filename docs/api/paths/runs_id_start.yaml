@@ -1,9 +1,10 @@
 post:
   tags: [Control]
-  summary: Start pending repos
+  summary: Start queued repos
   description: |
-    Starts execution for pending repos in a batch run by creating per-repo execution
-    runs and jobs. Returns counts of started/already_done/pending.
+    Starts execution for queued repos in a batch run by creating (or advancing)
+    repo-scoped job queues for `(run_id, repo_id, attempt)`. Returns counts of
+    started/already_done/pending (where pending means queued/not started).
   parameters:
     - in: path
       name: id

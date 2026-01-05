@@ -54,7 +54,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
 	}
-	if ms.lastCreate.RunID != runID {
+	if ms.lastCreate.RunID != runID.String() {
 		t.Fatalf("runID mismatch")
 	}
 }
@@ -104,7 +104,7 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunDiffs{
-		job: store.Job{ID: jobID.String(), RunID: runID},
+		job: store.Job{ID: jobID.String(), RunID: runID.String()},
 		run: store.Run{ID: runID.String()},
 	}
 	h := createRunDiffHandler(ms)
@@ -154,7 +154,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nodeID := domaintypes.NewNodeKey()
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: runID, NodeID: &nodeID},
+		job: store.Job{ID: jobID.String(), RunID: runID.String(), NodeID: &nodeID},
 		run: store.Run{ID: runID.String()},
 	}
 	h := createJobArtifactHandler(ms)

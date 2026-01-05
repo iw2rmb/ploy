@@ -31,29 +31,83 @@ func TestLabSmoke(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a run in queued status (simulating server receiving a run request).
-	modSpec := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
+	// Step 1: Create v1 entities: spec → mod → mod_repo → run → run_repo.
+	createdBy := "smoke-test"
+	specJSON := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
+	specID := domaintypes.NewSpecID().String()
+	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
+		ID:        specID,
+		Name:      "smoke-test",
+		Spec:      specJSON,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateSpec() failed: %v", err)
+	}
+
+	modID := domaintypes.NewModID().String()
+	_, err = db.CreateMod(ctx, store.CreateModParams{
+		ID:        modID,
+		Name:      "smoke-test-" + modID,
+		SpecID:    &spec.ID,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	repoURL := "https://github.com/octocat/Hello-World"
+	baseRef := "main"
+	targetRef := "feature/smoke-test"
+
+	modRepoID := domaintypes.NewModRepoID().String()
+	modRepo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
+		ID:        modRepoID,
+		ModID:     modID,
+		RepoUrl:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateModRepo() failed: %v", err)
+	}
+
+	runID := domaintypes.NewRunID().String()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		RepoUrl:   "https://github.com/octocat/Hello-World",
-		Spec:      modSpec,
-		Status:    store.RunStatusQueued,
-		BaseRef:   "main",
-		TargetRef: "feature/smoke-test",
+		ID:        runID,
+		ModID:     modID,
+		SpecID:    spec.ID,
+		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, repo_url=%s, status=%s", run.ID, run.RepoUrl, run.Status)
+	t.Logf("Created run: id=%v, mod_id=%s, spec_id=%s, status=%s", run.ID, run.ModID, run.SpecID, run.Status)
+
+	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
+		ModID:         modID,
+		RunID:         run.ID,
+		RepoID:        modRepo.ID,
+		RepoBaseRef:   modRepo.BaseRef,
+		RepoTargetRef: modRepo.TargetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunRepo() failed: %v", err)
+	}
 
 	// Step 4: Simulate node operations - Create a job for the run.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		RunID:     domaintypes.RunID(run.ID),
-		Name:      "build",
-		Status:    store.JobStatusRunning,
-		ModType:   "",
-		ModImage:  "",
-		StepIndex: 0,
-		Meta:      []byte(`{"type":"build","tool":"make"}`),
+		ID:          domaintypes.NewJobID().String(),
+		RunID:       run.ID,
+		RepoID:      runRepo.RepoID,
+		RepoBaseRef: runRepo.RepoBaseRef,
+		Attempt:     runRepo.Attempt,
+		Name:        "build",
+		Status:      store.JobStatusRunning,
+		ModType:     "",
+		ModImage:    "",
+		StepIndex:   0,
+		Meta:        []byte(`{"type":"build","tool":"make"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
@@ -63,7 +117,8 @@ func TestLabSmoke(t *testing.T) {
 	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).
 	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build job\n")
 	log, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
+		JobID:   &job.ID,
 		ChunkNo: 0,
 		Data:    logData,
 	})
@@ -75,7 +130,8 @@ func TestLabSmoke(t *testing.T) {
 	// Create a second log chunk to simulate continued streaming.
 	log2Data := []byte("INFO: Build completed successfully\nINFO: Running tests\nINFO: All tests passed\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
+		JobID:   &job.ID,
 		ChunkNo: 1,
 		Data:    log2Data,
 	})
@@ -97,7 +153,7 @@ index 1234567..abcdefg 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
 		JobID:   &job.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
@@ -141,8 +197,8 @@ index 1234567..abcdefg 100644
 		if diffs[0].ID.Bytes != diff.ID.Bytes {
 			t.Errorf("Diff ID mismatch: expected %v, got %v", diff.ID, diffs[0].ID)
 		}
-		if diffs[0].RunID.String() != run.ID {
-			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID.String())
+		if diffs[0].RunID != run.ID {
+			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID)
 		}
 		if diffs[0].JobID == nil || *diffs[0].JobID != job.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", job.ID, diffs[0].JobID)
@@ -164,15 +220,15 @@ index 1234567..abcdefg 100644
 	if fetchedDiff.ID.Bytes != diff.ID.Bytes {
 		t.Errorf("Fetched diff ID mismatch: expected %v, got %v", diff.ID, fetchedDiff.ID)
 	}
-	if fetchedDiff.RunID.String() != run.ID {
-		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID.String())
+	if fetchedDiff.RunID != run.ID {
+		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID)
 	}
 	t.Logf("✓ Individual diff retrieval successful")
 
 	// Step 10: Create an event to simulate node status updates.
 	now := time.Now().UTC()
 	eventParams := store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now,
 			Valid: true,

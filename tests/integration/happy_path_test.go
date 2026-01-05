@@ -28,38 +28,77 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a run in queued status.
+	// Step 1: Create v1 mod+spec+repo, then create a run.
+	createdBy := "integration-test"
 	modSpec := []byte(`{"type":"integration-test","description":"Happy path test"}`)
-	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		RepoUrl:   "https://github.com/example/happy-path-test",
+
+	specID := domaintypes.NewSpecID().String()
+	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
+		ID:        specID,
+		Name:      "integration-spec",
 		Spec:      modSpec,
-		Status:    store.RunStatusQueued,
-		BaseRef:   "main",
-		TargetRef: "feature/happy-path",
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateSpec() failed: %v", err)
+	}
+
+	modID := domaintypes.NewModID().String()
+	_, err = db.CreateMod(ctx, store.CreateModParams{
+		ID:        modID,
+		Name:      "integration-mod-" + modID,
+		SpecID:    &spec.ID,
+		CreatedBy: &createdBy,
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	repoURL := "https://github.com/example/happy-path-test"
+	baseRef := "main"
+	targetRef := "feature/happy-path"
+	repoID := domaintypes.NewModRepoID().String()
+	repo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
+		ID:        repoID,
+		ModID:     modID,
+		RepoUrl:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateModRepo() failed: %v", err)
+	}
+
+	runID := domaintypes.NewRunID().String()
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		ID:        runID,
+		ModID:     modID,
+		SpecID:    spec.ID,
+		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, repo_url=%s, status=%s", run.ID, run.RepoUrl, run.Status)
+	t.Logf("Created run: id=%v, mod_id=%s, repo_id=%s, repo_url=%s, status=%s", run.ID, run.ModID, repo.ID, repo.RepoUrl, run.Status)
 
 	// Verify the run was created with expected values.
-	if run.RepoUrl != "https://github.com/example/happy-path-test" {
-		t.Errorf("Expected run repo_url https://github.com/example/happy-path-test, got %s", run.RepoUrl)
+	if repo.RepoUrl != repoURL {
+		t.Errorf("Expected repo_url %q, got %q", repoURL, repo.RepoUrl)
 	}
-	if run.Status != store.RunStatusQueued {
-		t.Errorf("Expected status queued, got %s", run.Status)
+	if run.Status != store.RunStatusStarted {
+		t.Errorf("Expected status Started, got %s", run.Status)
 	}
-	if run.BaseRef != "main" {
-		t.Errorf("Expected base_ref 'main', got %s", run.BaseRef)
+	if repo.BaseRef != baseRef {
+		t.Errorf("Expected base_ref %q, got %q", baseRef, repo.BaseRef)
 	}
-	if run.TargetRef != "feature/happy-path" {
-		t.Errorf("Expected target_ref 'feature/happy-path', got %s", run.TargetRef)
+	if repo.TargetRef != targetRef {
+		t.Errorf("Expected target_ref %q, got %q", targetRef, repo.TargetRef)
 	}
 
 	// Step 4: Simulate node appends - Create events.
 	now := time.Now().UTC()
 	eventParams := store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now,
 			Valid: true,
@@ -75,8 +114,8 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	t.Logf("Created event: id=%d, run_id=%v, level=%s, message=%s", event.ID, event.RunID, event.Level, event.Message)
 
 	// Verify the event was created with expected values.
-	if event.RunID.String() != run.ID {
-		t.Errorf("Expected event run_id %v, got %v", run.ID, event.RunID.String())
+	if event.RunID != run.ID {
+		t.Errorf("Expected event run_id %v, got %v", run.ID, event.RunID)
 	}
 	if event.Level != "info" {
 		t.Errorf("Expected event level 'info', got %s", event.Level)
@@ -87,7 +126,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 
 	// Create a second event to simulate multiple appends.
 	event2Params := store.CreateEventParams{
-		RunID: domaintypes.RunID(run.ID),
+		RunID: run.ID,
 		Time: pgtype.Timestamptz{
 			Time:  now.Add(1 * time.Second),
 			Valid: true,
@@ -105,7 +144,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	// Step 5: Simulate node appends - Create logs.
 	logData := []byte("INFO: Starting integration test run\nINFO: Cloning repository\nINFO: Building project\n")
 	logParams := store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
 		ChunkNo: 0,
 		Data:    logData,
 	}
@@ -116,8 +155,8 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_len=%d", log.ID, log.RunID, log.ChunkNo, len(log.Data))
 
 	// Verify the log was created with expected values.
-	if log.RunID.String() != run.ID {
-		t.Errorf("Expected log run_id %v, got %v", run.ID, log.RunID.String())
+	if log.RunID != run.ID {
+		t.Errorf("Expected log run_id %v, got %v", run.ID, log.RunID)
 	}
 	if log.ChunkNo != 0 {
 		t.Errorf("Expected chunk_no 0, got %d", log.ChunkNo)
@@ -129,7 +168,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	// Create a second log chunk to simulate streaming appends.
 	log2Data := []byte("INFO: Tests passing\nINFO: Build complete\n")
 	log2Params := store.CreateLogParams{
-		RunID:   domaintypes.RunID(run.ID),
+		RunID:   run.ID,
 		ChunkNo: 1,
 		Data:    log2Data,
 	}
@@ -148,8 +187,8 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if fetchedRun.ID != run.ID {
 		t.Errorf("Fetched run ID mismatch: expected %v, got %v", run.ID, fetchedRun.ID)
 	}
-	if fetchedRun.Status != store.RunStatusQueued {
-		t.Errorf("Fetched run status: expected queued, got %s", fetchedRun.Status)
+	if fetchedRun.Status != store.RunStatusStarted {
+		t.Errorf("Fetched run status: expected Started, got %s", fetchedRun.Status)
 	}
 
 	// Verify events can be listed by run.
@@ -177,7 +216,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	// Also verify ListEventsByRunSince returns only newer events.
-	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{RunID: domaintypes.RunID(run.ID), ID: event.ID})
+	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{RunID: run.ID, ID: event.ID})
 	if err != nil {
 		t.Fatalf("ListEventsByRunSince() failed: %v", err)
 	}
@@ -210,7 +249,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	// Also verify ListLogsByRunSince returns only newer chunks.
-	logsSince, err := db.ListLogsByRunSince(ctx, store.ListLogsByRunSinceParams{RunID: domaintypes.RunID(run.ID), ID: log.ID})
+	logsSince, err := db.ListLogsByRunSince(ctx, store.ListLogsByRunSinceParams{RunID: run.ID, ID: log.ID})
 	if err != nil {
 		t.Fatalf("ListLogsByRunSince() failed: %v", err)
 	}

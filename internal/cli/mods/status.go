@@ -1,8 +1,6 @@
-// status.go provides CLI client implementations for fetching run details and diffs.
+// status.go provides CLI client implementations for fetching diffs.
 //
 // This file implements helpers used by `ploy mod run pull`:
-//   - FetchRunWithCommitSHA: Fetches full run details (including commit_sha)
-//     via GET /v1/runs/{id}.
 //   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs.
 //   - DownloadDiffCommand: Downloads a single diff via GET /v1/diffs/{diff_id}?download=true.
 package mods
@@ -21,65 +19,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// FetchRunWithCommitSHA fetches full run details including commit_sha via GET /v1/runs/{id}.
-// This is used when we need the commit_sha that isn't exposed in the mods API.
-type FetchRunWithCommitSHA struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-}
-
-// RunDetails contains the full run record with commit_sha.
-type RunDetails struct {
-	ID        string  `json:"id"`
-	RepoURL   string  `json:"repo_url"`
-	Status    string  `json:"status"`
-	BaseRef   string  `json:"base_ref"`
-	TargetRef string  `json:"target_ref"`
-	CommitSHA *string `json:"commit_sha,omitempty"`
-}
-
-// Run executes GET /v1/runs/{id} and returns the run details including commit_sha.
-func (c FetchRunWithCommitSHA) Run(ctx context.Context) (*RunDetails, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("fetch run: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("fetch run: base url required")
-	}
-	if c.RunID.IsZero() {
-		return nil, fmt.Errorf("fetch run: run id required")
-	}
-
-	// Build endpoint: /v1/runs/{id}
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()))
-	if err != nil {
-		return nil, fmt.Errorf("fetch run: build url: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("fetch run: build request: %w", err)
-	}
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch run: http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "fetch run")
-	}
-
-	var result RunDetails
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("fetch run: decode response: %w", err)
-	}
-
-	return &result, nil
-}
 
 // DiffEntry represents a single diff record from the list diffs response.
 type DiffEntry struct {

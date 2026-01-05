@@ -6,166 +6,26 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// NOTE: This file uses KSUID-backed string IDs for runs and NanoID(8)-backed string IDs for run_repos.
-// Run IDs are KSUID strings (27 chars); run_repo IDs are NanoID strings (8 chars).
-// Both are treated as opaque strings; no UUID parsing is performed.
-
-// Batch run handlers implement HTTP endpoints for listing, inspecting, and stopping
-// batched mod runs. These handlers build on the `runs` table and aggregate per-repo
-// status from `run_repos` to provide batch-level lifecycle management.
-//
-// The package also provides BatchRepoStarter, which implements the batchscheduler.RepoStarter
-// interface for background processing of pending repos.
-
-// listRunsHandler returns an HTTP handler that lists runs with pagination.
-// GET /v1/runs — Returns a list of run summaries ordered by creation time descending.
-// Query parameters:
-//   - limit: max number of runs to return (default 50, max 100)
-//   - offset: number of runs to skip (default 0)
-func listRunsHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse pagination parameters with defaults.
-		limit := int32(50)
-		offset := int32(0)
-
-		if l := r.URL.Query().Get("limit"); l != "" {
-			parsed, err := strconv.ParseInt(l, 10, 32)
-			if err != nil || parsed < 1 {
-				http.Error(w, "invalid limit parameter", http.StatusBadRequest)
-				return
-			}
-			limit = int32(parsed)
-			// Cap at 100 to avoid excessive load.
-			if limit > 100 {
-				limit = 100
-			}
-		}
-
-		if o := r.URL.Query().Get("offset"); o != "" {
-			parsed, err := strconv.ParseInt(o, 10, 32)
-			if err != nil || parsed < 0 {
-				http.Error(w, "invalid offset parameter", http.StatusBadRequest)
-				return
-			}
-			offset = int32(parsed)
-		}
-
-		// Fetch runs from the store.
-		runs, err := st.ListRuns(r.Context(), store.ListRunsParams{
-			Limit:  limit,
-			Offset: offset,
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list runs: %v", err), http.StatusInternalServerError)
-			slog.Error("list runs: fetch failed", "err", err)
-			return
-		}
-
-		// Build response summaries with optional repo counts.
-		// For efficiency, we fetch repo counts per run to include batch aggregate data.
-		summaries := make([]RunSummary, 0, len(runs))
-		for _, run := range runs {
-			summary := runToSummary(run)
-
-			// Fetch repo counts for this run to provide batch-level aggregates.
-			// run.ID is now a string (KSUID).
-			counts, err := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
-			if err != nil {
-				// Log but continue — repo counts are optional enhancement.
-				slog.Warn("list runs: failed to fetch repo counts", "run_id", run.ID, "err", err)
-			} else if counts.Total > 0 {
-				summary.Counts = counts
-			}
-
-			summaries = append(summaries, summary)
-		}
-
-		// Return response.
-		resp := struct {
-			Runs []RunSummary `json:"runs"`
-		}{
-			Runs: summaries,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list runs: encode response failed", "err", err)
-		}
-	}
-}
-
-// getRunHandler returns an HTTP handler that fetches a single run by ID.
-// GET /v1/runs/{id} — Returns detailed run summary including batch-level status and repo counts.
-//
-// Run IDs are now KSUID-backed strings; no UUID parsing is performed.
-func getRunHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
-		runIDStr, err := requiredPathParam(r, "id")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Fetch the run using string ID directly (no UUID parsing needed).
-		run, err := st.GetRun(r.Context(), runIDStr)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
-			slog.Error("get run: fetch failed", "run_id", runIDStr, "err", err)
-			return
-		}
-
-		// Build summary with repo counts.
-		summary := runToSummary(run)
-
-		// Fetch repo counts to provide batch-level aggregates.
-		// run.ID is now a string (KSUID).
-		counts, err := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
-		if err != nil {
-			slog.Warn("get run: failed to fetch repo counts", "run_id", runIDStr, "err", err)
-		} else if counts.Total > 0 {
-			summary.Counts = counts
-		}
-
-		// Return response.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(summary); err != nil {
-			slog.Error("get run: encode response failed", "err", err)
-		}
-	}
-}
-
-// stopRunHandler returns an HTTP handler that stops a batched run.
-// POST /v1/runs/{id}/stop — Marks the run as canceled and cancels all pending run_repos.
-// Returns 200 on success with the updated run summary.
-//
-// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
+// stopRunHandler returns an HTTP handler that cancels a v1 run.
+// POST /v1/runs/{id}/stop (legacy path) — Marks the run as Cancelled and cancels queued/running repos/jobs.
 func stopRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Fetch the run using string ID directly (no UUID parsing needed).
 		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -177,98 +37,80 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the run is already in a terminal state.
-		if isTerminalRunStatus(run.Status) {
-			// Run is already terminal — return current state without error.
-			// This makes the stop operation idempotent.
+		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 			summary := runToSummary(run)
-			counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
-			if counts != nil && counts.Total > 0 {
+			if counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID)); counts != nil && counts.Total > 0 {
 				summary.Counts = counts
 			}
-
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(summary); err != nil {
-				slog.Error("stop run: encode response failed", "err", err)
-			}
+			_ = json.NewEncoder(w).Encode(summary)
 			return
 		}
 
-		// Update the run status to canceled.
-		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
-			ID:         runIDStr,
-			Status:     store.RunStatusCanceled,
-			FinishedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		})
-		if err != nil {
+		if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runIDStr, Status: store.RunStatusCancelled}); err != nil {
 			http.Error(w, fmt.Sprintf("failed to update run status: %v", err), http.StatusInternalServerError)
 			slog.Error("stop run: update status failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
-		// Cancel all pending run_repos entries for this batch.
-		// Fetch and update each pending repo to 'cancelled'.
-		repos, err := st.ListRunReposByRun(r.Context(), runIDStr)
-		if err != nil {
-			// Log but continue — the run is already marked as canceled.
-			slog.Warn("stop run: failed to list run repos", "run_id", runIDStr, "err", err)
-		} else {
-			for _, repo := range repos {
-				// Only cancel repos that are still pending.
-				if repo.Status == store.RunRepoStatusPending {
-					// repo.ID is now a string (NanoID); use directly.
-					err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
-						ID:     repo.ID,
-						Status: store.RunRepoStatusCancelled,
-					})
-					if err != nil {
-						slog.Warn("stop run: failed to cancel repo", "run_id", runIDStr, "repo_id", repo.ID, "err", err)
-					}
+		now := time.Now().UTC()
+
+		if repos, err := st.ListRunReposByRun(r.Context(), runIDStr); err == nil {
+			for _, rr := range repos {
+				if rr.Status != store.RunRepoStatusQueued && rr.Status != store.RunRepoStatusRunning {
+					continue
 				}
+				_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
+					RunID:  rr.RunID,
+					RepoID: rr.RepoID,
+					Status: store.RunRepoStatusCancelled,
+				})
 			}
 		}
 
-		slog.Info("run stopped", "run_id", runIDStr)
-
-		// Re-fetch the run to get updated state.
-		run, err = st.GetRun(r.Context(), runIDStr)
-		if err != nil {
-			// The run was just updated, so this should not fail. Log and return the pre-updated summary.
-			slog.Error("stop run: re-fetch failed", "run_id", runIDStr, "err", err)
+		if jobs, err := st.ListJobsByRun(r.Context(), runIDStr); err == nil {
+			for _, job := range jobs {
+				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
+					continue
+				}
+				dur := int64(0)
+				if job.StartedAt.Valid {
+					if d := now.Sub(job.StartedAt.Time).Milliseconds(); d > 0 {
+						dur = d
+					}
+				}
+				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+					ID:         job.ID,
+					Status:     store.JobStatusCancelled,
+					StartedAt:  job.StartedAt,
+					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
+					DurationMs: dur,
+				})
+			}
 		}
 
-		// Build and return the updated summary.
+		run, _ = st.GetRun(r.Context(), runIDStr)
 		summary := runToSummary(run)
-		counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID))
-		if counts != nil && counts.Total > 0 {
+		if counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID)); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(summary); err != nil {
-			slog.Error("stop run: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(summary)
 	}
 }
 
-// addRunRepoHandler returns an HTTP handler that adds a repo to a batch run.
+// addRunRepoHandler adds a repo to an existing run (and to the mod repo set).
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
-// Creates a run_repos row with status=pending using a NanoID(8) for the repo ID.
-// Returns 201 on success with the created repo entry.
-//
-// Run IDs are KSUID strings; run_repo IDs are NanoID strings generated via NewRunRepoID().
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Verify the run exists before adding a repo.
 		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -279,27 +121,20 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			slog.Error("add run repo: get run failed", "run_id", runIDStr, "err", err)
 			return
 		}
-
-		// Reject adding repos to terminal runs — the batch is already complete.
-		if isTerminalRunStatus(run.Status) {
+		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 			http.Error(w, "cannot add repos to a terminal run", http.StatusConflict)
 			return
 		}
 
-		// Decode request body with domain types for VCS fields.
-		// JSON unmarshaling will automatically normalize values; we validate explicitly.
 		var req struct {
-			RepoURL domaintypes.RepoURL `json:"repo_url"`
-			BaseRef domaintypes.GitRef  `json:"base_ref"`
-			// TargetRef is optional; when omitted, downstream MR creation derives a default.
-			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
+			RepoURL   domaintypes.RepoURL `json:"repo_url"`
+			BaseRef   domaintypes.GitRef  `json:"base_ref"`
+			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
 			return
 		}
-
-		// Validate domain types explicitly to catch missing/zero-value fields.
 		if err := req.RepoURL.Validate(); err != nil {
 			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
 			return
@@ -308,230 +143,186 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
 			return
 		}
-		if req.TargetRef != nil {
-			if err := req.TargetRef.Validate(); err != nil {
-				http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
-				return
-			}
-		}
-
-		// Create the run_repo entry with status=pending.
-		// Generate a NanoID(8) for the repo ID using the ID helper.
-		targetRef := ""
-		if req.TargetRef != nil {
-			targetRef = req.TargetRef.String()
-		}
-
-		repoID := domaintypes.NewRunRepoID()
-		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			ID:        string(repoID),
-			RunID:     domaintypes.RunID(runIDStr),
-			RepoUrl:   req.RepoURL.String(),
-			BaseRef:   req.BaseRef.String(),
-			TargetRef: targetRef,
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
-			slog.Error("add run repo: create failed", "run_id", runIDStr, "repo_url", req.RepoURL, "err", err)
+		if err := req.TargetRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		slog.Info("run repo added",
-			"run_id", runIDStr,
-			"repo_id", runRepo.ID, // NanoID string; use directly.
-			"repo_url", req.RepoURL,
-		)
+		modRepoID := domaintypes.NewModRepoID().String()
+		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
+			ID:        modRepoID,
+			ModID:     run.ModID,
+			RepoUrl:   req.RepoURL.String(),
+			BaseRef:   req.BaseRef.String(),
+			TargetRef: req.TargetRef.String(),
+		})
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				http.Error(w, "repo already exists for mod", http.StatusConflict)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to create mod repo: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: create mod repo failed", "run_id", runIDStr, "err", err)
+			return
+		}
 
-		// Return the created repo entry.
+		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
+			ModID:         run.ModID,
+			RunID:         runIDStr,
+			RepoID:        modRepo.ID,
+			RepoBaseRef:   modRepo.BaseRef,
+			RepoTargetRef: modRepo.TargetRef,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: create run repo failed", "run_id", runIDStr, "repo_id", modRepo.ID, "err", err)
+			return
+		}
+
+		// v1 immediate start: create repo-scoped jobs for the new queued repo.
+		spec, err := st.GetSpec(r.Context(), run.SpecID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to load spec: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: get spec failed", "run_id", runIDStr, "spec_id", run.SpecID, "err", err)
+			return
+		}
+		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			slog.Error("add run repo: create jobs failed", "run_id", runIDStr, "repo_id", runRepo.RepoID, "err", err)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
-			slog.Error("add run repo: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, modRepo.RepoUrl))
 	}
 }
 
-// listRunReposHandler returns an HTTP handler that lists repos within a batch run.
-// GET /v1/runs/{id}/repos — Returns the list of repos with status, attempt, timing fields.
-//
-// Run IDs are KSUID strings; treated as opaque identifiers.
+// listRunReposHandler lists repos for a run.
+// GET /v1/runs/{id}/repos
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Verify the run exists before listing repos.
-		_, err = st.GetRun(r.Context(), runIDStr)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repos: get run failed", "run_id", runIDStr, "err", err)
-			return
-		}
-
-		// Fetch all repos for this run.
 		repos, err := st.ListRunReposByRun(r.Context(), runIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repos: list failed", "run_id", runIDStr, "err", err)
+			slog.Error("list run repos: fetch failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
-		// Build response.
 		reposResp := make([]RunRepoResponse, 0, len(repos))
 		for _, rr := range repos {
-			reposResp = append(reposResp, runRepoToResponse(rr))
+			repoURL := ""
+			if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
+				repoURL = mr.RepoUrl
+			}
+			reposResp = append(reposResp, runRepoToResponse(rr, repoURL))
 		}
 
 		resp := struct {
 			Repos []RunRepoResponse `json:"repos"`
-		}{
-			Repos: reposResp,
-		}
+		}{Repos: reposResp}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list run repos: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
-// deleteRunRepoHandler returns an HTTP handler that removes/cancels a repo from a batch.
-// DELETE /v1/runs/{id}/repos/{repo_id} — Marks pending repos as skipped, running repos as cancelled.
-// Returns 200 on success with the updated repo entry.
-//
-// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
+// deleteRunRepoHandler cancels a repo execution within a run (legacy DELETE path).
+// DELETE /v1/runs/{id}/repos/{repo_id}
 func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Parse the repo ID from the URL path parameter using the shared helper.
 		repoIDStr, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Verify the run exists.
-		_, err = st.GetRun(r.Context(), runIDStr)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run repo: get run failed", "run_id", runIDStr, "err", err)
-			return
-		}
-
-		// Fetch the repo entry using string ID directly.
-		runRepo, err := st.GetRunRepo(r.Context(), repoIDStr)
+		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "repo not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run repo: get repo failed", "repo_id", repoIDStr, "err", err)
+			slog.Error("delete run repo: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
 			return
 		}
 
-		// Verify the repo belongs to this run by comparing string run IDs.
-		if runRepo.RunID.String() != runIDStr {
-			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
-			return
-		}
-
-		// Determine the new status based on current status.
-		// Pending → Skipped (never started, user removed it).
-		// Running → Cancelled (will need execution to stop).
-		// Terminal statuses → No change (idempotent).
-		var newStatus store.RunRepoStatus
-		switch runRepo.Status {
-		case store.RunRepoStatusPending:
-			newStatus = store.RunRepoStatusSkipped
-		case store.RunRepoStatusRunning:
-			newStatus = store.RunRepoStatusCancelled
-		default:
-			// Already terminal — return current state (idempotent).
+		if rr.Status == store.RunRepoStatusCancelled || rr.Status == store.RunRepoStatusSuccess || rr.Status == store.RunRepoStatusFail {
+			repoURL := ""
+			if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
+				repoURL = mr.RepoUrl
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
-				slog.Error("delete run repo: encode response failed", "err", err)
+			_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL))
+			return
+		}
+
+		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runIDStr, RepoID: repoIDStr, Status: store.RunRepoStatusCancelled})
+
+		now := time.Now().UTC()
+		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{RunID: runIDStr, RepoID: repoIDStr, Attempt: rr.Attempt})
+		if err == nil {
+			for _, job := range jobs {
+				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
+					continue
+				}
+				dur := int64(0)
+				if job.StartedAt.Valid {
+					if d := now.Sub(job.StartedAt.Time).Milliseconds(); d > 0 {
+						dur = d
+					}
+				}
+				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+					ID:         job.ID,
+					Status:     store.JobStatusCancelled,
+					StartedAt:  job.StartedAt,
+					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
+					DurationMs: dur,
+				})
 			}
-			return
 		}
 
-		// Update the repo status using string ID.
-		err = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
-			ID:     repoIDStr,
-			Status: newStatus,
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to update repo status: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run repo: update status failed", "repo_id", repoIDStr, "err", err)
-			return
+		rr, _ = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
+		repoURL := ""
+		if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
+			repoURL = mr.RepoUrl
 		}
-
-		slog.Info("run repo deleted",
-			"run_id", runIDStr,
-			"repo_id", repoIDStr,
-			"old_status", runRepo.Status,
-			"new_status", newStatus,
-		)
-
-		// Re-fetch to get updated timestamps.
-		runRepo, err = st.GetRunRepo(r.Context(), repoIDStr)
-		if err != nil {
-			// Log but return success — the status was updated.
-			slog.Warn("delete run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
-			runRepo.Status = newStatus // Use the intended status in response.
-		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
-			slog.Error("delete run repo: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL))
 	}
 }
 
-// restartRunRepoHandler returns an HTTP handler that restarts a repo within a batch.
-// POST /v1/runs/{id}/repos/{repo_id}/restart — Resets status to pending, increments attempt.
-// Optionally updates base_ref/target_ref from request body.
-// Returns 200 on success with the updated repo entry.
-//
-// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
+// restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
+// POST /v1/runs/{id}/repos/{repo_id}/restart
 func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Parse the repo ID from the URL path parameter using the shared helper.
 		repoIDStr, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Verify the run exists and is not terminal.
 		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -543,51 +334,26 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Reject restarting repos in terminal runs — the batch is already complete.
-		if isTerminalRunStatus(run.Status) {
-			http.Error(w, "cannot restart repos in a terminal run", http.StatusConflict)
-			return
-		}
-
-		// Fetch the repo entry using string ID directly.
-		runRepo, err := st.GetRunRepo(r.Context(), repoIDStr)
+		runRepo, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "repo not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
-			slog.Error("restart run repo: get repo failed", "repo_id", repoIDStr, "err", err)
+			slog.Error("restart run repo: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
 			return
 		}
 
-		// Verify the repo belongs to this run by comparing string run IDs.
-		if runRepo.RunID.String() != runIDStr {
-			http.Error(w, "repo does not belong to this run", http.StatusNotFound)
-			return
-		}
-
-		// Only allow restart from terminal states (succeeded, failed, skipped, cancelled).
-		// Pending or running repos cannot be restarted — they haven't completed yet.
-		if !isTerminalRunRepoStatus(runRepo.Status) {
-			http.Error(w, "can only restart repos in terminal state", http.StatusConflict)
-			return
-		}
-
-		// Decode optional request body for ref updates.
-		// Empty body is allowed — just restart with existing refs.
 		var req struct {
 			BaseRef   *domaintypes.GitRef `json:"base_ref,omitempty"`
 			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
 		}
-		// Only decode if body is present (Content-Length > 0 or chunked).
 		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 				return
 			}
-
-			// Validate provided refs when present.
 			if req.BaseRef != nil {
 				if err := req.BaseRef.Validate(); err != nil {
 					http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
@@ -602,100 +368,81 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		// Increment attempt and reset status to pending.
-		// This uses IncrementRunRepoAttempt which also clears timing fields.
-		err = st.IncrementRunRepoAttempt(r.Context(), repoIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to restart repo: %v", err), http.StatusInternalServerError)
-			slog.Error("restart run repo: increment attempt failed", "repo_id", repoIDStr, "err", err)
-			return
-		}
-
-		// If base_ref/target_ref updates are provided, persist them.
-		if req.BaseRef != nil || req.TargetRef != nil {
-			newBaseRef := runRepo.BaseRef
-			if req.BaseRef != nil {
-				newBaseRef = req.BaseRef.String()
-			}
-			newTargetRef := runRepo.TargetRef
-			if req.TargetRef != nil {
-				newTargetRef = req.TargetRef.String()
-			}
-
-			if err := st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{
-				ID:        repoIDStr,
-				BaseRef:   newBaseRef,
-				TargetRef: newTargetRef,
-			}); err != nil {
-				http.Error(w, fmt.Sprintf("failed to update repo refs: %v", err), http.StatusInternalServerError)
-				slog.Error("restart run repo: update refs failed", "repo_id", repoIDStr, "err", err)
+		// If the run is terminal, reopen it to Started for the restart attempt.
+		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
+			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runIDStr, Status: store.RunStatusStarted}); err != nil {
+				http.Error(w, fmt.Sprintf("failed to reopen run: %v", err), http.StatusInternalServerError)
 				return
 			}
 		}
 
-		slog.Info("run repo restarted",
-			"run_id", runIDStr,
-			"repo_id", repoIDStr,
-			"old_status", runRepo.Status,
-			"old_attempt", runRepo.Attempt,
-		)
+		if req.BaseRef != nil || req.TargetRef != nil {
+			newBase := runRepo.RepoBaseRef
+			if req.BaseRef != nil {
+				newBase = req.BaseRef.String()
+			}
+			newTarget := runRepo.RepoTargetRef
+			if req.TargetRef != nil {
+				newTarget = req.TargetRef.String()
+			}
+			_ = st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runIDStr, RepoID: repoIDStr, RepoBaseRef: newBase, RepoTargetRef: newTarget})
+			_ = st.UpdateModRepoRefs(r.Context(), store.UpdateModRepoRefsParams{ID: repoIDStr, BaseRef: newBase, TargetRef: newTarget})
+		}
 
-		// Re-fetch to get updated state.
-		runRepo, err = st.GetRunRepo(r.Context(), repoIDStr)
+		if err := st.IncrementRunRepoAttempt(r.Context(), store.IncrementRunRepoAttemptParams{RunID: runIDStr, RepoID: repoIDStr}); err != nil {
+			http.Error(w, fmt.Sprintf("failed to restart repo: %v", err), http.StatusInternalServerError)
+			slog.Error("restart run repo: increment attempt failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+			return
+		}
+
+		runRepo, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
 		if err != nil {
-			// Log but return success — the restart was applied.
-			slog.Warn("restart run repo: re-fetch failed", "repo_id", repoIDStr, "err", err)
-			// Simulate the expected state in response.
-			runRepo.Status = store.RunRepoStatusPending
-			runRepo.Attempt++
+			http.Error(w, fmt.Sprintf("failed to reload repo: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		spec, err := st.GetSpec(r.Context(), run.SpecID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to load spec: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := createJobsFromSpec(r.Context(), st, runIDStr, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		repoURL := ""
+		if mr, err := st.GetModRepo(r.Context(), runRepo.RepoID); err == nil {
+			repoURL = mr.RepoUrl
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(runRepoToResponse(runRepo)); err != nil {
-			slog.Error("restart run repo: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL))
 	}
 }
 
-// -------------------------------------------------------------------------
-// Batch execution handlers — connect RunRepo entries to execution runs.
-// -------------------------------------------------------------------------
-
 // StartRunResponse contains the result of starting a batch run.
-// Uses domain type RunID for type-safe run identification.
 type StartRunResponse struct {
 	RunID       domaintypes.RunID `json:"run_id"`
-	Started     int               `json:"started"`      // Number of repos that started execution.
-	AlreadyDone int               `json:"already_done"` // Number of repos already in terminal state.
-	Pending     int               `json:"pending"`      // Number of repos still pending (if any).
+	Started     int               `json:"started"`
+	AlreadyDone int               `json:"already_done"`
+	Pending     int               `json:"pending"`
 }
 
-// startRunHandler returns an HTTP handler that starts execution for pending repos in a batch.
-// POST /v1/runs/{id}/start — Creates child execution runs for each pending repo and creates jobs.
-// Returns 200 on success with counts of started, already done, and remaining pending repos.
-//
-// This handler delegates to BatchRepoStarter.StartPendingRepos to ensure consistent behavior
-// between the HTTP endpoint and the background scheduler (batchscheduler.Scheduler).
-//
-// Run IDs are KSUID strings; run_repo IDs are NanoID strings. Both are treated as opaque.
+// startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
+// POST /v1/runs/{id}/start
 func startRunHandler(st store.Store) http.HandlerFunc {
-	// Create a BatchRepoStarter to delegate the start logic.
-	// This ensures the same code path is used for both HTTP and scheduler-triggered starts.
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Verify the run exists and check for terminal state before delegating.
-		// This allows returning proper HTTP error codes (404, 409) that the
-		// scheduler path doesn't need.
-		batchRun, err := st.GetRun(r.Context(), runIDStr)
+		run, err := st.GetRun(r.Context(), runIDStr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -706,23 +453,18 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Reject starting execution for terminal runs with HTTP 409 Conflict.
-		if isTerminalRunStatus(batchRun.Status) {
+		if isTerminalRunStatus(run.Status) {
 			http.Error(w, "cannot start repos in a terminal run", http.StatusConflict)
 			return
 		}
 
-		// Delegate to the unified StartPendingRepos implementation.
-		// This ensures the HTTP handler and background scheduler use the same logic
-		// for "create child run → create jobs → link repo → ack run start".
 		result, err := starter.StartPendingRepos(r.Context(), runIDStr)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to start pending repos: %v", err), http.StatusInternalServerError)
-			slog.Error("start run: start pending repos failed", "run_id", runIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to start queued repos: %v", err), http.StatusInternalServerError)
+			slog.Error("start run: start queued repos failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
-		// Build response using the result from the unified implementation.
 		resp := StartRunResponse{
 			RunID:       domaintypes.RunID(runIDStr),
 			Started:     result.Started,
@@ -732,8 +474,6 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("start run: encode response failed", "err", err)
-		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }

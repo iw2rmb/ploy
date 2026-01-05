@@ -33,26 +33,23 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			serverResp: []BatchSummary{
 				{
 					ID:        domaintypes.RunID("batch-001"), // Convert to domain type
-					Name:      strPtr("test-batch"),
-					Status:    "running",
-					RepoURL:   "https://github.com/org/repo.git",
-					BaseRef:   "main",
-					TargetRef: "feature",
+					Status:    "Started",
+					ModID:     "mod-001",
+					SpecID:    "spec-001",
 					CreatedAt: time.Now(),
 					Counts: &RunRepoCounts{
 						Total:         5,
-						Pending:       2,
+						Queued:        2,
 						Running:       1,
-						Succeeded:     2,
+						Success:       2,
 						DerivedStatus: "running",
 					},
 				},
 				{
 					ID:        domaintypes.RunID("batch-002"), // Convert to domain type
-					Status:    "completed",
-					RepoURL:   "https://github.com/org/repo2.git",
-					BaseRef:   "main",
-					TargetRef: "hotfix",
+					Status:    "Finished",
+					ModID:     "mod-002",
+					SpecID:    "spec-002",
 					CreatedAt: time.Now(),
 				},
 			},
@@ -70,7 +67,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			limit:  10,
 			offset: 5,
 			serverResp: []BatchSummary{
-				{ID: domaintypes.RunID("batch-page"), Status: "queued"}, // Convert to domain type
+				{ID: domaintypes.RunID("batch-page"), Status: "Started", ModID: "mod-page", SpecID: "spec-page"}, // Convert to domain type
 			},
 			wantCount: 1,
 		},
@@ -220,6 +217,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 		baseRef     string
 		targetRef   string
 		batchName   *string
+		runSummary  BatchSummary
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -230,6 +228,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "feature-branch",
 			batchName:  strPtr("test-batch"),
+			runSummary: BatchSummary{ID: domaintypes.RunID("batch-new-001"), Status: "Started", ModID: "mod-001", SpecID: "spec-001", CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -238,6 +237,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "hotfix",
 			batchName:  nil,
+			runSummary: BatchSummary{ID: domaintypes.RunID("batch-new-001"), Status: "Started", ModID: "mod-002", SpecID: "spec-002", CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -255,46 +255,40 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			t.Parallel()
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify POST method.
-				if r.Method != http.MethodPost {
-					t.Errorf("expected POST, got %s", r.Method)
-				}
-				// Verify path is /v1/mods.
-				if r.URL.Path != "/v1/mods" {
-					t.Errorf("expected path /v1/mods, got %s", r.URL.Path)
-				}
+				switch {
+				case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
+					// Decode and verify request body.
+					var req struct {
+						Name      *string `json:"name,omitempty"`
+						RepoURL   string  `json:"repo_url"`
+						BaseRef   string  `json:"base_ref"`
+						TargetRef string  `json:"target_ref"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+						t.Errorf("decode request body: %v", err)
+					}
+					if req.RepoURL != tc.repoURL {
+						t.Errorf("request repo_url = %q, want %q", req.RepoURL, tc.repoURL)
+					}
 
-				// Decode and verify request body.
-				var req struct {
-					Name      *string `json:"name,omitempty"`
-					RepoURL   string  `json:"repo_url"`
-					BaseRef   string  `json:"base_ref"`
-					TargetRef string  `json:"target_ref"`
-				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-					t.Errorf("decode request body: %v", err)
-				}
-				if req.RepoURL != tc.repoURL {
-					t.Errorf("request repo_url = %q, want %q", req.RepoURL, tc.repoURL)
-				}
+					resp := struct {
+						RunID domaintypes.RunID `json:"run_id"`
+					}{
+						RunID: domaintypes.RunID("batch-new-001"),
+					}
 
-				resp := struct {
-					RunID     domaintypes.RunID `json:"run_id"` // Run ID returned from server
-					Status    string            `json:"status"`
-					RepoURL   string            `json:"repo_url"`
-					BaseRef   string            `json:"base_ref"`
-					TargetRef string            `json:"target_ref"`
-				}{
-					RunID:     domaintypes.RunID("batch-new-001"),
-					Status:    "queued",
-					RepoURL:   tc.repoURL,
-					BaseRef:   tc.baseRef,
-					TargetRef: tc.targetRef,
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(tc.statusCode)
+					_ = json.NewEncoder(w).Encode(resp)
+					return
+				case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/batch-new-001":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(tc.runSummary)
+					return
+				default:
+					t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.Path)
 				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(tc.statusCode)
-				_ = json.NewEncoder(w).Encode(resp)
 			}))
 			t.Cleanup(srv.Close)
 
@@ -333,8 +327,8 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			if result.ID == "" {
 				t.Error("expected non-empty batch ID")
 			}
-			if result.Status != "queued" {
-				t.Errorf("got status %q, want %q", result.Status, "queued")
+			if result.Status != "Started" {
+				t.Errorf("got status %q, want %q", result.Status, "Started")
 			}
 		})
 	}

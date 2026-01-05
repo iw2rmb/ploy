@@ -2,7 +2,7 @@ post:
   tags: [Control]
   summary: Resume Mods run
   description: |
-    Resumes a failed or canceled Mods run by requeueing eligible jobs.
+    Resumes a failed or cancelled Mods run by requeueing eligible jobs.
     This endpoint is idempotent for in-progress runs.
   parameters:
     - in: path

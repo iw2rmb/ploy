@@ -170,7 +170,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateEventParams{
-				RunID:   domaintypes.RunID(runID),
+				RunID:   runID,
 				JobID:   nil,
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   "info",
@@ -186,7 +186,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 				return store.Event{}, context.DeadlineExceeded
 			},
 			params: store.CreateEventParams{
-				RunID:   domaintypes.RunID(runID),
+				RunID:   runID,
 				Level:   "error",
 				Message: "failed event",
 			},
@@ -205,7 +205,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			},
 			params: store.CreateEventParams{
 				// Whitespace-only run ID is treated as invalid for SSE stream.
-				RunID:   domaintypes.RunID("   "),
+				RunID:   "   ",
 				Level:   "warn",
 				Message: "invalid run id event",
 			},
@@ -246,7 +246,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 
 			// Check if event was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID.String())
+				streamID := strings.TrimSpace(tt.params.RunID)
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
@@ -306,7 +306,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 
 			ctx := context.Background()
 			params := store.CreateEventParams{
-				RunID:   domaintypes.RunID(runID),
+				RunID:   runID,
 				JobID:   nil,
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   tc.inLevel,
@@ -324,7 +324,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			}
 
 			// Verify SSE stream used normalized level in LogRecord.Stream
-			streamID := strings.TrimSpace(params.RunID.String())
+			streamID := strings.TrimSpace(params.RunID)
 			snapshot := svc.Hub().Snapshot(streamID)
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
@@ -369,7 +369,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateLogParams{
-				RunID:   domaintypes.RunID(runID),
+				RunID:   runID,
 				JobID:   nil,
 				ChunkNo: 1,
 				Data:    []byte("test log line"),
@@ -383,7 +383,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				return store.Log{}, context.DeadlineExceeded
 			},
 			params: store.CreateLogParams{
-				RunID:   domaintypes.RunID(runID),
+				RunID:   runID,
 				ChunkNo: 2,
 				Data:    []byte("failed log"),
 			},
@@ -401,7 +401,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateLogParams{
-				RunID:   domaintypes.RunID("   "),
+				RunID:   "   ",
 				ChunkNo: 3,
 				Data:    []byte("invalid run id log"),
 			},
@@ -442,7 +442,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 
 			// Check if log was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID.String())
+				streamID := strings.TrimSpace(tt.params.RunID)
 				snapshot := svc.Hub().Snapshot(streamID)
 				if len(snapshot) == 0 {
 					t.Fatal("expected log event in hub snapshot, got none")
@@ -531,7 +531,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 			}
 			return store.Job{
 				ID:        jobID,
-				RunID:     domaintypes.RunID(runID),
+				RunID:     runID,
 				Name:      "build-step",
 				ModType:   "mod",
 				StepIndex: 2000,
@@ -551,7 +551,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 
 	ctx := context.Background()
 	params := store.CreateLogParams{
-		RunID:   domaintypes.RunID(runID),
+		RunID:   runID,
 		JobID:   &jobID,
 		ChunkNo: 1,
 		Data:    gzippedLog,
@@ -632,7 +632,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 
 	ctx := context.Background()
 	params := store.CreateLogParams{
-		RunID:   domaintypes.RunID(runID),
+		RunID:   runID,
 		JobID:   nil, // No job ID.
 		ChunkNo: 1,
 		Data:    gzippedLog,
@@ -713,7 +713,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 
 	ctx := context.Background()
 	params := store.CreateLogParams{
-		RunID:   domaintypes.RunID(runID),
+		RunID:   runID,
 		JobID:   &jobID,
 		ChunkNo: 1,
 		Data:    gzippedLog,

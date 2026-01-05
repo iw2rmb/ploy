@@ -6,10 +6,10 @@
 // subcommand parses its own flags and invokes the corresponding HTTP handler.
 //
 // Command structure:
-//   - ploy mod run repo add --repo-url <url> --base-ref <ref> --target-ref <ref> <run-name>
-//   - ploy mod run repo remove --repo-id <id> <run-name>
-//   - ploy mod run repo restart --repo-id <id> [--base-ref <ref>] [--target-ref <ref>] <run-name>
-//   - ploy mod run repo status <run-name>
+//   - ploy mod run repo add --repo-url <url> --base-ref <ref> --target-ref <ref> <run-id>
+//   - ploy mod run repo remove --repo-id <id> <run-id>
+//   - ploy mod run repo restart --repo-id <id> [--base-ref <ref>] [--target-ref <ref>] <run-id>
+//   - ploy mod run repo status <run-id>
 package main
 
 import (
@@ -55,7 +55,7 @@ func handleModRunRepo(args []string, stderr io.Writer) error {
 
 // printModRunRepoUsage renders help for mod run repo subcommands.
 func printModRunRepoUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run repo <action> [flags] <run-name>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run repo <action> [flags] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Actions:")
 	_, _ = fmt.Fprintln(w, "  add       Add a repo to a batch run")
@@ -65,14 +65,14 @@ func printModRunRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	// Examples use neutral <repo-id> placeholder since repo IDs are NanoID(8) strings, not UUIDs.
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo add --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature <run-name>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove --repo-id <repo-id> <run-name>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart --repo-id <repo-id> <run-name>")
-	_, _ = fmt.Fprintln(w, "  ploy mod run repo status <run-name>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo add --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature <run-id>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo remove --repo-id <repo-id> <run-id>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo restart --repo-id <repo-id> <run-id>")
+	_, _ = fmt.Fprintln(w, "  ploy mod run repo status <run-id>")
 }
 
-// handleModRunRepoAdd implements `ploy mod run repo add <run-name> --repo-url <url> --base-ref <ref> [--target-ref <ref>]`.
-// Adds a new repo entry to a batch run with status=pending.
+// handleModRunRepoAdd implements `ploy mod run repo add <run-id> --repo-url <url> --base-ref <ref> --target-ref <ref>`.
+// Adds a new repo entry to a batch run with status=Queued and immediately creates repo-scoped jobs.
 func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -85,11 +85,11 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Extract positional run-name.
+	// Extract positional run-id.
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunRepoUsage(stderr)
-		return errors.New("run-name required")
+		return errors.New("run-id required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -103,9 +103,21 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 		printModRunRepoUsage(stderr)
 		return errors.New("--base-ref required")
 	}
+	if strings.TrimSpace(*targetRef) == "" {
+		printModRunRepoUsage(stderr)
+		return errors.New("--target-ref required")
+	}
 	if err := domaintypes.RepoURL(trimmedRepoURL).Validate(); err != nil {
 		printModRunRepoUsage(stderr)
 		return fmt.Errorf("--repo-url: %w", err)
+	}
+	if err := domaintypes.GitRef(strings.TrimSpace(*baseRef)).Validate(); err != nil {
+		printModRunRepoUsage(stderr)
+		return fmt.Errorf("--base-ref: %w", err)
+	}
+	if err := domaintypes.GitRef(strings.TrimSpace(*targetRef)).Validate(); err != nil {
+		printModRunRepoUsage(stderr)
+		return fmt.Errorf("--target-ref: %w", err)
 	}
 
 	ctx := context.Background()
@@ -129,8 +141,8 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleModRunRepoRemove implements `ploy mod run repo remove <run-name> --repo-id <id>`.
-// Marks pending repos as skipped, running repos as cancelled.
+// handleModRunRepoRemove implements `ploy mod run repo remove <run-id> --repo-id <id>`.
+// Cancels a repo within a run (Queued/Running → Cancelled) and cancels active jobs for the current attempt.
 func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo remove", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -142,11 +154,11 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Extract positional batch ID.
+	// Extract positional run ID.
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunRepoUsage(stderr)
-		return errors.New("run-name required")
+		return errors.New("run-id required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -172,8 +184,8 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleModRunRepoRestart implements `ploy mod run repo restart <run-name> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]`.
-// Resets repo status to pending, increments attempt, optionally updates refs.
+// handleModRunRepoRestart implements `ploy mod run repo restart <run-id> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]`.
+// Resets repo status to Queued, increments attempt, optionally updates refs.
 func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo restart", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -187,11 +199,11 @@ func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Extract positional batch ID.
+	// Extract positional run ID.
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunRepoUsage(stderr)
-		return errors.New("run-name required")
+		return errors.New("run-id required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 
@@ -226,7 +238,7 @@ func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleModRunRepoStatus implements `ploy mod run repo status <run-name>`.
+// handleModRunRepoStatus implements `ploy mod run repo status <run-id>`.
 // Lists all repos within a batch with their status, attempt count, and timing.
 func handleModRunRepoStatus(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run repo status", flag.ContinueOnError)
@@ -237,11 +249,11 @@ func handleModRunRepoStatus(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Extract positional batch ID.
+	// Extract positional run ID.
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
 		printModRunRepoUsage(stderr)
-		return errors.New("run-name required")
+		return errors.New("run-id required")
 	}
 	batchID := strings.TrimSpace(rest[0])
 

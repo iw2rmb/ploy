@@ -42,7 +42,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 			listArtifactBundlesByCIDResult: []store.ArtifactBundle{
 				{
 					ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-					RunID:  runID,
+					RunID:  runID.String(),
 					Cid:    &testCID,
 					Digest: &testDigest,
 					Name:   &testName,
@@ -175,7 +175,7 @@ func TestGetArtifactHandler(t *testing.T) {
 		st := &mockStore{
 			getArtifactBundleResult: store.ArtifactBundle{
 				ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:  runID,
+				RunID:  runID.String(),
 				Cid:    &testCID,
 				Digest: &testDigest,
 				Name:   &testName,
@@ -225,7 +225,7 @@ func TestGetArtifactHandler(t *testing.T) {
 		st := &mockStore{
 			getArtifactBundleResult: store.ArtifactBundle{
 				ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:  runID,
+				RunID:  runID.String(),
 				Cid:    &testCID,
 				Digest: &testDigest,
 				Bundle: testBundle,

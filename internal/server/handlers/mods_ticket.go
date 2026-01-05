@@ -32,7 +32,7 @@ import (
 // submitRunHandler returns an HTTP handler that submits a new run (mods run).
 //
 // Endpoint: POST /v1/mods
-// Request:  RunSubmitRequest {repo_url, base_ref, target_ref?, commit_sha?, spec?, created_by?}
+// Request:  RunSubmitRequest {repo_url, base_ref, target_ref?, spec?, created_by?}
 // Response: 201 Created with RunSummary body (canonical schema, no wrapper types)
 //
 // Canonical contract (see docs/mods-lifecycle.md § 2.1):
@@ -55,10 +55,9 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			// TargetRef is optional; when omitted, downstream components derive a default
 			// branch name when an MR is actually created (using the run name when set,
 			// otherwise the DB run ID).
-			TargetRef *domaintypes.GitRef    `json:"target_ref,omitempty"`
-			CommitSha *domaintypes.CommitSHA `json:"commit_sha,omitempty"`
-			Spec      *json.RawMessage       `json:"spec,omitempty"`
-			CreatedBy *string                `json:"created_by,omitempty"`
+			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
+			Spec      *json.RawMessage    `json:"spec,omitempty"`
+			CreatedBy *string             `json:"created_by,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,13 +81,6 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 				return
 			}
 		}
-		if req.CommitSha != nil {
-			if err := req.CommitSha.Validate(); err != nil {
-				http.Error(w, fmt.Sprintf("commit_sha: %v", err), http.StatusBadRequest)
-				return
-			}
-		}
-
 		// Prepare spec (default to empty JSON object if not provided).
 		spec := []byte("{}")
 		if req.Spec != nil && len(*req.Spec) > 0 {
@@ -99,104 +91,94 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			return
 		}
 
-		// Convert domain types to strings for storage layer.
-		// Generate KSUID-backed parent run ID using central helper.
-		var commitShaStr *string
-		if req.CommitSha != nil {
-			s := req.CommitSha.String()
-			commitShaStr = &s
-		}
 		targetRef := ""
 		if req.TargetRef != nil {
 			targetRef = req.TargetRef.String()
 		}
 
-		// 1. Create the parent batch run. This run holds the shared spec and
-		//    aggregates per-repo status via run_repos. It does not have jobs.
-		parentRunID := domaintypes.NewRunID()
-		parentRun, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			ID:        string(parentRunID),
-			Name:      nil, // Optional batch name (not provided by RunSubmitRequest).
-			RepoUrl:   req.RepoURL.String(),
+		specID := domaintypes.NewSpecID().String()
+		createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
+			ID:        specID,
+			Name:      "",
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
-			Status:    store.RunStatusQueued,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: create spec failed", "err", err)
+			return
+		}
+
+		// v1 entrypoint: `ploy run` creates a mod project as a side-effect; mod name == mod id.
+		modID := domaintypes.NewModID().String()
+		if _, err := st.CreateMod(r.Context(), store.CreateModParams{
+			ID:        modID,
+			Name:      modID,
+			SpecID:    &createdSpec.ID,
+			CreatedBy: req.CreatedBy,
+		}); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create mod: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: create mod failed", "mod_id", modID, "err", err)
+			return
+		}
+
+		modRepoID := domaintypes.NewModRepoID().String()
+		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
+			ID:        modRepoID,
+			ModID:     modID,
+			RepoUrl:   req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: targetRef,
-			CommitSha: commitShaStr,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create mod repo: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: create mod repo failed", "mod_id", modID, "repo_url", req.RepoURL, "err", err)
+			return
+		}
+
+		runID := domaintypes.NewRunID().String()
+		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
+			ID:        runID,
+			ModID:     modID,
+			SpecID:    createdSpec.ID,
+			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: create parent run failed", "repo_url", req.RepoURL, "err", err)
+			slog.Error("submit run: create run failed", "run_id", runID, "err", err)
 			return
 		}
 
-		// 2. Attach a single repo entry to the parent run. This models the
-		//    submission as a degenerate batch with exactly one repo.
-		repoID := domaintypes.NewRunRepoID()
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			ID:        string(repoID),
-			RunID:     parentRunID,
-			RepoUrl:   req.RepoURL.String(),
-			BaseRef:   req.BaseRef.String(),
-			TargetRef: targetRef,
+			ModID:         modID,
+			RunID:         run.ID,
+			RepoID:        modRepo.ID,
+			RepoBaseRef:   modRepo.BaseRef,
+			RepoTargetRef: modRepo.TargetRef,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: create run_repo failed", "run_id", parentRun.ID, "repo_url", req.RepoURL, "err", err)
+			slog.Error("submit run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.ID, "err", err)
 			return
 		}
 
-		// 3. Start execution for the pending repo using the batch machinery.
-		//    This creates a child execution run with jobs and links it via
-		//    run_repos.execution_run_id.
-		starter := NewBatchRepoStarter(st)
-		startResult, err := starter.StartPendingRepos(r.Context(), parentRun.ID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to start repo execution: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: start pending repos failed", "run_id", parentRun.ID, "err", err)
-			return
-		}
-		if startResult.Started == 0 {
-			http.Error(w, "failed to start repo execution", http.StatusInternalServerError)
-			slog.Error("submit run: no repos started", "run_id", parentRun.ID, "repo_id", runRepo.ID)
-			return
-		}
-
-		// Re-fetch the repo entry to obtain the execution_run_id.
-		runRepo, err = st.GetRunRepo(r.Context(), runRepo.ID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to reload run repo: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: get run_repo failed after start", "run_id", parentRun.ID, "repo_id", runRepo.ID, "err", err)
-			return
-		}
-		if runRepo.ExecutionRunID == nil || strings.TrimSpace(*runRepo.ExecutionRunID) == "" {
-			http.Error(w, "run repo execution_run_id missing after start", http.StatusInternalServerError)
-			slog.Error("submit run: execution_run_id missing", "run_id", parentRun.ID, "repo_id", runRepo.ID)
-			return
-		}
-
-		// 4. Load the child execution run and build the canonical RunSummary
-		//    for it. The execution run is the Mods run exposed to clients.
-		childRunID := strings.TrimSpace(*runRepo.ExecutionRunID)
-		childRun, err := st.GetRun(r.Context(), childRunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to get execution run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit run: get execution run failed", "execution_run_id", childRunID, "err", err)
+		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			slog.Error("submit run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return
 		}
 
 		summary := modsapi.RunSummary{
-			RunID:      domaintypes.RunID(childRun.ID),
-			State:      modsapi.RunStatusFromStore(childRun.Status),
+			RunID:      domaintypes.RunID(run.ID),
+			State:      modsapi.RunStatusFromStore(run.Status),
 			Submitter:  "",
-			Repository: childRun.RepoUrl,
+			Repository: modRepo.RepoUrl,
 			Metadata: map[string]string{
-				"repo_base_ref":   childRun.BaseRef,
-				"repo_target_ref": childRun.TargetRef,
+				"repo_base_ref":   runRepo.RepoBaseRef,
+				"repo_target_ref": runRepo.RepoTargetRef,
 			},
-			CreatedAt: timeOrZero(childRun.CreatedAt),
-			UpdatedAt: timeOrZero(childRun.CreatedAt),
+			CreatedAt: timeOrZero(run.CreatedAt),
+			UpdatedAt: timeOrZero(run.CreatedAt),
 			Stages:    make(map[string]modsapi.StageStatus),
 		}
 
@@ -215,9 +197,8 @@ func submitRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		}
 
 		slog.Info("run submitted",
-			"parent_run_id", parentRun.ID,
-			"execution_run_id", summary.RunID,
-			"repo_id", runRepo.ID,
+			"run_id", run.ID,
+			"repo_id", runRepo.RepoID,
 			"repo_url", req.RepoURL,
 			"base_ref", req.BaseRef,
 			"target_ref", req.TargetRef,
@@ -264,22 +245,41 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
 		runState := modsapi.RunStatusFromStore(run.Status)
 
+		var (
+			repoURL    string
+			repoBase   string
+			repoTarget string
+		)
+		runRepos, err := st.ListRunReposByRun(r.Context(), run.ID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			slog.Error("get run status: list run repos failed", "run_id", run.ID, "err", err)
+			return
+		}
+		if len(runRepos) > 0 {
+			rr := runRepos[0]
+			repoBase = rr.RepoBaseRef
+			repoTarget = rr.RepoTargetRef
+
+			mr, err := st.GetModRepo(r.Context(), rr.RepoID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+				slog.Error("get run status: get repo failed", "run_id", run.ID, "repo_id", rr.RepoID, "err", err)
+				return
+			}
+			repoURL = mr.RepoUrl
+		}
+
 		// run.ID is now a string (KSUID). Construct RunSummary with RunID.
 		summary := modsapi.RunSummary{
 			RunID:      domaintypes.RunID(run.ID),
 			State:      runState,
 			Submitter:  "",
-			Repository: run.RepoUrl,
-			Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
+			Repository: repoURL,
+			Metadata:   map[string]string{"repo_base_ref": repoBase, "repo_target_ref": repoTarget},
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
 			Stages:     make(map[string]modsapi.StageStatus),
-		}
-
-		// Include claiming node id when available for easier diagnostics.
-		// Node IDs are now NanoID(6) strings.
-		if run.NodeID != nil {
-			summary.Metadata["node_id"] = *run.NodeID
 		}
 
 		// Surface MR URL, gate summary, and resume metadata from runs.stats if present.
@@ -330,7 +330,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
 			// job.ID and run.ID are now strings (KSUID).
-			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: domaintypes.RunID(run.ID), JobID: &job.ID})
+			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
 				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", job.ID, "err", err)
@@ -381,91 +381,72 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 //
 // For multi-step runs (mods[] array), creates one mod job per entry.
 // Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
-//
-// runID is a KSUID-backed domain type; job IDs are generated using domaintypes.NewJobID().
-func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, spec []byte) error {
-	// Parse spec using the canonical parser for structured validation.
+func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoID string, repoBaseRef string, attempt int32, spec []byte) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse mods spec: %w", err)
 	}
 
-	// Check for multi-step run (mods[] array).
 	if modsSpec.IsMultiStep() {
-		// Multi-step run: create pre-gate, one job per mod, and post-gate.
-		// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
-		// Pre-gate job - pending (ready to be claimed immediately)
-		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
+		// v1 job queueing rules: first job is Queued, rest are Created (roadmap/v1/statuses.md:52-55).
+		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
-		// Mod jobs: step_index starts at 2000, increment by 1000
-		// All mod jobs start as 'created' - server will schedule them after prior job completes.
 		for i, mod := range modsSpec.Mods {
-			// Extract image string (use universal form or empty for stack-aware).
-			// Stack-aware images are resolved at execution time by the node agent.
 			modImage := ""
 			if mod.Image.Universal != "" {
 				modImage = strings.TrimSpace(mod.Image.Universal)
 			}
 			jobName := fmt.Sprintf("mod-%d", i)
 			stepIndex := domaintypes.StepIndex(2000 + i*1000)
-			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
+			if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
 				return fmt.Errorf("create mod job %d: %w", i, err)
 			}
 		}
 
-		// Post-gate job: after all mods - starts as 'created'
 		postGateIndex := domaintypes.StepIndex(2000 + len(modsSpec.Mods)*1000)
-		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
+		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
 			return fmt.Errorf("create post-gate job: %w", err)
 		}
 		return nil
 	}
 
-	// Single-step run: create pre-gate, single mod, and post-gate.
-	// Extract image from top-level spec (universal form only; stack-aware resolved at execution).
 	modImage := ""
 	if modsSpec.Image.Universal != "" {
 		modImage = strings.TrimSpace(modsSpec.Image.Universal)
 	}
-	return createSingleModJob(ctx, st, runID, modImage)
+	return createSingleModJob(ctx, st, runID, repoID, repoBaseRef, attempt, modImage)
 }
 
-// createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
-// Server-driven scheduling: first job (pre-gate) is 'pending', rest are 'created'.
-// runID is a KSUID-backed domain type.
-func createSingleModJob(ctx context.Context, st store.Store, runID domaintypes.RunID, modImage string) error {
-	// Pre-gate is pending (ready to claim), others are created (wait for server to schedule).
-	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusPending); err != nil {
+func createSingleModJob(ctx context.Context, st store.Store, runID string, repoID string, repoBaseRef string, attempt int32, modImage string) error {
+	// v1 job queueing rules: first job is Queued, rest are Created (roadmap/v1/statuses.md:52-55).
+	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", domaintypes.StepIndex(2000), modImage, store.JobStatusCreated); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "mod-0", "mod", domaintypes.StepIndex(2000), modImage, store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create mod job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", domaintypes.StepIndex(3000), "", store.JobStatusCreated); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "post-gate", "post_gate", domaintypes.StepIndex(3000), "", store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create post-gate job: %w", err)
 	}
 	return nil
 }
 
-// createJobWithIndex creates a job with the given step_index, status, and metadata.
-// modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
-// status should be JobStatusPending for the first job, JobStatusCreated for others.
-// runID is a KSUID-backed domain type; job ID is generated using domaintypes.NewJobID().
-func createJobWithIndex(ctx context.Context, st store.Store, runID domaintypes.RunID, name, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus) error {
-	// Generate KSUID-backed job ID using central helper.
+func createJobWithIndex(ctx context.Context, st store.Store, runID string, repoID string, repoBaseRef string, attempt int32, name string, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus) error {
 	jobID := domaintypes.NewJobID()
-	// Create the job with step_index and status.
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
-		ID:        string(jobID),
-		RunID:     runID,
-		Name:      name,
-		Status:    status,
-		ModType:   modType,
-		ModImage:  modImage,
-		StepIndex: stepIndex.Float64(),
-		Meta:      []byte(`{}`),
+		ID:          string(jobID),
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: repoBaseRef,
+		Attempt:     attempt,
+		Name:        name,
+		Status:      status,
+		ModType:     modType,
+		ModImage:    modImage,
+		StepIndex:   stepIndex.Float64(),
+		Meta:        []byte(`{}`),
 	})
 	return err
 }

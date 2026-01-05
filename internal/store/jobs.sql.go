@@ -13,35 +13,40 @@ import (
 
 const claimJob = `-- name: ClaimJob :one
 WITH eligible AS (
-  SELECT j.id FROM jobs j
+  SELECT j.id
+  FROM jobs j
   JOIN runs r ON j.run_id = r.id
-  WHERE j.status = 'pending'
+  WHERE j.status = 'Queued'
     AND j.node_id IS NULL
     AND (
-      -- Normal jobs: only when run is queued or running.
-      r.status IN ('queued', 'running') OR
-      -- MR jobs: allowed after run has reached a terminal state.
-      (j.mod_type = 'mr' AND r.status IN ('succeeded', 'failed'))
+      (j.mod_type = 'mr' AND r.status = 'Finished') OR
+      (j.mod_type != 'mr' AND r.status = 'Started')
     )
   ORDER BY j.step_index ASC
   FOR UPDATE SKIP LOCKED
   LIMIT 1
 )
-UPDATE jobs SET status = 'running', node_id = $1, started_at = now()
-FROM eligible WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
+UPDATE jobs
+SET status = 'Running', node_id = $1, started_at = now()
+FROM eligible
+WHERE jobs.id = eligible.id
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
 `
 
-// Atomically claim the next pending job for a node (single unified queue).
-// Jobs are ordered by step_index; no special handling for gate vs mod jobs.
-// Server-driven scheduling: only 'pending' jobs are claimable.
-// Job transitions directly to 'running' (no intermediate 'assigned' state).
+// Atomically claim the next claimable job for a node (unified queue).
+// v1:
+// - claimable jobs have status='Queued'
+// - normal jobs are claimable only when runs.status='Started'
+// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
 func (q *Queries) ClaimJob(ctx context.Context, nodeID *string) (Job, error) {
 	row := q.db.QueryRow(ctx, claimJob, nodeID)
 	var i Job
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
 		&i.Name,
 		&i.Status,
 		&i.ModType,
@@ -62,7 +67,6 @@ SELECT COUNT(*) FROM jobs
 WHERE run_id = $1
 `
 
-// Counts total jobs for a run.
 func (q *Queries) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
 	row := q.db.QueryRow(ctx, countJobsByRun, runID)
 	var count int64
@@ -80,7 +84,6 @@ type CountJobsByRunAndStatusParams struct {
 	Status JobStatus `json:"status"`
 }
 
-// Counts jobs for a run with a specific status.
 func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countJobsByRunAndStatus, arg.RunID, arg.Status)
 	var count int64
@@ -89,27 +92,62 @@ func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRu
 }
 
 const createJob = `-- name: CreateJob :one
-INSERT INTO jobs (id, run_id, name, status, mod_type, mod_image, step_index, meta)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+INSERT INTO jobs (
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  meta
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+)
+RETURNING
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
 `
 
 type CreateJobParams struct {
-	ID        string    `json:"id"`
-	RunID     string    `json:"run_id"`
-	Name      string    `json:"name"`
-	Status    JobStatus `json:"status"`
-	ModType   string    `json:"mod_type"`
-	ModImage  string    `json:"mod_image"`
-	StepIndex float64   `json:"step_index"`
-	Meta      []byte    `json:"meta"`
+	ID          string    `json:"id"`
+	RunID       string    `json:"run_id"`
+	RepoID      string    `json:"repo_id"`
+	RepoBaseRef string    `json:"repo_base_ref"`
+	Attempt     int32     `json:"attempt"`
+	Name        string    `json:"name"`
+	Status      JobStatus `json:"status"`
+	ModType     string    `json:"mod_type"`
+	ModImage    string    `json:"mod_image"`
+	StepIndex   float64   `json:"step_index"`
+	Meta        []byte    `json:"meta"`
 }
 
-// Note: `id` is now a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
+// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
 	row := q.db.QueryRow(ctx, createJob,
 		arg.ID,
 		arg.RunID,
+		arg.RepoID,
+		arg.RepoBaseRef,
+		arg.Attempt,
 		arg.Name,
 		arg.Status,
 		arg.ModType,
@@ -121,6 +159,9 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
 		&i.Name,
 		&i.Status,
 		&i.ModType,
@@ -148,9 +189,17 @@ func (q *Queries) DeleteJob(ctx context.Context, id string) error {
 
 const getAdjacentJobIndices = `-- name: GetAdjacentJobIndices :one
 SELECT
-  j1.step_index as prev_index,
-  (SELECT MIN(j2.step_index) FROM jobs j2 WHERE j2.run_id = j1.run_id AND j2.step_index > j1.step_index) as next_index
-FROM jobs j1 WHERE j1.id = $1
+  j1.step_index AS prev_index,
+  (
+    SELECT MIN(j2.step_index)
+    FROM jobs j2
+    WHERE j2.run_id = j1.run_id
+      AND j2.repo_id = j1.repo_id
+      AND j2.attempt = j1.attempt
+      AND j2.step_index > j1.step_index
+  ) AS next_index
+FROM jobs j1
+WHERE j1.id = $1
 `
 
 type GetAdjacentJobIndicesRow struct {
@@ -158,8 +207,7 @@ type GetAdjacentJobIndicesRow struct {
 	NextIndex interface{} `json:"next_index"`
 }
 
-// Get the step_index of a job and the next job's step_index for healing insertion.
-// Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
+// Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
 func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error) {
 	row := q.db.QueryRow(ctx, getAdjacentJobIndices, id)
 	var i GetAdjacentJobIndicesRow
@@ -168,7 +216,23 @@ func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id string) (GetAdja
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+SELECT
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
 FROM jobs
 WHERE id = $1
 `
@@ -179,6 +243,9 @@ func (q *Queries) GetJob(ctx context.Context, id string) (Job, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
 		&i.Name,
 		&i.Status,
 		&i.ModType,
@@ -194,16 +261,37 @@ func (q *Queries) GetJob(ctx context.Context, id string) (Job, error) {
 	return i, err
 }
 
-const listCreatedJobsByRun = `-- name: ListCreatedJobsByRun :many
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+const listCreatedJobsByRunRepoAttempt = `-- name: ListCreatedJobsByRunRepoAttempt :many
+SELECT
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
 FROM jobs
-WHERE run_id = $1 AND status = 'created'
+WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
 ORDER BY step_index ASC
 `
 
-// List all created (not yet pending) jobs for a run, ordered by step_index.
-func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID string) ([]Job, error) {
-	rows, err := q.db.Query(ctx, listCreatedJobsByRun, runID)
+type ListCreatedJobsByRunRepoAttemptParams struct {
+	RunID   string `json:"run_id"`
+	RepoID  string `json:"repo_id"`
+	Attempt int32  `json:"attempt"`
+}
+
+func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, listCreatedJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +302,9 @@ func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID string) ([]Job
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.Attempt,
 			&i.Name,
 			&i.Status,
 			&i.ModType,
@@ -237,10 +328,26 @@ func (q *Queries) ListCreatedJobsByRun(ctx context.Context, runID string) ([]Job
 }
 
 const listJobsByRun = `-- name: ListJobsByRun :many
-SELECT id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+SELECT
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
 FROM jobs
 WHERE run_id = $1
-ORDER BY step_index ASC
+ORDER BY repo_id ASC, attempt ASC, step_index ASC
 `
 
 func (q *Queries) ListJobsByRun(ctx context.Context, runID string) ([]Job, error) {
@@ -255,6 +362,75 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID string) ([]Job, error
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.Attempt,
+			&i.Name,
+			&i.Status,
+			&i.ModType,
+			&i.ModImage,
+			&i.StepIndex,
+			&i.NodeID,
+			&i.ExitCode,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.DurationMs,
+			&i.Meta,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listJobsByRunRepoAttempt = `-- name: ListJobsByRunRepoAttempt :many
+SELECT
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
+FROM jobs
+WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
+ORDER BY step_index ASC
+`
+
+type ListJobsByRunRepoAttemptParams struct {
+	RunID   string `json:"run_id"`
+	RepoID  string `json:"repo_id"`
+	Attempt int32  `json:"attempt"`
+}
+
+func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, listJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Job{}
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.RepoID,
+			&i.RepoBaseRef,
+			&i.Attempt,
 			&i.Name,
 			&i.Status,
 			&i.ModType,
@@ -278,25 +454,53 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID string) ([]Job, error
 }
 
 const scheduleNextJob = `-- name: ScheduleNextJob :one
-UPDATE jobs SET status = 'pending'
+UPDATE jobs
+SET status = 'Queued'
 WHERE id = (
-  SELECT j.id FROM jobs j
-  WHERE j.run_id = $1 AND j.status = 'created'
+  SELECT j.id
+  FROM jobs j
+  WHERE j.run_id = $1
+    AND j.repo_id = $2
+    AND j.attempt = $3
+    AND j.status = 'Created'
   ORDER BY j.step_index ASC
   LIMIT 1
 )
-RETURNING id, run_id, name, status, mod_type, mod_image, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta
+RETURNING
+  id,
+  run_id,
+  repo_id,
+  repo_base_ref,
+  attempt,
+  name,
+  status,
+  mod_type,
+  mod_image,
+  step_index,
+  node_id,
+  exit_code,
+  started_at,
+  finished_at,
+  duration_ms,
+  meta
 `
 
-// Transitions the first 'created' job to 'pending' for a run.
-// Called by server after a job completes successfully to enable server-driven scheduling.
-// Returns the pending job, or null if no more jobs to schedule.
-func (q *Queries) ScheduleNextJob(ctx context.Context, runID string) (Job, error) {
-	row := q.db.QueryRow(ctx, scheduleNextJob, runID)
+type ScheduleNextJobParams struct {
+	RunID   string `json:"run_id"`
+	RepoID  string `json:"repo_id"`
+	Attempt int32  `json:"attempt"`
+}
+
+// Promote the next job in a repo attempt: Created -> Queued.
+func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error) {
+	row := q.db.QueryRow(ctx, scheduleNextJob, arg.RunID, arg.RepoID, arg.Attempt)
 	var i Job
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
 		&i.Name,
 		&i.Status,
 		&i.ModType,
@@ -314,7 +518,9 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, runID string) (Job, error
 
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
 UPDATE jobs
-SET status = $2, exit_code = $3, finished_at = now(),
+SET status = $2,
+    exit_code = $3,
+    finished_at = now(),
     duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000
 WHERE id = $1
 `
@@ -325,7 +531,6 @@ type UpdateJobCompletionParams struct {
 	ExitCode *int32    `json:"exit_code"`
 }
 
-// Updates a job's terminal status, exit code, and timing.
 func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error {
 	_, err := q.db.Exec(ctx, updateJobCompletion, arg.ID, arg.Status, arg.ExitCode)
 	return err
@@ -333,7 +538,9 @@ func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompleti
 
 const updateJobCompletionWithMeta = `-- name: UpdateJobCompletionWithMeta :exec
 UPDATE jobs
-SET status = $2, exit_code = $3, finished_at = now(),
+SET status = $2,
+    exit_code = $3,
+    finished_at = now(),
     duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000,
     meta = $4
 WHERE id = $1
@@ -346,8 +553,6 @@ type UpdateJobCompletionWithMetaParams struct {
 	Meta     []byte    `json:"meta"`
 }
 
-// Updates a job's terminal status, exit code, timing, and meta in one operation.
-// Use this when completing a gate or build job that has execution metadata.
 func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
 	_, err := q.db.Exec(ctx, updateJobCompletionWithMeta,
 		arg.ID,
@@ -369,9 +574,6 @@ type UpdateJobMetaParams struct {
 	Meta []byte `json:"meta"`
 }
 
-// Updates a job's meta JSONB field with structured gate/build metadata.
-// Used to persist gate validation results or build metrics after job execution.
-// The meta parameter should be JSON-encoded JobMeta (see internal/workflow/contracts.JobMeta).
 func (q *Queries) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
 	_, err := q.db.Exec(ctx, updateJobMeta, arg.ID, arg.Meta)
 	return err

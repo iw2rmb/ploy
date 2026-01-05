@@ -17,6 +17,27 @@ type mockStore struct {
 	updateCertMetadataParams store.UpdateNodeCertMetadataParams
 	updateCertMetadataErr    error
 
+	// v1 mods/specs/mod_repos tracking (used by /v1/mods and /v1/runs handlers)
+	createSpecCalled bool
+	createSpecParams store.CreateSpecParams
+	createSpecResult store.Spec
+	createSpecErr    error
+
+	createModCalled bool
+	createModParams store.CreateModParams
+	createModResult store.Mod
+	createModErr    error
+
+	createModRepoCalled bool
+	createModRepoParams store.CreateModRepoParams
+	createModRepoResult store.ModRepo
+	createModRepoErr    error
+
+	getModRepoCalled bool
+	getModRepoParam  string
+	getModRepoResult store.ModRepo
+	getModRepoErr    error
+
 	createRunCalled bool
 	createRunParams store.CreateRunParams
 	createRunResult store.Run
@@ -36,6 +57,11 @@ type mockStore struct {
 	getRunParams string
 	getRunResult store.Run
 	getRunErr    error
+
+	getSpecCalled bool
+	getSpecParam  string
+	getSpecResult store.Spec
+	getSpecErr    error
 
 	getRunTimingCalled bool
 	getRunTimingParams string
@@ -156,6 +182,12 @@ type mockStore struct {
 	listJobsByRunResult []store.Job
 	listJobsByRunErr    error
 
+	// ListJobsByRunRepoAttempt tracking (v1 repo-scoped jobs)
+	listJobsByRunRepoAttemptCalled bool
+	listJobsByRunRepoAttemptParams store.ListJobsByRunRepoAttemptParams
+	listJobsByRunRepoAttemptResult []store.Job
+	listJobsByRunRepoAttemptErr    error
+
 	// CountJobsByRun tracking
 	countJobsByRunCalled bool
 	countJobsByRunParam  string
@@ -186,7 +218,7 @@ type mockStore struct {
 
 	// ScheduleNextJob tracking
 	scheduleNextJobCalled bool
-	scheduleNextJobParam  string
+	scheduleNextJobParam  store.ScheduleNextJobParams
 	scheduleNextJobResult store.Job
 	scheduleNextJobErr    error
 
@@ -288,38 +320,22 @@ type mockStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
-	// GetRunRepo tracking — repo IDs are now strings (NanoID).
+	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
-	getRunRepoParam  string
+	getRunRepoParam  store.GetRunRepoParams
 	getRunRepoResult store.RunRepo
 	getRunRepoErr    error
 
-	// IncrementRunRepoAttempt tracking — repo IDs are now strings (NanoID).
+	// IncrementRunRepoAttempt tracking — composite key (run_id, repo_id).
 	incrementRunRepoAttemptCalled bool
-	incrementRunRepoAttemptParam  string
+	incrementRunRepoAttemptParam  store.IncrementRunRepoAttemptParams
 	incrementRunRepoAttemptErr    error
 
-	// ListPendingRunReposByRun tracking — run IDs are now strings (KSUID).
-	listPendingRunReposByRunCalled bool
-	listPendingRunReposByRunParam  string
-	listPendingRunReposByRunResult []store.RunRepo
-	listPendingRunReposByRunErr    error
-
-	// SetRunRepoExecutionRun tracking — repo IDs are strings (NanoID), execution run IDs are strings (KSUID).
-	setRunRepoExecutionRunCalled bool
-	setRunRepoExecutionRunParams []store.SetRunRepoExecutionRunParams
-	setRunRepoExecutionRunErr    error
-
-	// GetRunRepoByExecutionRun tracking — execution run IDs are now strings (KSUID).
-	getRunRepoByExecutionRunCalled bool
-	getRunRepoByExecutionRunParam  *string
-	getRunRepoByExecutionRunResult store.RunRepo
-	getRunRepoByExecutionRunErr    error
-
-	// ClearRunRepoExecutionRun tracking — repo IDs are now strings (NanoID).
-	clearRunRepoExecutionRunCalled bool
-	clearRunRepoExecutionRunParam  string
-	clearRunRepoExecutionRunErr    error
+	// ListQueuedRunReposByRun tracking — run IDs are now strings (KSUID).
+	listQueuedRunReposByRunCalled bool
+	listQueuedRunReposByRunParam  string
+	listQueuedRunReposByRunResult []store.RunRepo
+	listQueuedRunReposByRunErr    error
 
 	// ListDistinctRepos tracking (for repo-centric handlers)
 	listDistinctReposCalled bool
@@ -358,6 +374,66 @@ func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.Upd
 	return m.updateCertMetadataErr
 }
 
+func (m *mockStore) CreateSpec(ctx context.Context, params store.CreateSpecParams) (store.Spec, error) {
+	m.createSpecCalled = true
+	m.createSpecParams = params
+
+	result := m.createSpecResult
+	if result.ID == "" {
+		result.ID = params.ID
+	}
+	if result.Spec == nil {
+		result.Spec = params.Spec
+	}
+	result.CreatedBy = params.CreatedBy
+	return result, m.createSpecErr
+}
+
+func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams) (store.Mod, error) {
+	m.createModCalled = true
+	m.createModParams = params
+
+	result := m.createModResult
+	if result.ID == "" {
+		result.ID = params.ID
+	}
+	if result.Name == "" {
+		result.Name = params.Name
+	}
+	result.SpecID = params.SpecID
+	result.CreatedBy = params.CreatedBy
+	return result, m.createModErr
+}
+
+func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error) {
+	m.createModRepoCalled = true
+	m.createModRepoParams = params
+
+	result := m.createModRepoResult
+	if result.ID == "" {
+		result.ID = params.ID
+	}
+	if result.ModID == "" {
+		result.ModID = params.ModID
+	}
+	if result.RepoUrl == "" {
+		result.RepoUrl = params.RepoUrl
+	}
+	if result.BaseRef == "" {
+		result.BaseRef = params.BaseRef
+	}
+	if result.TargetRef == "" {
+		result.TargetRef = params.TargetRef
+	}
+	return result, m.createModRepoErr
+}
+
+func (m *mockStore) GetModRepo(ctx context.Context, id string) (store.ModRepo, error) {
+	m.getModRepoCalled = true
+	m.getModRepoParam = id
+	return m.getModRepoResult, m.getModRepoErr
+}
+
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
 	m.createRunCalled = true
 	m.createRunParams = params
@@ -381,13 +457,30 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 		m.createRunCallCount++
 		return m.createRunResults[idx], err
 	}
-	return m.createRunResult, err
+	result := m.createRunResult
+	if result.ID == "" {
+		result.ID = params.ID
+	}
+	if result.ModID == "" {
+		result.ModID = params.ModID
+	}
+	if result.SpecID == "" {
+		result.SpecID = params.SpecID
+	}
+	result.CreatedBy = params.CreatedBy
+	return result, err
 }
 
 func (m *mockStore) GetRun(ctx context.Context, id string) (store.Run, error) {
 	m.getRunCalled = true
 	m.getRunParams = id
 	return m.getRunResult, m.getRunErr
+}
+
+func (m *mockStore) GetSpec(ctx context.Context, id string) (store.Spec, error) {
+	m.getSpecCalled = true
+	m.getSpecParam = id
+	return m.getSpecResult, m.getSpecErr
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id string) (store.RunsTiming, error) {
@@ -560,6 +653,12 @@ func (m *mockStore) ListJobsByRun(ctx context.Context, runID string) ([]store.Jo
 	return result, m.listJobsByRunErr
 }
 
+func (m *mockStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
+	m.listJobsByRunRepoAttemptCalled = true
+	m.listJobsByRunRepoAttemptParams = arg
+	return m.listJobsByRunRepoAttemptResult, m.listJobsByRunRepoAttemptErr
+}
+
 func (m *mockStore) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
 	m.countJobsByRunCalled = true
 	m.countJobsByRunParam = runID
@@ -616,9 +715,9 @@ func (m *mockStore) UpdateJobCompletionWithMeta(ctx context.Context, params stor
 	return m.updateJobCompletionWithMetaErr
 }
 
-func (m *mockStore) ScheduleNextJob(ctx context.Context, runID string) (store.Job, error) {
+func (m *mockStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
 	m.scheduleNextJobCalled = true
-	m.scheduleNextJobParam = runID
+	m.scheduleNextJobParam = arg
 	if m.scheduleNextJobErr != nil {
 		return store.Job{}, m.scheduleNextJobErr
 	}
@@ -748,49 +847,50 @@ func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.Update
 func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
 	m.createRunRepoCalled = true
 	m.createRunRepoParams = params
-	return m.createRunRepoResult, m.createRunRepoErr
+	result := m.createRunRepoResult
+	if result.ModID == "" {
+		result.ModID = params.ModID
+	}
+	if result.RunID == "" {
+		result.RunID = params.RunID
+	}
+	if result.RepoID == "" {
+		result.RepoID = params.RepoID
+	}
+	if result.RepoBaseRef == "" {
+		result.RepoBaseRef = params.RepoBaseRef
+	}
+	if result.RepoTargetRef == "" {
+		result.RepoTargetRef = params.RepoTargetRef
+	}
+	if result.Status == "" {
+		result.Status = store.RunRepoStatusQueued
+	}
+	if result.Attempt == 0 {
+		result.Attempt = 1
+	}
+	return result, m.createRunRepoErr
 }
 
 // GetRunRepo — repo IDs are now strings (NanoID).
-func (m *mockStore) GetRunRepo(ctx context.Context, id string) (store.RunRepo, error) {
+func (m *mockStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
 	m.getRunRepoCalled = true
-	m.getRunRepoParam = id
+	m.getRunRepoParam = arg
 	return m.getRunRepoResult, m.getRunRepoErr
 }
 
 // IncrementRunRepoAttempt — repo IDs are now strings (NanoID).
-func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, id string) error {
+func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
 	m.incrementRunRepoAttemptCalled = true
-	m.incrementRunRepoAttemptParam = id
+	m.incrementRunRepoAttemptParam = arg
 	return m.incrementRunRepoAttemptErr
 }
 
-// ListPendingRunReposByRun — run IDs are now strings (KSUID).
-func (m *mockStore) ListPendingRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
-	m.listPendingRunReposByRunCalled = true
-	m.listPendingRunReposByRunParam = runID
-	return m.listPendingRunReposByRunResult, m.listPendingRunReposByRunErr
-}
-
-// SetRunRepoExecutionRun links a run_repo to its child execution run.
-func (m *mockStore) SetRunRepoExecutionRun(ctx context.Context, arg store.SetRunRepoExecutionRunParams) error {
-	m.setRunRepoExecutionRunCalled = true
-	m.setRunRepoExecutionRunParams = append(m.setRunRepoExecutionRunParams, arg)
-	return m.setRunRepoExecutionRunErr
-}
-
-// GetRunRepoByExecutionRun — execution run IDs are now strings (KSUID).
-func (m *mockStore) GetRunRepoByExecutionRun(ctx context.Context, executionRunID *string) (store.RunRepo, error) {
-	m.getRunRepoByExecutionRunCalled = true
-	m.getRunRepoByExecutionRunParam = executionRunID
-	return m.getRunRepoByExecutionRunResult, m.getRunRepoByExecutionRunErr
-}
-
-// ClearRunRepoExecutionRun — repo IDs are now strings (NanoID).
-func (m *mockStore) ClearRunRepoExecutionRun(ctx context.Context, id string) error {
-	m.clearRunRepoExecutionRunCalled = true
-	m.clearRunRepoExecutionRunParam = id
-	return m.clearRunRepoExecutionRunErr
+// ListQueuedRunReposByRun — run IDs are now strings (KSUID).
+func (m *mockStore) ListQueuedRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
+	m.listQueuedRunReposByRunCalled = true
+	m.listQueuedRunReposByRunParam = runID
+	return m.listQueuedRunReposByRunResult, m.listQueuedRunReposByRunErr
 }
 
 // ListDistinctRepos returns distinct repos with optional substring filter.

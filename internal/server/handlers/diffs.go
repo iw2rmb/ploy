@@ -141,7 +141,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		// RunID and JobID are already domain types in the store model.
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
-			RunID:       d.RunID,
+			RunID:       domaintypes.RunID(d.RunID),
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,

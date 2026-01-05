@@ -2,200 +2,111 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestBatchRepoStarter_StartPendingRepos verifies the BatchRepoStarter helper
-// that background schedulers use to start pending repos in batch runs.
-// This tests the unified implementation that is shared between the HTTP handler
-// (startRunHandler) and the background scheduler (batchscheduler.Scheduler).
-func TestBatchRepoStarter_StartPendingRepos(t *testing.T) {
+func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	t.Parallel()
 
-	batchRunID := uuid.New()
-	repo1ID := uuid.New()
-	repo2ID := uuid.New()
-	childRunID := uuid.New()
+	ctx := context.Background()
+	runID := "run_1"
+	specID := "spec_1"
+	repoID := "repo_1"
 
-	queuedBatch := store.Run{
-		ID:        batchRunID.String(),
-		Status:    store.RunStatusQueued,
-		Spec:      []byte(`{"image":"test"}`),
-		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	st := &mockStore{
+		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		listRunReposByRunResult: []store.RunRepo{
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+		},
+		listQueuedRunReposByRunResult: []store.RunRepo{
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{},
 	}
 
-	pendingRepo := store.RunRepo{
-		ID:        repo1ID.String(),
-		RunID:     domaintypes.RunID(batchRunID.String()),
-		RepoUrl:   "https://github.com/org/repo.git",
-		Status:    store.RunRepoStatusPending,
-		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	starter := NewBatchRepoStarter(st)
+	got, err := starter.StartPendingRepos(ctx, runID)
+	if err != nil {
+		t.Fatalf("StartPendingRepos returned error: %v", err)
+	}
+	if got.Pending != 1 {
+		t.Fatalf("expected pending=1, got %d", got.Pending)
+	}
+	if got.Started != 1 {
+		t.Fatalf("expected started=1, got %d", got.Started)
+	}
+	if st.createJobCallCount != 3 {
+		t.Fatalf("expected 3 jobs to be created, got %d", st.createJobCallCount)
+	}
+	if st.scheduleNextJobCalled {
+		t.Fatalf("expected ScheduleNextJob not to be called when creating jobs")
+	}
+}
+
+func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := "run_1"
+	specID := "spec_1"
+	repoID := "repo_1"
+
+	st := &mockStore{
+		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		listRunReposByRunResult: []store.RunRepo{
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+		},
+		listQueuedRunReposByRunResult: []store.RunRepo{
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{ID: "job_1", RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
+			{ID: "job_2", RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
+		},
 	}
 
-	succeededRepo := store.RunRepo{
-		ID:        repo2ID.String(),
-		RunID:     domaintypes.RunID(batchRunID.String()),
-		RepoUrl:   "https://github.com/org/repo2.git",
-		Status:    store.RunRepoStatusSucceeded,
-		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	starter := NewBatchRepoStarter(st)
+	got, err := starter.StartPendingRepos(ctx, runID)
+	if err != nil {
+		t.Fatalf("StartPendingRepos returned error: %v", err)
+	}
+	if got.Pending != 1 {
+		t.Fatalf("expected pending=1, got %d", got.Pending)
+	}
+	if got.Started != 1 {
+		t.Fatalf("expected started=1, got %d", got.Started)
+	}
+	if !st.scheduleNextJobCalled {
+		t.Fatalf("expected ScheduleNextJob to be called")
+	}
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs to be created, got %d", st.createJobCallCount)
+	}
+}
+
+func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := "run_1"
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: runID, SpecID: "spec_1", Status: store.RunStatusFinished},
 	}
 
-	childRun := store.Run{
-		ID:        childRunID.String(),
-		Status:    store.RunStatusQueued,
-		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	starter := NewBatchRepoStarter(st)
+	got, err := starter.StartPendingRepos(ctx, runID)
+	if err != nil {
+		t.Fatalf("StartPendingRepos returned error: %v", err)
 	}
-
-	t.Run("starts pending repos successfully and returns correct counts", func(t *testing.T) {
-		t.Parallel()
-
-		m := &mockStore{
-			getRunResult:                   queuedBatch,
-			listRunReposByRunResult:        []store.RunRepo{pendingRepo, succeededRepo},
-			listPendingRunReposByRunResult: []store.RunRepo{pendingRepo},
-			createRunResult:                childRun,
-		}
-
-		starter := NewBatchRepoStarter(m)
-		result, err := starter.StartPendingRepos(context.Background(), queuedBatch.ID)
-
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		// Verify Started count.
-		if result.Started != 1 {
-			t.Errorf("Started = %d, want 1", result.Started)
-		}
-
-		// Verify AlreadyDone count (succeededRepo is terminal).
-		if result.AlreadyDone != 1 {
-			t.Errorf("AlreadyDone = %d, want 1", result.AlreadyDone)
-		}
-
-		// Verify Pending count (should be 0 after starting the one pending repo).
-		if result.Pending != 0 {
-			t.Errorf("Pending = %d, want 0", result.Pending)
-		}
-
-		if !m.createRunCalled {
-			t.Error("expected CreateRun to be called")
-		}
-		if !m.setRunRepoExecutionRunCalled {
-			t.Error("expected SetRunRepoExecutionRun to be called")
-		}
-		if !m.ackRunStartCalled {
-			t.Error("expected AckRunStart to be called")
-		}
-	})
-
-	t.Run("skips terminal batch runs", func(t *testing.T) {
-		t.Parallel()
-
-		canceledBatch := queuedBatch
-		canceledBatch.Status = store.RunStatusCanceled
-
-		m := &mockStore{
-			getRunResult: canceledBatch,
-		}
-
-		starter := NewBatchRepoStarter(m)
-		result, err := starter.StartPendingRepos(context.Background(), canceledBatch.ID)
-
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if result.Started != 0 {
-			t.Errorf("Started = %d, want 0 (terminal batch)", result.Started)
-		}
-		// Should not try to list repos for terminal batch.
-		if m.listRunReposByRunCalled {
-			t.Error("should not list repos for terminal batch")
-		}
-		if m.listPendingRunReposByRunCalled {
-			t.Error("should not list pending repos for terminal batch")
-		}
-	})
-
-	t.Run("returns correct counts when no pending repos", func(t *testing.T) {
-		t.Parallel()
-
-		m := &mockStore{
-			getRunResult:                   queuedBatch,
-			listRunReposByRunResult:        []store.RunRepo{succeededRepo}, // Only completed repos.
-			listPendingRunReposByRunResult: []store.RunRepo{},              // No pending repos.
-		}
-
-		starter := NewBatchRepoStarter(m)
-		result, err := starter.StartPendingRepos(context.Background(), queuedBatch.ID)
-
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if result.Started != 0 {
-			t.Errorf("Started = %d, want 0", result.Started)
-		}
-		if result.AlreadyDone != 1 {
-			t.Errorf("AlreadyDone = %d, want 1", result.AlreadyDone)
-		}
-		if result.Pending != 0 {
-			t.Errorf("Pending = %d, want 0", result.Pending)
-		}
-	})
-
-	t.Run("returns pending count when a repo fails to start", func(t *testing.T) {
-		t.Parallel()
-
-		// Create a scenario where we have 2 pending repos but the CreateRun call fails for one.
-		pendingRepo2 := store.RunRepo{
-			ID:        repo2ID.String(),
-			RunID:     domaintypes.RunID(batchRunID.String()),
-			RepoUrl:   "https://github.com/org/repo2.git",
-			Status:    store.RunRepoStatusPending,
-			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
-
-		m := &mockStore{
-			getRunResult:                   queuedBatch,
-			listRunReposByRunResult:        []store.RunRepo{pendingRepo, pendingRepo2},
-			listPendingRunReposByRunResult: []store.RunRepo{pendingRepo, pendingRepo2},
-			createRunResult:                childRun,
-			createRunErrs:                  []error{nil, errors.New("create run failed")},
-		}
-
-		starter := NewBatchRepoStarter(m)
-		result, err := starter.StartPendingRepos(context.Background(), queuedBatch.ID)
-
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if result.Started != 1 {
-			t.Errorf("Started = %d, want 1", result.Started)
-		}
-		if result.AlreadyDone != 0 {
-			t.Errorf("AlreadyDone = %d, want 0", result.AlreadyDone)
-		}
-		if result.Pending != 1 {
-			t.Errorf("Pending = %d, want 1", result.Pending)
-		}
-
-		if !m.createRunCalled {
-			t.Error("expected CreateRun to be called")
-		}
-		if len(m.setRunRepoExecutionRunParams) != 1 {
-			t.Errorf("SetRunRepoExecutionRun calls = %d, want 1", len(m.setRunRepoExecutionRunParams))
-		}
-		if !m.ackRunStartCalled {
-			t.Error("expected AckRunStart to be called")
-		}
-	})
+	if got.Started != 0 || got.Pending != 0 || got.AlreadyDone != 0 {
+		t.Fatalf("expected zero result for terminal run, got %+v", got)
+	}
+	if st.listRunReposByRunCalled || st.listQueuedRunReposByRunCalled {
+		t.Fatalf("expected no repo queries for terminal run")
+	}
 }

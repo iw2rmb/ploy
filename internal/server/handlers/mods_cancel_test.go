@@ -22,8 +22,7 @@ func TestCancelRun_Success(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        id.String(),
-			Status:    store.RunStatusRunning,
-			RepoUrl:   "https://example/repo.git",
+			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{
@@ -47,7 +46,7 @@ func TestCancelRun_Success(t *testing.T) {
 	if !st.updateRunStatusCalled {
 		t.Fatal("expected UpdateRunStatus to be called")
 	}
-	if st.updateRunStatusParams.Status != store.RunStatusCanceled {
+	if st.updateRunStatusParams.Status != store.RunStatusCancelled {
 		t.Fatalf("expected status canceled, got %s", st.updateRunStatusParams.Status)
 	}
 	if !st.updateJobStatusCalled {
@@ -63,15 +62,11 @@ func TestCancelRun_Idempotent(t *testing.T) {
 	}{
 		{
 			name:      "already canceled",
-			runStatus: store.RunStatusCanceled,
+			runStatus: store.RunStatusCancelled,
 		},
 		{
 			name:      "already succeeded",
-			runStatus: store.RunStatusSucceeded,
-		},
-		{
-			name:      "already failed",
-			runStatus: store.RunStatusFailed,
+			runStatus: store.RunStatusFinished,
 		},
 	}
 
@@ -159,8 +154,7 @@ func TestCancelRun_SSEPublish(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        id.String(),
-			Status:    store.RunStatusRunning,
-			RepoUrl:   "https://example/repo.git",
+			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{},
@@ -259,12 +253,12 @@ func TestCancelRun_OnlyPendingRunningStagesUpdated(t *testing.T) {
 
 	stgPending := store.Job{ID: pendingID, Status: store.JobStatusCreated}
 	stgRunning := store.Job{ID: runningID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
-	stgSucceeded := store.Job{ID: succeededID, Status: store.JobStatusSucceeded}
-	stgFailed := store.Job{ID: failedID, Status: store.JobStatusFailed}
-	stgCanceled := store.Job{ID: canceledID, Status: store.JobStatusCanceled}
+	stgSucceeded := store.Job{ID: succeededID, Status: store.JobStatusSuccess}
+	stgFailed := store.Job{ID: failedID, Status: store.JobStatusFail}
+	stgCanceled := store.Job{ID: canceledID, Status: store.JobStatusCancelled}
 
 	st := &mockStore{
-		getRunResult: store.Run{ID: id.String(), Status: store.RunStatusRunning},
+		getRunResult: store.Run{ID: id.String(), Status: store.RunStatusStarted},
 		listJobsByRunResult: []store.Job{
 			stgPending, stgRunning, stgSucceeded, stgFailed, stgCanceled,
 		},
@@ -289,7 +283,7 @@ func TestCancelRun_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	updated := map[string]bool{}
 	for _, c := range st.updateJobStatusCalls {
 		updated[c.ID] = true
-		if c.Status != store.JobStatusCanceled {
+		if c.Status != store.JobStatusCancelled {
 			t.Fatalf("expected job status canceled, got %s", c.Status)
 		}
 	}
@@ -307,8 +301,7 @@ func TestCancelRun_NoStages(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        id.String(),
-			Status:    store.RunStatusRunning,
-			RepoUrl:   "https://example/repo.git",
+			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 		listJobsByRunResult: []store.Job{},
@@ -376,8 +369,7 @@ func TestCancelRun_JSONBodyVariations(t *testing.T) {
 			st := &mockStore{
 				getRunResult: store.Run{
 					ID:        id.String(),
-					Status:    store.RunStatusRunning,
-					RepoUrl:   "https://example/repo.git",
+					Status:    store.RunStatusStarted,
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
 				listJobsByRunResult: []store.Job{},
@@ -423,8 +415,7 @@ func TestCancelRun_StageDuration(t *testing.T) {
 			st := &mockStore{
 				getRunResult: store.Run{
 					ID:        id.String(),
-					Status:    store.RunStatusRunning,
-					RepoUrl:   "https://example/repo.git",
+					Status:    store.RunStatusStarted,
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
 				listJobsByRunResult: []store.Job{

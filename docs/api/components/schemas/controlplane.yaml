@@ -1,17 +1,16 @@
 # RunRepoStatus defines the per-repo execution state within a batch run.
 # Tracks the lifecycle of individual repositories as they progress through
-# the batch processing pipeline (pending → running → terminal).
+# the batch processing pipeline (Queued → Running → terminal).
 RunRepoStatus:
   type: string
   description: |
     Per-repo execution status within a batch run.
-    - pending: Repo is queued and waiting to start execution.
-    - running: Repo execution is in progress (claimed by a node).
-    - succeeded: Repo completed successfully with exit code 0.
-    - failed: Repo execution failed (non-zero exit or error).
-    - skipped: Repo was removed from batch before execution started.
-    - cancelled: Repo was stopped while running (explicit user action).
-  enum: [pending, running, succeeded, failed, skipped, cancelled]
+    - Queued: Repo is queued and waiting to start execution.
+    - Running: Repo execution is in progress (claimed by a node).
+    - Success: Repo completed successfully.
+    - Fail: Repo execution failed.
+    - Cancelled: Repo was cancelled (explicit user action or run cancelled).
+  enum: [Queued, Running, Success, Fail, Cancelled]
 
 # RunBatchDerivedStatus represents the batch-level aggregate status computed
 # from the per-repo states in RunRepoCounts.DerivedStatus.
@@ -19,59 +18,49 @@ RunBatchDerivedStatus:
   type: string
   description: |
     Batch-level status derived from aggregated per-repo states.
-    - pending: No repos have started (all pending or no repos).
+    - pending: No repos have started (all queued or no repos).
     - running: At least one repo is currently running.
-    - completed: All repos finished successfully (succeeded/skipped).
+    - completed: All repos are terminal with no failures.
     - failed: At least one repo failed (and none running).
     - cancelled: Batch was stopped and repos were cancelled.
   enum: [pending, running, completed, failed, cancelled]
 
-Repo:
+Run:
   type: object
-  # Note: This schema is used for API modeling; there is no dedicated `repos` table
-  # in the database. The `id` field is an opaque string identifier assigned by the
-  # caller or derived from the repo URL; no specific format (UUID, KSUID) is enforced.
+  description: |
+    Database-backed run row (v1 execution model).
+    Note: run IDs are KSUID-backed strings (27 characters); format: uuid removed.
   properties:
     id:
       type: string
-      description: |
-        Opaque repository identifier. No specific format enforced; treat as
-        an opaque string (e.g., URL-derived hash or caller-assigned key).
-    url: { type: string }
-    branch: { type: string, nullable: true }
-    commit_sha: { type: string, nullable: true }
-    created_at: { type: string, format: date-time }
-  required: [id, url, created_at]
-
-CreateRepoRequest:
-  type: object
-  properties:
-    url: { type: string }
-    branch: { type: string, nullable: true }
-    commit_sha: { type: string, nullable: true }
-  required: [url]
-
-Run:
-  type: object
-  # Note: The `reason` field was removed to prevent schema drift from the DB model.
-  # Failure context is derived from `stats.exit_code` and `metadata`. The `stats`
-  # field contains job/run metrics including exit codes; use it for failure analysis.
-  # Note: run IDs are now KSUID-backed strings (27 characters); format: uuid removed.
-  properties:
-    id: { type: string, description: "Run ID (KSUID string)" }
-    repo_url:
+      description: Run ID (KSUID string)
+    mod_id:
       type: string
-      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
-    spec: {}
-    created_by: { type: string, nullable: true }
-    status: { type: string }
-    created_at: { type: string, format: date-time }
-    started_at: { type: string, format: date-time, nullable: true }
-    finished_at: { type: string, format: date-time, nullable: true }
-    node_id: { type: string, nullable: true, description: "Node ID (NanoID 6-character string)" }
-    base_ref: { type: string }
-    target_ref: { type: string }
-    commit_sha: { type: string, nullable: true }
+      description: Mod (project) ID (NanoID string)
+    spec_id:
+      type: string
+      description: Spec ID (NanoID string)
+    created_by:
+      type: string
+      nullable: true
+      description: User or system that created the run.
+    status:
+      type: string
+      description: "Run status. Values: Started, Finished, Cancelled."
+    created_at:
+      type: string
+      format: date-time
+      description: Timestamp when the run was created.
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the run started.
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the run reached a terminal state.
     stats:
       description: |
         Job/run metrics JSON object. Contains exit_code for failure context,
@@ -80,13 +69,13 @@ Run:
       type: object
       additionalProperties: true
       nullable: true
-  required: [id, repo_url, status, created_at, base_ref, target_ref]
+  required: [id, mod_id, spec_id, status, created_at]
 
 RunRepoCounts:
   type: object
   description: |
     Aggregated per-repo status counts for a batch run. Provides a summary of
-    how many repos are in each lifecycle state (pending, running, terminal).
+    how many repos are in each lifecycle state (queued, running, terminal).
     The derived_status field computes a single batch-level status from these
     counts for easy display in CLI/UI surfaces.
   properties:
@@ -94,7 +83,7 @@ RunRepoCounts:
       type: integer
       format: int32
       description: Total number of repos in the batch.
-    pending:
+    queued:
       type: integer
       format: int32
       description: Repos waiting to start execution.
@@ -102,18 +91,14 @@ RunRepoCounts:
       type: integer
       format: int32
       description: Repos currently executing.
-    succeeded:
+    success:
       type: integer
       format: int32
       description: Repos that completed successfully.
-    failed:
+    fail:
       type: integer
       format: int32
       description: Repos that failed execution.
-    skipped:
-      type: integer
-      format: int32
-      description: Repos removed before execution started.
     cancelled:
       type: integer
       format: int32
@@ -131,16 +116,14 @@ RunRepo:
     Repo entry within a batch run, backed by the `run_repos` table.
     Represents a single repository's execution state within the batch,
     tracking refs, status, attempt count, and timing information.
-    Note: id is NanoID(8), run_id is KSUID (27 characters).
+    Note: repo_id is NanoID(8), run_id is KSUID (27 characters).
   properties:
-    id:
-      type: string
-      description: |
-        Unique repo entry ID within the batch (NanoID 8-character string).
-        Generated via types.NewRunRepoID() using a URL-safe alphabet.
     run_id:
       type: string
       description: Parent batch run ID (KSUID string).
+    repo_id:
+      type: string
+      description: Repository ID (mod_repos.id, NanoID string).
     repo_url:
       type: string
       description: Git repository URL (https, ssh, or file scheme).
@@ -180,8 +163,8 @@ RunRepo:
       nullable: true
       description: Timestamp when execution completed (terminal status reached).
   required:
-    - id
     - run_id
+    - repo_id
     - repo_url
     - base_ref
     - target_ref
@@ -192,67 +175,49 @@ RunRepo:
 RunSummary:
   type: object
   description: |
-    Batch run summary with optional aggregated repo status counts.
-    Returned by list and inspect endpoints for batch runs. The repo_counts
-    field provides aggregate status when multiple repos are attached to
-    the batch (via POST /v1/runs/{id}/repos).
+    Run summary with optional aggregated repo status counts.
     Note: id is now a KSUID-backed string (27 characters).
   properties:
     id:
       type: string
-      description: Unique batch run identifier (KSUID string).
-    name:
+      description: Unique run identifier (KSUID string).
+    mod_id:
       type: string
-      nullable: true
-      description: Optional human-readable name for the batch.
-    repo_url:
+      description: Mod (project) identifier for the run.
+    spec_id:
       type: string
-      description: |
-        Primary Git repository URL for the batch. When repos are added
-        individually, this serves as the default/template URL.
+      description: Spec identifier for the run.
     status:
       type: string
       description: |
-        Batch run status. Values: queued, running, succeeded, failed, canceled.
-        For multi-repo batches, use repo_counts.derived_status for aggregate state.
-    base_ref:
-      type: string
-      description: Default base Git ref for repos in the batch (e.g., main).
-    target_ref:
-      type: string
-      description: Default target Git ref for repos in the batch.
+        Run status. Values: Started, Finished, Cancelled.
     created_by:
       type: string
       nullable: true
-      description: User or system that created the batch run.
+      description: User or system that created the run.
     created_at:
       type: string
       format: date-time
-      description: Timestamp when the batch was created.
+      description: Timestamp when the run was created.
     started_at:
       type: string
       format: date-time
       nullable: true
-      description: Timestamp when the first repo started execution.
+      description: Timestamp when the run started.
     finished_at:
       type: string
       format: date-time
       nullable: true
-      description: Timestamp when all repos reached terminal state.
+      description: Timestamp when the run reached a terminal state.
     repo_counts:
-      allOf:
-        - $ref: '#/RunRepoCounts'
+      $ref: '#/RunRepoCounts'
       nullable: true
-      description: |
-        Aggregated per-repo status counts. Present when repos have been
-        added to the batch. Use derived_status for a single batch-level
-        status value.
+      description: Aggregated per-repo status counts (optional).
   required:
     - id
-    - repo_url
+    - mod_id
+    - spec_id
     - status
-    - base_ref
-    - target_ref
     - created_at
 
 CreateRunRequest:
@@ -263,7 +228,6 @@ CreateRunRequest:
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
     target_ref: { type: string }
-    commit_sha: { type: string, nullable: true }
     spec: {}
   required: [repo_url, base_ref, target_ref]
 
@@ -282,11 +246,13 @@ RunSubmitRequest:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
-    target_ref: { type: string }
-    commit_sha: { type: string, nullable: true }
+    target_ref:
+      type: string
+      nullable: true
+      description: Optional target ref; when omitted, the server derives a default branch name when creating an MR.
     spec: {}
     created_by: { type: string, nullable: true }
-  required: [repo_url, base_ref, target_ref]
+  required: [repo_url, base_ref]
 
 # ModsRunSummary — Canonical Mods run status schema
 #
@@ -434,6 +400,13 @@ NodeClaimResponse:
     id:
       type: string
       description: Run ID (parent run of the claimed job, KSUID string)
+    repo_id:
+      type: string
+      description: Repo ID (mod_repos.id, NanoID string)
+    attempt:
+      type: integer
+      format: int32
+      description: Attempt number for this repo within the run (starts at 1).
     job_id:
       type: string
       description: Claimed job ID (KSUID string)
@@ -449,11 +422,12 @@ NodeClaimResponse:
     repo_url:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
-    status: { type: string }
+    status:
+      type: string
+      description: "Run status. Values: Started, Finished, Cancelled."
     node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
     target_ref: { type: string }
-    commit_sha: { type: string, nullable: true }
     step_index:
       type: number
       format: double
@@ -469,6 +443,8 @@ NodeClaimResponse:
       additionalProperties: true
   required:
     - id
+    - repo_id
+    - attempt
     - job_id
     - job_name
     - repo_url
@@ -688,7 +664,7 @@ WorkflowGraphNode:
     status:
       type: string
       description: Job execution status (matches jobs.status)
-      enum: [created, pending, running, succeeded, failed, skipped, canceled]
+      enum: [Created, Queued, Running, Success, Fail, Cancelled]
     attempt:
       type: integer
       format: int32
@@ -767,6 +743,9 @@ RepoSummary:
     Repository summary returned by GET /v1/repos. Includes the repo URL
     along with metadata from the most recent run (if any).
   properties:
+    repo_id:
+      type: string
+      description: Repository identifier (mod_repos.id, NanoID string)
     repo_url:
       type: string
       description: Git repository URL (https, ssh, or file scheme)
@@ -778,8 +757,9 @@ RepoSummary:
     last_status:
       type: string
       nullable: true
-      description: Status of the most recent run (pending, running, succeeded, etc.)
+      description: Status of the most recent per-repo execution (Queued, Running, Success, Fail, Cancelled)
   required:
+    - repo_id
     - repo_url
 
 RepoRunSummary:
@@ -792,16 +772,15 @@ RepoRunSummary:
     run_id:
       type: string
       description: Unique run identifier (KSUID string)
-    name:
+    mod_id:
       type: string
-      nullable: true
-      description: Optional batch run name
+      description: Mod (project) identifier for the run
     run_status:
       type: string
-      description: Parent run status (queued, running, succeeded, failed, canceled)
+      description: Parent run status (Started, Finished, Cancelled)
     repo_status:
       type: string
-      description: Per-repo status within the batch (pending, running, succeeded, etc.)
+      description: Per-repo status within the batch (Queued, Running, Success, Fail, Cancelled)
     base_ref:
       type: string
       description: Git base ref for the run
@@ -822,16 +801,9 @@ RepoRunSummary:
       format: date-time
       nullable: true
       description: Timestamp when execution completed
-    execution_run_id:
-      type: string
-      nullable: true
-      description: |
-        Child execution run ID (KSUID string) for this repo within the batch.
-        Links to the Mods run created to process this specific repo. Used by
-        `ploy mod run pull` to fetch diffs and status for the repo execution.
-        Null when execution has not started or no child run was created.
   required:
     - run_id
+    - mod_id
     - run_status
     - repo_status
     - base_ref

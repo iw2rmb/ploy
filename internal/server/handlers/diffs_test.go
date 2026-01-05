@@ -24,7 +24,7 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 	st.listDiffsByRunResult = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID,
+		RunID:     runID.String(),
 		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{"exit_code":0}`),
@@ -71,7 +71,7 @@ func TestGetDiff_Download(t *testing.T) {
 	diffID := uuid.New()
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID,
+		RunID:     runID.String(),
 		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0}`),
@@ -101,7 +101,7 @@ func TestGetDiff_Metadata(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID,
+		RunID:     runID.String(),
 		JobID:     &jobIDStr,
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
@@ -124,8 +124,8 @@ func TestGetDiff_Metadata(t *testing.T) {
 	if resp.ID != diffID.String() {
 		t.Errorf("id=%q, want %q", resp.ID, diffID.String())
 	}
-	if resp.RunID != domaintypes.RunID(runID.String()) { // Compare with domain type
-		t.Errorf("run_id=%q, want %q", resp.RunID, runID.String())
+	if resp.RunID != runID {
+		t.Errorf("run_id=%q, want %q", resp.RunID, runID)
 	}
 	expectedJobID := domaintypes.JobID(jobID.String()) // Create expected domain type
 	if resp.JobID == nil || *resp.JobID != expectedJobID {
@@ -193,7 +193,7 @@ func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID,
+		RunID:     runID.String(),
 		JobID:     nil,
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{}`),

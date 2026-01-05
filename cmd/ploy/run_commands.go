@@ -83,13 +83,9 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 
 	// Rich summary output (previously used by `ploy mod run status`).
 	_, _ = fmt.Fprintf(stderr, "Run: %s\n", summary.ID)
-	if summary.Name != nil && *summary.Name != "" {
-		_, _ = fmt.Fprintf(stderr, "Name: %s\n", *summary.Name)
-	}
 	_, _ = fmt.Fprintf(stderr, "Status: %s\n", summary.Status)
-	_, _ = fmt.Fprintf(stderr, "Repo URL: %s\n", summary.RepoURL)
-	_, _ = fmt.Fprintf(stderr, "Base Ref: %s\n", summary.BaseRef)
-	_, _ = fmt.Fprintf(stderr, "Target Ref: %s\n", summary.TargetRef)
+	_, _ = fmt.Fprintf(stderr, "Mod ID: %s\n", summary.ModID)
+	_, _ = fmt.Fprintf(stderr, "Spec ID: %s\n", summary.SpecID)
 	if summary.CreatedBy != nil && *summary.CreatedBy != "" {
 		_, _ = fmt.Fprintf(stderr, "Created By: %s\n", *summary.CreatedBy)
 	}
@@ -105,11 +101,10 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 		_, _ = fmt.Fprintln(stderr, "")
 		_, _ = fmt.Fprintln(stderr, "Repo Counts:")
 		_, _ = fmt.Fprintf(stderr, "  Total:     %d\n", summary.Counts.Total)
-		_, _ = fmt.Fprintf(stderr, "  Pending:   %d\n", summary.Counts.Pending)
+		_, _ = fmt.Fprintf(stderr, "  Queued:    %d\n", summary.Counts.Queued)
 		_, _ = fmt.Fprintf(stderr, "  Running:   %d\n", summary.Counts.Running)
-		_, _ = fmt.Fprintf(stderr, "  Succeeded: %d\n", summary.Counts.Succeeded)
-		_, _ = fmt.Fprintf(stderr, "  Failed:    %d\n", summary.Counts.Failed)
-		_, _ = fmt.Fprintf(stderr, "  Skipped:   %d\n", summary.Counts.Skipped)
+		_, _ = fmt.Fprintf(stderr, "  Success:   %d\n", summary.Counts.Success)
+		_, _ = fmt.Fprintf(stderr, "  Fail:      %d\n", summary.Counts.Fail)
 		_, _ = fmt.Fprintf(stderr, "  Cancelled: %d\n", summary.Counts.Cancelled)
 		_, _ = fmt.Fprintf(stderr, "  Derived:   %s\n", summary.Counts.DerivedStatus)
 	}

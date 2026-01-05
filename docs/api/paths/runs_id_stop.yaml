@@ -3,9 +3,9 @@ post:
   summary: Stop a batch run
   description: |
     Stop a batch run identified by its run ID. Transitions the run status to
-    `canceled` and marks all `pending` `run_repos` as `cancelled`. The operation
-    is idempotent: if the run is already in a terminal state (succeeded, failed,
-    or canceled), the handler returns the current summary with `200 OK`.
+    `Cancelled` and marks all `Queued`/`Running` `run_repos` as `Cancelled`. The
+    operation is idempotent: if the run is already in a terminal state
+    (`Finished` or `Cancelled`), the handler returns the current summary with `200 OK`.
   parameters:
     - in: path
       name: id

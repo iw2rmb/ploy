@@ -50,7 +50,8 @@ post:
   summary: Add a repo to a batch run
   description: |
     Attach a new repository to an existing batch run. Creates a `run_repos`
-    entry with `status=pending` that will be picked up by the batch scheduler.
+    entry with `status=Queued` and immediately creates repo-scoped jobs for the
+    new repo attempt.
   parameters:
     - in: path
       name: id

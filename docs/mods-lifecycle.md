@@ -175,13 +175,13 @@ about multi-step runs where diffs accumulate across steps.
 #### Pre-mod gate workspace
 
 The **pre-mod gate** runs on the **initial hydrated workspace** (step 0). This workspace
-is created by cloning the repository at `base_ref` (optionally checking out `commit_sha`)
+is created by cloning the repository at `base_ref`
 and contains no modifications from any mods. The pre-mod gate validates that the baseline
 code compiles and tests pass before any mods execute.
 
 Workspace state for pre-mod gate:
 ```
-base_ref (+ commit_sha if specified) → fresh clone → pre-mod gate
+base_ref → fresh clone → pre-mod gate
 ```
 
 #### Post-mod gate workspace
@@ -193,7 +193,7 @@ current mod (step k).
 Before `mod[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace for
 step k from:
 
-1. **Base clone**: A cached copy of the initial repository state (base_ref + commit_sha).
+1. **Base clone**: A cached copy of the initial repository state (base_ref).
 2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane and
    applied in order using `git apply`.
 
@@ -222,7 +222,7 @@ Key invariants:
 
 | Gate Phase     | Workspace State                                      | Code Reference                              |
 |----------------|------------------------------------------------------|---------------------------------------------|
-| Pre-mod gate   | Fresh clone of base_ref (+ commit_sha)               | `rehydrateWorkspaceForStep` with stepIndex=0 |
+| Pre-mod gate   | Fresh clone of base_ref                              | `rehydrateWorkspaceForStep` with stepIndex=0 |
 | Post-mod gate[k] | Base clone + diffs[0..k-1] + mod[k] changes         | `rehydrateWorkspaceForStep` with stepIndex=k |
 
 ### Implementation references
@@ -456,7 +456,7 @@ at midpoint `step_index` values:
 ### Parallel healing branches (Phase E)
 
 Multi-strategy healing creates concurrent branches with distinct `step_index`
-windows. The first branch whose re-gate passes wins; losing branches are canceled:
+windows. The first branch whose re-gate passes wins; losing branches are cancelled:
 
 ```
                            ┌─────────────────────────────────────┐
@@ -512,23 +512,21 @@ Batched runs introduce a parent–child relationship between tables:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Parent run (`runs`)** — Stores the shared specification (`spec` JSONB),
-  optional batch name, and aggregate status. The parent holds no per-repo
-  details; those live in `run_repos`.
+- **Run (`runs`)** — Stores a run referencing `mod_id` + `spec_id` and run-level
+  status (`Started`, `Finished`, `Cancelled`). Per-repo execution lives in `run_repos`.
 
-- **Run repos (`run_repos`)** — Mapping table that attaches repositories to a
-  parent run. Each row captures:
-  - `repo_url`, `base_ref`, `target_ref` — repository coordinates.
-  - `status` — per-repo execution state (`pending`, `running`, `succeeded`,
-    `failed`, `skipped`, `cancelled`).
-  - `attempt` — retry counter; incremented on `restart`.
-  - `execution_run_id` — foreign key to the child `runs` row that holds the
-    actual job pipeline for this repo.
+- **Specs (`specs`)** — Append-only spec JSON dictionary. Runs and mods reference
+  a spec by ID.
 
-- **Child run (`runs`)** — Created when a `run_repo` transitions from `pending`
-  to `running`. The child inherits the parent's `spec` and owns its own `jobs`
-  rows (pre-gate, mod, post-gate, heal, re-gate). Logs, diffs, and artifacts
-  are stored against the child run.
+- **Repo set (`mod_repos`)** — Managed repositories for a mod project, each with
+  current `repo_url`, `base_ref`, and `target_ref`.
+
+- **Run repos (`run_repos`)** — One row per `(run_id, repo_id)` capturing snapshot
+  `repo_base_ref`/`repo_target_ref`, per-repo status (`Queued`, `Running`, `Success`,
+  `Fail`, `Cancelled`), and retry `attempt`.
+
+- **Jobs (`jobs`)** — Jobs are scoped to `(run_id, repo_id, attempt)`; logs/diffs/artifacts
+  attach to `job_id`. There are no per-repo child runs in v1.
 
 ### Single-repo vs batch runs
 
@@ -536,140 +534,75 @@ A single-repo submission via `ploy mod run --repo-url ... --spec ...` is
 internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
 
-| Aspect           | Single-repo run              | Batch run                              |
-|------------------|------------------------------|----------------------------------------|
-| Parent run       | Created with `repo_url`      | Created with optional `name`, no repo  |
-| `run_repos` rows | 1 (auto-created)             | 0 initially; added via `repo add`      |
-| Child runs       | 1 (linked by `execution_run_id`) | 1 per `run_repo`                   |
-| Spec storage     | On parent; inherited by child| Same                                   |
+| Aspect         | Single-repo run                 | Batch run                               |
+|----------------|----------------------------------|-----------------------------------------|
+| Run (`runs`)   | Created (`Started`)              | Created (`Started`)                     |
+| `mod_repos`    | 1 repo created/managed           | N repos created/managed                 |
+| `run_repos`    | 1 (auto-created)                 | N (added via batch creation / repo add) |
+| Child runs     | None                             | None                                    |
+| Spec storage   | `specs` referenced by `runs.spec_id` | Same                                |
 
 ### State machines
 
 #### Parent run state machine
 
-The parent run aggregates status from its `run_repos` entries:
+The control plane exposes a batch-level derived status from `run_repos` counts (`RunRepoCounts.derived_status`):
 
 ```
-         ┌─────────────────────────────────────────────────────────┐
-         │                  Parent Run Status                      │
-         ├─────────────────────────────────────────────────────────┤
-         │                                                         │
-         │    ┌─────────┐                                          │
-         │    │ queued  │  (initial; no repos running yet)         │
-         │    └────┬────┘                                          │
-         │         │ first run_repo transitions to 'running'       │
-         │         ▼                                               │
-         │    ┌─────────┐                                          │
-         │    │ running │  (at least one repo is active)           │
-         │    └────┬────┘                                          │
-         │         │ all run_repos reach terminal state            │
-         │         ▼                                               │
-         │    ┌──────────────────────────────────┐                 │
-         │    │ succeeded │ failed │ canceled   │                  │
-         │    └──────────────────────────────────┘                 │
-         │    (aggregate: all succeeded → succeeded,               │
-         │     any failed → failed, else canceled)                 │
-         │                                                         │
-         └─────────────────────────────────────────────────────────┘
+	         ┌─────────────────────────────────────────────────────────┐
+	         │                Batch Derived Status                      │
+	         ├─────────────────────────────────────────────────────────┤
+	         │                                                         │
+	         │    ┌─────────┐                                          │
+	         │    │ pending │  (initial; no repos running yet)         │
+	         │    └────┬────┘                                          │
+	         │         │ first run_repo transitions to 'running'       │
+	         │         ▼                                               │
+	         │    ┌─────────┐                                          │
+	         │    │ running │  (at least one repo is active)           │
+	         │    └────┬────┘                                          │
+	         │         │ all run_repos reach terminal state            │
+	         │         ▼                                               │
+	         │    ┌──────────────────────────────────┐                 │
+	         │    │ completed │ failed │ cancelled │                  │
+	         │    └──────────────────────────────────┘                 │
+	         │    (aggregate: any cancelled → cancelled,               │
+	         │     any failed → failed, else completed)                │
+	         │                                                         │
+	         └─────────────────────────────────────────────────────────┘
 ```
 
-#### Run repo state machine
+#### Run repo state machine (v1)
 
-Each `run_repos` row tracks individual repository progress:
+Each `run_repos` row tracks execution for a single repository within a run:
 
-```
-         ┌───────────────────────────────────────────────────────────────┐
-         │                   Run Repo Status                             │
-         ├───────────────────────────────────────────────────────────────┤
-         │                                                               │
-         │    ┌─────────┐    scheduler picks up repo                     │
-         │    │ pending │ ─────────────────────────────┐                 │
-         │    └────┬────┘                              │                 │
-         │         │                                   ▼                 │
-         │         │              ┌─────────────────────────────────┐    │
-         │         │              │ Create child run + jobs        │    │
-         │         │              │ Link via execution_run_id      │    │
-         │         │              └────────────────┬────────────────┘    │
-         │         │                               │                     │
-         │         │                               ▼                     │
-         │         │                         ┌─────────┐                 │
-         │         │                         │ running │                 │
-         │         │                         └────┬────┘                 │
-         │         │                              │                      │
-         │         │         ┌────────────────────┼──────────────────┐   │
-         │         │         │                    │                  │   │
-         │         ▼         ▼                    ▼                  ▼   │
-         │    ┌─────────┐ ┌─────────┐       ┌──────────┐      ┌─────────┐│
-         │    │ skipped │ │succeeded│       │  failed  │      │cancelled││
-         │    └─────────┘ └─────────┘       └──────────┘      └─────────┘│
-         │                                                               │
-         └───────────────────────────────────────────────────────────────┘
-```
+`Queued` → `Running` → (`Success` | `Fail` | `Cancelled`)
 
-### Jobs pipeline within a batch
+- `Queued` is created on run submission / repo add.
+- The repo transitions to `Running` when the first job for that `(run_id, repo_id, attempt)` is claimed.
+- Terminal status is set when the repo’s last job finishes, or when cancelled.
 
-Each `run_repo` that transitions to `running` spawns its own child run with a
-complete jobs pipeline. The pipeline follows the same logic described in
-§ 1.1 (Build Gate Sequence):
+### Jobs pipeline within a batch (v1)
 
-```
-  run_repos[0] → child_run_0 → jobs: pre-gate → mod-0 → post-gate
-  run_repos[1] → child_run_1 → jobs: pre-gate → mod-0 → post-gate
-  ...
-```
+Jobs are stored directly in `jobs` and scoped to `(run_id, repo_id, attempt, step_index)`.
+The first job for a repo attempt is `Queued`, and later jobs are `Created`. Healing may
+insert `heal-*` + `re-gate-*` jobs by allocating intermediate `step_index` values.
 
-Child runs execute independently. There is no cross-repo ordering within a
-batch—repos may complete in any order depending on node availability and
-execution time.
+### Batch scheduler (v1)
 
-### Batch scheduler
+The background scheduler ensures queued repos have jobs and promotes the next job for a
+repo attempt. It does not create per-repo child runs.
 
-The `batchscheduler` package (`internal/store/batchscheduler/batch_scheduler.go`)
-automatically starts pending repos:
+### Relationship summary (v1)
 
-1. Polls for parent runs with `run_repos` in `pending` status.
-2. For each pending repo, creates a child run and links it via
-   `execution_run_id`.
-3. Transitions the `run_repo` to `running`.
-4. When the child run completes, a completion callback updates the `run_repo`
-   status to the child's terminal state.
-
-### CLI workflow for batched runs
-
-In a batch workflow, `ploy mod run` submits the spec once, then
-`ploy mod run repo add` attaches multiple repositories under the same run via
-`run_repos`:
-
-```bash
-# 1. Create a batch run with a shared spec (no repo attached yet).
-ploy mod run --spec mod.yaml --name my-batch
-
-# 2. Add repos to the batch.
-ploy mod run repo add --repo-url https://github.com/org/repo1.git \
-    --base-ref main --target-ref feature-branch my-batch
-ploy mod run repo add --repo-url https://github.com/org/repo2.git \
-    --base-ref main --target-ref feature-branch my-batch
-
-# 3. Monitor per-repo status within the batch.
-ploy mod run repo status my-batch
-
-# 4. Optionally restart a failed repo with updated refs.
-# Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mod run repo restart --repo-id <repo-id> --base-ref hotfix my-batch
-
-# 5. Remove a repo from the batch (marks pending as skipped, running as cancelled).
-ploy mod run repo remove --repo-id <repo-id> my-batch
-```
-
-### Relationship summary
-
-| Table        | Purpose                                        | Key Relationships                     |
-|--------------|------------------------------------------------|---------------------------------------|
-| `runs`       | Stores spec + status for parent or child runs  | Parent→run_repos (1:N), Child→jobs    |
-| `run_repos`  | Maps repos to a parent run; tracks per-repo state | run_repos→parent (N:1), →child (1:1)|
-| `jobs`       | Execution units (pre-gate, mod, post-gate, etc.) | jobs→child_run (N:1)                |
-| `diffs`      | Per-job workspace patches                      | diffs→child_run, diffs→job            |
-| `logs`       | Execution logs                                 | logs→child_run, logs→job              |
+| Table       | Purpose                                    | Key relationships                         |
+|-------------|--------------------------------------------|-------------------------------------------|
+| `specs`     | Append-only spec dictionary                | referenced by `mods.spec_id`, `runs.spec_id` |
+| `mods`      | Mod projects                               | `mods` → `mod_repos` (1:N), `mods` → `runs` (1:N) |
+| `mod_repos` | Managed repo set for a mod                 | `mod_repos` → `run_repos` (1:N), `mod_repos` → `jobs` (1:N) |
+| `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
+| `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
+| `jobs`      | Execution units (pre-gate, mod, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
 ### Pulling Diffs Locally (`mod run pull`)
 
@@ -684,26 +617,23 @@ on changes produced by a batch run without relying on MR-based workflows.
 │                        mod run pull Workflow                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  1. Resolve run + repo                                                      │
-│     ├─ Get origin URL from `git remote get-url origin`                      │
-│     ├─ Call GET /v1/repos/{repo_id}/runs to list runs for this repo         │
-│     └─ Match <run-name|run-id> to find RepoRunSummary                       │
+│  1. Resolve repo + run                                                      │
+│     ├─ Get origin URL from `git remote get-url <origin>`                    │
+│     ├─ Call GET /v1/repos?contains=... to resolve repo_id                    │
+│     ├─ Call GET /v1/repos/{repo_id}/runs to list runs for this repo          │
+│     └─ Match <run-id> to find RepoRunSummary                                │
 │                                                                             │
-│  2. Fetch execution details                                                 │
-│     ├─ Use RepoRunSummary.execution_run_id to identify the child run        │
-│     └─ Call GET /v1/runs/{execution_run_id} to get commit_sha, base_ref,    │
-│        and target_ref                                                       │
+│  2. Fetch base snapshot                                                      │
+│     ├─ Use RepoRunSummary.base_ref + target_ref                              │
+│     └─ git fetch <origin> <base_ref> --depth=1                               │
 │                                                                             │
-│  3. Verify commit reachability                                              │
-│     └─ git fetch <origin> <commit_sha> --depth=1                            │
+│  3. Create branch                                                            │
+│     ├─ Check no local/remote collision for target_ref                        │
+│     ├─ git branch <target_ref> FETCH_HEAD                                    │
+│     └─ git checkout <target_ref>                                             │
 │                                                                             │
-│  4. Create branch                                                           │
-│     ├─ Check no local/remote collision for target_ref                       │
-│     ├─ git branch <target_ref> <commit_sha>                                 │
-│     └─ git checkout <target_ref>                                            │
-│                                                                             │
-│  5. Apply diffs                                                             │
-│     ├─ Call GET /v1/mods/{execution_run_id}/diffs to list diffs             │
+│  4. Apply diffs                                                              │
+│     ├─ Call GET /v1/mods/{run_id}/diffs to list diffs                        │
 │     ├─ For each diff (ordered by step_index):                               │
 │     │   ├─ Download via GET /v1/diffs/{id}?download=true                    │
 │     │   ├─ Decompress gzipped patch                                         │
@@ -723,20 +653,19 @@ on changes produced by a batch run without relying on MR-based workflows.
 
 **Key fields used:**
 
-| Field                            | Source                     | Purpose                                    |
-|----------------------------------|----------------------------|--------------------------------------------|
-| `run_repos.repo_url`             | API / run_repos table      | Match against local origin URL             |
-| `run_repos.execution_run_id`     | API / run_repos table      | Link to child run with diffs               |
-| `runs.commit_sha`                | API / runs table           | Pinned commit for branch creation          |
-| `run_repos.target_ref`           | API / run_repos table      | Branch name for the reconstructed changes  |
-| `diffs.step_index`               | API / diffs table          | Order diffs for correct application        |
+| Field                     | Source                          | Purpose                                   |
+|---------------------------|---------------------------------|-------------------------------------------|
+| `mod_repos.repo_url`      | API / `GET /v1/repos`           | Match against local origin URL            |
+| `mod_repos.id`            | API / `GET /v1/repos`           | `repo_id` for repo-scoped endpoints       |
+| `run_repos.repo_base_ref` | API / `GET /v1/repos/{repo_id}/runs` | Base ref snapshot for branch base    |
+| `run_repos.repo_target_ref` | API / `GET /v1/repos/{repo_id}/runs` | Target branch name snapshot          |
+| `diffs.step_index`        | API / diffs table               | Order diffs for correct application       |
 
 **API endpoints consumed:**
 
-- `GET /v1/repos/{repo_id}/runs` — List runs for the repository (repo_id is URL-encoded
-  origin URL).
-- `GET /v1/runs/{id}/status` — Fetch run details including `commit_sha`.
-- `GET /v1/mods/{id}/diffs` — List diffs for the execution run.
+- `GET /v1/repos` — List repos (used to resolve `repo_url` → `repo_id`).
+- `GET /v1/repos/{repo_id}/runs` — List runs for the repository (`repo_id` is `mod_repos.id`).
+- `GET /v1/mods/{run_id}/diffs` — List diffs for the run.
 - `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
 
 **Normalization:**
@@ -877,32 +806,32 @@ value is a `StageStatus` object describing that job's execution state.
 
 - **Jobs** (`jobs` table)
   - Created by the control plane when a run is submitted via `POST /v1/mods`.
-  - Each job row has:
-    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
-    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
-    - `step_index` — float for ordering (e.g., 1000, 2000, 3000).
-  - `status` — job state (`created`, `pending`, `running`, `succeeded`,
-      `failed`, `canceled`).
-    - `node_id` — which node claimed this job.
-    - `meta` — JSONB with job metadata:
-      - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`).
-      - `mod_image` — container image for this job (optional, for diagnostics).
+	- Each job row has:
+	    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
+	    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
+	    - `step_index` — float for ordering (e.g., 1000, 2000, 3000).
+	  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
+	    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
+	    - `node_id` — which node claimed this job.
+	    - `meta` — JSONB with job metadata:
+	      - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`).
+	      - `mod_image` — container image for this job (optional, for diagnostics).
   - Float `step_index` enables dynamic job insertion:
     - Initial jobs: `pre-gate` (1000), `mod-0` (2000), `post-gate` (3000).
     - Healing jobs inserted at midpoints: `heal-1` (1500), `re-gate` (1750).
     - `GetAdjacentJobIndices` query computes midpoints for insertion.
 
-- **Server-driven scheduling**
-  - Jobs are created with status `created` (not yet claimable) or `pending`
-    (ready to claim). The first job (`pre-gate`) is created as `pending`.
-  - `ClaimJob` (`internal/store/queries/jobs.sql`) only returns `pending`
-    jobs. This ensures nodes cannot claim jobs until the server decides they
-    are ready.
-  - When a job completes successfully, `ScheduleNextJob` transitions the first
-    `created` job to `pending`, allowing the next node claim.
-  - This model enforces sequential execution: `pre-gate` → `mod-0` → `post-gate`.
-  - Healing jobs follow the same pattern: heal jobs are created with status
-    `pending` to be claimed immediately after insertion.
+	- **Server-driven scheduling**
+	  - Jobs are created with status `Created` (not yet claimable) or `Queued`
+	    (ready to claim). The first job (`pre-gate`) is created as `Queued`.
+	  - `ClaimJob` (`internal/store/queries/jobs.sql`) only returns `Queued`
+	    jobs. This ensures nodes cannot claim jobs until the server decides they
+	    are ready.
+	  - When a job completes successfully, `ScheduleNextJob` transitions the first
+	    `Created` job to `Queued`, allowing the next node claim.
+	  - This model enforces sequential execution: `pre-gate` → `mod-0` → `post-gate`.
+	  - Healing jobs follow the same pattern: heal jobs are created with status
+	    `Queued` to be claimed immediately after insertion.
 
 - **Diffs**
   - Generated by the workflow runtime (`internal/workflow/runtime/step`) and
@@ -929,19 +858,15 @@ value is a `StageStatus` object describing that job's execution state.
 ### 3.1 Mods endpoints (`internal/server/handlers`)
 
 - `POST /v1/mods` — submit a Mods run.
-  - Simplified shape: `{repo_url, base_ref, target_ref, commit_sha?, spec?, created_by?}`.
+  - Simplified shape: `{repo_url, base_ref, target_ref?, spec?, created_by?}`.
   - Handler: `submitRunHandler`.
   - Behaviour (single source of truth for Mods execution):
-    - Creates a **parent batch run** in `runs` with `status=queued` and the shared spec.
-    - Creates a single `run_repos` entry with `status=pending` for the submitted repo.
-    - Starts execution for that repo using the batch machinery (equivalent to a
-      one‑repo batch):
-      - `BatchRepoStarter.StartPendingRepos` creates a **child execution run** in `runs`.
-      - Child run inherits the parent spec, repo_url, base_ref, target_ref, and commit_sha.
-      - Child run gets its own `jobs` pipeline (pre-gate, mod-0, post-gate, …).
-      - The `run_repos` row is linked via `execution_run_id` and transitions to `running`.
-    - Publishes an initial `RunSummary` snapshot for the **execution run** via
-      `events.Service.PublishRun` (this run_id is used by SSE, diffs, and logs APIs).
+    - Creates a spec (`specs`), a mod project (`mods`), a managed repo (`mod_repos`),
+      a run (`runs`, `status=Started`), a run repo (`run_repos`, `status=Queued`),
+      and the repo-scoped `jobs` pipeline (first job `Queued`, later jobs `Created`).
+    - The run repo transitions to `Running` when the first job is claimed.
+    - Publishes an initial `RunSummary` snapshot via `events.Service.PublishRun`
+      (this run_id is used by SSE, diffs, and logs APIs).
 
 - `GET /v1/runs/{id}/status` — run status.
   - Handler: `getRunStatusHandler`.
@@ -964,8 +889,8 @@ value is a `StageStatus` object describing that job's execution state.
 - `POST /v1/mods/{id}/cancel` — cancel a run.
   - Handler: `cancelRunHandler`.
   - Behaviour:
-    - Transitions run to `canceled`, updates jobs in `pending|running` to
-      `canceled`.
+    - Transitions run to `Cancelled`, updates jobs in `Created|Queued|Running` to
+      `Cancelled`.
     - Publishes a final `RunSummary` with `state=cancelled`.
     - Emits a terminal `done` status on the stream.
 
@@ -1004,9 +929,9 @@ artifacts/diffs to the correct node.
 
 ### 3.3 Runs endpoints (`internal/server/handlers/runs_batch_http.go`)
 
-- `GET /v1/runs` — list batch runs with basic metadata (repo_url, refs, status, timestamps) and optional per-repo status counts.
+- `GET /v1/runs` — list batch runs with basic metadata (mod_id, spec_id, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
-- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `canceled` and marking pending `run_repos` as `cancelled` (idempotent for terminal runs). The CLI maps this to `ploy run stop <run-id>` and returns the canonical `RunSummary` payload.
+- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `Cancelled` and marking `Queued`/`Running` `run_repos` as `Cancelled` (idempotent for terminal runs). The CLI maps this to `ploy run stop <run-id>` and returns the canonical `RunSummary` payload.
 
 ## 4. Node Execution and Rehydration
 
@@ -1021,8 +946,7 @@ For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
    - Creates jobs (pre-gate, mod, post-gate) with float step_index.
    - Publishes an initial `RunSummary`.
 3. A node:
-   - Claims jobs sequentially via `/v1/nodes/{id}/claim` (ClaimJob enforces
-     dependency: only returns a job when all prior jobs succeeded/skipped).
+   - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
    - For each claimed job:
      - Hydrates the workspace using `step.WorkspaceHydrator`.
      - Executes the job (gate check or mod container).
@@ -1042,14 +966,13 @@ For a spec with `mods[]`:
    - Job metadata includes `mod_type` (pre_gate, mod, post_gate, heal, re_gate)
      and `mod_image`.
 3. Scheduler and nodeagents:
-   - ClaimJob returns jobs in step_index order, but only when all prior jobs
-     have succeeded or been skipped.
+   - ClaimJob returns jobs in step_index order for the unified queue, and the server promotes the next job for a repo attempt only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.
 
 Workspace rehydration is implemented in `internal/nodeagent/execution_orchestrator.go`:
 
 - `rehydrateWorkspaceForStep`:
-  - Copies the base clone (base_ref + optional commit_sha).
+  - Copies the base clone (base_ref).
   - Applies diffs for prior jobs in order using `git apply`.
   - Diffs are fetched via `GET /v1/mods/{id}/diffs`, ordered by `step_index`.
 

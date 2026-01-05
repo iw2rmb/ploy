@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -45,7 +44,7 @@ func TestGetArtifactHandler_Metadata_Fields(t *testing.T) {
 	run := uuid.New()
 	st := &mockStore{getArtifactBundleResult: store.ArtifactBundle{
 		ID:    pgtype.UUID{Bytes: id, Valid: true},
-		RunID: domaintypes.RunID(run.String()),
+		RunID: run.String(),
 		// no CreatedAt valid timestamp here; handler should omit formatting without panicking
 		Bundle: []byte("x"),
 	}}

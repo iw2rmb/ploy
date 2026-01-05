@@ -17,12 +17,11 @@ func TestStageStatusFromStore(t *testing.T) {
 		want  StageState
 	}{
 		{name: "created->pending", input: store.JobStatusCreated, want: StageStatePending},
-		{name: "pending->pending", input: store.JobStatusPending, want: StageStatePending},
+		{name: "queued->pending", input: store.JobStatusQueued, want: StageStatePending},
 		{name: "running", input: store.JobStatusRunning, want: StageStateRunning},
-		{name: "succeeded", input: store.JobStatusSucceeded, want: StageStateSucceeded},
-		{name: "failed", input: store.JobStatusFailed, want: StageStateFailed},
-		{name: "skipped->failed", input: store.JobStatusSkipped, want: StageStateFailed},
-		{name: "canceled->cancelled", input: store.JobStatusCanceled, want: StageStateCancelled},
+		{name: "success", input: store.JobStatusSuccess, want: StageStateSucceeded},
+		{name: "fail", input: store.JobStatusFail, want: StageStateFailed},
+		{name: "cancelled", input: store.JobStatusCancelled, want: StageStateCancelled},
 		{name: "unknown->pending", input: store.JobStatus("unknown"), want: StageStatePending},
 	}
 
@@ -47,13 +46,10 @@ func TestRunStatusFromStore(t *testing.T) {
 		input store.RunStatus
 		want  RunState
 	}{
-		{name: "queued->pending", input: store.RunStatusQueued, want: RunStatePending},
-		{name: "assigned->pending", input: store.RunStatusAssigned, want: RunStatePending},
-		{name: "running", input: store.RunStatusRunning, want: RunStateRunning},
-		{name: "succeeded", input: store.RunStatusSucceeded, want: RunStateSucceeded},
-		{name: "failed", input: store.RunStatusFailed, want: RunStateFailed},
-		{name: "canceled->cancelled", input: store.RunStatusCanceled, want: RunStateCancelled},
-		{name: "unknown->pending", input: store.RunStatus("unknown"), want: RunStatePending},
+		{name: "started->running", input: store.RunStatusStarted, want: RunStateRunning},
+		{name: "finished->succeeded", input: store.RunStatusFinished, want: RunStateSucceeded},
+		{name: "cancelled", input: store.RunStatusCancelled, want: RunStateCancelled},
+		{name: "unknown->running", input: store.RunStatus("unknown"), want: RunStateRunning},
 	}
 
 	for _, tt := range tests {
@@ -80,10 +76,10 @@ func TestStageStatusToStore(t *testing.T) {
 		{name: "pending->created", input: StageStatePending, want: store.JobStatusCreated},
 		{name: "queued->created", input: StageStateQueued, want: store.JobStatusCreated},
 		{name: "running", input: StageStateRunning, want: store.JobStatusRunning},
-		{name: "succeeded", input: StageStateSucceeded, want: store.JobStatusSucceeded},
-		{name: "failed", input: StageStateFailed, want: store.JobStatusFailed},
-		{name: "cancelling->canceled", input: StageStateCancelling, want: store.JobStatusCanceled},
-		{name: "cancelled->canceled", input: StageStateCancelled, want: store.JobStatusCanceled},
+		{name: "succeeded", input: StageStateSucceeded, want: store.JobStatusSuccess},
+		{name: "failed", input: StageStateFailed, want: store.JobStatusFail},
+		{name: "cancelling->cancelled", input: StageStateCancelling, want: store.JobStatusCancelled},
+		{name: "cancelled", input: StageStateCancelled, want: store.JobStatusCancelled},
 		{name: "unknown->created", input: StageState("unknown"), want: store.JobStatusCreated},
 	}
 
@@ -108,13 +104,13 @@ func TestRunStatusToStore(t *testing.T) {
 		input RunState
 		want  store.RunStatus
 	}{
-		{name: "pending->queued", input: RunStatePending, want: store.RunStatusQueued},
-		{name: "running", input: RunStateRunning, want: store.RunStatusRunning},
-		{name: "succeeded", input: RunStateSucceeded, want: store.RunStatusSucceeded},
-		{name: "failed", input: RunStateFailed, want: store.RunStatusFailed},
-		{name: "cancelling->canceled", input: RunStateCancelling, want: store.RunStatusCanceled},
-		{name: "cancelled->canceled", input: RunStateCancelled, want: store.RunStatusCanceled},
-		{name: "unknown->queued", input: RunState("unknown"), want: store.RunStatusQueued},
+		{name: "pending->started", input: RunStatePending, want: store.RunStatusStarted},
+		{name: "running->started", input: RunStateRunning, want: store.RunStatusStarted},
+		{name: "succeeded->finished", input: RunStateSucceeded, want: store.RunStatusFinished},
+		{name: "failed->finished", input: RunStateFailed, want: store.RunStatusFinished},
+		{name: "cancelling->cancelled", input: RunStateCancelling, want: store.RunStatusCancelled},
+		{name: "cancelled", input: RunStateCancelled, want: store.RunStatusCancelled},
+		{name: "unknown->started", input: RunState("unknown"), want: store.RunStatusStarted},
 	}
 
 	for _, tt := range tests {
@@ -168,62 +164,41 @@ func TestRoundTripConversion(t *testing.T) {
 
 	t.Run("stage status round trip", func(t *testing.T) {
 		t.Parallel()
-		// Most statuses should round-trip cleanly
+		// StageStatePending maps back to JobStatusCreated; other statuses round-trip.
 		storeStatuses := []store.JobStatus{
 			store.JobStatusCreated,
+			store.JobStatusQueued,
 			store.JobStatusRunning,
-			store.JobStatusSucceeded,
-			store.JobStatusFailed,
-			store.JobStatusCanceled,
+			store.JobStatusSuccess,
+			store.JobStatusFail,
+			store.JobStatusCancelled,
 		}
 
 		for _, orig := range storeStatuses {
 			apiState := StageStatusFromStore(orig)
 			backToStore := StageStatusToStore(apiState)
+			if apiState == StageStatePending {
+				if backToStore != store.JobStatusCreated {
+					t.Errorf("Stage status pending round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
+				}
+				continue
+			}
 			if backToStore != orig {
 				t.Errorf("Stage status round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
 			}
-		}
-
-		// Skipped doesn't round-trip (maps to failed in API, which maps back to failed in store)
-		skipped := store.JobStatusSkipped
-		apiState := StageStatusFromStore(skipped)
-		backToStore := StageStatusToStore(apiState)
-		if apiState != StageStateFailed {
-			t.Errorf("Skipped should map to failed in API, got %v", apiState)
-		}
-		if backToStore != store.JobStatusFailed {
-			t.Errorf("Failed API state should map back to failed in store, got %v", backToStore)
 		}
 	})
 
 	t.Run("run status round trip", func(t *testing.T) {
 		t.Parallel()
-		// Running, succeeded, failed, and canceled should round-trip cleanly
-		roundTripStatuses := []store.RunStatus{
-			store.RunStatusRunning,
-			store.RunStatusSucceeded,
-			store.RunStatusFailed,
-			store.RunStatusCanceled,
-		}
+		roundTripStatuses := []store.RunStatus{store.RunStatusStarted, store.RunStatusFinished, store.RunStatusCancelled}
 
 		for _, orig := range roundTripStatuses {
 			apiState := RunStatusFromStore(orig)
 			backToStore := RunStatusToStore(apiState)
+			// Finished maps to succeeded/failed API state, which maps back to Finished.
 			if backToStore != orig {
 				t.Errorf("Run status round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
-			}
-		}
-
-		// Queued and assigned both map to pending in API, which maps back to queued in store
-		for _, orig := range []store.RunStatus{store.RunStatusQueued, store.RunStatusAssigned} {
-			apiState := RunStatusFromStore(orig)
-			if apiState != RunStatePending {
-				t.Errorf("%v should map to pending in API, got %v", orig, apiState)
-			}
-			backToStore := RunStatusToStore(apiState)
-			if backToStore != store.RunStatusQueued {
-				t.Errorf("Pending API state should map back to queued in store, got %v", backToStore)
 			}
 		}
 	})

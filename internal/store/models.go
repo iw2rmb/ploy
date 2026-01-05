@@ -214,19 +214,22 @@ type Event struct {
 }
 
 type Job struct {
-	ID         string             `json:"id"`
-	RunID      string             `json:"run_id"`
-	Name       string             `json:"name"`
-	Status     JobStatus          `json:"status"`
-	ModType    string             `json:"mod_type"`
-	ModImage   string             `json:"mod_image"`
-	StepIndex  float64            `json:"step_index"`
-	NodeID     *string            `json:"node_id"`
-	ExitCode   *int32             `json:"exit_code"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	DurationMs int64              `json:"duration_ms"`
-	Meta       []byte             `json:"meta"`
+	ID          string             `json:"id"`
+	RunID       string             `json:"run_id"`
+	RepoID      string             `json:"repo_id"`
+	RepoBaseRef string             `json:"repo_base_ref"`
+	Attempt     int32              `json:"attempt"`
+	Name        string             `json:"name"`
+	Status      JobStatus          `json:"status"`
+	ModType     string             `json:"mod_type"`
+	ModImage    string             `json:"mod_image"`
+	StepIndex   float64            `json:"step_index"`
+	NodeID      *string            `json:"node_id"`
+	ExitCode    *int32             `json:"exit_code"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
+	DurationMs  int64              `json:"duration_ms"`
+	Meta        []byte             `json:"meta"`
 }
 
 type Log struct {
@@ -235,6 +238,24 @@ type Log struct {
 	JobID     *string            `json:"job_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Mod struct {
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	SpecID     *string            `json:"spec_id"`
+	CreatedBy  *string            `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+}
+
+type ModRepo struct {
+	ID        string             `json:"id"`
+	ModID     string             `json:"mod_id"`
+	RepoUrl   string             `json:"repo_url"`
+	BaseRef   string             `json:"base_ref"`
+	TargetRef string             `json:"target_ref"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -273,38 +294,41 @@ type NodeMetric struct {
 
 type Run struct {
 	ID         string             `json:"id"`
-	Name       *string            `json:"name"`
-	RepoUrl    string             `json:"repo_url"`
-	Spec       []byte             `json:"spec"`
+	ModID      string             `json:"mod_id"`
+	SpecID     string             `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
 	Status     RunStatus          `json:"status"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	NodeID     *string            `json:"node_id"`
-	BaseRef    string             `json:"base_ref"`
-	TargetRef  string             `json:"target_ref"`
-	CommitSha  *string            `json:"commit_sha"`
 	Stats      []byte             `json:"stats"`
 }
 
 type RunRepo struct {
-	ID             string             `json:"id"`
-	RunID          string             `json:"run_id"`
-	RepoUrl        string             `json:"repo_url"`
-	BaseRef        string             `json:"base_ref"`
-	TargetRef      string             `json:"target_ref"`
-	Status         RunRepoStatus      `json:"status"`
-	Attempt        int32              `json:"attempt"`
-	LastError      *string            `json:"last_error"`
-	ExecutionRunID *string            `json:"execution_run_id"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+	ModID         string             `json:"mod_id"`
+	RunID         string             `json:"run_id"`
+	RepoID        string             `json:"repo_id"`
+	RepoBaseRef   string             `json:"repo_base_ref"`
+	RepoTargetRef string             `json:"repo_target_ref"`
+	Status        RunRepoStatus      `json:"status"`
+	Attempt       int32              `json:"attempt"`
+	LastError     *string            `json:"last_error"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
 }
 
 type RunsTiming struct {
 	ID      string `json:"id"`
 	QueueMs int64  `json:"queue_ms"`
 	RunMs   int64  `json:"run_ms"`
+}
+
+type Spec struct {
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	Spec       []byte             `json:"spec"`
+	CreatedBy  *string            `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
 }

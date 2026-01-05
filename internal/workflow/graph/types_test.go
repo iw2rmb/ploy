@@ -43,7 +43,7 @@ func TestAddNode(t *testing.T) {
 		Name:      "pre-gate",
 		Type:      NodeTypePreGate,
 		StepIndex: 1000,
-		Status:    NodeStatusPending,
+		Status:    NodeStatusQueued,
 	}
 	g.AddNode(node)
 
@@ -74,7 +74,7 @@ func TestComputeEdges_LinearChain(t *testing.T) {
 	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
 
 	// Create a standard 3-job pipeline: pre-gate → mod-0 → post-gate.
-	g.AddNode(&GraphNode{ID: "pre-gate", Name: "pre-gate", Type: NodeTypePreGate, StepIndex: 1000, Status: NodeStatusSucceeded})
+	g.AddNode(&GraphNode{ID: "pre-gate", Name: "pre-gate", Type: NodeTypePreGate, StepIndex: 1000, Status: NodeStatusSuccess})
 	g.AddNode(&GraphNode{ID: "mod-0", Name: "mod-0", Type: NodeTypeMod, StepIndex: 2000, Status: NodeStatusRunning})
 	g.AddNode(&GraphNode{ID: "post-gate", Name: "post-gate", Type: NodeTypePostGate, StepIndex: 3000, Status: NodeStatusCreated})
 
@@ -131,9 +131,9 @@ func TestComputeEdges_WithHealing(t *testing.T) {
 
 	// Simulate a healing scenario:
 	// pre-gate (1000) → heal-1 (1500) → re-gate (1750) → mod-0 (2000) → post-gate (3000)
-	g.AddNode(&GraphNode{ID: "pre-gate", Name: "pre-gate", Type: NodeTypePreGate, StepIndex: 1000, Status: NodeStatusFailed})
-	g.AddNode(&GraphNode{ID: "heal-1", Name: "heal-1", Type: NodeTypeHeal, StepIndex: 1500, Status: NodeStatusSucceeded})
-	g.AddNode(&GraphNode{ID: "re-gate", Name: "re-gate", Type: NodeTypeReGate, StepIndex: 1750, Status: NodeStatusSucceeded})
+	g.AddNode(&GraphNode{ID: "pre-gate", Name: "pre-gate", Type: NodeTypePreGate, StepIndex: 1000, Status: NodeStatusFail})
+	g.AddNode(&GraphNode{ID: "heal-1", Name: "heal-1", Type: NodeTypeHeal, StepIndex: 1500, Status: NodeStatusSuccess})
+	g.AddNode(&GraphNode{ID: "re-gate", Name: "re-gate", Type: NodeTypeReGate, StepIndex: 1750, Status: NodeStatusSuccess})
 	g.AddNode(&GraphNode{ID: "mod-0", Name: "mod-0", Type: NodeTypeMod, StepIndex: 2000, Status: NodeStatusRunning})
 	g.AddNode(&GraphNode{ID: "post-gate", Name: "post-gate", Type: NodeTypePostGate, StepIndex: 3000, Status: NodeStatusCreated})
 
@@ -180,7 +180,7 @@ func TestComputeEdges_SingleNode(t *testing.T) {
 	t.Parallel()
 
 	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
-	g.AddNode(&GraphNode{ID: "only-job", Name: "only-job", Type: NodeTypeMod, StepIndex: 1000, Status: NodeStatusPending})
+	g.AddNode(&GraphNode{ID: "only-job", Name: "only-job", Type: NodeTypeMod, StepIndex: 1000, Status: NodeStatusQueued})
 	g.ComputeEdges()
 
 	node := g.Nodes["only-job"]
@@ -318,7 +318,7 @@ func TestWorkflowGraph_JSONSerialization(t *testing.T) {
 		Name:      "pre-gate",
 		Type:      NodeTypePreGate,
 		StepIndex: 1000,
-		Status:    NodeStatusSucceeded,
+		Status:    NodeStatusSuccess,
 		Attempt:   1,
 	})
 	g.AddNode(&GraphNode{

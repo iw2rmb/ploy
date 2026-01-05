@@ -8,10 +8,11 @@ post:
   description: |
     Submit a new Mods run using a repository URL and Git refs. The server:
 
-    1. Creates the repository entry if it does not exist.
-    2. Creates jobs for the run (pre-gate, mod, post-gate) based on the `spec`.
-    3. Enqueues the run with initial state `pending`.
-    4. Returns a canonical `RunSummary` response.
+    1. Creates a spec row (`specs`) from the provided `spec` JSON.
+    2. Creates a mod project (`mods`) as a side-effect (for `ploy run`, mod name == mod id).
+    3. Creates a mod repo entry (`mod_repos`) for `repo_url` + refs.
+    4. Creates a run (`runs`) and a run repo row (`run_repos`) for the repo snapshot.
+    5. Creates repo-scoped jobs (`jobs`) for the run and returns a canonical `RunSummary` response.
 
     **Response contract**:
     - Returns `RunSummary` directly (no wrapper types).
@@ -23,7 +24,7 @@ post:
     ```json
     {
       "run_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
-      "state": "pending",
+      "state": "running",
       "repository": "https://github.com/org/repo.git",
       "metadata": {
         "repo_base_ref": "main",
@@ -49,7 +50,7 @@ post:
           $ref: '../components/schemas/controlplane.yaml#/RunSubmitRequest'
   responses:
     '201':
-      description: Created — run accepted and queued for execution.
+      description: Created — run accepted and started.
       content:
         application/json:
           schema:

@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -103,25 +102,22 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	// Handle 201 Created response from server.
 	if resp.StatusCode == http.StatusCreated {
 		var srvResp struct {
-			RunID     domaintypes.RunID `json:"run_id"` // Run ID returned from server
-			Status    string            `json:"status"`
-			RepoURL   string            `json:"repo_url"`
-			BaseRef   string            `json:"base_ref"`
-			TargetRef string            `json:"target_ref"`
+			RunID domaintypes.RunID `json:"run_id"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
 			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
-		return BatchSummary{
-			ID:        srvResp.RunID,
-			Name:      c.Name,
-			Status:    strings.ToLower(srvResp.Status),
-			RepoURL:   srvResp.RepoURL,
-			BaseRef:   srvResp.BaseRef,
-			TargetRef: srvResp.TargetRef,
-			CreatedBy: c.CreatedBy,
-			CreatedAt: time.Now(),
-		}, nil
+
+		summary, err := runs.GetStatusCommand{
+			Client:  c.Client,
+			BaseURL: c.BaseURL,
+			RunID:   srvResp.RunID,
+		}.Run(ctx)
+		if err != nil {
+			return BatchSummary{}, fmt.Errorf("batch create: fetch run summary: %w", err)
+		}
+
+		return summary, nil
 	}
 
 	// Non-success: read error body and return error.

@@ -54,17 +54,16 @@ func cancelRunHandler(st store.Store, eventsService *events.Service) http.Handle
 		}
 
 		// If already terminal, idempotent 200 OK
-		if run.Status == store.RunStatusSucceeded || run.Status == store.RunStatusFailed || run.Status == store.RunStatusCanceled {
+		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		// Transition to canceled; set finished_at to now.
+		// Transition to Cancelled; finished_at is set by the DB on terminal transition.
 		now := time.Now().UTC()
 		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
-			ID:         runIDStr,
-			Status:     store.RunStatusCanceled,
-			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			ID:     runIDStr,
+			Status: store.RunStatusCancelled,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to cancel run: %v", err), http.StatusInternalServerError)
@@ -72,10 +71,24 @@ func cancelRunHandler(st store.Store, eventsService *events.Service) http.Handle
 			return
 		}
 
+		// Cancel all queued/running repos for this run.
+		if repos, err := st.ListRunReposByRun(r.Context(), runIDStr); err == nil {
+			for _, rr := range repos {
+				if rr.Status != store.RunRepoStatusQueued && rr.Status != store.RunRepoStatusRunning {
+					continue
+				}
+				_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
+					RunID:  rr.RunID,
+					RepoID: rr.RepoID,
+					Status: store.RunRepoStatusCancelled,
+				})
+			}
+		}
+
 		// Best-effort job updates to canceled — only for created|pending|running jobs
 		if jobs, err := st.ListJobsByRun(r.Context(), runIDStr); err == nil && len(jobs) > 0 {
 			for _, job := range jobs {
-				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusPending && job.Status != store.JobStatusRunning {
+				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
 					continue
 				}
 				// Compute duration if started
@@ -88,7 +101,7 @@ func cancelRunHandler(st store.Store, eventsService *events.Service) http.Handle
 				}
 				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
 					ID:         job.ID,
-					Status:     store.JobStatusCanceled,
+					Status:     store.JobStatusCancelled,
 					StartedAt:  job.StartedAt,
 					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 					DurationMs: dur,
@@ -98,11 +111,18 @@ func cancelRunHandler(st store.Store, eventsService *events.Service) http.Handle
 
 		// Publish terminal run event + done status for SSE clients.
 		if eventsService != nil {
+			repoURL := ""
+			if repos, err := st.ListRunReposByRun(r.Context(), runIDStr); err == nil && len(repos) > 0 {
+				if mr, err := st.GetModRepo(r.Context(), repos[0].RepoID); err == nil {
+					repoURL = mr.RepoUrl
+				}
+			}
+
 			// Construct RunSummary with RunID for SSE event publishing.
 			runSummary := modsapi.RunSummary{
 				RunID:      domaintypes.RunID(runIDStr),
 				State:      modsapi.RunStateCancelled,
-				Repository: run.RepoUrl,
+				Repository: repoURL,
 				CreatedAt:  timeOrZero(run.CreatedAt),
 				UpdatedAt:  now,
 				Stages:     make(map[string]modsapi.StageStatus),

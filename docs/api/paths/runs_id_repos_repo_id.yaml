@@ -2,10 +2,10 @@ delete:
   tags: [Control]
   summary: Remove or cancel a repo within a batch run
   description: |
-    Remove a repository from a batch run. For repos in `pending` state, the
-    handler marks them as `skipped`. For repos in `running` state, the handler
-    marks them as `cancelled` while in-flight execution winds down. Terminal
-    repos are left unchanged and the operation is idempotent.
+    Cancel a repository within a batch run. For repos in `Queued` or `Running`
+    state, the handler transitions the repo status to `Cancelled` and cancels
+    any `Created`/`Queued`/`Running` jobs for the current attempt. Terminal repos
+    are left unchanged and the operation is idempotent.
   parameters:
     - in: path
       name: id
