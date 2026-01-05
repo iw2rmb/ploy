@@ -468,11 +468,11 @@ The scheduler treats multi-step runs as ordered sequences of claims:
 - **Step 0**: Claimable immediately (no dependencies)
 - **Step k>0**: Claimable only after step k-1 succeeds
 
-Step-level execution is implemented via the `jobs` table. Each job row represents a unit of work (pre-gate, mod, heal, post-gate) with a float `step_index` and a `status` (`created → pending → running → succeeded/failed/canceled`). The scheduler:
+Step-level execution is implemented via the `jobs` table. Each job row represents a unit of work (pre-gate, mod, heal, post-gate) with a float `step_index` and a `status` (`Created → Queued → Running → Success/Fail/Cancelled`). The scheduler:
 
 - Treats `step_index` as the ordering key for multi-step runs.
-- Uses `ClaimJob` (see `internal/store/queries/jobs.sql`) to atomically claim the next `pending` job with `FOR UPDATE SKIP LOCKED`.
-- Transitions jobs from `created` to `pending` via `ScheduleNextJob` after prior jobs complete, enforcing step dependencies.
+- Uses `ClaimJob` (see `internal/store/queries/jobs.sql`) to atomically claim the next `Queued` job with `FOR UPDATE SKIP LOCKED`.
+- Transitions jobs from `Created` to `Queued` via `ScheduleNextJob` after prior jobs complete, enforcing step dependencies.
 
 #### Execution Flow (Multi-Node Example)
 

@@ -52,7 +52,7 @@ Gate validation is orchestrated by the node agent as part of the Mods run lifecy
 
 **Flow:**
 1. Control plane creates gate jobs (`pre-gate`, `post-gate`) in the `jobs` table.
-2. Node agent claims the next pending job via `/v1/nodes/{id}/claim`.
+2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For gate jobs, the node executes validation using the Docker gate executor.
 4. Gate runs inside a Docker container with the workspace mounted at `/workspace`.
 5. Results are captured as `BuildGateStageMetadata` (passed/failed, duration, logs).

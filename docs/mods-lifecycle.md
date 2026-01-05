@@ -105,8 +105,8 @@ jobs and claimed by nodes in FIFO order by `step_index`:
 ```
 
 **Flow:**
-1. Control plane creates gate jobs in the `jobs` table with status `pending`.
-2. Node agent claims the next pending job via `/v1/nodes/{id}/claim`.
+1. Control plane creates gate jobs in the `jobs` table with status `Queued`.
+2. Node agent claims the next queued job via `/v1/nodes/{id}/claim`.
 3. For gate jobs, the Docker gate executor runs validation in a local container.
 4. Gate results are captured as `BuildGateStageMetadata` and returned to the orchestrator.
 5. For healing flows: re-gate runs against the workspace with accumulated changes.
@@ -907,10 +907,9 @@ value is a `StageStatus` object describing that job's execution state.
 Nodeagents use `/v1/nodes/*` to execute work:
 
 - `POST /v1/nodes/{id}/heartbeat` — report node liveness.
-- `POST /v1/nodes/{id}/claim` — claim the next pending job from the unified
+- `POST /v1/nodes/{id}/claim` — claim the next queued job from the unified
   jobs queue (FIFO by `step_index`; returns the claimed job plus parent run
-  metadata). This endpoint now transitions the parent run to `running` when
-  still queued and publishes SSE "running" events for real-time client updates.
+  metadata) and marks the repo as `Running` in `run_repos`.
   (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
   (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
@@ -1149,8 +1148,7 @@ Code paths most relevant for Mods:
   - `internal/stream/hub.go`, `internal/stream/http.go`
 - Database:
   - `internal/store/schema.sql` — single source of truth for database schema (jobs table, float step_index)
-  - `internal/store/queries/jobs.sql` — job queries including `ClaimJob` (claims pending jobs)
-    and `ScheduleNextJob` (transitions next created job to pending)
+  - `internal/store/queries/jobs.sql` — job queries including `ClaimJob` (claims `Queued` jobs) and `ScheduleNextJob` (transitions next `Created` job to `Queued`)
 - Nodeagent:
   - `internal/nodeagent/execution_orchestrator.go`
   - `internal/nodeagent/execution_healing.go`
@@ -1184,6 +1182,6 @@ When changing Mods behaviour, prefer these anchors:
     `internal/workflow/runtime/step/*`.
   - Keep `step_index` relationships consistent across jobs and diffs.
 - Job scheduling:
-  - `ClaimJob` in `internal/store/queries/jobs.sql` only returns `pending` jobs.
-  - `ScheduleNextJob` transitions the first `created` job to `pending` after completion.
+  - `ClaimJob` in `internal/store/queries/jobs.sql` only returns `Queued` jobs.
+  - `ScheduleNextJob` transitions the first `Created` job to `Queued` after completion.
   - This server-driven model ensures jobs execute in `step_index` order.
