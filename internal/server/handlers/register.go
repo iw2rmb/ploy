@@ -46,9 +46,9 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Legacy routes under /v1/mods/{id}/* for run operations.
 	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
 	// See roadmap/v1/scope.md:66-73 for the v1 migration plan.
+	// Note: POST /v1/mods/{id}/cancel has been moved to POST /v1/runs/{id}/cancel (v1).
+	// Note: POST /v1/mods/{id}/resume has been removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelRunHandler(st, eventsService), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/mods/{id}/resume", resumeRunHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)

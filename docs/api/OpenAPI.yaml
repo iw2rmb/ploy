@@ -9,7 +9,7 @@ info:
     Primary endpoints expose mod projects under `/v1/mods` and run submission
     under `/v1/runs` (plus run list/inspect/cancel/start under `/v1/runs/*`).
     Legacy run-scoped endpoints still exist under `/v1/mods/{id}/*` for some
-    lifecycle operations (graph/cancel/resume/logs/diffs).
+    legacy run operations (graph/logs/diffs).
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -73,12 +73,10 @@ paths:
   /v1/mods/{mod_id}/unarchive:
     $ref: './paths/mods_mod_id_unarchive.yaml'
   # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
+  # Legacy /v1/mods/{id}/cancel moved to /v1/runs/{id}/cancel (v1 API).
+  # Legacy /v1/mods/{id}/resume removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
   /v1/mods/{id}/graph:
     $ref: './paths/mods_id_graph.yaml'
-  /v1/mods/{id}/cancel:
-    $ref: './paths/mods_id_cancel.yaml'
-  /v1/mods/{id}/resume:
-    $ref: './paths/mods_id_resume.yaml'
   /v1/runs/{id}/logs:
     $ref: './paths/runs_id_logs.yaml'
   /v1/mods/{id}/logs:

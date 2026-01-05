@@ -885,13 +885,12 @@ value is a `StageStatus` object describing that job's execution state.
     - `event: done`, data: `Status {status:"done"}` sentinel.
   - Supports `Last-Event-ID` for resumption.
 
-- `POST /v1/mods/{id}/cancel` — cancel a run.
-  - Handler: `cancelRunHandler`.
+- `POST /v1/runs/{id}/cancel` — cancel a run.
+  - Handler: `cancelRunHandlerV1`.
   - Behaviour:
-    - Transitions run to `Cancelled`, updates jobs in `Created|Queued|Running` to
-      `Cancelled`.
-    - Publishes a final `RunSummary` with `state=cancelled`.
-    - Emits a terminal `done` status on the stream.
+    - Transitions run to `Cancelled`.
+    - Updates repos in `Queued|Running` to `Cancelled`.
+    - Updates jobs in `Created|Queued|Running` to `Cancelled`.
 
 - `GET /v1/mods/{id}/diffs` and `GET /v1/diffs/{id}` — diff list and download.
   - Handler: `listRunDiffsHandler` and `getDiffHandler`.
