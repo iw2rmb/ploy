@@ -110,23 +110,23 @@ const listMods = `-- name: ListMods :many
 SELECT id, name, spec_id, created_by, created_at, archived_at
 FROM mods
 WHERE ($3::boolean IS NULL OR
-       ($3 = true AND archived_at IS NOT NULL) OR
-       ($3 = false AND archived_at IS NULL))
-  AND ($4::text IS NULL OR $4 = '' OR name ILIKE '%' || $4 || '%')
+       ($3::boolean = true AND archived_at IS NOT NULL) OR
+       ($3::boolean = false AND archived_at IS NULL))
+  AND ($4::text IS NULL OR $4::text = '' OR name ILIKE '%' || $4::text || '%')
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
 
 type ListModsParams struct {
-	Limit        int32  `json:"limit"`
-	Offset       int32  `json:"offset"`
-	ArchivedOnly bool   `json:"archived_only"`
-	NameFilter   string `json:"name_filter"`
+	Limit        int32   `json:"limit"`
+	Offset       int32   `json:"offset"`
+	ArchivedOnly *bool   `json:"archived_only"`
+	NameFilter   *string `json:"name_filter"`
 }
 
 // Lists mods with optional filtering by archived status and name substring.
-// @archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
-// @name_filter: if non-empty, filter by name substring (case-insensitive).
+// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 func (q *Queries) ListMods(ctx context.Context, arg ListModsParams) ([]Mod, error) {
 	rows, err := q.db.Query(ctx, listMods,
 		arg.Limit,

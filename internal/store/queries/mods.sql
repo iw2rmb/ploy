@@ -15,14 +15,14 @@ WHERE name = $1;
 
 -- name: ListMods :many
 -- Lists mods with optional filtering by archived status and name substring.
--- @archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
--- @name_filter: if non-empty, filter by name substring (case-insensitive).
+-- archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+-- name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 SELECT id, name, spec_id, created_by, created_at, archived_at
 FROM mods
-WHERE (@archived_only::boolean IS NULL OR
-       (@archived_only = true AND archived_at IS NOT NULL) OR
-       (@archived_only = false AND archived_at IS NULL))
-  AND (@name_filter::text IS NULL OR @name_filter = '' OR name ILIKE '%' || @name_filter || '%')
+WHERE (sqlc.narg(archived_only)::boolean IS NULL OR
+       (sqlc.narg(archived_only)::boolean = true AND archived_at IS NOT NULL) OR
+       (sqlc.narg(archived_only)::boolean = false AND archived_at IS NULL))
+  AND (sqlc.narg(name_filter)::text IS NULL OR sqlc.narg(name_filter)::text = '' OR name ILIKE '%' || sqlc.narg(name_filter)::text || '%')
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -49,4 +49,3 @@ WHERE id = $1 AND archived_at IS NOT NULL;
 -- Deletes a mod. Use with caution; should only be called when safe to remove.
 DELETE FROM mods
 WHERE id = $1;
-

@@ -51,8 +51,8 @@ WHERE id = $1
 `
 
 // Deletes a mod_repo by id.
-// Per roadmap/v1/db.md:63, this will CASCADE to related run_repos and jobs due to ON DELETE RESTRICT.
-// Caller must ensure no active runs reference this repo.
+// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT (roadmap/v1/db.md).
+// This DELETE will fail if any run_repos/jobs rows still reference the repo.
 func (q *Queries) DeleteModRepo(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteModRepo, id)
 	return err
