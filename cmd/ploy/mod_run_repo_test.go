@@ -100,9 +100,10 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				ID:        "a1b2c3d4",
 				RunID:     "2NxO0FEXAMPLE4Rn",
+				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   receivedBody["repo_url"],
 				BaseRef:   receivedBody["base_ref"],
 				TargetRef: receivedBody["target_ref"],
@@ -189,9 +190,10 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				ID:        "a1b2c3d4",
 				RunID:     "2NxO0FEXAMPLE4Rn",
+				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
@@ -236,9 +238,10 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				ID:        "a1b2c3d4",
 				RunID:     "2NxO0FEXAMPLE4Rn",
+				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch-v2",
@@ -286,10 +289,11 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			repos := []runRepoResponse{
 				{
-					ID:        "e5f6g7h8",
 					RunID:     "2NxO0FEXAMPLE4Rn",
+					RepoID:    "e5f6g7h8", // mod_repos.id (NanoID, 8 chars)
 					RepoURL:   "https://github.com/org/repo1.git",
 					BaseRef:   "main",
 					TargetRef: "feature-1",
@@ -298,8 +302,8 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 					CreatedAt: time.Now(),
 				},
 				{
-					ID:        "i9j0k1l2",
 					RunID:     "2NxO0FEXAMPLE4Rn",
+					RepoID:    "i9j0k1l2", // mod_repos.id (NanoID, 8 chars)
 					RepoURL:   "https://github.com/org/repo2.git",
 					BaseRef:   "main",
 					TargetRef: "feature-2",
@@ -487,9 +491,10 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				ID:        "a1b2c3d4",
 				RunID:     "2NxO0FEXAMPLE4Rn",
+				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-branch",
@@ -533,9 +538,10 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
+			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				ID:        "a1b2c3d4",
 				RunID:     "2NxO0FEXAMPLE4Rn",
+				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-v2",
