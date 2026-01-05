@@ -1,0 +1,363 @@
+package store
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	domaintypes "github.com/ploy-ai/ploy/internal/domain/types"
+)
+
+// TestV1Schema_ModsNameUniqueness verifies the UNIQUE constraint on mods.name.
+// Per roadmap/v1/db.md:24: mods table has a unique index on name.
+//
+// This test is skipped if PLOY_TEST_PG_DSN is not set.
+func TestV1Schema_ModsNameUniqueness(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Clean up any existing test mods.
+	testModIDs := []string{}
+	defer func() {
+		for _, modID := range testModIDs {
+			_ = db.ExecQuery(ctx, "DELETE FROM mods WHERE id = $1", modID)
+		}
+	}()
+
+	// Insert first mod with name "test-mod-uniqueness".
+	modID1 := domaintypes.NewModID()
+	testModIDs = append(testModIDs, modID1.String())
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mods (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())
+	`, modID1.String(), "test-mod-uniqueness", "test-user")
+	if err != nil {
+		t.Fatalf("first mod insert failed: %v", err)
+	}
+
+	// Attempt to insert second mod with the same name.
+	modID2 := domaintypes.NewModID()
+	testModIDs = append(testModIDs, modID2.String())
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mods (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())
+	`, modID2.String(), "test-mod-uniqueness", "test-user")
+
+	// Verify that the insert was rejected due to unique constraint violation.
+	if err == nil {
+		t.Fatal("expected duplicate name insert to fail, but it succeeded")
+	}
+	var pgErr *pgconn.PgError
+	if !assertPgError(err, &pgErr) {
+		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)
+	}
+	// PostgreSQL unique violation code is 23505.
+	if pgErr.Code != "23505" {
+		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
+	}
+}
+
+// TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mod_id, repo_url).
+// Per roadmap/v1/db.md:71: mod_repos has UNIQUE (mod_id, repo_url).
+//
+// This test is skipped if PLOY_TEST_PG_DSN is not set.
+func TestV1Schema_ModReposUniqueness(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test mod.
+	modID := domaintypes.NewModID()
+	defer func() {
+		_ = db.ExecQuery(ctx, "DELETE FROM mods WHERE id = $1", modID.String())
+	}()
+
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mods (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())
+	`, modID.String(), "test-mod-repos-uniq-"+modID.String(), "test-user")
+	if err != nil {
+		t.Fatalf("mod insert failed: %v", err)
+	}
+
+	// Insert first mod_repos row.
+	repoID1 := domaintypes.NewModRepoID()
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, repoID1.String(), modID.String(), "https://github.com/test/repo1.git", "main", "feature")
+	if err != nil {
+		t.Fatalf("first mod_repos insert failed: %v", err)
+	}
+
+	// Attempt to insert second mod_repos row with the same (mod_id, repo_url).
+	repoID2 := domaintypes.NewModRepoID()
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, repoID2.String(), modID.String(), "https://github.com/test/repo1.git", "main", "feature-2")
+
+	// Verify that the insert was rejected due to unique constraint violation.
+	if err == nil {
+		t.Fatal("expected duplicate (mod_id, repo_url) insert to fail, but it succeeded")
+	}
+	var pgErr *pgconn.PgError
+	if !assertPgError(err, &pgErr) {
+		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)
+	}
+	if pgErr.Code != "23505" {
+		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
+	}
+}
+
+// TestV1Schema_RunReposCompositePK verifies the composite PRIMARY KEY (run_id, repo_id).
+// Per roadmap/v1/db.md:141: run_repos has PRIMARY KEY (run_id, repo_id).
+//
+// This test is skipped if PLOY_TEST_PG_DSN is not set.
+func TestV1Schema_RunReposCompositePK(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test mod, spec, mod_repo, and run.
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewModRepoID()
+	runID := domaintypes.NewRunID()
+
+	defer func() {
+		_ = db.ExecQuery(ctx, "DELETE FROM runs WHERE id = $1", runID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM mod_repos WHERE id = $1", repoID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM specs WHERE id = $1", specID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM mods WHERE id = $1", modID.String())
+	}()
+
+	// Insert mod.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mods (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())
+	`, modID.String(), "test-run-repos-pk-"+modID.String(), "test-user")
+	if err != nil {
+		t.Fatalf("mod insert failed: %v", err)
+	}
+
+	// Insert spec.
+	specJSON, _ := json.Marshal(map[string]interface{}{"steps": []string{"test"}})
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO specs (id, name, spec, created_by, created_at)
+		VALUES ($1, $2, $3, $4, now())
+	`, specID.String(), "test-spec", specJSON, "test-user")
+	if err != nil {
+		t.Fatalf("spec insert failed: %v", err)
+	}
+
+	// Insert mod_repo.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, repoID.String(), modID.String(), "https://github.com/test/repo-pk.git", "main", "feature")
+	if err != nil {
+		t.Fatalf("mod_repos insert failed: %v", err)
+	}
+
+	// Insert run.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO runs (id, mod_id, spec_id, created_by, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, runID.String(), modID.String(), specID.String(), "test-user", "Started")
+	if err != nil {
+		t.Fatalf("run insert failed: %v", err)
+	}
+
+	// Insert first run_repos row.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO run_repos (mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, now())
+	`, modID.String(), runID.String(), repoID.String(), "main", "feature", "Queued")
+	if err != nil {
+		t.Fatalf("first run_repos insert failed: %v", err)
+	}
+
+	// Attempt to insert second run_repos row with the same (run_id, repo_id).
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO run_repos (mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, now())
+	`, modID.String(), runID.String(), repoID.String(), "main", "feature-2", "Queued")
+
+	// Verify that the insert was rejected due to PK violation.
+	if err == nil {
+		t.Fatal("expected duplicate (run_id, repo_id) insert to fail, but it succeeded")
+	}
+	var pgErr *pgconn.PgError
+	if !assertPgError(err, &pgErr) {
+		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)
+	}
+	if pgErr.Code != "23505" {
+		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
+	}
+}
+
+// TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name, step_index).
+// Per roadmap/v1/db.md:177: jobs has UNIQUE (run_id, repo_id, attempt, name, step_index).
+//
+// This test is skipped if PLOY_TEST_PG_DSN is not set.
+func TestV1Schema_JobsUniqueness(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test mod, spec, mod_repo, run, and run_repo.
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewModRepoID()
+	runID := domaintypes.NewRunID()
+	jobID1 := domaintypes.NewJobID()
+	jobID2 := domaintypes.NewJobID()
+
+	defer func() {
+		_ = db.ExecQuery(ctx, "DELETE FROM jobs WHERE id = $1", jobID1.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM jobs WHERE id = $1", jobID2.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM run_repos WHERE run_id = $1 AND repo_id = $2", runID.String(), repoID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM runs WHERE id = $1", runID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM mod_repos WHERE id = $1", repoID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM specs WHERE id = $1", specID.String())
+		_ = db.ExecQuery(ctx, "DELETE FROM mods WHERE id = $1", modID.String())
+	}()
+
+	// Insert mod.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mods (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())
+	`, modID.String(), "test-jobs-uniq-"+modID.String(), "test-user")
+	if err != nil {
+		t.Fatalf("mod insert failed: %v", err)
+	}
+
+	// Insert spec.
+	specJSON, _ := json.Marshal(map[string]interface{}{"steps": []string{"test"}})
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO specs (id, name, spec, created_by, created_at)
+		VALUES ($1, $2, $3, $4, now())
+	`, specID.String(), "test-spec", specJSON, "test-user")
+	if err != nil {
+		t.Fatalf("spec insert failed: %v", err)
+	}
+
+	// Insert mod_repo.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, repoID.String(), modID.String(), "https://github.com/test/repo-jobs.git", "main", "feature")
+	if err != nil {
+		t.Fatalf("mod_repos insert failed: %v", err)
+	}
+
+	// Insert run.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO runs (id, mod_id, spec_id, created_by, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, now())
+	`, runID.String(), modID.String(), specID.String(), "test-user", "Started")
+	if err != nil {
+		t.Fatalf("run insert failed: %v", err)
+	}
+
+	// Insert run_repos.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO run_repos (mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, now())
+	`, modID.String(), runID.String(), repoID.String(), "main", "feature", "Queued")
+	if err != nil {
+		t.Fatalf("run_repos insert failed: %v", err)
+	}
+
+	// Insert first job.
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, jobID1.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
+	if err != nil {
+		t.Fatalf("first job insert failed: %v", err)
+	}
+
+	// Attempt to insert second job with the same (run_id, repo_id, attempt, name, step_index).
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, jobID2.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
+
+	// Verify that the insert was rejected due to unique constraint violation.
+	if err == nil {
+		t.Fatal("expected duplicate (run_id, repo_id, attempt, name, step_index) insert to fail, but it succeeded")
+	}
+	var pgErr *pgconn.PgError
+	if !assertPgError(err, &pgErr) {
+		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)
+	}
+	if pgErr.Code != "23505" {
+		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
+	}
+
+	// Verify that a job with different step_index can be inserted (same run_id, repo_id, attempt, name).
+	jobID3 := domaintypes.NewJobID()
+	defer func() {
+		_ = db.ExecQuery(ctx, "DELETE FROM jobs WHERE id = $1", jobID3.String())
+	}()
+
+	_, err = db.ExecQuery(ctx, `
+		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, jobID3.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 2000.0, "mod", "test-image")
+	if err != nil {
+		t.Fatalf("job insert with different step_index should succeed, but failed: %v", err)
+	}
+}
+
+// assertPgError checks if the error is a pgconn.PgError and assigns it to the target.
+// Returns true if the error is a PgError, false otherwise.
+func assertPgError(err error, target **pgconn.PgError) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if pgx.ErrorAs(err, &pgErr) {
+		*target = pgErr
+		return true
+	}
+	return false
+}
