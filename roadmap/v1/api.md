@@ -10,7 +10,7 @@ Change entry: repurpose `/v1/mods` from “run submission” to “mod project C
 - Where: new handlers under `internal/server/handlers/*` + OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking API change; no backward compatibility required.
 - Unchanged: `/v1/runs/*` remains the run execution/history surface, updated to support repo scoping for multi-repo runs.
-  - Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel` (see current `stopRunHandler` in `internal/server/handlers/runs_batch_http.go`).
+  - Endpoint rename: `POST /v1/runs/{run_id}/stop` becomes `POST /v1/runs/{run_id}/cancel` (see `cancelRunHandlerV1` in `internal/server/handlers/runs_batch_http.go`).
 
 ### `POST /v1/mods`
 
