@@ -150,8 +150,8 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 
 // RunRepoResponse represents a single repo within a batch for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
-// Uses domain types (RunRepoID, RunID, RepoURL, GitRef) for type-safe
-// serialization at API boundaries.
+// v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
+// to mod_repos.id (NanoID(8)).
 type RunRepoResponse struct {
 	RunID      domaintypes.RunID   `json:"run_id"`
 	RepoID     string              `json:"repo_id"`
