@@ -69,65 +69,108 @@ CREATE INDEX IF NOT EXISTS nodes_last_heartbeat_idx ON nodes(last_heartbeat);
 CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained;
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
--- Runs (acts as a queue with SKIP LOCKED assignment)
--- The `name` column provides an optional human-readable batch name for grouping
--- or identifying runs; when NULL, the run is unnamed (single-repo or ad-hoc).
+-- Specs (dictionary of all Mods specs; append-only)
+-- Mods do not "own" specs; a mod just points at a single current spec via mods.spec_id.
+-- Setting/updating a mod spec means: insert a new specs row and update mods.spec_id.
+-- Note: id is TEXT (NanoID-backed, 8 chars) for stable run references over time.
+-- Application code generates IDs via types.NewSpecID() before insertion.
+CREATE TABLE IF NOT EXISTS specs (
+  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewSpecID().
+  name         TEXT NOT NULL DEFAULT '',  -- Optional human label.
+  spec         JSONB NOT NULL,  -- Canonical Mods spec JSON.
+  created_by   TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at  TIMESTAMPTZ NULL  -- Optional archiving support; not currently enforced.
+);
+CREATE INDEX IF NOT EXISTS specs_created_idx ON specs(created_at);
+
+-- Mods (code modification projects)
+-- A mod is a long-lived project with a unique name that references a spec and manages a repo set.
+-- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly mod identifiers.
+-- Application code generates IDs via types.NewModID() before insertion.
+CREATE TABLE IF NOT EXISTS mods (
+  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (6 chars); no default, app-generated via NewModID().
+  name         TEXT NOT NULL UNIQUE,  -- Human-readable unique name for the mod project.
+  spec_id      TEXT REFERENCES specs(id) ON DELETE SET NULL,  -- Current spec; NULL if no spec set yet.
+  created_by   TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at  TIMESTAMPTZ NULL  -- When non-NULL, creating new runs for this mod must fail.
+);
+CREATE INDEX IF NOT EXISTS mods_name_idx ON mods(name);
+-- Optional partial index on active mods for efficient filtering.
+CREATE INDEX IF NOT EXISTS mods_active_idx ON mods(id) WHERE archived_at IS NULL;
+
+-- ModRepos (managed repo set for a mod project)
+-- Each row represents a repo participating in a mod, with mutable refs.
+-- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
+-- Application code generates IDs via types.NewModRepoID() before insertion.
+CREATE TABLE IF NOT EXISTS mod_repos (
+  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewModRepoID().
+  mod_id       TEXT NOT NULL REFERENCES mods(id) ON DELETE CASCADE,
+  repo_url     TEXT NOT NULL,  -- Repository URL (normalized for matching).
+  base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
+  target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Enforce uniqueness: one repo_url per mod.
+CREATE UNIQUE INDEX IF NOT EXISTS mod_repos_mod_repo_uniq ON mod_repos(mod_id, repo_url);
+CREATE INDEX IF NOT EXISTS mod_repos_mod_created_idx ON mod_repos(mod_id, created_at);
+
+-- Runs (execution of one spec_id over a specific set of repos)
+-- v1 model: A run represents the execution of a mod's spec over its repo set.
+-- No repo-level fields here; repo attribution comes from run_repos and jobs.repo_id.
 -- Note: id is TEXT (KSUID-backed) rather than UUID; application code generates IDs
 -- via types.NewRunID() before insertion.
 CREATE TABLE IF NOT EXISTS runs (
   id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
-  name         TEXT,  -- Optional batch name for human-readable identification.
-  repo_url     TEXT NOT NULL,
-  spec         JSONB NOT NULL DEFAULT '{}'::jsonb,
+  mod_id       TEXT NOT NULL REFERENCES mods(id) ON DELETE RESTRICT,  -- Mod project this run belongs to.
+  spec_id      TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,  -- Spec used for this run (immutable snapshot).
   created_by   TEXT,
   status       run_status NOT NULL DEFAULT 'Started',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at   TIMESTAMPTZ,
-  finished_at  TIMESTAMPTZ,
-  node_id      TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id.
-  base_ref     TEXT NOT NULL,
-  target_ref   TEXT NOT NULL,
-  commit_sha   TEXT,
+  started_at   TIMESTAMPTZ,  -- Set on run creation.
+  finished_at  TIMESTAMPTZ,  -- Set when status transitions to terminal (Finished or Cancelled).
   stats        JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status);
-CREATE INDEX IF NOT EXISTS runs_node_idx ON runs(node_id);
 CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
+CREATE INDEX IF NOT EXISTS runs_mod_idx ON runs(mod_id);
 
--- RunRepos tracks per-repo execution state within a batched run.
--- The parent run holds shared spec and metadata; each run_repos row captures
--- a single repository's execution state, allowing multiple repos per batch.
--- execution_run_id links to the child run created for this repo's job pipeline.
--- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly IDs.
--- Note: run_id and execution_run_id are TEXT (KSUID-backed) to match runs.id.
+-- RunRepos tracks per-repo execution state within a run.
+-- v1 model: composite PK (run_id, repo_id); execution_run_id removed (no child runs per repo).
+-- repo_base_ref and repo_target_ref are snapshots copied from mod_repos at run creation time.
+-- Note: run_id is TEXT (KSUID-backed) to match runs.id.
+-- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mod_repos.id.
 CREATE TABLE IF NOT EXISTS run_repos (
-  id               TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewRunRepoID().
+  mod_id           TEXT NOT NULL REFERENCES mods(id) ON DELETE RESTRICT,  -- Copied from runs.mod_id.
   run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_url         TEXT NOT NULL,
-  base_ref         TEXT NOT NULL,
-  target_ref       TEXT NOT NULL,
+  repo_id          TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT,  -- FK to mod_repos.id.
+  repo_base_ref    TEXT NOT NULL,  -- Snapshot of mod_repos.base_ref at run creation time.
+  repo_target_ref  TEXT NOT NULL,  -- Snapshot of mod_repos.target_ref at run creation time.
   status           run_repo_status NOT NULL DEFAULT 'Queued',
   attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error       TEXT,
-  execution_run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,  -- Child run for this repo's execution; KSUID string.
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at       TIMESTAMPTZ,
-  finished_at      TIMESTAMPTZ
+  started_at       TIMESTAMPTZ,  -- Set when status changes Queued → Running.
+  finished_at      TIMESTAMPTZ,  -- Set when status changes to terminal (Fail, Success, Cancelled).
+  PRIMARY KEY (run_id, repo_id)  -- Composite PK: one row per repo per run.
 );
 -- Index for listing repos by run (batch lookups).
 CREATE INDEX IF NOT EXISTS run_repos_run_idx ON run_repos(run_id);
 -- Partial index for scheduling: find Queued/Running repos efficiently (v1 status values).
 CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE status IN ('Queued','Running');
--- Index for finding run_repos by execution_run_id (for completion callbacks).
-CREATE INDEX IF NOT EXISTS run_repos_execution_run_idx ON run_repos(execution_run_id) WHERE execution_run_id IS NOT NULL;
+-- Index for repo history queries (list runs per repo).
+CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, created_at);
 
 -- Jobs (unified job queue for all execution units: pre-gate, mod, heal, post-gate, gate, build)
+-- v1 model: jobs are repo-scoped; repo attribution is via job_id → jobs.repo_id.
 -- Float step_index enables inserting healing jobs between existing jobs:
 --   pre-gate=1000, mod=2000, post-gate=3000
 --   heal-1 inserted at 1500, re-gate at 1750, etc.
--- Server-driven scheduling: first job is 'pending', rest are 'created'.
--- When a job completes, server schedules the next 'created' job.
+-- Server-driven scheduling: first job per repo attempt is 'Queued', rest are 'Created'.
+-- When a job completes, server schedules the next 'Created' job for that repo attempt.
 -- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
+-- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mod_repos.id.
 --
 -- The `meta` column stores structured job metadata as JSONB. The schema is
 -- defined by internal/workflow/contracts.JobMeta with the following shape:
@@ -139,25 +182,30 @@ CREATE INDEX IF NOT EXISTS run_repos_execution_run_idx ON run_repos(execution_ru
 -- See internal/workflow/contracts.BuildGateStageMetadata for gate metadata fields.
 -- See internal/workflow/contracts.BuildMeta for build metadata fields.
 CREATE TABLE IF NOT EXISTS jobs (
-  id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
-  run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  name         TEXT NOT NULL,
-  status       job_status NOT NULL DEFAULT 'created',
-  mod_type     TEXT NOT NULL DEFAULT '',
-  mod_image    TEXT NOT NULL DEFAULT '',
-  step_index   FLOAT NOT NULL DEFAULT 0,  -- float for dynamic insertion between jobs
-  node_id      TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.
-  exit_code    INT,  -- exit code from job execution (null until completed)
-  started_at   TIMESTAMPTZ,
-  finished_at  TIMESTAMPTZ,
-  duration_ms  BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
-  meta         JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
-  UNIQUE (run_id, name)
+  id              TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
+  run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  repo_id         TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT,  -- FK to mod_repos.id for repo attribution.
+  repo_base_ref   TEXT NOT NULL,  -- Copied from run_repos.repo_base_ref at job creation time.
+  attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
+  name            TEXT NOT NULL,
+  status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
+  mod_type        TEXT NOT NULL DEFAULT '',
+  mod_image       TEXT NOT NULL DEFAULT '',
+  step_index      FLOAT NOT NULL DEFAULT 0,  -- float for dynamic insertion between jobs
+  node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.
+  exit_code       INT,  -- exit code from job execution (null until completed)
+  started_at      TIMESTAMPTZ,
+  finished_at     TIMESTAMPTZ,
+  duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
+  UNIQUE (run_id, repo_id, attempt, name, step_index)  -- v1 uniqueness: per-repo within a run.
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- v1: 'Queued' replaces 'pending' as claimable job status (see roadmap/v1/statuses.md:50).
 CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
+-- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
+CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
