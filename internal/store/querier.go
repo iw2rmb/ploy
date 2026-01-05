@@ -11,6 +11,10 @@ import (
 )
 
 type Querier interface {
+	// Archives a mod by setting archived_at to now().
+	// Per roadmap/v1/db.md:29, archiving must be refused when the mod has any jobs in a running state.
+	// This query only sets the timestamp; validation logic must be in the caller.
+	ArchiveMod(ctx context.Context, id string) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	// Atomically claim the next claimable job for a node (unified queue).
@@ -62,6 +66,12 @@ type Querier interface {
 	DeleteJob(ctx context.Context, id string) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	// Deletes a mod. Use with caution; should only be called when safe to remove.
+	DeleteMod(ctx context.Context, id string) error
+	// Deletes a mod_repo by id.
+	// Per roadmap/v1/db.md:63, this will CASCADE to related run_repos and jobs due to ON DELETE RESTRICT.
+	// Caller must ensure no active runs reference this repo.
+	DeleteModRepo(ctx context.Context, id string) error
 	DeleteNode(ctx context.Context, id string) error
 	DeleteRun(ctx context.Context, id string) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
@@ -77,7 +87,10 @@ type Querier interface {
 	GetJob(ctx context.Context, id string) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMod(ctx context.Context, id string) (Mod, error)
+	GetModByName(ctx context.Context, name string) (Mod, error)
 	GetModRepo(ctx context.Context, id string) (ModRepo, error)
+	// Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
+	GetModRepoByURL(ctx context.Context, arg GetModRepoByURLParams) (ModRepo, error)
 	GetNode(ctx context.Context, id string) (Node, error)
 	GetRun(ctx context.Context, id string) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
@@ -121,6 +134,10 @@ type Querier interface {
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	ListModReposByMod(ctx context.Context, modID string) ([]ModRepo, error)
+	// Lists mods with optional filtering by archived status and name substring.
+	// @archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+	// @name_filter: if non-empty, filter by name substring (case-insensitive).
+	ListMods(ctx context.Context, arg ListModsParams) ([]Mod, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
@@ -133,10 +150,15 @@ type Querier interface {
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
 	ListRunsWithQueuedRepos(ctx context.Context) ([]string, error)
+	// Lists specs ordered by created_at descending (most recent first).
+	// Per roadmap/v1/db.md:53, there is an index on created_at for this query.
+	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Promote the next job in a repo attempt: Created -> Queued.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
+	// Unarchives a mod by clearing archived_at.
+	UnarchiveMod(ctx context.Context, id string) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
@@ -167,6 +189,10 @@ type Querier interface {
 	// Updates value, scope, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
+	// Bulk upsert a mod_repo by normalized repo_url.
+	// Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+	// If a row exists, update refs; otherwise insert.
+	UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -9,6 +9,20 @@ import (
 	"context"
 )
 
+const archiveMod = `-- name: ArchiveMod :exec
+UPDATE mods
+SET archived_at = now()
+WHERE id = $1 AND archived_at IS NULL
+`
+
+// Archives a mod by setting archived_at to now().
+// Per roadmap/v1/db.md:29, archiving must be refused when the mod has any jobs in a running state.
+// This query only sets the timestamp; validation logic must be in the caller.
+func (q *Queries) ArchiveMod(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, archiveMod, id)
+	return err
+}
+
 const createMod = `-- name: CreateMod :one
 INSERT INTO mods (id, name, spec_id, created_by)
 VALUES ($1, $2, $3, $4)
@@ -41,6 +55,17 @@ func (q *Queries) CreateMod(ctx context.Context, arg CreateModParams) (Mod, erro
 	return i, err
 }
 
+const deleteMod = `-- name: DeleteMod :exec
+DELETE FROM mods
+WHERE id = $1
+`
+
+// Deletes a mod. Use with caution; should only be called when safe to remove.
+func (q *Queries) DeleteMod(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteMod, id)
+	return err
+}
+
 const getMod = `-- name: GetMod :one
 SELECT id, name, spec_id, created_by, created_at, archived_at
 FROM mods
@@ -59,6 +84,91 @@ func (q *Queries) GetMod(ctx context.Context, id string) (Mod, error) {
 		&i.ArchivedAt,
 	)
 	return i, err
+}
+
+const getModByName = `-- name: GetModByName :one
+SELECT id, name, spec_id, created_by, created_at, archived_at
+FROM mods
+WHERE name = $1
+`
+
+func (q *Queries) GetModByName(ctx context.Context, name string) (Mod, error) {
+	row := q.db.QueryRow(ctx, getModByName, name)
+	var i Mod
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SpecID,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const listMods = `-- name: ListMods :many
+SELECT id, name, spec_id, created_by, created_at, archived_at
+FROM mods
+WHERE ($3::boolean IS NULL OR
+       ($3 = true AND archived_at IS NOT NULL) OR
+       ($3 = false AND archived_at IS NULL))
+  AND ($4::text IS NULL OR $4 = '' OR name ILIKE '%' || $4 || '%')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListModsParams struct {
+	Limit        int32  `json:"limit"`
+	Offset       int32  `json:"offset"`
+	ArchivedOnly bool   `json:"archived_only"`
+	NameFilter   string `json:"name_filter"`
+}
+
+// Lists mods with optional filtering by archived status and name substring.
+// @archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+// @name_filter: if non-empty, filter by name substring (case-insensitive).
+func (q *Queries) ListMods(ctx context.Context, arg ListModsParams) ([]Mod, error) {
+	rows, err := q.db.Query(ctx, listMods,
+		arg.Limit,
+		arg.Offset,
+		arg.ArchivedOnly,
+		arg.NameFilter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Mod{}
+	for rows.Next() {
+		var i Mod
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.SpecID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unarchiveMod = `-- name: UnarchiveMod :exec
+UPDATE mods
+SET archived_at = NULL
+WHERE id = $1 AND archived_at IS NOT NULL
+`
+
+// Unarchives a mod by clearing archived_at.
+func (q *Queries) UnarchiveMod(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, unarchiveMod, id)
+	return err
 }
 
 const updateModSpec = `-- name: UpdateModSpec :exec
