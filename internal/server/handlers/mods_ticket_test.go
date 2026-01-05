@@ -26,7 +26,7 @@ func newTestEventsService() *events.Service {
 	return svc
 }
 
-func TestSubmitRunHandler_SingleRepo(t *testing.T) {
+func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
@@ -37,15 +37,16 @@ func TestSubmitRunHandler_SingleRepo(t *testing.T) {
 		},
 	}
 
-	handler := submitRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil)
 
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/user/repo.git",
 		"base_ref":   "main",
 		"target_ref": "feature",
+		"spec":       map[string]any{},
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -54,25 +55,23 @@ func TestSubmitRunHandler_SingleRepo(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.RunSummary
+	var resp struct {
+		RunID  string `json:"run_id"`
+		ModID  string `json:"mod_id"`
+		SpecID string `json:"spec_id"`
+	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if string(resp.RunID) == "" {
+	if resp.RunID == "" {
 		t.Fatalf("expected run_id to be set")
 	}
-	if resp.State != modsapi.RunStateRunning {
-		t.Fatalf("expected state running, got %s", resp.State)
+	if resp.ModID == "" {
+		t.Fatalf("expected mod_id to be set")
 	}
-	if resp.Repository != "https://github.com/user/repo.git" {
-		t.Fatalf("expected repository to match, got %q", resp.Repository)
-	}
-	if resp.Metadata["repo_base_ref"] != "main" {
-		t.Fatalf("expected metadata repo_base_ref main, got %q", resp.Metadata["repo_base_ref"])
-	}
-	if resp.Metadata["repo_target_ref"] != "feature" {
-		t.Fatalf("expected metadata repo_target_ref feature, got %q", resp.Metadata["repo_target_ref"])
+	if resp.SpecID == "" {
+		t.Fatalf("expected spec_id to be set")
 	}
 
 	if !st.createSpecCalled || !st.createModCalled || !st.createModRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
@@ -92,28 +91,30 @@ func TestSubmitRunHandler_SingleRepo(t *testing.T) {
 	}
 }
 
-func TestSubmitRunHandler_MissingFields(t *testing.T) {
+func TestCreateSingleRepoRunHandler_MissingFields(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
-	handler := submitRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil)
 
 	cases := []struct {
 		name string
 		body map[string]any
 		err  string
 	}{
-		{"empty repo_url", map[string]any{"repo_url": "", "base_ref": "main"}, "empty"},
-		{"no repo_url", map[string]any{"base_ref": "main"}, "empty"},
-		{"empty base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": ""}, "empty"},
-		{"no base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git"}, "empty"},
-		{"empty target_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": ""}, "empty"},
+		{"empty repo_url", map[string]any{"repo_url": "", "base_ref": "main", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
+		{"no repo_url", map[string]any{"base_ref": "main", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
+		{"empty base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
+		{"no base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
+		{"empty target_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "", "spec": map[string]any{}}, "empty"},
+		{"no target_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "spec": map[string]any{}}, "empty"},
+		{"no spec", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "feature"}, "spec is required"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			body, _ := json.Marshal(tc.body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
 			rr := httptest.NewRecorder()
 
 			handler.ServeHTTP(rr, req)
@@ -128,13 +129,13 @@ func TestSubmitRunHandler_MissingFields(t *testing.T) {
 	}
 }
 
-func TestSubmitRunHandler_InvalidJSON(t *testing.T) {
+func TestCreateSingleRepoRunHandler_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
-	handler := submitRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods", strings.NewReader("{invalid json"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader("{invalid json"))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -147,11 +148,11 @@ func TestSubmitRunHandler_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSubmitRunHandler_InvalidRepoURL(t *testing.T) {
+func TestCreateSingleRepoRunHandler_InvalidRepoURL(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
-	handler := submitRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil)
 
 	cases := []struct {
 		name    string
@@ -169,9 +170,10 @@ func TestSubmitRunHandler_InvalidRepoURL(t *testing.T) {
 				"repo_url":   tc.repoURL,
 				"base_ref":   "main",
 				"target_ref": "feature",
+				"spec":       map[string]any{},
 			}
 			bodyBytes, _ := json.Marshal(body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(bodyBytes))
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(bodyBytes))
 			rr := httptest.NewRecorder()
 
 			handler.ServeHTTP(rr, req)
@@ -186,7 +188,7 @@ func TestSubmitRunHandler_InvalidRepoURL(t *testing.T) {
 	}
 }
 
-func TestSubmitRunHandler_PublishesEvent(t *testing.T) {
+func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
@@ -198,15 +200,16 @@ func TestSubmitRunHandler_PublishesEvent(t *testing.T) {
 	}
 
 	eventsService := newTestEventsService()
-	handler := submitRunHandler(st, eventsService)
+	handler := createSingleRepoRunHandler(st, eventsService)
 
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/user/repo.git",
 		"base_ref":   "main",
 		"target_ref": "feature",
+		"spec":       map[string]any{},
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -215,11 +218,13 @@ func TestSubmitRunHandler_PublishesEvent(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp modsapi.RunSummary
+	var resp struct {
+		RunID string `json:"run_id"`
+	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	runID := string(resp.RunID)
+	runID := resp.RunID
 
 	snapshot := eventsService.Hub().Snapshot(runID)
 	if len(snapshot) == 0 {
@@ -241,7 +246,7 @@ func TestSubmitRunHandler_PublishesEvent(t *testing.T) {
 	}
 }
 
-func TestSubmitRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
+func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
@@ -252,11 +257,12 @@ func TestSubmitRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 		},
 	}
 
-	handler := submitRunHandler(st, nil)
+	handler := createSingleRepoRunHandler(st, nil)
 
 	reqBody := map[string]any{
-		"repo_url": "https://github.com/user/repo.git",
-		"base_ref": "main",
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
 		"spec": map[string]any{
 			"mods": []any{
 				map[string]any{"image": "img1:latest"},
@@ -265,7 +271,7 @@ func TestSubmitRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 		},
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

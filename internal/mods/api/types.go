@@ -8,7 +8,7 @@ import (
 )
 
 // Package api defines the Mods run and stage types shared by the CLI,
-// control plane (/v1/mods*) and SSE hub. JSON tags mirror the wire shape.
+// control plane (/v1/runs + legacy /v1/mods/{id}*) and SSE hub. JSON tags mirror the wire shape.
 
 // StageState mirrors Mods stage lifecycle states exposed over the API.
 type StageState string
@@ -35,27 +35,25 @@ const (
 	RunStateCancelled  RunState = "cancelled"
 )
 
-// RunSubmitRequest represents the canonical submit payload for POST /v1/mods.
+// RunSubmitRequest represents the submit payload for POST /v1/runs.
 //
 // This mirrors docs/api/components/schemas/controlplane.yaml#/RunSubmitRequest:
 //   - repo_url: Git repository URL (https/ssh/file)
 //   - base_ref: base Git ref (branch or tag)
-//   - target_ref: target Git ref (optional)
-//   - commit_sha: optional exact commit for reproducible runs
+//   - target_ref: target Git ref (branch or tag)
 //   - spec: arbitrary JSON spec (YAML/JSON from CLI after normalisation)
 //   - created_by: optional submitter identifier (email, CI job, etc.)
 type RunSubmitRequest struct {
 	RepoURL   string          `json:"repo_url"`
 	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref,omitempty"`
-	CommitSHA string          `json:"commit_sha,omitempty"`
-	Spec      json.RawMessage `json:"spec,omitempty"`
+	TargetRef string          `json:"target_ref"`
+	Spec      json.RawMessage `json:"spec"`
 	CreatedBy string          `json:"created_by,omitempty"`
 }
 
-// RunSummary is the canonical response type for POST /v1/mods (submit)
-// and GET /v1/runs/{id}/status (status). No wrapper types are used — the JSON
-// shape is RunSummary directly (run_id, state, stages, etc.).
+// RunSummary is the canonical response type for GET /v1/runs/{id}/status (status)
+// and SSE `event: run` payloads. No wrapper types are used — the JSON shape is
+// RunSummary directly (run_id, state, stages, etc.).
 //
 // RunSummary summarises run lifecycle state and associated stages.
 // The RunID field uses domaintypes.RunID and marshals as "run_id" in JSON.

@@ -52,13 +52,26 @@ func TestArtifactsCommand(t *testing.T) {
 
 func TestCancelResumeSubmitCommands(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		// Server returns 201 Created with canonical RunSummary response.
+		// Server returns 201 Created with {run_id, mod_id, spec_id}.
 		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(struct {
+			RunID  string `json:"run_id"`
+			ModID  string `json:"mod_id"`
+			SpecID string `json:"spec_id"`
+		}{
+			RunID:  "t2",
+			ModID:  "m2",
+			SpecID: "s2",
+		})
+	})
+	mux.HandleFunc("/v1/runs/t2/status", func(w http.ResponseWriter, r *http.Request) {
+		// Canonical RunSummary response shape for status.
+		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 			RunID:      domaintypes.RunID("t2"),
 			State:      modsapi.RunStatePending,
@@ -88,6 +101,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			RepoURL:   "https://example.com/repo.git",
 			BaseRef:   "main",
 			TargetRef: "feature",
+			Spec:      []byte("{}"),
 		},
 	}).Run(context.Background())
 	if err != nil || string(sum.RunID) != "t2" {
@@ -175,10 +189,11 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 
 func TestModsCommandsErrorPaths(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"bad req"}`))
 	})
+	mux.HandleFunc("/v1/runs/t/status", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("/v1/runs/t/cancel", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
 	mux.HandleFunc("/v1/runs/t/resume", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
 	mux.HandleFunc("/v1/mods/t", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
@@ -193,6 +208,7 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 			RepoURL:   "https://example.com/repo.git",
 			BaseRef:   "main",
 			TargetRef: "feature",
+			Spec:      []byte("{}"),
 		},
 	}).Run(context.Background()); err == nil {
 		t.Fatal("expected submit error")

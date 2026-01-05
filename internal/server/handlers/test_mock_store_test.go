@@ -23,10 +23,36 @@ type mockStore struct {
 	createSpecResult store.Spec
 	createSpecErr    error
 
+	updateModSpecCalled bool
+	updateModSpecParams store.UpdateModSpecParams
+	updateModSpecErr    error
+
 	createModCalled bool
 	createModParams store.CreateModParams
 	createModResult store.Mod
 	createModErr    error
+
+	listModsCalled bool
+	listModsParams store.ListModsParams
+	listModsResult []store.Mod
+	listModsErr    error
+
+	getModCalled bool
+	getModParam  string
+	getModResult store.Mod
+	getModErr    error
+
+	deleteModCalled bool
+	deleteModParam  string
+	deleteModErr    error
+
+	archiveModCalled bool
+	archiveModParam  string
+	archiveModErr    error
+
+	unarchiveModCalled bool
+	unarchiveModParam  string
+	unarchiveModErr    error
 
 	createModRepoCalled bool
 	createModRepoParams store.CreateModRepoParams
@@ -320,6 +346,11 @@ type mockStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
+	listModReposByModCalled bool
+	listModReposByModParam  string
+	listModReposByModResult []store.ModRepo
+	listModReposByModErr    error
+
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
 	getRunRepoParam  store.GetRunRepoParams
@@ -405,6 +436,52 @@ func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams)
 	return result, m.createModErr
 }
 
+func (m *mockStore) UpdateModSpec(ctx context.Context, params store.UpdateModSpecParams) error {
+	m.updateModSpecCalled = true
+	m.updateModSpecParams = params
+	return m.updateModSpecErr
+}
+
+func (m *mockStore) ListMods(ctx context.Context, params store.ListModsParams) ([]store.Mod, error) {
+	m.listModsCalled = true
+	m.listModsParams = params
+	return m.listModsResult, m.listModsErr
+}
+
+func (m *mockStore) GetMod(ctx context.Context, id string) (store.Mod, error) {
+	m.getModCalled = true
+	m.getModParam = id
+	if m.getModErr != nil {
+		return store.Mod{}, m.getModErr
+	}
+	result := m.getModResult
+	if result.ID == "" {
+		result.ID = id
+	}
+	if result.Name == "" {
+		result.Name = "mod-" + id
+	}
+	return result, nil
+}
+
+func (m *mockStore) DeleteMod(ctx context.Context, id string) error {
+	m.deleteModCalled = true
+	m.deleteModParam = id
+	return m.deleteModErr
+}
+
+func (m *mockStore) ArchiveMod(ctx context.Context, id string) error {
+	m.archiveModCalled = true
+	m.archiveModParam = id
+	return m.archiveModErr
+}
+
+func (m *mockStore) UnarchiveMod(ctx context.Context, id string) error {
+	m.unarchiveModCalled = true
+	m.unarchiveModParam = id
+	return m.unarchiveModErr
+}
+
 func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error) {
 	m.createModRepoCalled = true
 	m.createModRepoParams = params
@@ -432,6 +509,12 @@ func (m *mockStore) GetModRepo(ctx context.Context, id string) (store.ModRepo, e
 	m.getModRepoCalled = true
 	m.getModRepoParam = id
 	return m.getModRepoResult, m.getModRepoErr
+}
+
+func (m *mockStore) ListModReposByMod(ctx context.Context, modID string) ([]store.ModRepo, error) {
+	m.listModReposByModCalled = true
+	m.listModReposByModParam = modID
+	return m.listModReposByModResult, m.listModReposByModErr
 }
 
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {

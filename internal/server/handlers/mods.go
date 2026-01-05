@@ -1,17 +1,21 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // createModHandler creates a new mod project.
@@ -41,30 +45,13 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Create spec if provided
-		var specIDPtr *string
-		if req.Spec != nil && len(*req.Spec) > 0 {
-			specID := domaintypes.NewSpecID().String()
-			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
-				ID:        specID,
-				Name:      "",
-				Spec:      *req.Spec,
-				CreatedBy: req.CreatedBy,
-			})
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
-				slog.Error("create mod: create spec failed", "err", err)
-				return
-			}
-			specIDPtr = &createdSpec.ID
-		}
-
-		// Create mod
+		// Create mod (create spec only after the mod row exists to avoid creating
+		// orphaned specs on mod-name collisions).
 		modID := domaintypes.NewModID().String()
 		mod, err := st.CreateMod(r.Context(), store.CreateModParams{
 			ID:        modID,
 			Name:      req.Name,
-			SpecID:    specIDPtr,
+			SpecID:    nil,
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
@@ -79,6 +66,34 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Create spec if provided and attach it to the mod.
+		var specIDPtr *string
+		if req.Spec != nil && len(*req.Spec) > 0 {
+			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
+				http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+				return
+			}
+
+			specID := domaintypes.NewSpecID().String()
+			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
+				ID:        specID,
+				Name:      "",
+				Spec:      *req.Spec,
+				CreatedBy: req.CreatedBy,
+			})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
+				slog.Error("create mod: create spec failed", "mod_id", modID, "err", err)
+				return
+			}
+			if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
+				http.Error(w, fmt.Sprintf("failed to update mod spec: %v", err), http.StatusInternalServerError)
+				slog.Error("create mod: update spec failed", "mod_id", modID, "spec_id", createdSpec.ID, "err", err)
+				return
+			}
+			specIDPtr = &createdSpec.ID
+		}
+
 		// Build response
 		resp := struct {
 			ID        string  `json:"id"`
@@ -89,7 +104,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 		}{
 			ID:        mod.ID,
 			Name:      mod.Name,
-			SpecID:    mod.SpecID,
+			SpecID:    specIDPtr,
 			CreatedBy: mod.CreatedBy,
 			CreatedAt: mod.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
@@ -114,13 +129,113 @@ func createModHandler(st store.Store) http.HandlerFunc {
 // - Optional filters: name_substring, archived (true/false), repo_url.
 func listModsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse query parameters
-		// TODO: Implement filters (name_substring, archived, repo_url) when store methods are available.
-		// For now, return all mods with basic pagination.
+		limit := int32(50)
+		offset := int32(0)
+
+		if l := r.URL.Query().Get("limit"); l != "" {
+			parsed, err := strconv.ParseInt(l, 10, 32)
+			if err != nil || parsed < 1 {
+				http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+				return
+			}
+			limit = int32(parsed)
+			if limit > 100 {
+				limit = 100
+			}
+		}
+		if o := r.URL.Query().Get("offset"); o != "" {
+			parsed, err := strconv.ParseInt(o, 10, 32)
+			if err != nil || parsed < 0 {
+				http.Error(w, "invalid offset parameter", http.StatusBadRequest)
+				return
+			}
+			offset = int32(parsed)
+		}
+
+		nameSubstring := strings.TrimSpace(r.URL.Query().Get("name_substring"))
+		var nameFilter *string
+		if nameSubstring != "" {
+			nameFilter = &nameSubstring
+		}
+
+		archivedStr := strings.TrimSpace(r.URL.Query().Get("archived"))
+		var archivedOnly *bool
+		if archivedStr != "" {
+			parsed, err := strconv.ParseBool(archivedStr)
+			if err != nil {
+				http.Error(w, "invalid archived parameter", http.StatusBadRequest)
+				return
+			}
+			archivedOnly = &parsed
+		}
+
+		repoURLFilter := strings.TrimSpace(r.URL.Query().Get("repo_url"))
+		if repoURLFilter != "" {
+			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
+				http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Repo URL filtering is implemented in the handler because the store does
+		// not currently provide a repo_url-filtered ListMods query.
+		if repoURLFilter != "" {
+			// Fetch all mods matching archived/name filters, then filter by repo_url membership.
+			const pageLimit = int32(200)
+			pageOffset := int32(0)
+			var filtered []store.Mod
+			for {
+				page, err := st.ListMods(r.Context(), store.ListModsParams{
+					Limit:        pageLimit,
+					Offset:       pageOffset,
+					ArchivedOnly: archivedOnly,
+					NameFilter:   nameFilter,
+				})
+				if err != nil {
+					http.Error(w, fmt.Sprintf("failed to list mods: %v", err), http.StatusInternalServerError)
+					slog.Error("list mods: fetch failed", "err", err)
+					return
+				}
+				if len(page) == 0 {
+					break
+				}
+				for _, mod := range page {
+					repos, err := st.ListModReposByMod(r.Context(), mod.ID)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("failed to list mod repos: %v", err), http.StatusInternalServerError)
+						slog.Error("list mods: list mod repos failed", "mod_id", mod.ID, "err", err)
+						return
+					}
+					for _, mr := range repos {
+						if strings.TrimSpace(mr.RepoUrl) == repoURLFilter {
+							filtered = append(filtered, mod)
+							break
+						}
+					}
+				}
+				pageOffset += pageLimit
+			}
+
+			// Apply pagination after filtering.
+			start := int(offset)
+			if start > len(filtered) {
+				start = len(filtered)
+			}
+			end := start + int(limit)
+			if end > len(filtered) {
+				end = len(filtered)
+			}
+			mods := filtered[start:end]
+
+			writeModsListResponse(w, mods)
+			return
+		}
 
 		mods, err := st.ListMods(r.Context(), store.ListModsParams{
-			Limit:  100, // Default limit
-			Offset: 0,
+			Limit:        limit,
+			Offset:       offset,
+			ArchivedOnly: archivedOnly,
+			NameFilter:   nameFilter,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list mods: %v", err), http.StatusInternalServerError)
@@ -128,37 +243,40 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response
-		type modItem struct {
-			ID        string  `json:"id"`
-			Name      string  `json:"name"`
-			SpecID    *string `json:"spec_id,omitempty"`
-			CreatedBy *string `json:"created_by,omitempty"`
-			Archived  bool    `json:"archived"`
-			CreatedAt string  `json:"created_at"`
-		}
+		writeModsListResponse(w, mods)
+	}
+}
 
-		items := make([]modItem, 0, len(mods))
-		for _, mod := range mods {
-			items = append(items, modItem{
-				ID:        mod.ID,
-				Name:      mod.Name,
-				SpecID:    mod.SpecID,
-				CreatedBy: mod.CreatedBy,
-				Archived:  mod.ArchivedAt.Valid,
-				CreatedAt: mod.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-			})
-		}
+func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
+	type modItem struct {
+		ID        string  `json:"id"`
+		Name      string  `json:"name"`
+		SpecID    *string `json:"spec_id,omitempty"`
+		CreatedBy *string `json:"created_by,omitempty"`
+		Archived  bool    `json:"archived"`
+		CreatedAt string  `json:"created_at"`
+	}
 
-		resp := struct {
-			Mods []modItem `json:"mods"`
-		}{Mods: items}
+	items := make([]modItem, 0, len(mods))
+	for _, mod := range mods {
+		items = append(items, modItem{
+			ID:        mod.ID,
+			Name:      mod.Name,
+			SpecID:    mod.SpecID,
+			CreatedBy: mod.CreatedBy,
+			Archived:  mod.ArchivedAt.Valid,
+			CreatedAt: mod.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list mods: encode response failed", "err", err)
-		}
+	resp := struct {
+		Mods []modItem `json:"mods"`
+	}{Mods: items}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.Error("list mods: encode response failed", "err", err)
 	}
 }
 
@@ -189,22 +307,12 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if any runs exist for this mod
-		// Use ListRuns and filter by mod_id since there's no dedicated ListRunsByMod method
-		allRuns, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: 1000, Offset: 0})
+		hasRuns, err := modHasAnyRuns(r.Context(), st, modIDStr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to check runs: %v", err), http.StatusInternalServerError)
 			slog.Error("delete mod: check runs failed", "mod_id", modIDStr, "err", err)
 			return
 		}
-
-		hasRuns := false
-		for _, run := range allRuns {
-			if run.ModID == modIDStr {
-				hasRuns = true
-				break
-			}
-		}
-
 		if hasRuns {
 			http.Error(w, "cannot delete mod with existing runs", http.StatusConflict)
 			return
@@ -219,6 +327,26 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 		slog.Info("mod deleted", "mod_id", modIDStr)
+	}
+}
+
+func modHasAnyRuns(ctx context.Context, st store.Store, modID string) (bool, error) {
+	const pageLimit = int32(200)
+	pageOffset := int32(0)
+	for {
+		page, err := st.ListRuns(ctx, store.ListRunsParams{Limit: pageLimit, Offset: pageOffset})
+		if err != nil {
+			return false, err
+		}
+		if len(page) == 0 {
+			return false, nil
+		}
+		for _, run := range page {
+			if run.ModID == modID {
+				return true, nil
+			}
+		}
+		pageOffset += pageLimit
 	}
 }
 
@@ -268,31 +396,15 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check for running jobs in this mod's runs
-		// Get all runs and filter by mod_id
-		allRuns, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: 1000, Offset: 0})
+		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modIDStr)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to check runs: %v", err), http.StatusInternalServerError)
-			slog.Error("archive mod: check runs failed", "mod_id", modIDStr, "err", err)
+			http.Error(w, fmt.Sprintf("failed to check jobs: %v", err), http.StatusInternalServerError)
+			slog.Error("archive mod: check jobs failed", "mod_id", modIDStr, "err", err)
 			return
 		}
-
-		// Check if any run has running jobs
-		for _, run := range allRuns {
-			if run.ModID != modIDStr {
-				continue
-			}
-			jobs, err := st.ListJobsByRun(r.Context(), run.ID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to check jobs: %v", err), http.StatusInternalServerError)
-				slog.Error("archive mod: check jobs failed", "mod_id", modIDStr, "run_id", run.ID, "err", err)
-				return
-			}
-			for _, job := range jobs {
-				if job.Status == store.JobStatusRunning || job.Status == store.JobStatusQueued {
-					http.Error(w, "cannot archive mod with running jobs", http.StatusConflict)
-					return
-				}
-			}
+		if hasRunningJobs {
+			http.Error(w, "cannot archive mod with running jobs", http.StatusConflict)
+			return
 		}
 
 		// Archive the mod
@@ -316,6 +428,35 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(resp)
 
 		slog.Info("mod archived", "mod_id", modIDStr)
+	}
+}
+
+func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID string) (bool, error) {
+	const pageLimit = int32(200)
+	pageOffset := int32(0)
+	for {
+		page, err := st.ListRuns(ctx, store.ListRunsParams{Limit: pageLimit, Offset: pageOffset})
+		if err != nil {
+			return false, err
+		}
+		if len(page) == 0 {
+			return false, nil
+		}
+		for _, run := range page {
+			if run.ModID != modID {
+				continue
+			}
+			jobs, err := st.ListJobsByRun(ctx, run.ID)
+			if err != nil {
+				return false, err
+			}
+			for _, job := range jobs {
+				if job.Status == store.JobStatusRunning || job.Status == store.JobStatusQueued {
+					return true, nil
+				}
+			}
+		}
+		pageOffset += pageLimit
 	}
 }
 

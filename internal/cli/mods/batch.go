@@ -43,7 +43,7 @@ type CreateBatchCommand struct {
 	TargetRef string          // Initial target ref.
 }
 
-// Run executes POST /v1/mods to create a batch run with the shared spec.
+// Run executes POST /v1/runs to submit the initial repo for a run.
 // Returns the created batch summary on success.
 func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	if c.Client == nil {
@@ -57,27 +57,32 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
 		return BatchSummary{}, fmt.Errorf("batch create: repo_url: %w", err)
 	}
-
-	// Build the request payload matching server's expected format.
-	// Server uses /v1/mods for initial creation with repo_url/base_ref/target_ref + spec.
-	req := struct {
-		Name      *string          `json:"name,omitempty"`
-		RepoURL   string           `json:"repo_url"`
-		BaseRef   string           `json:"base_ref"`
-		TargetRef string           `json:"target_ref"`
-		Spec      *json.RawMessage `json:"spec,omitempty"`
-		CreatedBy *string          `json:"created_by,omitempty"`
-	}{
-		Name:      c.Name,
-		RepoURL:   repoURL,
-		BaseRef:   c.BaseRef,
-		TargetRef: c.TargetRef,
-		CreatedBy: c.CreatedBy,
+	baseRef := strings.TrimSpace(c.BaseRef)
+	if err := domaintypes.GitRef(baseRef).Validate(); err != nil {
+		return BatchSummary{}, fmt.Errorf("batch create: base_ref: %w", err)
+	}
+	targetRef := strings.TrimSpace(c.TargetRef)
+	if err := domaintypes.GitRef(targetRef).Validate(); err != nil {
+		return BatchSummary{}, fmt.Errorf("batch create: target_ref: %w", err)
+	}
+	if len(c.Spec) == 0 {
+		return BatchSummary{}, fmt.Errorf("batch create: spec is required")
 	}
 
-	if len(c.Spec) > 0 {
-		spec := c.Spec
-		req.Spec = &spec
+	// Build the request payload matching server's expected format.
+	// Server uses /v1/runs for single-repo submission (roadmap/v1/api.md).
+	req := struct {
+		RepoURL   string          `json:"repo_url"`
+		BaseRef   string          `json:"base_ref"`
+		TargetRef string          `json:"target_ref"`
+		Spec      json.RawMessage `json:"spec"`
+		CreatedBy *string         `json:"created_by,omitempty"`
+	}{
+		RepoURL:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+		Spec:      c.Spec,
+		CreatedBy: c.CreatedBy,
 	}
 
 	payload, err := json.Marshal(req)
@@ -85,8 +90,8 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 		return BatchSummary{}, fmt.Errorf("batch create: marshal request: %w", err)
 	}
 
-	// POST /v1/mods to create the batch run.
-	endpoint := c.BaseURL.JoinPath("/v1/mods")
+	// POST /v1/runs to create the run.
+	endpoint := c.BaseURL.JoinPath("/v1/runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return BatchSummary{}, fmt.Errorf("batch create: build request: %w", err)
