@@ -4,8 +4,8 @@ post:
   description: |
     Cancel a batch run identified by its run ID. Transitions the run status to
     `Cancelled` and marks all `Queued`/`Running` `run_repos` as `Cancelled`, and
-    cancels/removes waiting jobs from the queue. The operation is idempotent: if
-    the run is already in a terminal state (`Finished` or `Cancelled`), the handler
+    cancels/removes `Created`/`Queued`/`Running` jobs from the queue. The operation
+    is idempotent: if the run is already in a terminal state (`Finished` or `Cancelled`), the handler
     returns the current summary with `200 OK`.
 
     Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
