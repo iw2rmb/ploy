@@ -13,7 +13,7 @@ import (
 )
 
 // handleRunStop implements `ploy run stop <run-id>`.
-// Stops a run and cancels all pending repos.
+// Stops a run by calling the v1 cancel endpoint (Queued/Running repos -> Cancelled).
 func handleRunStop(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("run stop", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)

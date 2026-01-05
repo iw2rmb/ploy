@@ -16,7 +16,7 @@ func TestRunStopCallsControlPlane(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-456/stop" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-456/cancel" {
 			called = true
 
 			now := time.Now()
@@ -30,7 +30,7 @@ func TestRunStopCallsControlPlane(t *testing.T) {
 				} `json:"repo_counts,omitempty"`
 			}{
 				ID:        "run-456",
-				Status:    "canceled",
+				Status:    "Cancelled",
 				CreatedAt: now,
 				Counts: &struct {
 					Total     int32 `json:"total"`
@@ -54,7 +54,7 @@ func TestRunStopCallsControlPlane(t *testing.T) {
 		t.Fatalf("run stop error: %v", err)
 	}
 	if !called {
-		t.Fatal("expected POST /v1/runs/run-456/stop to be called")
+		t.Fatal("expected POST /v1/runs/run-456/cancel to be called")
 	}
 
 	output := buf.String()

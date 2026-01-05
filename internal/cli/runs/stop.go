@@ -19,7 +19,7 @@ type StopCommand struct {
 	RunID   domaintypes.RunID
 }
 
-// Run executes POST /v1/runs/{id}/stop to stop the run.
+// Run executes POST /v1/runs/{id}/cancel to stop (cancel) the run.
 func (c StopCommand) Run(ctx context.Context) (Summary, error) {
 	var zero Summary
 
@@ -33,7 +33,7 @@ func (c StopCommand) Run(ctx context.Context) (Summary, error) {
 		return zero, fmt.Errorf("run stop: run id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String(), "stop")
+	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String(), "cancel")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return zero, fmt.Errorf("run stop: build request: %w", err)

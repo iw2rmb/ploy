@@ -63,7 +63,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/status", getRunStatusHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/logs", getRunLogsHandler(st, eventsService), auth.RoleControlPlane)
-	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and removes/cancels queued jobs.
+	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and cancels/removes Created/Queued/Running jobs.
 	// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
 	s.HandleFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
