@@ -13,7 +13,6 @@ func TestIDs_Basics(t *testing.T) {
 			a RunID
 			d StepID
 			e ClusterID
-			f RunRepoID
 			g ModID
 			h SpecID
 			i ModRepoID
@@ -26,9 +25,6 @@ func TestIDs_Basics(t *testing.T) {
 		}
 		if !e.IsZero() || e.String() != "" {
 			t.Fatalf("ClusterID zero failed")
-		}
-		if !f.IsZero() || f.String() != "" {
-			t.Fatalf("RunRepoID zero failed")
 		}
 		if !g.IsZero() || g.String() != "" {
 			t.Fatalf("ModID zero failed")
@@ -54,10 +50,6 @@ func TestIDs_Basics(t *testing.T) {
 		if c1 != c2 || c1.String() != "c1" {
 			t.Fatalf("ClusterID compare/string failed")
 		}
-		rr1, rr2 := RunRepoID("rr1"), RunRepoID("rr1")
-		if rr1 != rr2 || rr1.String() != "rr1" {
-			t.Fatalf("RunRepoID compare/string failed")
-		}
 		m1, m2 := ModID("m1"), ModID("m1")
 		if m1 != m2 || m1.String() != "m1" {
 			t.Fatalf("ModID compare/string failed")
@@ -80,7 +72,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		rid  RunID
 		step StepID
 		cid  ClusterID
-		rrid RunRepoID
 		mid  ModID
 		sid  SpecID
 		mrid ModRepoID
@@ -115,9 +106,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	if err := cid.UnmarshalText([]byte(" c-1 ")); err != nil {
 		t.Fatalf("cluster UnmarshalText: %v", err)
 	}
-	if err := rrid.UnmarshalText([]byte(" repo-1 ")); err != nil {
-		t.Fatalf("runrepo UnmarshalText: %v", err)
-	}
 	// Test v1 ID types text round-trip.
 	if err := mid.UnmarshalText([]byte(" mod-1 ")); err != nil {
 		t.Fatalf("mod UnmarshalText: %v", err)
@@ -133,7 +121,6 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		"run":     rid,
 		"step":    step,
 		"cluster": cid,
-		"runrepo": rrid,
 		"mod":     mid,
 		"spec":    sid,
 		"modrepo": mrid,
@@ -157,7 +144,6 @@ func TestIDs_RejectEmpty(t *testing.T) {
 		{"run", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }},
 		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
 		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},
-		{"runrepo", func(b []byte) error { var v RunRepoID; return v.UnmarshalText(b) }},
 		{"mod", func(b []byte) error { var v ModID; return v.UnmarshalText(b) }},
 		{"spec", func(b []byte) error { var v SpecID; return v.UnmarshalText(b) }},
 		{"modrepo", func(b []byte) error { var v ModRepoID; return v.UnmarshalText(b) }},
@@ -211,34 +197,6 @@ func TestIDGenerators(t *testing.T) {
 			newID := NewJobID()
 			if _, exists := seen[newID]; exists {
 				t.Fatalf("NewJobID produced duplicate ID after %d calls", i)
-			}
-			seen[newID] = struct{}{}
-		}
-	})
-
-	t.Run("NewRunRepoID", func(t *testing.T) {
-		// Verify non-empty output with expected NanoID length (8 characters).
-		id := NewRunRepoID()
-		if id.IsZero() {
-			t.Fatal("NewRunRepoID returned zero value")
-		}
-		if len(id.String()) != 8 {
-			t.Fatalf("NewRunRepoID length = %d, want 8", len(id.String()))
-		}
-
-		// Verify characters are from the expected URL-safe alphabet.
-		for _, c := range id.String() {
-			if !isURLSafeChar(c) {
-				t.Fatalf("NewRunRepoID contains invalid character: %c", c)
-			}
-		}
-
-		// Verify multiple calls produce different values.
-		seen := make(map[RunRepoID]struct{})
-		for i := 0; i < 100; i++ {
-			newID := NewRunRepoID()
-			if _, exists := seen[newID]; exists {
-				t.Fatalf("NewRunRepoID produced duplicate ID after %d calls", i)
 			}
 			seen[newID] = struct{}{}
 		}

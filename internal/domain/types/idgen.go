@@ -27,21 +27,6 @@ func NewJobID() JobID {
 	return JobID(ksuid.New().String())
 }
 
-// NewRunRepoID generates a new unique RunRepoID using NanoID.
-// Uses an 8-character NanoID with the URL-safe alphabet for compact,
-// human-friendly identifiers suitable for use in URLs and UI displays.
-// The 8-character length provides sufficient entropy for per-run repo IDs.
-func NewRunRepoID() RunRepoID {
-	// Generate returns an error only if the alphabet is invalid or length is <= 0.
-	// Since we use a fixed valid alphabet and length, error is effectively impossible.
-	id, err := gonanoid.Generate(alphabet, 8)
-	if err != nil {
-		// Panic on configuration error; this should never happen with valid inputs.
-		panic("idgen: failed to generate NanoID: " + err.Error())
-	}
-	return RunRepoID(id)
-}
-
 // NewNodeKey generates a new unique node identifier using NanoID.
 // Uses a 6-character NanoID with the URL-safe alphabet for compact identifiers
 // suitable for node IDs in nodes.id and node agent configuration.

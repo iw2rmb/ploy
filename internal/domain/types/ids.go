@@ -26,10 +26,6 @@ type ClusterID string
 // NodeID identifies a worker node in the cluster.
 type NodeID string
 
-// RunRepoID identifies a repo entry within a batch run.
-// Used in batch run handlers to provide type-safe repo identification.
-type RunRepoID string
-
 // ModID identifies a mod project.
 // v1 identifier for mods table (NanoID(6), app-generated).
 // See roadmap/v1/db.md:15 for schema requirements.
@@ -81,12 +77,6 @@ func (v NodeID) String() string { return string(v) }
 
 // IsZero reports whether the value is empty (after trimming spaces).
 func (v NodeID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v RunRepoID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v RunRepoID) IsZero() bool { return IsEmpty(string(v)) }
 
 // String returns the underlying string value.
 func (v ModID) String() string { return string(v) }
@@ -201,16 +191,6 @@ func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
 func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
 func (v NodeID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *NodeID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*RunRepoID)(nil)
-
-func (v RunRepoID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *RunRepoID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
-func (v RunRepoID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *RunRepoID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
 // ModID implements encoding.TextMarshaler and encoding.TextUnmarshaler
 // for text-based serialization (normalizes and rejects empty values).
