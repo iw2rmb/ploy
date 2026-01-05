@@ -31,14 +31,24 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/bootstrap/tokens", createBootstrapTokenHandler(st, tokenSecret), auth.RoleControlPlane, auth.RoleCLIAdmin)
 	s.HandleFunc("POST /v1/pki/bootstrap", bootstrapCertificateHandler(st, tokenSecret), auth.RoleWorker)
 
-	// Mods run submission (simplified API for single-repo runs).
-	s.HandleFunc("POST /v1/mods", submitRunHandler(st, eventsService), auth.RoleControlPlane)
+	// Runs — single-repo run submission (v1 API).
+	// v1 change (roadmap/v1/scope.md:66, roadmap/v1/api.md:104): POST /v1/runs for single-repo submission.
+	s.HandleFunc("POST /v1/runs", createSingleRepoRunHandler(st, eventsService), auth.RoleControlPlane)
+
+	// Mods — mod project CRUD (v1 API).
+	// v1 change (roadmap/v1/api.md:5-91): Repurpose /v1/mods for mod project CRUD.
+	s.HandleFunc("POST /v1/mods", createModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods", listModsHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/mods/{mod_id}", deleteModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/mods/{mod_id}/archive", archiveModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/mods/{mod_id}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
+
+	// Legacy routes under /v1/mods/{id}/* for run operations.
+	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
+	// See roadmap/v1/scope.md:66-73 for the v1 migration plan.
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	// Mods run cancellation.
 	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelRunHandler(st, eventsService), auth.RoleControlPlane)
-	// Mods run resume (for failed/canceled runs).
 	s.HandleFunc("POST /v1/mods/{id}/resume", resumeRunHandler(st, eventsService), auth.RoleControlPlane)
-	// Diffs listing and download (Worker role for multi-node rehydration C2, ControlPlane for CLI access)
 	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
