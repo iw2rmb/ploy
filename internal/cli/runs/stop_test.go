@@ -29,7 +29,7 @@ func TestStopCommand_Run(t *testing.T) {
 			runID: domaintypes.RunID("run-456"),
 			serverResp: Summary{
 				ID:     domaintypes.RunID("run-456"),
-				Status: "canceled",
+				Status: "Cancelled",
 			},
 			statusCode: http.StatusOK,
 		},
@@ -57,8 +57,8 @@ func TestStopCommand_Run(t *testing.T) {
 				if r.Method != http.MethodPost {
 					t.Errorf("expected POST, got %s", r.Method)
 				}
-				if !strings.HasSuffix(r.URL.Path, "/stop") {
-					t.Errorf("expected path to end with /stop, got %s", r.URL.Path)
+				if !strings.HasSuffix(r.URL.Path, "/cancel") {
+					t.Errorf("expected path to end with /cancel, got %s", r.URL.Path)
 				}
 
 				if tc.statusCode == http.StatusNotFound {

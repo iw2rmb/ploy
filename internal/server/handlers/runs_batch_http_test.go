@@ -101,7 +101,8 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	queuedRepoID := domaintypes.NewModRepoID().String()
+	runningRepoID := domaintypes.NewModRepoID().String()
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -112,11 +113,14 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued},
+			{RunID: runID, RepoID: queuedRepoID, Status: store.RunRepoStatusQueued},
+			{RunID: runID, RepoID: runningRepoID, Status: store.RunRepoStatusRunning},
 			{RunID: runID, RepoID: "repo_done", Status: store.RunRepoStatusSuccess},
 		},
 		listJobsByRunResult: []store.Job{
 			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusCreated},
+			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusQueued},
+			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-5 * time.Second).UTC(), Valid: true}},
 			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusSuccess},
 		},
 	}
@@ -136,13 +140,32 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusCancelled {
 		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
 	}
-	// Should cancel the Queued repo (not the Success repo).
-	if len(st.updateRunRepoStatusParams) != 1 {
-		t.Fatalf("expected 1 repo status update (for Queued repo), got %d", len(st.updateRunRepoStatusParams))
+	if len(st.updateRunRepoStatusParams) != 2 {
+		t.Fatalf("expected 2 repo status updates (Queued + Running), got %d", len(st.updateRunRepoStatusParams))
 	}
-	// Should cancel the Created job (not the Success job).
-	if len(st.updateJobStatusCalls) != 1 {
-		t.Fatalf("expected 1 job status update (for Created job), got %d", len(st.updateJobStatusCalls))
+	updatedRepos := map[string]store.UpdateRunRepoStatusParams{}
+	for _, p := range st.updateRunRepoStatusParams {
+		updatedRepos[p.RepoID] = p
+	}
+	for _, repoID := range []string{queuedRepoID, runningRepoID} {
+		p, ok := updatedRepos[repoID]
+		if !ok {
+			t.Fatalf("expected repo %s to be cancelled", repoID)
+		}
+		if p.RunID != runID || p.Status != store.RunRepoStatusCancelled {
+			t.Fatalf("unexpected UpdateRunRepoStatus params for repo %s: %+v", repoID, p)
+		}
+	}
+	if len(st.updateJobStatusCalls) != 3 {
+		t.Fatalf("expected 3 job status updates (Created + Queued + Running), got %d", len(st.updateJobStatusCalls))
+	}
+	for _, p := range st.updateJobStatusCalls {
+		if p.Status != store.JobStatusCancelled {
+			t.Fatalf("expected job status Cancelled, got %+v", p)
+		}
+		if !p.FinishedAt.Valid {
+			t.Fatalf("expected FinishedAt to be set for job %+v", p)
+		}
 	}
 }
 
