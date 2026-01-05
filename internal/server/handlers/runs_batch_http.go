@@ -16,9 +16,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// stopRunHandler returns an HTTP handler that cancels a v1 run.
-// POST /v1/runs/{id}/stop (legacy path) — Marks the run as Cancelled and cancels queued/running repos/jobs.
-func stopRunHandler(st store.Store) http.HandlerFunc {
+// cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
+// POST /v1/runs/{id}/cancel (v1 API) — Marks the run as Cancelled and cancels queued/running repos/jobs.
+// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
+// This handler:
+// - Sets runs.status=Cancelled
+// - Cancels all repos with status Queued or Running → Cancelled
+// - Cancels/removes waiting jobs (Created/Queued/Running → Cancelled)
+func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
@@ -33,10 +38,11 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
-			slog.Error("stop run: fetch failed", "run_id", runIDStr, "err", err)
+			slog.Error("cancel run: fetch failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
+		// Idempotent: if already terminal, return current state.
 		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 			summary := runToSummary(run)
 			if counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID)); counts != nil && counts.Total > 0 {
@@ -48,14 +54,16 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Update run status to Cancelled.
 		if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runIDStr, Status: store.RunStatusCancelled}); err != nil {
 			http.Error(w, fmt.Sprintf("failed to update run status: %v", err), http.StatusInternalServerError)
-			slog.Error("stop run: update status failed", "run_id", runIDStr, "err", err)
+			slog.Error("cancel run: update status failed", "run_id", runIDStr, "err", err)
 			return
 		}
 
 		now := time.Now().UTC()
 
+		// Cancel all Queued/Running repos → Cancelled (v1 requirement).
 		if repos, err := st.ListRunReposByRun(r.Context(), runIDStr); err == nil {
 			for _, rr := range repos {
 				if rr.Status != store.RunRepoStatusQueued && rr.Status != store.RunRepoStatusRunning {
@@ -69,6 +77,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
+		// Cancel/remove waiting jobs (Created/Queued/Running → Cancelled).
 		if jobs, err := st.ListJobsByRun(r.Context(), runIDStr); err == nil {
 			for _, job := range jobs {
 				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
@@ -90,6 +99,7 @@ func stopRunHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
+		// Return updated run summary.
 		run, _ = st.GetRun(r.Context(), runIDStr)
 		summary := runToSummary(run)
 		if counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID)); counts != nil && counts.Total > 0 {

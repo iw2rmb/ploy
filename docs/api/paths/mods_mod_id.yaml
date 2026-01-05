@@ -1,0 +1,35 @@
+delete:
+  tags: [Control]
+  summary: Delete mod
+  description: |
+    Delete a mod project.
+
+    Refuses deletion if any runs exist for the mod.
+  responses:
+    '204':
+      description: No Content
+    '400':
+      description: Bad request (invalid mod id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict — mod has existing runs.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

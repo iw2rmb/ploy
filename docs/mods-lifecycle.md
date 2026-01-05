@@ -929,7 +929,7 @@ artifacts/diffs to the correct node.
 
 - `GET /v1/runs` — list batch runs with basic metadata (mod_id, spec_id, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
-- `POST /v1/runs/{id}/stop` — stop a batch run by transitioning the run to `Cancelled` and marking `Queued`/`Running` `run_repos` as `Cancelled` (idempotent for terminal runs). The CLI maps this to `ploy run stop <run-id>` and returns the canonical `RunSummary` payload.
+- `POST /v1/runs/{id}/cancel` — cancel a batch run by transitioning the run to `Cancelled` and marking `Queued`/`Running` `run_repos` as `Cancelled`, and cancelling/removing waiting jobs from the queue (idempotent for terminal runs). The CLI maps this to `ploy run stop <run-id>` and returns the canonical `RunSummary` payload.
 
 ## 4. Node Execution and Rehydration
 
