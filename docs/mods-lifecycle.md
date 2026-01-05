@@ -7,7 +7,7 @@ checkpoint notes in the repository.
 ## 1. Core Concepts
 
 - **Run** — A Mods run submitted to the control plane. Runs are stored as
-  `runs` rows in PostgreSQL and exposed via the `/v1/mods` API.
+  `runs` rows in PostgreSQL and exposed via the `/v1/runs` API.
 - **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
   `post-gate`). Jobs are stored as `jobs` rows.
 - **StepIndex** — Float index that orders jobs and ties them to diffs. Jobs use
@@ -705,7 +705,6 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 `RunSummary` is the **canonical wire type** for Mods run status. It is the single
 response schema for:
 
-- `POST /v1/mods` (submit) — 201 response body.
 - `GET /v1/runs/{id}/status` (status) — 200 response body.
 - `event: run` SSE payloads on `/v1/runs/{id}/logs`.
 
@@ -805,7 +804,7 @@ value is a `StageStatus` object describing that job's execution state.
 ### 2.2 Jobs and diffs
 
 - **Jobs** (`jobs` table)
-  - Created by the control plane when a run is submitted via `POST /v1/mods`.
+  - Created by the control plane when a run is submitted via `POST /v1/runs`.
 	- Each job row has:
 	    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
 	    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
@@ -857,9 +856,9 @@ value is a `StageStatus` object describing that job's execution state.
 
 ### 3.1 Mods endpoints (`internal/server/handlers`)
 
-- `POST /v1/mods` — submit a Mods run.
-  - Simplified shape: `{repo_url, base_ref, target_ref?, spec?, created_by?}`.
-  - Handler: `submitRunHandler`.
+- `POST /v1/runs` — submit a single-repo Mods run.
+  - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
+  - Handler: `createSingleRepoRunHandler`.
   - Behaviour (single source of truth for Mods execution):
     - Creates a spec (`specs`), a mod project (`mods`), a managed repo (`mod_repos`),
       a run (`runs`, `status=Started`), a run repo (`run_repos`, `status=Queued`),
@@ -941,9 +940,9 @@ For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
 1. CLI (`ploy mod run`) builds a `RunSubmitRequest` in
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
-   2. CLI submits to `POST /v1/mods`. The control plane:
+2. CLI submits to `POST /v1/runs`. The control plane:
    - Creates jobs (pre-gate, mod, post-gate) with float step_index.
-   - Publishes an initial `RunSummary`.
+   - Publishes an initial `RunSummary` over SSE.
 3. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
    - For each claimed job:
@@ -960,7 +959,7 @@ For a spec with `mods[]`:
 
 1. CLI preserves the `mods[]` array as-is (`buildSpecPayload` does not rewrite
    or reorder entries).
-2. `POST /v1/mods`:
+2. `POST /v1/runs`:
    - Creates jobs for pre-gate, each mod, and post-gates with float step_index.
    - Job metadata includes `mod_type` (pre_gate, mod, post_gate, heal, re_gate)
      and `mod_image`.

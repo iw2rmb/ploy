@@ -86,7 +86,7 @@ v1 behavior (to implement):
 
 Code pointers for the refactor:
 
-- `internal/server/handlers/mods_ticket.go`: `submitRunHandler` currently creates a parent run, inserts `run_repos`, then relies on `StartPendingRepos` which expects `execution_run_id`.
+- `internal/server/handlers/runs_submit.go`: `createSingleRepoRunHandler` submits a single-repo run, inserts `run_repos`, and creates jobs immediately.
 - `internal/server/handlers/runs_batch_scheduler.go`: currently creates a child run per repo, calls `createJobsFromSpec` on the child run, and stores `execution_run_id`.
 - `internal/server/handlers/nodes_complete_run.go`: completion logic derives run status by listing jobs for a run ID; in v1, completion must also update `run_repos.status` per repo.
 - `internal/server/handlers/repos.go`: repo-centric endpoints currently expose `execution_run_id`; v1 must remove that field and switch to `run_id + repo_id` addressing.

@@ -238,7 +238,7 @@ CreateRunResponse:
     run_id: { type: string, description: "Run ID (KSUID string)" }
   required: [run_id]
 
-# Run submission (simplified Mods facade)
+# Run submission (v1 single-repo)
 RunSubmitRequest:
   type: object
   properties:
@@ -246,18 +246,68 @@ RunSubmitRequest:
       type: string
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
-    target_ref:
-      type: string
-      nullable: true
-      description: Optional target ref; when omitted, the server derives a default branch name when creating an MR.
+    target_ref: { type: string }
     spec: {}
     created_by: { type: string, nullable: true }
-  required: [repo_url, base_ref]
+  required: [repo_url, base_ref, target_ref, spec]
+
+CreateSingleRepoRunResponse:
+  type: object
+  properties:
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+    mod_id: { type: string, description: "Mod ID (KSUID string)" }
+    spec_id: { type: string, description: "Spec ID (KSUID string)" }
+  required: [run_id, mod_id, spec_id]
+
+CreateModRequest:
+  type: object
+  properties:
+    name: { type: string, description: "Unique mod name." }
+    spec: { description: "Optional initial spec JSON." }
+    created_by: { type: string, nullable: true }
+  required: [name]
+
+CreateModResponse:
+  type: object
+  properties:
+    id: { type: string, description: "Mod ID (KSUID string)" }
+    name: { type: string }
+    spec_id: { type: string, nullable: true }
+    created_by: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+  required: [id, name, created_at]
+
+ModListItem:
+  type: object
+  properties:
+    id: { type: string, description: "Mod ID (KSUID string)" }
+    name: { type: string }
+    spec_id: { type: string, nullable: true }
+    created_by: { type: string, nullable: true }
+    archived: { type: boolean }
+    created_at: { type: string, format: date-time }
+  required: [id, name, archived, created_at]
+
+ListModsResponse:
+  type: object
+  properties:
+    mods:
+      type: array
+      items:
+        $ref: '#/ModListItem'
+  required: [mods]
+
+ModArchiveResponse:
+  type: object
+  properties:
+    id: { type: string }
+    name: { type: string }
+    archived: { type: boolean }
+  required: [id, name, archived]
 
 # ModsRunSummary — Canonical Mods run status schema
 #
 # This is the single authoritative response type for:
-# - POST /v1/mods (submit) → 201 response body
 # - GET /v1/runs/{id}/status (status) → 200 response body
 # - SSE `event: run` payloads on /v1/runs/{id}/logs
 #
@@ -271,9 +321,8 @@ ModsRunSummary:
   type: object
   description: |
     Canonical Mods run status schema. This is the single response type for run
-    submission (POST /v1/mods), status queries (GET /v1/runs/{id}/status), and SSE
-    `event: run` payloads. No wrapper types are used — the JSON shape is
-    RunSummary directly.
+    status queries (GET /v1/runs/{id}/status) and SSE `event: run` payloads. No
+    wrapper types are used — the JSON shape is RunSummary directly.
   properties:
     run_id:
       type: string

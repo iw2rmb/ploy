@@ -6,10 +6,10 @@ info:
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require authentication. The server supports both mutual TLS and JWT bearer
     tokens (`Authorization: Bearer ...`) depending on client and deployment.
-    Primary endpoints expose the Mods facade under `/v1/mods` (run submission,
-    status, events, and artifact/log/diff uploads). The old `/v1/mods/crud` and
-    legacy `/v1/runs/*` read/stream endpoints have been removed; new batch-level
-    runs endpoints under `/v1/runs` provide list/inspect/stop semantics.
+    Primary endpoints expose mod projects under `/v1/mods` and run submission
+    under `/v1/runs` (plus run list/inspect/stop/start under `/v1/runs/*`).
+    Legacy run-scoped endpoints still exist under `/v1/mods/{id}/*` for some
+    lifecycle operations (graph/cancel/resume/logs/diffs).
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -60,11 +60,18 @@ paths:
   /v1/pki/sign/client:
     $ref: './paths/pki_sign_client.yaml'
   # Control-plane CRUD
-  # Jobs endpoints removed; use /v1/mods/* for control, legacy ingest under /v1/runs/{id}/*.
+  # Jobs endpoints removed; legacy run-scoped control endpoints live under /v1/mods/{id}/*,
+  # with batch lifecycle under /v1/runs/*.
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
   # SSE events are exposed under /v1/runs/{id}/logs.
   /v1/mods:
     $ref: './paths/mods.yaml'
+  /v1/mods/{mod_id}:
+    $ref: './paths/mods_mod_id.yaml'
+  /v1/mods/{mod_id}/archive:
+    $ref: './paths/mods_mod_id_archive.yaml'
+  /v1/mods/{mod_id}/unarchive:
+    $ref: './paths/mods_mod_id_unarchive.yaml'
   # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
   /v1/mods/{id}/graph:
     $ref: './paths/mods_id_graph.yaml'
