@@ -486,7 +486,7 @@ of execution location:
 - `Gate: failed pre-gate duration=567ms`
 
 Gate jobs may run on any node that claims them from the unified queue, but the CLI output
-and `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses remain unchanged. The
+and `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses remain unchanged. The
 gate executor logic abstracts execution location, ensuring consistent gate status
 reporting.
 
@@ -514,7 +514,7 @@ for end-to-end usage with `mods-codex`.
 ## Job Graph and DAG State
 
 Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
-surfaces via `GET /v1/mods/{id}` in `RunSummary.stages` and through the
+surfaces via `GET /v1/runs/{id}/status` in `RunSummary.stages` and through the
 Run status includes a `stages` map. Each job has a `step_index` for execution ordering
 and optional metadata identifying the job phase.
 

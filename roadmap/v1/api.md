@@ -5,6 +5,7 @@
 Change entry: repurpose `/v1/mods` from “run submission” to “mod project CRUD”.
 
 - Current (HEAD): `POST /v1/mods` submits a run (see `internal/server/handlers/register.go`, `submitRunHandler` in `internal/server/handlers/mods_ticket.go`, and `docs/api/OpenAPI.yaml`).
+- Current (HEAD): `/v1/mods` is mod project CRUD and run submission is `POST /v1/runs` (see `internal/server/handlers/register.go`, `internal/server/handlers/mods.go`, `internal/server/handlers/runs_submit.go`, and `docs/api/OpenAPI.yaml`).
 - Proposed (v1): `/v1/mods` becomes mod project CRUD (create/list/delete/archive), and mod runs are created under `/v1/mods/{mod_id}/runs`.
 - Where: new handlers under `internal/server/handlers/*` + OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking API change; no backward compatibility required.
@@ -94,7 +95,7 @@ Unarchives a mod.
 
 Change entry: add `POST /v1/runs` for single-repo submission.
 
-- Current (HEAD): there is no run-submission endpoint at `POST /v1/runs`; run submission uses `POST /v1/mods` (see `internal/server/handlers/register.go`).
+- Current (HEAD): `POST /v1/runs` is the single-repo run submission endpoint; `/v1/mods` is reserved for mod project CRUD (see `internal/server/handlers/register.go` and `docs/api/OpenAPI.yaml`).
 - Proposed (v1): `POST /v1/runs` submits a single-repo run and starts execution; it may create a mod project as a side-effect.
 - Where: new handler under `internal/server/handlers/*`, CLI callers under `cmd/ploy/*` and `internal/cli/*`, OpenAPI updates in `docs/api/OpenAPI.yaml`.
 - Compatibility: breaking for clients that submit runs via `POST /v1/mods`; no backward compatibility required.

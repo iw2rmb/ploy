@@ -1,3 +1,40 @@
+post:
+  tags: [Control]
+  summary: Submit single-repo run
+  description: |
+    Submit a single-repo run and start execution immediately.
+
+    Side-effects:
+    - Creates a mod project (mod name == mod id).
+    - Creates a spec row and sets mods.spec_id.
+    - Creates a mod repo row for the provided repo_url.
+    - Creates a run and run repo row and enqueues jobs.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/RunSubmitRequest'
+  responses:
+    '201':
+      description: Created — run accepted and started.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse'
+    '400':
+      description: Bad request — missing or invalid fields in the request body.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+
 get:
   tags: [Control]
   summary: List batch runs
