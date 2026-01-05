@@ -137,7 +137,8 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Repo added: %s (id: %s, status: %s)\n", resp.RepoURL, resp.ID, resp.Status)
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	_, _ = fmt.Fprintf(stderr, "Repo added: %s (repo_id: %s, status: %s)\n", resp.RepoURL, resp.RepoID, resp.Status)
 	return nil
 }
 
@@ -180,7 +181,8 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (id: %s, status: %s)\n", resp.RepoURL, resp.ID, resp.Status)
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (repo_id: %s, status: %s)\n", resp.RepoURL, resp.RepoID, resp.Status)
 	return nil
 }
 
@@ -234,7 +236,8 @@ func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (id: %s, attempt: %d, status: %s)\n", resp.RepoURL, resp.ID, resp.Attempt, resp.Status)
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (repo_id: %s, attempt: %d, status: %s)\n", resp.RepoURL, resp.RepoID, resp.Attempt, resp.Status)
 	return nil
 }
 
@@ -275,8 +278,9 @@ func handleModRunRepoStatus(args []string, stderr io.Writer) error {
 	}
 
 	// Print table with repo details.
+	// v1: Display repo_id (mod_repos.id) rather than a non-existent run_repos.id.
 	tw := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tREPO URL\tBASE REF\tTARGET REF\tATTEMPT\tSTATUS\tLAST ERROR")
+	_, _ = fmt.Fprintln(tw, "REPO_ID\tREPO URL\tBASE REF\tTARGET REF\tATTEMPT\tSTATUS\tLAST ERROR")
 	for _, r := range repos {
 		lastErr := "-"
 		if r.LastError != nil && *r.LastError != "" {
@@ -288,7 +292,7 @@ func handleModRunRepoStatus(args []string, stderr io.Writer) error {
 			lastErr = errStr
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
-			r.ID, r.RepoURL, r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
+			r.RepoID, r.RepoURL, r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
 	}
 	_ = tw.Flush()
 	return nil
@@ -312,18 +316,21 @@ type runRepoRestartRequest struct {
 }
 
 // runRepoResponse mirrors the server's RunRepoResponse for CLI consumption.
+// runRepoResponse represents a single repo within a batch for CLI responses.
+// v1 model: run_repos uses composite PK (run_id, repo_id), not a standalone id field.
+// RepoID refers to mod_repos.id (the repository identifier within a mod project).
 type runRepoResponse struct {
-	ID         domaintypes.RunRepoID `json:"id"`
-	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoURL    string                `json:"repo_url"`
-	BaseRef    string                `json:"base_ref"`
-	TargetRef  string                `json:"target_ref"`
-	Status     string                `json:"status"`
-	Attempt    int32                 `json:"attempt"`
-	LastError  *string               `json:"last_error,omitempty"`
-	CreatedAt  time.Time             `json:"created_at"`
-	StartedAt  *time.Time            `json:"started_at,omitempty"`
-	FinishedAt *time.Time            `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID `json:"run_id"`
+	RepoID     string            `json:"repo_id"` // mod_repos.id (NanoID, 8 chars)
+	RepoURL    string            `json:"repo_url"`
+	BaseRef    string            `json:"base_ref"`   // Snapshot from run_repos.repo_base_ref
+	TargetRef  string            `json:"target_ref"` // Snapshot from run_repos.repo_target_ref
+	Status     string            `json:"status"`
+	Attempt    int32             `json:"attempt"`
+	LastError  *string           `json:"last_error,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	StartedAt  *time.Time        `json:"started_at,omitempty"`
+	FinishedAt *time.Time        `json:"finished_at,omitempty"`
 }
 
 // doRunRepoAdd sends POST /v1/runs/{id}/repos to add a repo to a batch.
