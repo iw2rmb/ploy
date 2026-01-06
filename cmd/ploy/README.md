@@ -19,6 +19,7 @@ Common command patterns:
 
 ```bash
 ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->  # submit a single-repo run
+ploy mod run <mod-id|name> [--repo <url> ...] [--failed]                   # execute a mod project over its repo set
 ploy mod run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
@@ -60,6 +61,32 @@ download referenced artifacts and generate `<dir>/manifest.json`. The manifest
 lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
 and the local `path`. Filenames are sanitized and deterministic; when a content
 digest is available it prefixes the name, otherwise the artifact CID is used.
+
+## Mod Projects
+
+Mod projects are long-lived containers with a unique name, a current spec, and a managed repo set.
+
+```bash
+# Create a mod project.
+ploy mod add --name my-mod --spec mod.yaml
+
+# Update the mod's current spec.
+ploy mod spec set my-mod mod.yaml
+
+# Manage the mod's repo set.
+ploy mod repo add my-mod --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
+ploy mod repo add my-mod --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
+ploy mod repo list my-mod
+
+# Execute the mod project (all repos by default).
+ploy mod run my-mod
+
+# Execute only specific repos (repeatable).
+ploy mod run my-mod --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
+
+# Re-run only repos whose last terminal state is Fail.
+ploy mod run my-mod --failed
+```
 
 ## Batched Mod Runs
 
