@@ -96,7 +96,6 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 
 // TestCancelRunHandlerV1_CancelsRunAndWork verifies that POST /v1/runs/{id}/cancel
 // cancels the run, cancels Queued/Running repos, and cancels Created/Queued/Running jobs.
-// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
 func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 

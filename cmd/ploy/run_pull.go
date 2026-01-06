@@ -1,7 +1,7 @@
 // run_pull.go implements the `ploy run pull <run-id>` subcommand for
 // pulling Mods diffs into the current git worktree.
 //
-// This is the v1 replacement for `ploy mod run pull`, per roadmap/v1/cli.md:123-139.
+// This command pulls diffs from a specific run into the current git repository.
 // The command uses POST /v1/runs/{run_id}/pull to resolve the current repo.
 //
 // Command structure:
@@ -41,8 +41,8 @@ import (
 // handleRunPull implements `ploy run pull [--origin <remote>] [--dry-run] <run-id>`.
 // Parses CLI flags, validates arguments, enforces git worktree preconditions, and resolves the run.
 //
-// Per roadmap/v1/cli.md:123-139:
-//   - Executed from inside a repo folder
+// The command:
+//   - Must be executed from inside a git repository
 //   - Derives repo identity from git remote URL (origin by default)
 //   - Uses POST /v1/runs/{run_id}/pull to resolve repo execution identifiers
 //   - Pulls diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs
@@ -59,7 +59,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("run pull", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // Suppress default flag error output; we print custom usage.
 
-	// Define flags per roadmap/v1/cli.md specification:
+	// Define flags:
 	// --origin: git remote to match (default "origin")
 	// --dry-run: validate and print actions without mutating the repo
 	origin := fs.String("origin", "origin", "git remote to match (default origin)")
@@ -272,8 +272,7 @@ func printRunPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Pulls Mods diffs from a run into the current git repository.")
 	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "This is the v1 replacement for 'ploy mod run pull'.")
-	_, _ = fmt.Fprintln(w, "Per roadmap/v1/cli.md:123-139.")
+	_, _ = fmt.Fprintln(w, "Use this command when you have a specific run ID.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Arguments:")
 	_, _ = fmt.Fprintln(w, "  <run-id>  Run ID (KSUID string)")

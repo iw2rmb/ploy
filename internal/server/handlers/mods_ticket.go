@@ -208,7 +208,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoI
 	}
 
 	if modsSpec.IsMultiStep() {
-		// v1 job queueing rules: first job is Queued, rest are Created (roadmap/v1/statuses.md:52-55).
+		// v1 job queueing rules: first job is Queued, rest are Created.
 		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
@@ -240,7 +240,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoI
 }
 
 func createSingleModJob(ctx context.Context, st store.Store, runID string, repoID string, repoBaseRef string, attempt int32, modImage string) error {
-	// v1 job queueing rules: first job is Queued, rest are Created (roadmap/v1/statuses.md:52-55).
+	// v1 job queueing rules: first job is Queued, rest are Created.
 	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
 	}

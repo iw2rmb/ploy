@@ -55,7 +55,7 @@ type diffGetResponse struct {
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
 //
-// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
+// v1 repo-scoped diffs listing:
 // - Repo attribution comes from joining diffs.job_id → jobs.repo_id
 // - Diffs for repo A are excluded from repo B listing
 // - Response shape is unchanged from legacy endpoint (diffListResponse)

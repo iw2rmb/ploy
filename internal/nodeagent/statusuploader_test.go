@@ -110,8 +110,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 
 			ctx := context.Background()
 			jobID := types.JobID("test-job-id")
-			// v1 uses capitalized job status values: Success, Fail, Cancelled
-			// (see roadmap/v1/statuses.md:127).
+			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
 
 			if tt.wantErr && err == nil {
@@ -161,8 +160,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 	ctx := context.Background()
 	jobID := types.JobID("test-job-id")
 	start := time.Now()
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
 	elapsed := time.Since(start)
 
@@ -216,8 +214,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	defer cancel()
 
 	jobID := types.JobID("test-job-id")
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
 
 	if err == nil {
@@ -273,8 +270,7 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 	jobID := types.JobID("test-job-id-uuid")
 
 	// Upload status via job-level endpoint.
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	err = uploader.UploadJobStatus(ctx, jobID, "Fail", exitCode, stats)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -354,8 +350,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		DurationMs(1000).
 		MustBuild()
 
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	err = uploader.UploadJobStatus(ctx, jobID, "Success", &exitCode, stats)
 	if err != nil {
 		t.Fatalf("unexpected error uploading job status: %v", err)

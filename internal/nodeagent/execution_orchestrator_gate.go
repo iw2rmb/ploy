@@ -77,8 +77,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 
 	// Determine status and exit code.
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	if gateErr != nil || !gatePassed {
 		// Gate failed - exit code 1 signals gate failure for healing.
 		var exitCode int32 = 1

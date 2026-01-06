@@ -25,9 +25,9 @@ import (
 // Request: {repo_url, base_ref, target_ref}
 // Response: 201 Created with repo details
 //
-// v1 contract (roadmap/v1/api.md:154-167):
+// v1 contract:
 // - Adds/enables a repo in a mod.
-// - Normalizes repo_url for matching (roadmap/v1/scope.md:31).
+// - Normalizes repo_url for matching (strips trailing slashes and .git suffixes).
 // - Returns id (repo_id) and stored fields.
 func addModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +62,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Normalize and validate repo URL per roadmap/v1/scope.md:31.
+		// Normalize and validate repo URL (strips trailing slashes and .git suffixes).
 		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
 		if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
 			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
@@ -106,7 +106,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response per roadmap/v1/api.md:164-167.
+		// Build response with repo details.
 		resp := struct {
 			ID        string `json:"id"`
 			ModID     string `json:"mod_id"`
@@ -137,7 +137,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 // Endpoint: GET /v1/mods/{mod_id}/repos
 // Response: 200 OK with list of repos
 //
-// v1 contract (roadmap/v1/api.md:190-192, roadmap/v1/cli.md:77-79):
+// v1 contract:
 // - Lists repos: ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 func listModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +204,7 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 // Endpoint: DELETE /v1/mods/{mod_id}/repos/{repo_id}
 // Response: 204 No Content on success
 //
-// v1 contract (roadmap/v1/api.md:194-198, roadmap/v1/cli.md:81-84):
+// v1 contract:
 // - Deletes a repo from the mod repo set.
 // - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
 func deleteModRepoHandler(st store.Store) http.HandlerFunc {
@@ -278,11 +278,11 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 // Request: Content-Type: text/csv; body is UTF-8 CSV with header row: repo_url,base_ref,target_ref
 // Response: 200 OK with counts {created, updated, failed} and errors array
 //
-// v1 contract (roadmap/v1/api.md:168-188, roadmap/v1/cli.md:86-98):
+// v1 contract:
 // - Continues on per-line errors; may partially apply.
 // - Upserts by (mod_id, repo_url): inserts new rows, updates refs for existing.
 // - Does not affect historical run data (run_repos snapshots remain unchanged).
-// - CSV parsing rules (roadmap/v1/cli.md:90-95):
+// - CSV parsing rules:
 //   - delimiter: ,
 //   - UTF-8 text; unicode allowed
 //   - fields may be quoted with " (CSV-style)
@@ -321,7 +321,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 		// Parse CSV body.
 		reader := csv.NewReader(bufio.NewReader(r.Body))
 		reader.FieldsPerRecord = 3 // repo_url, base_ref, target_ref
-		reader.LazyQuotes = false  // Strict CSV parsing per roadmap/v1/cli.md
+		reader.LazyQuotes = false  // Strict CSV parsing
 		reader.TrimLeadingSpace = false
 
 		// Collect results.
@@ -440,7 +440,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response per roadmap/v1/api.md:185-188.
+		// Build response with counts and any errors.
 		resp := struct {
 			Created int         `json:"created"`
 			Updated int         `json:"updated"`

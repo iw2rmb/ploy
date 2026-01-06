@@ -51,7 +51,7 @@ WHERE id = $1
 `
 
 // Deletes a mod_repo by id.
-// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT (roadmap/v1/db.md).
+// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 // This DELETE will fail if any run_repos/jobs rows still reference the repo.
 func (q *Queries) DeleteModRepo(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteModRepo, id)
@@ -112,7 +112,7 @@ SELECT EXISTS(
 
 // Checks if a mod_repo has any historical executions (run_repos references).
 // Returns true if the repo cannot be deleted due to history, false otherwise.
-// Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+// Deletion is refused if the repo has historical executions.
 func (q *Queries) HasModRepoHistory(ctx context.Context, repoID string) (bool, error) {
 	row := q.db.QueryRow(ctx, hasModRepoHistory, repoID)
 	var has_history bool
@@ -244,7 +244,7 @@ type UpsertModRepoParams struct {
 }
 
 // Bulk upsert a mod_repo by normalized repo_url.
-// Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+// Uniqueness is on (mod_id, repo_url) to prevent duplicate repo URLs per mod.
 // If a row exists, update refs; otherwise insert.
 func (q *Queries) UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error) {
 	row := q.db.QueryRow(ctx, upsertModRepo,

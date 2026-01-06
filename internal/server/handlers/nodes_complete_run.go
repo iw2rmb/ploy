@@ -16,7 +16,7 @@ import (
 // maybeUpdateRunRepoStatus derives and persists run_repos.status from job outcomes.
 // Called after a job completes to check if the repo attempt has reached a terminal state.
 //
-// Per roadmap/v1/statuses.md:193 and roadmap/v1/scope.md:98:
+// Repo-scoped status computation:
 // - On job terminal for the last step in a repo: compute and persist run_repos.status.
 // - MR jobs (mod_type='mr') are excluded from terminal computation.
 //

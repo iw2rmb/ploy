@@ -1,14 +1,11 @@
 // mod_pull.go implements the `ploy mod pull` subcommand for pulling Mods diffs
 // into the current git worktree based on mod project context.
 //
-// This is the v1 replacement for `ploy mod run pull` when working with mods,
-// per roadmap/v1/cli.md:146-166.
-//
 // Command structure:
 //
 //	ploy mod pull [--origin <remote>] [--dry-run] [--last-failed | --last-succeeded] [<mod-name|id>]
 //
-// Behavior per roadmap/v1/cli.md:146-166:
+// Behavior:
 //   - If <mod-name|id> is provided, use it to select the mod.
 //   - If <mod-name|id> is omitted, infer the mod from the current repo:
 //     Call GET /v1/mods?repo_url=<current_repo_url>&archived=false
@@ -37,8 +34,8 @@ import (
 // handleModPull implements `ploy mod pull [--origin <remote>] [--dry-run] [--last-failed] [<mod-id|name>]`.
 // Parses CLI flags, validates arguments, enforces git worktree preconditions, and resolves the mod + run.
 //
-// Per roadmap/v1/cli.md:146-166:
-//   - Executed from inside a repo folder
+// The command:
+//   - Must be executed from inside a git repository
 //   - Derives repo identity from git remote URL (origin by default)
 //   - Optionally accepts a mod ID/name; if omitted, infers from current repo
 //   - Uses POST /v1/mods/{mod_id}/pull to resolve run execution identifiers
@@ -55,7 +52,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod pull", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // Suppress default flag error output; we print custom usage.
 
-	// Define flags per roadmap/v1/cli.md specification:
+	// Define flags:
 	// --origin: git remote to match (default "origin")
 	// --dry-run: validate and print actions without mutating the repo
 	// --last-failed: select newest run with status=Fail (default: last-succeeded)
@@ -232,7 +229,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 // inferModFromRepo attempts to infer the mod ID from the current repo.
 // It queries GET /v1/mods?repo_url=<url>&archived=false to find mods that include this repo.
 //
-// Per roadmap/v1/cli.md:152-157:
+// Returns:
 //   - If exactly one non-archived mod matches: return that mod's ID.
 //   - If multiple mods match: return error with list of matching mods.
 //   - If no mods match: return error.
@@ -274,7 +271,7 @@ func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 		return "", fmt.Errorf("decode response: %w", err)
 	}
 
-	// Handle results per roadmap/v1/cli.md:154-157.
+	// Handle results based on number of matches.
 	switch len(result.Mods) {
 	case 0:
 		return "", fmt.Errorf("no mods found that include repo %s", repoURL)
@@ -299,8 +296,7 @@ func printModPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Pulls Mods diffs from a mod's latest run into the current git repository.")
 	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "This is the v1 replacement for 'ploy mod run pull' for mod-based workflows.")
-	_, _ = fmt.Fprintln(w, "Per roadmap/v1/cli.md:146-166.")
+	_, _ = fmt.Fprintln(w, "Use this command when you want to pull from a mod's latest run.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Arguments:")
 	_, _ = fmt.Fprintln(w, "  [<mod-id|name>]  Optional mod ID or name (inferred from repo if omitted)")

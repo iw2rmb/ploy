@@ -54,10 +54,8 @@ type diffListResponse struct {
 // ListRunRepoDiffs fetches the list of diffs for a specific repo execution within a run.
 // This is the v1 repo-scoped diffs listing endpoint.
 //
-// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
-// - Returns diffs filtered by repo_id via jobs.repo_id join
-// - Diffs for repo A are excluded from repo B listing
-// - Response shape is unchanged from legacy endpoint
+// Diffs are filtered by repo_id via jobs.repo_id join, so diffs for repo A
+// are excluded from repo B listing. Response shape is unchanged from legacy endpoint.
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
 func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID, repoID string) ([]diffListItem, error) {
@@ -89,9 +87,7 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID, repoID string
 
 // FetchDiffsForStepRepo fetches all gzipped patches for non-healing diffs up to (and including)
 // the specified step index for a specific repo execution within a run.
-// This is the v1 repo-scoped version of FetchDiffsForStep.
-//
-// Per roadmap/v1/scope.md:69-71: Uses repo-scoped diffs listing.
+// This is the v1 repo-scoped version of FetchDiffsForStep that uses repo-scoped diffs listing.
 func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID string, stepIndex types.StepIndex) ([][]byte, error) {
 	// Step 1: List all diffs for the repo execution.
 	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)

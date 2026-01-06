@@ -356,7 +356,6 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Server-driven scheduling: after job succeeds, schedule the next job.
-		// v1 removes skipped status (see roadmap/v1/statuses.md:138).
 		if jobStatus == store.JobStatusSuccess {
 			if _, err := st.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: job.RunID, RepoID: job.RepoID, Attempt: job.Attempt}); err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
@@ -369,7 +368,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
-		// v1 repo-scoped progression (roadmap/v1/scope.md:98, roadmap/v1/statuses.md:193):
+		// v1 repo-scoped progression:
 		// After completing a job, check if the repo attempt has reached a terminal state.
 		// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 		jobModType := domaintypes.ModType(job.ModType)
@@ -387,7 +386,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 
 			// If the repo reached terminal state, check if the run should transition to Finished.
-			// runs.status becomes Finished when all repos are terminal (roadmap/v1/statuses.md:68).
+			// runs.status becomes Finished when all repos are terminal.
 			if repoUpdated {
 				if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, domaintypes.RunID(runID)); completeErr != nil {
 					slog.Error("complete job: failed to check run completion",

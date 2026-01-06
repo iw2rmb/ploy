@@ -21,7 +21,7 @@ import (
 
 // TestModRuns_Create_AllRepos verifies POST /v1/mods/{mod_id}/runs with mode="all"
 // creates a run with all repos from the mod's repo set.
-// Scope: roadmap/v1/api.md:202-223, roadmap/v1/scope.md:19.
+// Tests multi-repo run creation with repo_selector mode.
 func TestModRuns_Create_AllRepos(t *testing.T) {
 	specID := "spec123"
 	st := &mockStore{
@@ -94,7 +94,7 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 
 // TestModRuns_Create_FailedRepos verifies POST /v1/mods/{mod_id}/runs with mode="failed"
 // only selects repos whose last terminal status is 'Fail'.
-// Scope: roadmap/v1/db.md:189.
+// Tests failed repo selection using last terminal run_repos status.
 func TestModRuns_Create_FailedRepos(t *testing.T) {
 	specID := "spec123"
 	st := &mockStore{
@@ -164,7 +164,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 
 // TestModRuns_Create_ExplicitRepos verifies POST /v1/mods/{mod_id}/runs with mode="explicit"
 // only selects repos matching the provided repo URLs.
-// Scope: roadmap/v1/api.md:211-213.
+// Tests explicit repo selection by normalized URL matching.
 func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 	specID := "spec123"
 	st := &mockStore{
@@ -415,7 +415,7 @@ func TestModRuns_Create_ModNotFound(t *testing.T) {
 }
 
 // TestModRuns_Create_ArchivedMod verifies POST /v1/mods/{mod_id}/runs rejects archived mods.
-// Scope: roadmap/v1/scope.md:45 — archived mods cannot be executed.
+// Archived mods cannot be executed.
 func TestModRuns_Create_ArchivedMod(t *testing.T) {
 	specID := "spec123"
 	st := &mockStore{
@@ -448,7 +448,7 @@ func TestModRuns_Create_ArchivedMod(t *testing.T) {
 }
 
 // TestModRuns_Create_NoSpec verifies POST /v1/mods/{mod_id}/runs rejects mods without a spec.
-// Scope: roadmap/v1/api.md:218 — if mods.spec_id is NULL, return error.
+// If mods.spec_id is NULL, the endpoint returns an error.
 func TestModRuns_Create_NoSpec(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{

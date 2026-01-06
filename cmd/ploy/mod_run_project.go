@@ -1,8 +1,8 @@
 // mod_run_project.go implements the 'ploy mod run <mod-id|name>' command handler for mod projects.
 //
-// Per roadmap/v1/cli.md:102-119, this command creates a run from a mod project:
+// This command creates a run from a mod project:
 // - ploy mod run <mod-id|name> [--repo <repo-url> ...] [--failed]
-// - Resolves <mod-id|name> to a mod.
+// - Resolves <mod-id|name> to a mod (supports both ID and name).
 // - Refuses when the mod is archived.
 // - Uses mods.spec_id as the run's spec_id.
 // - Selects repos:
@@ -45,7 +45,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run project", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	// Repo selection flags per roadmap/v1/cli.md:113-115.
+	// Repo selection flags.
 	// --repo can be repeated for explicit repo selection.
 	// --failed selects repos with last terminal state Fail.
 	var repoURLs stringSlice
@@ -70,7 +70,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports name/ID resolution per roadmap/v1/cli.md:169-170).
+	// Resolve mod reference to ID (supports both name and ID).
 	resolveCmd := climods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -95,7 +95,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Print run_id per roadmap/v1/cli.md:117-119.
+	// Print run_id on success.
 	_, _ = fmt.Fprintln(stderr, result.RunID)
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 
 type Querier interface {
 	// Archives a mod by setting archived_at to now().
-	// Per roadmap/v1/db.md:29, archiving must be refused when the mod has any jobs in a running state.
+	// Archiving must be refused when the mod has any jobs in a running state.
 	// This query only sets the timestamp; validation logic must be in the caller.
 	ArchiveMod(ctx context.Context, id string) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
@@ -26,7 +26,7 @@ type Querier interface {
 	CountJobsByRun(ctx context.Context, runID string) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
-	// Used by repo-scoped terminal detection per roadmap/v1/statuses.md:193.
+	// Used by repo-scoped terminal detection to determine run_repos.status.
 	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
@@ -73,7 +73,7 @@ type Querier interface {
 	// Deletes a mod. Use with caution; should only be called when safe to remove.
 	DeleteMod(ctx context.Context, id string) error
 	// Deletes a mod_repo by id.
-	// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT (roadmap/v1/db.md).
+	// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 	// This DELETE will fail if any run_repos/jobs rows still reference the repo.
 	DeleteModRepo(ctx context.Context, id string) error
 	DeleteNode(ctx context.Context, id string) error
@@ -107,7 +107,7 @@ type Querier interface {
 	GetSpec(ctx context.Context, id string) (Spec, error)
 	// Checks if a mod_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
-	// Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+	// Deletion is refused if the repo has historical executions.
 	HasModRepoHistory(ctx context.Context, repoID string) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
@@ -125,9 +125,8 @@ type Querier interface {
 	// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
 	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
-	// Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
-	// joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
-	// GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
+	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 	// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
 	// v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
@@ -137,9 +136,8 @@ type Querier interface {
 	ListEventsByRun(ctx context.Context, runID string) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
-	// Per roadmap/v1/db.md:189: define "last terminal state" per repo_id by looking at
-	// the newest run_repos row where status in (Fail, Success, Cancelled) and selecting
-	// those where status='Fail'.
+	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
+	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
 	ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
@@ -176,7 +174,7 @@ type Querier interface {
 	// Lists runs that have queued work (at least one Queued run_repos row).
 	ListRunsWithQueuedRepos(ctx context.Context) ([]string, error)
 	// Lists specs ordered by created_at descending (most recent first).
-	// Per roadmap/v1/db.md:53, there is an index on created_at for this query.
+	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
@@ -215,7 +213,7 @@ type Querier interface {
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	// Bulk upsert a mod_repo by normalized repo_url.
-	// Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+	// Uniqueness is on (mod_id, repo_url) to prevent duplicate repo URLs per mod.
 	// If a row exists, update refs; otherwise insert.
 	UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error)
 }

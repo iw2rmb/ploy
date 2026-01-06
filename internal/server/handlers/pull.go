@@ -8,7 +8,7 @@
 //   - POST /v1/runs/{run_id}/pull — resolve repo for a specific run
 //   - POST /v1/mods/{mod_id}/pull — resolve repo for a mod (last succeeded/failed)
 //
-// Per roadmap/v1/api.md:57-82 and roadmap/v1/api.md:227-249.
+// Implements pull resolution endpoints for mod and run repos.
 package handlers
 
 import (
@@ -64,10 +64,10 @@ type pullResponse struct {
 // Request: {repo_url}
 // Response: 200 OK with {run_id, repo_id, repo_target_ref}
 //
-// v1 contract (roadmap/v1/api.md:227-249):
+// v1 contract:
 //   - Server matches the repo by joining run_repos to mod_repos by repo_id,
 //     filtering by run_id, and comparing normalized repo_url.
-//   - Uses vcs.NormalizeRepoURL for URL comparison (see roadmap/v1/scope.md:28).
+//   - Uses vcs.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If multiple repos match: 409 error (ambiguous).
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
@@ -93,7 +93,6 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Normalize the incoming repo_url for comparison.
-		// Per roadmap/v1/api.md:248 and roadmap/v1/scope.md:28.
 		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
 
 		// Verify the run exists before querying repos.
@@ -132,7 +131,6 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		if len(matches) > 1 {
 			// Multiple repos match the same normalized URL — this is ambiguous.
-			// Per roadmap/v1/api.md:249: "If multiple matches: error."
 			http.Error(w, "multiple repos match the given repo_url", http.StatusConflict)
 			slog.Warn("pull run repo: multiple matches",
 				"run_id", runID,
@@ -169,14 +167,14 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 // Request: {repo_url, mode?}
 // Response: 200 OK with {run_id, repo_id, repo_target_ref}
 //
-// v1 contract (roadmap/v1/api.md:57-82):
+// v1 contract:
 //   - Server performs the lookup using mod_id + repo_url → mod_repos.id.
 //   - Then selects the appropriate run_repos by created_at DESC, filtering by
 //     the requested terminal status (Success or Fail).
 //   - Mode values:
 //   - "last-succeeded" (default): newest run_repos with status=Success
 //   - "last-failed": newest run_repos with status=Fail
-//   - Uses vcs.NormalizeRepoURL for URL comparison (see roadmap/v1/scope.md:28).
+//   - Uses vcs.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If no run with matching status found: 404 error.
 func pullModRepoHandler(st store.Store) http.HandlerFunc {
@@ -205,7 +203,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
 
 		// Determine the target status based on mode.
-		// Default is "last-succeeded" per roadmap/v1/api.md:69.
+		// Default is "last-succeeded".
 		mode := req.Mode
 		if mode == "" {
 			mode = "last-succeeded"
@@ -257,7 +255,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Get the latest run_repos row with the specified terminal status.
-		// Per roadmap/v1/api.md:79: select by run_repos.created_at DESC.
+		// Select by run_repos.created_at DESC.
 		latestRunRepo, err := st.GetLatestRunRepoByModAndRepoStatus(r.Context(), store.GetLatestRunRepoByModAndRepoStatusParams{
 			ModID:  modID,
 			RepoID: matchedRepoID,

@@ -20,13 +20,13 @@ import (
 // Request: {repo_selector: {mode, repos?}, created_by?}
 // Response: 201 Created with {run_id}
 //
-// v1 contract (roadmap/v1/api.md:202-223):
+// v1 contract:
 // - repo_selector.mode: "all" | "failed" | "explicit"
-// - For "failed": selects repos whose last terminal run_repos status is 'Fail' (roadmap/v1/db.md:189).
+// - For "failed": selects repos whose last terminal run_repos status is 'Fail'.
 // - For "explicit": uses repo_selector.repos array of repo_urls.
-// - Must use mods.spec_id; if NULL, return error (roadmap/v1/api.md:218).
-// - Archived mods cannot be executed (roadmap/v1/scope.md:45).
-// - Copies mods.spec_id → runs.spec_id (immutability, roadmap/v1/scope.md:43).
+// - Must use mods.spec_id; if NULL, return error.
+// - Archived mods cannot be executed.
+// - Copies mods.spec_id → runs.spec_id for immutability.
 // - Creates run_repos rows snapshotting refs from mod_repos.
 // - Creates jobs for each selected repo and starts execution immediately.
 func createModRunHandler(st store.Store) http.HandlerFunc {
@@ -78,13 +78,13 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Archived mods cannot be executed (roadmap/v1/scope.md:45).
+		// Archived mods cannot be executed.
 		if mod.ArchivedAt.Valid {
 			http.Error(w, "cannot create run for archived mod", http.StatusConflict)
 			return
 		}
 
-		// Validate mods.spec_id is non-NULL (roadmap/v1/api.md:218).
+		// Validate mods.spec_id is non-NULL.
 		if mod.SpecID == nil {
 			http.Error(w, "mod has no spec; set a spec before creating runs", http.StatusBadRequest)
 			return
@@ -112,7 +112,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Create run with spec_id copied from mods.spec_id (immutability, roadmap/v1/scope.md:43).
+		// Create run with spec_id copied from mods.spec_id for immutability.
 		runID := domaintypes.NewRunID().String()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
@@ -127,7 +127,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Create run_repos entries and jobs for each selected repo.
-		// v1: run_repos snapshots refs from mod_repos at run creation time (roadmap/v1/db.md:130-131).
+		// v1: run_repos snapshots refs from mod_repos at run creation time.
 		for _, modRepo := range selectedRepos {
 			// Create run_repo entry snapshotting refs.
 			runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
@@ -149,7 +149,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Create repo-scoped jobs for the queued repo.
-			// v1 immediate start: jobs are created and made immediately runnable (roadmap/v1/scope.md:51).
+			// v1 immediate start: jobs are created and made immediately runnable.
 			if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
 				http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 				slog.Error("create mod run: create jobs failed",
@@ -161,7 +161,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		// Build response per v1 contract (roadmap/v1/api.md:221-223).
+		// Build response with run_id.
 		resp := struct {
 			RunID string `json:"run_id"`
 		}{
@@ -189,7 +189,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 //
 // Modes:
 // - "all": all repos in the mod's repo set
-// - "failed": repos whose last terminal run_repos status is 'Fail' (roadmap/v1/db.md:189)
+// - "failed": repos whose last terminal run_repos status is 'Fail'
 // - "explicit": specific repos by URL (normalized for matching)
 func selectReposForRun(ctx context.Context, st store.Store, modID string, mode string, repoURLs []string) ([]store.ModRepo, error) {
 	// Get all repos for the mod.
@@ -227,7 +227,7 @@ func selectReposForRun(ctx context.Context, st store.Store, modID string, mode s
 
 	case "explicit":
 		// Build a set of normalized URLs for matching.
-		// Per roadmap/v1/scope.md:28-33, use vcs.NormalizeRepoURL for matching.
+		// Use vcs.NormalizeRepoURL for URL comparison.
 		normalizedURLs := make(map[string]bool, len(repoURLs))
 		for _, url := range repoURLs {
 			normalizedURLs[vcs.NormalizeRepoURL(url)] = true

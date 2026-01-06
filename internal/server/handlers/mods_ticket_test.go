@@ -92,7 +92,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	}
 }
 
-// These tests verify v1 job creation behavior per roadmap/v1/scope.md:97-98:
+// These tests verify v1 job creation behavior:
 // - Jobs are created directly for (runs.id, run_repos.repo_id)
 // - jobs.repo_id and jobs.repo_base_ref are persisted correctly
 // - First job is Queued, remaining jobs are Created per repo attempt
@@ -122,7 +122,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		t.Fatalf("expected 3 jobs, got %d", st.createJobCallCount)
 	}
 
-	// Verify job ordering and status per roadmap/v1/statuses.md:52-55.
+	// Verify job ordering and status (first job is Queued, rest are Created).
 	expectedJobs := []struct {
 		name    string
 		modType string
@@ -145,7 +145,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
 		}
 
-		// Verify repo_id and repo_base_ref are persisted correctly (roadmap/v1/scope.md:98).
+		// Verify repo_id and repo_base_ref are persisted correctly.
 		if got.RepoID != repoID {
 			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
 		}
@@ -192,7 +192,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		t.Fatalf("expected 5 jobs (pre-gate + 3 mods + post-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify job ordering and status per roadmap/v1/statuses.md:52-55.
+	// Verify job ordering and status (first job is Queued, rest are Created).
 	expectedJobs := []struct {
 		name     string
 		modType  string
@@ -221,7 +221,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 			t.Errorf("job %d: expected mod_image %q, got %q", i, exp.modImage, got.ModImage)
 		}
 
-		// Verify repo_id and repo_base_ref are persisted correctly (roadmap/v1/scope.md:98).
+		// Verify repo_id and repo_base_ref are persisted correctly.
 		if got.RepoID != repoID {
 			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
 		}

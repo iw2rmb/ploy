@@ -1,6 +1,6 @@
 // mod_repo.go implements the 'ploy mod repo' command handler.
 //
-// Per roadmap/v1/cli.md:62-99, this command manages a mod's repo set:
+// This command manages a mod's repo set:
 // - ploy mod repo add <mod-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>
 // - ploy mod repo list <mod-id|name>
 // - ploy mod repo remove <mod-id|name> --repo-id <repo_id>
@@ -173,7 +173,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Print results in tabular format per roadmap/v1/cli.md:79.
+	// Print results in tabular format.
 	w := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "ID\tREPO_URL\tBASE_REF\tTARGET_REF\tADDED_AT")
 	for _, repo := range results {
@@ -319,7 +319,7 @@ func handleModRepoImport(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Print import results per roadmap/v1/cli.md:98.
+	// Print import results.
 	_, _ = fmt.Fprintf(stderr, "Import complete: %d created, %d updated, %d failed\n",
 		result.Created, result.Updated, result.Failed)
 

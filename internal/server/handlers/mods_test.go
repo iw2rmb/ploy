@@ -21,7 +21,7 @@ import (
 // =============================================================================
 
 // TestMods_Create_Success verifies POST /v1/mods creates a mod with valid input.
-// Scope: roadmap/v1/api.md:14-30.
+// Tests mod project creation endpoint.
 func TestMods_Create_Success(t *testing.T) {
 	st := &mockStore{}
 	handler := createModHandler(st)
@@ -66,7 +66,7 @@ func TestMods_Create_Success(t *testing.T) {
 }
 
 // TestMods_Create_WithSpec verifies POST /v1/mods with spec creates both mod and spec.
-// Scope: roadmap/v1/api.md:22-30 — optional spec parameter creates initial spec row.
+// Optional spec parameter creates initial spec row.
 func TestMods_Create_WithSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := createModHandler(st)
@@ -142,7 +142,7 @@ func TestMods_Create_EmptyName(t *testing.T) {
 }
 
 // TestMods_Create_DuplicateName verifies POST /v1/mods returns 409 for duplicate name.
-// Scope: roadmap/v1/db.md:24 — unique on name.
+// Mod names must be unique.
 func TestMods_Create_DuplicateName(t *testing.T) {
 	// Simulate unique constraint violation (PostgreSQL error code 23505).
 	st := &mockStore{
@@ -213,7 +213,7 @@ func TestMods_Create_InvalidSpec(t *testing.T) {
 // =============================================================================
 
 // TestMods_List_Success verifies GET /v1/mods returns mods list.
-// Scope: roadmap/v1/api.md:31-46.
+// Tests mod listing with pagination and filters.
 func TestMods_List_Success(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
@@ -302,7 +302,7 @@ func TestMods_List_WithNameFilter(t *testing.T) {
 }
 
 // TestMods_List_ArchivedFilter verifies GET /v1/mods respects archived filter.
-// Scope: roadmap/v1/api.md:41 — archived filter.
+// Tests archived filter parameter.
 func TestMods_List_ArchivedFilter(t *testing.T) {
 	tests := []struct {
 		query        string
@@ -368,7 +368,6 @@ func TestMods_List_InvalidArchived(t *testing.T) {
 
 // TestMods_List_WithRepoURLFilter_Normalizes verifies GET /v1/mods repo_url filter
 // uses vcs.NormalizeRepoURL for matching.
-// Scope: roadmap/v1/api.md:42-46, roadmap/v1/scope.md:28-33.
 func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
@@ -456,7 +455,7 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 // =============================================================================
 
 // TestMods_Delete_Success verifies DELETE /v1/mods/{mod_id} deletes a mod.
-// Scope: roadmap/v1/api.md:47-54.
+// Tests mod deletion when no runs exist.
 func TestMods_Delete_Success(t *testing.T) {
 	st := &mockStore{
 		// No runs exist for this mod.
@@ -511,7 +510,7 @@ func TestMods_Delete_NotFound(t *testing.T) {
 
 // TestMods_Delete_RefusesWithRuns verifies DELETE /v1/mods/{mod_id} returns 409
 // when runs exist for the mod.
-// Scope: roadmap/v1/api.md:47 — refuse deletion if any runs exist.
+// Deletion is refused if any runs exist for the mod.
 func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	st := &mockStore{
 		// Runs exist for this mod.
@@ -542,7 +541,7 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 // =============================================================================
 
 // TestMods_Archive_Success verifies PATCH /v1/mods/{mod_id}/archive archives a mod.
-// Scope: roadmap/v1/api.md:82-88.
+// Tests mod archiving to prevent execution.
 func TestMods_Archive_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -636,7 +635,7 @@ func TestMods_Archive_NotFound(t *testing.T) {
 
 // TestMods_Archive_RefusesWithRunningJobs verifies PATCH /v1/mods/{mod_id}/archive
 // returns 409 when running jobs exist.
-// Scope: roadmap/v1/api.md:82, roadmap/v1/db.md:29 — archive refuses if running jobs exist.
+// Archive refuses if running jobs exist.
 func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -738,7 +737,7 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 // =============================================================================
 
 // TestMods_Unarchive_Success verifies PATCH /v1/mods/{mod_id}/unarchive unarchives a mod.
-// Scope: roadmap/v1/api.md:89-91.
+// Tests mod unarchiving to allow execution again.
 func TestMods_Unarchive_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -938,7 +937,7 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 // =============================================================================
 
 // TestMods_SetSpec_Success verifies POST /v1/mods/{mod_id}/specs creates a new spec and updates mods.spec_id.
-// Scope: roadmap/v1/api.md:140-151, roadmap/v1/scope.md:8-9.
+// Tests append-only spec creation with mods.spec_id update.
 func TestMods_SetSpec_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{

@@ -54,8 +54,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		builder.MetadataEntry("mr_url", mrURL)
 	}
 
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	if mrErr != nil {
 		// MR jobs are best-effort; surface failure via job status and logs.
 		builder.Error(mrErr.Error())

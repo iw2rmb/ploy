@@ -7,7 +7,7 @@ import (
 // ConvertToJobStatus converts a job status string to the canonical JobStatus.
 // Only v1 canonical values are accepted; non-canonical aliases are rejected.
 //
-// v1 status model (see roadmap/v1/statuses.md:127):
+// v1 status model (see docs/mods-lifecycle.md):
 //   - "Created" -> JobStatusCreated
 //   - "Queued" -> JobStatusQueued (replaces v0 "pending")
 //   - "Running" -> JobStatusRunning
@@ -15,7 +15,7 @@ import (
 //   - "Fail" -> JobStatusFail (replaces v0 "failed")
 //   - "Cancelled" -> JobStatusCancelled (replaces v0 "canceled")
 //
-// Removed in v1: "skipped" (see roadmap/v1/statuses.md:138).
+// The "skipped" status was removed in v1.
 func ConvertToJobStatus(status string) (JobStatus, error) {
 	switch status {
 	case "Created":
@@ -38,12 +38,12 @@ func ConvertToJobStatus(status string) (JobStatus, error) {
 // ConvertToRunStatus converts a run status string to the canonical RunStatus.
 // Only v1 canonical values are accepted; non-canonical aliases are rejected.
 //
-// v1 status model (see roadmap/v1/statuses.md:113):
+// v1 status model (see docs/mods-lifecycle.md):
 //   - "Started" -> RunStatusStarted (replaces v0 "queued"/"assigned"/"running")
 //   - "Cancelled" -> RunStatusCancelled (replaces v0 "canceled")
 //   - "Finished" -> RunStatusFinished (replaces v0 "succeeded"/"failed")
 //
-// Removed in v1: "queued", "assigned", "running", "succeeded", "failed" (see roadmap/v1/statuses.md:114).
+// The "queued", "assigned", "running", "succeeded", "failed" statuses were removed in v1.
 func ConvertToRunStatus(status string) (RunStatus, error) {
 	switch status {
 	case "Started":
@@ -61,7 +61,7 @@ func ConvertToRunStatus(status string) (RunStatus, error) {
 // Returns the typed status if valid, otherwise returns an error.
 //
 // v1 valid values: Created, Queued, Running, Success, Fail, Cancelled.
-// Removed in v1: skipped (see roadmap/v1/statuses.md:138).
+// The "skipped" status was removed in v1.
 func ValidateJobStatus(status string) (JobStatus, error) {
 	s := JobStatus(status)
 	switch s {
@@ -77,7 +77,7 @@ func ValidateJobStatus(status string) (JobStatus, error) {
 // Returns the typed status if valid, otherwise returns an error.
 //
 // v1 valid values: Started, Cancelled, Finished.
-// Removed in v1: queued, assigned, running, succeeded, failed (see roadmap/v1/statuses.md:114).
+// The "queued", "assigned", "running", "succeeded", "failed" statuses were removed in v1.
 func ValidateRunStatus(status string) (RunStatus, error) {
 	s := RunStatus(status)
 	switch s {
@@ -94,7 +94,7 @@ func ValidateRunStatus(status string) (RunStatus, error) {
 //
 // v1 valid values: Queued, Running, Cancelled, Fail, Success.
 // Removed in v1: pending (now Queued), skipped, succeeded (now Success), failed (now Fail).
-// See roadmap/v1/statuses.md:116.
+// See docs/mods-lifecycle.md for the complete status model.
 func ValidateRunRepoStatus(status string) (RunRepoStatus, error) {
 	s := RunRepoStatus(status)
 	switch s {
@@ -109,14 +109,14 @@ func ValidateRunRepoStatus(status string) (RunRepoStatus, error) {
 // ConvertToRunRepoStatus converts a run repo status string to the canonical RunRepoStatus type.
 // Only v1 canonical values are accepted; non-canonical aliases are rejected.
 //
-// v1 status model (see roadmap/v1/statuses.md:116):
+// v1 status model (see docs/mods-lifecycle.md):
 //   - "Queued" -> RunRepoStatusQueued (replaces v0 "pending")
 //   - "Running" -> RunRepoStatusRunning
 //   - "Cancelled" -> RunRepoStatusCancelled
 //   - "Fail" -> RunRepoStatusFail (replaces v0 "failed")
 //   - "Success" -> RunRepoStatusSuccess (replaces v0 "succeeded")
 //
-// Removed in v1: "skipped" (see roadmap/v1/statuses.md:40).
+// The "skipped" status was removed in v1.
 func ConvertToRunRepoStatus(status string) (RunRepoStatus, error) {
 	switch status {
 	case "Queued":

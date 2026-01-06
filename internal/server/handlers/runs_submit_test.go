@@ -16,7 +16,7 @@ import (
 // =============================================================================
 
 // TestRunsCreateSingleRepo_Success verifies POST /v1/runs creates a run with mod side-effect.
-// Scope: roadmap/v1/api.md:104-128, roadmap/v1/scope.md:18.
+// Tests single-repo run creation with automatic mod project creation.
 // Contract:
 //   - Creates a mod project (mod name == mod id).
 //   - Creates a spec row and sets mods.spec_id.
@@ -153,7 +153,7 @@ func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 }
 
 // TestRunsCreateSingleRepo_RepoURLNormalized verifies repo URLs are normalized.
-// Scope: roadmap/v1/scope.md:28-33 — use vcs.NormalizeRepoURL for matching.
+// Uses vcs.NormalizeRepoURL for URL normalization.
 func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()
@@ -228,7 +228,7 @@ func TestRunsCreateSingleRepo_MissingRepoURL(t *testing.T) {
 }
 
 // TestRunsCreateSingleRepo_InvalidRepoURLScheme verifies POST /v1/runs rejects invalid schemes.
-// Scope: roadmap/v1/scope.md:30 — only accept https://, ssh://, file://.
+// Only https://, ssh://, and file:// schemes are accepted.
 func TestRunsCreateSingleRepo_InvalidRepoURLScheme(t *testing.T) {
 	st := &mockStore{}
 	handler := createSingleRepoRunHandler(st, nil)

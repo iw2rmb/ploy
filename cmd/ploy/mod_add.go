@@ -1,6 +1,6 @@
 // mod_add.go implements the 'ploy mod add' command handler.
 //
-// Per roadmap/v1/cli.md:26-31, this command creates a mod project:
+// This command creates a mod project:
 // - ploy mod add --name <name> [--spec <path|->]
 // - Creates a mod with unique name.
 // - If --spec is provided, creates initial spec row and sets mods.spec_id.
@@ -74,7 +74,7 @@ func handleModAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Print result per roadmap/v1/cli.md:31.
+	// Print result.
 	if result.SpecID != nil {
 		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s, spec_id: %s)\n", result.ID, result.Name, *result.SpecID)
 	} else {

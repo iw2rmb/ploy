@@ -1,8 +1,8 @@
 // mod_list.go implements the 'ploy mod list' command handler.
 //
-// Per roadmap/v1/cli.md:33-35, this command lists mod projects:
+// This command lists mod projects:
 // - ploy mod list
-// - Lists mods: ID, NAME, CREATED_AT, ARCHIVED_AT.
+// - Lists mods: ID, NAME, CREATED_AT, ARCHIVED.
 package main
 
 import (
@@ -46,7 +46,7 @@ func handleModList(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Print results in tabular format per roadmap/v1/cli.md:35.
+	// Print results in tabular format.
 	w := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tCREATED_AT\tARCHIVED")
 	for _, mod := range results {

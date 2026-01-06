@@ -4,7 +4,6 @@
 //   - POST /v1/runs/{run_id}/pull (resolve repo for a run)
 //   - POST /v1/mods/{mod_id}/pull (resolve repo for a mod)
 //
-// Per roadmap/v1/api.md:57-82 and roadmap/v1/api.md:227-251.
 // These endpoints help CLI clients resolve repo execution identifiers needed to
 // pull diffs from the server.
 package mods
@@ -41,11 +40,9 @@ type PullResolution struct {
 // RunPullCommand resolves a repo_url to execution identifiers for a specific run.
 // Endpoint: POST /v1/runs/{run_id}/pull
 //
-// Per roadmap/v1/api.md:227-251:
-//   - Server matches the repo by joining run_repos to mod_repos by repo_id,
-//     filtering by run_id, and comparing normalized repo_url.
-//   - If no repo matches: 404 error.
-//   - If multiple repos match: 409 error (ambiguous).
+// Server matches the repo by joining run_repos to mod_repos by repo_id,
+// filtering by run_id, and comparing normalized repo_url.
+// Returns 404 if no repo matches, 409 if multiple repos match (ambiguous).
 type RunPullCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -114,7 +111,6 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 // =============================================================================
 
 // PullMode specifies which run to select for mod pull resolution.
-// See roadmap/v1/api.md:67-69.
 type PullMode string
 
 const (
@@ -127,15 +123,14 @@ const (
 // ModPullCommand resolves a repo_url to execution identifiers for a mod.
 // Endpoint: POST /v1/mods/{mod_id}/pull
 //
-// Per roadmap/v1/api.md:57-82:
-//   - Server performs the lookup using mod_id + repo_url → mod_repos.id.
-//   - Then selects the appropriate run_repos by created_at DESC, filtering by
-//     the requested terminal status (Success or Fail).
-//   - Mode values:
+// Server performs the lookup using mod_id + repo_url to find mod_repos.id,
+// then selects the appropriate run_repos by created_at DESC, filtering by
+// the requested terminal status (Success or Fail).
+// Mode values:
 //   - "last-succeeded" (default): newest run_repos with status=Success
 //   - "last-failed": newest run_repos with status=Fail
-//   - If no repo matches: 404 error.
-//   - If no run with matching status found: 404 error.
+//
+// Returns 404 if no repo matches or no run with matching status found.
 type ModPullCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -162,7 +157,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 		return nil, fmt.Errorf("mod pull: repo url required")
 	}
 
-	// Default mode is "last-succeeded" per roadmap/v1/api.md:68.
+	// Default mode is "last-succeeded".
 	mode := c.Mode
 	if mode == "" {
 		mode = PullModeLastSucceeded

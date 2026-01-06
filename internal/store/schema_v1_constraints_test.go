@@ -12,7 +12,7 @@ import (
 )
 
 // TestV1Schema_ModsNameUniqueness verifies the UNIQUE constraint on mods.name.
-// Per roadmap/v1/db.md:24: mods table has a unique index on name.
+// The mods table has a unique index on name to prevent duplicate mod names.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_ModsNameUniqueness(t *testing.T) {
@@ -70,7 +70,7 @@ func TestV1Schema_ModsNameUniqueness(t *testing.T) {
 }
 
 // TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mod_id, repo_url).
-// Per roadmap/v1/db.md:71: mod_repos has UNIQUE (mod_id, repo_url).
+// The mod_repos table has UNIQUE (mod_id, repo_url) to prevent duplicate repo URLs per mod.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_ModReposUniqueness(t *testing.T) {
@@ -131,7 +131,7 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 }
 
 // TestV1Schema_RunReposCompositePK verifies the composite PRIMARY KEY (run_id, repo_id).
-// Per roadmap/v1/db.md:141: run_repos has PRIMARY KEY (run_id, repo_id).
+// The run_repos table has PRIMARY KEY (run_id, repo_id) to ensure one entry per repo per run.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_RunReposCompositePK(t *testing.T) {
@@ -226,7 +226,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 }
 
 // TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name, step_index).
-// Per roadmap/v1/db.md:177: jobs has UNIQUE (run_id, repo_id, attempt, name, step_index).
+// The jobs table has UNIQUE (run_id, repo_id, attempt, name, step_index) to prevent duplicate jobs.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_JobsUniqueness(t *testing.T) {

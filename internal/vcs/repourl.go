@@ -25,8 +25,6 @@ import "strings"
 //   - Cache key generation (internal/worker/hydration)
 //   - Repo URL matching in server handlers
 //   - CLI repo URL resolution (cmd/ploy)
-//
-// See roadmap/v1/scope.md:28 for the v1 normalization requirements.
 func NormalizeRepoURL(raw string) string {
 	// Step 1: Trim leading/trailing whitespace.
 	normalized := strings.TrimSpace(raw)

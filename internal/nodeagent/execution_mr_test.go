@@ -9,8 +9,7 @@ import (
 )
 
 // TestShouldCreateMR verifies MR creation logic based on v1 job status values.
-// v1 uses capitalized job status values: Success, Fail, Cancelled
-// (see roadmap/v1/statuses.md:127).
+// v1 uses capitalized job status values: Success, Fail, Cancelled.
 func TestShouldCreateMR(t *testing.T) {
 	tests := []struct {
 		name           string
