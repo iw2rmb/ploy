@@ -387,6 +387,24 @@ type mockStore struct {
 	listFailedRepoIDsByModResult []string
 	listFailedRepoIDsByModErr    error
 
+	// ListRunReposWithURLByRun tracking (for pull resolution)
+	listRunReposWithURLByRunCalled bool
+	listRunReposWithURLByRunParam  string
+	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
+	listRunReposWithURLByRunErr    error
+
+	// GetLatestRunRepoByModAndRepoStatus tracking (for mod pull resolution)
+	getLatestRunRepoByModAndRepoStatusCalled bool
+	getLatestRunRepoByModAndRepoStatusParams store.GetLatestRunRepoByModAndRepoStatusParams
+	getLatestRunRepoByModAndRepoStatusResult store.GetLatestRunRepoByModAndRepoStatusRow
+	getLatestRunRepoByModAndRepoStatusErr    error
+
+	// GetRunRepoForPull tracking (for run pull resolution)
+	getRunRepoForPullCalled bool
+	getRunRepoForPullParams store.GetRunRepoForPullParams
+	getRunRepoForPullResult store.GetRunRepoForPullRow
+	getRunRepoForPullErr    error
+
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
 	getRunRepoParam  store.GetRunRepoParams
@@ -1132,4 +1150,25 @@ func (m *mockStore) ListFailedRepoIDsByMod(ctx context.Context, modID string) ([
 	m.listFailedRepoIDsByModCalled = true
 	m.listFailedRepoIDsByModParam = modID
 	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
+}
+
+// ListRunReposWithURLByRun returns run repos with their repo_url for pull resolution.
+func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID string) ([]store.ListRunReposWithURLByRunRow, error) {
+	m.listRunReposWithURLByRunCalled = true
+	m.listRunReposWithURLByRunParam = runID
+	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
+}
+
+// GetLatestRunRepoByModAndRepoStatus returns the latest run_repos row for a repo in a mod filtered by status.
+func (m *mockStore) GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByModAndRepoStatusParams) (store.GetLatestRunRepoByModAndRepoStatusRow, error) {
+	m.getLatestRunRepoByModAndRepoStatusCalled = true
+	m.getLatestRunRepoByModAndRepoStatusParams = arg
+	return m.getLatestRunRepoByModAndRepoStatusResult, m.getLatestRunRepoByModAndRepoStatusErr
+}
+
+// GetRunRepoForPull returns run_repos info for a specific repo in a run.
+func (m *mockStore) GetRunRepoForPull(ctx context.Context, arg store.GetRunRepoForPullParams) (store.GetRunRepoForPullRow, error) {
+	m.getRunRepoForPullCalled = true
+	m.getRunRepoForPullParams = arg
+	return m.getRunRepoForPullResult, m.getRunRepoForPullErr
 }
