@@ -45,12 +45,14 @@ func stringValue(s *string) string {
 // ## Return Values
 //
 // Returns:
-//   - opts: map[string]any containing flattened options. This is an internal
-//     intermediate representation used to bridge JSON parsing and typed options.
-//     Callers should use typedOpts for all option access.
+//   - opts: map[string]any containing flattened options. This is a legacy
+//     intermediate representation kept for backward compatibility with tests
+//     and existing code paths. New code should use typedOpts exclusively.
 //   - env: map[string]string containing merged environment variables.
 //   - typedOpts: RunOptions with typed accessors for all understood option keys.
 //     This is the canonical source of truth; prefer typed fields over raw map access.
+//     The typed options are now produced via direct conversion from ModsSpec,
+//     eliminating the float64/int and []any/[]string conversion hazards on the hot path.
 //
 // If the spec is empty or invalid JSON, returns empty maps and zero RunOptions.
 func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOptions) {
@@ -69,11 +71,17 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 		return opts, env, typedOpts
 	}
 
-	// Convert canonical ModsSpec to internal options format.
+	// Convert canonical ModsSpec to internal options format (legacy, for backward compat).
+	// The opts map is still returned for existing code paths that inspect raw options,
+	// but callers should prefer typedOpts for all new option access.
 	opts, env = modsSpecToOptions(modsSpec)
 
-	// Parse typed options from the flattened opts map.
-	typedOpts = parseRunOptions(opts)
+	// Direct conversion from typed ModsSpec to RunOptions.
+	// This bypasses the intermediate map[string]any bridge and eliminates
+	// type conversion hazards (float64→int, []any→[]string) on the hot path.
+	// The previous pipeline was: modsSpecToOptions → parseRunOptions (two-stage).
+	// The new pipeline is: modsSpecToRunOptions (single-stage, direct typed access).
+	typedOpts = modsSpecToRunOptions(modsSpec)
 
 	return opts, env, typedOpts
 }
