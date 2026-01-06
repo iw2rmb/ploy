@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,6 +21,7 @@ func TestAddModRepoHandler(t *testing.T) {
 		modID          string
 		body           map[string]interface{}
 		setupMock      func(m *mockStore)
+		wantRepoURL    string
 		wantStatus     int
 		wantBodySubstr string
 	}{
@@ -47,7 +49,8 @@ func TestAddModRepoHandler(t *testing.T) {
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
 			},
-			wantStatus: http.StatusCreated,
+			wantRepoURL: "https://github.com/org/repo",
+			wantStatus:  http.StatusCreated,
 		},
 		{
 			name:  "error - mod not found",
@@ -144,6 +147,14 @@ func TestAddModRepoHandler(t *testing.T) {
 			}
 			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
 				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
+			}
+			if tt.wantRepoURL != "" {
+				if !ms.createModRepoCalled {
+					t.Fatalf("expected CreateModRepo to be called")
+				}
+				if ms.createModRepoParams.RepoUrl != tt.wantRepoURL {
+					t.Fatalf("CreateModRepo repo_url mismatch: got=%q want=%q", ms.createModRepoParams.RepoUrl, tt.wantRepoURL)
+				}
 			}
 		})
 	}
@@ -330,6 +341,7 @@ func TestBulkUpsertModReposHandler(t *testing.T) {
 		contentType    string
 		body           string
 		setupMock      func(m *mockStore)
+		verify         func(t *testing.T, m *mockStore)
 		wantStatus     int
 		wantBodySubstr string
 		wantCreated    int
@@ -387,6 +399,52 @@ https://github.com/org/new-repo2,develop,feature2`,
 			wantStatus:  http.StatusOK,
 			wantCreated: 2,
 			wantUpdated: 0,
+			wantFailed:  0,
+		},
+		{
+			name:        "success - parses quoted fields and unicode",
+			modID:       "mod-abc123",
+			contentType: "text/csv",
+			body: "repo_url,base_ref,target_ref\n" +
+				"\"https://github.com/org/привет\",\"main\",\"feature\"\"one\"",
+			setupMock: func(m *mockStore) {
+				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModRepoByURLErr = pgx.ErrNoRows
+			},
+			wantStatus:  http.StatusOK,
+			wantCreated: 1,
+			wantUpdated: 0,
+			wantFailed:  0,
+		},
+		{
+			name:        "success - normalizes repo URL before upsert",
+			modID:       "mod-abc123",
+			contentType: "text/csv",
+			body: "repo_url,base_ref,target_ref\n" +
+				"https://github.com/org/repo.git/,main,feature",
+			setupMock: func(m *mockStore) {
+				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModRepoByURLErr = pgx.ErrNoRows
+			},
+			verify: func(t *testing.T, m *mockStore) {
+				t.Helper()
+				if !m.getModRepoByURLCalled {
+					t.Fatalf("expected GetModRepoByURL to be called")
+				}
+				if m.getModRepoByURLParams.RepoUrl != "https://github.com/org/repo" {
+					t.Fatalf("GetModRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.RepoUrl, "https://github.com/org/repo")
+				}
+				if !m.upsertModRepoCalled {
+					t.Fatalf("expected UpsertModRepo to be called")
+				}
+				if m.upsertModRepoParams.RepoUrl != "https://github.com/org/repo" {
+					t.Fatalf("UpsertModRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.RepoUrl, "https://github.com/org/repo")
+				}
+			},
+			wantStatus:  http.StatusOK,
+			wantCreated: 1,
+			wantUpdated: 0,
+			wantFailed:  0,
 		},
 		{
 			name:        "error - wrong content type",
@@ -452,6 +510,7 @@ ftp://invalid.com/bad-repo,main,feature2`,
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
+			wantUpdated: 0,
 			wantFailed:  1,
 		},
 		{
@@ -464,8 +523,45 @@ https://github.com/org/repo,,feature`,
 				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusOK,
+			wantCreated:    0,
+			wantUpdated:    0,
 			wantFailed:     1,
 			wantBodySubstr: "base_ref is required",
+		},
+		{
+			name:        "partial success - strict CSV parse error",
+			modID:       "mod-abc123",
+			contentType: "text/csv",
+			body: "repo_url,base_ref,target_ref\n" +
+				"https://github.com/org/repo,main,\"unterminated",
+			setupMock: func(m *mockStore) {
+				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+			},
+			wantStatus:  http.StatusOK,
+			wantCreated: 0,
+			wantUpdated: 0,
+			wantFailed:  1,
+		},
+		{
+			name:        "partial success - store lookup error is a per-line failure",
+			modID:       "mod-abc123",
+			contentType: "text/csv",
+			body: "repo_url,base_ref,target_ref\n" +
+				"https://github.com/org/repo,main,feature",
+			setupMock: func(m *mockStore) {
+				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModRepoByURLErr = errors.New("db down")
+			},
+			verify: func(t *testing.T, m *mockStore) {
+				t.Helper()
+				if m.upsertModRepoCalled {
+					t.Fatalf("did not expect UpsertModRepo to be called when lookup fails")
+				}
+			},
+			wantStatus:  http.StatusOK,
+			wantCreated: 0,
+			wantUpdated: 0,
+			wantFailed:  1,
 		},
 	}
 
@@ -503,15 +599,17 @@ https://github.com/org/repo,,feature`,
 				if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 					t.Fatalf("failed to unmarshal response: %v", err)
 				}
-				// Only check counts when specifically expected (some tests have mock limitations).
-				if tt.wantCreated > 0 && resp.Created != tt.wantCreated {
+				if resp.Created != tt.wantCreated {
 					t.Errorf("got created=%d, want %d", resp.Created, tt.wantCreated)
 				}
-				if tt.wantUpdated > 0 && resp.Updated != tt.wantUpdated {
+				if resp.Updated != tt.wantUpdated {
 					t.Errorf("got updated=%d, want %d", resp.Updated, tt.wantUpdated)
 				}
-				if tt.wantFailed > 0 && resp.Failed != tt.wantFailed {
+				if resp.Failed != tt.wantFailed {
 					t.Errorf("got failed=%d, want %d", resp.Failed, tt.wantFailed)
+				}
+				if tt.verify != nil {
+					tt.verify(t, ms)
 				}
 			}
 		})
