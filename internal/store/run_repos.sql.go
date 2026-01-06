@@ -103,7 +103,7 @@ const getLatestRunRepoByModAndRepoStatus = `-- name: GetLatestRunRepoByModAndRep
 SELECT rr.run_id, rr.repo_id, rr.repo_target_ref
 FROM run_repos rr
 JOIN runs r ON rr.run_id = r.id
-WHERE rr.mod_id = $1
+WHERE r.mod_id = $1
   AND rr.repo_id = $2
   AND rr.status = $3
 ORDER BY rr.created_at DESC
@@ -159,40 +159,6 @@ func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-	)
-	return i, err
-}
-
-const getRunRepoForPull = `-- name: GetRunRepoForPull :one
-SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
-FROM run_repos rr
-JOIN mod_repos mr ON rr.repo_id = mr.id
-WHERE rr.run_id = $1 AND rr.repo_id = $2
-`
-
-type GetRunRepoForPullParams struct {
-	RunID  string `json:"run_id"`
-	RepoID string `json:"repo_id"`
-}
-
-type GetRunRepoForPullRow struct {
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoTargetRef string `json:"repo_target_ref"`
-	RepoUrl       string `json:"repo_url"`
-}
-
-// v1: Gets run_repos info for a specific repo_id within a run.
-// Used by POST /v1/runs/{run_id}/pull to resolve repo execution identifiers.
-// Joins mod_repos to get the repo_url for validation after normalization.
-func (q *Queries) GetRunRepoForPull(ctx context.Context, arg GetRunRepoForPullParams) (GetRunRepoForPullRow, error) {
-	row := q.db.QueryRow(ctx, getRunRepoForPull, arg.RunID, arg.RepoID)
-	var i GetRunRepoForPullRow
-	err := row.Scan(
-		&i.RunID,
-		&i.RepoID,
-		&i.RepoTargetRef,
-		&i.RepoUrl,
 	)
 	return i, err
 }

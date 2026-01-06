@@ -399,12 +399,6 @@ type mockStore struct {
 	getLatestRunRepoByModAndRepoStatusResult store.GetLatestRunRepoByModAndRepoStatusRow
 	getLatestRunRepoByModAndRepoStatusErr    error
 
-	// GetRunRepoForPull tracking (for run pull resolution)
-	getRunRepoForPullCalled bool
-	getRunRepoForPullParams store.GetRunRepoForPullParams
-	getRunRepoForPullResult store.GetRunRepoForPullRow
-	getRunRepoForPullErr    error
-
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
 	getRunRepoParam  store.GetRunRepoParams
@@ -1164,11 +1158,4 @@ func (m *mockStore) GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg 
 	m.getLatestRunRepoByModAndRepoStatusCalled = true
 	m.getLatestRunRepoByModAndRepoStatusParams = arg
 	return m.getLatestRunRepoByModAndRepoStatusResult, m.getLatestRunRepoByModAndRepoStatusErr
-}
-
-// GetRunRepoForPull returns run_repos info for a specific repo in a run.
-func (m *mockStore) GetRunRepoForPull(ctx context.Context, arg store.GetRunRepoForPullParams) (store.GetRunRepoForPullRow, error) {
-	m.getRunRepoForPullCalled = true
-	m.getRunRepoForPullParams = arg
-	return m.getRunRepoForPullResult, m.getRunRepoForPullErr
 }

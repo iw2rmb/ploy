@@ -103,10 +103,6 @@ type Querier interface {
 	GetNode(ctx context.Context, id string) (Node, error)
 	GetRun(ctx context.Context, id string) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
-	// v1: Gets run_repos info for a specific repo_id within a run.
-	// Used by POST /v1/runs/{run_id}/pull to resolve repo execution identifiers.
-	// Joins mod_repos to get the repo_url for validation after normalization.
-	GetRunRepoForPull(ctx context.Context, arg GetRunRepoForPullParams) (GetRunRepoForPullRow, error)
 	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
 	GetSpec(ctx context.Context, id string) (Spec, error)
 	// Checks if a mod_repo has any historical executions (run_repos references).
