@@ -494,3 +494,167 @@ func parseHealingMod(modMap map[string]any) HealingMod {
 func parseHealingModFromMap(modMap map[string]any) HealingMod {
 	return parseHealingMod(modMap)
 }
+
+// modsSpecToRunOptions converts a canonical contracts.ModsSpec directly to RunOptions.
+// This is the preferred hot-path conversion that avoids the intermediate map[string]any
+// bridge and its associated type conversion hazards (float64/int, []any/[]string).
+//
+// The function preserves all env merging semantics from the previous modsSpecToOptions +
+// parseRunOptions pipeline while eliminating intermediate type conversions.
+//
+// ## Why Direct Conversion?
+//
+// The previous two-stage pipeline (modsSpecToOptions → parseRunOptions) introduced
+// type hazards on the hot path:
+//   - JSON numbers unmarshaled as float64 required int conversion in parseRunOptions
+//   - String slices passed through []any required element-by-element conversion
+//   - Map values required type assertions at every access point
+//
+// Direct conversion from the typed ModsSpec struct eliminates these hazards by
+// reading strongly-typed fields directly (e.g., spec.BuildGate.Healing.Retries as int).
+func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
+	if spec == nil {
+		return RunOptions{}
+	}
+
+	runOpts := RunOptions{}
+
+	// --- Build Gate Options ---
+	// Extract enabled/profile from the typed BuildGate struct.
+	if spec.BuildGate != nil {
+		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
+		runOpts.BuildGate.Profile = spec.BuildGate.Profile
+
+		// --- Healing Configuration ---
+		// Convert contracts.HealingSpec to nodeagent.HealingConfig directly,
+		// avoiding the map[string]any bridge that required float64→int conversion.
+		if spec.BuildGate.Healing != nil {
+			healing := &HealingConfig{
+				Retries: spec.BuildGate.Healing.Retries,
+			}
+			// Default retries to 1 if not specified (spec parser sets default of 1).
+			if healing.Retries <= 0 {
+				healing.Retries = 1
+			}
+
+			// Convert healing mod specification.
+			if spec.BuildGate.Healing.Mod != nil {
+				healing.Mod = healingModSpecToHealingMod(spec.BuildGate.Healing.Mod)
+			}
+
+			runOpts.Healing = healing
+		}
+	}
+
+	// --- MR Wiring Options ---
+	// Direct field assignment from typed spec fields.
+	runOpts.MRWiring.GitLabPAT = spec.GitLabPAT
+	runOpts.MRWiring.GitLabDomain = spec.GitLabDomain
+	if spec.MROnSuccess != nil {
+		runOpts.MRWiring.MROnSuccess = *spec.MROnSuccess
+		runOpts.MRFlagsPresent.MROnSuccessSet = true
+	}
+	if spec.MROnFail != nil {
+		runOpts.MRWiring.MROnFail = *spec.MROnFail
+		runOpts.MRFlagsPresent.MROnFailSet = true
+	}
+
+	// --- Execution Options (Single-Step) ---
+	// For single-step specs, extract image/command/retain_container from steps[0].
+	// Multi-step specs populate Steps[] instead.
+	if len(spec.Steps) == 1 {
+		step := spec.Steps[0]
+		runOpts.Execution.Image = step.Image
+		runOpts.Execution.Command = commandSpecToExecutionCommand(step.Command)
+		runOpts.Execution.RetainContainer = step.RetainContainer
+	}
+
+	// --- Multi-Step Steps Array ---
+	// For multi-step specs (len > 1), populate Steps[] with typed StepMod entries.
+	// Single-step specs use Execution options instead (Steps remains empty).
+	if len(spec.Steps) > 1 {
+		runOpts.Steps = make([]StepMod, 0, len(spec.Steps))
+		for _, step := range spec.Steps {
+			stepMod := StepMod{
+				Image:           step.Image,
+				Command:         commandSpecToExecutionCommand(step.Command),
+				Env:             copyStringMap(step.Env),
+				RetainContainer: step.RetainContainer,
+			}
+			runOpts.Steps = append(runOpts.Steps, stepMod)
+		}
+	}
+
+	// --- Artifact Options ---
+	// Direct slice copy without []any→[]string conversion.
+	runOpts.Artifacts.Name = spec.ArtifactName
+	if len(spec.ArtifactPaths) > 0 {
+		runOpts.Artifacts.Paths = make([]string, 0, len(spec.ArtifactPaths))
+		for _, p := range spec.ArtifactPaths {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, p)
+			}
+		}
+	}
+
+	// --- Server Metadata ---
+	// Direct assignment from typed spec fields.
+	if trimmed := strings.TrimSpace(spec.JobID); trimmed != "" {
+		runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
+	}
+
+	// --- Mod Index ---
+	// Direct int assignment without float64→int conversion.
+	if spec.ModIndex != nil {
+		runOpts.ModIndex = *spec.ModIndex
+		runOpts.ModIndexSet = true
+	}
+
+	return runOpts
+}
+
+// healingModSpecToHealingMod converts contracts.HealingModSpec to nodeagent.HealingMod.
+// This direct conversion avoids the map[string]any bridge for healing mod parsing.
+func healingModSpecToHealingMod(spec *contracts.HealingModSpec) HealingMod {
+	if spec == nil {
+		return HealingMod{}
+	}
+
+	return HealingMod{
+		Image:           spec.Image,
+		Command:         commandSpecToHealingCommand(spec.Command),
+		Env:             copyStringMap(spec.Env),
+		RetainContainer: spec.RetainContainer,
+	}
+}
+
+// commandSpecToExecutionCommand converts contracts.CommandSpec to ExecutionCommand.
+// Direct field mapping without polymorphic type switching.
+func commandSpecToExecutionCommand(cmd contracts.CommandSpec) ExecutionCommand {
+	return ExecutionCommand{
+		Shell: cmd.Shell,
+		Exec:  cmd.Exec,
+	}
+}
+
+// commandSpecToHealingCommand converts contracts.CommandSpec to HealingCommand.
+// Direct field mapping without polymorphic type switching.
+func commandSpecToHealingCommand(cmd contracts.CommandSpec) HealingCommand {
+	return HealingCommand{
+		Shell: cmd.Shell,
+		Exec:  cmd.Exec,
+	}
+}
+
+// copyStringMap creates a shallow copy of a string map.
+// Returns nil if the input is nil or empty.
+func copyStringMap(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}

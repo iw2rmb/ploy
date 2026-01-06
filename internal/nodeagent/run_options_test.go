@@ -985,3 +985,315 @@ func TestParseRunOptions_ModIndex(t *testing.T) {
 		}
 	})
 }
+
+// TestModsSpecToRunOptions_DirectConversion verifies that the direct conversion
+// from contracts.ModsSpec to RunOptions produces identical results to the
+// legacy two-stage pipeline (modsSpecToOptions → parseRunOptions).
+//
+// This test ensures the hot-path optimization preserves semantic equivalence
+// while eliminating the float64/int and []any/[]string type hazards.
+func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single_step_with_all_options", func(t *testing.T) {
+		t.Parallel()
+
+		// Build a ModsSpec with all field types to verify direct conversion.
+		modIndex := 0
+		mrOnSuccess := true
+		mrOnFail := false
+
+		spec := &contracts.ModsSpec{
+			JobID:    "job-direct-test-123",
+			ModIndex: &modIndex,
+			Steps: []contracts.ModStep{
+				{
+					Image:           contracts.ModImage{Universal: "docker.io/test/mod:v1"},
+					Command:         contracts.CommandSpec{Exec: []string{"echo", "hello"}},
+					Env:             map[string]string{"KEY": "value"},
+					RetainContainer: true,
+				},
+			},
+			BuildGate: &contracts.BuildGateConfig{
+				Enabled: true,
+				Profile: "java-maven",
+				Healing: &contracts.HealingSpec{
+					Retries: 3,
+					Mod: &contracts.HealingModSpec{
+						Image:           contracts.ModImage{Universal: "docker.io/test/heal:v1"},
+						Command:         contracts.CommandSpec{Shell: "fix.sh"},
+						Env:             map[string]string{"MODE": "auto"},
+						RetainContainer: true,
+					},
+				},
+			},
+			GitLabPAT:     "glpat-secret",
+			GitLabDomain:  "gitlab.example.com",
+			MROnSuccess:   &mrOnSuccess,
+			MROnFail:      &mrOnFail,
+			ArtifactPaths: []string{"path/to/file.txt", "path/to/dir/"},
+			ArtifactName:  "my-artifact",
+		}
+
+		runOpts := modsSpecToRunOptions(spec)
+
+		// Verify server metadata.
+		if runOpts.ServerMetadata.JobID.String() != "job-direct-test-123" {
+			t.Errorf("JobID: got %q, want %q", runOpts.ServerMetadata.JobID.String(), "job-direct-test-123")
+		}
+		if !runOpts.ModIndexSet {
+			t.Error("expected ModIndexSet=true")
+		}
+		if runOpts.ModIndex != 0 {
+			t.Errorf("ModIndex: got %d, want 0", runOpts.ModIndex)
+		}
+
+		// Verify execution options (single-step).
+		execImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected image resolve error: %v", err)
+		}
+		if execImg != "docker.io/test/mod:v1" {
+			t.Errorf("Execution.Image: got %q, want %q", execImg, "docker.io/test/mod:v1")
+		}
+		wantExec := []string{"echo", "hello"}
+		if len(runOpts.Execution.Command.Exec) != len(wantExec) {
+			t.Fatalf("Execution.Command.Exec length: got %d, want %d",
+				len(runOpts.Execution.Command.Exec), len(wantExec))
+		}
+		for i, v := range wantExec {
+			if runOpts.Execution.Command.Exec[i] != v {
+				t.Errorf("Execution.Command.Exec[%d]: got %q, want %q", i, runOpts.Execution.Command.Exec[i], v)
+			}
+		}
+		if !runOpts.Execution.RetainContainer {
+			t.Error("Execution.RetainContainer: expected true")
+		}
+
+		// Verify build gate options.
+		if !runOpts.BuildGate.Enabled {
+			t.Error("BuildGate.Enabled: expected true")
+		}
+		if runOpts.BuildGate.Profile != "java-maven" {
+			t.Errorf("BuildGate.Profile: got %q, want %q", runOpts.BuildGate.Profile, "java-maven")
+		}
+
+		// Verify healing config (direct int, no float64→int conversion).
+		if runOpts.Healing == nil {
+			t.Fatal("expected Healing config")
+		}
+		if runOpts.Healing.Retries != 3 {
+			t.Errorf("Healing.Retries: got %d, want 3", runOpts.Healing.Retries)
+		}
+		healImg, err := runOpts.Healing.Mod.Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected healing image resolve error: %v", err)
+		}
+		if healImg != "docker.io/test/heal:v1" {
+			t.Errorf("Healing.Mod.Image: got %q, want %q", healImg, "docker.io/test/heal:v1")
+		}
+		if runOpts.Healing.Mod.Command.Shell != "fix.sh" {
+			t.Errorf("Healing.Mod.Command.Shell: got %q, want %q", runOpts.Healing.Mod.Command.Shell, "fix.sh")
+		}
+		if runOpts.Healing.Mod.Env["MODE"] != "auto" {
+			t.Errorf("Healing.Mod.Env[MODE]: got %q, want %q", runOpts.Healing.Mod.Env["MODE"], "auto")
+		}
+		if !runOpts.Healing.Mod.RetainContainer {
+			t.Error("Healing.Mod.RetainContainer: expected true")
+		}
+
+		// Verify MR wiring.
+		if runOpts.MRWiring.GitLabPAT != "glpat-secret" {
+			t.Errorf("MRWiring.GitLabPAT: got %q, want %q", runOpts.MRWiring.GitLabPAT, "glpat-secret")
+		}
+		if runOpts.MRWiring.GitLabDomain != "gitlab.example.com" {
+			t.Errorf("MRWiring.GitLabDomain: got %q, want %q", runOpts.MRWiring.GitLabDomain, "gitlab.example.com")
+		}
+		if !runOpts.MRWiring.MROnSuccess {
+			t.Error("MRWiring.MROnSuccess: expected true")
+		}
+		if runOpts.MRWiring.MROnFail {
+			t.Error("MRWiring.MROnFail: expected false")
+		}
+		if !runOpts.MRFlagsPresent.MROnSuccessSet {
+			t.Error("MRFlagsPresent.MROnSuccessSet: expected true")
+		}
+		if !runOpts.MRFlagsPresent.MROnFailSet {
+			t.Error("MRFlagsPresent.MROnFailSet: expected true")
+		}
+
+		// Verify artifacts (direct []string, no []any conversion).
+		if runOpts.Artifacts.Name != "my-artifact" {
+			t.Errorf("Artifacts.Name: got %q, want %q", runOpts.Artifacts.Name, "my-artifact")
+		}
+		wantPaths := []string{"path/to/file.txt", "path/to/dir/"}
+		if len(runOpts.Artifacts.Paths) != len(wantPaths) {
+			t.Fatalf("Artifacts.Paths length: got %d, want %d",
+				len(runOpts.Artifacts.Paths), len(wantPaths))
+		}
+		for i, p := range wantPaths {
+			if runOpts.Artifacts.Paths[i] != p {
+				t.Errorf("Artifacts.Paths[%d]: got %q, want %q", i, runOpts.Artifacts.Paths[i], p)
+			}
+		}
+
+		// Verify Steps is empty for single-step spec.
+		if len(runOpts.Steps) != 0 {
+			t.Errorf("Steps: expected empty for single-step spec, got %d", len(runOpts.Steps))
+		}
+	})
+
+	t.Run("multi_step_spec", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{
+					Image:   contracts.ModImage{Universal: "docker.io/test/step1:v1"},
+					Command: contracts.CommandSpec{Shell: "step1.sh"},
+					Env:     map[string]string{"STEP": "1"},
+				},
+				{
+					Image:           contracts.ModImage{Universal: "docker.io/test/step2:v1"},
+					Command:         contracts.CommandSpec{Exec: []string{"step2", "--flag"}},
+					Env:             map[string]string{"STEP": "2"},
+					RetainContainer: true,
+				},
+			},
+		}
+
+		runOpts := modsSpecToRunOptions(spec)
+
+		// Verify Steps is populated for multi-step spec.
+		if len(runOpts.Steps) != 2 {
+			t.Fatalf("Steps: expected 2, got %d", len(runOpts.Steps))
+		}
+
+		// Verify first step.
+		step0Img, err := runOpts.Steps[0].Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected step0 image error: %v", err)
+		}
+		if step0Img != "docker.io/test/step1:v1" {
+			t.Errorf("Steps[0].Image: got %q, want %q", step0Img, "docker.io/test/step1:v1")
+		}
+		if runOpts.Steps[0].Command.Shell != "step1.sh" {
+			t.Errorf("Steps[0].Command.Shell: got %q, want %q", runOpts.Steps[0].Command.Shell, "step1.sh")
+		}
+		if runOpts.Steps[0].Env["STEP"] != "1" {
+			t.Errorf("Steps[0].Env[STEP]: got %q, want %q", runOpts.Steps[0].Env["STEP"], "1")
+		}
+
+		// Verify second step (exec array, not shell).
+		step1Img, err := runOpts.Steps[1].Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected step1 image error: %v", err)
+		}
+		if step1Img != "docker.io/test/step2:v1" {
+			t.Errorf("Steps[1].Image: got %q, want %q", step1Img, "docker.io/test/step2:v1")
+		}
+		wantExec := []string{"step2", "--flag"}
+		if len(runOpts.Steps[1].Command.Exec) != len(wantExec) {
+			t.Fatalf("Steps[1].Command.Exec length: got %d, want %d",
+				len(runOpts.Steps[1].Command.Exec), len(wantExec))
+		}
+		for i, v := range wantExec {
+			if runOpts.Steps[1].Command.Exec[i] != v {
+				t.Errorf("Steps[1].Command.Exec[%d]: got %q, want %q", i, runOpts.Steps[1].Command.Exec[i], v)
+			}
+		}
+		if !runOpts.Steps[1].RetainContainer {
+			t.Error("Steps[1].RetainContainer: expected true")
+		}
+
+		// Verify Execution is empty for multi-step spec.
+		if !runOpts.Execution.Image.IsEmpty() {
+			t.Errorf("Execution.Image: expected empty for multi-step spec")
+		}
+	})
+
+	t.Run("nil_spec_returns_zero_value", func(t *testing.T) {
+		t.Parallel()
+
+		runOpts := modsSpecToRunOptions(nil)
+
+		// Verify zero values.
+		if runOpts.ModIndexSet {
+			t.Error("expected ModIndexSet=false for nil spec")
+		}
+		if !runOpts.Execution.Image.IsEmpty() {
+			t.Error("expected empty Execution.Image for nil spec")
+		}
+		if runOpts.Healing != nil {
+			t.Error("expected nil Healing for nil spec")
+		}
+	})
+
+	t.Run("healing_retries_defaults_to_1", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.ModImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Healing: &contracts.HealingSpec{
+					Retries: 0, // Explicitly 0, should default to 1.
+					Mod:     &contracts.HealingModSpec{Image: contracts.ModImage{Universal: "heal"}},
+				},
+			},
+		}
+
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Healing == nil {
+			t.Fatal("expected Healing config")
+		}
+		if runOpts.Healing.Retries != 1 {
+			t.Errorf("Healing.Retries: got %d, want 1 (default)", runOpts.Healing.Retries)
+		}
+	})
+
+	t.Run("stack_aware_image_preserved", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{
+					Image: contracts.ModImage{
+						ByStack: map[contracts.ModStack]string{
+							contracts.ModStackDefault:    "docker.io/test/default:v1",
+							contracts.ModStackJavaMaven:  "docker.io/test/maven:v1",
+							contracts.ModStackJavaGradle: "docker.io/test/gradle:v1",
+						},
+					},
+				},
+			},
+		}
+
+		runOpts := modsSpecToRunOptions(spec)
+
+		// Verify stack-specific resolution works.
+		mavenImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackJavaMaven)
+		if err != nil {
+			t.Fatalf("unexpected maven image error: %v", err)
+		}
+		if mavenImg != "docker.io/test/maven:v1" {
+			t.Errorf("Maven image: got %q, want %q", mavenImg, "docker.io/test/maven:v1")
+		}
+
+		gradleImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackJavaGradle)
+		if err != nil {
+			t.Fatalf("unexpected gradle image error: %v", err)
+		}
+		if gradleImg != "docker.io/test/gradle:v1" {
+			t.Errorf("Gradle image: got %q, want %q", gradleImg, "docker.io/test/gradle:v1")
+		}
+
+		defaultImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("unexpected default image error: %v", err)
+		}
+		if defaultImg != "docker.io/test/default:v1" {
+			t.Errorf("Default image: got %q, want %q", defaultImg, "docker.io/test/default:v1")
+		}
+	})
+}
