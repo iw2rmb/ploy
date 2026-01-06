@@ -17,18 +17,18 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 		"gitlab_domain": "https://gitlab.example.com"
 	}`)
 
-	opts, env, _ := parseSpec(spec)
+	env, typedOpts := parseSpec(spec)
 
-	if opts["job_id"] != "job-123" {
-		t.Errorf("job_id = %v, want job-123", opts["job_id"])
+	if typedOpts.ServerMetadata.JobID.String() != "job-123" {
+		t.Errorf("job_id = %q, want job-123", typedOpts.ServerMetadata.JobID.String())
 	}
 
-	// Verify gitlab_pat is extracted into opts.
-	if opts["gitlab_pat"] != "server-default-token" {
-		t.Errorf("gitlab_pat = %v, want server-default-token", opts["gitlab_pat"])
+	// Verify gitlab config is extracted into typed options.
+	if typedOpts.MRWiring.GitLabPAT != "server-default-token" {
+		t.Errorf("gitlab_pat = %q, want server-default-token", typedOpts.MRWiring.GitLabPAT)
 	}
-	if opts["gitlab_domain"] != "https://gitlab.example.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", opts["gitlab_domain"])
+	if typedOpts.MRWiring.GitLabDomain != "https://gitlab.example.com" {
+		t.Errorf("gitlab_domain = %q, want https://gitlab.example.com", typedOpts.MRWiring.GitLabDomain)
 	}
 
 	// Verify that env is not populated with gitlab config (these are options, not env).
@@ -54,19 +54,22 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	}`)
 
 	// Parse the spec.
-	opts, _, _ := parseSpec(spec)
+	_, typedOpts := parseSpec(spec)
 
-	// Verify all fields are extracted into opts.
-	if opts["job_id"] != "job-123" {
-		t.Errorf("job_id = %v, want job-123", opts["job_id"])
+	// Verify all fields are extracted into typed options.
+	if typedOpts.ServerMetadata.JobID.String() != "job-123" {
+		t.Errorf("job_id = %q, want job-123", typedOpts.ServerMetadata.JobID.String())
 	}
-	if opts["gitlab_pat"] != "server-default-token" {
-		t.Errorf("gitlab_pat = %v, want server-default-token", opts["gitlab_pat"])
+	if typedOpts.MRWiring.GitLabPAT != "server-default-token" {
+		t.Errorf("gitlab_pat = %q, want server-default-token", typedOpts.MRWiring.GitLabPAT)
 	}
-	if opts["gitlab_domain"] != "https://gitlab.example.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", opts["gitlab_domain"])
+	if typedOpts.MRWiring.GitLabDomain != "https://gitlab.example.com" {
+		t.Errorf("gitlab_domain = %q, want https://gitlab.example.com", typedOpts.MRWiring.GitLabDomain)
 	}
-	if opts["mr_on_success"] != true {
-		t.Errorf("mr_on_success = %v, want true", opts["mr_on_success"])
+	if !typedOpts.MRFlagsPresent.MROnSuccessSet {
+		t.Errorf("mr_on_success presence = false, want true")
+	}
+	if typedOpts.MRWiring.MROnSuccess != true {
+		t.Errorf("mr_on_success = %v, want true", typedOpts.MRWiring.MROnSuccess)
 	}
 }

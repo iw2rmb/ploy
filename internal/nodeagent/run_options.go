@@ -15,8 +15,9 @@
 //   - No []any→[]string conversion for slices (artifact_paths, command exec arrays)
 //   - No map[string]any type assertions at access points
 //
-// The legacy parseRunOptions() function remains available for backward compatibility
-// with tests that construct map[string]any inputs directly.
+// Typed options are constructed at the nodeagent boundary from the canonical
+// contracts.ModsSpec (see parseSpec in claimer_spec.go). This removes the
+// intermediate map[string]any bridge and its associated type conversion hazards.
 //
 // ## Stack-Aware Image Selection
 //
@@ -267,258 +268,18 @@ type StepMod struct {
 	RetainContainer bool
 }
 
-// parseRunOptions extracts typed options from untyped map[string]any.
-// This function centralizes the map[string]any → RunOptions conversion and
-// provides a single point for option validation and defaulting.
-//
-// All callers should use the typed RunOptions struct instead of accessing
-// the raw map directly. The typed struct is the canonical source of truth.
-func parseRunOptions(opts map[string]any) RunOptions {
-	runOpts := RunOptions{}
-
-	// Parse build gate options (flattened by parseSpec).
-	if enabled, ok := opts["build_gate_enabled"].(bool); ok {
-		runOpts.BuildGate.Enabled = enabled
-	}
-	if profile, ok := opts["build_gate_profile"].(string); ok {
-		runOpts.BuildGate.Profile = profile
-	}
-
-	// Parse healing configuration (single-mod form).
-	if bg, ok := opts["build_gate"].(map[string]any); ok {
-		if healingMap, ok := bg["healing"].(map[string]any); ok {
-			healing := &HealingConfig{
-				Retries: 1, // Default to 1 retry.
-			}
-
-			// Extract retries (handle both int and float64 from JSON unmarshaling).
-			if r, ok := healingMap["retries"].(int); ok && r > 0 {
-				healing.Retries = r
-			} else if rf, ok := healingMap["retries"].(float64); ok && rf > 0 {
-				healing.Retries = int(rf)
-			}
-
-			// Single-mod form: mod is the canonical schema.
-			if modMap, ok := healingMap["mod"].(map[string]any); ok {
-				healing.Mod = parseHealingModFromMap(modMap)
-				runOpts.Healing = healing
-			}
-		}
-	}
-
-	// Parse MR wiring options.
-	if pat, ok := opts["gitlab_pat"].(string); ok {
-		runOpts.MRWiring.GitLabPAT = pat
-	}
-	if domain, ok := opts["gitlab_domain"].(string); ok {
-		runOpts.MRWiring.GitLabDomain = domain
-	}
-	// Track MR flag presence separately from their values to distinguish
-	// between "not set" and "set to false".
-	if mrSuccess, ok := opts["mr_on_success"].(bool); ok {
-		runOpts.MRWiring.MROnSuccess = mrSuccess
-		runOpts.MRFlagsPresent.MROnSuccessSet = true
-	}
-	if mrFail, ok := opts["mr_on_fail"].(bool); ok {
-		runOpts.MRWiring.MROnFail = mrFail
-		runOpts.MRFlagsPresent.MROnFailSet = true
-	}
-
-	// Parse execution options.
-	// Image supports both string (universal) and map (stack-specific) forms.
-	// ParseModImage handles the polymorphic conversion.
-	if imgVal, hasImage := opts["image"]; hasImage {
-		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
-			runOpts.Execution.Image = modImage
-		}
-		// On parse error, leave Image empty; validation happens at manifest build.
-	}
-	if retain, ok := opts["retain_container"].(bool); ok {
-		runOpts.Execution.RetainContainer = retain
-	}
-
-	// Parse command (polymorphic: string, []string, or []any).
-	// The []any case handles JSON-unmarshaled arrays from modsSpecToOptions,
-	// which converts CommandSpec.Exec to []any via commandSpecToAnyForNested.
-	// Without this, single-step specs with exec-array commands (e.g., ["a","b"])
-	// would drop into empty command because []any != []string.
-	switch cmd := opts["command"].(type) {
-	case string:
-		runOpts.Execution.Command.Shell = cmd
-	case []string:
-		runOpts.Execution.Command.Exec = cmd
-	case []any:
-		// Convert []any to []string, filtering non-string elements.
-		for _, elem := range cmd {
-			if s, ok := elem.(string); ok {
-				runOpts.Execution.Command.Exec = append(runOpts.Execution.Command.Exec, s)
-			}
-		}
-	}
-
-	// Parse artifact options.
-	if name, ok := opts["artifact_name"].(string); ok {
-		runOpts.Artifacts.Name = name
-	}
-	// Parse artifact_paths (accepts both []any from JSON and []string from programmatic callers).
-	switch paths := opts["artifact_paths"].(type) {
-	case []any:
-		for _, p := range paths {
-			if s, ok := p.(string); ok && strings.TrimSpace(s) != "" {
-				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, s)
-			}
-		}
-	case []string:
-		for _, s := range paths {
-			if strings.TrimSpace(s) != "" {
-				runOpts.Artifacts.Paths = append(runOpts.Artifacts.Paths, s)
-			}
-		}
-	}
-
-	// Parse server metadata.
-	if jobID, ok := opts["job_id"].(string); ok {
-		if trimmed := strings.TrimSpace(jobID); trimmed != "" {
-			runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
-		}
-	}
-
-	// Parse mod_index for multi-step runs (server-injected per-job index).
-	// Handle both int and float64 (JSON unmarshals numbers as float64).
-	switch mi := opts["mod_index"].(type) {
-	case int:
-		runOpts.ModIndex = mi
-		runOpts.ModIndexSet = true
-	case float64:
-		runOpts.ModIndex = int(mi)
-		runOpts.ModIndexSet = true
-	}
-
-	// Parse multi-step steps array for sequential execution.
-	// For multi-step runs (steps[] in spec), each entry defines a step.
-	// For single-step runs (mod or legacy top-level), Steps remains empty.
-	if stepsSlice, ok := opts["steps"].([]any); ok && len(stepsSlice) > 0 {
-		for _, stepEntry := range stepsSlice {
-			if stepMap, ok := stepEntry.(map[string]any); ok {
-				stepMod := parseStepMod(stepMap)
-				runOpts.Steps = append(runOpts.Steps, stepMod)
-			}
-		}
-	}
-
-	return runOpts
-}
-
-// parseStepMod extracts a StepMod from an untyped map[string]any.
-// This function handles the polymorphic command representation (string or []any)
-// and provides safe type conversions for multi-step mod entries.
-func parseStepMod(modMap map[string]any) StepMod {
-	stepMod := StepMod{
-		Env: make(map[string]string),
-	}
-
-	// Extract image (required for multi-step mods).
-	// Image supports both string (universal) and map (stack-specific) forms.
-	if imgVal, hasImage := modMap["image"]; hasImage {
-		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
-			stepMod.Image = modImage
-		}
-		// On parse error, leave Image empty; validation happens at manifest build.
-	}
-
-	// Extract command (polymorphic: string or []any).
-	switch cmd := modMap["command"].(type) {
-	case string:
-		stepMod.Command.Shell = cmd
-	case []any:
-		for _, elem := range cmd {
-			if s, ok := elem.(string); ok {
-				stepMod.Command.Exec = append(stepMod.Command.Exec, s)
-			}
-		}
-	}
-
-	// Extract env map.
-	if envMap, ok := modMap["env"].(map[string]any); ok {
-		for k, v := range envMap {
-			if s, ok := v.(string); ok {
-				stepMod.Env[k] = s
-			}
-		}
-	}
-
-	// Extract retain_container.
-	if retain, ok := modMap["retain_container"].(bool); ok {
-		stepMod.RetainContainer = retain
-	}
-
-	return stepMod
-}
-
-// parseHealingMod extracts a HealingMod from an untyped map[string]any.
-// This function handles the polymorphic command representation (string or []any)
-// and provides safe type conversions with defaults.
-func parseHealingMod(modMap map[string]any) HealingMod {
-	mod := HealingMod{
-		Env: make(map[string]string),
-	}
-
-	// Extract image (required, but we don't validate here; validation happens
-	// in buildHealingManifest where context allows better error messages).
-	// Image supports both string (universal) and map (stack-specific) forms.
-	if imgVal, hasImage := modMap["image"]; hasImage {
-		if modImage, err := contracts.ParseModImage(imgVal); err == nil {
-			mod.Image = modImage
-		}
-		// On parse error, leave Image empty; validation happens at manifest build.
-	}
-
-	// Extract command (polymorphic: string or []any).
-	switch cmd := modMap["command"].(type) {
-	case string:
-		mod.Command.Shell = cmd
-	case []any:
-		for _, elem := range cmd {
-			if s, ok := elem.(string); ok {
-				mod.Command.Exec = append(mod.Command.Exec, s)
-			}
-		}
-	}
-
-	// Extract env map.
-	if envMap, ok := modMap["env"].(map[string]any); ok {
-		for k, v := range envMap {
-			if s, ok := v.(string); ok {
-				mod.Env[k] = s
-			}
-		}
-	}
-
-	// Extract retain_container.
-	if retain, ok := modMap["retain_container"].(bool); ok {
-		mod.RetainContainer = retain
-	}
-
-	return mod
-}
-
-// parseHealingModFromMap extracts a HealingMod from an untyped map[string]any.
-func parseHealingModFromMap(modMap map[string]any) HealingMod {
-	return parseHealingMod(modMap)
-}
-
 // modsSpecToRunOptions converts a canonical contracts.ModsSpec directly to RunOptions.
 // This is the preferred hot-path conversion that avoids the intermediate map[string]any
 // bridge and its associated type conversion hazards (float64/int, []any/[]string).
 //
-// The function preserves all env merging semantics from the previous modsSpecToOptions +
-// parseRunOptions pipeline while eliminating intermediate type conversions.
+// Env merge semantics are handled alongside spec parsing (see modsSpecToEnv in
+// claimer_spec.go). This conversion focuses on producing typed option structs.
 //
 // ## Why Direct Conversion?
 //
-// The previous two-stage pipeline (modsSpecToOptions → parseRunOptions) introduced
+// The previous map-bridge pipeline introduced
 // type hazards on the hot path:
-//   - JSON numbers unmarshaled as float64 required int conversion in parseRunOptions
+//   - JSON numbers unmarshaled as float64 required int conversion at access points
 //   - String slices passed through []any required element-by-element conversion
 //   - Map values required type assertions at every access point
 //

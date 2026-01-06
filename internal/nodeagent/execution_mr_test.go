@@ -95,7 +95,7 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("feature"),
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",
@@ -155,7 +155,7 @@ func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
 		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    "", // Unspecified target ref.
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",
@@ -208,7 +208,7 @@ func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
 		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    "", // Unspecified target ref.
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 	manifest := contracts.StepManifest{Options: map[string]any{
 		"gitlab_pat":    "glpat-xyz",

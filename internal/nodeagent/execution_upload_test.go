@@ -19,7 +19,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		artifactPaths interface{}
+		artifactPaths []string
 		createFiles   []string
 		wantUpload    bool
 	}{
@@ -27,12 +27,6 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			name:          "valid paths trigger upload",
 			artifactPaths: []string{"file1.txt", "dir1/file2.txt"},
 			createFiles:   []string{"file1.txt", "dir1/file2.txt"},
-			wantUpload:    true,
-		},
-		{
-			name:          "JSON array format",
-			artifactPaths: []any{"file1.txt"},
-			createFiles:   []string{"file1.txt"},
 			wantUpload:    true,
 		},
 		{
@@ -104,15 +98,12 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			// Build StartRunRequest with artifact_paths in Options for parseRunOptions.
-			opts := map[string]any{}
-			if tt.artifactPaths != nil {
-				opts["artifact_paths"] = tt.artifactPaths
+			typedOpts := RunOptions{
+				Artifacts: ArtifactOptions{
+					Paths: tt.artifactPaths,
+					Name:  "test-artifact",
+				},
 			}
-			opts["artifact_name"] = "test-artifact"
-
-			// Parse options into typed RunOptions.
-			typedOpts := parseRunOptions(opts)
 
 			req := StartRunRequest{
 				RunID:        types.RunID("test-run-123"),
@@ -599,14 +590,12 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			// Build options with artifact paths including traversal attempts.
-			opts := map[string]any{
-				"artifact_paths": tt.artifactPaths,
-				"artifact_name":  "test-artifact",
+			typedOpts := RunOptions{
+				Artifacts: ArtifactOptions{
+					Paths: tt.artifactPaths,
+					Name:  "test-artifact",
+				},
 			}
-
-			// Parse options into typed RunOptions.
-			typedOpts := parseRunOptions(opts)
 
 			req := StartRunRequest{
 				RunID:        types.RunID("test-run-traversal"),

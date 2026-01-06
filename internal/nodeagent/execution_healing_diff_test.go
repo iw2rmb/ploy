@@ -105,16 +105,12 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		TargetRef: types.GitRef("mods-upgrade-java17"),
 		CommitSHA: types.CommitSHA("abc123"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/codex-healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "test/codex-healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

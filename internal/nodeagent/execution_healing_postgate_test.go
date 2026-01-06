@@ -73,7 +73,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("test-postgate-pass"),
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 
 	manifest := contracts.StepManifest{
@@ -219,16 +219,12 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-postgate-heal"),
 		JobID: types.JobID("test-job-postgate-heal"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

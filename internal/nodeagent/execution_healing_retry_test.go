@@ -56,16 +56,19 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-nonzero"), JobID: types.JobID("j-nonzero"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "heal:latest",
-				},
+	req := StartRunRequest{
+		RunID:     types.RunID("t-nonzero"),
+		JobID:     types.JobID("j-nonzero"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
 		},
-	})}
+	}
 	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	res, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -81,9 +84,9 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	}
 }
 
-// TestExecuteWithHealing_RetriesFloat64ValueHonored verifies that a JSON-typed
-// float64 for retries is respected (e.g., when unmarshalled from generic JSON).
-func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
+// TestExecuteWithHealing_RetriesValueHonored verifies that the healing retry
+// limit is enforced (retries=N → exactly N healing attempts).
+func TestExecuteWithHealing_RetriesValueHonored(t *testing.T) {
 	// Gate always fails to force all retry attempts.
 	gateCalls := 0
 	mockGate := &mockGateExecutor{executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
@@ -115,17 +118,19 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	// Use float64 for retries as produced by encoding/json when decoding into map[string]any.
-	req := StartRunRequest{RunID: types.RunID("t-f64"), JobID: types.JobID("j-f64"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"retries": float64(2),
-				"mod": map[string]any{
-					"image": "heal:latest",
-				},
+	req := StartRunRequest{
+		RunID:     types.RunID("t-retries"),
+		JobID:     types.JobID("j-retries"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
 		},
-	})}
+	}
 	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -164,11 +169,18 @@ func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-empty-strategies"), JobID: types.JobID("j-empty-strategies"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
-		"build_gate": map[string]any{
-			"healing": map[string]any{"retries": 3},
+	req := StartRunRequest{
+		RunID:     types.RunID("t-empty-strategies"),
+		JobID:     types.JobID("j-empty-strategies"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 3,
+			},
 		},
-	})}
+	}
 	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -214,16 +226,19 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://127.0.0.1:8080", NodeID: "n", HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}}
 
-	req := StartRunRequest{RunID: types.RunID("t-tls"), JobID: types.JobID("j-tls"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "heal:latest",
-				},
+	req := StartRunRequest{
+		RunID:     types.RunID("t-tls"),
+		JobID:     types.JobID("j-tls"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
 		},
-	})}
+	}
 	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -306,16 +321,12 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 2, // Try twice
-					"mod": map[string]any{
-						"image": "test/healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2, // Try twice
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "test/healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -405,16 +416,19 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-env"), JobID: types.JobID("j-env"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "heal:latest",
-				},
+	req := StartRunRequest{
+		RunID:     types.RunID("t-env"),
+		JobID:     types.JobID("j-env"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
 		},
-	})}
+	}
 
 	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
@@ -507,16 +521,12 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "heal:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -605,16 +615,12 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "heal:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -701,16 +707,12 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 2, // Two retries to verify session propagation.
-					"mod": map[string]any{
-						"image": "mods-codex:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2, // Two retries to verify session propagation.
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "mods-codex:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -807,17 +809,12 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 2,
-					// Non-Codex healer image.
-					"mod": map[string]any{
-						"image": "standard-healer:v1",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "standard-healer:v1"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -914,16 +911,12 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "heal:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "heal:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

@@ -121,16 +121,14 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/healer-final-gate:latest",
-					},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod: HealingMod{
+					Image: contracts.ModImage{Universal: "test/healer-final-gate:latest"},
 				},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -287,19 +285,17 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/healer:latest",
-						"env": map[string]any{
-							"HEAL_TASK": "fix-build",
-						},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod: HealingMod{
+					Image: contracts.ModImage{Universal: "test/healer:latest"},
+					Env: map[string]string{
+						"HEAL_TASK": "fix-build",
 					},
 				},
 			},
-		}),
+		},
 	}
 
 	// Build main manifest with gate enabled.
@@ -441,16 +437,14 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/healer:latest",
-					},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod: HealingMod{
+					Image: contracts.ModImage{Universal: "test/healer:latest"},
 				},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -538,9 +532,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("test-branch"),
-		TypedOptions: parseRunOptions(map[string]any{
-			// No build_gate_healing configured
-		}),
+		TypedOptions: RunOptions{},
 	}
 
 	manifest := contracts.StepManifest{
@@ -665,7 +657,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("test-branch"),
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 
 	// Manifest with gate enabled — but executeWithHealing should disable it before
@@ -877,16 +869,14 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 3,
+				Mod: HealingMod{
+					Image: contracts.ModImage{Universal: "healer:latest"},
 				},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

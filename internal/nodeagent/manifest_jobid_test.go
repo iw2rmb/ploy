@@ -21,7 +21,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 			JobID:        types.JobID("job-unique-456"),
 			RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
 			BaseRef:      types.GitRef("main"),
-			TypedOptions: parseRunOptions(nil),
+			TypedOptions: RunOptions{},
 		}
 
 		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
@@ -41,7 +41,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 			RunID:        types.RunID("run-fallback-789"),
 			RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
 			BaseRef:      types.GitRef("main"),
-			TypedOptions: parseRunOptions(nil),
+			TypedOptions: RunOptions{},
 			// JobID intentionally omitted.
 		}
 
@@ -72,7 +72,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 				JobID:        jobID,
 				RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
 				BaseRef:      types.GitRef("main"),
-				TypedOptions: parseRunOptions(nil),
+				TypedOptions: RunOptions{},
 			}
 
 			manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
@@ -100,13 +100,11 @@ func TestBuildGateManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 	t.Parallel()
 
 	req := StartRunRequest{
-		RunID:   types.RunID("run-gate-shared"),
-		JobID:   types.JobID("job-gate-unique"),
-		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
-		BaseRef: types.GitRef("main"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_enabled": true,
-		}),
+		RunID:        types.RunID("run-gate-shared"),
+		JobID:        types.JobID("job-gate-unique"),
+		RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
+		BaseRef:      types.GitRef("main"),
+		TypedOptions: RunOptions{BuildGate: BuildGateOptions{Enabled: true}},
 	}
 
 	manifest, err := buildGateManifestFromRequest(req, req.TypedOptions)
@@ -220,10 +218,10 @@ func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 		JobID:   types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
 		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
 		BaseRef: types.GitRef("main"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"job_id":        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-			"artifact_name": "custom-bundle",
-		}),
+		TypedOptions: RunOptions{
+			ServerMetadata: ServerMetadataOptions{JobID: types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
+			Artifacts:      ArtifactOptions{Name: "custom-bundle"},
+		},
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
