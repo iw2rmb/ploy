@@ -1,12 +1,31 @@
 Usage: ploy mod <command>
 
-Commands:
-  run         Submit a Mods run to the control plane
-  run repo    Manage repos within a batch run (add/remove/restart/status)
-  artifacts   List run artifacts by stage
+Mod Project Management:
+  add         Create a new mod project
+  list        List mod projects
+  remove      Delete a mod project
+  archive     Archive a mod project
+  unarchive   Unarchive a mod project
 
-Use 'ploy mod run --help' for flag details.
-Use 'ploy mod run repo' for batch repo subcommands.
+Spec Management:
+  spec set    Set a mod's spec from a file
+
+Repo Set Management:
+  repo add    Add a repo to the mod
+  repo list   List repos in the mod
+  repo remove Remove a repo from the mod
+  repo import Import repos from CSV
+
+Run Execution:
+  run <mod>   Run a mod project (with --repo or --failed for repo selection)
+  run         Submit a single-repo run (legacy)
+  run repo    Manage repos within a batch run
+
+Artifacts:
+  artifacts   List run artifacts by stage
+  fetch       Download run artifacts
+
+Use 'ploy mod <command> --help' for command details.
 
 Flags for 'ploy mod run':
   --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)
