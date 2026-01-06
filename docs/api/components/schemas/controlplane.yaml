@@ -277,6 +277,26 @@ CreateModResponse:
     created_at: { type: string, format: date-time }
   required: [id, name, created_at]
 
+SetModSpecRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      description: Optional human label for the spec.
+    spec:
+      type: object
+      additionalProperties: true
+      description: Mods spec JSON object.
+    created_by: { type: string, nullable: true }
+  required: [spec]
+
+SetModSpecResponse:
+  type: object
+  properties:
+    id: { type: string, description: "Spec ID (NanoID string)" }
+    created_at: { type: string, format: date-time }
+  required: [id, created_at]
+
 ModListItem:
   type: object
   properties:

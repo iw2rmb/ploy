@@ -131,8 +131,7 @@ Response:
 
 Change entry: specs are stored globally; mods point at a single `spec_id`.
 
-- Current (HEAD): no spec storage outside `runs.spec` JSONB.
-- Proposed (v1): specs are stored in `specs` (global dictionary); `mods.spec_id` points at the current spec.
+- Current (HEAD): specs are stored in `specs` (global dictionary); `mods.spec_id` points at the current spec.
 - Where: `internal/store/schema.sql` (`specs`, `mods.spec_id`) + mod CRUD handlers.
 - Compatibility: breaking; no backward compatibility required.
 - Unchanged: runs are immutable and reference the exact `spec_id` that was current on the mod at run creation time.
