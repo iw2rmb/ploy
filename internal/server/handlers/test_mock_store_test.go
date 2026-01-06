@@ -254,12 +254,6 @@ type mockStore struct {
 	scheduleNextJobResult store.Job
 	scheduleNextJobErr    error
 
-	// ListDiffsByRun tracking
-	listDiffsByRunCalled bool
-	listDiffsByRunParam  string
-	listDiffsByRunResult []store.Diff
-	listDiffsByRunErr    error
-
 	// ListDiffsByRunRepo tracking (v1 repo-scoped diffs listing)
 	listDiffsByRunRepoCalled bool
 	listDiffsByRunRepoParams store.ListDiffsByRunRepoParams
@@ -873,12 +867,6 @@ func (m *mockStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJ
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.scheduleNextJobResult, nil
-}
-
-func (m *mockStore) ListDiffsByRun(ctx context.Context, runID string) ([]store.Diff, error) {
-	m.listDiffsByRunCalled = true
-	m.listDiffsByRunParam = runID
-	return m.listDiffsByRunResult, m.listDiffsByRunErr
 }
 
 // ListDiffsByRunRepo implements the v1 repo-scoped diffs listing query.

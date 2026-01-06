@@ -38,6 +38,10 @@ func (r *runController) rehydrateWorkspaceForStep(
 	stepIndex types.StepIndex,
 ) (string, error) {
 	runID := req.RunID.String()
+	repoID := strings.TrimSpace(req.RepoID)
+	if repoID == "" {
+		return "", fmt.Errorf("rehydrate workspace: repo_id is required for repo-scoped diffs listing")
+	}
 
 	// Step 1: Ensure base clone exists (create on first use, reuse on subsequent calls).
 	// Base clone path is deterministic per run and node.
@@ -112,7 +116,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 	// C2: Uniform rehydration query for ALL steps.
 	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).
 	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
-	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, stepIndex-1)
+	gzippedDiffs, err := diffFetcher.FetchDiffsForStepRepo(ctx, runID, repoID, stepIndex-1)
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("fetch diffs for step: %w", err)

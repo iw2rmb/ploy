@@ -41,7 +41,6 @@ func NewDiffFetcher(cfg Config) (*DiffFetcher, error) {
 type diffListItem struct {
 	ID        string            `json:"id"`
 	JobID     types.JobID       `json:"job_id"`
-	StepIndex types.StepIndex   `json:"step_index"`
 	CreatedAt time.Time         `json:"created_at"`
 	Size      int               `json:"gzipped_size"`
 	Summary   types.DiffSummary `json:"summary,omitempty"`
@@ -52,39 +51,8 @@ type diffListResponse struct {
 	Diffs []diffListItem `json:"diffs"`
 }
 
-// ListRunDiffs fetches the list of diffs for a given run from the control plane.
-// Returns the list of diff metadata items ordered by step_index, then created_at (as per the API).
-//
-// GET /v1/mods/{id}/diffs
-func (f *DiffFetcher) ListRunDiffs(ctx context.Context, runID string) ([]diffListItem, error) {
-	url := fmt.Sprintf("%s/v1/mods/%s/diffs", f.cfg.ServerURL, runID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list diffs failed: status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var result diffListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return result.Diffs, nil
-}
-
 // ListRunRepoDiffs fetches the list of diffs for a specific repo execution within a run.
-// This is the v1 repo-scoped endpoint that replaces the legacy run-scoped ListRunDiffs.
+// This is the v1 repo-scoped diffs listing endpoint.
 //
 // Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
 // - Returns diffs filtered by repo_id via jobs.repo_id join
@@ -134,7 +102,11 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 	// Step 2: Filter diffs up to the target step index (inclusive).
 	var relevantDiffs []diffListItem
 	for _, d := range diffs {
-		if d.StepIndex > stepIndex {
+		si, ok := d.Summary.StepIndex()
+		if !ok {
+			continue
+		}
+		if types.StepIndex(si) > stepIndex {
 			continue
 		}
 
@@ -151,7 +123,7 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 	for _, d := range relevantDiffs {
 		patch, err := f.FetchDiffPatch(ctx, d.ID)
 		if err != nil {
-			return nil, fmt.Errorf("fetch patch for diff %s (step %.0f): %w", d.ID, d.StepIndex, err)
+			return nil, fmt.Errorf("fetch patch for diff %s: %w", d.ID, err)
 		}
 		patches = append(patches, patch)
 	}
@@ -190,51 +162,4 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 	}
 
 	return patchBytes, nil
-}
-
-// FetchDiffsForStep fetches all gzipped patches for non-healing diffs up to (and including)
-// the specified step index. This combines ListRunDiffs and FetchDiffPatch to retrieve the
-// ordered set of patches needed to rehydrate a workspace for step k+1.
-//
-// C2: Healing diffs (mod_type="healing") share the same step_index as their parent mod step
-// for observability, but rehydration uses only non-healing diffs (mod_type!="healing").
-// Each per-step mod diff is incremental from the rehydrated baseline, so applying only
-// these diffs in step_index order reconstructs the workspace safely.
-func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex types.StepIndex) ([][]byte, error) {
-	// Step 1: List all diffs for the run.
-	diffs, err := f.ListRunDiffs(ctx, runID)
-	if err != nil {
-		return nil, fmt.Errorf("list diffs: %w", err)
-	}
-
-	// Step 2: Filter diffs up to the target step index (inclusive).
-	// Apply path-local isolation: only include mainline diffs and same-path diffs.
-	var relevantDiffs []diffListItem
-	for _, d := range diffs {
-		if d.StepIndex > stepIndex {
-			continue
-		}
-
-		// Skip healing diffs in the patch chain. Healing diffs share the same
-		// step_index for telemetry but represent intermediate workspace states
-		// that are already captured in the final per-step mod diff.
-		// DiffSummary is now json.RawMessage-backed; use the accessor method.
-		if d.Summary.ModType() == "healing" {
-			continue
-		}
-
-		relevantDiffs = append(relevantDiffs, d)
-	}
-
-	// Step 3: Fetch each diff's gzipped patch in order.
-	patches := make([][]byte, 0, len(relevantDiffs))
-	for _, d := range relevantDiffs {
-		patch, err := f.FetchDiffPatch(ctx, d.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetch patch for diff %s (step %.0f): %w", d.ID, d.StepIndex, err)
-		}
-		patches = append(patches, patch)
-	}
-
-	return patches, nil
 }

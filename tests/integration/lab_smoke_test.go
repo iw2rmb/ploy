@@ -186,9 +186,12 @@ index 1234567..abcdefg 100644
 	t.Logf("✓ Verified %d log chunks stored correctly", len(logs))
 
 	// Step 8: Assert diffs are stored - Verify diffs can be listed by run.
-	diffs, err := db.ListDiffsByRun(ctx, run.ID)
+	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
+		RunID:  run.ID,
+		RepoID: job.RepoID,
+	})
 	if err != nil {
-		t.Fatalf("ListDiffsByRun() failed: %v", err)
+		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
 	}
 	if len(diffs) != 1 {
 		t.Errorf("Expected 1 diff, got %d", len(diffs))

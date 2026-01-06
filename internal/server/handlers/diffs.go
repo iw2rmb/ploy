@@ -49,55 +49,9 @@ type diffGetResponse struct {
 	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
 }
 
-// listRunDiffsHandler returns a JSON list of diffs for a given Mods run (run id).
-// GET /v1/mods/{id}/diffs
-//
-// Run and job IDs are now KSUID-backed strings; no UUID parsing is performed.
-func listRunDiffsHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the run ID from the URL path parameter using the shared helper.
-		idStr, err := requiredPathParam(r, "id")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Use string run ID directly (no UUID parsing needed).
-		diffs, err := st.ListDiffsByRun(r.Context(), idStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
-			slog.Error("list diffs: query failed", "run_id", idStr, "err", err)
-			return
-		}
-
-		items := make([]diffItem, 0, len(diffs))
-		for _, d := range diffs {
-			var summary domaintypes.DiffSummary
-			if len(d.Summary) > 0 {
-				_ = json.Unmarshal(d.Summary, &summary)
-			}
-			// d.JobID is now *string (KSUID-backed); convert to domaintypes.JobID.
-			var jobID domaintypes.JobID
-			if d.JobID != nil && *d.JobID != "" {
-				jobID = domaintypes.JobID(*d.JobID)
-			}
-			items = append(items, diffItem{
-				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
-				JobID:     jobID,                          // KSUID-backed domain type
-				CreatedAt: d.CreatedAt.Time,
-				Size:      len(d.Patch),
-				Summary:   summary,
-			})
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
-	}
-}
-
 // listRunRepoDiffsHandler returns a JSON list of diffs for a specific repo execution
 // within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
-// GET /v1/mods/{id}/diffs endpoint.
+// diffs listing endpoint.
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
 //
@@ -134,7 +88,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response items in the same format as listRunDiffsHandler.
+		// Build response items in the standard list format (diffListResponse).
 		items := make([]diffItem, 0, len(diffs))
 		for _, d := range diffs {
 			var summary domaintypes.DiffSummary

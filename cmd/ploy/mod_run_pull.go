@@ -173,8 +173,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Step 9: Fetch all diffs for the run.
-	diffs, err := fetchAllDiffs(ctx, runID)
+	// Step 9: Fetch diffs for this repo execution within the run (v1 repo-scoped diffs listing).
+	diffs, err := fetchRunRepoDiffs(ctx, runID, normalizedOriginURL)
 	if err != nil {
 		return err
 	}
@@ -379,23 +379,29 @@ func printModRunPullUsage(w io.Writer) {
 // Diff Retrieval, Branch Creation, and Patch Application Helpers
 // =============================================================================
 
-// fetchAllDiffs fetches all diffs for the given run.
-// Returns diffs sorted by step_index for correct application order.
-func fetchAllDiffs(ctx context.Context, runID domaintypes.RunID) ([]mods.DiffEntry, error) {
+// fetchRunRepoDiffs fetches all diffs for the given repo execution within a run.
+// Diffs are returned in server-provided order (ordered by step_index, then created_at).
+func fetchRunRepoDiffs(ctx context.Context, runID domaintypes.RunID, normalizedRepoURL string) ([]mods.DiffEntry, error) {
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mod run pull: %w", err)
 	}
 
-	cmd := mods.ListAllDiffsCommand{
+	repoID, err := mods.ResolveRepoID(ctx, httpClient, base, normalizedRepoURL)
+	if err != nil {
+		return nil, fmt.Errorf("mod run pull: resolve repo_id: %w", err)
+	}
+
+	cmd := mods.ListRunRepoDiffsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   runID,
+		RepoID:  repoID,
 	}
 
 	diffs, err := cmd.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("mod run pull: failed to list diffs: %w", err)
+		return nil, fmt.Errorf("mod run pull: failed to list repo diffs: %w", err)
 	}
 
 	return diffs, nil
@@ -527,8 +533,12 @@ func downloadAndApplyDiffs(ctx context.Context, diffs []mods.DiffEntry, stderr i
 	appliedCount := 0
 
 	for i, diff := range diffs {
-		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s (step %d)...\n",
-			i+1, len(diffs), diff.ID, diff.StepIndex)
+		stepLabel := "?"
+		if si, ok := diff.Summary.StepIndex(); ok {
+			stepLabel = fmt.Sprintf("%d", si)
+		}
+		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s (step %s)...\n",
+			i+1, len(diffs), diff.ID, stepLabel)
 
 		// Download the diff patch (returns decompressed bytes).
 		downloadCmd := mods.DownloadDiffCommand{

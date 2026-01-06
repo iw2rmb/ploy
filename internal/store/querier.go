@@ -119,9 +119,6 @@ type Querier interface {
 	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
 	// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
 	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
-	// Returns diffs for a run ordered by job step_index, then by created_at.
-	// Joins with jobs to get ordering from job's step_index.
-	ListDiffsByRun(ctx context.Context, runID string) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
 	// joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
