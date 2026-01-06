@@ -203,6 +203,9 @@ func TestMods_Create_InvalidSpec(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
 	}
+	if st.createModCalled {
+		t.Error("store.CreateMod should not be called for invalid spec")
+	}
 }
 
 // =============================================================================
@@ -360,6 +363,91 @@ func TestMods_List_InvalidArchived(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+// TestMods_List_WithRepoURLFilter_Normalizes verifies GET /v1/mods repo_url filter
+// uses vcs.NormalizeRepoURL for matching.
+// Scope: roadmap/v1/api.md:42-46, roadmap/v1/scope.md:28-33.
+func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
+	now := time.Now()
+	st := &mockStore{
+		listModsResult: []store.Mod{
+			{ID: "mod1", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "mod2", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+		},
+		listModReposByModResults: map[string][]store.ModRepo{
+			"mod1": {{ID: "repo1", ModID: "mod1", RepoUrl: "https://github.com/org/repo"}},
+			"mod2": {{ID: "repo2", ModID: "mod2", RepoUrl: "https://github.com/org/other"}},
+		},
+	}
+	handler := listModsHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods?repo_url=https://github.com/org/repo.git/", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+
+	var resp struct {
+		Mods []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"mods"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Mods) != 1 {
+		t.Fatalf("got %d mods, want 1", len(resp.Mods))
+	}
+	if resp.Mods[0].ID != "mod1" {
+		t.Errorf("id = %q, want %q", resp.Mods[0].ID, "mod1")
+	}
+}
+
+// TestMods_List_WithRepoURLFilter_Paginates verifies limit/offset apply after repo_url filtering.
+func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
+	now := time.Now()
+	st := &mockStore{
+		listModsResult: []store.Mod{
+			{ID: "modA", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "modB", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+			{ID: "modC", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
+		},
+		listModReposByModResults: map[string][]store.ModRepo{
+			"modA": {{ID: "repoA", ModID: "modA", RepoUrl: "https://github.com/org/repo"}},
+			"modB": {{ID: "repoB", ModID: "modB", RepoUrl: "https://github.com/org/repo"}},
+			"modC": {{ID: "repoC", ModID: "modC", RepoUrl: "https://github.com/org/repo"}},
+		},
+	}
+	handler := listModsHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods?repo_url=https://github.com/org/repo&limit=1&offset=1", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+
+	var resp struct {
+		Mods []struct {
+			ID string `json:"id"`
+		} `json:"mods"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Mods) != 1 {
+		t.Fatalf("got %d mods, want 1", len(resp.Mods))
+	}
+	if resp.Mods[0].ID != "modB" {
+		t.Errorf("id = %q, want %q", resp.Mods[0].ID, "modB")
 	}
 }
 

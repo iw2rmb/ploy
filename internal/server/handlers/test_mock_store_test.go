@@ -352,10 +352,11 @@ type mockStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
-	listModReposByModCalled bool
-	listModReposByModParam  string
-	listModReposByModResult []store.ModRepo
-	listModReposByModErr    error
+	listModReposByModCalled  bool
+	listModReposByModParam   string
+	listModReposByModResult  []store.ModRepo
+	listModReposByModResults map[string][]store.ModRepo
+	listModReposByModErr     error
 
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
@@ -451,7 +452,16 @@ func (m *mockStore) UpdateModSpec(ctx context.Context, params store.UpdateModSpe
 func (m *mockStore) ListMods(ctx context.Context, params store.ListModsParams) ([]store.Mod, error) {
 	m.listModsCalled = true
 	m.listModsParams = params
-	return m.listModsResult, m.listModsErr
+	// Simulate pagination: return empty list when offset exceeds available results.
+	if int(params.Offset) >= len(m.listModsResult) {
+		return []store.Mod{}, m.listModsErr
+	}
+	// Apply simple pagination simulation: return slice starting at offset, up to limit.
+	end := int(params.Offset) + int(params.Limit)
+	if end > len(m.listModsResult) {
+		end = len(m.listModsResult)
+	}
+	return m.listModsResult[params.Offset:end], m.listModsErr
 }
 
 func (m *mockStore) GetMod(ctx context.Context, id string) (store.Mod, error) {
@@ -520,6 +530,11 @@ func (m *mockStore) GetModRepo(ctx context.Context, id string) (store.ModRepo, e
 func (m *mockStore) ListModReposByMod(ctx context.Context, modID string) ([]store.ModRepo, error) {
 	m.listModReposByModCalled = true
 	m.listModReposByModParam = modID
+	if m.listModReposByModResults != nil {
+		if repos, ok := m.listModReposByModResults[modID]; ok {
+			return repos, m.listModReposByModErr
+		}
+	}
 	return m.listModReposByModResult, m.listModReposByModErr
 }
 
