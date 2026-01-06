@@ -69,6 +69,7 @@ func join(parts []string, sep string) string {
 // For `ploy run`, print full subcommand list.
 func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run <command>")
+	_, _ = fmt.Fprintln(w, "       ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  list        List batch runs with pagination")
@@ -77,6 +78,12 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
 	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
 	_, _ = fmt.Fprintln(w, "  diff        List diffs or download newest patch for a run")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Run submission (direct flags without subcommand):")
+	_, _ = fmt.Fprintln(w, "  --repo <url>       Git repository URL (https/ssh/file)")
+	_, _ = fmt.Fprintln(w, "  --base-ref <ref>   Base Git ref (branch or tag)")
+	_, _ = fmt.Fprintln(w, "  --target-ref <ref> Target Git ref (branch)")
+	_, _ = fmt.Fprintln(w, "  --spec <path|->    Path to YAML/JSON spec file (use '-' for stdin)")
 }
 
 // wantsHelp checks whether the given argument list represents a help request.
