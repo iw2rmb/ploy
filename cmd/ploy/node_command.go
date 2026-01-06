@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -199,10 +200,8 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "Bootstrap token received (expires: %s)\n", expiresAt.Format(time.RFC3339))
 
 	// Get CA certificate for TLS verification (node will need this to verify server)
-	// For now, we'll need to fetch this from the server or require it as a flag
-	// This is a simplified approach - in production, the CA cert should be fetched securely
 	_, _ = fmt.Fprintln(stderr, "Fetching CA certificate for TLS verification...")
-	caCert, err := fetchCACertificate(ctx, serverURL)
+	caCert, err := fetchCACertificate(ctx, serverURL, user, sshPort, identityPath, nil)
 	if err != nil {
 		// For now, we'll allow continuing without CA cert if it fails
 		// The node will use system trust store
@@ -409,14 +408,44 @@ func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token
 	return result.Token, result.ExpiresAt, nil
 }
 
-// fetchCACertificate attempts to fetch the CA certificate from the server.
-// This is used by nodes for TLS verification when connecting to the server.
-func fetchCACertificate(ctx context.Context, serverURL string) (string, error) {
-	// For now, we'll try to fetch from a public endpoint
-	// In a real implementation, this should be a dedicated endpoint like GET /v1/pki/ca
-	// or the CA cert should be provided as a configuration parameter
+// fetchCACertificate reads the CA certificate from the server host over SSH so
+// the node can verify the server during bootstrap (before it has mTLS credentials).
+//
+// The CA cert is expected at /etc/ploy/pki/ca.crt (written during server deploy).
+// If serverURL is not https, an empty string is returned.
+func fetchCACertificate(ctx context.Context, serverURL, sshUser string, sshPort int, identityPath string, runner deploy.Runner) (string, error) {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(serverURL)), "http://") {
+		return "", nil
+	}
 
-	// Placeholder implementation - return empty string to indicate CA cert not available
-	// The calling code should handle this gracefully
-	return "", fmt.Errorf("CA certificate fetch not implemented - node will use system trust store")
+	u, err := url.Parse(strings.TrimSpace(serverURL))
+	if err != nil || u.Hostname() == "" {
+		// url.Parse treats URLs without a scheme as paths. Retry with an https scheme.
+		u, err = url.Parse("https://" + strings.TrimSpace(serverURL))
+	}
+	if err != nil {
+		return "", fmt.Errorf("parse server URL: %w", err)
+	}
+	host := strings.TrimSpace(u.Hostname())
+	if host == "" {
+		return "", fmt.Errorf("parse server URL: missing host")
+	}
+	if strings.TrimSpace(sshUser) == "" {
+		sshUser = deploy.DefaultRemoteUser
+	}
+	if sshPort == 0 {
+		sshPort = deploy.DefaultSSHPort
+	}
+	if runner == nil {
+		runner = deploy.NewSystemRunner()
+	}
+
+	sshArgs := deploy.BuildSSHArgs(identityPath, sshPort)
+	target := fmt.Sprintf("%s@%s", sshUser, host)
+	out := &strings.Builder{}
+	args := append(append([]string(nil), sshArgs...), target, "cat /etc/ploy/pki/ca.crt")
+	if err := runner.Run(ctx, "ssh", args, nil, deploy.IOStreams{Stdout: out, Stderr: io.Discard}); err != nil {
+		return "", fmt.Errorf("read CA cert from %s: %w", host, err)
+	}
+	return out.String(), nil
 }
