@@ -485,7 +485,11 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 		"repo_url":   "https://github.com/user/repo.git",
 		"base_ref":   "main",
 		"target_ref": "feature",
-		"spec":       map[string]any{},
+		"spec": map[string]any{
+			"steps": []any{
+				map[string]any{"image": "docker.io/test/mod:latest"},
+			},
+		},
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))

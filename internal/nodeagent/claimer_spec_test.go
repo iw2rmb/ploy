@@ -100,33 +100,36 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	}
 }
 
-// TestParseSpec_LegacyModObjectIgnored verifies that the legacy "mod" object format
-// is no longer processed by parseSpec. Specs using "mod" must be migrated to
-// canonical shapes (steps[]).
-func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
-	// Legacy format: nested "mod" object (no longer supported).
+func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
 	specJSON := `{
-        "steps": [{"image": "docker.io/test/required:latest"}],
+        "steps": [{
+            "image": "docker.io/test/required:latest",
+            "command": "echo from steps",
+            "env": {"A":"1","B":"2"}
+        }],
         "mod": {
-            "image": "docker.io/test/mod:latest",
+            "image": "docker.io/test/ignored:latest",
             "retain_container": true,
-            "env": {"A":"1","B":"2"},
-            "command": ["/bin/sh","-c","echo hi"]
+            "env": {"A":"999","C":"should-not-merge"},
+            "command": "echo ignored"
         },
         "build_gate": {"enabled": false, "profile": "java-maven"}
     }`
 	var raw json.RawMessage = []byte(specJSON)
 	opts, env, _ := parseSpec(raw)
 
-	// Legacy "mod" object is rejected by the canonical parser; parseSpec returns empty maps.
-	if _, hasImage := opts["image"]; hasImage {
-		t.Fatalf("expected image not to be extracted from legacy mod object")
+	// steps[0] should drive single-step extraction; unknown top-level "mod" is ignored.
+	if opts["image"] != "docker.io/test/required:latest" {
+		t.Fatalf("expected image from steps[0], got %v", opts["image"])
 	}
-	if _, hasRetain := opts["retain_container"]; hasRetain {
-		t.Fatalf("expected retain_container not to be extracted from legacy mod object")
+	if cmd, ok := opts["command"].(string); !ok || cmd != "echo from steps" {
+		t.Fatalf("expected command from steps[0], got %v", opts["command"])
 	}
-	if len(env) > 0 {
-		t.Fatalf("expected env to be empty (mod.env should not be merged), got: %+v", env)
+	if env["A"] != "1" || env["B"] != "2" {
+		t.Fatalf("expected env from steps[0] to be merged, got: %+v", env)
+	}
+	if _, ok := env["C"]; ok {
+		t.Fatalf("expected env from top-level mod to be ignored, got: %+v", env)
 	}
 }
 

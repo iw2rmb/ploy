@@ -31,7 +31,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -113,7 +113,7 @@ func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -162,7 +162,7 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	// URL with trailing slash and .git suffix — should be normalized.
 	reqBody := map[string]any{
@@ -202,7 +202,7 @@ func TestRunsCreateSingleRepo_MissingRepoURL(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"base_ref":   "main",
@@ -236,7 +236,7 @@ func TestRunsCreateSingleRepo_InvalidRepoURLScheme(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	// ftp:// is not an allowed scheme.
 	reqBody := map[string]any{
@@ -266,7 +266,7 @@ func TestRunsCreateSingleRepo_MissingBaseRef(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -294,7 +294,7 @@ func TestRunsCreateSingleRepo_MissingTargetRef(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url": "https://github.com/org/repo",
@@ -392,7 +392,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -431,12 +431,13 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
-	// Multi-step spec with mods[] array.
+	// Multi-step spec with steps[] array.
 	spec := map[string]any{
 		"version": "0.2.0",
-		"mods": []any{
-			map[string]any{"image": map[string]any{"universal": "mod-image-1"}},
-			map[string]any{"image": map[string]any{"universal": "mod-image-2"}},
+		"env":     map[string]any{},
+		"steps": []any{
+			map[string]any{"image": "mod-image-1"},
+			map[string]any{"image": "mod-image-2"},
 		},
 	}
 	reqBody := map[string]any{
@@ -478,7 +479,7 @@ func TestRunsCreateSingleRepo_CreateSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -509,7 +510,7 @@ func TestRunsCreateSingleRepo_CreateModError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -540,7 +541,7 @@ func TestRunsCreateSingleRepo_CreateModRepoError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -571,7 +572,7 @@ func TestRunsCreateSingleRepo_CreateRunError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -602,7 +603,7 @@ func TestRunsCreateSingleRepo_CreateRunRepoError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -633,7 +634,7 @@ func TestRunsCreateSingleRepo_CreateJobError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
