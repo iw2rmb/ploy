@@ -12,9 +12,11 @@ import (
 )
 
 // TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
-// calls POST /v1/runs and then GET /v1/runs/{id}/status.
+// calls POST /v1/runs and prints run_id and mod_id.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunSubmitCallsControlPlane(t *testing.T) {
+	t.Setenv("USER", "test-user")
+
 	// Create a temporary spec file for the test.
 	specDir := t.TempDir()
 	specPath := filepath.Join(specDir, "spec.yaml")
@@ -25,7 +27,7 @@ command: echo hello
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	var submitCalled, statusCalled bool
+	var submitCalled bool
 	var capturedRequest map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,19 +46,6 @@ command: echo hello
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"run_id":"run-test-123","mod_id":"mod-test-456","spec_id":"spec-test-789"}`))
-			return
-		}
-
-		// Handle GET /v1/runs/{id}/status for status fetch.
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
-			statusCalled = true
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{
-				"run_id": "run-test-123",
-				"state": "running",
-				"created_at": "2024-01-01T00:00:00Z",
-				"updated_at": "2024-01-01T00:00:00Z"
-			}`))
 			return
 		}
 
@@ -81,9 +70,6 @@ command: echo hello
 	if !submitCalled {
 		t.Fatal("expected POST /v1/runs to be called")
 	}
-	if !statusCalled {
-		t.Fatal("expected GET /v1/runs/{id}/status to be called")
-	}
 
 	// Validate captured request fields.
 	if capturedRequest["repo_url"] != "https://github.com/test/repo" {
@@ -95,11 +81,27 @@ command: echo hello
 	if capturedRequest["target_ref"] != "feature-branch" {
 		t.Errorf("expected target_ref='feature-branch', got %v", capturedRequest["target_ref"])
 	}
+	if capturedRequest["created_by"] != "test-user" {
+		t.Errorf("expected created_by='test-user', got %v", capturedRequest["created_by"])
+	}
+	spec, ok := capturedRequest["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec to be JSON object, got %T (%v)", capturedRequest["spec"], capturedRequest["spec"])
+	}
+	if spec["image"] != "alpine:latest" {
+		t.Errorf("expected spec.image='alpine:latest', got %v", spec["image"])
+	}
+	if spec["command"] != "echo hello" {
+		t.Errorf("expected spec.command='echo hello', got %v", spec["command"])
+	}
 
-	// Validate output contains run_id.
+	// Validate output contains run_id and mod_id.
 	output := buf.String()
-	if !strings.Contains(output, "run-test-123") {
+	if !strings.Contains(output, "run_id: run-test-123") {
 		t.Errorf("expected output to contain run_id 'run-test-123': %s", output)
+	}
+	if !strings.Contains(output, "mod_id: mod-test-456") {
+		t.Errorf("expected output to contain mod_id 'mod-test-456': %s", output)
 	}
 }
 
@@ -154,13 +156,70 @@ func TestRunSubmitMissingFlags(t *testing.T) {
 }
 
 // TestRunSubmitSpecFromStdin validates that --spec - reads from stdin.
-// This test is skipped in normal runs because it requires stdin manipulation.
 func TestRunSubmitSpecFromStdin(t *testing.T) {
-	t.Skip("stdin tests require special handling; covered by integration tests")
+	t.Setenv("USER", "test-user")
+
+	var submitCalled bool
+	var capturedRequest map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
+			submitCalled = true
+			if err := json.NewDecoder(r.Body).Decode(&capturedRequest); err != nil {
+				t.Errorf("decode request body: %v", err)
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"run_id":"run-stdin-test","mod_id":"mod-stdin-test","spec_id":"spec-stdin-test"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	useServerDescriptor(t, server.URL)
+
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdin = r
+	defer func() {
+		os.Stdin = oldStdin
+		_ = r.Close()
+	}()
+
+	_, _ = w.Write([]byte("image: alpine:latest\ncommand: echo stdin\n"))
+	_ = w.Close()
+
+	var buf bytes.Buffer
+	err = executeCmd([]string{
+		"run",
+		"--repo", "https://github.com/test/repo",
+		"--base-ref", "main",
+		"--target-ref", "feature",
+		"--spec", "-",
+	}, &buf)
+	if err != nil {
+		t.Fatalf("run submit with stdin spec error: %v", err)
+	}
+	if !submitCalled {
+		t.Fatal("expected POST /v1/runs to be called")
+	}
+	spec, ok := capturedRequest["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec to be JSON object, got %T (%v)", capturedRequest["spec"], capturedRequest["spec"])
+	}
+	if spec["command"] != "echo stdin" {
+		t.Errorf("expected spec.command='echo stdin', got %v", spec["command"])
+	}
 }
 
 // TestRunSubmitJSONSpec validates that JSON specs are accepted.
 func TestRunSubmitJSONSpec(t *testing.T) {
+	t.Setenv("USER", "test-user")
+
 	specDir := t.TempDir()
 	specPath := filepath.Join(specDir, "spec.json")
 	specContent := `{"image":"alpine:latest","command":"echo hello"}`
@@ -175,12 +234,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 			submitCalled = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"run-json-test"}`))
-			return
-		}
-		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/status") {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"run_id":"run-json-test","state":"running","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"run_id":"run-json-test","mod_id":"mod-json-test","spec_id":"spec-json-test"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -203,6 +257,13 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 
 	if !submitCalled {
 		t.Fatal("expected POST /v1/runs to be called")
+	}
+	output := buf.String()
+	if !strings.Contains(output, "run_id: run-json-test") {
+		t.Errorf("expected output to contain run_id 'run-json-test': %s", output)
+	}
+	if !strings.Contains(output, "mod_id: mod-json-test") {
+		t.Errorf("expected output to contain mod_id 'mod-json-test': %s", output)
 	}
 }
 
