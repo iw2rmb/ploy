@@ -45,6 +45,14 @@ DO UPDATE SET
   target_ref = EXCLUDED.target_ref
 RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at;
 
+-- name: HasModRepoHistory :one
+-- Checks if a mod_repo has any historical executions (run_repos references).
+-- Returns true if the repo cannot be deleted due to history, false otherwise.
+-- Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+SELECT EXISTS(
+  SELECT 1 FROM run_repos WHERE repo_id = $1 LIMIT 1
+) AS has_history;
+
 -- name: ListDistinctRepos :many
 -- v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
 SELECT

@@ -358,6 +358,29 @@ type mockStore struct {
 	listModReposByModResults map[string][]store.ModRepo
 	listModReposByModErr     error
 
+	// GetModRepoByURL tracking (for bulk upsert duplicate detection)
+	getModRepoByURLCalled bool
+	getModRepoByURLParams store.GetModRepoByURLParams
+	getModRepoByURLResult store.ModRepo
+	getModRepoByURLErr    error
+
+	// UpsertModRepo tracking (for bulk upsert)
+	upsertModRepoCalled bool
+	upsertModRepoParams store.UpsertModRepoParams
+	upsertModRepoResult store.ModRepo
+	upsertModRepoErr    error
+
+	// DeleteModRepo tracking
+	deleteModRepoCalled bool
+	deleteModRepoParam  string
+	deleteModRepoErr    error
+
+	// HasModRepoHistory tracking (for delete validation)
+	hasModRepoHistoryCalled bool
+	hasModRepoHistoryParam  string
+	hasModRepoHistoryResult bool
+	hasModRepoHistoryErr    error
+
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
 	getRunRepoParam  store.GetRunRepoParams
@@ -1051,4 +1074,48 @@ func (m *mockStore) DeleteGlobalEnv(ctx context.Context, key string) error {
 	m.deleteGlobalEnvCalled = true
 	m.deleteGlobalEnvParam = key
 	return m.deleteGlobalEnvErr
+}
+
+// GetModRepoByURL returns a mod_repo by mod_id and repo_url.
+func (m *mockStore) GetModRepoByURL(ctx context.Context, arg store.GetModRepoByURLParams) (store.ModRepo, error) {
+	m.getModRepoByURLCalled = true
+	m.getModRepoByURLParams = arg
+	return m.getModRepoByURLResult, m.getModRepoByURLErr
+}
+
+// UpsertModRepo upserts a mod_repo by mod_id and repo_url.
+func (m *mockStore) UpsertModRepo(ctx context.Context, arg store.UpsertModRepoParams) (store.ModRepo, error) {
+	m.upsertModRepoCalled = true
+	m.upsertModRepoParams = arg
+	result := m.upsertModRepoResult
+	if result.ID == "" {
+		result.ID = arg.ID
+	}
+	if result.ModID == "" {
+		result.ModID = arg.ModID
+	}
+	if result.RepoUrl == "" {
+		result.RepoUrl = arg.RepoUrl
+	}
+	if result.BaseRef == "" {
+		result.BaseRef = arg.BaseRef
+	}
+	if result.TargetRef == "" {
+		result.TargetRef = arg.TargetRef
+	}
+	return result, m.upsertModRepoErr
+}
+
+// DeleteModRepo deletes a mod_repo by id.
+func (m *mockStore) DeleteModRepo(ctx context.Context, id string) error {
+	m.deleteModRepoCalled = true
+	m.deleteModRepoParam = id
+	return m.deleteModRepoErr
+}
+
+// HasModRepoHistory checks if a mod_repo has any historical executions.
+func (m *mockStore) HasModRepoHistory(ctx context.Context, repoID string) (bool, error) {
+	m.hasModRepoHistoryCalled = true
+	m.hasModRepoHistoryParam = repoID
+	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
 }
