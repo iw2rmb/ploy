@@ -50,7 +50,7 @@ func TestLogStreamer_Write(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: "http://localhost:8443",
 			}
-			ls := NewLogStreamer(cfg, "run-123", "stage-456")
+			ls := NewLogStreamer(cfg, "run-123", "job-456")
 			defer func() { _ = ls.Close() }()
 
 			n, err := ls.Write([]byte(tt.input))
