@@ -912,7 +912,16 @@ func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) 
 func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
 	m.listRunsCalled = true
 	m.listRunsParams = params
-	return m.listRunsResult, m.listRunsErr
+	// Simulate pagination: return empty list when offset exceeds available results.
+	if int(params.Offset) >= len(m.listRunsResult) {
+		return []store.Run{}, m.listRunsErr
+	}
+	// Apply simple pagination simulation: return slice starting at offset, up to limit.
+	end := int(params.Offset) + int(params.Limit)
+	if end > len(m.listRunsResult) {
+		end = len(m.listRunsResult)
+	}
+	return m.listRunsResult[params.Offset:end], m.listRunsErr
 }
 
 // ListRunReposByRun — run IDs are now strings (KSUID).
