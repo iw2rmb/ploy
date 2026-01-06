@@ -83,7 +83,7 @@ func (c ListRunsForRepoCommand) Run(ctx context.Context) ([]RepoRunSummary, erro
 
 	normalized := vcs.NormalizeRepoURL(repoURL)
 
-	repoID, err := resolveRepoID(ctx, c.Client, c.BaseURL, normalized)
+	repoID, err := ResolveRepoID(ctx, c.Client, c.BaseURL, normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,9 @@ type repoSummary struct {
 	RepoURL string `json:"repo_url"`
 }
 
-func resolveRepoID(ctx context.Context, client *http.Client, baseURL *url.URL, normalizedRepoURL string) (string, error) {
+// ResolveRepoID resolves a normalized repo URL to its repo_id via GET /v1/repos?contains=...
+// It returns an error when no exact normalization match is found.
+func ResolveRepoID(ctx context.Context, client *http.Client, baseURL *url.URL, normalizedRepoURL string) (string, error) {
 	endpoint := baseURL.JoinPath("/v1/repos")
 	q := endpoint.Query()
 	q.Set("contains", normalizedRepoURL)

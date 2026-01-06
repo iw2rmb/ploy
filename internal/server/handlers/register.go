@@ -58,7 +58,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Note: POST /v1/mods/{id}/cancel has been moved to POST /v1/runs/{id}/cancel (v1).
 	// Note: POST /v1/mods/{id}/resume has been removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)

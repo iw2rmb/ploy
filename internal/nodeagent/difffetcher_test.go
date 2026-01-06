@@ -12,25 +12,27 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestDiffFetcher_ListRunDiffs verifies listing diffs for a run.
-func TestDiffFetcher_ListRunDiffs(t *testing.T) {
+// TestDiffFetcher_ListRunRepoDiffs verifies listing diffs for a repo execution within a run.
+func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
 		runID          string
+		repoID         string
 		serverResponse diffListResponse
 		serverStatus   int
 		wantErr        bool
 		wantCount      int
 	}{
 		{
-			name:  "successful list with diffs",
-			runID: "test-run-123",
+			name:   "successful list with diffs",
+			runID:  "test-run-123",
+			repoID: "repo-abc",
 			serverResponse: diffListResponse{
 				Diffs: []diffListItem{
-					{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(0), Size: 100},
-					{ID: "diff-2", JobID: "job-2", StepIndex: stepIndex(1), Size: 200},
+					{ID: "diff-1", JobID: "job-1", Size: 100},
+					{ID: "diff-2", JobID: "job-2", Size: 200},
 				},
 			},
 			serverStatus: http.StatusOK,
@@ -38,8 +40,9 @@ func TestDiffFetcher_ListRunDiffs(t *testing.T) {
 			wantCount:    2,
 		},
 		{
-			name:  "empty diff list",
-			runID: "test-run-empty",
+			name:   "empty diff list",
+			runID:  "test-run-empty",
+			repoID: "repo-abc",
 			serverResponse: diffListResponse{
 				Diffs: []diffListItem{},
 			},
@@ -50,6 +53,7 @@ func TestDiffFetcher_ListRunDiffs(t *testing.T) {
 		{
 			name:         "server error",
 			runID:        "test-run-error",
+			repoID:       "repo-abc",
 			serverStatus: http.StatusInternalServerError,
 			wantErr:      true,
 		},
@@ -63,7 +67,7 @@ func TestDiffFetcher_ListRunDiffs(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				expectedPath := "/v1/mods/" + tt.runID + "/diffs"
+				expectedPath := "/v1/runs/" + tt.runID + "/repos/" + tt.repoID + "/diffs"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -85,15 +89,15 @@ func TestDiffFetcher_ListRunDiffs(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			diffs, err := fetcher.ListRunDiffs(ctx, tt.runID)
+			diffs, err := fetcher.ListRunRepoDiffs(ctx, tt.runID, tt.repoID)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ListRunDiffs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ListRunRepoDiffs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && len(diffs) != tt.wantCount {
-				t.Errorf("ListRunDiffs() returned %d diffs, want %d", len(diffs), tt.wantCount)
+				t.Errorf("ListRunRepoDiffs() returned %d diffs, want %d", len(diffs), tt.wantCount)
 			}
 		})
 	}
@@ -180,14 +184,15 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 	}
 }
 
-// TestDiffFetcher_FetchDiffsForStep verifies fetching all diffs up to a step and
-// excluding healing diffs from the rehydration chain.
-func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
+// TestDiffFetcher_FetchDiffsForStepRepo verifies fetching all diffs up to a step (inclusive)
+// for a repo execution, and excluding healing diffs from the rehydration chain.
+func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name      string
 		runID     string
+		repoID    string
 		stepIndex types.StepIndex
 		diffs     []diffListItem
 		patches   map[string][]byte
@@ -197,11 +202,12 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 		{
 			name:      "fetch diffs for step 1 (includes step 0 and 1)",
 			runID:     "run-123",
+			repoID:    "repo-abc",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0)},
-				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1)},
-				{ID: "diff-2", JobID: "job-2", StepIndex: stepIndex(2)},
+				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType("mod").MustBuild()},
+				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType("mod").MustBuild()},
+				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType("mod").MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -214,11 +220,12 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 		{
 			name:      "fetch all diffs for step 2",
 			runID:     "run-456",
+			repoID:    "repo-abc",
 			stepIndex: 2,
 			diffs: []diffListItem{
-				{ID: "diff-0", JobID: "job-0", StepIndex: stepIndex(0)},
-				{ID: "diff-1", JobID: "job-1", StepIndex: stepIndex(1)},
-				{ID: "diff-2", JobID: "job-2", StepIndex: stepIndex(2)},
+				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType("mod").MustBuild()},
+				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType("mod").MustBuild()},
+				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType("mod").MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -231,14 +238,15 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 		{
 			name:      "exclude healing diffs from rehydration chain",
 			runID:     "run-healing",
+			repoID:    "repo-abc",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0-mod", JobID: "job-0", StepIndex: stepIndex(0), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
-				{ID: "diff-0-heal", JobID: "job-0", StepIndex: stepIndex(0), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
-				{ID: "diff-1-mod", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
-				{ID: "diff-1-heal1", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
-				{ID: "diff-1-heal2", JobID: "job-1", StepIndex: stepIndex(1), Summary: types.NewDiffSummaryBuilder().ModType("healing").MustBuild()},
-				{ID: "diff-2-mod", JobID: "job-2", StepIndex: stepIndex(2), Summary: types.NewDiffSummaryBuilder().ModType("mod").MustBuild()},
+				{ID: "diff-0-mod", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType("mod").MustBuild()},
+				{ID: "diff-0-heal", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType("healing").MustBuild()},
+				{ID: "diff-1-mod", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType("mod").MustBuild()},
+				{ID: "diff-1-heal1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType("healing").MustBuild()},
+				{ID: "diff-1-heal2", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType("healing").MustBuild()},
+				{ID: "diff-2-mod", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType("mod").MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
@@ -258,7 +266,7 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			t.Parallel()
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/mods/"+tt.runID+"/diffs" {
+				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" {
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: tt.diffs})
 					return
@@ -287,15 +295,15 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			patches, err := fetcher.FetchDiffsForStep(ctx, tt.runID, tt.stepIndex)
+			patches, err := fetcher.FetchDiffsForStepRepo(ctx, tt.runID, tt.repoID, tt.stepIndex)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("FetchDiffsForStep() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FetchDiffsForStepRepo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && len(patches) != tt.wantCount {
-				t.Errorf("FetchDiffsForStep() returned %d patches, want %d", len(patches), tt.wantCount)
+				t.Errorf("FetchDiffsForStepRepo() returned %d patches, want %d", len(patches), tt.wantCount)
 			}
 		})
 	}

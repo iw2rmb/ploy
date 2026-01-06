@@ -15,54 +15,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestListRunDiffs_ReturnsItems(t *testing.T) {
-	st := &mockStore{}
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	jobIDStr := jobID.String()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-	st.listDiffsByRunResult = []store.Diff{{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID.String(),
-		JobID:     &jobIDStr,
-		Patch:     []byte{0x1f, 0x8b},
-		Summary:   []byte(`{"exit_code":0}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-	}}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/diffs", nil)
-	req.SetPathValue("id", runID.String())
-	listRunDiffsHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffListResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(resp.Diffs) != 1 {
-		t.Fatalf("expected 1 diff, got %d", len(resp.Diffs))
-	}
-	item := resp.Diffs[0]
-	if item.ID != diffID.String() {
-		t.Errorf("id=%q, want %q", item.ID, diffID.String())
-	}
-	if item.JobID != domaintypes.JobID(jobID.String()) { // Compare with domain type
-		t.Errorf("job_id=%q, want %q", item.JobID, jobID.String())
-	}
-	if !item.CreatedAt.Equal(createdAt) {
-		t.Errorf("created_at=%v, want %v", item.CreatedAt, createdAt)
-	}
-	if item.Size != 2 {
-		t.Errorf("gzipped_size=%d, want 2", item.Size)
-	}
-	// DiffSummary is now json.RawMessage-backed; use accessor methods.
-	if exitCode, ok := item.Summary.ExitCode(); !ok || exitCode != 0 {
-		t.Errorf("summary.ExitCode()=%d, want 0", exitCode)
-	}
-}
-
 func TestGetDiff_Download(t *testing.T) {
 	st := &mockStore{}
 	runID := domaintypes.NewRunID()

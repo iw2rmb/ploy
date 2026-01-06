@@ -28,6 +28,7 @@ type ClaimManager struct {
 type ClaimResponse struct {
 	RunID     types.RunID     `json:"id"` // Run ID (KSUID identifying the parent run)
 	Name      *string         `json:"name,omitempty"`
+	RepoID    string          `json:"repo_id"`    // Repo ID (NanoID identifying the repo execution)
 	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
 	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
 	ModType   types.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate

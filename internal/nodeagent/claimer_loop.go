@@ -143,6 +143,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	startReq := StartRunRequest{
 		RunID:        claim.RunID, // Already types.RunID from ClaimResponse
 		JobID:        claim.JobID, // Already types.JobID from ClaimResponse
+		RepoID:       claim.RepoID,
 		RepoURL:      types.RepoURL(claim.RepoURL),
 		BaseRef:      types.GitRef(claim.BaseRef),
 		TargetRef:    types.GitRef(targetRef),

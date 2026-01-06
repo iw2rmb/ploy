@@ -127,42 +127,6 @@ func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeSt
 	return items, nil
 }
 
-const listDiffsByRun = `-- name: ListDiffsByRun :many
-SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
-LEFT JOIN jobs j ON d.job_id = j.id
-WHERE d.run_id = $1
-ORDER BY j.step_index NULLS LAST, d.created_at ASC
-`
-
-// Returns diffs for a run ordered by job step_index, then by created_at.
-// Joins with jobs to get ordering from job's step_index.
-func (q *Queries) ListDiffsByRun(ctx context.Context, runID string) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Diff{}
-	for rows.Next() {
-		var i Diff
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.Patch,
-			&i.Summary,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id

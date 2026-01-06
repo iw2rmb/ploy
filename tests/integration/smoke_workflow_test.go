@@ -390,9 +390,12 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d log chunks in correct order", len(logs))
 
 	// Verify diffs are retrievable
-	diffs, err := db.ListDiffsByRun(ctx, run.ID)
+	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
+		RunID:  run.ID,
+		RepoID: jobMain.RepoID,
+	})
 	if err != nil {
-		t.Fatalf("ListDiffsByRun() failed: %v", err)
+		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
 	}
 	if len(diffs) != 1 {
 		t.Errorf("Expected 1 diff, got %d", len(diffs))
@@ -578,15 +581,18 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created step 1 healing diff 2: id=%v", step1Heal2Diff.ID)
 
-	// Verify ListDiffsByRun returns all 5 diffs.
-	allDiffs, err := db.ListDiffsByRun(ctx, run.ID)
+	// Verify ListDiffsByRunRepo returns all 5 diffs.
+	allDiffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
+		RunID:  run.ID,
+		RepoID: jobStep0.RepoID,
+	})
 	if err != nil {
-		t.Fatalf("ListDiffsByRun() failed: %v", err)
+		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
 	}
 	if len(allDiffs) != 5 {
 		t.Errorf("Expected 5 diffs (2 for step 0 + 3 for step 1), got %d", len(allDiffs))
 	}
-	t.Logf("✓ ListDiffsByRun returned %d diffs", len(allDiffs))
+	t.Logf("✓ ListDiffsByRunRepo returned %d diffs", len(allDiffs))
 
 	// C2: Verify ListDiffsBeforeStep returns correct subset.
 	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).

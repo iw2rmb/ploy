@@ -12,46 +12,41 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestListAllDiffsCommand_Success verifies successful listing and sorting of diffs.
-func TestListAllDiffsCommand_Success(t *testing.T) {
-	// Use a simpler struct for test response that doesn't have custom JSON marshaling.
+func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	type testDiff struct {
-		ID        string `json:"id"`
-		JobID     string `json:"job_id"`
-		CreatedAt string `json:"created_at"`
-		Size      int    `json:"gzipped_size"`
-		StepIndex int    `json:"step_index"`
+		ID        string                 `json:"id"`
+		JobID     string                 `json:"job_id"`
+		CreatedAt string                 `json:"created_at"`
+		Size      int                    `json:"gzipped_size"`
+		Summary   map[string]interface{} `json:"summary,omitempty"`
 	}
 
-	// Return diffs in unsorted order; verify they're sorted by step_index.
 	diffs := []testDiff{
-		{ID: "diff-3", JobID: "job-3", StepIndex: 3000, Size: 100},
-		{ID: "diff-1", JobID: "job-1", StepIndex: 1000, Size: 200},
-		{ID: "diff-2", JobID: "job-2", StepIndex: 2000, Size: 150},
+		{ID: "diff-1", JobID: "job-1", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
+		{ID: "diff-2", JobID: "job-2", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
+		{ID: "diff-3", JobID: "job-3", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
 	}
 
-	// Use a mux to handle the specific endpoint path.
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/mods/run-123/diffs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs/run-123/repos/repo-abc/diffs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(struct {
+		_ = json.NewEncoder(w).Encode(struct {
 			Diffs []testDiff `json:"diffs"`
-		}{Diffs: diffs}); err != nil {
-			t.Errorf("failed to encode response: %v", err)
-		}
+		}{Diffs: diffs})
 	})
 
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
 	base, _ := url.Parse(srv.URL)
-	cmd := ListAllDiffsCommand{
+	cmd := ListRunRepoDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-123"),
+		RepoID:  "repo-abc",
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -63,20 +58,15 @@ func TestListAllDiffsCommand_Success(t *testing.T) {
 		t.Fatalf("got %d diffs, want 3", len(result))
 	}
 
-	// Verify sorting by step_index.
-	if result[0].ID != "diff-1" {
-		t.Errorf("result[0].ID = %q, want diff-1 (lowest step_index)", result[0].ID)
+	if got, ok := result[0].Summary.StepIndex(); !ok || got != 1000 {
+		t.Fatalf("result[0].Summary.StepIndex()=%d ok=%v, want 1000 true", got, ok)
 	}
-	if result[1].ID != "diff-2" {
-		t.Errorf("result[1].ID = %q, want diff-2", result[1].ID)
-	}
-	if result[2].ID != "diff-3" {
-		t.Errorf("result[2].ID = %q, want diff-3 (highest step_index)", result[2].ID)
+	if got, ok := result[2].Summary.StepIndex(); !ok || got != 3000 {
+		t.Fatalf("result[2].Summary.StepIndex()=%d ok=%v, want 3000 true", got, ok)
 	}
 }
 
-// TestListAllDiffsCommand_EmptyList verifies handling of empty diff lists.
-func TestListAllDiffsCommand_EmptyList(t *testing.T) {
+func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(struct {
@@ -86,10 +76,11 @@ func TestListAllDiffsCommand_EmptyList(t *testing.T) {
 	defer srv.Close()
 
 	base, _ := url.Parse(srv.URL)
-	cmd := ListAllDiffsCommand{
+	cmd := ListRunRepoDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-empty"),
+		RepoID:  "repo-abc",
 	}
 
 	result, err := cmd.Run(context.Background())
