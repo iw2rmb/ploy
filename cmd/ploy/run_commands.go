@@ -26,6 +26,15 @@ func handleRun(args []string, stderr io.Writer) error {
 		printRunUsage(stderr)
 		return errors.New("run subcommand required")
 	}
+
+	// Check if the first argument is a flag (starts with "-").
+	// When flags are provided directly to `ploy run`, route to run submit.
+	// This implements: ploy run --repo ... --base-ref ... --target-ref ... --spec ...
+	// See roadmap/v1/cli.md:13 for specification.
+	if strings.HasPrefix(args[0], "-") {
+		return handleRunSubmit(args, stderr)
+	}
+
 	switch args[0] {
 	case "list":
 		return handleRunList(args[1:], stderr)
