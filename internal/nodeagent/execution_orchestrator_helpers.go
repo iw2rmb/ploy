@@ -133,7 +133,7 @@ type snapshotResult struct {
 // Parameters:
 //   - runID: run identifier for logging
 //   - jobID: job identifier for logging
-//   - jobType: "mod" or "healing" for log message context
+//   - diffType: DiffModTypeMod or DiffModTypeHealing for log message context
 //   - workspace: source workspace to snapshot
 //
 // Returns snapshotResult with:
@@ -141,17 +141,18 @@ type snapshotResult struct {
 //   - cleanup: function to remove snapshot (safe to call even if empty)
 //
 // Note: Caller must defer cleanup() to avoid leaking temp directories.
-func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, jobType string, workspace string) snapshotResult {
-	prefix := fmt.Sprintf("ploy-%s-base-*", jobType)
+func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType DiffModType, workspace string) snapshotResult {
+	jobTypeStr := diffType.String()
+	prefix := fmt.Sprintf("ploy-%s-base-*", jobTypeStr)
 	snapshotDir, err := os.MkdirTemp("", prefix)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("%s: failed to create baseline snapshot directory", jobType),
+		slog.Warn(fmt.Sprintf("%s: failed to create baseline snapshot directory", jobTypeStr),
 			"run_id", runID, "job_id", jobID, "error", err)
 		return snapshotResult{dir: "", cleanup: func() {}}
 	}
 
 	if err := copyGitClone(workspace, snapshotDir); err != nil {
-		slog.Warn(fmt.Sprintf("%s: failed to snapshot baseline workspace", jobType),
+		slog.Warn(fmt.Sprintf("%s: failed to snapshot baseline workspace", jobTypeStr),
 			"run_id", runID, "job_id", jobID, "error", err)
 		_ = os.RemoveAll(snapshotDir)
 		return snapshotResult{dir: "", cleanup: func() {}}

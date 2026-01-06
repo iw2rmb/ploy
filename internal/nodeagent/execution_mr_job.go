@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -59,6 +60,15 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		// MR jobs are best-effort; surface failure via job status and logs.
 		builder.Error(mrErr.Error())
 		stats := builder.MustBuild()
+
+		if errors.Is(mrErr, context.Canceled) || errors.Is(mrErr, context.DeadlineExceeded) {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+			}
+			slog.Info("MR job cancelled", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
+			return
+		}
+
 		var exitCode int32 = -1
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload MR job failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)

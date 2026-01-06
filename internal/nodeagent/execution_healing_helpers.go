@@ -57,7 +57,7 @@ type executionResult struct {
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job by
 // comparing the pre-healing baseline snapshot with the post-healing workspace.
 //
-// Discrete healing jobs publish diffs as mod_type="mod" so that subsequent
+// Discrete healing jobs publish diffs as mod_type=DiffModTypeMod so that subsequent
 // steps rehydrate the healed workspace from the diff chain. Using
 // GenerateBetween(baseDir, workspace) ensures that:
 //   - Untracked files created by the healer are included in the diff
@@ -100,7 +100,7 @@ func (r *runController) uploadHealingJobDiff(
 	}
 
 	// Build diff summary with step metadata for database storage.
-	// Discrete healing jobs publish mod_type="mod" so their diffs participate in
+	// Discrete healing jobs publish mod_type=DiffModTypeMod so their diffs participate in
 	// the rehydration chain (healing diffs are not intermediate states here).
 	// Uses typed builder to eliminate map[string]any construction.
 	summary := types.NewDiffSummaryBuilder().

@@ -111,7 +111,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 			ctx := context.Background()
 			jobID := types.JobID("test-job-id")
 			// v1 uses capitalized job status values: Success, Fail, Cancelled.
-			err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
+			err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -161,7 +161,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 	jobID := types.JobID("test-job-id")
 	start := time.Now()
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
+	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -215,7 +215,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 
 	jobID := types.JobID("test-job-id")
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, "Success", nil, nil)
+	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
 
 	if err == nil {
 		t.Error("expected context cancellation error")
@@ -271,14 +271,14 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 
 	// Upload status via job-level endpoint.
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, "Fail", exitCode, stats)
+	err = uploader.UploadJobStatus(ctx, jobID, JobStatusFail.String(), exitCode, stats)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// Verify status uses v1 capitalized value.
-	if receivedPayload["status"] != "Fail" {
-		t.Errorf("expected status=Fail, got %v", receivedPayload["status"])
+	if receivedPayload["status"] != JobStatusFail.String() {
+		t.Errorf("expected status=%s, got %v", JobStatusFail.String(), receivedPayload["status"])
 	}
 
 	// Verify exit_code is present.
@@ -351,13 +351,13 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		MustBuild()
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, "Success", &exitCode, stats)
+	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), &exitCode, stats)
 	if err != nil {
 		t.Fatalf("unexpected error uploading job status: %v", err)
 	}
 
-	if receivedPayload["status"] != "Success" {
-		t.Errorf("expected status=Success, got %v", receivedPayload["status"])
+	if receivedPayload["status"] != JobStatusSuccess.String() {
+		t.Errorf("expected status=%s, got %v", JobStatusSuccess.String(), receivedPayload["status"])
 	}
 
 	if ec, ok := receivedPayload["exit_code"].(float64); !ok || ec != 0 {
