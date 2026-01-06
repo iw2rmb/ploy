@@ -10,7 +10,7 @@ WHERE id = $1;
 
 -- name: ListSpecs :many
 -- Lists specs ordered by created_at descending (most recent first).
--- Per roadmap/v1/db.md:53, there is an index on created_at for this query.
+-- There is an index on created_at to optimize this query.
 SELECT id, name, spec, created_by, created_at, archived_at
 FROM specs
 ORDER BY created_at DESC

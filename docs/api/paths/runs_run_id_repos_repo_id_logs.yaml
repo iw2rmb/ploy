@@ -6,7 +6,6 @@
 # - `event: retention` → RetentionHint (unchanged)
 # - `event: done` → Terminal sentinel
 #
-# Required by roadmap/v1/api.md:264 and roadmap/v1/api.md:273.
 parameters:
   - in: path
     name: run_id
@@ -36,9 +35,9 @@ get:
     Server-Sent Events stream for real-time status and log updates, filtered to
     jobs belonging to a specific repo execution within a run.
 
-    Per roadmap/v1/api.md:264 and roadmap/v1/api.md:273:
+    Behavior:
     - SSE event types/payloads are unchanged from GET /v1/runs/{id}/logs
-    - v1 only filters the stream to jobs belonging to the repo execution
+    - Filters the stream to jobs belonging to the repo execution
     - `event: run` payloads are still RunSummary (stages map filtered to repo jobs)
 
     See `docs/api/paths/runs_id_logs.yaml` for the canonical SSE contract.

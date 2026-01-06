@@ -5,7 +5,7 @@ post:
     Selects the latest run for a specific repo in a mod and returns the repo-scoped
     execution identifiers needed to pull diffs.
 
-    Per roadmap/v1/api.md:57-82:
+    Behavior:
     - Request provides repo_url and optional mode (last-succeeded default, last-failed).
     - Response returns run_id, repo_id, and repo_target_ref (from run_repos snapshot).
   parameters:

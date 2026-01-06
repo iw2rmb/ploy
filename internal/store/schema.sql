@@ -11,14 +11,12 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Enums
 --
--- v1 status model (see roadmap/v1/statuses.md):
+-- Status model (see docs/mods-lifecycle.md § "State machines"):
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Cancelled
 --
 -- Capitalized values are canonical; no aliases.
--- 'skipped' removed from job_status per roadmap/v1/statuses.md:138.
--- 'assigned' removed from run_status per roadmap/v1/statuses.md:26.
 CREATE TYPE run_status AS ENUM (
   'Started', 'Cancelled', 'Finished'
 );
@@ -28,8 +26,7 @@ CREATE TYPE job_status AS ENUM (
 );
 
 -- RunRepoStatus tracks per-repo execution state within a batched run.
--- v1 model: Queued (was pending), Running, Cancelled, Fail (was failed), Success (was succeeded).
--- 'skipped' removed per roadmap/v1/statuses.md:40.
+-- Status values: Queued, Running, Cancelled, Fail, Success.
 CREATE TYPE run_repo_status AS ENUM (
   'Queued', 'Running', 'Cancelled', 'Fail', 'Success'
 );
@@ -201,7 +198,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   UNIQUE (run_id, repo_id, attempt, name, step_index)  -- v1 uniqueness: per-repo within a run.
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
--- v1: 'Queued' replaces 'pending' as claimable job status (see roadmap/v1/statuses.md:50).
+-- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
 CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).

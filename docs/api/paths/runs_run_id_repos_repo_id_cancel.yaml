@@ -1,5 +1,4 @@
 # Repo-scoped cancel for a repo execution within a run.
-# Required by roadmap/v1/api.md:266 and roadmap/v1/api.md:289-298.
 #
 # This POST endpoint cancels a single repo execution within a batch run.
 # It is the v1 replacement for the HEAD DELETE /v1/runs/{id}/repos/{repo_id}
@@ -16,7 +15,7 @@ post:
     The operation is idempotent: if the repo is already terminal, the handler
     returns the current repo state with `200 OK`.
 
-    Per roadmap/v1/api.md:289-298:
+    Cancellation behavior:
     - Set `run_repos.status='Cancelled'` if not already terminal
     - Cancel jobs for that repo execution (attempt-scoped):
       - `jobs.status IN ('Created','Queued','Running')` for matching

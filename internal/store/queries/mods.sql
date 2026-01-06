@@ -33,7 +33,7 @@ WHERE id = $1;
 
 -- name: ArchiveMod :exec
 -- Archives a mod by setting archived_at to now().
--- Per roadmap/v1/db.md:29, archiving must be refused when the mod has any jobs in a running state.
+-- Archiving must be refused when the mod has any jobs in a running state.
 -- This query only sets the timestamp; validation logic must be in the caller.
 UPDATE mods
 SET archived_at = now()
