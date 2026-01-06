@@ -136,8 +136,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  run ID: %s\n", resolvedRun.RunID)
 	_, _ = fmt.Fprintf(stderr, "  repo status: %s\n", resolvedRun.RepoStatus)
 
-	// v1: No per-repo execution run IDs. The resolved RunID is the execution identifier.
-	executionRunID := resolvedRun.RunID
+	// v1: No per-repo child runs. The resolved RunID is the identifier used to fetch diffs.
+	runID := resolvedRun.RunID
 
 	// Base snapshot: use the per-repo base_ref snapshot from RepoRunSummary.
 	baseRef := strings.TrimSpace(resolvedRun.BaseRef)
@@ -173,8 +173,8 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Step 9: Fetch all diffs for the execution run.
-	diffs, err := fetchAllDiffs(ctx, executionRunID)
+	// Step 9: Fetch all diffs for the run.
+	diffs, err := fetchAllDiffs(ctx, runID)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func handleModRunPull(args []string, stderr io.Writer) error {
 
 	// Success message.
 	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
-		appliedCount, executionRunID, targetRef, *origin)
+		appliedCount, runID, targetRef, *origin)
 	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
 
 	return nil
@@ -379,9 +379,9 @@ func printModRunPullUsage(w io.Writer) {
 // Diff Retrieval, Branch Creation, and Patch Application Helpers
 // =============================================================================
 
-// fetchAllDiffs fetches all diffs for the given execution run.
+// fetchAllDiffs fetches all diffs for the given run.
 // Returns diffs sorted by step_index for correct application order.
-func fetchAllDiffs(ctx context.Context, executionRunID domaintypes.RunID) ([]mods.DiffEntry, error) {
+func fetchAllDiffs(ctx context.Context, runID domaintypes.RunID) ([]mods.DiffEntry, error) {
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mod run pull: %w", err)
@@ -390,7 +390,7 @@ func fetchAllDiffs(ctx context.Context, executionRunID domaintypes.RunID) ([]mod
 	cmd := mods.ListAllDiffsCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		RunID:   executionRunID,
+		RunID:   runID,
 	}
 
 	diffs, err := cmd.Run(ctx)

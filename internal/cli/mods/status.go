@@ -34,7 +34,7 @@ type DiffEntry struct {
 type ListAllDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type, execution run id)
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
 }
 
 // Run executes GET /v1/mods/{id}/diffs and returns all diff entries.
