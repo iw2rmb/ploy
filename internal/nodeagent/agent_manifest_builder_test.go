@@ -288,14 +288,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	})
 
 	// Multi-step execution tests: verify step-by-step manifest building.
-	t.Run("multi-step run builds manifest for each step from mods array", func(t *testing.T) {
+	t.Run("multi-step run builds manifest for each step from steps array", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			BaseRef: types.GitRef("main"),
 			Env:     map[string]string{"BASE_VAR": "base_value"},
 			TypedOptions: parseRunOptions(map[string]any{
-				"mods": []any{
+				"steps": []any{
 					map[string]any{
 						"image":   "mods-orw:latest",
 						"command": []any{"--apply", "--dir", "/workspace"},
@@ -372,7 +372,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Env:     map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"},
 			TypedOptions: parseRunOptions(map[string]any{
-				"mods": []any{
+				"steps": []any{
 					map[string]any{
 						"image": "mods-step:latest",
 						"env":   map[string]any{"SHARED_VAR": "step_override"},
@@ -401,7 +401,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:   types.RunID("run-multi-789"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
-				"mods": []any{
+				"steps": []any{
 					map[string]any{"image": "mods-step:latest"},
 				},
 			}),
