@@ -1,0 +1,64 @@
+# Repo-scoped cancel for a repo execution within a run.
+# Required by roadmap/v1/api.md:266 and roadmap/v1/api.md:289-298.
+#
+# This POST endpoint cancels a single repo execution within a batch run.
+# It is the v1 replacement for the HEAD DELETE /v1/runs/{id}/repos/{repo_id}
+# endpoint, using POST semantics consistent with other v1 cancellation endpoints.
+post:
+  tags: [Control]
+  summary: Cancel a repo execution within a run
+  description: |
+    Cancel a single repository execution within a batch run. Transitions
+    the repo status to `Cancelled` if it is not already in a terminal state
+    (`Success`, `Fail`, `Cancelled`).
+
+    This is the v1 replacement for HEAD `DELETE /v1/runs/{id}/repos/{repo_id}`.
+    The operation is idempotent: if the repo is already terminal, the handler
+    returns the current repo state with `200 OK`.
+
+    Per roadmap/v1/api.md:289-298:
+    - Set `run_repos.status='Cancelled'` if not already terminal
+    - Cancel jobs for that repo execution (attempt-scoped):
+      - `jobs.status IN ('Created','Queued','Running')` for matching
+        `(run_id, repo_id, attempt=run_repos.attempt)` are transitioned
+        to `jobs.status='Cancelled'` (best-effort; nodes may race to complete)
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
+  responses:
+    '200':
+      description: OK; repo is now in a terminal state (Cancelled or unchanged)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/RunRepo'
+    '400':
+      description: Bad request (missing or empty run_id or repo_id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run or repo not found, or repo does not belong to the run
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

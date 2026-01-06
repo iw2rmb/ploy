@@ -1,0 +1,81 @@
+# Repo-scoped logs SSE stream for a repo execution within a run.
+# Required by roadmap/v1/api.md:264 and roadmap/v1/api.md:273.
+#
+# This endpoint streams logs and events for jobs belonging to a specific
+# repository execution within a batch run. The SSE event types and payloads
+# are unchanged from the run-level logs endpoint (GET /v1/runs/{id}/logs);
+# the filter restricts output to jobs with matching (run_id, repo_id, attempt).
+get:
+  tags: [Artifacts]
+  summary: Stream logs for a repo execution within a run
+  description: |
+    Server-Sent Events (SSE) stream of logs and events for a specific
+    repository execution within a run.
+
+    This is the v1 repo-scoped endpoint that provides the same event stream
+    as GET /v1/runs/{id}/logs but filtered to jobs belonging to the specified
+    repo execution (matching run_id, repo_id, and current attempt).
+
+    Per roadmap/v1/api.md:264 and roadmap/v1/api.md:273:
+    - SSE event types/payloads are unchanged from run-level logs endpoint
+    - v1 only filters the stream to jobs belonging to the repo execution
+    - Event types: `log` (log chunks), `run` (status updates), `heartbeat`
+
+    Connection behavior:
+    - Streams historical events then switches to real-time
+    - Sends periodic `heartbeat` events to keep connection alive
+    - Closes when the repo execution reaches a terminal state
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
+    - in: query
+      name: follow
+      required: false
+      schema:
+        type: boolean
+        default: true
+      description: |
+        When true (default), stream remains open for real-time updates.
+        When false, stream closes after sending all existing events.
+  responses:
+    '200':
+      description: SSE stream of logs and events
+      content:
+        text/event-stream:
+          schema:
+            type: string
+            description: |
+              SSE event stream. Event types:
+              - `log`: Log chunk data (base64-gzipped content)
+              - `run`: Run/repo status update (ModsRunSummary JSON)
+              - `heartbeat`: Keep-alive ping (empty data)
+    '400':
+      description: Bad request (missing or empty run_id or repo_id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run or repo not found, or repo does not belong to the run
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
