@@ -1,0 +1,69 @@
+// mod_list.go implements the 'ploy mod list' command handler.
+//
+// Per roadmap/v1/cli.md:33-35, this command lists mod projects:
+// - ploy mod list
+// - Lists mods: ID, NAME, CREATED_AT, ARCHIVED_AT.
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"text/tabwriter"
+
+	"github.com/iw2rmb/ploy/internal/cli/mods"
+)
+
+// handleModList implements 'ploy mod list'.
+func handleModList(args []string, stderr io.Writer) error {
+	// Handle help flag.
+	if wantsHelp(args) {
+		printModListUsage(stderr)
+		return nil
+	}
+
+	// Resolve control plane connection.
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Execute mod list command.
+	cmd := mods.ListModsCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		Limit:   100,
+	}
+
+	results, err := cmd.Run(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(results) == 0 {
+		_, _ = fmt.Fprintln(stderr, "No mods found.")
+		return nil
+	}
+
+	// Print results in tabular format per roadmap/v1/cli.md:35.
+	w := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tCREATED_AT\tARCHIVED")
+	for _, mod := range results {
+		archived := "-"
+		if mod.Archived {
+			archived = "yes"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", mod.ID, mod.Name, mod.CreatedAt, archived)
+	}
+	_ = w.Flush()
+
+	return nil
+}
+
+// printModListUsage prints usage for the mod list command.
+func printModListUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod list")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Lists mod projects: ID, NAME, CREATED_AT, ARCHIVED.")
+}

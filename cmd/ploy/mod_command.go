@@ -19,7 +19,37 @@ func handleMod(args []string, stderr io.Writer) error {
 	}
 
 	switch args[0] {
+	// v1 mod management commands (roadmap/v1/cli.md:24-50).
+	case "add":
+		return handleModAdd(args[1:], stderr)
+	case "list":
+		return handleModList(args[1:], stderr)
+	case "remove":
+		return handleModRemove(args[1:], stderr)
+	case "archive":
+		return handleModArchive(args[1:], stderr)
+	case "unarchive":
+		return handleModUnarchive(args[1:], stderr)
+	// v1 spec management (roadmap/v1/cli.md:53-60).
+	case "spec":
+		return handleModSpec(args[1:], stderr)
+	// v1 repo set management (roadmap/v1/cli.md:62-99).
+	case "repo":
+		return handleModRepo(args[1:], stderr)
+	// v1 mod run with repo selection (roadmap/v1/cli.md:102-119).
+	// Check if first arg looks like a mod ID/name (not a flag) to route to project run.
 	case "run":
+		// If next arg exists and doesn't start with '-', it's a mod reference.
+		if len(args) > 1 && len(args[1]) > 0 && args[1][0] != '-' {
+			// Check if it's not a known subcommand (repo, pull).
+			switch args[1] {
+			case "repo", "pull":
+				// Fall through to existing handleModRun which routes these.
+			default:
+				// Treat as mod reference for project run.
+				return handleModRunProject(args[1:], stderr)
+			}
+		}
 		return handleModRun(args[1:], stderr)
 	case "fetch":
 		return handleModFetch(args[1:], stderr)

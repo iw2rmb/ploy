@@ -1,0 +1,386 @@
+package mods
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+)
+
+// TestAddModCommand_Run validates AddModCommand responses.
+func TestAddModCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		modName     string
+		spec        *json.RawMessage
+		serverResp  AddModResult
+		statusCode  int
+		wantErr     bool
+		wantErrText string
+	}{
+		{
+			name:       "successful create without spec",
+			modName:    "test-mod",
+			spec:       nil,
+			statusCode: http.StatusCreated,
+			serverResp: AddModResult{
+				ID:        "mod-001",
+				Name:      "test-mod",
+				SpecID:    nil,
+				CreatedAt: "2024-01-01T00:00:00Z",
+			},
+		},
+		{
+			name:       "successful create with spec",
+			modName:    "test-mod-with-spec",
+			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
+			statusCode: http.StatusCreated,
+			serverResp: AddModResult{
+				ID:        "mod-002",
+				Name:      "test-mod-with-spec",
+				SpecID:    strPtr("spec-001"),
+				CreatedAt: "2024-01-01T00:00:00Z",
+			},
+		},
+		{
+			name:        "missing name",
+			modName:     "",
+			wantErr:     true,
+			wantErrText: "name is required",
+		},
+		{
+			name:        "missing client",
+			modName:     "test-mod",
+			wantErr:     true,
+			wantErrText: "http client required",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Verify POST method to /v1/mods.
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST, got %s", r.Method)
+				}
+				if r.URL.Path != "/v1/mods" {
+					t.Errorf("expected path /v1/mods, got %s", r.URL.Path)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.statusCode)
+				_ = json.NewEncoder(w).Encode(tc.serverResp)
+			}))
+			t.Cleanup(srv.Close)
+
+			baseURL, err := url.Parse(srv.URL)
+			if err != nil {
+				t.Fatalf("parse server URL: %v", err)
+			}
+
+			var client *http.Client
+			if !tc.wantErr || !strings.Contains(tc.wantErrText, "http client required") {
+				client = srv.Client()
+			}
+
+			cmd := AddModCommand{
+				Client:  client,
+				BaseURL: baseURL,
+				Name:    tc.modName,
+				Spec:    tc.spec,
+			}
+
+			result, err := cmd.Run(context.Background())
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tc.wantErrText != "" && !strings.Contains(err.Error(), tc.wantErrText) {
+					t.Errorf("error %q should contain %q", err.Error(), tc.wantErrText)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Run() error: %v", err)
+			}
+			if result.ID != tc.serverResp.ID {
+				t.Errorf("got ID %q, want %q", result.ID, tc.serverResp.ID)
+			}
+			if result.Name != tc.serverResp.Name {
+				t.Errorf("got Name %q, want %q", result.Name, tc.serverResp.Name)
+			}
+		})
+	}
+}
+
+// TestListModsCommand_Run validates ListModsCommand responses.
+func TestListModsCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		limit      int32
+		offset     int32
+		serverResp []ModSummary
+		wantCount  int
+	}{
+		{
+			name:   "list mods with results",
+			limit:  50,
+			offset: 0,
+			serverResp: []ModSummary{
+				{ID: "mod-001", Name: "mod-one", Archived: false, CreatedAt: "2024-01-01T00:00:00Z"},
+				{ID: "mod-002", Name: "mod-two", Archived: true, CreatedAt: "2024-01-02T00:00:00Z"},
+			},
+			wantCount: 2,
+		},
+		{
+			name:       "empty list",
+			limit:      50,
+			offset:     0,
+			serverResp: []ModSummary{},
+			wantCount:  0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET, got %s", r.Method)
+				}
+				if !strings.HasPrefix(r.URL.Path, "/v1/mods") {
+					t.Errorf("expected path /v1/mods, got %s", r.URL.Path)
+				}
+
+				resp := struct {
+					Mods []ModSummary `json:"mods"`
+				}{Mods: tc.serverResp}
+
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+			}))
+			t.Cleanup(srv.Close)
+
+			baseURL, _ := url.Parse(srv.URL)
+
+			cmd := ListModsCommand{
+				Client:  srv.Client(),
+				BaseURL: baseURL,
+				Limit:   tc.limit,
+				Offset:  tc.offset,
+			}
+
+			result, err := cmd.Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error: %v", err)
+			}
+			if len(result) != tc.wantCount {
+				t.Errorf("got %d results, want %d", len(result), tc.wantCount)
+			}
+		})
+	}
+}
+
+// TestRemoveModCommand_Run validates RemoveModCommand responses.
+func TestRemoveModCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		modID       string
+		statusCode  int
+		wantErr     bool
+		wantErrText string
+	}{
+		{
+			name:       "successful delete",
+			modID:      "mod-001",
+			statusCode: http.StatusNoContent,
+		},
+		{
+			name:        "mod not found",
+			modID:       "nonexistent",
+			statusCode:  http.StatusNotFound,
+			wantErr:     true,
+			wantErrText: "not found",
+		},
+		{
+			name:        "mod has runs",
+			modID:       "mod-with-runs",
+			statusCode:  http.StatusConflict,
+			wantErr:     true,
+			wantErrText: "existing runs",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodDelete {
+					t.Errorf("expected DELETE, got %s", r.Method)
+				}
+				if !strings.HasPrefix(r.URL.Path, "/v1/mods/") {
+					t.Errorf("expected path /v1/mods/{id}, got %s", r.URL.Path)
+				}
+
+				if tc.statusCode == http.StatusNoContent {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+
+				w.WriteHeader(tc.statusCode)
+				if tc.wantErrText != "" {
+					_, _ = w.Write([]byte(tc.wantErrText))
+				}
+			}))
+			t.Cleanup(srv.Close)
+
+			baseURL, _ := url.Parse(srv.URL)
+
+			cmd := RemoveModCommand{
+				Client:  srv.Client(),
+				BaseURL: baseURL,
+				ModID:   tc.modID,
+			}
+
+			err := cmd.Run(context.Background())
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tc.wantErrText != "" && !strings.Contains(err.Error(), tc.wantErrText) {
+					t.Errorf("error %q should contain %q", err.Error(), tc.wantErrText)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Run() error: %v", err)
+			}
+		})
+	}
+}
+
+// TestArchiveModCommand_Run validates ArchiveModCommand responses.
+func TestArchiveModCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "/archive") {
+			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
+		}
+
+		resp := ArchiveModResult{ID: "mod-001", Name: "test-mod", Archived: true}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	t.Cleanup(srv.Close)
+
+	baseURL, _ := url.Parse(srv.URL)
+
+	cmd := ArchiveModCommand{
+		Client:  srv.Client(),
+		BaseURL: baseURL,
+		ModID:   "mod-001",
+	}
+
+	result, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if !result.Archived {
+		t.Error("expected Archived to be true")
+	}
+}
+
+// TestUnarchiveModCommand_Run validates UnarchiveModCommand responses.
+func TestUnarchiveModCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "/unarchive") {
+			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
+		}
+
+		resp := UnarchiveModResult{ID: "mod-001", Name: "test-mod", Archived: false}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	t.Cleanup(srv.Close)
+
+	baseURL, _ := url.Parse(srv.URL)
+
+	cmd := UnarchiveModCommand{
+		Client:  srv.Client(),
+		BaseURL: baseURL,
+		ModID:   "mod-001",
+	}
+
+	result, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if result.Archived {
+		t.Error("expected Archived to be false")
+	}
+}
+
+// TestSetModSpecCommand_Run validates SetModSpecCommand responses.
+func TestSetModSpecCommand_Run(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "/specs") {
+			t.Errorf("expected path to contain /specs, got %s", r.URL.Path)
+		}
+
+		resp := SetModSpecResult{ID: "spec-001", CreatedAt: "2024-01-01T00:00:00Z"}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	t.Cleanup(srv.Close)
+
+	baseURL, _ := url.Parse(srv.URL)
+
+	cmd := SetModSpecCommand{
+		Client:  srv.Client(),
+		BaseURL: baseURL,
+		ModID:   "mod-001",
+		Spec:    json.RawMessage(`{"version":"v1"}`),
+	}
+
+	result, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if result.ID != "spec-001" {
+		t.Errorf("got ID %q, want %q", result.ID, "spec-001")
+	}
+}
+
+// Helper functions for tests.
+func jsonRawPtr(data []byte) *json.RawMessage {
+	raw := json.RawMessage(data)
+	return &raw
+}
