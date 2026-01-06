@@ -82,6 +82,8 @@ paths:
     $ref: './paths/mods_mod_id_repos_bulk.yaml'
   /v1/mods/{mod_id}/runs:
     $ref: './paths/mods_mod_id_runs.yaml'
+  /v1/mods/{mod_id}/pull:
+    $ref: './paths/mods_mod_id_pull.yaml'
   # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
   # Legacy /v1/mods/{id}/cancel moved to /v1/runs/{id}/cancel (v1 API).
   # Legacy /v1/mods/{id}/resume removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
@@ -151,6 +153,8 @@ paths:
   # Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
     $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
+  /v1/runs/{run_id}/pull:
+    $ref: './paths/runs_run_id_pull.yaml'
   # Repo-centric endpoints — list repos and show runs for a given repo
   /v1/repos:
     $ref: './paths/repos.yaml'

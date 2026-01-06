@@ -379,6 +379,46 @@ CreateModRunResponse:
     run_id: { type: string, description: "Run ID (KSUID string)" }
   required: [run_id]
 
+PullResolutionMode:
+  type: string
+  description: |
+    Selection mode for resolving a mod repo execution for pull.
+    - last-succeeded: newest terminal Success (default)
+    - last-failed: newest terminal Fail
+  enum: [last-succeeded, last-failed]
+
+RunPullRequest:
+  type: object
+  properties:
+    repo_url:
+      type: string
+      description: Repository URL (normalized for matching).
+  required: [repo_url]
+
+ModPullRequest:
+  type: object
+  properties:
+    repo_url:
+      type: string
+      description: Repository URL (normalized for matching).
+    mode:
+      $ref: '#/PullResolutionMode'
+  required: [repo_url]
+
+PullResolutionResponse:
+  type: object
+  properties:
+    run_id:
+      type: string
+      description: Run ID (KSUID string)
+    repo_id:
+      type: string
+      description: Repo ID (NanoID 8-character string)
+    repo_target_ref:
+      type: string
+      description: Target ref snapshot for this repo execution (run_repos.repo_target_ref)
+  required: [run_id, repo_id, repo_target_ref]
+
 ModListItem:
   type: object
   properties:
