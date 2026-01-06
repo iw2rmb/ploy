@@ -189,18 +189,12 @@ Run status updates / endpoint naming:
 Run completion:
 
 - `internal/server/handlers/jobs_complete.go`
-  - currently:
-    - schedules next job with `ScheduleNextJob(run_id)` (run-scoped),
-    - then calls `maybeCompleteMultiStepRun` to set run terminal status (`succeeded`/`failed`/`canceled` are HEAD literals).
-  - v1 must change the terminal computation:
-    - compute and persist the repo terminal status (`run_repos.status`) when a repo’s last job completes
-    - compute `runs.status` (`Finished`) by aggregating repo statuses
-    - remove any run-level `succeeded/failed` transitions; success/failure becomes repo-scoped.
+  - v1 (HEAD):
+    - schedules next job with `ScheduleNextJob(run_id, repo_id, attempt)` (repo-scoped)
+    - derives and persists the repo terminal status (`run_repos.status`) from repo-scoped jobs (excluding MR jobs)
+    - sets `runs.status='Finished'` only when all repos are terminal (derived from `run_repos.status`)
 - `internal/server/handlers/nodes_complete_run.go`
-  - `maybeCompleteMultiStepRun` currently derives run terminal state from jobs and writes `runs.status=succeeded`/`failed`/`canceled` (HEAD literals).
-  - v1 must be rewritten (or replaced) to update:
-    - `run_repos.status` for the repo whose job completed
-    - `runs.status=Finished` only when all repos are terminal
+  - `maybeCompleteMultiStepRun` aggregates `run_repos.status` counts and updates `runs.status='Finished'` only when all repos are terminal.
 
 Batch status helpers:
 

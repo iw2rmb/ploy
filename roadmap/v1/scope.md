@@ -88,7 +88,7 @@ Code pointers for the refactor:
 
 - `internal/server/handlers/runs_submit.go`: `createSingleRepoRunHandler` submits a single-repo run, inserts `run_repos`, and creates jobs immediately.
 - `internal/server/handlers/runs_batch_scheduler.go`: starts queued repos by creating jobs directly for `(run_id, repo_id, attempt)` via `createJobsFromSpec`.
-- `internal/server/handlers/nodes_complete_run.go`: completion derives run completion from `run_repos` terminal counts; remaining work updates `run_repos.status` per repo from job results.
+- `internal/server/handlers/nodes_complete_run.go`: completion derives run completion from `run_repos` terminal counts; repo terminal status is derived from repo-scoped job results in `internal/server/handlers/jobs_complete.go` (`maybeUpdateRunRepoStatus`).
 - `internal/server/handlers/repos.go`: repo-centric endpoints are `(run_id, repo_id)`-scoped and do not expose per-repo run IDs.
 - `internal/store/schema.sql` + `internal/store/queries/run_repos.sql`: `execution_run_id` is already removed; remaining work is repo-scoped status progression.
 
