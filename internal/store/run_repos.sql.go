@@ -150,6 +150,42 @@ func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunR
 	return err
 }
 
+const listFailedRepoIDsByMod = `-- name: ListFailedRepoIDsByMod :many
+SELECT repo_id FROM (
+  SELECT DISTINCT ON (rr.repo_id) rr.repo_id, rr.status
+  FROM run_repos rr
+  WHERE rr.mod_id = $1
+    AND rr.status IN ('Fail', 'Success', 'Cancelled')
+  ORDER BY rr.repo_id, rr.created_at DESC
+) AS last_status
+WHERE status = 'Fail'
+`
+
+// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
+// Per roadmap/v1/db.md:189: define "last terminal state" per repo_id by looking at
+// the newest run_repos row where status in (Fail, Success, Cancelled) and selecting
+// those where status='Fail'.
+// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
+func (q *Queries) ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listFailedRepoIDsByMod, modID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var repo_id string
+		if err := rows.Scan(&repo_id); err != nil {
+			return nil, err
+		}
+		items = append(items, repo_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listQueuedRunReposByRun = `-- name: ListQueuedRunReposByRun :many
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos

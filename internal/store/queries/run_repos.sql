@@ -91,3 +91,18 @@ JOIN runs r ON rr.run_id = r.id
 WHERE rr.repo_id = $1
 ORDER BY rr.created_at DESC
 LIMIT $2 OFFSET $3;
+
+-- name: ListFailedRepoIDsByMod :many
+-- Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
+-- Per roadmap/v1/db.md:189: define "last terminal state" per repo_id by looking at
+-- the newest run_repos row where status in (Fail, Success, Cancelled) and selecting
+-- those where status='Fail'.
+-- Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
+SELECT repo_id FROM (
+  SELECT DISTINCT ON (rr.repo_id) rr.repo_id, rr.status
+  FROM run_repos rr
+  WHERE rr.mod_id = $1
+    AND rr.status IN ('Fail', 'Success', 'Cancelled')
+  ORDER BY rr.repo_id, rr.created_at DESC
+) AS last_status
+WHERE status = 'Fail';

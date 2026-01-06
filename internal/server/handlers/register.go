@@ -49,6 +49,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/mods/{mod_id}/repos", listModReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/mods/{mod_id}/repos/{repo_id}", deleteModRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{mod_id}/repos/bulk", bulkUpsertModReposHandler(st), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/api.md:202-223, roadmap/v1/scope.md:19): Multi-repo run submission with repo selection (all/failed/explicit).
+	s.HandleFunc("POST /v1/mods/{mod_id}/runs", createModRunHandler(st), auth.RoleControlPlane)
 
 	// Legacy routes under /v1/mods/{id}/* for run operations.
 	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
