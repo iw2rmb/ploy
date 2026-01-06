@@ -9,15 +9,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
@@ -118,27 +120,77 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
 
-	// Submit run to control plane via POST /v1/runs.
-	// The SubmitCommand returns a RunSummary after fetching status.
-	cmd := mods.SubmitCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		Request: request,
-	}
-
-	summary, err := cmd.Run(ctx)
+	runID, modID, err := submitSingleRepoRun(ctx, base, httpClient, request)
 	if err != nil {
 		return err
 	}
 
 	// Print run_id and mod_id as specified in roadmap/v1/cli.md:18.
-	// summary.RunID is the created run; summary contains the mod_id indirectly
-	// (via the status endpoint), but the submit response itself returns mod_id.
-	// For now we print run_id; mod_id is printed via a follow-up if needed.
-	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", summary.RunID)
-	_, _ = fmt.Fprintf(stderr, "state: %s\n", summary.State)
+	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID)
+	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID)
 
 	return nil
+}
+
+func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (runID string, modID string, err error) {
+	if base == nil {
+		return "", "", fmt.Errorf("run submit: base url required")
+	}
+	if httpClient == nil {
+		return "", "", fmt.Errorf("run submit: http client required")
+	}
+
+	endpoint := base.ResolveReference(&url.URL{Path: "/v1/runs"})
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return "", "", fmt.Errorf("run submit: marshal request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
+	if err != nil {
+		return "", "", fmt.Errorf("run submit: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("run submit: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		var apiErr struct {
+			Error string `json:"error"`
+		}
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			if msg := strings.TrimSpace(apiErr.Error); msg != "" {
+				return "", "", fmt.Errorf("run submit: %s", msg)
+			}
+		}
+		msg := strings.TrimSpace(string(body))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return "", "", fmt.Errorf("run submit: %s", msg)
+	}
+
+	var created struct {
+		RunID  string `json:"run_id"`
+		ModID  string `json:"mod_id"`
+		SpecID string `json:"spec_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		return "", "", fmt.Errorf("run submit: decode response: %w", err)
+	}
+	created.RunID = strings.TrimSpace(created.RunID)
+	created.ModID = strings.TrimSpace(created.ModID)
+	if created.RunID == "" {
+		return "", "", fmt.Errorf("run submit: empty run_id in response")
+	}
+	if created.ModID == "" {
+		return "", "", fmt.Errorf("run submit: empty mod_id in response")
+	}
+	return created.RunID, created.ModID, nil
 }
 
 // loadSpec loads a spec from a file path or stdin (when path is "-").
