@@ -92,6 +92,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-no-diff-healing"),
+		JobID: types.JobID("test-job-no-diff-healing"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -105,7 +106,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
@@ -173,10 +174,11 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-pass"),
+		JobID: types.JobID("test-job-gate-pass"),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
@@ -248,11 +250,12 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("test-gate-fail-no-heal"),
+		JobID:        types.JobID("test-job-gate-fail-no-heal"),
 		TypedOptions: parseRunOptions(map[string]any{}),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
@@ -343,6 +346,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-heal-success"),
+		JobID: types.JobID("test-job-gate-heal-success"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -356,7 +360,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
@@ -442,6 +446,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-heal-exhausted"),
+		JobID: types.JobID("test-job-heal-exhausted"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -455,7 +460,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
@@ -547,6 +552,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-premod-gate-heal"),
+		JobID:     types.JobID("test-job-premod-gate-heal"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
@@ -563,7 +569,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -665,6 +671,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-premod-exhausted"),
+		JobID:     types.JobID("test-job-premod-exhausted"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
@@ -681,7 +688,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -773,6 +780,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-premod-pass"),
+		JobID: types.JobID("test-job-premod-pass"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -786,7 +794,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
@@ -834,10 +842,11 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-disabled"),
+		JobID: types.JobID("test-job-gate-disabled"),
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		// Gate nil or disabled.
 	}
@@ -973,6 +982,7 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-http-regate"),
+		JobID: types.JobID("test-job-http-regate"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -986,7 +996,7 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:   types.StepID(req.RunID),
+		ID:   types.StepID(req.JobID),
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
 	}
