@@ -183,6 +183,12 @@ type mockStore struct {
 	listArtifactBundlesByCIDResult []store.ArtifactBundle
 	listArtifactBundlesByCIDErr    error
 
+	// ListArtifactBundlesByRun tracking
+	listArtifactBundlesByRunCalled bool
+	listArtifactBundlesByRunParam  string
+	listArtifactBundlesByRunResult []store.ArtifactBundle
+	listArtifactBundlesByRunErr    error
+
 	// GetArtifactBundle tracking
 	getArtifactBundleCalled bool
 	getArtifactBundleParams pgtype.UUID
@@ -746,6 +752,12 @@ func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) (
 	m.listArtifactBundlesByCIDCalled = true
 	m.listArtifactBundlesByCIDParams = cid
 	return m.listArtifactBundlesByCIDResult, m.listArtifactBundlesByCIDErr
+}
+
+func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID string) ([]store.ArtifactBundle, error) {
+	m.listArtifactBundlesByRunCalled = true
+	m.listArtifactBundlesByRunParam = runID
+	return m.listArtifactBundlesByRunResult, m.listArtifactBundlesByRunErr
 }
 
 func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (store.ArtifactBundle, error) {

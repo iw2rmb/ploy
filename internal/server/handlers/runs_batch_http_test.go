@@ -251,19 +251,19 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	}
 }
 
-func TestDeleteRunRepoHandler_NotFound(t *testing.T) {
+func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{
 		getRunRepoErr: pgx.ErrNoRows,
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/run_1/repos/repo_1", nil)
-	req.SetPathValue("id", "run_1")
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_1/repos/repo_1/cancel", nil)
+	req.SetPathValue("run_id", "run_1")
 	req.SetPathValue("repo_id", "repo_1")
 	rr := httptest.NewRecorder()
 
-	deleteRunRepoHandler(st).ServeHTTP(rr, req)
+	cancelRunRepoHandlerV1(st).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rr.Code)
