@@ -1,0 +1,55 @@
+post:
+  tags: [Control]
+  summary: Resolve repo execution identifiers for pulling diffs (run)
+  description: |
+    Resolves the repo execution for a given run and returns identifiers needed to
+    pull diffs for the current repo.
+
+    Per roadmap/v1/api.md:227-249:
+    - Request provides repo_url.
+    - Server matches by joining run_repos to mod_repos and comparing normalized repo URLs.
+    - Errors if no repo matches or multiple repos match.
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      description: Run ID (KSUID string)
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/RunPullRequest'
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/PullResolutionResponse'
+    '400':
+      description: Bad request — missing or invalid fields in the request body.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found — run or repo not found.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict — multiple repos match the provided repo URL.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

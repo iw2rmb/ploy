@@ -1,7 +1,7 @@
 // execution_mr.go separates GitLab merge request workflow from core execution.
 //
 // This file contains MR creation logic for runs that complete with terminal
-// status (succeeded or failed). It handles Git commit creation, branch push,
+// status (Success or Fail). It handles Git commit creation, branch push,
 // and GitLab MR API interaction. MR creation is triggered by manifest options
 // (mr_on_success/mr_on_fail) and is isolated from execution orchestration to
 // maintain single responsibility for each file.
