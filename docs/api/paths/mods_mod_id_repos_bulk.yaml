@@ -1,0 +1,51 @@
+post:
+  tags: [Control]
+  summary: Bulk upsert mod repos (CSV)
+  description: |
+    Bulk upsert repos for a mod project from CSV.
+
+    The request body is UTF-8 CSV with a required header row:
+    `repo_url,base_ref,target_ref`.
+
+    Continues on per-line errors; may partially apply.
+
+    Refuses updates for archived mods.
+  requestBody:
+    required: true
+    content:
+      text/csv:
+        schema:
+          type: string
+          description: CSV content (UTF-8); header required.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/BulkUpsertModReposResponse'
+    '400':
+      description: Bad request — Content-Type must be text/csv, or CSV header is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict — mod is archived.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

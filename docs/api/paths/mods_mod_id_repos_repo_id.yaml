@@ -1,0 +1,35 @@
+delete:
+  tags: [Control]
+  summary: Delete mod repo
+  description: |
+    Delete a repo from a mod project's managed repo set.
+
+    Refuses deletion when the repo has historical executions.
+  responses:
+    '204':
+      description: No Content
+    '400':
+      description: Bad request (invalid ids)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict — repo has historical executions.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+
