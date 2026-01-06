@@ -779,14 +779,19 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	now := time.Now()
 
+	repoID := domaintypes.NewModRepoID().String()
+
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
-		Name:      "mod-0",
-		Status:    store.JobStatusRunning,
-		ModType:   "mod",
-		StepIndex: 1000,
+		ID:          jobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "mod-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "mod",
+		StepIndex:   1000,
 	}
 
 	st := &mockStore{
@@ -797,6 +802,12 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
+		// v1: repo-scoped progression requires CountJobsByRunRepoAttemptGroupByStatus
+		// to return all jobs terminal for repo status update to occur.
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
+			{Status: store.JobStatusSuccess, Count: 1},
+		},
+		// All repos terminal triggers run completion.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
 			{Status: store.RunRepoStatusSuccess, Count: 1},
 		},
@@ -1839,5 +1850,432 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 				t.Errorf("ValidateJobMeta() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// ===== Repo-Scoped Status Progression Tests =====
+// These tests verify v1 repo-scoped progression per roadmap/v1/scope.md:98 and roadmap/v1/statuses.md:193.
+// When a job completes:
+// - run_repos.status is updated when all jobs for the repo attempt are terminal
+// - runs.status becomes Finished when all repos are terminal
+
+// TestCompleteJob_RepoStatusUpdatedOnLastJob verifies that run_repos.status is updated
+// to Success when the last job in a repo attempt completes successfully.
+func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewModRepoID().String()
+
+	// Single job per repo, completing it should mark repo as terminal.
+	job := store.Job{
+		ID:          jobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "mod-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "mod",
+		StepIndex:   2000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+		// Return that all jobs (1 total) are now Success after completion.
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
+			{Status: store.JobStatusSuccess, Count: 1},
+		},
+		// All repos terminal (1 Success), so run becomes Finished.
+		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+			{Status: store.RunRepoStatusSuccess, Count: 1},
+		},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify CountJobsByRunRepoAttemptGroupByStatus was called to check repo terminal state.
+	if !st.countJobsByRunRepoAttemptGroupByStatusCalled {
+		t.Fatal("expected CountJobsByRunRepoAttemptGroupByStatus to be called")
+	}
+	if st.countJobsByRunRepoAttemptGroupByStatusParams.RunID != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID, st.countJobsByRunRepoAttemptGroupByStatusParams.RunID)
+	}
+	if st.countJobsByRunRepoAttemptGroupByStatusParams.RepoID != repoID {
+		t.Errorf("expected repo_id %s, got %s", repoID, st.countJobsByRunRepoAttemptGroupByStatusParams.RepoID)
+	}
+
+	// Verify UpdateRunRepoStatus was called to update repo to Success.
+	if !st.updateRunRepoStatusCalled {
+		t.Fatal("expected UpdateRunRepoStatus to be called")
+	}
+	if len(st.updateRunRepoStatusParams) == 0 {
+		t.Fatal("expected at least one UpdateRunRepoStatus call")
+	}
+	lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
+	if lastRepoUpdate.Status != store.RunRepoStatusSuccess {
+		t.Errorf("expected repo status Success, got %s", lastRepoUpdate.Status)
+	}
+
+	// Verify UpdateRunStatus was called to set run to Finished.
+	if !st.updateRunStatusCalled {
+		t.Fatal("expected UpdateRunStatus to be called")
+	}
+	if st.updateRunStatusParams.Status != store.RunStatusFinished {
+		t.Errorf("expected run status Finished, got %s", st.updateRunStatusParams.Status)
+	}
+}
+
+// TestCompleteJob_RepoStatusFail verifies that run_repos.status is updated
+// to Fail when a job in the repo attempt fails.
+func TestCompleteJob_RepoStatusFail(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewModRepoID().String()
+
+	// Job that will fail.
+	job := store.Job{
+		ID:          jobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "mod-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "mod",
+		StepIndex:   2000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:                   job,
+		listJobsByRunResult:            []store.Job{job},
+		listJobsByRunRepoAttemptResult: []store.Job{job},
+		// All jobs terminal: 1 Fail.
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
+			{Status: store.JobStatusFail, Count: 1},
+		},
+		// All repos terminal.
+		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+			{Status: store.RunRepoStatusFail, Count: 1},
+		},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Fail",
+		"exit_code": 1,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify repo status was updated to Fail.
+	if !st.updateRunRepoStatusCalled {
+		t.Fatal("expected UpdateRunRepoStatus to be called")
+	}
+	if len(st.updateRunRepoStatusParams) == 0 {
+		t.Fatal("expected at least one UpdateRunRepoStatus call")
+	}
+	lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
+	if lastRepoUpdate.Status != store.RunRepoStatusFail {
+		t.Errorf("expected repo status Fail, got %s", lastRepoUpdate.Status)
+	}
+}
+
+// TestCompleteJob_RepoNotTerminalWhileJobsInProgress verifies that run_repos.status
+// is NOT updated when there are still non-terminal jobs for the repo attempt.
+func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nextJobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewModRepoID().String()
+
+	// Two jobs: first completes, second is still Created.
+	job1 := store.Job{
+		ID:          jobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "pre-gate",
+		Status:      store.JobStatusRunning,
+		ModType:     "pre_gate",
+		StepIndex:   1000,
+	}
+	job2 := store.Job{
+		ID:          nextJobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		Name:        "mod-0",
+		Status:      store.JobStatusCreated,
+		ModType:     "mod",
+		StepIndex:   2000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:          job1,
+		listJobsByRunResult:   []store.Job{job1, job2},
+		scheduleNextJobResult: job2,
+		// 1 Success, 1 Created => not all terminal.
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
+			{Status: store.JobStatusSuccess, Count: 1},
+			{Status: store.JobStatusCreated, Count: 1},
+		},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify repo status was NOT updated (jobs still in progress).
+	if st.updateRunRepoStatusCalled {
+		t.Error("did not expect UpdateRunRepoStatus to be called while jobs still in progress")
+	}
+
+	// Verify run status was NOT updated to Finished.
+	if st.updateRunStatusCalled {
+		t.Error("did not expect UpdateRunStatus to be called while repo not terminal")
+	}
+
+	// Verify next job was scheduled.
+	if !st.scheduleNextJobCalled {
+		t.Fatal("expected ScheduleNextJob to be called")
+	}
+}
+
+// TestCompleteJob_MRJobDoesNotAffectRepoStatus verifies that MR jobs (mod_type='mr')
+// do NOT trigger repo status updates, per roadmap/v1/statuses.md:77.
+func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewModRepoID().String()
+
+	// MR job (auxiliary, should not affect repo/run status).
+	mrJob := store.Job{
+		ID:          jobID.String(),
+		RunID:       runID.String(),
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "mr-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "mr", // MR job type
+		StepIndex:   9000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusFinished, // MR jobs run after run is Finished.
+		},
+		getJobResult:        mrJob,
+		listJobsByRunResult: []store.Job{mrJob},
+		// Should NOT be called for MR jobs.
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify CountJobsByRunRepoAttemptGroupByStatus was NOT called for MR jobs.
+	if st.countJobsByRunRepoAttemptGroupByStatusCalled {
+		t.Error("did not expect CountJobsByRunRepoAttemptGroupByStatus to be called for MR job")
+	}
+
+	// Verify repo status was NOT updated.
+	if st.updateRunRepoStatusCalled {
+		t.Error("did not expect UpdateRunRepoStatus to be called for MR job")
+	}
+
+	// Verify run status was NOT updated (already Finished, MR doesn't change it).
+	if st.updateRunStatusCalled {
+		t.Error("did not expect UpdateRunStatus to be called for MR job")
+	}
+}
+
+// TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal verifies that runs.status
+// becomes Finished only when ALL repos reach terminal state, not just one.
+func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID()
+	jobIDRepoA := domaintypes.NewJobID()
+	repoIDA := domaintypes.NewModRepoID().String()
+	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatusResult).
+	_ = domaintypes.NewModRepoID().String() // repoIDB - unused but conceptually part of the multi-repo scenario
+
+	// Job for repo A completing (repo B still has work).
+	jobRepoA := store.Job{
+		ID:          jobIDRepoA.String(),
+		RunID:       runID.String(),
+		RepoID:      repoIDA,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeIDStr,
+		Name:        "mod-0",
+		Status:      store.JobStatusRunning,
+		ModType:     "mod",
+		StepIndex:   2000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID.String(),
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        jobRepoA,
+		listJobsByRunResult: []store.Job{jobRepoA},
+		// Repo A is now terminal (all jobs Success).
+		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
+			{Status: store.JobStatusSuccess, Count: 1},
+		},
+		// But repo B is still Running, so run should NOT become Finished.
+		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+			{Status: store.RunRepoStatusSuccess, Count: 1}, // Repo A
+			{Status: store.RunRepoStatusRunning, Count: 1}, // Repo B still running
+		},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobIDRepoA.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobIDRepoA.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify repo A status was updated to Success.
+	if !st.updateRunRepoStatusCalled {
+		t.Fatal("expected UpdateRunRepoStatus to be called for repo A")
+	}
+
+	// Verify run status was NOT updated to Finished (repo B still in progress).
+	if st.updateRunStatusCalled {
+		t.Error("did not expect UpdateRunStatus to be called when not all repos are terminal")
 	}
 }

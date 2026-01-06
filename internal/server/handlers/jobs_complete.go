@@ -369,14 +369,33 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
-		// After completing a job, check if the run should transition to terminal state.
-		if err == nil {
-			if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, domaintypes.RunID(runID)); completeErr != nil {
-				slog.Error("complete job: failed to check run completion",
+		// v1 repo-scoped progression (roadmap/v1/scope.md:98, roadmap/v1/statuses.md:193):
+		// After completing a job, check if the repo attempt has reached a terminal state.
+		// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+		jobModType := domaintypes.ModType(job.ModType)
+		isMRJob := jobModType.Validate() == nil && jobModType == domaintypes.ModTypeMR
+		if err == nil && !isMRJob {
+			// Update run_repos.status if all jobs for this repo attempt are terminal.
+			repoUpdated, repoErr := maybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
+			if repoErr != nil {
+				slog.Error("complete job: failed to check repo completion",
 					"job_id", jobIDStr,
-					"step_index", job.StepIndex,
-					"err", completeErr,
+					"repo_id", job.RepoID,
+					"attempt", job.Attempt,
+					"err", repoErr,
 				)
+			}
+
+			// If the repo reached terminal state, check if the run should transition to Finished.
+			// runs.status becomes Finished when all repos are terminal (roadmap/v1/statuses.md:68).
+			if repoUpdated {
+				if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, domaintypes.RunID(runID)); completeErr != nil {
+					slog.Error("complete job: failed to check run completion",
+						"job_id", jobIDStr,
+						"step_index", job.StepIndex,
+						"err", completeErr,
+					)
+				}
 			}
 		}
 
@@ -385,9 +404,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// expose it via RunStats.MRURL() and CLI commands can display it. This is a
 		// best-effort update and does not affect run status.
 		// We use the typed statsPayload.MRURL() accessor instead of map[string]any casting.
+		// Note: jobModType and isMRJob were already computed above for repo-scoped progression.
 		mrURL := statsPayload.MRURL()
-		jobModType := domaintypes.ModType(job.ModType)
-		if err == nil && mrURL != "" && jobModType.Validate() == nil && jobModType == domaintypes.ModTypeMR {
+		if err == nil && mrURL != "" && isMRJob {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
 				ID:    runID,
 				MrUrl: mrURL,

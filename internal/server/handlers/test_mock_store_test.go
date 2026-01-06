@@ -226,6 +226,12 @@ type mockStore struct {
 	countJobsByRunAndStatusResult int64
 	countJobsByRunAndStatusErr    error
 
+	// CountJobsByRunRepoAttemptGroupByStatus tracking (v1 repo-scoped progression)
+	countJobsByRunRepoAttemptGroupByStatusCalled bool
+	countJobsByRunRepoAttemptGroupByStatusParams store.CountJobsByRunRepoAttemptGroupByStatusParams
+	countJobsByRunRepoAttemptGroupByStatusResult []store.CountJobsByRunRepoAttemptGroupByStatusRow
+	countJobsByRunRepoAttemptGroupByStatusErr    error
+
 	// UpdateJobStatus tracking
 	updateJobStatusCalled bool
 	updateJobStatusParams store.UpdateJobStatusParams
@@ -777,6 +783,14 @@ func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.Count
 		return count, nil
 	}
 	return m.countJobsByRunAndStatusResult, nil
+}
+
+// CountJobsByRunRepoAttemptGroupByStatus returns job counts by status for a repo attempt.
+// Used by maybeUpdateRunRepoStatus for v1 repo-scoped terminal detection.
+func (m *mockStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {
+	m.countJobsByRunRepoAttemptGroupByStatusCalled = true
+	m.countJobsByRunRepoAttemptGroupByStatusParams = arg
+	return m.countJobsByRunRepoAttemptGroupByStatusResult, m.countJobsByRunRepoAttemptGroupByStatusErr
 }
 
 func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {

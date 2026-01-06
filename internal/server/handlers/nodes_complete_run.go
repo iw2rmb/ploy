@@ -13,6 +13,114 @@ import (
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
+// maybeUpdateRunRepoStatus derives and persists run_repos.status from job outcomes.
+// Called after a job completes to check if the repo attempt has reached a terminal state.
+//
+// Per roadmap/v1/statuses.md:193 and roadmap/v1/scope.md:98:
+// - On job terminal for the last step in a repo: compute and persist run_repos.status.
+// - MR jobs (mod_type='mr') are excluded from terminal computation.
+//
+// Terminal status derivation rules:
+// - Success: all jobs completed with status=Success
+// - Fail: any job completed with status=Fail
+// - Cancelled: all jobs are terminal and at least one is Cancelled (no Fail)
+//
+// Returns true if the repo status was updated to terminal, false otherwise.
+func maybeUpdateRunRepoStatus(
+	ctx context.Context,
+	st store.Store,
+	runID string,
+	repoID string,
+	attempt int32,
+) (bool, error) {
+	// Count jobs by status for this repo attempt, excluding MR jobs.
+	// MR jobs are auxiliary post-run jobs that must not affect run_repos/runs status.
+	counts, err := st.CountJobsByRunRepoAttemptGroupByStatus(ctx, store.CountJobsByRunRepoAttemptGroupByStatusParams{
+		RunID:   runID,
+		RepoID:  repoID,
+		Attempt: attempt,
+	})
+	if err != nil {
+		return false, fmt.Errorf("count jobs by repo attempt: %w", err)
+	}
+
+	// If no jobs (excluding MR), nothing to compute.
+	if len(counts) == 0 {
+		return false, nil
+	}
+
+	// Tally job statuses to determine if repo is terminal.
+	var (
+		total        int32
+		terminal     int32
+		anySuccess   bool
+		anyFail      bool
+		anyCancelled bool
+	)
+	for _, row := range counts {
+		total += row.Count
+		switch row.Status {
+		case store.JobStatusSuccess:
+			terminal += row.Count
+			anySuccess = true
+		case store.JobStatusFail:
+			terminal += row.Count
+			anyFail = true
+		case store.JobStatusCancelled:
+			terminal += row.Count
+			anyCancelled = true
+		}
+		// Created, Queued, Running are non-terminal
+	}
+
+	// If not all jobs are terminal, repo is still in progress.
+	if terminal < total {
+		return false, nil
+	}
+
+	// All jobs are terminal; derive repo status.
+	// Priority: Fail > Cancelled > Success (per v1 rules).
+	var repoStatus store.RunRepoStatus
+	switch {
+	case anyFail:
+		// Any failure means repo failed.
+		repoStatus = store.RunRepoStatusFail
+	case anyCancelled:
+		// No failures but some cancelled means repo cancelled.
+		repoStatus = store.RunRepoStatusCancelled
+	case anySuccess:
+		// All jobs succeeded means repo succeeded.
+		repoStatus = store.RunRepoStatusSuccess
+	default:
+		// Should not happen if we have terminal jobs, but guard against edge cases.
+		slog.Warn("maybeUpdateRunRepoStatus: unexpected job status distribution",
+			"run_id", runID,
+			"repo_id", repoID,
+			"attempt", attempt,
+			"counts", counts,
+		)
+		return false, nil
+	}
+
+	// Update run_repos.status and finished_at timestamp.
+	if err := st.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
+		RunID:  runID,
+		RepoID: repoID,
+		Status: repoStatus,
+	}); err != nil {
+		return false, fmt.Errorf("update run repo status: %w", err)
+	}
+
+	slog.Info("run repo completed",
+		"run_id", runID,
+		"repo_id", repoID,
+		"attempt", attempt,
+		"status", repoStatus,
+	)
+
+	return true, nil
+}
+
 // maybeCompleteMultiStepRun is kept for handler compatibility, but v1 completion is repo-aggregate:
 // - runs.status transitions to Finished only when all run_repos are terminal (Success/Fail/Cancelled).
 // - success/failure is derived from repo outcomes (not stored on runs.status).

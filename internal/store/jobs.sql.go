@@ -91,6 +91,50 @@ func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRu
 	return count, err
 }
 
+const countJobsByRunRepoAttemptGroupByStatus = `-- name: CountJobsByRunRepoAttemptGroupByStatus :many
+SELECT status, COUNT(*)::int AS count
+FROM jobs
+WHERE run_id = $1
+  AND repo_id = $2
+  AND attempt = $3
+  AND mod_type != 'mr'
+GROUP BY status
+`
+
+type CountJobsByRunRepoAttemptGroupByStatusParams struct {
+	RunID   string `json:"run_id"`
+	RepoID  string `json:"repo_id"`
+	Attempt int32  `json:"attempt"`
+}
+
+type CountJobsByRunRepoAttemptGroupByStatusRow struct {
+	Status JobStatus `json:"status"`
+	Count  int32     `json:"count"`
+}
+
+// Counts jobs by status for a specific repo attempt, excluding MR jobs.
+// Used by repo-scoped terminal detection per roadmap/v1/statuses.md:193.
+// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+func (q *Queries) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countJobsByRunRepoAttemptGroupByStatus, arg.RunID, arg.RepoID, arg.Attempt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountJobsByRunRepoAttemptGroupByStatusRow{}
+	for rows.Next() {
+		var i CountJobsByRunRepoAttemptGroupByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createJob = `-- name: CreateJob :one
 INSERT INTO jobs (
   id,

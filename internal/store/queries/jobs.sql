@@ -231,3 +231,15 @@ SET status = $2,
     duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000,
     meta = $4
 WHERE id = $1;
+
+-- name: CountJobsByRunRepoAttemptGroupByStatus :many
+-- Counts jobs by status for a specific repo attempt, excluding MR jobs.
+-- Used by repo-scoped terminal detection per roadmap/v1/statuses.md:193.
+-- MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+SELECT status, COUNT(*)::int AS count
+FROM jobs
+WHERE run_id = $1
+  AND repo_id = $2
+  AND attempt = $3
+  AND mod_type != 'mr'
+GROUP BY status;
