@@ -27,12 +27,12 @@ import (
 // Only boolean true values trigger MR creation; non-boolean values are ignored.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool {
-	if terminalStatus == "Success" {
+	if terminalStatus == JobStatusSuccess.String() {
 		if mrOnSuccess, ok := manifest.OptionBool("mr_on_success"); ok && mrOnSuccess {
 			return true
 		}
 	}
-	if terminalStatus == "Fail" {
+	if terminalStatus == JobStatusFail.String() {
 		if mrOnFail, ok := manifest.OptionBool("mr_on_fail"); ok && mrOnFail {
 			return true
 		}

@@ -109,7 +109,10 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 		}
 
 		// Skip healing diffs in the patch chain.
-		if d.Summary.ModType() == "healing" {
+		// Healing diffs are filtered out during rehydration to avoid applying
+		// intermediate healing states. Discrete healing jobs use DiffModTypeMod
+		// so their changes are included in the rehydration chain.
+		if d.Summary.ModType() == DiffModTypeHealing.String() {
 			continue
 		}
 
