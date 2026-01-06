@@ -80,8 +80,8 @@ Notes:
 
 Change entry: reshape execution model to `runs` → `run_repos` and make jobs repo-scoped.
 
-- Current (HEAD): batch execution uses `run_repos.execution_run_id` (child “execution run” per repo) and jobs/diffs/logs/events attach to that child run (see `internal/store/schema.sql`, `internal/store/queries/run_repos.sql`, and scheduling in `internal/server/handlers/runs_batch_scheduler.go`).
-- Proposed (v1): remove per-repo execution runs; use a single `runs` row with per-repo `run_repos` rows, and add `jobs.repo_id` + `jobs.repo_base_ref` to attribute artifacts to repos.
+- Current (HEAD): no per-repo execution runs. Batch execution uses one `runs` row with per-repo `run_repos` rows; jobs are repo-scoped (`jobs.repo_id`, `jobs.repo_base_ref`, `jobs.attempt`) and artifacts attach via `job_id` (see `internal/store/schema.sql`, `internal/store/queries/run_repos.sql`, and scheduling in `internal/server/handlers/runs_batch_scheduler.go`).
+- Proposed (v1): unchanged for this slice; remaining work focuses on repo-scoped progression and status derivation (see `roadmap/v1/scope.md` and `roadmap/v1/statuses.md`).
 - Where: `internal/store/schema.sql` (`runs`, `run_repos`, `jobs`) and refactors in `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/runs_batch_scheduler.go`, `internal/server/handlers/nodes_complete_run.go`.
 - Compatibility: breaking DB + scheduling semantics; no backward compatibility required.
 - Unchanged: job lifecycle ingestion remains job-addressed (jobs are still completed via job ID), but v1 renames status strings per `roadmap/v1/statuses.md`.
