@@ -102,6 +102,11 @@ func TestClaimJob_Success(t *testing.T) {
 	if resp["target_ref"] != "feature-branch" {
 		t.Fatalf("expected target_ref feature-branch, got %v", resp["target_ref"])
 	}
+	// v1: run status should be "Started" (not HEAD literals like "assigned"/"running").
+	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
+	if resp["status"] != "Started" {
+		t.Fatalf("expected status Started, got %v", resp["status"])
+	}
 
 	spec, ok := resp["spec"].(map[string]any)
 	if !ok {

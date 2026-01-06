@@ -20,18 +20,23 @@ import (
 // claimJobHandler allows nodes to claim a queued job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
 //
-// v1:
-// - claimable jobs have status='Queued'
+// v1 status rules (per roadmap/v1/statuses.md):
+// - claimable jobs have status='Queued'; claimed jobs transition to 'Running'
+// - normal jobs are claimable only when runs.status='Started'
+// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+// - on first claim for a repo attempt, run_repos.status transitions Queued → Running
 // - repo progression is attempt-scoped (run_id, repo_id, attempt)
+//
+// v1 response includes repo attribution (per roadmap/v1/scope.md:84):
+// - repo_url: from mod_repos (since runs no longer have repo_url fields)
+// - base_ref: from jobs.repo_base_ref (snapshot at job creation)
+// - target_ref: from run_repos.repo_target_ref (snapshot at run_repos creation)
 //
 // Jobs are claimed from a single unified queue (FIFO by step_index). There is no
 // separate Build Gate queue or claim path — all job types (pre-gate, mod, heal,
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
-//
-// When the run transitions from 'queued' to 'running' on first job claim, the handler
-// publishes an SSE "running" event so clients can track run lifecycle in real-time.
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
@@ -67,7 +72,9 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			return
 		}
 
-		// Mark the claimed repo as Running (idempotent), setting started_at if needed.
+		// v1 repo status transition: Queued → Running on first claim for repo attempt.
+		// Per roadmap/v1/statuses.md:84, this is idempotent (already Running repos stay Running).
+		// The UpdateRunRepoStatus query sets started_at on first transition to Running.
 		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
 			RunID:  job.RunID,
 			RepoID: job.RepoID,

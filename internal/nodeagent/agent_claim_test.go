@@ -29,11 +29,13 @@ func TestClaimLoop(t *testing.T) {
 		case "/v1/nodes/test-node/claim":
 			calls = append(calls, "claim")
 			// Return a run to claim.
+			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+			// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
 			resp := ClaimResponse{
 				RunID:     types.RunID("run-123"),
 				JobID:     types.JobID("job-123"),
 				RepoURL:   "https://github.com/test/repo",
-				Status:    "assigned",
+				Status:    "Started",
 				NodeID:    types.NodeID("test-node"),
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
@@ -291,11 +293,12 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 			}
 
 			// Return success to reset backoff.
+			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 			resp := ClaimResponse{
 				RunID:     types.RunID("run-reset"),
 				JobID:     types.JobID("job-reset"),
 				RepoURL:   "https://github.com/test/repo",
-				Status:    "assigned",
+				Status:    "Started",
 				NodeID:    types.NodeID("test-node"),
 				BaseRef:   "main",
 				TargetRef: "feature",
@@ -388,11 +391,13 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	t.Parallel()
 
 	commit := "deadbeef"
+	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
 	claim := ClaimResponse{
 		RunID:     types.RunID("run-map-1"),
 		JobID:     types.JobID("job-map-1"),
 		RepoURL:   "https://github.com/acme/thing.git",
-		Status:    "assigned",
+		Status:    "Started",
 		NodeID:    types.NodeID("test-node"),
 		BaseRef:   "main",
 		TargetRef: "feature/x",
@@ -470,12 +475,14 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 
 	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
 	commit := "abc123"
+	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
 	claim := ClaimResponse{
 		RunID:     types.RunID("run-step-map"),
 		JobID:     types.JobID("job-123-step-map"),
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi.git",
-		Status:    "assigned",
+		Status:    "Started",
 		NodeID:    types.NodeID("test-node"),
 		BaseRef:   "main",
 		TargetRef: "feature/multi-step",
@@ -562,13 +569,15 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	commit := "deadbeef"
 
 	// Node1 claims job 0 (pre-gate).
+	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
 	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
 		RunID:     runID,
 		JobID:     types.JobID("job-node1-pregate"),
 		JobName:   "pre-gate",
 		RepoURL:   "https://github.com/acme/multi-node.git",
-		Status:    "assigned",
+		Status:    "Started",
 		NodeID:    types.NodeID("node-1"),
 		BaseRef:   "main",
 		TargetRef: "feature/parallel-steps",
@@ -579,13 +588,14 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	}
 
 	// Node2 claims job 1 (mod-0).
+	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
 		RunID:     runID,
 		JobID:     types.JobID("job-node2-mod0"),
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi-node.git",
-		Status:    "assigned",
+		Status:    "Started",
 		NodeID:    types.NodeID("node-2"),
 		BaseRef:   "main",
 		TargetRef: "feature/parallel-steps",
