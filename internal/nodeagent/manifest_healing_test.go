@@ -29,6 +29,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			name: "all repo metadata present",
 			req: StartRunRequest{
 				RunID:     types.RunID("test-run-1"),
+				JobID:     types.JobID("test-job-1"),
 				RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"),
 				BaseRef:   types.GitRef("main"),
 				TargetRef: types.GitRef("e2e/fail-missing-symbol"),
@@ -48,6 +49,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			name: "only repo_url and base_ref present",
 			req: StartRunRequest{
 				RunID:   types.RunID("test-run-2"),
+				JobID:   types.JobID("test-job-2"),
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("develop"),
 			},
@@ -64,6 +66,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			name: "empty strings are not injected",
 			req: StartRunRequest{
 				RunID:     types.RunID("test-run-3"),
+				JobID:     types.JobID("test-job-3"),
 				RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef:   types.GitRef(""),
 				TargetRef: types.GitRef("   "), // whitespace only
@@ -81,6 +84,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			name: "mod env is preserved alongside repo metadata",
 			req: StartRunRequest{
 				RunID:   types.RunID("test-run-4"),
+				JobID:   types.JobID("test-job-4"),
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
@@ -104,6 +108,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			name: "mod env can override repo metadata if specified",
 			req: StartRunRequest{
 				RunID:   types.RunID("test-run-5"),
+				JobID:   types.JobID("test-job-5"),
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
@@ -166,6 +171,7 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-mutate"),
+		JobID:     types.JobID("test-job-mutate"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
@@ -202,6 +208,7 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:   types.RunID("test-run-nil-env"),
+		JobID:   types.JobID("test-job-nil-env"),
 		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef: types.GitRef("main"),
 	}
@@ -250,6 +257,7 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:   types.RunID("test-run-validation"),
+		JobID:   types.JobID("test-job-validation"),
 		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef: types.GitRef("main"),
 	}
@@ -362,6 +370,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:   types.RunID("test-run-codex-resume"),
+		JobID:   types.JobID("test-job-codex-resume"),
 		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef: types.GitRef("main"),
 	}
@@ -397,6 +406,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:   types.RunID("test-run-preserve-env"),
+		JobID:   types.JobID("test-job-preserve-env"),
 		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef: types.GitRef("main"),
 	}

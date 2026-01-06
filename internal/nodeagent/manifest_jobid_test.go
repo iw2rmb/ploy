@@ -35,24 +35,22 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 		}
 	})
 
-	t.Run("falls back to RunID when JobID is empty", func(t *testing.T) {
+	t.Run("requires JobID", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-fallback-789"),
 			RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
 			BaseRef:      types.GitRef("main"),
 			TypedOptions: parseRunOptions(nil),
-			// JobID intentionally omitted (zero value).
+			// JobID intentionally omitted.
 		}
 
 		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("buildManifestFromRequest error: %v", err)
+		if err == nil {
+			t.Fatalf("expected error when JobID is missing")
 		}
-
-		// Manifest ID should fall back to RunID.
-		if manifest.ID.String() != req.RunID.String() {
-			t.Errorf("manifest.ID = %q, want RunID %q", manifest.ID, req.RunID)
+		if manifest.ID.String() != "" {
+			t.Fatalf("expected empty manifest on error, got ID %q", manifest.ID.String())
 		}
 	})
 
@@ -165,15 +163,9 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			Image: contracts.ModImage{Universal: "healer:latest"},
 		}
 
-		manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest error: %v", err)
-		}
-
-		// Healing manifest ID should fall back to RunID with heal suffix.
-		wantID := "run-heal-fallback-heal-0"
-		if manifest.ID.String() != wantID {
-			t.Errorf("healing manifest.ID = %q, want %q", manifest.ID, wantID)
+		_, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+		if err == nil {
+			t.Fatalf("expected error when JobID is missing")
 		}
 	})
 
@@ -225,6 +217,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 	req := StartRunRequest{
 		RunID:   types.RunID("run-opts-1"),
+		JobID:   types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
 		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
 		BaseRef: types.GitRef("main"),
 		TypedOptions: parseRunOptions(map[string]any{

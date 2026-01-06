@@ -162,6 +162,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
 		RunID:        types.RunID("run-e2e-env-test"),
+		JobID:        types.JobID("job-e2e-env-456"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("feature/global-env"),
@@ -231,6 +232,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-gate-env-test"),
+		JobID:        types.JobID("job-gate-env-test"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TypedOptions: parseRunOptions(opts),
@@ -309,6 +311,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-multi-step-env"),
+		JobID:        types.JobID("job-multi-step-env"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		TypedOptions: parseRunOptions(opts),
 		Env:          env, // Global env from spec.
@@ -366,6 +369,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("run-healing-env-test"),
+		JobID:     types.JobID("job-healing-env-test"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/healing"),
@@ -435,6 +439,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-no-filter-test"),
+		JobID:        types.JobID("job-no-filter-test"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		TypedOptions: parseRunOptions(opts),
 		Env:          env,

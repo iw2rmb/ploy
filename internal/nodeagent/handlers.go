@@ -142,6 +142,9 @@ func validateStartRunRequest(req StartRunRequest) error {
 	if req.RunID.IsZero() {
 		return fmt.Errorf("run_id is required")
 	}
+	if req.JobID.IsZero() {
+		return fmt.Errorf("job_id is required")
+	}
 	if strings.TrimSpace(req.RepoURL.String()) == "" {
 		return fmt.Errorf("repo_url is required")
 	}

@@ -17,6 +17,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("valid request with all fields", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:        types.RunID("run-123"),
+			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
 			BaseRef:      types.GitRef("main"),
 			TargetRef:    types.GitRef("feature-branch"),
@@ -33,9 +34,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		// When no JobID is provided, manifest.ID falls back to RunID.
-		if manifest.ID.String() != req.RunID.String() {
-			t.Errorf("expected ID %q (fallback to RunID), got %q", req.RunID, manifest.ID.String())
+		// Manifest IDs are unique per job.
+		if manifest.ID.String() != req.JobID.String() {
+			t.Errorf("expected ID %q (JobID), got %q", req.JobID, manifest.ID.String())
 		}
 		if manifest.Image != "ubuntu:latest" {
 			t.Errorf("expected default image ubuntu:latest, got %q", manifest.Image)
@@ -105,6 +106,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("missing repo_url", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:        types.RunID("run-123"),
+			JobID:        types.JobID("job-123"),
 			TypedOptions: parseRunOptions(nil),
 		}
 
@@ -121,6 +123,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("defaults target_ref from base_ref", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:        types.RunID("run-123"),
+			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
 			BaseRef:      types.GitRef("main"),
 			TypedOptions: parseRunOptions(nil),
@@ -140,6 +143,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("validates manifest", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:        types.RunID("run-123"),
+			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
 			TargetRef:    types.GitRef("main"),
 			TypedOptions: parseRunOptions(nil),
@@ -160,6 +164,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("command option string maps to shell", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-123"),
+			JobID:   types.JobID("job-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"command": "echo hi",
@@ -188,6 +193,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-123"),
+			JobID:   types.JobID("job-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"image": "docker.io/example/mods-openrewrite:latest",
@@ -209,6 +215,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("placeholder command injected only for default ubuntu image", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:        types.RunID("run-456"),
+			JobID:        types.JobID("job-456"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(nil), // Empty options to use defaults
 		}
@@ -231,6 +238,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("gitlab options are extracted and stored in manifest", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-789"),
+			JobID:   types.JobID("job-789"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"gitlab_pat":       "glpat-secret-token",
@@ -267,6 +275,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("gitlab options are trimmed and only included when non-empty", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-890"),
+			JobID:   types.JobID("job-890"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"gitlab_pat":    "  trimmed-token  ",
@@ -292,6 +301,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("multi-step run builds manifest for each step from steps array", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-123"),
+			JobID:   types.JobID("job-multi-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			BaseRef: types.GitRef("main"),
 			Env:     map[string]string{"BASE_VAR": "base_value"},
@@ -370,6 +380,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("multi-step run: step env overrides base env", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-456"),
+			JobID:   types.JobID("job-multi-456"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Env:     map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"},
 			TypedOptions: parseRunOptions(map[string]any{
@@ -400,6 +411,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("multi-step run: step index out of range returns error", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-789"),
+			JobID:   types.JobID("job-multi-789"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"steps": []any{
@@ -422,6 +434,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("single-step run: stepIndex is ignored when Steps is empty", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-single-123"),
+			JobID:   types.JobID("job-single-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: parseRunOptions(map[string]any{
 				"image":   "single-mod:latest",
@@ -465,6 +478,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-gate-001"),
+			JobID:        types.JobID("job-gate-001"),
 			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			BaseRef:      types.GitRef("main"),
 			TargetRef:    types.GitRef("feature/gate-wiring"),
@@ -498,6 +512,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-gate-002"),
+			JobID:        types.JobID("job-gate-002"),
 			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			BaseRef:      types.GitRef("main"),
 			TargetRef:    types.GitRef("feature/gate-wiring"),
@@ -521,6 +536,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-gate-003"),
+			JobID:        types.JobID("job-gate-003"),
 			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			BaseRef:      types.GitRef("main"),
 			TypedOptions: parseRunOptions(nil),
@@ -543,6 +559,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-gate-004"),
+			JobID:        types.JobID("job-gate-004"),
 			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			TypedOptions: parseRunOptions(nil),
 			// No refs at all.
@@ -567,6 +584,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:        types.RunID("run-gate-005"),
+			JobID:        types.JobID("job-gate-005"),
 			RepoURL:      types.RepoURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
 			CommitSHA:    types.CommitSHA("  abc123  "),
 			TypedOptions: parseRunOptions(nil),
@@ -593,6 +611,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:     types.RunID("run-gate-006"),
+			JobID:     types.JobID("job-gate-006"),
 			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
 			TargetRef: types.GitRef("main"),
 			TypedOptions: parseRunOptions(map[string]any{
@@ -634,6 +653,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:   types.RunID("run-gate-stack-aware"),
+		JobID:   types.JobID("job-gate-stack-aware"),
 		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		BaseRef: types.GitRef("main"),
 		TypedOptions: parseRunOptions(map[string]any{
