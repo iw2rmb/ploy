@@ -219,10 +219,12 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-postgate-heal"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),

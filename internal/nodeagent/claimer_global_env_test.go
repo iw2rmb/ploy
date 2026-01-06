@@ -10,7 +10,7 @@
 //     pass through the full claim → manifest pipeline without filtering.
 //   - Per-run env values override global env when both are present.
 //   - Gate manifests (buildGateManifestFromRequest) preserve env vars.
-//   - Multi-step runs (mods[]) merge base env with step-specific env.
+//   - Multi-step runs (steps[]) merge base env with step-specific env.
 //
 // These tests complement the server-side spec_utils_global_env_test.go which
 // verifies mergeGlobalEnvIntoSpec semantics. Together they form an end-to-end
@@ -43,6 +43,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			name: "global_env_vars_extracted",
 			spec: json.RawMessage(`{
 				"job_id": "job-global-env-123",
+				"steps": [{"image": "docker.io/test/mod:latest"}],
 				"env": {
 					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
 					"CODEX_AUTH_JSON": "{\"api_key\":\"sk-xxx\",\"org_id\":\"org-yyy\"}",
@@ -60,6 +61,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			// be merged into the container env map.
 			name: "nested_env_not_merged",
 			spec: json.RawMessage(`{
+					"steps": [{"image": "docker.io/test/mod:latest"}],
 					"env": {
 						"GLOBAL_VAR": "global_value",
 						"SHARED_VAR": "top_level_value"
@@ -69,9 +71,9 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 						"env": {
 							"MOD_VAR": "mod_value",
 							"SHARED_VAR": "mod_ignored"
+						}
 					}
-				}
-			}`),
+				}`),
 			wantEnv: map[string]string{
 				// Only top-level env is extracted; mod.env is ignored.
 				"GLOBAL_VAR": "global_value",
@@ -82,6 +84,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		{
 			name: "empty_env_values_preserved",
 			spec: json.RawMessage(`{
+				"steps": [{"image": "docker.io/test/mod:latest"}],
 				"env": {
 					"EMPTY_VAR": "",
 					"WHITESPACE_VAR": "   "
@@ -95,6 +98,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		{
 			name: "multiline_cert_bundle_preserved",
 			spec: json.RawMessage(`{
+				"steps": [{"image": "docker.io/test/mod:latest"}],
 				"env": {
 					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----"
 				}
@@ -142,6 +146,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	// Simulate a spec with global env vars injected by the server.
 	specJSON := json.RawMessage(`{
 		"job_id": "job-e2e-env-456",
+		"steps": [{"image": "docker.io/test/mod:latest"}],
 		"gitlab_pat": "glpat-test-token",
 		"env": {
 			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
@@ -203,6 +208,14 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	// Note: build_gate is specified as a nested object which parseSpec flattens
 	// to build_gate_enabled and build_gate_profile in opts.
 	specJSON := json.RawMessage(`{
+		"steps": [
+			{
+				"image": {
+					"java-maven": "docker.io/test/maven-mod:latest",
+					"java-gradle": "docker.io/test/gradle-mod:latest"
+				}
+			}
+		],
 		"build_gate": {
 			"enabled": true,
 			"profile": "java-maven"
@@ -211,15 +224,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 			"CA_CERTS_PEM_BUNDLE": "gate-test-cert-bundle",
 			"CODEX_AUTH_JSON": "gate-codex-auth",
 			"GATE_SPECIFIC_VAR": "gate_value"
-		},
-		"mods": [
-			{
-				"image": {
-					"java-maven": "docker.io/test/maven-mod:latest",
-					"java-gradle": "docker.io/test/gradle-mod:latest"
-				}
-			}
-		]
+		}
 	}`)
 
 	opts, env, typedOpts := parseSpec(specJSON)
@@ -269,11 +274,11 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 }
 
 // TestGlobalEnvPropagation_MultiStepRun verifies that global env vars are
-// correctly merged with step-specific env in multi-step runs (mods[] array).
+// correctly merged with step-specific env in multi-step runs (steps[] array).
 //
 // The merge semantics are:
 //  1. Base env (req.Env) provides global defaults.
-//  2. Step-specific env (mods[i].env) overrides on conflict.
+//  2. Step-specific env (steps[i].env) overrides on conflict.
 func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	t.Parallel()
 
@@ -283,7 +288,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 			"SHARED_VAR": "global_default",
 			"CA_CERTS_PEM_BUNDLE": "global-cert-bundle"
 		},
-		"mods": [
+		"steps": [
 			{
 				"image": "step0-mod:latest",
 				"env": {
@@ -412,6 +417,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 
 	// Test various env key patterns that might be incorrectly filtered.
 	specJSON := json.RawMessage(`{
+		"steps": [{"image": "docker.io/test/mod:latest"}],
 		"env": {
 			"NORMAL_KEY": "value1",
 			"lowercase_key": "value2",

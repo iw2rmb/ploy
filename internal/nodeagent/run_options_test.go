@@ -31,15 +31,17 @@ func TestParseRunOptions_HealingConfig(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(3), // JSON unmarshals numbers as float64
-			"mod": map[string]any{
-				"image":   "docker.io/test/heal:v1",
-				"command": "heal.sh",
-				"env": map[string]any{
-					"MODE": "auto",
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": float64(3), // JSON unmarshals numbers as float64
+				"mod": map[string]any{
+					"image":   "docker.io/test/heal:v1",
+					"command": "heal.sh",
+					"env": map[string]any{
+						"MODE": "auto",
+					},
+					"retain_container": true,
 				},
-				"retain_container": true,
 			},
 		},
 	}
@@ -79,11 +81,13 @@ func TestParseRunOptions_HealingWithArrayCommand(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": 1,
-			"mod": map[string]any{
-				"image":   "docker.io/test/heal:v2",
-				"command": []any{"/bin/sh", "-c", "echo healing"},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": 1,
+				"mod": map[string]any{
+					"image":   "docker.io/test/heal:v2",
+					"command": []any{"/bin/sh", "-c", "echo healing"},
+				},
 			},
 		},
 	}
@@ -217,9 +221,11 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
-		"image": "docker.io/test/mod:latest",
-		"command": "run-test.sh",
-		"retain_container": true,
+		"steps": [{
+			"image": "docker.io/test/mod:latest",
+			"command": "run-test.sh",
+			"retain_container": true
+		}],
 		"build_gate": {
 			"enabled": false,
 			"profile": "java-auto"
@@ -276,7 +282,7 @@ func TestParseSpec_ModIndexPropagatesToTypedOptions(t *testing.T) {
 
 	specJSON := `{
 		"mod_index": 1,
-		"mods": [
+		"steps": [
 			{"image":"docker.io/test/step-a:v1"},
 			{"image":"docker.io/test/step-b:v1"}
 		]
@@ -295,18 +301,18 @@ func TestParseSpec_ModIndexPropagatesToTypedOptions(t *testing.T) {
 }
 
 // TestParseSpec_ImageMap_PopulatesExecutionImage verifies that a single-step
-// spec using top-level image as a stack-aware map is parsed into Execution.Image.
-// Uses the canonical single-step format with top-level image field.
+// spec using steps[0].image as a stack-aware map is parsed into Execution.Image.
 func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	t.Parallel()
 
-	// Canonical single-step format: top-level image field (stack-aware map).
 	specJSON := `{
-		"image": {
-			"default": "docker.io/user/mods-orw:latest",
-			"java-maven": "docker.io/user/mods-orw-maven:latest",
-			"java-gradle": "docker.io/user/mods-orw-gradle:latest"
-		}
+		"steps": [{
+			"image": {
+				"default": "docker.io/user/mods-orw:latest",
+				"java-maven": "docker.io/user/mods-orw-maven:latest",
+				"java-gradle": "docker.io/user/mods-orw-gradle:latest"
+			}
+		}]
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
@@ -431,16 +437,16 @@ func TestExecutionCommand_ToSlice(t *testing.T) {
 	})
 }
 
-// TestParseRunOptions_MultiStepMods verifies that parseRunOptions correctly
-// extracts the Steps slice from mods[] array in multi-step run specs.
+// TestParseRunOptions_MultiStepSteps verifies that parseRunOptions correctly
+// extracts the Steps slice from steps[] array in multi-step run specs.
 // For multi-step runs, RunOptions.Steps is populated; for single-step runs,
 // Steps remains empty and Execution options are used.
-func TestParseRunOptions_MultiStepMods(t *testing.T) {
+func TestParseRunOptions_MultiStepSteps(t *testing.T) {
 	t.Parallel()
 
-	// Multi-step spec with 3 mods entries.
+	// Multi-step spec with 3 steps entries.
 	opts := map[string]any{
-		"mods": []any{
+		"steps": []any{
 			map[string]any{
 				"image":   "docker.io/test/step1:v1",
 				"command": "migrate-java8.sh",
@@ -540,18 +546,18 @@ func TestParseRunOptions_MultiStepMods(t *testing.T) {
 	}
 }
 
-// TestParseRunOptions_EmptyModsArray verifies that an empty mods[] array
+// TestParseRunOptions_EmptyStepsArray verifies that an empty steps[] array
 // results in empty Steps slice (not nil).
-func TestParseRunOptions_EmptyModsArray(t *testing.T) {
+func TestParseRunOptions_EmptyStepsArray(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"mods": []any{},
+		"steps": []any{},
 	}
 
 	runOpts := parseRunOptions(opts)
 
-	// Empty mods[] should not populate Steps (len=0, not nil).
+	// Empty steps[] should not populate Steps (len=0, not nil).
 	if len(runOpts.Steps) != 0 {
 		t.Errorf("expected empty steps slice, got %d steps", len(runOpts.Steps))
 	}
@@ -590,12 +596,12 @@ func TestParseRunOptions_SingleStepHasNoSteps(t *testing.T) {
 }
 
 // TestParseSpec_MultiStepProducesTypedSteps verifies that parseSpec correctly
-// produces typed RunOptions.Steps for multi-step specs with mods[] array.
+// produces typed RunOptions.Steps for multi-step specs with steps[] array.
 func TestParseSpec_MultiStepProducesTypedSteps(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
-		"mods": [
+		"steps": [
 			{
 				"image": "docker.io/test/step-a:v1",
 				"command": "step-a.sh",
@@ -707,19 +713,21 @@ func TestParseRunOptions_StackAwareImage(t *testing.T) {
 }
 
 // TestParseRunOptions_HealingStackAwareImage verifies that healing mods
-// with stack-aware image maps are correctly parsed from build_gate_healing.mod.
+// with stack-aware image maps are correctly parsed from build_gate.healing.mod.
 func TestParseRunOptions_HealingStackAwareImage(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": 1,
-			"mod": map[string]any{
-				"image": map[string]any{
-					"default":    "docker.io/user/heal:latest",
-					"java-maven": "docker.io/user/heal-maven:latest",
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": 1,
+				"mod": map[string]any{
+					"image": map[string]any{
+						"default":    "docker.io/user/heal:latest",
+						"java-maven": "docker.io/user/heal-maven:latest",
+					},
+					"command": "heal.sh",
 				},
-				"command": "heal.sh",
 			},
 		},
 	}
@@ -757,7 +765,7 @@ func TestParseRunOptions_MultiStepStackAwareImage(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"mods": []any{
+		"steps": []any{
 			map[string]any{
 				"image": map[string]any{
 					"default":     "docker.io/user/step1:latest",

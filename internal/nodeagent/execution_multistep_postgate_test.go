@@ -114,8 +114,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		},
 	}
 
-	// Build a two-step request: mods[0] and mods[1].
-	// Only mods[0] should complete successfully; mods[1] should fail on post-gate.
+	// Build a two-step request: steps[0] and steps[1].
+	// Only steps[0] should complete successfully; steps[1] should fail on post-gate.
 	req := StartRunRequest{
 		RunID:     types.RunID("test-postgate-stops"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
@@ -123,8 +123,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
 		TypedOptions: parseRunOptions(map[string]any{
-			// Multi-step mods array with 2 entries.
-			"mods": []any{
+			// Multi-step steps array with 2 entries.
+			"steps": []any{
 				map[string]any{
 					"image": "test/mod-step0:latest",
 				},
@@ -327,7 +327,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
 		TypedOptions: parseRunOptions(map[string]any{
-			"mods": []any{
+			"steps": []any{
 				map[string]any{
 					"image": "test/mod-step0:latest",
 				},
@@ -335,10 +335,12 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 					"image": "test/mod-step1:latest",
 				},
 			},
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "test/healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "test/healer:latest",
+					},
 				},
 			},
 		}),
