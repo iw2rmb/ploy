@@ -370,23 +370,6 @@ func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
 func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 	spec := &ModsSpec{}
 
-	// Reject legacy spec shapes explicitly to avoid silent no-op parsing.
-	if _, ok := raw["mod"]; ok {
-		return nil, fmt.Errorf("mod: legacy spec shape is not supported; use steps[]")
-	}
-	if _, ok := raw["mods"]; ok {
-		return nil, fmt.Errorf("mods: renamed to steps")
-	}
-	if _, ok := raw["image"]; ok {
-		return nil, fmt.Errorf("image: moved under steps[0].image")
-	}
-	if _, ok := raw["command"]; ok {
-		return nil, fmt.Errorf("command: moved under steps[0].command")
-	}
-	if _, ok := raw["retain_container"]; ok {
-		return nil, fmt.Errorf("retain_container: moved under steps[0].retain_container")
-	}
-
 	// Parse server-injected fields.
 	if v, ok := raw["job_id"]; ok && v != nil {
 		s, ok := v.(string)
@@ -490,9 +473,6 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			bg.Healing = heal
 		}
 		spec.BuildGate = bg
-	}
-	if _, ok := raw["build_gate_healing"]; ok {
-		return nil, fmt.Errorf("build_gate_healing: renamed to build_gate.healing")
 	}
 
 	// Parse GitLab integration.

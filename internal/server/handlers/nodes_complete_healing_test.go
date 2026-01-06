@@ -18,10 +18,15 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	specID := domaintypes.NewSpecID().String()
 
 	specBytes, err := json.Marshal(map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(2),
-			"mod": map[string]any{
-				"image": "mods-codex:latest",
+		"steps": []any{
+			map[string]any{"image": "mods-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": float64(2),
+				"mod": map[string]any{
+					"image": "mods-codex:latest",
+				},
 			},
 		},
 	})
@@ -109,10 +114,15 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	specID := domaintypes.NewSpecID().String()
 
 	specBytes, err := json.Marshal(map[string]any{
-		"build_gate_healing": map[string]any{
-			"retries": float64(3),
-			"mod": map[string]any{
-				"image": "heal:latest",
+		"steps": []any{
+			map[string]any{"image": "mods-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": float64(3),
+				"mod": map[string]any{
+					"image": "heal:latest",
+				},
 			},
 		},
 	})

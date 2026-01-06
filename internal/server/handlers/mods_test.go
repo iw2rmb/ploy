@@ -74,7 +74,7 @@ func TestMods_Create_WithSpec(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"name": "mod-with-spec",
@@ -951,7 +951,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"spec": spec,
@@ -1010,7 +1010,7 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{
 		"name": "my-named-spec",
@@ -1051,7 +1051,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	spec1 := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody1 := map[string]any{"spec": spec1}
 	body1, _ := json.Marshal(reqBody1)
@@ -1081,7 +1081,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	spec2 := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{"FOO": "bar"},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody2 := map[string]any{"spec": spec2}
 	body2, _ := json.Marshal(reqBody2)
@@ -1175,7 +1175,7 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -1211,7 +1211,7 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -1265,7 +1265,7 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -1297,7 +1297,7 @@ func TestMods_SetSpec_UpdateModSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
