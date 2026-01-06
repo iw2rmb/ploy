@@ -52,7 +52,7 @@ func TestClaimJob_Success(t *testing.T) {
 			RepoID:        repoID,
 			RepoBaseRef:   "main",
 			RepoTargetRef: "feature-branch",
-			Status:        store.RunRepoStatusRunning,
+			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
 		getModRepoResult: store.ModRepo{
@@ -117,6 +117,86 @@ func TestClaimJob_Success(t *testing.T) {
 	}
 	if mi, ok := spec["mod_index"].(float64); !ok || mi != 0 {
 		t.Fatalf("expected spec.mod_index 0, got %v", spec["mod_index"])
+	}
+}
+
+func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := nodeID
+	runID := domaintypes.NewRunID().String()
+	repoID := domaintypes.NewModRepoID().String()
+	specID := domaintypes.NewSpecID().String()
+	jobID := domaintypes.NewJobID().String()
+	now := time.Now().UTC()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeIDStr,
+			Name:        "mr-0",
+			Status:      store.JobStatusRunning,
+			ModType:     domaintypes.ModTypeMR.String(),
+			StepIndex:   2000,
+			Meta:        []byte(`{}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusFinished,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusSuccess,
+			Attempt:       1,
+		},
+		getModRepoResult: store.ModRepo{
+			ID:      repoID,
+			RepoUrl: "https://github.com/user/repo.git",
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
+	req.SetPathValue("id", nodeID)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if len(st.updateRunRepoStatusParams) != 0 {
+		t.Fatalf("expected UpdateRunRepoStatus not to be called for MR jobs")
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["status"] != "Finished" {
+		t.Fatalf("expected status Finished, got %v", resp["status"])
+	}
+	if resp["repo_url"] != "https://github.com/user/repo.git" {
+		t.Fatalf("expected repo_url, got %v", resp["repo_url"])
+	}
+	if resp["base_ref"] != "main" {
+		t.Fatalf("expected base_ref main, got %v", resp["base_ref"])
+	}
+	if resp["target_ref"] != "feature-branch" {
+		t.Fatalf("expected target_ref feature-branch, got %v", resp["target_ref"])
 	}
 }
 
@@ -199,7 +279,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			RepoID:        repoID,
 			RepoBaseRef:   "main",
 			RepoTargetRef: "feature-branch",
-			Status:        store.RunRepoStatusRunning,
+			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
 		getModRepoResult: store.ModRepo{
