@@ -37,8 +37,8 @@ and no further mods execute.
 ### Single-mod runs (no `mods[]`)
 
 > **Note:** A single-repo submission is internally a degenerate batch with one
-> `run_repos` entry. See § 1.4 (Batched Mods Runs) for the parent/child run
-> model and how single-repo runs fit into the unified architecture.
+> `run_repos` entry. See § 1.4 (Batched Mods Runs) for the batch model
+> (`runs` + `run_repos`) and how single-repo runs fit into the unified architecture.
 
 When the spec does **not** contain a `mods[]` array (single-step run using
 top-level `image`/`command`/`env`), the execution sequence is:
@@ -486,16 +486,17 @@ many repos without submitting separate  runs for each.
 
 ### Conceptual model
 
-Batched runs introduce a parent–child relationship between tables:
+Batched runs use a single `runs` row with per-repo `run_repos` rows. Jobs (and all
+artifacts) remain job-addressed via `job_id`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Batch Run Hierarchy                                │
+│                           Batch Run Model                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   ┌─────────────┐          ┌──────────────┐          ┌──────────────┐       │
-│   │  runs (P)   │──────────│  run_repos   │──────────│  runs (C)    │       │
-│   │  (parent)   │  1 : N   │  (mapping)   │  1 : 1   │  (child)     │       │
+│   │    runs     │──────────│  run_repos   │──────────│     jobs     │       │
+│   │ (run-level) │  1 : N   │ (per repo)   │  1 : N   │ (per step)   │       │
 │   └─────────────┘          └──────────────┘          └──────────────┘       │
 │         │                        │                         │                │
 │         │                        │                         │                │
@@ -505,8 +506,6 @@ Batched runs introduce a parent–child relationship between tables:
 │   │  status   │            │ target_ref│             │   logs    │          │
 │   │           │            │  status   │             │ artifacts │          │
 │   └───────────┘            │  attempt  │             └───────────┘          │
-│                            │ execution │                                    │
-│                            │ _run_id   │                                    │
 │                            └───────────┘                                    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -692,7 +691,7 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 
 ### Implementation references
 
-- Parent/child run creation: `internal/server/handlers/runs_batch_http.go`.
+- Run submission + repo add: `internal/server/handlers/runs_submit.go`, `internal/server/handlers/runs_batch_http.go`.
 - Run repos queries: `internal/store/queries/run_repos.sql`.
 - Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
 - CLI subcommands: `cmd/ploy/mod_run_repo.go`.

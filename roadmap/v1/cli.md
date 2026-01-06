@@ -126,8 +126,8 @@ Pull Mods-generated diffs into the current git worktree.
 
 v0 reference:
 
-- Today the CLI implements `ploy mod run pull` (see `cmd/ploy/mod_run_pull.go`) which relies on `run_repos.execution_run_id`.
-- v1 removes `execution_run_id`, so pull must be based on `run_id + repo_id` (`run_repos`) and the repo-scoped run artifacts APIs.
+- Older designs used per-repo execution runs (`run_repos.execution_run_id`).
+- v1 removes per-repo execution runs; pull is based on the run ID plus repo context (repo resolution is done via repo-centric APIs; artifacts are fetched via run/job IDs).
 
 Behavior:
 
