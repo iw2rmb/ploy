@@ -16,7 +16,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -459,15 +458,4 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 		// Multiple exact matches should not happen (name is unique), but handle gracefully.
 		return "", fmt.Errorf("resolve mod: multiple mods found with name %q", ref)
 	}
-}
-
-// decodeHTTPErrorAlt provides an alternative error decoder that extracts more detail.
-// Used internally to provide better error messages.
-func decodeHTTPErrorAlt(resp *http.Response, prefix string) error {
-	data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-	msg := strings.TrimSpace(string(data))
-	if msg == "" {
-		msg = resp.Status
-	}
-	return fmt.Errorf("%s: %s", prefix, msg)
 }
