@@ -51,6 +51,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/mods/{mod_id}/repos/bulk", bulkUpsertModReposHandler(st), auth.RoleControlPlane)
 	// v1 change (roadmap/v1/api.md:202-223, roadmap/v1/scope.md:19): Multi-repo run submission with repo selection (all/failed/explicit).
 	s.HandleFunc("POST /v1/mods/{mod_id}/runs", createModRunHandler(st), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/api.md:57-82): Pull resolution for mod repos (last-succeeded/last-failed).
+	s.HandleFunc("POST /v1/mods/{mod_id}/pull", pullModRepoHandler(st), auth.RoleControlPlane)
 
 	// Legacy routes under /v1/mods/{id}/* for run operations.
 	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
@@ -84,6 +86,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// v1 change (roadmap/v1/scope.md:69-71, roadmap/v1/api.md:263): Repo-scoped diffs listing.
 	// Replaces legacy GET /v1/mods/{id}/diffs with repo-scoped addressing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
+	// v1 change (roadmap/v1/api.md:227-249): Pull resolution for run repos.
+	s.HandleFunc("POST /v1/runs/{run_id}/pull", pullRunRepoHandler(st), auth.RoleControlPlane)
 
 	// Repos — repo-centric view: list repos and show runs for a given repo.
 	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)

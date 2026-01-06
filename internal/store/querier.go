@@ -89,6 +89,11 @@ type Querier interface {
 	// Returns pgx.ErrNoRows if the key does not exist.
 	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
 	GetJob(ctx context.Context, id string) (Job, error)
+	// v1: Gets the newest run_repos row for a specific repo_id in a mod,
+	// filtered by terminal status (Success or Fail).
+	// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
+	// Order by created_at DESC to get the newest matching run_repos row.
+	GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMod(ctx context.Context, id string) (Mod, error)
 	GetModByName(ctx context.Context, name string) (Mod, error)
@@ -98,6 +103,10 @@ type Querier interface {
 	GetNode(ctx context.Context, id string) (Node, error)
 	GetRun(ctx context.Context, id string) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
+	// v1: Gets run_repos info for a specific repo_id within a run.
+	// Used by POST /v1/runs/{run_id}/pull to resolve repo execution identifiers.
+	// Joins mod_repos to get the repo_url for validation after normalization.
+	GetRunRepoForPull(ctx context.Context, arg GetRunRepoForPullParams) (GetRunRepoForPullRow, error)
 	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
 	GetSpec(ctx context.Context, id string) (Spec, error)
 	// Checks if a mod_repo has any historical executions (run_repos references).
@@ -161,6 +170,9 @@ type Querier interface {
 	ListQueuedRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
+	// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
+	// Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
+	ListRunReposWithURLByRun(ctx context.Context, runID string) ([]ListRunReposWithURLByRunRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	// Lists runs for a given repo_id (mod_repos.id).
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)

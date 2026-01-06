@@ -99,6 +99,40 @@ func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) er
 	return err
 }
 
+const getLatestRunRepoByModAndRepoStatus = `-- name: GetLatestRunRepoByModAndRepoStatus :one
+SELECT rr.run_id, rr.repo_id, rr.repo_target_ref
+FROM run_repos rr
+JOIN runs r ON rr.run_id = r.id
+WHERE rr.mod_id = $1
+  AND rr.repo_id = $2
+  AND rr.status = $3
+ORDER BY rr.created_at DESC
+LIMIT 1
+`
+
+type GetLatestRunRepoByModAndRepoStatusParams struct {
+	ModID  string        `json:"mod_id"`
+	RepoID string        `json:"repo_id"`
+	Status RunRepoStatus `json:"status"`
+}
+
+type GetLatestRunRepoByModAndRepoStatusRow struct {
+	RunID         string `json:"run_id"`
+	RepoID        string `json:"repo_id"`
+	RepoTargetRef string `json:"repo_target_ref"`
+}
+
+// v1: Gets the newest run_repos row for a specific repo_id in a mod,
+// filtered by terminal status (Success or Fail).
+// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
+// Order by created_at DESC to get the newest matching run_repos row.
+func (q *Queries) GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error) {
+	row := q.db.QueryRow(ctx, getLatestRunRepoByModAndRepoStatus, arg.ModID, arg.RepoID, arg.Status)
+	var i GetLatestRunRepoByModAndRepoStatusRow
+	err := row.Scan(&i.RunID, &i.RepoID, &i.RepoTargetRef)
+	return i, err
+}
+
 const getRunRepo = `-- name: GetRunRepo :one
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
@@ -125,6 +159,40 @@ func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const getRunRepoForPull = `-- name: GetRunRepoForPull :one
+SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
+FROM run_repos rr
+JOIN mod_repos mr ON rr.repo_id = mr.id
+WHERE rr.run_id = $1 AND rr.repo_id = $2
+`
+
+type GetRunRepoForPullParams struct {
+	RunID  string `json:"run_id"`
+	RepoID string `json:"repo_id"`
+}
+
+type GetRunRepoForPullRow struct {
+	RunID         string `json:"run_id"`
+	RepoID        string `json:"repo_id"`
+	RepoTargetRef string `json:"repo_target_ref"`
+	RepoUrl       string `json:"repo_url"`
+}
+
+// v1: Gets run_repos info for a specific repo_id within a run.
+// Used by POST /v1/runs/{run_id}/pull to resolve repo execution identifiers.
+// Joins mod_repos to get the repo_url for validation after normalization.
+func (q *Queries) GetRunRepoForPull(ctx context.Context, arg GetRunRepoForPullParams) (GetRunRepoForPullRow, error) {
+	row := q.db.QueryRow(ctx, getRunRepoForPull, arg.RunID, arg.RepoID)
+	var i GetRunRepoForPullRow
+	err := row.Scan(
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoTargetRef,
+		&i.RepoUrl,
 	)
 	return i, err
 }
@@ -254,6 +322,47 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID string) ([]RunRep
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunReposWithURLByRun = `-- name: ListRunReposWithURLByRun :many
+SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
+FROM run_repos rr
+JOIN mod_repos mr ON rr.repo_id = mr.id
+WHERE rr.run_id = $1
+`
+
+type ListRunReposWithURLByRunRow struct {
+	RunID         string `json:"run_id"`
+	RepoID        string `json:"repo_id"`
+	RepoTargetRef string `json:"repo_target_ref"`
+	RepoUrl       string `json:"repo_url"`
+}
+
+// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
+// Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
+func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID string) ([]ListRunReposWithURLByRunRow, error) {
+	rows, err := q.db.Query(ctx, listRunReposWithURLByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRunReposWithURLByRunRow{}
+	for rows.Next() {
+		var i ListRunReposWithURLByRunRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.RepoID,
+			&i.RepoTargetRef,
+			&i.RepoUrl,
 		); err != nil {
 			return nil, err
 		}
