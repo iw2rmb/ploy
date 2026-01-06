@@ -25,6 +25,10 @@ type Querier interface {
 	ClaimJob(ctx context.Context, nodeID *string) (Job, error)
 	CountJobsByRun(ctx context.Context, runID string) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
+	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
+	// Used by repo-scoped terminal detection per roadmap/v1/statuses.md:193.
+	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
 	// Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
