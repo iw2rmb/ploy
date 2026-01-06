@@ -150,7 +150,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 		}
 	})
 
-	t.Run("falls back to RunID when JobID is empty", func(t *testing.T) {
+	t.Run("requires JobID", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
 			RunID:   types.RunID("run-heal-fallback"),
