@@ -1854,7 +1854,7 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 }
 
 // ===== Repo-Scoped Status Progression Tests =====
-// These tests verify v1 repo-scoped progression per roadmap/v1/scope.md:98 and roadmap/v1/statuses.md:193.
+// These tests verify v1 repo-scoped progression behavior.
 // When a job completes:
 // - run_repos.status is updated when all jobs for the repo attempt are terminal
 // - runs.status becomes Finished when all repos are terminal
@@ -2127,7 +2127,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 }
 
 // TestCompleteJob_MRJobDoesNotAffectRepoStatus verifies that MR jobs (mod_type='mr')
-// do NOT trigger repo status updates, per roadmap/v1/statuses.md:77.
+// do NOT trigger repo status updates. MR jobs are auxiliary post-run jobs.
 func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	t.Parallel()
 
@@ -2283,7 +2283,6 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 // ===== v0 Status String Rejection Tests =====
 // v1 API uses capitalized status strings: Success, Fail, Cancelled.
 // v0 status strings (succeeded, failed, canceled) must be rejected with 400.
-// See roadmap/v1/statuses.md:127.
 
 // TestCompleteJob_RejectsV0StatusSucceeded verifies that v0 "succeeded" is rejected.
 func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {

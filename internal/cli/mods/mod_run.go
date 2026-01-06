@@ -2,9 +2,7 @@
 // This file implements the mod run command for creating runs from a mod project.
 //
 // This command calls POST /v1/mods/{mod_id}/runs with repo selection.
-//
-// Per roadmap/v1/cli.md:102-119, this command implements:
-// - ploy mod run <mod-id|name> [--repo <repo-url> ...] [--failed]
+// Implements: ploy mod run <mod-id|name> [--repo <repo-url> ...] [--failed]
 package mods
 
 import (
@@ -19,7 +17,7 @@ import (
 
 // CreateModRunCommand creates a batch run from a mod project with repo selection.
 // Endpoint: POST /v1/mods/{mod_id}/runs
-// Per roadmap/v1/api.md:202-223, this creates a run with repo selection.
+// Creates a run with repo selection based on mode: all, explicit, or failed.
 type CreateModRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
@@ -35,10 +33,10 @@ type CreateModRunResult struct {
 }
 
 // Run executes POST /v1/mods/{mod_id}/runs to create a run with repo selection.
-// Per roadmap/v1/cli.md:112-116:
-// - --repo ... → explicit repos (by repo_url identity within the mod)
-// - --failed → repos with last terminal state Fail
-// - omitted → all repos in the mod repo set
+// Flag behavior:
+//   - --repo ... selects explicit repos (by repo_url identity within the mod)
+//   - --failed selects repos with last terminal state Fail
+//   - omitted selects all repos in the mod repo set
 func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error) {
 	if c.Client == nil {
 		return CreateModRunResult{}, fmt.Errorf("mod run: http client required")
@@ -71,7 +69,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 		mode = "all"
 	}
 
-	// Build request payload per roadmap/v1/api.md:209-214.
+	// Build request payload with repo_selector mode and optional repos list.
 	req := struct {
 		RepoSelector struct {
 			Mode  string   `json:"mode"`

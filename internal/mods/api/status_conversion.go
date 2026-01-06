@@ -12,7 +12,7 @@ import (
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
-// v1 status model (see roadmap/v1/statuses.md:127):
+// Status mapping:
 //   - store.JobStatusCreated -> StageStatePending (created jobs are pending from API perspective)
 //   - store.JobStatusQueued -> StageStatePending (queued jobs are pending from API perspective)
 //   - store.JobStatusRunning -> StageStateRunning
@@ -20,7 +20,7 @@ import (
 //   - store.JobStatusFail -> StageStateFailed
 //   - store.JobStatusCancelled -> StageStateCancelled
 //
-// Removed in v1: skipped (see roadmap/v1/statuses.md:138).
+// Note: "skipped" status is not used; jobs are never skipped, only cancelled or failed.
 func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
 	case store.JobStatusCreated, store.JobStatusQueued:
@@ -43,12 +43,12 @@ func StageStatusFromStore(status store.JobStatus) StageState {
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
-// v1 status model (see roadmap/v1/statuses.md:113):
+// Status mapping:
 //   - store.RunStatusStarted -> RunStateRunning (started runs are running from API perspective)
 //   - store.RunStatusCancelled -> RunStateCancelled
 //   - store.RunStatusFinished -> RunStateSucceeded (finished runs are treated as succeeded by default)
 //
-// Removed in v1: queued, assigned, running, succeeded, failed (see roadmap/v1/statuses.md:114).
+// Run statuses are simplified to Started, Finished, and Cancelled.
 func RunStatusFromStore(status store.RunStatus) RunState {
 	switch status {
 	case store.RunStatusStarted:
@@ -70,7 +70,7 @@ func RunStatusFromStore(status store.RunStatus) RunState {
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
-// v1 status model (see roadmap/v1/statuses.md:127):
+// Status mapping:
 //   - StageStatePending/StageStateQueued -> store.JobStatusCreated
 //   - StageStateRunning -> store.JobStatusRunning
 //   - StageStateSucceeded -> store.JobStatusSuccess
@@ -98,8 +98,8 @@ func StageStatusToStore(state StageState) store.JobStatus {
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
-// v1 status model (see roadmap/v1/statuses.md:113):
-//   - RunStatePending -> store.RunStatusStarted (v1 has no pending state)
+// Status mapping:
+//   - RunStatePending -> store.RunStatusStarted (no separate pending state in store)
 //   - RunStateRunning -> store.RunStatusStarted
 //   - RunStateSucceeded -> store.RunStatusFinished
 //   - RunStateFailed -> store.RunStatusFinished

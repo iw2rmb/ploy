@@ -74,7 +74,7 @@ type ListSpecsParams struct {
 }
 
 // Lists specs ordered by created_at descending (most recent first).
-// Per roadmap/v1/db.md:53, there is an index on created_at for this query.
+// There is an index on created_at to optimize this query.
 func (q *Queries) ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error) {
 	rows, err := q.db.Query(ctx, listSpecs, arg.Limit, arg.Offset)
 	if err != nil {

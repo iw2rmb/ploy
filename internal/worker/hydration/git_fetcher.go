@@ -186,7 +186,7 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 // collision-resistant identifiers that remain stable across runs.
 func computeCacheKey(url, baseRef, commitSHA string) string {
 	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
-	// Uses the shared vcs.NormalizeRepoURL helper per roadmap/v1/scope.md:28.
+	// Uses the shared vcs.NormalizeRepoURL helper for canonical URL form.
 	normalized := vcs.NormalizeRepoURL(url)
 
 	// Include base_ref and commit_sha in the key for cache isolation.

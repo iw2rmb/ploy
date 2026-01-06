@@ -1,6 +1,6 @@
 // mod_spec.go implements the 'ploy mod spec' command handler.
 //
-// Per roadmap/v1/cli.md:53-60, this command sets a mod's spec:
+// This command sets a mod's spec:
 // - ploy mod spec set <mod-id|name> <path|->
 // - Stores the parsed spec JSON (from YAML/JSON input).
 // - Validates spec shape.
@@ -65,7 +65,7 @@ func handleModSpecSet(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports name/ID resolution per roadmap/v1/cli.md:169-170).
+	// Resolve mod reference to ID (supports both name and ID).
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,

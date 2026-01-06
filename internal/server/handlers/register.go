@@ -32,31 +32,30 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/pki/bootstrap", bootstrapCertificateHandler(st, tokenSecret), auth.RoleWorker)
 
 	// Runs — single-repo run submission (v1 API).
-	// v1 change (roadmap/v1/scope.md:66, roadmap/v1/api.md:104): POST /v1/runs for single-repo submission.
+	// POST /v1/runs creates a single-repo run with automatic mod project creation.
 	s.HandleFunc("POST /v1/runs", createSingleRepoRunHandler(st, eventsService), auth.RoleControlPlane)
 
 	// Mods — mod project CRUD (v1 API).
-	// v1 change (roadmap/v1/api.md:5-91): Repurpose /v1/mods for mod project CRUD.
+	// /v1/mods endpoints handle mod project CRUD operations.
 	s.HandleFunc("POST /v1/mods", createModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods", listModsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/mods/{mod_id}", deleteModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/mods/{mod_id}/archive", archiveModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/mods/{mod_id}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:140-151, roadmap/v1/scope.md:8-9): Set mod spec (append-only specs + mods.spec_id pointer).
+	// Set mod spec (append-only specs + mods.spec_id pointer).
 	s.HandleFunc("POST /v1/mods/{mod_id}/specs", setModSpecHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:154-198, roadmap/v1/scope.md:10): Mod repo set management (add/list/delete + bulk CSV upsert).
+	// Mod repo set management (add/list/delete + bulk CSV upsert).
 	s.HandleFunc("POST /v1/mods/{mod_id}/repos", addModRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{mod_id}/repos", listModReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/mods/{mod_id}/repos/{repo_id}", deleteModRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{mod_id}/repos/bulk", bulkUpsertModReposHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:202-223, roadmap/v1/scope.md:19): Multi-repo run submission with repo selection (all/failed/explicit).
+	// Multi-repo run submission with repo selection (all/failed/explicit).
 	s.HandleFunc("POST /v1/mods/{mod_id}/runs", createModRunHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:57-82): Pull resolution for mod repos (last-succeeded/last-failed).
+	// Pull resolution for mod repos (last-succeeded/last-failed).
 	s.HandleFunc("POST /v1/mods/{mod_id}/pull", pullModRepoHandler(st), auth.RoleControlPlane)
 
 	// Legacy routes under /v1/mods/{id}/* for run operations.
 	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
-	// See roadmap/v1/scope.md:66-73 for the v1 migration plan.
 	// Note: POST /v1/mods/{id}/cancel has been moved to POST /v1/runs/{id}/cancel (v1).
 	// Note: POST /v1/mods/{id}/resume has been removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
 	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
@@ -74,7 +73,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}/status", getRunStatusHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/logs", getRunLogsHandler(st, eventsService), auth.RoleControlPlane)
 	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and cancels/removes Created/Queued/Running jobs.
-	// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
 	s.HandleFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
 
@@ -82,16 +80,16 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/runs/{id}/repos", addRunRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/scope.md:69-71, roadmap/v1/api.md:263): Repo-scoped diffs listing.
+	// Repo-scoped diffs listing.
 	// Replaces legacy GET /v1/mods/{id}/diffs with repo-scoped addressing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
-	// v1 change (roadmap/v1/api.md:264): Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
+	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:265): Repo-scoped artifact listing.
+	// Repo-scoped artifact listing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:266): Repo-scoped cancel (replacement for DELETE /v1/runs/{id}/repos/{repo_id}).
+	// Repo-scoped cancel (replacement for DELETE /v1/runs/{id}/repos/{repo_id}).
 	s.HandleFunc("POST /v1/runs/{run_id}/repos/{repo_id}/cancel", cancelRunRepoHandlerV1(st), auth.RoleControlPlane)
-	// v1 change (roadmap/v1/api.md:227-249): Pull resolution for run repos.
+	// Pull resolution for run repos.
 	s.HandleFunc("POST /v1/runs/{run_id}/pull", pullRunRepoHandler(st), auth.RoleControlPlane)
 
 	// Repos — repo-centric view: list repos and show runs for a given repo.

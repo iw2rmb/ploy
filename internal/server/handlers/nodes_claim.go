@@ -20,14 +20,14 @@ import (
 // claimJobHandler allows nodes to claim a queued job for execution.
 // Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
 //
-// v1 status rules (per roadmap/v1/statuses.md):
+// v1 status rules:
 // - claimable jobs have status='Queued'; claimed jobs transition to 'Running'
 // - normal jobs are claimable only when runs.status='Started'
 // - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
 // - on first claim for a repo attempt, run_repos.status transitions Queued → Running
 // - repo progression is attempt-scoped (run_id, repo_id, attempt)
 //
-// v1 response includes repo attribution (per roadmap/v1/scope.md:84):
+// v1 response includes repo attribution:
 // - repo_url: from mod_repos (since runs no longer have repo_url fields)
 // - base_ref: from jobs.repo_base_ref (snapshot at job creation)
 // - target_ref: from run_repos.repo_target_ref (snapshot at run_repos creation)
@@ -87,8 +87,8 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// v1 repo status transition: Queued → Running on first claim for repo attempt.
-		// Per roadmap/v1/statuses.md:84, this is idempotent (already Running repos stay Running).
-		// MR jobs must not affect run_repos.status (roadmap/v1/statuses.md:77).
+		// This is idempotent (already Running repos stay Running).
+		// MR jobs must not affect run_repos.status.
 		isMRJob := job.ModType == domaintypes.ModTypeMR.String()
 		if !isMRJob && rr.Status == store.RunRepoStatusQueued {
 			// The UpdateRunRepoStatus query sets started_at on first transition to Running.

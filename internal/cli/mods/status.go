@@ -31,10 +31,9 @@ type DiffEntry struct {
 // ListRunRepoDiffsCommand fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 // This is the v1 repo-scoped diffs listing endpoint.
 //
-// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
-// - Returns diffs filtered by repo_id via jobs.repo_id join
-// - Diffs for repo A are excluded from repo B listing
-// - Response shape is unchanged from legacy endpoint
+// Returns diffs filtered by repo_id via jobs.repo_id join.
+// Diffs for repo A are excluded from repo B listing.
+// Response shape is unchanged from legacy endpoint.
 type ListRunRepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

@@ -30,7 +30,7 @@ func TestClaimLoop(t *testing.T) {
 			calls = append(calls, "claim")
 			// Return a run to claim.
 			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
-			// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
+			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
 				RunID:     types.RunID("run-123"),
 				JobID:     types.JobID("job-123"),
@@ -294,6 +294,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 			// Return success to reset backoff.
 			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
 				RunID:     types.RunID("run-reset"),
 				JobID:     types.JobID("job-reset"),
@@ -392,7 +393,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 
 	commit := "deadbeef"
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
-	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
+	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
 		RunID:     types.RunID("run-map-1"),
 		JobID:     types.JobID("job-map-1"),
@@ -476,7 +477,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
 	commit := "abc123"
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
-	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
+	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
 		RunID:     types.RunID("run-step-map"),
 		JobID:     types.JobID("job-123-step-map"),
@@ -570,7 +571,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 
 	// Node1 claims job 0 (pre-gate).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
-	// Per roadmap/v1/statuses.md:17, v1 run status is Started/Cancelled/Finished.
+	// v1 run status values are: Started, Cancelled, Finished.
 	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
 		RunID:     runID,
@@ -589,6 +590,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 
 	// Node2 claims job 1 (mod-0).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
+	// v1 run status values are: Started, Cancelled, Finished.
 	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
 		RunID:     runID,

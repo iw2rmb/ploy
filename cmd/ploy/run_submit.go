@@ -1,11 +1,9 @@
 // run_submit.go implements `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
 // for single-repo run submission via POST /v1/runs.
 //
-// This is the v1 CLI entry point for submitting runs directly (without creating
+// This is the CLI entry point for submitting runs directly (without creating
 // a mod project first). The command creates a mod project as a side-effect;
 // the created mod has name == id.
-//
-// See roadmap/v1/cli.md:13 for specification.
 package main
 
 import (
@@ -125,7 +123,7 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Print run_id and mod_id as specified in roadmap/v1/cli.md:18.
+	// Print run_id and mod_id on success.
 	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID)
 	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID)
 

@@ -73,8 +73,7 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 		t.Fatalf("PLOY_NODE_UUID header = %q, want %q", capturedHeaderNodeID, "node123")
 	}
 
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	if got, _ := capturedPayload["status"].(string); got != "Fail" {
 		t.Fatalf("status = %v, want %q", capturedPayload["status"], "Fail")
 	}

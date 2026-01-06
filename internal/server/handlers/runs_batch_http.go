@@ -18,7 +18,6 @@ import (
 
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
 // POST /v1/runs/{id}/cancel (v1 API) — Marks the run as Cancelled and cancels queued/running repos/jobs.
-// Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
 // This handler:
 // - Sets runs.status=Cancelled
 // - Cancels all repos with status Queued or Running → Cancelled

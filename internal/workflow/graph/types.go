@@ -33,8 +33,8 @@ const (
 )
 
 // NodeStatus represents the execution state of a graph node.
-// These values align with the v1 job_status enum in the database.
-// v1 status model (see roadmap/v1/statuses.md:127).
+// These values align with the job_status enum in the database.
+// See docs/mods-lifecycle.md for the complete status model.
 type NodeStatus string
 
 const (
@@ -48,9 +48,9 @@ const (
 	NodeStatusSuccess NodeStatus = "Success"
 	// NodeStatusFail indicates the job execution failed (replaces v0 failed).
 	NodeStatusFail NodeStatus = "Fail"
-	// NodeStatusCancelled indicates the job was cancelled (UK spelling, replaces v0 canceled).
+	// NodeStatusCancelled indicates the job was cancelled (UK spelling).
 	NodeStatusCancelled NodeStatus = "Cancelled"
-	// NOTE: NodeStatusSkipped removed in v1 per roadmap/v1/statuses.md:138.
+	// NOTE: NodeStatusSkipped is not used; jobs are never skipped, only cancelled or failed.
 )
 
 // GraphNode represents a single job as a node in the workflow graph.

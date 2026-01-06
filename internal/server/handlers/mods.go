@@ -24,7 +24,7 @@ import (
 // Request: {name, spec?}
 // Response: 201 Created with mod details
 //
-// v1 contract (roadmap/v1/api.md:14-30):
+// v1 contract:
 // - Creates a mod project with a unique name.
 // - Optional spec parameter creates an initial spec row and sets mods.spec_id.
 func createModHandler(st store.Store) http.HandlerFunc {
@@ -128,7 +128,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 // Query params: limit, offset, name_substring, archived, repo_url
 // Response: 200 OK with list of mods
 //
-// v1 contract (roadmap/v1/api.md:31-46):
+// v1 contract:
 // - Supports pagination with limit/offset.
 // - Optional filters: name_substring, archived (true/false), repo_url.
 func listModsHandler(st store.Store) http.HandlerFunc {
@@ -289,7 +289,7 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 // Endpoint: DELETE /v1/mods/{mod_id}
 // Response: 204 No Content on success
 //
-// v1 contract (roadmap/v1/api.md:47-54):
+// v1 contract:
 // - Refuses deletion if any runs exist for the mod.
 func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -359,7 +359,7 @@ func modHasAnyRuns(ctx context.Context, st store.Store, modID string) (bool, err
 // Endpoint: PATCH /v1/mods/{mod_id}/archive
 // Response: 200 OK with mod details
 //
-// v1 contract (roadmap/v1/api.md:82-88):
+// v1 contract:
 // - Archives a mod (prevents execution).
 // - Cannot archive a mod with running jobs.
 func archiveModHandler(st store.Store) http.HandlerFunc {
@@ -470,7 +470,7 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID string) (bo
 // Request: {name?, spec}
 // Response: 201 Created with spec details (id, created_at)
 //
-// v1 contract (roadmap/v1/api.md:140-151, roadmap/v1/scope.md:8-9):
+// v1 contract:
 // - Specs are append-only: each call inserts a new specs row.
 // - mods.spec_id is updated to point at the newly created spec.
 // - This is the canonical way to "set" or "update" a mod's spec.
@@ -544,7 +544,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response per roadmap/v1/api.md:149-151.
+		// Build response with spec ID and creation timestamp.
 		resp := struct {
 			ID        string `json:"id"`
 			CreatedAt string `json:"created_at"`
@@ -567,7 +567,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 // Endpoint: PATCH /v1/mods/{mod_id}/unarchive
 // Response: 200 OK with mod details
 //
-// v1 contract (roadmap/v1/api.md:89-91):
+// v1 contract:
 // - Unarchives a mod (allows execution again).
 func unarchiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

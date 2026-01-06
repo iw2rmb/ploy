@@ -154,9 +154,8 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 // optionally downloads the newest patch. This is the v1 repo-scoped version
 // that replaces the legacy run-scoped DiffsCommand.
 //
-// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
-// - Uses GET /v1/runs/{run_id}/repos/{repo_id}/diffs endpoint
-// - Returns diffs filtered by repo_id via jobs.repo_id join
+// Uses GET /v1/runs/{run_id}/repos/{repo_id}/diffs endpoint.
+// Returns diffs filtered by repo_id via jobs.repo_id join.
 type RepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

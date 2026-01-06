@@ -16,7 +16,7 @@ WHERE id = $1 AND archived_at IS NULL
 `
 
 // Archives a mod by setting archived_at to now().
-// Per roadmap/v1/db.md:29, archiving must be refused when the mod has any jobs in a running state.
+// Archiving must be refused when the mod has any jobs in a running state.
 // This query only sets the timestamp; validation logic must be in the caller.
 func (q *Queries) ArchiveMod(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, archiveMod, id)

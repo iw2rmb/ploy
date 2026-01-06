@@ -113,7 +113,7 @@ type CountJobsByRunRepoAttemptGroupByStatusRow struct {
 }
 
 // Counts jobs by status for a specific repo attempt, excluding MR jobs.
-// Used by repo-scoped terminal detection per roadmap/v1/statuses.md:193.
+// Used by repo-scoped terminal detection to determine run_repos.status.
 // MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 func (q *Queries) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error) {
 	rows, err := q.db.Query(ctx, countJobsByRunRepoAttemptGroupByStatus, arg.RunID, arg.RepoID, arg.Attempt)

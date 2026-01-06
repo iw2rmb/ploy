@@ -5,8 +5,8 @@ import (
 )
 
 // TestNormalizeRepoURL is the comprehensive test suite for NormalizeRepoURL.
-// Per roadmap/v1/scope.md:51, this should cover edge cases around trailing slash,
-// .git suffix combinations, and whitespace.
+// This covers edge cases around trailing slash, .git suffix combinations, and whitespace
+// to ensure consistent URL normalization for cache key generation and repo URL matching.
 func TestNormalizeRepoURL(t *testing.T) {
 	t.Parallel()
 

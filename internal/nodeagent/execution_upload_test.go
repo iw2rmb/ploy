@@ -285,8 +285,7 @@ func TestRunController_uploadStatus(t *testing.T) {
 			controller := &runController{cfg: cfg}
 
 			// Execute upload with job_id.
-			// v1 uses capitalized job status values: Success, Fail, Cancelled
-			// (see roadmap/v1/statuses.md:127).
+			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()

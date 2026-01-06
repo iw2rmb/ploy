@@ -147,7 +147,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 }
 
 // TestModRunRepoAddRejectsInvalidRepoURLScheme verifies that the CLI rejects invalid repo_url
-// schemes at the input boundary (roadmap/v1/scope.md:30) and does not call the control plane.
+// schemes at the input boundary and does not call the control plane.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 	var called bool

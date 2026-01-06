@@ -140,9 +140,8 @@ type ListDiffsByRunRepoParams struct {
 }
 
 // Returns diffs for a specific repo execution within a run.
-// Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
-// joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
-// GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
+// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 // Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)

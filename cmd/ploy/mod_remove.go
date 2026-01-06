@@ -1,6 +1,6 @@
 // mod_remove.go implements the 'ploy mod remove' command handler.
 //
-// Per roadmap/v1/cli.md:37-40, this command deletes a mod project:
+// This command deletes a mod project:
 // - ploy mod remove <mod-id|name>
 // - Refuses if the mod has any runs.
 package main
@@ -35,7 +35,7 @@ func handleModRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports name/ID resolution per roadmap/v1/cli.md:169-170).
+	// Resolve mod reference to ID (supports both name and ID).
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,

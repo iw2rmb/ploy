@@ -230,11 +230,11 @@ func TestIDGenerators(t *testing.T) {
 		}
 	})
 
-	// v1 ID generators: ModID, SpecID, ModRepoID (per roadmap/v1/db.md:94).
+	// v1 ID generators: ModID, SpecID, ModRepoID use NanoID for compact, URL-safe identifiers.
 
 	t.Run("NewModID", func(t *testing.T) {
 		// Verify non-empty output with expected NanoID length (6 characters).
-		// Per roadmap/v1/db.md:15: mods.id is NanoID(6).
+		// ModID uses NanoID(6) for mod project identifiers.
 		id := NewModID()
 		if id.IsZero() {
 			t.Fatal("NewModID returned zero value")
@@ -263,7 +263,7 @@ func TestIDGenerators(t *testing.T) {
 
 	t.Run("NewSpecID", func(t *testing.T) {
 		// Verify non-empty output with expected NanoID length (8 characters).
-		// Per roadmap/v1/db.md:44: specs.id is NanoID(8).
+		// SpecID uses NanoID(8) for spec identifiers in the append-only specs table.
 		id := NewSpecID()
 		if id.IsZero() {
 			t.Fatal("NewSpecID returned zero value")
@@ -292,7 +292,7 @@ func TestIDGenerators(t *testing.T) {
 
 	t.Run("NewModRepoID", func(t *testing.T) {
 		// Verify non-empty output with expected NanoID length (8 characters).
-		// Per roadmap/v1/db.md:62: mod_repos.id is NanoID(8).
+		// ModRepoID uses NanoID(8) for per-mod repository identifiers.
 		id := NewModRepoID()
 		if id.IsZero() {
 			t.Fatal("NewModRepoID returned zero value")

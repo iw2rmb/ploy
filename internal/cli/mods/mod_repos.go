@@ -7,7 +7,7 @@
 // - DELETE /v1/mods/{mod_id}/repos/{repo_id} (delete repo)
 // - POST /v1/mods/{mod_id}/repos/bulk (bulk import from CSV)
 //
-// Per roadmap/v1/cli.md:62-99, these commands implement mod repo set management.
+// These commands implement mod repo set management (add, list, remove, import).
 package mods
 
 import (
@@ -33,7 +33,7 @@ type ModRepoSummary struct {
 
 // AddModRepoCommand adds a repo to a mod's repo set.
 // Endpoint: POST /v1/mods/{mod_id}/repos
-// Per roadmap/v1/cli.md:72-75, this adds a repo with URL and refs.
+// Adds a repo with URL, base ref, and target ref.
 type AddModRepoCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
@@ -64,7 +64,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: target ref is required")
 	}
 
-	// Build request payload per roadmap/v1/api.md:158-162.
+	// Build request payload with repo_url, base_ref, and target_ref.
 	req := struct {
 		RepoURL   string `json:"repo_url"`
 		BaseRef   string `json:"base_ref"`
@@ -108,7 +108,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 
 // ListModReposCommand lists repos in a mod's repo set.
 // Endpoint: GET /v1/mods/{mod_id}/repos
-// Per roadmap/v1/cli.md:77-79, this lists repos with ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
+// Returns repos with ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 type ListModReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -157,7 +157,7 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 
 // RemoveModRepoCommand deletes a repo from a mod's repo set.
 // Endpoint: DELETE /v1/mods/{mod_id}/repos/{repo_id}
-// Per roadmap/v1/cli.md:81-84, this refuses deletion if there are historical executions.
+// Refuses deletion if there are historical executions referencing this repo.
 type RemoveModRepoCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -208,7 +208,7 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 
 // ImportModReposCommand bulk imports repos for a mod from CSV.
 // Endpoint: POST /v1/mods/{mod_id}/repos/bulk
-// Per roadmap/v1/cli.md:86-98, this imports repos from CSV with specific parsing rules.
+// Imports repos from CSV with header: repo_url,base_ref,target_ref.
 type ImportModReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

@@ -168,8 +168,7 @@ func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
 }
 
 // TestRunRepoDiffs_ReturnsRepoFilteredItems verifies that diffs for repo A are
-// excluded from repo B listing. This is the primary v1 repo-scoped test per
-// roadmap/v1/scope.md:85 and ROADMAP.md:372.
+// excluded from repo B listing. This is the primary v1 repo-scoped test.
 //
 // The test sets up:
 // - Two repos (repo A and repo B) for a run

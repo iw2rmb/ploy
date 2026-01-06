@@ -7,7 +7,7 @@ import (
 // TestConvertToJobStatus verifies that ConvertToJobStatus correctly maps
 // v1 canonical strings to store.JobStatus values.
 // v1 status model: Created, Queued, Running, Success, Fail, Cancelled.
-// Removed in v1: skipped (see roadmap/v1/statuses.md:138).
+// The "skipped" status was removed in v1.
 func TestConvertToJobStatus(t *testing.T) {
 	t.Parallel()
 
@@ -58,7 +58,7 @@ func TestConvertToJobStatus(t *testing.T) {
 // TestConvertToRunStatus verifies that ConvertToRunStatus correctly maps
 // v1 canonical strings to store.RunStatus values.
 // v1 status model: Started, Cancelled, Finished.
-// Removed in v1: queued, assigned, running, succeeded, failed (see roadmap/v1/statuses.md:114).
+// The "queued", "assigned", "running", "succeeded", "failed" statuses were removed in v1.
 func TestConvertToRunStatus(t *testing.T) {
 	t.Parallel()
 

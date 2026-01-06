@@ -70,7 +70,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	}
 
 	// Build the request payload matching server's expected format.
-	// Server uses /v1/runs for single-repo submission (roadmap/v1/api.md).
+	// Server uses POST /v1/runs for single-repo run submission.
 	req := struct {
 		RepoURL   string          `json:"repo_url"`
 		BaseRef   string          `json:"base_ref"`

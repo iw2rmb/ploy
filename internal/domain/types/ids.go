@@ -27,20 +27,17 @@ type ClusterID string
 type NodeID string
 
 // ModID identifies a mod project.
-// v1 identifier for mods table (NanoID(6), app-generated).
-// See roadmap/v1/db.md:15 for schema requirements.
+// Uses NanoID(6) for compact, URL-safe identifiers suitable for CLI usage and display.
 type ModID string
 
 // SpecID identifies a spec instance in the specs table.
-// v1 identifier for specs table (NanoID(8), app-generated).
-// See roadmap/v1/db.md:44 for schema requirements.
+// Uses NanoID(8) for spec identifiers in the append-only specs table.
 type SpecID string
 
 // ModRepoID identifies a repo entry within a mod project.
-// v1 identifier for mod_repos table (NanoID(8), app-generated).
-// See roadmap/v1/db.md:62 for schema requirements.
+// Uses NanoID(8) for per-mod repository identifiers.
 // Note: In CLI flags and some legacy naming, this may be called "mod_repo_id".
-// Prefer "repo_id" in v1 docs per roadmap/v1/db.md:98.
+// Prefer "repo_id" in API contexts.
 type ModRepoID string
 
 // StepIndex identifies a job's ordering value within a run execution sequence.

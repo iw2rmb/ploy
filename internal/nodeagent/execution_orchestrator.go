@@ -190,8 +190,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 			MustBuild()
 
 		// Determine status.
-		// v1 uses capitalized job status values: Success, Fail, Cancelled
-		// (see roadmap/v1/statuses.md:127).
+		// v1 uses capitalized job status values: Success, Fail, Cancelled.
 		if runErr != nil {
 			var exitCode int32 = -1 // Use -1 to indicate runtime error
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "Fail", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
@@ -396,8 +395,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 				MustBuild()
 
 			// Determine status.
-			// v1 uses capitalized job status values: Success, Fail, Cancelled
-			// (see roadmap/v1/statuses.md:127).
+			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			if runErr != nil {
 				var exitCode int32 = -1 // Use -1 to indicate runtime error
 				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "Fail", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
@@ -452,8 +450,7 @@ func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Conte
 		HealingWarning("no_workspace_changes").
 		MustBuild()
 
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	var exitCodeOne int32 = 1
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "Fail", &exitCodeOne, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload healing failure status (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
@@ -535,8 +532,7 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 
 // uploadFailureStatus uploads a failure status for early errors.
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
-// v1 uses capitalized job status values: Success, Fail, Cancelled
-// (see roadmap/v1/statuses.md:127).
+// v1 uses capitalized job status values: Success, Fail, Cancelled.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
 	var exitCode int32 = -1 // -1 indicates pre-execution failure
 	// Build stats using typed builder to eliminate map[string]any construction.
@@ -601,8 +597,7 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	result := execResult.Result
 
 	// Determine terminal status and exit code based on execution result.
-	// v1 uses capitalized job status values: Success, Fail, Cancelled
-	// (see roadmap/v1/statuses.md:127).
+	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	terminalStatus := "Success"
 	var exitCode int32
 

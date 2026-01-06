@@ -20,7 +20,7 @@ import (
 // Request: {repo_url, base_ref, target_ref, spec}
 // Response: 201 Created with {run_id, mod_id, spec_id}
 //
-// v1 contract (roadmap/v1/api.md:104-128):
+// v1 contract:
 // - Submits a single-repo run via POST /v1/runs.
 // - Creates a mod project as a side-effect; mod name == mod id.
 // - Creates an initial spec row and sets mods.spec_id.
@@ -141,14 +141,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// v1 immediate start: Create repo-scoped jobs for the queued repo.
-		// This ensures the run starts execution immediately (roadmap/v1/scope.md:51).
+		// This ensures the run starts execution immediately.
 		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("create single-repo run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return
 		}
 
-		// Build response per v1 contract (roadmap/v1/api.md:123-128)
+		// Build response with run_id, mod_id, and spec_id.
 		resp := struct {
 			RunID  string `json:"run_id"`
 			ModID  string `json:"mod_id"`

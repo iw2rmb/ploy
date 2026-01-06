@@ -8,7 +8,7 @@
 // - PATCH /v1/mods/{mod_id}/archive (archive mod)
 // - PATCH /v1/mods/{mod_id}/unarchive (unarchive mod)
 //
-// Per roadmap/v1/cli.md:24-50, these commands implement the mod management surfaces.
+// These commands implement the mod management surfaces (create, list, delete, archive).
 package mods
 
 import (
@@ -34,7 +34,7 @@ type ModSummary struct {
 
 // AddModCommand creates a new mod project.
 // Endpoint: POST /v1/mods
-// Per roadmap/v1/cli.md:26-31, this creates a mod with unique name and optional spec.
+// Creates a mod with unique name and optional initial spec.
 type AddModCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
@@ -63,7 +63,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 		return AddModResult{}, fmt.Errorf("mod add: name is required")
 	}
 
-	// Build request payload per roadmap/v1/api.md:15-23.
+	// Build request payload with name, optional spec, and optional created_by.
 	req := struct {
 		Name      string           `json:"name"`
 		Spec      *json.RawMessage `json:"spec,omitempty"`
@@ -108,7 +108,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 
 // ListModsCommand lists mod projects with optional filters.
 // Endpoint: GET /v1/mods
-// Per roadmap/v1/cli.md:33-35, this lists mods: ID, NAME, CREATED_AT, ARCHIVED_AT.
+// Returns mods with ID, NAME, CREATED_AT, ARCHIVED status.
 type ListModsCommand struct {
 	Client        *http.Client
 	BaseURL       *url.URL
@@ -176,7 +176,7 @@ func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 
 // RemoveModCommand deletes a mod project.
 // Endpoint: DELETE /v1/mods/{mod_id}
-// Per roadmap/v1/cli.md:37-40, this refuses deletion if the mod has any runs.
+// Refuses deletion if the mod has any runs.
 type RemoveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -218,7 +218,7 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 
 // ArchiveModCommand archives a mod project.
 // Endpoint: PATCH /v1/mods/{mod_id}/archive
-// Per roadmap/v1/cli.md:42-45, this refuses archival if the mod has running jobs.
+// Refuses archival if the mod has running jobs.
 type ArchiveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -270,7 +270,7 @@ func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 
 // UnarchiveModCommand unarchives a mod project.
 // Endpoint: PATCH /v1/mods/{mod_id}/unarchive
-// Per roadmap/v1/cli.md:47-49.
+// Restores an archived mod to active status.
 type UnarchiveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -322,7 +322,7 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 
 // SetModSpecCommand creates a new spec row and updates mods.spec_id.
 // Endpoint: POST /v1/mods/{mod_id}/specs
-// Per roadmap/v1/cli.md:53-60, this sets the mod's current spec.
+// Sets the mod's current spec by creating a new spec row.
 type SetModSpecCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
@@ -353,7 +353,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: spec is required")
 	}
 
-	// Build request payload per roadmap/v1/api.md:143-147.
+	// Build request payload with spec content, optional name, and created_by.
 	req := struct {
 		Name      string          `json:"name,omitempty"`
 		Spec      json.RawMessage `json:"spec"`
@@ -398,8 +398,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 }
 
 // ResolveModByNameCommand attempts to resolve a mod by name (if not a valid ID format).
-// This is used to support name/ID resolution per roadmap/v1/cli.md:169-170.
-// It lists mods and finds an exact name match.
+// It lists mods and finds an exact name match, supporting both ID and name lookups.
 type ResolveModByNameCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -427,7 +426,7 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 	}
 
 	// Otherwise, try to find by name using the list endpoint with name filter.
-	// Per roadmap/v1/cli.md:170, prefer exact name match.
+	// Prefer exact name match.
 	listCmd := ListModsCommand{
 		Client:        c.Client,
 		BaseURL:       c.BaseURL,

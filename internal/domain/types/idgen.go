@@ -44,7 +44,7 @@ func NewNodeKey() string {
 }
 
 // NewModID generates a new unique ModID using NanoID.
-// Uses a 6-character NanoID with the URL-safe alphabet per roadmap/v1/db.md:15.
+// Uses a 6-character NanoID with the URL-safe alphabet.
 // The 6-character length provides sufficient entropy for mod project identifiers
 // while remaining compact for CLI usage and display.
 func NewModID() ModID {
@@ -59,7 +59,7 @@ func NewModID() ModID {
 }
 
 // NewSpecID generates a new unique SpecID using NanoID.
-// Uses an 8-character NanoID with the URL-safe alphabet per roadmap/v1/db.md:44.
+// Uses an 8-character NanoID with the URL-safe alphabet.
 // The 8-character length provides sufficient entropy for spec identifiers
 // in the append-only specs table.
 func NewSpecID() SpecID {
@@ -74,10 +74,9 @@ func NewSpecID() SpecID {
 }
 
 // NewModRepoID generates a new unique ModRepoID using NanoID.
-// Uses an 8-character NanoID with the URL-safe alphabet per roadmap/v1/db.md:62.
+// Uses an 8-character NanoID with the URL-safe alphabet.
 // The 8-character length provides sufficient entropy for per-mod repo identifiers.
-// Note: This type may also be referred to as "repo_id" in v1 API/docs contexts
-// per roadmap/v1/db.md:98.
+// Note: This type may also be referred to as "repo_id" in API contexts.
 func NewModRepoID() ModRepoID {
 	// Generate returns an error only if the alphabet is invalid or length is <= 0.
 	// Since we use a fixed valid alphabet and length, error is effectively impossible.

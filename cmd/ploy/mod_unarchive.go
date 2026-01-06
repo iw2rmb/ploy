@@ -1,6 +1,6 @@
 // mod_unarchive.go implements the 'ploy mod unarchive' command handler.
 //
-// Per roadmap/v1/cli.md:47-49, this command unarchives a mod project:
+// This command unarchives a mod project:
 // - ploy mod unarchive <mod-id|name>
 package main
 
@@ -34,7 +34,7 @@ func handleModUnarchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports name/ID resolution per roadmap/v1/cli.md:169-170).
+	// Resolve mod reference to ID (supports both name and ID).
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
