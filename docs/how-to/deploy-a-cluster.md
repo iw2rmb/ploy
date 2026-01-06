@@ -248,10 +248,10 @@ in their local repositories without relying on MRs:
 ```bash
 # From a repo that participated in the batch:
 cd service-a
-ploy mod run pull fleet-upgrade
+ploy mod pull fleet-upgrade
 
 # Preview without making changes:
-ploy mod run pull --dry-run fleet-upgrade
+ploy mod pull --dry-run fleet-upgrade
 ```
 
 This creates a local branch at the pinned commit and applies all stored diffs. See
