@@ -15,6 +15,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/vcs"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -45,6 +46,14 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Validate spec early so invalid specs do not create a mod row.
+		if req.Spec != nil && len(*req.Spec) > 0 {
+			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
+				http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+				return
+			}
+		}
+
 		// Create mod (create spec only after the mod row exists to avoid creating
 		// orphaned specs on mod-name collisions).
 		modID := domaintypes.NewModID().String()
@@ -69,11 +78,6 @@ func createModHandler(st store.Store) http.HandlerFunc {
 		// Create spec if provided and attach it to the mod.
 		var specIDPtr *string
 		if req.Spec != nil && len(*req.Spec) > 0 {
-			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
-				http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
-				return
-			}
-
 			specID := domaintypes.NewSpecID().String()
 			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
 				ID:        specID,
@@ -171,6 +175,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 
 		repoURLFilter := strings.TrimSpace(r.URL.Query().Get("repo_url"))
 		if repoURLFilter != "" {
+			repoURLFilter = vcs.NormalizeRepoURL(repoURLFilter)
 			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
 				http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
 				return
@@ -207,7 +212,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 						return
 					}
 					for _, mr := range repos {
-						if strings.TrimSpace(mr.RepoUrl) == repoURLFilter {
+						if vcs.NormalizeRepoURL(mr.RepoUrl) == repoURLFilter {
 							filtered = append(filtered, mod)
 							break
 						}

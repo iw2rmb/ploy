@@ -11,6 +11,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/vcs"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -96,11 +97,12 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// Create mod repo for the provided repo_url
+		normalizedRepoURL := vcs.NormalizeRepoURL(req.RepoURL.String())
 		modRepoID := domaintypes.NewModRepoID().String()
 		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
 			ID:        modRepoID,
 			ModID:     modID,
-			RepoUrl:   req.RepoURL.String(),
+			RepoUrl:   normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
