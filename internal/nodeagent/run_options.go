@@ -64,9 +64,9 @@ type RunOptions struct {
 	// This distinguishes between "not set" (use 0) and "set to 0".
 	ModIndexSet bool
 
-	// Steps holds the list of mod steps for multi-step runs (mods[] array).
+	// Steps holds the list of mod steps for multi-step runs (steps[] array).
 	// For single-step runs, this slice is empty and Execution options are used.
-	// For multi-step runs, this slice contains one entry per mod in mods[].
+	// For multi-step runs, this slice contains one entry per mod in steps[].
 	Steps []StepMod
 }
 
@@ -235,7 +235,7 @@ type ServerMetadataOptions struct {
 	JobID domaintypes.JobID
 }
 
-// StepMod describes a single mod step in a multi-step run (mods[] array).
+// StepMod describes a single mod step in a multi-step run (steps[] array).
 // Each step has its own image, command, and environment configuration.
 // Steps execute sequentially with shared workspace, each running gate+mod.
 type StepMod struct {
@@ -273,22 +273,24 @@ func parseRunOptions(opts map[string]any) RunOptions {
 	}
 
 	// Parse healing configuration (single-mod form).
-	if healingMap, ok := opts["build_gate_healing"].(map[string]any); ok {
-		healing := &HealingConfig{
-			Retries: 1, // Default to 1 retry.
-		}
+	if bg, ok := opts["build_gate"].(map[string]any); ok {
+		if healingMap, ok := bg["healing"].(map[string]any); ok {
+			healing := &HealingConfig{
+				Retries: 1, // Default to 1 retry.
+			}
 
-		// Extract retries (handle both int and float64 from JSON unmarshaling).
-		if r, ok := healingMap["retries"].(int); ok && r > 0 {
-			healing.Retries = r
-		} else if rf, ok := healingMap["retries"].(float64); ok && rf > 0 {
-			healing.Retries = int(rf)
-		}
+			// Extract retries (handle both int and float64 from JSON unmarshaling).
+			if r, ok := healingMap["retries"].(int); ok && r > 0 {
+				healing.Retries = r
+			} else if rf, ok := healingMap["retries"].(float64); ok && rf > 0 {
+				healing.Retries = int(rf)
+			}
 
-		// Single-mod form: mod is the canonical schema.
-		if modMap, ok := healingMap["mod"].(map[string]any); ok {
-			healing.Mod = parseHealingModFromMap(modMap)
-			runOpts.Healing = healing
+			// Single-mod form: mod is the canonical schema.
+			if modMap, ok := healingMap["mod"].(map[string]any); ok {
+				healing.Mod = parseHealingModFromMap(modMap)
+				runOpts.Healing = healing
+			}
 		}
 	}
 
@@ -368,13 +370,13 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.ModIndexSet = true
 	}
 
-	// Parse multi-step mods array for sequential execution.
-	// For multi-step runs (mods[] in spec), each entry defines a step.
+	// Parse multi-step steps array for sequential execution.
+	// For multi-step runs (steps[] in spec), each entry defines a step.
 	// For single-step runs (mod or legacy top-level), Steps remains empty.
-	if modsSlice, ok := opts["mods"].([]any); ok && len(modsSlice) > 0 {
-		for _, modEntry := range modsSlice {
-			if modMap, ok := modEntry.(map[string]any); ok {
-				stepMod := parseStepMod(modMap)
+	if stepsSlice, ok := opts["steps"].([]any); ok && len(stepsSlice) > 0 {
+		for _, stepEntry := range stepsSlice {
+			if stepMap, ok := stepEntry.(map[string]any); ok {
+				stepMod := parseStepMod(stepMap)
 				runOpts.Steps = append(runOpts.Steps, stepMod)
 			}
 		}

@@ -84,7 +84,11 @@ func maybeCreateHealingJobs(
 	}
 
 	// Check if healing is configured.
-	if spec.BuildGateHealing == nil || spec.BuildGateHealing.Mod == nil {
+	healing := (*contracts.HealingSpec)(nil)
+	if spec.BuildGate != nil {
+		healing = spec.BuildGate.Healing
+	}
+	if healing == nil || healing.Mod == nil {
 		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
 			"run_id", runID,
 		)
@@ -99,7 +103,7 @@ func maybeCreateHealingJobs(
 	}
 
 	// Get retry limit (default to 1 if not specified).
-	retries := spec.BuildGateHealing.Retries
+	retries := healing.Retries
 	if retries <= 0 {
 		retries = 1
 	}
@@ -245,8 +249,8 @@ func maybeCreateHealingJobs(
 	)
 
 	modImage := ""
-	if spec.BuildGateHealing.Mod.Image.Universal != "" {
-		modImage = strings.TrimSpace(spec.BuildGateHealing.Mod.Image.Universal)
+	if healing.Mod.Image.Universal != "" {
+		modImage = strings.TrimSpace(healing.Mod.Image.Universal)
 	}
 
 	// Create a single healing job for this attempt.
