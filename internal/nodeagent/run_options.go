@@ -6,6 +6,18 @@
 // wire-level compatibility. The typed options align with the roadmap goal of
 // reducing map[string]any casts and improving internal type safety.
 //
+// ## Hot-Path Optimization
+//
+// The primary entry point for typed options is modsSpecToRunOptions(), which
+// converts directly from contracts.ModsSpec to RunOptions. This eliminates the
+// intermediate map[string]any bridge and its associated type conversion hazards:
+//   - No float64→int conversion for numeric fields (mod_index, retries)
+//   - No []any→[]string conversion for slices (artifact_paths, command exec arrays)
+//   - No map[string]any type assertions at access points
+//
+// The legacy parseRunOptions() function remains available for backward compatibility
+// with tests that construct map[string]any inputs directly.
+//
 // ## Stack-Aware Image Selection
 //
 // The Image field in StepMod, HealingMod, and ExecutionOptions uses the
