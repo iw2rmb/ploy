@@ -33,8 +33,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
+		// When no JobID is provided, manifest.ID falls back to RunID.
 		if manifest.ID.String() != req.RunID.String() {
-			t.Errorf("expected ID %q, got %q", req.RunID, manifest.ID.String())
+			t.Errorf("expected ID %q (fallback to RunID), got %q", req.RunID, manifest.ID.String())
 		}
 		if manifest.Image != "ubuntu:latest" {
 			t.Errorf("expected default image ubuntu:latest, got %q", manifest.Image)
