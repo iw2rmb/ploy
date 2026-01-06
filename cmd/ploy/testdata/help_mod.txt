@@ -27,6 +27,10 @@ Artifacts:
 
 Use 'ploy mod <command> --help' for command details.
 
+Flags for 'ploy mod run <mod>':
+  --repo <url>    Explicit repo URL(s) to run (repeatable)
+  --failed        Run repos with last terminal state Fail
+
 Flags for 'ploy mod run':
   --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)
   --repo-url <url>           Git repository URL
