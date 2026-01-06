@@ -21,19 +21,20 @@
 apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
- # Stack-aware image map: Build Gate detects workspace stack and selects
- # the appropriate image. For Maven projects, java-maven is selected.
- # For Gradle projects, java-gradle is selected. Other stacks use default.
-image:
-  default: docker.io/iwtormb/mods-orw-maven:latest
-  java-maven: docker.io/iwtormb/mods-orw-maven:latest
-  java-gradle: docker.io/iwtormb/mods-orw-gradle:latest
-env:
-  RECIPE_GROUP: org.openrewrite.recipe
-  RECIPE_ARTIFACT: rewrite-migrate-java
-  RECIPE_VERSION: "3.20.0"
-  RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-  MAVEN_PLUGIN_VERSION: "6.18.0"
+steps:
+  - # Stack-aware image map: Build Gate detects workspace stack and selects
+    # the appropriate image. For Maven projects, java-maven is selected.
+    # For Gradle projects, java-gradle is selected. Other stacks use default.
+    image:
+      default: docker.io/iwtormb/mods-orw-maven:latest
+      java-maven: docker.io/iwtormb/mods-orw-maven:latest
+      java-gradle: docker.io/iwtormb/mods-orw-gradle:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+      MAVEN_PLUGIN_VERSION: "6.18.0"
 
 build_gate:
   enabled: true
