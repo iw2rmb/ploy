@@ -428,6 +428,12 @@ func (m *mockController) StopRun(ctx context.Context, req StopRunRequest) error 
 	return nil
 }
 
+func (m *mockController) AcquireSlot(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockController) ReleaseSlot() {}
+
 // containsError checks if an error message contains a substring.
 func containsError(err error, substr string) bool {
 	if err == nil {

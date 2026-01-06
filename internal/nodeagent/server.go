@@ -19,6 +19,16 @@ import (
 type RunController interface {
 	StartRun(ctx context.Context, req StartRunRequest) error
 	StopRun(ctx context.Context, req StopRunRequest) error
+
+	// AcquireSlot blocks until a concurrency slot is available or the context
+	// is canceled. Returns nil when a slot is acquired, or ctx.Err() if the
+	// context was canceled while waiting. The caller must call ReleaseSlot()
+	// after the job completes to free the slot.
+	AcquireSlot(ctx context.Context) error
+
+	// ReleaseSlot frees a previously acquired concurrency slot.
+	// Must be called exactly once for each successful AcquireSlot call.
+	ReleaseSlot()
 }
 
 // Server exposes the node agent API over HTTPS with mTLS.
