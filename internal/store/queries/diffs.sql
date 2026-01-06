@@ -2,14 +2,6 @@
 SELECT * FROM diffs
 WHERE id = $1;
 
--- name: ListDiffsByRun :many
--- Returns diffs for a run ordered by job step_index, then by created_at.
--- Joins with jobs to get ordering from job's step_index.
-SELECT d.* FROM diffs d
-LEFT JOIN jobs j ON d.job_id = j.id
-WHERE d.run_id = $1
-ORDER BY j.step_index NULLS LAST, d.created_at ASC;
-
 -- name: ListDiffsBeforeStep :many
 -- Returns all diffs for a run up to (and including) the specified step_index.
 -- Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
