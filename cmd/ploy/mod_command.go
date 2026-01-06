@@ -36,6 +36,10 @@ func handleMod(args []string, stderr io.Writer) error {
 	// v1 repo set management (roadmap/v1/cli.md:62-99).
 	case "repo":
 		return handleModRepo(args[1:], stderr)
+	// v1 pull command: replaces `ploy mod run pull` for mod-based workflows.
+	// Per roadmap/v1/cli.md:146-166.
+	case "pull":
+		return handleModPull(args[1:], stderr)
 	// v1 mod run with repo selection (roadmap/v1/cli.md:102-119).
 	// Check if first arg looks like a mod ID/name (not a flag) to route to project run.
 	case "run":
