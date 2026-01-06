@@ -42,6 +42,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("DELETE /v1/mods/{mod_id}", deleteModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/mods/{mod_id}/archive", archiveModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/mods/{mod_id}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/api.md:140-151, roadmap/v1/scope.md:8-9): Set mod spec (append-only specs + mods.spec_id pointer).
+	s.HandleFunc("POST /v1/mods/{mod_id}/specs", setModSpecHandler(st), auth.RoleControlPlane)
 
 	// Legacy routes under /v1/mods/{id}/* for run operations.
 	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
