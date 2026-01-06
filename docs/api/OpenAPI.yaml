@@ -147,6 +147,10 @@ paths:
     $ref: './paths/runs_id_repos_repo_id.yaml'
   /v1/runs/{id}/repos/{repo_id}/restart:
     $ref: './paths/runs_id_repos_repo_id_restart.yaml'
+  # v1 repo-scoped diffs listing — replaces legacy GET /v1/mods/{id}/diffs
+  # Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263
+  /v1/runs/{run_id}/repos/{repo_id}/diffs:
+    $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
   # Repo-centric endpoints — list repos and show runs for a given repo
   /v1/repos:
     $ref: './paths/repos.yaml'

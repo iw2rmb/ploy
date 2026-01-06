@@ -679,6 +679,32 @@ CreateDiffRequest:
     summary: {}
   required: [patch]
 
+# DiffItem represents a single diff in a list response.
+# Used by GET /v1/mods/{id}/diffs and GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+DiffItem:
+  type: object
+  properties:
+    id: { type: string, format: uuid, description: "Diff ID (UUID)" }
+    job_id: { type: string, description: "Job ID (KSUID string)" }
+    created_at: { type: string, format: date-time }
+    gzipped_size: { type: integer, format: int32, description: "Size of gzipped patch in bytes" }
+    summary:
+      type: object
+      additionalProperties: true
+      description: "Diff summary metadata (exit_code, files_changed, mod_type, etc.)"
+  required: [id, job_id, created_at, gzipped_size]
+
+# DiffListResponse is the response for listing diffs.
+# Used by GET /v1/mods/{id}/diffs and GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+DiffListResponse:
+  type: object
+  properties:
+    diffs:
+      type: array
+      items:
+        $ref: '#/DiffItem'
+  required: [diffs]
+
 Log:
   type: object
   # Note: run_id and job_id are now KSUID-backed strings (27 characters).

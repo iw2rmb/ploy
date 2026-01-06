@@ -1,0 +1,48 @@
+get:
+  tags: [Artifacts]
+  summary: List diffs for a repo execution within a run
+  description: |
+    Returns all diffs for a specific repository execution within a run.
+    This is the v1 repo-scoped endpoint that replaces the legacy run-scoped
+    GET /v1/mods/{id}/diffs endpoint.
+
+    Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
+    - Repo attribution comes from joining diffs.job_id -> jobs.repo_id
+    - Diffs for repo A are excluded from repo B listing
+    - Response shape is unchanged from legacy endpoint
+
+    Diffs are ordered by step_index (ascending), then by created_at (ascending).
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/DiffListResponse'
+    '400':
+      description: Bad request (missing or empty run_id or repo_id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

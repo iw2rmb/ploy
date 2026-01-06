@@ -1,0 +1,48 @@
+post:
+  tags: [Control]
+  summary: Create mod run (multi-repo)
+  description: |
+    Create a batch run from the mod's current spec over a selected set of repos
+    and start execution immediately.
+
+    Repo selection modes:
+    - all: all repos in the mod repo set
+    - failed: repos whose last terminal run state is Fail
+    - explicit: only repos matching the provided repo URLs (normalized)
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/CreateModRunRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/CreateModRunResponse'
+    '400':
+      description: Bad request — missing or invalid fields in the request body.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict — mod is archived.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
