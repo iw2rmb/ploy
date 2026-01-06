@@ -6,27 +6,40 @@ import (
 )
 
 // TestParseSpec_PassesThroughBuildGateHealing verifies that the node agent
-// carries the build_gate_healing block from the spec into Options so that
+// carries the build_gate.healing block from the spec into Options so that
 // executeWithHealing can honor the configured heal → re-gate loop.
 func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	specJSON := `{
-	        "build_gate_healing": {
-	            "retries": 2,
-	            "mod": { "image": "docker.io/test/heal:latest" }
+	        "steps": [{"image": "docker.io/test/mod:latest"}],
+	        "build_gate": {
+	            "healing": {
+	                "retries": 2,
+	                "mod": { "image": "docker.io/test/heal:latest" }
+	            }
 	        }
 	    }`
 
 	var raw json.RawMessage = []byte(specJSON)
 	opts, _, _ := parseSpec(raw)
 
-	v, ok := opts["build_gate_healing"]
+	bgAny, ok := opts["build_gate"]
 	if !ok {
-		t.Fatalf("expected build_gate_healing present in options")
+		t.Fatalf("expected build_gate present in options")
 	}
 
-	m, ok := v.(map[string]any)
+	bg, ok := bgAny.(map[string]any)
 	if !ok {
-		t.Fatalf("expected build_gate_healing to be map[string]any, got %T", v)
+		t.Fatalf("expected build_gate to be map[string]any, got %T", bgAny)
+	}
+
+	healingAny, ok := bg["healing"]
+	if !ok {
+		t.Fatalf("expected build_gate.healing present in options")
+	}
+
+	m, ok := healingAny.(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing to be map[string]any, got %T", healingAny)
 	}
 
 	// Check retries
@@ -53,15 +66,15 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 }
 
 // TestParseSpec_CanonicalSingleStepFormat verifies that parseSpec correctly extracts
-// top-level fields for single-step runs. This is the canonical shape for single-step
-// specs (replacing the legacy "mod" object format).
+// flattened top-level fields for single-step runs from steps[0].
 func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
-	// Canonical single-step format: top-level image, command, env, retain_container.
 	specJSON := `{
-        "image": "docker.io/test/mod:latest",
-        "retain_container": true,
+        "steps": [{
+            "image": "docker.io/test/mod:latest",
+            "retain_container": true,
+            "command": ["/bin/sh","-c","echo hi"]
+        }],
         "env": {"A":"1","B":"2"},
-        "command": ["/bin/sh","-c","echo hi"],
         "build_gate": {"enabled": false, "profile": "java-maven"}
     }`
 	var raw json.RawMessage = []byte(specJSON)
@@ -89,10 +102,11 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 
 // TestParseSpec_LegacyModObjectIgnored verifies that the legacy "mod" object format
 // is no longer processed by parseSpec. Specs using "mod" must be migrated to
-// canonical shapes (top-level fields for single-step, mods[] for multi-step).
+// canonical shapes (steps[]).
 func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
 	// Legacy format: nested "mod" object (no longer supported).
 	specJSON := `{
+        "steps": [{"image": "docker.io/test/required:latest"}],
         "mod": {
             "image": "docker.io/test/mod:latest",
             "retain_container": true,
@@ -116,15 +130,15 @@ func TestParseSpec_LegacyModObjectIgnored(t *testing.T) {
 	}
 }
 
-// TestParseSpec_PreservesModsArray verifies that parseSpec preserves the mods[]
+// TestParseSpec_PreservesStepsArray verifies that parseSpec preserves the steps[]
 // array for multi-step runs without modification. The mods[] array represents
 // sequential transformation steps that share global gate/healing policy.
-func TestParseSpec_PreservesModsArray(t *testing.T) {
+func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	t.Parallel()
 
-	// Spec with multi-step mods[] array (3 steps with different images and env).
+	// Spec with multi-step steps[] array (3 steps with different images and env).
 	specJSON := `{
-		"mods": [
+		"steps": [
 			{
 				"image": "docker.io/test/mod-step1:latest",
 				"env": {"STEP": "1", "TARGET": "java8"},
@@ -141,93 +155,103 @@ func TestParseSpec_PreservesModsArray(t *testing.T) {
 				"env": {"STEP": "3"}
 			}
 		],
-		"build_gate": {"enabled": true, "profile": "auto"},
-		"build_gate_healing": {
-			"retries": 1,
-			"mod": {"image": "docker.io/test/healer:latest"}
+		"build_gate": {
+			"enabled": true,
+			"profile": "auto",
+			"healing": {
+				"retries": 1,
+				"mod": {"image": "docker.io/test/healer:latest"}
+			}
 		}
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
 	opts, _, _ := parseSpec(raw)
 
-	// Verify mods[] array is present in opts.
-	modsRaw, ok := opts["mods"]
+	// Verify steps[] array is present in opts.
+	stepsRaw, ok := opts["steps"]
 	if !ok {
-		t.Fatalf("expected mods array in options, got none")
+		t.Fatalf("expected steps array in options, got none")
 	}
 
-	modsSlice, ok := modsRaw.([]any)
+	stepsSlice, ok := stepsRaw.([]any)
 	if !ok {
-		t.Fatalf("expected mods to be []any, got %T", modsRaw)
+		t.Fatalf("expected steps to be []any, got %T", stepsRaw)
 	}
 
-	if len(modsSlice) != 3 {
-		t.Fatalf("expected 3 mods in array, got %d", len(modsSlice))
+	if len(stepsSlice) != 3 {
+		t.Fatalf("expected 3 steps in array, got %d", len(stepsSlice))
 	}
 
 	// Verify first mod entry is preserved correctly.
-	mod0, ok := modsSlice[0].(map[string]any)
+	mod0, ok := stepsSlice[0].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[0] to be map[string]any, got %T", modsSlice[0])
+		t.Fatalf("expected steps[0] to be map[string]any, got %T", stepsSlice[0])
 	}
 	if img, _ := mod0["image"].(string); img != "docker.io/test/mod-step1:latest" {
-		t.Errorf("expected mods[0].image=docker.io/test/mod-step1:latest, got %v", img)
+		t.Errorf("expected steps[0].image=docker.io/test/mod-step1:latest, got %v", img)
 	}
 	if env0, ok := mod0["env"].(map[string]any); ok {
 		if step, _ := env0["STEP"].(string); step != "1" {
-			t.Errorf("expected mods[0].env.STEP=1, got %v", step)
+			t.Errorf("expected steps[0].env.STEP=1, got %v", step)
 		}
 		if target, _ := env0["TARGET"].(string); target != "java8" {
-			t.Errorf("expected mods[0].env.TARGET=java8, got %v", target)
+			t.Errorf("expected steps[0].env.TARGET=java8, got %v", target)
 		}
 	} else {
-		t.Errorf("expected mods[0].env to be present")
+		t.Errorf("expected steps[0].env to be present")
 	}
 
 	// Verify second mod entry has command array preserved.
-	mod1, ok := modsSlice[1].(map[string]any)
+	mod1, ok := stepsSlice[1].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[1] to be map[string]any, got %T", modsSlice[1])
+		t.Fatalf("expected steps[1] to be map[string]any, got %T", stepsSlice[1])
 	}
 	if img, _ := mod1["image"].(string); img != "docker.io/test/mod-step2:latest" {
-		t.Errorf("expected mods[1].image=docker.io/test/mod-step2:latest, got %v", img)
+		t.Errorf("expected steps[1].image=docker.io/test/mod-step2:latest, got %v", img)
 	}
 	if cmdArr, ok := mod1["command"].([]any); ok {
 		if len(cmdArr) != 2 || cmdArr[0] != "migrate.sh" || cmdArr[1] != "--verbose" {
-			t.Errorf("expected mods[1].command=[migrate.sh --verbose], got %v", cmdArr)
+			t.Errorf("expected steps[1].command=[migrate.sh --verbose], got %v", cmdArr)
 		}
 	} else {
-		t.Errorf("expected mods[1].command to be array, got %T", mod1["command"])
+		t.Errorf("expected steps[1].command to be array, got %T", mod1["command"])
 	}
 
 	// Verify third mod entry has shell command preserved.
-	mod2, ok := modsSlice[2].(map[string]any)
+	mod2, ok := stepsSlice[2].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[2] to be map[string]any, got %T", modsSlice[2])
+		t.Fatalf("expected steps[2] to be map[string]any, got %T", stepsSlice[2])
 	}
 	if cmd, _ := mod2["command"].(string); cmd != "finalize.sh" {
-		t.Errorf("expected mods[2].command=finalize.sh, got %v", cmd)
+		t.Errorf("expected steps[2].command=finalize.sh, got %v", cmd)
 	}
 
-	// Verify build_gate and build_gate_healing are preserved (global policy).
+	// Verify build_gate and build_gate.healing are preserved (global policy).
 	if en, ok := opts["build_gate_enabled"].(bool); !ok || !en {
 		t.Errorf("expected build_gate_enabled=true, got %v", opts["build_gate_enabled"])
 	}
-	if healing, ok := opts["build_gate_healing"].(map[string]any); !ok {
-		t.Errorf("expected build_gate_healing to be preserved")
+	bgAny, ok := opts["build_gate"]
+	if !ok {
+		t.Errorf("expected build_gate to be preserved")
+	} else if bg, ok := bgAny.(map[string]any); !ok {
+		t.Errorf("expected build_gate to be map[string]any, got %T", bgAny)
+	} else if healingAny, ok := bg["healing"]; !ok {
+		t.Errorf("expected build_gate.healing to be preserved")
+	} else if healing, ok := healingAny.(map[string]any); !ok {
+		t.Errorf("expected build_gate.healing to be map[string]any, got %T", healingAny)
 	} else {
 		switch retries := healing["retries"].(type) {
 		case int:
 			if retries != 1 {
-				t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+				t.Errorf("expected build_gate.healing.retries=1, got %v", retries)
 			}
 		case float64:
 			if int(retries) != 1 {
-				t.Errorf("expected build_gate_healing.retries=1, got %v", retries)
+				t.Errorf("expected build_gate.healing.retries=1, got %v", retries)
 			}
 		default:
-			t.Errorf("expected build_gate_healing.retries to be numeric, got %T", healing["retries"])
+			t.Errorf("expected build_gate.healing.retries to be numeric, got %T", healing["retries"])
 		}
 	}
 }
@@ -246,11 +270,14 @@ func TestParseRunOptions_HealingSingleMod(t *testing.T) {
 		{
 			name: "single_mod_healing",
 			specJSON: `{
-				"build_gate_healing": {
-					"retries": 3,
-					"mod": {
-						"image": "docker.io/test/codex:latest",
-						"command": "fix-with-ai"
+				"steps": [{"image": "docker.io/test/mod:latest"}],
+				"build_gate": {
+					"healing": {
+						"retries": 3,
+						"mod": {
+							"image": "docker.io/test/codex:latest",
+							"command": "fix-with-ai"
+						}
 					}
 				}
 			}`,
@@ -267,8 +294,16 @@ func TestParseRunOptions_HealingSingleMod(t *testing.T) {
 			opts, _, typedOpts := parseSpec(raw)
 
 			// Verify raw opts contains the healing block.
-			if _, ok := opts["build_gate_healing"]; !ok {
-				t.Fatal("expected build_gate_healing in raw opts")
+			bgAny, ok := opts["build_gate"]
+			if !ok {
+				t.Fatal("expected build_gate in raw opts")
+			}
+			bg, ok := bgAny.(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate to be map[string]any, got %T", bgAny)
+			}
+			if _, ok := bg["healing"]; !ok {
+				t.Fatal("expected build_gate.healing in raw opts")
 			}
 
 			// Verify typed options.
@@ -293,16 +328,19 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
-		"build_gate_healing": {
-			"retries": 1,
-			"mod": {
-				"image": "docker.io/test/healer:v1",
-				"command": "heal.sh --fix",
-				"env": {
-					"MODE": "aggressive",
-					"DEBUG": "true"
-				},
-				"retain_container": true
+		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"build_gate": {
+			"healing": {
+				"retries": 1,
+				"mod": {
+					"image": "docker.io/test/healer:v1",
+					"command": "heal.sh --fix",
+					"env": {
+						"MODE": "aggressive",
+						"DEBUG": "true"
+					},
+					"retain_container": true
+				}
 			}
 		}
 	}`
