@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -183,14 +184,44 @@ func (a *Agent) bootstrap(ctx context.Context) error {
 // It retries with exponential backoff to handle temporary network failures.
 // Uses shared backoff policy (1s initial, 2x multiplier, 5 attempts total).
 func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []byte) (cert, caCert string, err error) {
-	// Create plain HTTPS client (no mTLS - we don't have certs yet).
-	// Only verify server's CA certificate.
+	// Build TLS config for bootstrap: verify server CA using pinned CA bundle.
+	// Fallback order:
+	//   1. BootstrapCAPath (explicit bootstrap CA)
+	//   2. CAPath if file exists (cluster CA from previous bootstrap)
+	//   3. System roots (for public PKI / first boot on public infra)
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS13,
+	}
+
+	// Determine which CA bundle to use for server verification.
+	bootstrapCAPath := a.cfg.HTTP.TLS.BootstrapCAPath
+	if bootstrapCAPath == "" && fileExists(a.cfg.HTTP.TLS.CAPath) {
+		// Fall back to cluster CA if it exists (e.g., after previous bootstrap).
+		bootstrapCAPath = a.cfg.HTTP.TLS.CAPath
+	}
+
+	if bootstrapCAPath != "" {
+		// Load pinned CA bundle for server verification.
+		caData, readErr := os.ReadFile(bootstrapCAPath)
+		if readErr != nil {
+			return "", "", fmt.Errorf("read bootstrap CA from %s: %w", bootstrapCAPath, readErr)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caData) {
+			return "", "", fmt.Errorf("parse bootstrap CA from %s: no valid certificates found", bootstrapCAPath)
+		}
+		tlsCfg.RootCAs = pool
+		slog.Debug("bootstrap TLS: using pinned CA", "path", bootstrapCAPath)
+	} else {
+		// No pinned CA available; use system roots (public PKI scenario).
+		slog.Debug("bootstrap TLS: using system roots (no pinned CA configured)")
+	}
+
+	// Create HTTPS client (no client cert - we don't have one yet).
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS13,
-			},
+			TLSClientConfig: tlsCfg,
 		},
 	}
 

@@ -448,3 +448,315 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+// TestBootstrapTLS_PinnedCA verifies that requestCertificate uses the configured
+// BootstrapCAPath to verify the server during bootstrap.
+func TestBootstrapTLS_PinnedCA(t *testing.T) {
+	// Generate test CA and server certificate.
+	now := time.Now().UTC()
+	ca, err := pki.GenerateCA("test-cluster", now)
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, "test-cluster", "127.0.0.1", now)
+	if err != nil {
+		t.Fatalf("issue server cert: %v", err)
+	}
+
+	// Write CA to temp file.
+	tmpDir := t.TempDir()
+	bootstrapCAPath := filepath.Join(tmpDir, "bootstrap-ca.crt")
+	if err := os.WriteFile(bootstrapCAPath, []byte(ca.CertPEM), 0600); err != nil {
+		t.Fatalf("write bootstrap CA: %v", err)
+	}
+
+	// Set up HTTPS test server using the generated certificate.
+	tlsCert, err := tls.X509KeyPair([]byte(serverCert.CertPEM), []byte(serverCert.KeyPEM))
+	if err != nil {
+		t.Fatalf("load server cert: %v", err)
+	}
+
+	testMux := http.NewServeMux()
+	testMux.HandleFunc("/v1/pki/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"certificate":"cert-data","ca_bundle":"ca-data"}`))
+	})
+
+	serverTLSConfig := &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	testServer := &http.Server{Handler: testMux}
+	go func() { _ = testServer.Serve(listener) }()
+
+	// Configure agent with BootstrapCAPath pointing to our test CA.
+	cfg := Config{
+		ServerURL: "https://" + listener.Addr().String(),
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled:         true,
+				BootstrapCAPath: bootstrapCAPath,
+				CAPath:          filepath.Join(tmpDir, "nonexistent-ca.crt"), // Doesn't exist.
+			},
+		},
+	}
+
+	agent := &Agent{cfg: cfg}
+	ctx := context.Background()
+
+	// Request should succeed because we verify with the pinned CA.
+	cert, caCert, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
+	if err != nil {
+		t.Fatalf("requestCertificate failed: %v", err)
+	}
+
+	if cert != "cert-data" {
+		t.Errorf("expected cert=cert-data, got %s", cert)
+	}
+	if caCert != "ca-data" {
+		t.Errorf("expected caCert=ca-data, got %s", caCert)
+	}
+}
+
+// TestBootstrapTLS_PinnedCA_WrongCA verifies that requestCertificate fails when
+// the server presents a certificate not signed by the configured BootstrapCAPath.
+func TestBootstrapTLS_PinnedCA_WrongCA(t *testing.T) {
+	// Generate two different CAs.
+	now := time.Now().UTC()
+	serverCA, err := pki.GenerateCA("server-cluster", now)
+	if err != nil {
+		t.Fatalf("generate server CA: %v", err)
+	}
+	clientCA, err := pki.GenerateCA("client-cluster", now)
+	if err != nil {
+		t.Fatalf("generate client CA: %v", err)
+	}
+
+	// Server uses serverCA.
+	serverCert, err := pki.IssueServerCert(serverCA, "server-cluster", "127.0.0.1", now)
+	if err != nil {
+		t.Fatalf("issue server cert: %v", err)
+	}
+
+	// Client is configured with clientCA (different from serverCA).
+	tmpDir := t.TempDir()
+	bootstrapCAPath := filepath.Join(tmpDir, "wrong-ca.crt")
+	if err := os.WriteFile(bootstrapCAPath, []byte(clientCA.CertPEM), 0600); err != nil {
+		t.Fatalf("write bootstrap CA: %v", err)
+	}
+
+	// Set up HTTPS test server.
+	tlsCert, err := tls.X509KeyPair([]byte(serverCert.CertPEM), []byte(serverCert.KeyPEM))
+	if err != nil {
+		t.Fatalf("load server cert: %v", err)
+	}
+
+	testMux := http.NewServeMux()
+	testMux.HandleFunc("/v1/pki/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"certificate":"cert-data","ca_bundle":"ca-data"}`))
+	})
+
+	serverTLSConfig := &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	testServer := &http.Server{Handler: testMux}
+	go func() { _ = testServer.Serve(listener) }()
+
+	// Configure agent with wrong BootstrapCAPath.
+	cfg := Config{
+		ServerURL: "https://" + listener.Addr().String(),
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled:         true,
+				BootstrapCAPath: bootstrapCAPath,
+			},
+		},
+	}
+
+	agent := &Agent{cfg: cfg}
+
+	// Use a short timeout context to avoid long waits on retries.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Request should fail because server cert is not signed by the pinned CA.
+	_, _, err = agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
+	if err == nil {
+		t.Fatal("expected TLS verification error, got nil")
+	}
+
+	// Verify the error is related to certificate verification.
+	if !containsError(err, "certificate") {
+		t.Logf("error message: %v", err)
+	}
+}
+
+// TestBootstrapTLS_CAPathFallback verifies that when BootstrapCAPath is empty
+// but CAPath exists, the cluster CA is used for bootstrap TLS verification.
+func TestBootstrapTLS_CAPathFallback(t *testing.T) {
+	// Generate test CA and server certificate.
+	now := time.Now().UTC()
+	ca, err := pki.GenerateCA("test-cluster", now)
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, "test-cluster", "127.0.0.1", now)
+	if err != nil {
+		t.Fatalf("issue server cert: %v", err)
+	}
+
+	// Write CA to CAPath (simulating previous bootstrap).
+	tmpDir := t.TempDir()
+	caPath := filepath.Join(tmpDir, "ca.crt")
+	if err := os.WriteFile(caPath, []byte(ca.CertPEM), 0600); err != nil {
+		t.Fatalf("write CA: %v", err)
+	}
+
+	// Set up HTTPS test server.
+	tlsCert, err := tls.X509KeyPair([]byte(serverCert.CertPEM), []byte(serverCert.KeyPEM))
+	if err != nil {
+		t.Fatalf("load server cert: %v", err)
+	}
+
+	testMux := http.NewServeMux()
+	testMux.HandleFunc("/v1/pki/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"certificate":"cert-data","ca_bundle":"ca-data"}`))
+	})
+
+	serverTLSConfig := &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	testServer := &http.Server{Handler: testMux}
+	go func() { _ = testServer.Serve(listener) }()
+
+	// Configure agent without BootstrapCAPath but with existing CAPath.
+	cfg := Config{
+		ServerURL: "https://" + listener.Addr().String(),
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled:         true,
+				BootstrapCAPath: "", // Empty - should fall back to CAPath.
+				CAPath:          caPath,
+			},
+		},
+	}
+
+	agent := &Agent{cfg: cfg}
+	ctx := context.Background()
+
+	// Request should succeed using CAPath as fallback.
+	cert, caCert, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
+	if err != nil {
+		t.Fatalf("requestCertificate failed: %v", err)
+	}
+
+	if cert != "cert-data" {
+		t.Errorf("expected cert=cert-data, got %s", cert)
+	}
+	if caCert != "ca-data" {
+		t.Errorf("expected caCert=ca-data, got %s", caCert)
+	}
+}
+
+// TestBootstrapTLS_InvalidCAFile verifies that requestCertificate returns an error
+// when the configured BootstrapCAPath contains invalid certificate data.
+func TestBootstrapTLS_InvalidCAFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	bootstrapCAPath := filepath.Join(tmpDir, "invalid-ca.crt")
+
+	// Write invalid certificate data.
+	if err := os.WriteFile(bootstrapCAPath, []byte("not a valid certificate"), 0600); err != nil {
+		t.Fatalf("write invalid CA: %v", err)
+	}
+
+	cfg := Config{
+		ServerURL: "https://127.0.0.1:9999",
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled:         true,
+				BootstrapCAPath: bootstrapCAPath,
+			},
+		},
+	}
+
+	agent := &Agent{cfg: cfg}
+	ctx := context.Background()
+
+	// Request should fail immediately due to invalid CA file.
+	_, _, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
+	if err == nil {
+		t.Fatal("expected error for invalid CA file, got nil")
+	}
+
+	// Verify error message mentions the parse failure.
+	expectedSubstr := "no valid certificates found"
+	if !containsError(err, expectedSubstr) {
+		t.Errorf("expected error containing %q, got: %v", expectedSubstr, err)
+	}
+}
+
+// TestBootstrapTLS_MissingCAFile verifies that requestCertificate returns an error
+// when the configured BootstrapCAPath file does not exist.
+func TestBootstrapTLS_MissingCAFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	missingPath := filepath.Join(tmpDir, "missing-ca.crt")
+
+	cfg := Config{
+		ServerURL: "https://127.0.0.1:9999",
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled:         true,
+				BootstrapCAPath: missingPath,
+			},
+		},
+	}
+
+	agent := &Agent{cfg: cfg}
+	ctx := context.Background()
+
+	// Request should fail immediately because CA file doesn't exist.
+	_, _, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
+	if err == nil {
+		t.Fatal("expected error for missing CA file, got nil")
+	}
+
+	// Verify error message mentions the read failure.
+	if !containsError(err, "read bootstrap CA") {
+		t.Errorf("expected error about reading CA, got: %v", err)
+	}
+}
