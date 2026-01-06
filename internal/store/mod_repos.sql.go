@@ -104,6 +104,22 @@ func (q *Queries) GetModRepoByURL(ctx context.Context, arg GetModRepoByURLParams
 	return i, err
 }
 
+const hasModRepoHistory = `-- name: HasModRepoHistory :one
+SELECT EXISTS(
+  SELECT 1 FROM run_repos WHERE repo_id = $1 LIMIT 1
+) AS has_history
+`
+
+// Checks if a mod_repo has any historical executions (run_repos references).
+// Returns true if the repo cannot be deleted due to history, false otherwise.
+// Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+func (q *Queries) HasModRepoHistory(ctx context.Context, repoID string) (bool, error) {
+	row := q.db.QueryRow(ctx, hasModRepoHistory, repoID)
+	var has_history bool
+	err := row.Scan(&has_history)
+	return has_history, err
+}
+
 const listDistinctRepos = `-- name: ListDistinctRepos :many
 SELECT
   mr.id AS repo_id,

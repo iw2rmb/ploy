@@ -100,6 +100,10 @@ type Querier interface {
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
 	GetSpec(ctx context.Context, id string) (Spec, error)
+	// Checks if a mod_repo has any historical executions (run_repos references).
+	// Returns true if the repo cannot be deleted due to history, false otherwise.
+	// Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+	HasModRepoHistory(ctx context.Context, repoID string) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
