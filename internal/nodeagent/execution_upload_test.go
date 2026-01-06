@@ -285,10 +285,12 @@ func TestRunController_uploadStatus(t *testing.T) {
 			controller := &runController{cfg: cfg}
 
 			// Execute upload with job_id.
+			// v1 uses capitalized job status values: Success, Fail, Cancelled
+			// (see roadmap/v1/statuses.md:127).
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
-			err := controller.uploadStatus(ctx, "test-run", "succeeded", &exitCode, stats, 1000, "test-job-id")
+			err := controller.uploadStatus(ctx, "test-run", "Success", &exitCode, stats, 1000, "test-job-id")
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {

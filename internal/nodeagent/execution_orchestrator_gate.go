@@ -77,10 +77,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 
 	// Determine status and exit code.
+	// v1 uses capitalized job status values: Success, Fail, Cancelled
+	// (see roadmap/v1/statuses.md:127).
 	if gateErr != nil || !gatePassed {
 		// Gate failed - exit code 1 signals gate failure for healing.
 		var exitCode int32 = 1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "Fail", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload gate failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Info("gate job failed",
@@ -94,7 +96,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Gate passed.
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "Success", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload gate success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("gate job succeeded",
