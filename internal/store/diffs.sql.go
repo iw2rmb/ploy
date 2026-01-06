@@ -162,3 +162,47 @@ func (q *Queries) ListDiffsByRun(ctx context.Context, runID string) ([]Diff, err
 	}
 	return items, nil
 }
+
+const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
+SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
+JOIN jobs j ON j.id = d.job_id
+WHERE d.run_id = $1 AND j.repo_id = $2
+ORDER BY j.step_index ASC, d.created_at ASC
+`
+
+type ListDiffsByRunRepoParams struct {
+	RunID  string `json:"run_id"`
+	RepoID string `json:"repo_id"`
+}
+
+// Returns diffs for a specific repo execution within a run.
+// Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
+// joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
+// GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
+func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Diff{}
+	for rows.Next() {
+		var i Diff
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.Patch,
+			&i.Summary,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

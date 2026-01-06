@@ -122,6 +122,12 @@ type Querier interface {
 	// Returns diffs for a run ordered by job step_index, then by created_at.
 	// Joins with jobs to get ordering from job's step_index.
 	ListDiffsByRun(ctx context.Context, runID string) ([]Diff, error)
+	// Returns diffs for a specific repo execution within a run.
+	// Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
+	// joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
+	// GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+	// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
+	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
 	// v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
