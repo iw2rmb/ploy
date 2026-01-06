@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,162 +9,47 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestGetDiff_Download(t *testing.T) {
+func TestRunRepoDiffs_Download(t *testing.T) {
 	st := &mockStore{}
 	runID := domaintypes.NewRunID()
+	repoID := "repoAAAA"
 	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
 	diffID := uuid.New()
+	patch := []byte{0x1f, 0x8b, 0x08, 0x00}
+
 	st.getDiffResult = store.Diff{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID.String(),
-		JobID:     &jobIDStr,
-		Patch:     []byte{0x1f, 0x8b, 0x08},
-		Summary:   []byte(`{"exit_code":0}`),
-		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		ID:    pgtype.UUID{Bytes: diffID, Valid: true},
+		RunID: runID.String(),
+		JobID: &jobIDStr,
+		Patch: patch,
 	}
+	st.getJobResult = store.Job{ID: jobIDStr, RunID: runID.String(), RepoID: repoID}
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String()+"?download=true", nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&diff_id="+diffID.String(), nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID)
+	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
+		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "application/gzip" {
-		t.Fatalf("content-type=%s", ct)
+		t.Fatalf("content-type=%s, want application/gzip", ct)
 	}
-	if rr.Body.Len() == 0 {
-		t.Fatal("empty body")
+	if !bytes.Equal(rr.Body.Bytes(), patch) {
+		t.Fatalf("patch len=%d, want %d", rr.Body.Len(), len(patch))
 	}
-}
-
-func TestGetDiff_Metadata(t *testing.T) {
-	st := &mockStore{}
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	jobIDStr := jobID.String()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
-	st.getDiffResult = store.Diff{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID.String(),
-		JobID:     &jobIDStr,
-		Patch:     []byte{0x1f, 0x8b, 0x08},
-		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
+	if !st.getDiffCalled {
+		t.Fatal("expected GetDiff to be called")
 	}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
-		t.Fatalf("content-type=%s, want application/json", ct)
-	}
-	var resp diffGetResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if resp.ID != diffID.String() {
-		t.Errorf("id=%q, want %q", resp.ID, diffID.String())
-	}
-	if resp.RunID != runID {
-		t.Errorf("run_id=%q, want %q", resp.RunID, runID)
-	}
-	expectedJobID := domaintypes.JobID(jobID.String()) // Create expected domain type
-	if resp.JobID == nil || *resp.JobID != expectedJobID {
-		t.Errorf("job_id=%v, want %q", resp.JobID, jobID.String())
-	}
-	if !resp.CreatedAt.Equal(createdAt) {
-		t.Errorf("created_at=%v, want %v", resp.CreatedAt, createdAt)
-	}
-	if resp.GzippedSize != 3 {
-		t.Errorf("gzipped_size=%d, want 3", resp.GzippedSize)
-	}
-	// DiffSummary is now json.RawMessage-backed; use accessor methods.
-	if exitCode, ok := resp.Summary.ExitCode(); !ok || exitCode != 0 {
-		t.Errorf("summary.ExitCode()=%d, want 0", exitCode)
-	}
-	if filesChanged, ok := resp.Summary.FilesChanged(); !ok || filesChanged != 3 {
-		t.Errorf("summary.FilesChanged()=%d, want 3", filesChanged)
-	}
-}
-
-func TestGetDiff_InvalidID(t *testing.T) {
-	st := &mockStore{}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/bad-id", nil)
-	req.SetPathValue("id", "bad-id")
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status %d, want 400", rr.Code)
-	}
-}
-
-func TestGetDiff_MissingID(t *testing.T) {
-	st := &mockStore{}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/", nil)
-	req.SetPathValue("id", "")
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status %d, want 400", rr.Code)
-	}
-}
-
-func TestGetDiff_NotFound(t *testing.T) {
-	st := &mockStore{}
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	diffID := uuid.New()
-	_ = runID
-	_ = jobID
-	st.getDiffErr = pgx.ErrNoRows
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status %d, want 404", rr.Code)
-	}
-}
-
-func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
-	st := &mockStore{}
-	runID := domaintypes.NewRunID()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
-	st.getDiffResult = store.Diff{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID.String(),
-		JobID:     nil,
-		Patch:     []byte{0x1f, 0x8b},
-		Summary:   []byte(`{}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-	}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffGetResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if resp.JobID != nil {
-		t.Errorf("job_id=%v, want nil", *resp.JobID)
+	if !st.getJobCalled {
+		t.Fatal("expected GetJob to be called")
 	}
 }
 

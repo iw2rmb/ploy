@@ -592,7 +592,7 @@ If the CA variables are not present, rotation is skipped and a warning is logged
 renew via your external process.
 
 Legacy endpoint notice:
-- All `/v1/jobs*` endpoints and `/v1/mods/{run}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
+- Legacy endpoints have been removed. Use:
   - Events: `GET /v1/runs/{id}/logs`
   - Heartbeat: `POST /v1/nodes/{id}/heartbeat`
   - Job completion: `POST /v1/jobs/{job_id}/complete` (node-based endpoint removed)

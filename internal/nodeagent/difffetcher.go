@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -117,7 +118,7 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 	// Step 3: Fetch each diff's gzipped patch in order.
 	patches := make([][]byte, 0, len(relevantDiffs))
 	for _, d := range relevantDiffs {
-		patch, err := f.FetchDiffPatch(ctx, d.ID)
+		patch, err := f.FetchRunRepoDiffPatch(ctx, runID, repoID, d.ID)
 		if err != nil {
 			return nil, fmt.Errorf("fetch patch for diff %s: %w", d.ID, err)
 		}
@@ -127,14 +128,22 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 	return patches, nil
 }
 
-// FetchDiffPatch downloads the gzipped patch for a given diff ID from the control plane.
-// Returns the raw gzipped patch bytes ready for decompression and application.
+// FetchRunRepoDiffPatch downloads the gzipped patch for a diff that belongs to a specific
+// repo execution within a run.
 //
-// GET /v1/diffs/{id}?download=true
-func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte, error) {
-	url := fmt.Sprintf("%s/v1/diffs/%s?download=true", f.cfg.ServerURL, diffID)
+// GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID, repoID, diffID string) ([]byte, error) {
+	base, err := url.Parse(f.cfg.ServerURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse server url: %w", err)
+	}
+	endpoint := base.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	q := endpoint.Query()
+	q.Set("download", "true")
+	q.Set("diff_id", diffID)
+	endpoint.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -147,7 +156,7 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("fetch diff patch failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("fetch run repo diff patch failed: status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	// Read the entire gzipped patch into memory.

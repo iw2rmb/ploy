@@ -54,15 +54,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Pull resolution for mod repos (last-succeeded/last-failed).
 	s.HandleFunc("POST /v1/mods/{mod_id}/pull", pullModRepoHandler(st), auth.RoleControlPlane)
 
-	// Legacy routes under /v1/mods/{id}/* for run operations.
-	// These routes remain for backward compatibility but should eventually move to /v1/runs/{id}/*.
-	// Note: POST /v1/mods/{id}/cancel has been moved to POST /v1/runs/{id}/cancel (v1).
-	// Note: POST /v1/mods/{id}/resume has been removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
-	s.HandleFunc("GET /v1/mods/{id}/graph", getModGraphHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
-	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/mods/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
-
 	// Artifact download endpoints
 	s.HandleFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/artifacts/{id}", getArtifactHandler(st), auth.RoleControlPlane)
@@ -81,7 +72,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
 	// Repo-scoped diffs listing.
-	// Replaces legacy GET /v1/mods/{id}/diffs with repo-scoped addressing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)

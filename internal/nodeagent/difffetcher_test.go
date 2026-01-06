@@ -103,12 +103,14 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 	}
 }
 
-// TestDiffFetcher_FetchDiffPatch verifies fetching a single diff patch.
-func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
+// TestDiffFetcher_FetchRunRepoDiffPatch verifies fetching a single diff patch for a repo execution.
+func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name         string
+		runID        string
+		repoID       string
 		diffID       string
 		patchContent []byte
 		serverStatus int
@@ -116,6 +118,8 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 	}{
 		{
 			name:         "successful fetch",
+			runID:        "run-123",
+			repoID:       "repo-abc",
 			diffID:       "diff-123",
 			patchContent: gzipBytesHelper(t, []byte("test patch content")),
 			serverStatus: http.StatusOK,
@@ -123,6 +127,8 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 		},
 		{
 			name:         "empty patch",
+			runID:        "run-123",
+			repoID:       "repo-abc",
 			diffID:       "diff-empty",
 			patchContent: gzipBytesHelper(t, []byte("")),
 			serverStatus: http.StatusOK,
@@ -130,6 +136,8 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 		},
 		{
 			name:         "server error",
+			runID:        "run-123",
+			repoID:       "repo-abc",
 			diffID:       "diff-error",
 			serverStatus: http.StatusNotFound,
 			wantErr:      true,
@@ -144,12 +152,15 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				expectedPath := "/v1/diffs/" + tt.diffID
+				expectedPath := "/v1/runs/" + tt.runID + "/repos/" + tt.repoID + "/diffs"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 				if r.URL.Query().Get("download") != "true" {
 					t.Error("expected download=true query parameter")
+				}
+				if r.URL.Query().Get("diff_id") != tt.diffID {
+					t.Errorf("expected diff_id=%q, got %q", tt.diffID, r.URL.Query().Get("diff_id"))
 				}
 
 				w.WriteHeader(tt.serverStatus)
@@ -170,15 +181,15 @@ func TestDiffFetcher_FetchDiffPatch(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			patch, err := fetcher.FetchDiffPatch(ctx, tt.diffID)
+			patch, err := fetcher.FetchRunRepoDiffPatch(ctx, tt.runID, tt.repoID, tt.diffID)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("FetchDiffPatch() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FetchRunRepoDiffPatch() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && !bytes.Equal(patch, tt.patchContent) {
-				t.Errorf("FetchDiffPatch() returned %d bytes, want %d bytes", len(patch), len(tt.patchContent))
+				t.Errorf("FetchRunRepoDiffPatch() returned %d bytes, want %d bytes", len(patch), len(tt.patchContent))
 			}
 		})
 	}
@@ -266,19 +277,24 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 			t.Parallel()
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" {
+				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" && r.URL.Query().Get("download") != "true" {
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: tt.diffs})
 					return
 				}
 
-				for _, d := range tt.diffs {
-					if r.URL.Path == "/v1/diffs/"+d.ID {
-						w.Header().Set("Content-Type", "application/gzip")
-						w.WriteHeader(http.StatusOK)
-						_, _ = w.Write(tt.patches[d.ID])
-						return
+				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" && r.URL.Query().Get("download") == "true" {
+					diffID := r.URL.Query().Get("diff_id")
+					for _, d := range tt.diffs {
+						if diffID == d.ID {
+							w.Header().Set("Content-Type", "application/gzip")
+							w.WriteHeader(http.StatusOK)
+							_, _ = w.Write(tt.patches[d.ID])
+							return
+						}
 					}
+					w.WriteHeader(http.StatusNotFound)
+					return
 				}
 
 				w.WriteHeader(http.StatusNotFound)

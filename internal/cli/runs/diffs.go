@@ -95,59 +95,10 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	if len(listing.Diffs) == 0 {
 		return errors.New("run diffs: no diffs available for this run")
 	}
-	// Newest first by API; take first.
-	diffID := strings.TrimSpace(listing.Diffs[0].ID)
-
-	// Download gzipped patch
-	dlURL, err := url.JoinPath(c.BaseURL.String(), "v1", "diffs", url.PathEscape(diffID))
-	if err != nil {
-		return err
-	}
-	q := url.Values{"download": []string{"true"}}
-	dlURL = dlURL + "?" + q.Encode()
-	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, nil)
-	if err != nil {
-		return err
-	}
-	resp2, err := c.Client.Do(req2)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp2.Body.Close() }()
-	if resp2.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp2.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp2.Status
-		}
-		return fmt.Errorf("run diffs: %s", msg)
-	}
-	gzData, err := io.ReadAll(resp2.Body)
-	if err != nil {
-		return err
-	}
-	// gunzip
-	patch, err := gunzipBytes(gzData)
-	if err != nil {
-		return fmt.Errorf("gunzip patch: %w", err)
-	}
-
-	if strings.TrimSpace(c.SavePath) != "" {
-		// ensure dir exists
-		_ = os.MkdirAll(filepath.Dir(c.SavePath), 0o755)
-		if err := os.WriteFile(c.SavePath, patch, 0o644); err != nil {
-			return fmt.Errorf("write patch: %w", err)
-		}
-		_, _ = fmt.Fprintf(out, "Saved diff to %s (%d bytes)\n", c.SavePath, len(patch))
-		return nil
-	}
-
-	// print to stdout
-	_, _ = out.Write(patch)
-	if len(patch) == 0 || patch[len(patch)-1] != '\n' {
-		_, _ = out.Write([]byte("\n"))
-	}
-	return nil
+	// Diff download requires repo-scoped addressing. The legacy global diff download
+	// endpoint (`GET /v1/diffs/{id}`) is removed, and this command does not have a
+	// repo_id to scope the download.
+	return errors.New("run diffs: download is not supported; use `ploy run pull <run-id>` or `ploy mod pull`")
 }
 
 // RepoDiffsCommand lists diffs for a specific repo execution within a run and
@@ -239,12 +190,14 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	// Newest first by API; take first.
 	diffID := strings.TrimSpace(listing.Diffs[0].ID)
 
-	// Download gzipped patch
-	dlURL, err := url.JoinPath(c.BaseURL.String(), "v1", "diffs", url.PathEscape(diffID))
+	// Download gzipped patch via repo-scoped endpoint (download mode).
+	dlURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "repos", url.PathEscape(repoID), "diffs")
 	if err != nil {
 		return err
 	}
-	q := url.Values{"download": []string{"true"}}
+	q := url.Values{}
+	q.Set("download", "true")
+	q.Set("diff_id", diffID)
 	dlURL = dlURL + "?" + q.Encode()
 	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, nil)
 	if err != nil {
