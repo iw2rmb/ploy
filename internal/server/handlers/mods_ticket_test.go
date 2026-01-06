@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -88,6 +89,281 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	}
 	if st.createJobParams[1].Status != store.JobStatusCreated || st.createJobParams[2].Status != store.JobStatusCreated {
 		t.Fatalf("expected non-first jobs to be Created, got %s/%s", st.createJobParams[1].Status, st.createJobParams[2].Status)
+	}
+}
+
+// These tests verify v1 job creation behavior per roadmap/v1/scope.md:97-98:
+// - Jobs are created directly for (runs.id, run_repos.repo_id)
+// - jobs.repo_id and jobs.repo_base_ref are persisted correctly
+// - First job is Queued, remaining jobs are Created per repo attempt
+
+func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
+	t.Parallel()
+
+	const (
+		runID       = "run_test_12345678901234567"
+		repoID      = "repo_abc"
+		repoBaseRef = "main"
+		attempt     = int32(1)
+	)
+
+	st := &mockStore{}
+
+	// Single mod spec (empty mods array uses single-mod path).
+	spec := []byte(`{}`)
+
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	// Verify 3 jobs were created: pre-gate, mod-0, post-gate.
+	if st.createJobCallCount != 3 {
+		t.Fatalf("expected 3 jobs, got %d", st.createJobCallCount)
+	}
+
+	// Verify job ordering and status per roadmap/v1/statuses.md:52-55.
+	expectedJobs := []struct {
+		name    string
+		modType string
+		status  store.JobStatus
+	}{
+		{"pre-gate", "pre_gate", store.JobStatusQueued}, // First job is Queued.
+		{"mod-0", "mod", store.JobStatusCreated},        // Remaining jobs are Created.
+		{"post-gate", "post_gate", store.JobStatusCreated},
+	}
+
+	for i, exp := range expectedJobs {
+		got := st.createJobParams[i]
+		if got.Name != exp.name {
+			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
+		}
+		if got.ModType != exp.modType {
+			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.ModType)
+		}
+		if got.Status != exp.status {
+			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
+		}
+
+		// Verify repo_id and repo_base_ref are persisted correctly (roadmap/v1/scope.md:98).
+		if got.RepoID != repoID {
+			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
+		}
+		if got.RepoBaseRef != repoBaseRef {
+			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, got.RepoBaseRef)
+		}
+		if got.Attempt != attempt {
+			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, got.Attempt)
+		}
+		if got.RunID != runID {
+			t.Errorf("job %d: expected run_id %q, got %q", i, runID, got.RunID)
+		}
+	}
+}
+
+func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
+	t.Parallel()
+
+	const (
+		runID       = "run_multistep_0123456789"
+		repoID      = "repo_multi"
+		repoBaseRef = "develop"
+		attempt     = int32(2)
+	)
+
+	st := &mockStore{}
+
+	// Multi-step spec with 3 mods.
+	spec := []byte(`{
+		"mods": [
+			{"image": "mod1:v1"},
+			{"image": "mod2:v2"},
+			{"image": "mod3:v3"}
+		]
+	}`)
+
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	// Verify 5 jobs were created: pre-gate, mod-0, mod-1, mod-2, post-gate.
+	if st.createJobCallCount != 5 {
+		t.Fatalf("expected 5 jobs (pre-gate + 3 mods + post-gate), got %d", st.createJobCallCount)
+	}
+
+	// Verify job ordering and status per roadmap/v1/statuses.md:52-55.
+	expectedJobs := []struct {
+		name     string
+		modType  string
+		status   store.JobStatus
+		modImage string
+	}{
+		{"pre-gate", "pre_gate", store.JobStatusQueued, ""}, // First job is Queued.
+		{"mod-0", "mod", store.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
+		{"mod-1", "mod", store.JobStatusCreated, "mod2:v2"},
+		{"mod-2", "mod", store.JobStatusCreated, "mod3:v3"},
+		{"post-gate", "post_gate", store.JobStatusCreated, ""},
+	}
+
+	for i, exp := range expectedJobs {
+		got := st.createJobParams[i]
+		if got.Name != exp.name {
+			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
+		}
+		if got.ModType != exp.modType {
+			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.ModType)
+		}
+		if got.Status != exp.status {
+			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
+		}
+		if got.ModImage != exp.modImage {
+			t.Errorf("job %d: expected mod_image %q, got %q", i, exp.modImage, got.ModImage)
+		}
+
+		// Verify repo_id and repo_base_ref are persisted correctly (roadmap/v1/scope.md:98).
+		if got.RepoID != repoID {
+			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
+		}
+		if got.RepoBaseRef != repoBaseRef {
+			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, got.RepoBaseRef)
+		}
+		if got.Attempt != attempt {
+			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, got.Attempt)
+		}
+		if got.RunID != runID {
+			t.Errorf("job %d: expected run_id %q, got %q", i, runID, got.RunID)
+		}
+	}
+}
+
+func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		spec         []byte
+		expectedJobs int
+	}{
+		{
+			name:         "single_mod",
+			spec:         []byte(`{}`),
+			expectedJobs: 3,
+		},
+		{
+			name:         "two_mods",
+			spec:         []byte(`{"mods":[{"image":"a"},{"image":"b"}]}`),
+			expectedJobs: 4,
+		},
+		{
+			name:         "five_mods",
+			spec:         []byte(`{"mods":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`),
+			expectedJobs: 7,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			st := &mockStore{}
+
+			err := createJobsFromSpec(context.Background(), st, "run_123", "repo_456", "main", 1, tc.spec)
+			if err != nil {
+				t.Fatalf("createJobsFromSpec failed: %v", err)
+			}
+
+			if st.createJobCallCount != tc.expectedJobs {
+				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, st.createJobCallCount)
+			}
+
+			// Count jobs with Queued status — exactly one should be Queued.
+			queuedCount := 0
+			for _, p := range st.createJobParams {
+				if p.Status == store.JobStatusQueued {
+					queuedCount++
+				}
+			}
+
+			if queuedCount != 1 {
+				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
+			}
+
+			// Verify the first job (lowest step_index) is the one that's Queued.
+			if st.createJobParams[0].Status != store.JobStatusQueued {
+				t.Errorf("expected first job to be Queued, got %s", st.createJobParams[0].Status)
+			}
+
+			// Verify all remaining jobs are Created.
+			for i := 1; i < len(st.createJobParams); i++ {
+				if st.createJobParams[i].Status != store.JobStatusCreated {
+					t.Errorf("job %d: expected status Created, got %s", i, st.createJobParams[i].Status)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
+	t.Parallel()
+
+	const (
+		runID       = "run_v1_direct_addressing_12"
+		repoID      = "repo_direct_addr"
+		repoBaseRef = "feature/test"
+		attempt     = int32(3)
+	)
+
+	st := &mockStore{}
+	spec := []byte(`{}`)
+
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	// Verify all jobs are created with the same (run_id, repo_id, attempt) tuple.
+	for i, p := range st.createJobParams {
+		if p.RunID != runID {
+			t.Errorf("job %d: expected run_id %q (direct addressing), got %q", i, runID, p.RunID)
+		}
+		if p.RepoID != repoID {
+			t.Errorf("job %d: expected repo_id %q (no child runs), got %q", i, repoID, p.RepoID)
+		}
+		if p.Attempt != attempt {
+			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, p.Attempt)
+		}
+		if p.RepoBaseRef != repoBaseRef {
+			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, p.RepoBaseRef)
+		}
+	}
+}
+
+func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{}
+	spec := []byte(`{"mods":[{"image":"a"},{"image":"b"}]}`)
+
+	err := createJobsFromSpec(context.Background(), st, "run_123", "repo_456", "main", 1, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	// Verify step_index ordering: pre-gate < mod-0 < mod-1 < post-gate.
+	var prevIndex float64 = 0
+	for i, p := range st.createJobParams {
+		if p.StepIndex <= prevIndex && i > 0 {
+			t.Errorf("job %d (%s): step_index %.0f is not greater than previous %.0f", i, p.Name, p.StepIndex, prevIndex)
+		}
+		prevIndex = p.StepIndex
+	}
+
+	// Verify expected step_index values per mods_ticket.go layout:
+	// pre-gate=1000, mod-0=2000, mod-1=3000, post-gate=4000.
+	expectedIndices := []float64{1000, 2000, 3000, 4000}
+	for i, exp := range expectedIndices {
+		if st.createJobParams[i].StepIndex != exp {
+			t.Errorf("job %d: expected step_index %.0f, got %.0f", i, exp, st.createJobParams[i].StepIndex)
+		}
 	}
 }
 
