@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -270,5 +272,93 @@ func TestDiffUploader_Compression(t *testing.T) {
 		}
 	} else {
 		t.Error("no gzipped data received")
+	}
+}
+
+// TestBearerToken_TrimsWhitespace verifies that the bearer token read from
+// file is trimmed of leading/trailing whitespace before being used in
+// the Authorization header. Token files commonly have trailing newlines
+// (e.g., from text editors or "echo tok > file") which would corrupt headers.
+func TestBearerToken_TrimsWhitespace(t *testing.T) {
+	tests := []struct {
+		name          string
+		tokenContent  string // Raw file contents (may include whitespace/newlines)
+		expectedToken string // Expected token after trimming
+	}{
+		{
+			name:          "trailing newline",
+			tokenContent:  "tok\n",
+			expectedToken: "tok",
+		},
+		{
+			name:          "trailing CRLF",
+			tokenContent:  "tok\r\n",
+			expectedToken: "tok",
+		},
+		{
+			name:          "leading and trailing whitespace",
+			tokenContent:  "  tok  \n",
+			expectedToken: "tok",
+		},
+		{
+			name:          "multiple trailing newlines",
+			tokenContent:  "tok\n\n\n",
+			expectedToken: "tok",
+		},
+		{
+			name:          "clean token (no whitespace)",
+			tokenContent:  "tok",
+			expectedToken: "tok",
+		},
+		{
+			name:          "token with internal spaces preserved",
+			tokenContent:  "tok with spaces\n",
+			expectedToken: "tok with spaces",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temp directory and token file with the test content.
+			tmpDir := t.TempDir()
+			tokenPath := filepath.Join(tmpDir, "bearer-token")
+			if err := os.WriteFile(tokenPath, []byte(tt.tokenContent), 0600); err != nil {
+				t.Fatalf("failed to write token file: %v", err)
+			}
+
+			// Override the bearer token path for this test.
+			t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
+
+			// Capture the Authorization header sent by the HTTP client.
+			var capturedAuthHeader string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedAuthHeader = r.Header.Get("Authorization")
+				w.WriteHeader(http.StatusCreated)
+			}))
+			defer server.Close()
+
+			cfg := Config{
+				ServerURL: server.URL,
+				NodeID:    "test-node-id",
+				HTTP: HTTPConfig{
+					TLS: TLSConfig{Enabled: false},
+				},
+			}
+
+			uploader, err := NewDiffUploader(cfg)
+			if err != nil {
+				t.Fatalf("failed to create uploader: %v", err)
+			}
+
+			// Make a request to trigger the Authorization header.
+			ctx := context.Background()
+			_ = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte("diff"), types.NewDiffSummaryBuilder().MustBuild())
+
+			// Verify the Authorization header is correctly trimmed.
+			expectedHeader := "Bearer " + tt.expectedToken
+			if capturedAuthHeader != expectedHeader {
+				t.Errorf("Authorization header mismatch:\ngot:  %q\nwant: %q", capturedAuthHeader, expectedHeader)
+			}
+		})
 	}
 }
