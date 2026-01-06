@@ -15,7 +15,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -270,16 +269,4 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	}
 
 	return ImportModReposResult{}, decodeHTTPError(resp, "mod repo import")
-}
-
-// decodeHTTPError reads and formats an error from a non-success HTTP response.
-// Note: This function is already defined in batch.go but we need it here as well.
-// The existing implementation in batch.go will be used; this is a backup.
-func decodeHTTPErrorInline(resp *http.Response, prefix string) error {
-	data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-	msg := strings.TrimSpace(string(data))
-	if msg == "" {
-		msg = resp.Status
-	}
-	return fmt.Errorf("%s: %s", prefix, msg)
 }

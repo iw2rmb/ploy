@@ -72,6 +72,10 @@ func printModUsage(w io.Writer) {
 // printModRunFlagsSummary renders the 'ploy mod run' flags overview used by 'help mod'.
 // This is a human-friendly summary, not the exhaustive FlagSet help.
 func printModRunFlagsSummary(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Flags for 'ploy mod run <mod>':")
+	_, _ = fmt.Fprintln(w, "  --repo <url>    Explicit repo URL(s) to run (repeatable)")
+	_, _ = fmt.Fprintln(w, "  --failed        Run repos with last terminal state Fail")
+	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags for 'ploy mod run':")
 	_, _ = fmt.Fprintln(w, "  --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)")
 	_, _ = fmt.Fprintln(w, "  --repo-url <url>           Git repository URL")

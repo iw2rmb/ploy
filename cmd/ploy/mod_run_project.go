@@ -26,10 +26,12 @@ import (
 // handleModRunProject implements 'ploy mod run <mod-id|name> [--repo <url>...] [--failed]'.
 // This is the v1 mod project run command with repo selection.
 func handleModRunProject(args []string, stderr io.Writer) error {
-	// Handle help flag.
-	if wantsHelp(args) {
-		printModRunProjectUsage(stderr)
-		return nil
+	// Handle help flag (support `ploy mod run <mod> --help`).
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			printModRunProjectUsage(stderr)
+			return nil
+		}
 	}
 
 	// First positional arg is mod ID/name.
@@ -94,7 +96,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	}
 
 	// Print run_id per roadmap/v1/cli.md:117-119.
-	_, _ = fmt.Fprintf(stderr, "Run created: %s\n", result.RunID)
+	_, _ = fmt.Fprintln(stderr, result.RunID)
 	return nil
 }
 
