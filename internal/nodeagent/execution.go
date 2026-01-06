@@ -70,11 +70,10 @@ func (r *runController) createDiffGenerator() step.DiffGenerator {
 //   - For each diff in order: decompress gzipped patch, apply via "git apply".
 //   - Returns error if copy or any patch application fails.
 //
-// Note: The caller is responsible for fetching diffs in the correct order (by step_index).
-// In practice, callers use the repo-scoped diffs listing endpoint
-// GET /v1/runs/{run_id}/repos/{repo_id}/diffs and then filter by summary.step_index
-// (see DiffFetcher.FetchDiffsForStepRepo) to obtain diffs for steps 0 through k-1
-// when preparing to execute step k.
+// Note: Diffs must be applied in a deterministic order to ensure workspace rehydration
+// produces identical results across nodes and retries. Callers should fetch diffs via
+// DiffFetcher.FetchDiffsForStepRepo, which filters and sorts diffs by
+// (summary.step_index, created_at, id) before downloading patches.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
 	// Step 1: Copy base clone to destination workspace.
 	// This creates a fresh workspace starting from the base snapshot (base_ref + optional commit_sha).
