@@ -93,10 +93,12 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	req := StartRunRequest{
 		RunID: types.RunID("test-no-diff-healing"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),
@@ -342,10 +344,12 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-heal-success"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),
@@ -439,10 +443,12 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-heal-exhausted"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 2,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 2,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),
@@ -545,10 +551,12 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),
@@ -661,10 +669,12 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 2,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 2,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),
@@ -764,9 +774,13 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-premod-pass"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mods":    []any{map[string]any{"image": "healer:latest"}},
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
+				},
 			},
 		}),
 	}
@@ -960,10 +974,12 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-http-regate"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),

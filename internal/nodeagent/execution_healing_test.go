@@ -121,10 +121,12 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "test/healer-final-gate:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "test/healer-final-gate:latest",
+					},
 				},
 			},
 		}),
@@ -284,12 +286,14 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "test/healer:latest",
-					"env": map[string]any{
-						"HEAL_TASK": "fix-build",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "test/healer:latest",
+						"env": map[string]any{
+							"HEAL_TASK": "fix-build",
+						},
 					},
 				},
 			},
@@ -435,10 +439,12 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		TargetRef: types.GitRef("feature"),
 		Env:       map[string]string{},
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 1,
-				"mod": map[string]any{
-					"image": "test/healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 1,
+					"mod": map[string]any{
+						"image": "test/healer:latest",
+					},
 				},
 			},
 		}),
@@ -866,10 +872,12 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
 		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate_healing": map[string]any{
-				"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
-				"mod": map[string]any{
-					"image": "healer:latest",
+			"build_gate": map[string]any{
+				"healing": map[string]any{
+					"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
+					"mod": map[string]any{
+						"image": "healer:latest",
+					},
 				},
 			},
 		}),

@@ -626,7 +626,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 
 // TestBuildGateManifestFromRequest_IgnoresStackAwareModImages verifies that the
 // gate manifest builder does not attempt stack-aware image resolution using
-// mods[].image. Gate jobs should always use the default execution image and
+// steps[].image. Gate jobs should always use the default execution image and
 // rely on Build Gate stack detection for subsequent Mods steps.
 func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 	t.Parallel()
@@ -637,7 +637,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 		BaseRef: types.GitRef("main"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate_enabled": true,
-			"mods": []any{
+			"steps": []any{
 				map[string]any{
 					// Stack-aware image map without default key. If the gate
 					// manifest builder tried to resolve this with stack=unknown,
@@ -659,7 +659,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 	}
 
 	// Gate manifest should use the default execution image, not the stack-aware
-	// mods[].image map.
+	// steps[].image map.
 	if manifest.Image != "ubuntu:latest" {
 		t.Errorf("gate manifest image=%q, want ubuntu:latest", manifest.Image)
 	}
