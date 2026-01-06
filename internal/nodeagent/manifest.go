@@ -34,6 +34,9 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
+	if req.JobID.IsZero() {
+		return contracts.StepManifest{}, errors.New("job_id required")
+	}
 	if strings.TrimSpace(req.RepoURL.String()) == "" {
 		return contracts.StepManifest{}, errors.New("repo_url required")
 	}
@@ -163,14 +166,9 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		gateRef = br
 	}
 
-	// Generate a unique step ID based on JobID when available, falling back to
-	// RunID for backwards compatibility. JobID-based IDs prevent collisions when
-	// multiple jobs exist within the same run (e.g., multi-step runs with
-	// pre_gate, mod, post_gate jobs). Format: "{JobID}" or "{RunID}" if no JobID.
-	stepID := types.StepID(req.RunID)
-	if !req.JobID.IsZero() {
-		stepID = types.StepID(req.JobID)
-	}
+	// Step manifest IDs must be unique per job. Use JobID to avoid collisions
+	// across jobs within the same run (pre_gate/mod/post_gate/heal/re_gate).
+	stepID := types.StepID(req.JobID)
 
 	manifest := contracts.StepManifest{
 		ID:         stepID,
@@ -306,6 +304,9 @@ func isCodexHealingImage(image string) bool {
 // gate-heal-regate loops (where stack may not be persisted yet), pass
 // contracts.ModStackUnknown explicitly.
 func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+	if req.JobID.IsZero() {
+		return contracts.StepManifest{}, errors.New("job_id required")
+	}
 	// Validate and resolve the image field. ModImage can be:
 	//   - Universal string: returned directly
 	//   - Stack map: resolved using the provided stack with default fallback
@@ -364,13 +365,9 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexS
 	// Create the healing manifest.
 	// Healing mods do not run the build gate themselves; they only modify the workspace.
 	//
-	// Generate a unique step ID based on JobID when available, falling back to
-	// RunID for backwards compatibility. JobID-based IDs prevent collisions when
-	// multiple healing jobs exist within the same run.
-	healingStepID := types.StepID(fmt.Sprintf("%s-heal-%d", req.RunID, index))
-	if !req.JobID.IsZero() {
-		healingStepID = types.StepID(fmt.Sprintf("%s-heal-%d", req.JobID, index))
-	}
+	// Step manifest IDs must be unique per job. Healing jobs may execute multiple
+	// healing mods; include the mod index to keep IDs distinct within the job.
+	healingStepID := types.StepID(fmt.Sprintf("%s-heal-%d", req.JobID, index))
 
 	manifest := contracts.StepManifest{
 		ID:         healingStepID,
