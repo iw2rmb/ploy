@@ -102,16 +102,14 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/healer:latest",
-					},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod: HealingMod{
+					Image: contracts.ModImage{Universal: "test/healer:latest"},
 				},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

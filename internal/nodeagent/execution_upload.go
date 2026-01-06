@@ -33,7 +33,7 @@ import (
 //
 // Invalid paths are skipped with a warning and no upload attempt is made.
 func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace string) {
-	// Use typed Artifacts.Paths from RunOptions (already parsed by parseRunOptions).
+	// Use typed Artifacts.Paths from RunOptions (already parsed from spec).
 	if len(typedOpts.Artifacts.Paths) == 0 {
 		return
 	}

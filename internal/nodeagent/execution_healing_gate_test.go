@@ -93,16 +93,12 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	req := StartRunRequest{
 		RunID: types.RunID("test-no-diff-healing"),
 		JobID: types.JobID("test-job-no-diff-healing"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -251,7 +247,7 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	req := StartRunRequest{
 		RunID:        types.RunID("test-gate-fail-no-heal"),
 		JobID:        types.JobID("test-job-gate-fail-no-heal"),
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 
 	manifest := contracts.StepManifest{
@@ -347,16 +343,12 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-gate-heal-success"),
 		JobID: types.JobID("test-job-gate-heal-success"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -447,16 +439,12 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-heal-exhausted"),
 		JobID: types.JobID("test-job-heal-exhausted"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 2,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -556,16 +544,12 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -675,16 +659,12 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 2,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 2,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -781,16 +761,12 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-premod-pass"),
 		JobID: types.JobID("test-job-premod-pass"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{
@@ -983,16 +959,12 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	req := StartRunRequest{
 		RunID: types.RunID("test-http-regate"),
 		JobID: types.JobID("test-job-http-regate"),
-		TypedOptions: parseRunOptions(map[string]any{
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "healer:latest",
-					},
-				},
+		TypedOptions: RunOptions{
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	manifest := contracts.StepManifest{

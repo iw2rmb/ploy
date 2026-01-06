@@ -113,7 +113,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, env, _ := parseSpec(tc.spec)
+			env, _ := parseSpec(tc.spec)
 
 			// Verify all expected env vars are present with correct values.
 			for key, wantVal := range tc.wantEnv {
@@ -157,7 +157,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}`)
 
 	// Step 1: Parse the spec (simulates claimer_spec.go).
-	opts, env, typedOpts := parseSpec(specJSON)
+	env, typedOpts := parseSpec(specJSON)
 
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
@@ -166,7 +166,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("feature/global-env"),
-		TypedOptions: parseRunOptions(opts),
+		TypedOptions: typedOpts,
 		Env:          env, // Global env vars flow here.
 	}
 
@@ -206,8 +206,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	t.Parallel()
 
 	// Spec with global env vars and stack-aware image map.
-	// Note: build_gate is specified as a nested object which parseSpec flattens
-	// to build_gate_enabled and build_gate_profile in opts.
+	// Note: build_gate is specified as a nested object and is consumed via typed options.
 	specJSON := json.RawMessage(`{
 		"steps": [
 			{
@@ -228,14 +227,14 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		}
 	}`)
 
-	opts, env, typedOpts := parseSpec(specJSON)
+	env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-gate-env-test"),
 		JobID:        types.JobID("job-gate-env-test"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
-		TypedOptions: parseRunOptions(opts),
+		TypedOptions: typedOpts,
 		Env:          env,
 	}
 
@@ -307,13 +306,13 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		]
 	}`)
 
-	opts, env, typedOpts := parseSpec(specJSON)
+	env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-multi-step-env"),
 		JobID:        types.JobID("job-multi-step-env"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		TypedOptions: parseRunOptions(opts),
+		TypedOptions: typedOpts,
 		Env:          env, // Global env from spec.
 	}
 
@@ -435,13 +434,13 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		}
 	}`)
 
-	opts, env, typedOpts := parseSpec(specJSON)
+	env, typedOpts := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-no-filter-test"),
 		JobID:        types.JobID("job-no-filter-test"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
-		TypedOptions: parseRunOptions(opts),
+		TypedOptions: typedOpts,
 		Env:          env,
 	}
 

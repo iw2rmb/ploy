@@ -10,6 +10,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // End-to-end execution tests: full node run flow against a mock server.
@@ -99,10 +100,12 @@ func TestEndToEndFlow(t *testing.T) {
 			JobID:   types.JobID("test-job-e2e"),
 			RepoURL: types.RepoURL("https://github.com/iw2rmb/ploy-nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
-			TypedOptions: parseRunOptions(map[string]any{
-				"image":   "alpine:latest",
-				"command": "echo 'test execution'",
-			}),
+			TypedOptions: RunOptions{
+				Execution: ExecutionOptions{
+					Image:   contracts.ModImage{Universal: "alpine:latest"},
+					Command: ExecutionCommand{Shell: "echo 'test execution'"},
+				},
+			},
 		}
 
 		// Start the run in a background context with timeout.

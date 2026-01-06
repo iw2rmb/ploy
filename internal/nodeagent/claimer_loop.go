@@ -142,7 +142,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Parse spec into typed RunOptions and environment variables.
 	// The typed RunOptions is the canonical source of truth; no raw map[string]any
 	// is passed to StartRunRequest.
-	_, envFromSpec, typedOpts := parseSpec(claim.Spec)
+	envFromSpec, typedOpts := parseSpec(claim.Spec)
 
 	// Derive target ref: prefer server-provided value, otherwise default to
 	// ploy/{run_name|run_id} so MR branch and PLOY_TARGET_REF have a deterministic name.

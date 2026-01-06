@@ -119,7 +119,7 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 		RepoURL:      "https://gitlab.com/test/repo.git",
 		BaseRef:      "main",
 		TargetRef:    "test-branch",
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 
 	// Create manifest with Gate.Enabled=true.
@@ -238,7 +238,7 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 		RepoURL:      "https://gitlab.com/test/repo.git",
 		BaseRef:      "main",
 		TargetRef:    "test-branch",
-		TypedOptions: parseRunOptions(map[string]any{}),
+		TypedOptions: RunOptions{},
 	}
 
 	// Create manifest with Gate.Enabled=true to verify it gets disabled for Runner.Run.

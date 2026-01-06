@@ -123,17 +123,12 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			// Multi-step steps array with 2 entries.
-			"steps": []any{
-				map[string]any{
-					"image": "test/mod-step0:latest",
-				},
-				map[string]any{
-					"image": "test/mod-step1:latest",
-				},
+		TypedOptions: RunOptions{
+			Steps: []StepMod{
+				{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}},
+				{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}},
 			},
-		}),
+		},
 	}
 
 	// Build manifests for both steps with gate enabled.
@@ -328,24 +323,16 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
 		Env:       map[string]string{},
-		TypedOptions: parseRunOptions(map[string]any{
-			"steps": []any{
-				map[string]any{
-					"image": "test/mod-step0:latest",
-				},
-				map[string]any{
-					"image": "test/mod-step1:latest",
-				},
+		TypedOptions: RunOptions{
+			Steps: []StepMod{
+				{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}},
+				{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}},
 			},
-			"build_gate": map[string]any{
-				"healing": map[string]any{
-					"retries": 1,
-					"mod": map[string]any{
-						"image": "test/healer:latest",
-					},
-				},
+			Healing: &HealingConfig{
+				Retries: 1,
+				Mod:     HealingMod{Image: contracts.ModImage{Universal: "test/healer:latest"}},
 			},
-		}),
+		},
 	}
 
 	typedOpts := req.TypedOptions
