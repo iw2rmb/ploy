@@ -271,6 +271,7 @@ func TestAgentComponentIntegration(t *testing.T) {
 	// Send a run start request to the agent's HTTP server.
 	startReq := map[string]string{
 		"run_id":   "test-run-123",
+		"job_id":   "test-job-123",
 		"repo_url": "https://github.com/example/repo.git",
 		"base_ref": "main",
 	}

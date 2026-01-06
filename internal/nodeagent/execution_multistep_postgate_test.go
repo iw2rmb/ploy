@@ -118,6 +118,7 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 	// Only steps[0] should complete successfully; steps[1] should fail on post-gate.
 	req := StartRunRequest{
 		RunID:     types.RunID("test-postgate-stops"),
+		JobID:     types.JobID("test-job-postgate-stops"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
@@ -322,6 +323,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 	// Two-step run with healing configured (1 retry).
 	req := StartRunRequest{
 		RunID:     types.RunID("test-postgate-heal-exhaust"),
+		JobID:     types.JobID("test-job-postgate-heal-exhaust"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),

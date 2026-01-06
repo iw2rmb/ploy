@@ -218,6 +218,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID: types.RunID("test-postgate-heal"),
+		JobID: types.JobID("test-job-postgate-heal"),
 		TypedOptions: parseRunOptions(map[string]any{
 			"build_gate": map[string]any{
 				"healing": map[string]any{
@@ -231,7 +232,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "main:latest",
 		Inputs: []contracts.StepInput{
