@@ -45,7 +45,10 @@ test-coverage: $(COVERAGE_FILE) ## Run tests and generate coverage report
 	@echo "\n=== Coverage Summary ==="
 	@go tool cover -func=$(COVERAGE_FILE) | grep '^total:'
 
-$(COVERAGE_FILE):
+.PHONY: FORCE
+FORCE:
+
+$(COVERAGE_FILE): FORCE
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
 	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./internal/... ./cmd/...; \
