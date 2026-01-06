@@ -64,15 +64,34 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 // Returns true if a job was claimed, false if no work is available (204).
 //
 // Flow:
-//  1. POST /v1/nodes/{id}/claim to attempt claiming a job.
-//  2. If 204 returned, no jobs are available; return false.
-//  3. If 200 returned, decode claim response and job metadata.
-//  4. Parse spec into options and environment variables.
-//  5. Invoke controller to start job execution.
+//  1. Acquire a concurrency slot before claiming (blocks until available).
+//  2. POST /v1/nodes/{id}/claim to attempt claiming a job.
+//  3. If 204 returned, release slot and return false (no jobs available).
+//  4. If 200 returned, decode claim response and job metadata.
+//  5. Parse spec into options and environment variables.
+//  6. Invoke controller to start job execution (slot released when job completes).
 //
 // Note: Returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
+	// Acquire a concurrency slot before claiming. This ensures the node does not
+	// claim more work than it can execute concurrently (Config.Concurrency).
+	// The slot is released in executeRun's defer when the job completes.
+	if err := c.controller.AcquireSlot(ctx); err != nil {
+		// Context was canceled while waiting for a slot.
+		return false, err
+	}
+
+	// slotHeld tracks whether we still own the concurrency slot.
+	// Set to false after successful StartRun (controller takes ownership).
+	slotHeld := true
+	defer func() {
+		// Release the slot if we still hold it (claim failed or no work available).
+		if slotHeld {
+			c.controller.ReleaseSlot()
+		}
+	}()
+
 	// Lazy initialization: create HTTP client if not yet initialized.
 	// This allows bootstrap() to run first and create certificates.
 	if c.client == nil {
@@ -162,6 +181,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		// The controller's executeRun will upload terminal status.
 		return true, fmt.Errorf("start run: %w", err)
 	}
+
+	// Transfer slot ownership to the controller. The slot will be released
+	// in executeRun's defer when the job completes.
+	slotHeld = false
 
 	return true, nil
 }

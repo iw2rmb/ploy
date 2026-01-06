@@ -8,6 +8,11 @@ import (
 
 // runController implements the RunController interface for managing runs.
 // Runs are tracked by job_id (not run_id) to support multiple jobs per run.
+//
+// Concurrency is enforced via the jobSem semaphore: callers must acquire a slot
+// via AcquireSlot before claiming work and release it via ReleaseSlot when the
+// job completes. This prevents the node from claiming more jobs than it can
+// execute concurrently.
 type runController struct {
 	mu sync.Mutex
 
@@ -15,12 +20,68 @@ type runController struct {
 
 	// jobs tracks active jobs by job_id.
 	jobs map[string]*jobContext
+
+	// jobSem is a counting semaphore that limits concurrent job execution.
+	// The capacity is set to Config.Concurrency (minimum 1).
+	// AcquireSlot sends to this channel; ReleaseSlot receives from it.
+	jobSem chan struct{}
 }
 
 type jobContext struct {
 	runID  string
 	jobID  string
 	cancel context.CancelFunc
+}
+
+// initJobSem initializes the concurrency semaphore if not already initialized.
+// Called lazily on first AcquireSlot to allow Config.Concurrency to be set.
+// Thread-safe via the controller's mutex.
+func (r *runController) initJobSem() {
+	if r.jobSem != nil {
+		return
+	}
+	// Use configured concurrency; minimum of 1 (already enforced in LoadConfig,
+	// but we guard here defensively for direct struct construction in tests).
+	capacity := r.cfg.Concurrency
+	if capacity < 1 {
+		capacity = 1
+	}
+	r.jobSem = make(chan struct{}, capacity)
+}
+
+// AcquireSlot blocks until a concurrency slot is available or the context
+// is canceled. Returns nil when a slot is acquired, or ctx.Err() if the
+// context was canceled while waiting.
+//
+// The semaphore ensures the node does not claim more work than it can execute
+// concurrently. The slot must be released via ReleaseSlot when the job completes.
+func (r *runController) AcquireSlot(ctx context.Context) error {
+	r.mu.Lock()
+	r.initJobSem()
+	sem := r.jobSem
+	r.mu.Unlock()
+
+	// Block until we can acquire a slot or context is canceled.
+	select {
+	case sem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// ReleaseSlot frees a previously acquired concurrency slot.
+// Must be called exactly once for each successful AcquireSlot call.
+func (r *runController) ReleaseSlot() {
+	r.mu.Lock()
+	sem := r.jobSem
+	r.mu.Unlock()
+
+	if sem == nil {
+		// Should not happen in normal operation, but guard defensively.
+		return
+	}
+	<-sem
 }
 
 // StartRun accepts a run start request and initiates execution.
