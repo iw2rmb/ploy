@@ -22,8 +22,13 @@ type RunController interface {
 
 	// AcquireSlot blocks until a concurrency slot is available or the context
 	// is canceled. Returns nil when a slot is acquired, or ctx.Err() if the
-	// context was canceled while waiting. The caller must call ReleaseSlot()
-	// after the job completes to free the slot.
+	// context was canceled while waiting.
+	//
+	// Slot ownership:
+	//   - On StartRun success (nil error), the controller is responsible for
+	//     releasing the slot when the job completes.
+	//   - On StartRun failure (non-nil error), the caller must ReleaseSlot()
+	//     before returning.
 	AcquireSlot(ctx context.Context) error
 
 	// ReleaseSlot frees a previously acquired concurrency slot.
