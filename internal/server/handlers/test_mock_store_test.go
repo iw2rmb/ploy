@@ -73,9 +73,9 @@ type mockStore struct {
 	// the last entry is reused for extra calls.
 	createRunErrs         []error
 	createRunErrCallCount int
-	// createRunResults allows tests to configure multiple CreateRun return values
-	// (e.g., parent + child runs). When non-empty, successive CreateRun calls
-	// return entries from this slice; the last entry is reused for extra calls.
+	// createRunResults allows tests to configure multiple CreateRun return values.
+	// When non-empty, successive CreateRun calls return entries from this slice;
+	// the last entry is reused for extra calls.
 	createRunResults   []store.Run
 	createRunCallCount int
 
