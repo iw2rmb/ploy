@@ -348,6 +348,37 @@ BulkUpsertModReposResponse:
         $ref: '#/BulkUpsertError'
   required: [created, updated, failed, errors]
 
+RepoSelectorMode:
+  type: string
+  description: Repo selection mode for creating a mod run.
+  enum: [all, failed, explicit]
+
+ModRepoSelector:
+  type: object
+  properties:
+    mode:
+      $ref: '#/RepoSelectorMode'
+    repos:
+      type: array
+      items:
+        type: string
+      description: Repo URLs for explicit selection (required when mode=explicit).
+  required: [mode]
+
+CreateModRunRequest:
+  type: object
+  properties:
+    repo_selector:
+      $ref: '#/ModRepoSelector'
+    created_by: { type: string, nullable: true }
+  required: [repo_selector]
+
+CreateModRunResponse:
+  type: object
+  properties:
+    run_id: { type: string, description: "Run ID (KSUID string)" }
+  required: [run_id]
+
 ModListItem:
   type: object
   properties:
