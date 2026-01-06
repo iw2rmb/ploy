@@ -255,8 +255,8 @@ CreateSingleRepoRunResponse:
   type: object
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    mod_id: { type: string, description: "Mod ID (KSUID string)" }
-    spec_id: { type: string, description: "Spec ID (KSUID string)" }
+    mod_id: { type: string, description: "Mod ID (NanoID string)" }
+    spec_id: { type: string, description: "Spec ID (NanoID string)" }
   required: [run_id, mod_id, spec_id]
 
 CreateModRequest:
@@ -270,7 +270,7 @@ CreateModRequest:
 CreateModResponse:
   type: object
   properties:
-    id: { type: string, description: "Mod ID (KSUID string)" }
+    id: { type: string, description: "Mod ID (NanoID string)" }
     name: { type: string }
     spec_id: { type: string, nullable: true }
     created_by: { type: string, nullable: true }
@@ -280,7 +280,7 @@ CreateModResponse:
 ModListItem:
   type: object
   properties:
-    id: { type: string, description: "Mod ID (KSUID string)" }
+    id: { type: string, description: "Mod ID (NanoID string)" }
     name: { type: string }
     spec_id: { type: string, nullable: true }
     created_by: { type: string, nullable: true }
