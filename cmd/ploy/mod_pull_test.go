@@ -164,9 +164,9 @@ func TestModPullUsageHelp(t *testing.T) {
 		t.Errorf("usage should contain examples section, got %q", output)
 	}
 
-	// Verify v1 reference is mentioned.
-	if !strings.Contains(output, "v1 replacement") {
-		t.Errorf("usage should mention v1 replacement, got %q", output)
+	// Verify description of functionality is mentioned.
+	if !strings.Contains(output, "Pulls Mods diffs from a mod") {
+		t.Errorf("usage should describe pulling diffs from a mod, got %q", output)
 	}
 }
 
