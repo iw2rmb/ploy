@@ -116,6 +116,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-final-gate-healing-main-fail"),
+		JobID:     types.JobID("test-job-final-gate-healing-main-fail"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
@@ -133,7 +134,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod-final-gate:latest",
 		Inputs: []contracts.StepInput{
@@ -281,6 +282,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	// Prepare request with healing configuration.
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-healing"),
+		JobID:     types.JobID("test-job-run-healing"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
@@ -302,7 +304,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 
 	// Build main manifest with gate enabled.
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -434,6 +436,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-trimmed-log"),
+		JobID:     types.JobID("test-job-run-trimmed-log"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
@@ -451,7 +454,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -531,6 +534,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:        types.RunID("test-run-no-healing"),
+		JobID:        types.JobID("test-job-run-no-healing"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("test-branch"),
@@ -540,7 +544,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -657,6 +661,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	// Request without healing (gate passes, so no healing needed).
 	req := StartRunRequest{
 		RunID:        types.RunID("test-run-no-runner-gate"),
+		JobID:        types.JobID("test-job-run-no-runner-gate"),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("test-branch"),
@@ -666,7 +671,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	// Manifest with gate enabled — but executeWithHealing should disable it before
 	// calling Runner.Run, so Runner.Run never sees Gate.Enabled=true.
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -868,6 +873,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-gate-history"),
+		JobID:     types.JobID("test-job-gate-history"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature"),
@@ -884,7 +890,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "main:latest",
 		Inputs: []contracts.StepInput{

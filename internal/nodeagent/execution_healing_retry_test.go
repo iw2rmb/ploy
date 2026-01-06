@@ -56,7 +56,7 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-nonzero"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
+	req := StartRunRequest{RunID: types.RunID("t-nonzero"), JobID: types.JobID("j-nonzero"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": 1,
@@ -66,7 +66,7 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 			},
 		},
 	})}
-	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	res, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
 	// Use float64 for retries as produced by encoding/json when decoding into map[string]any.
-	req := StartRunRequest{RunID: types.RunID("t-f64"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
+	req := StartRunRequest{RunID: types.RunID("t-f64"), JobID: types.JobID("j-f64"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": float64(2),
@@ -126,7 +126,7 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 			},
 		},
 	})}
-	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
@@ -164,12 +164,12 @@ func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-empty-strategies"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
+	req := StartRunRequest{RunID: types.RunID("t-empty-strategies"), JobID: types.JobID("j-empty-strategies"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
 		"build_gate": map[string]any{
 			"healing": map[string]any{"retries": 3},
 		},
 	})}
-	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
@@ -214,7 +214,7 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://127.0.0.1:8080", NodeID: "n", HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}}
 
-	req := StartRunRequest{RunID: types.RunID("t-tls"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
+	req := StartRunRequest{RunID: types.RunID("t-tls"), JobID: types.JobID("j-tls"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": 1,
@@ -224,7 +224,7 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 			},
 		},
 	})}
-	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
@@ -302,6 +302,7 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-exhausted"),
+		JobID:     types.JobID("test-job-exhausted"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
@@ -318,7 +319,7 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
@@ -404,7 +405,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
 	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
 
-	req := StartRunRequest{RunID: types.RunID("t-env"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
+	req := StartRunRequest{RunID: types.RunID("t-env"), JobID: types.JobID("j-env"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), TypedOptions: parseRunOptions(map[string]any{
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": 1,
@@ -415,7 +416,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 		},
 	})}
 
-	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
@@ -502,6 +503,7 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("t-env-bearer"),
+		JobID:     types.JobID("t-job-env-bearer"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -518,7 +520,7 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:     types.StepID(req.RunID),
+		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
 		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
@@ -599,6 +601,7 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 
 	req := StartRunRequest{
 		RunID:     types.RunID("t-file-bearer"),
+		JobID:     types.JobID("t-job-file-bearer"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -615,7 +618,7 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 	}
 
 	manifest := contracts.StepManifest{
-		ID:     types.StepID(req.RunID),
+		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
 		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
@@ -694,6 +697,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("t-session"),
+		JobID:     types.JobID("t-job-session"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -710,7 +714,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:     types.StepID(req.RunID),
+		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
 		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
@@ -799,6 +803,7 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("t-nonsession"),
+		JobID:     types.JobID("t-job-nonsession"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -816,7 +821,7 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:     types.StepID(req.RunID),
+		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
 		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
@@ -905,6 +910,7 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 
 	req := StartRunRequest{
 		RunID:     types.RunID("t-tls-nofallback"),
+		JobID:     types.JobID("t-job-tls-nofallback"),
 		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("br"),
@@ -921,7 +927,7 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 	}
 
 	manifest := contracts.StepManifest{
-		ID:     types.StepID(req.RunID),
+		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
 		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
