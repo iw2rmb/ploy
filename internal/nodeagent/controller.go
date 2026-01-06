@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // runController implements the RunController interface for managing runs.
@@ -18,8 +20,10 @@ type runController struct {
 
 	cfg Config
 
-	// jobs tracks active jobs by job_id.
-	jobs map[string]*jobContext
+	// jobs tracks active jobs by typed JobID key.
+	// Using types.JobID as map key avoids stringly-typed lookups and provides
+	// compile-time safety against mismatched ID types.
+	jobs map[types.JobID]*jobContext
 
 	// jobSem is a counting semaphore that limits concurrent job execution.
 	// The capacity is set to Config.Concurrency (minimum 1).
@@ -28,8 +32,11 @@ type runController struct {
 }
 
 type jobContext struct {
-	runID  string
-	jobID  string
+	// runID is the typed run identifier for this job's parent run.
+	runID types.RunID
+	// jobID is the typed job identifier, matching the map key in runController.jobs.
+	jobID types.JobID
+	// cancel terminates execution of this job when called.
 	cancel context.CancelFunc
 }
 
@@ -86,20 +93,21 @@ func (r *runController) ReleaseSlot() {
 
 // StartRun accepts a run start request and initiates execution.
 // Tracks by job_id to allow multiple jobs within the same run_id (e.g. pre-gate, mod-0).
+// The jobs map uses typed types.JobID keys to prevent stringly-typed ID confusion.
 func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	jobKey := req.JobID.String()
-	if _, exists := r.jobs[jobKey]; exists {
+	// Use typed JobID directly as map key — no intermediate string conversion needed.
+	if _, exists := r.jobs[req.JobID]; exists {
 		return fmt.Errorf("job %s already exists", req.JobID)
 	}
 
 	// Create a cancellable context for this job, derived from caller.
 	runCtx, cancel := context.WithCancel(ctx)
-	r.jobs[jobKey] = &jobContext{
-		runID:  req.RunID.String(),
-		jobID:  jobKey,
+	r.jobs[req.JobID] = &jobContext{
+		runID:  req.RunID,
+		jobID:  req.JobID,
 		cancel: cancel,
 	}
 
@@ -111,13 +119,15 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 
 // StopRun cancels all jobs associated with a run_id.
 // Since jobs are tracked by job_id, this iterates to find matching run_ids.
+// Comparisons use typed types.RunID values directly for type safety.
 func (r *runController) StopRun(_ context.Context, req StopRunRequest) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	var found bool
 	for jobKey, job := range r.jobs {
-		if job.runID == req.RunID.String() {
+		// Compare typed RunID values directly — no string conversion needed.
+		if job.runID == req.RunID {
 			job.cancel()
 			delete(r.jobs, jobKey)
 			found = true

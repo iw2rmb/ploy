@@ -14,7 +14,7 @@ func TestRunControllerStartRun(t *testing.T) {
 	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	req := StartRunRequest{
@@ -32,7 +32,8 @@ func TestRunControllerStartRun(t *testing.T) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	if _, exists := rc.jobs[req.JobID.String()]; !exists {
+	// Use typed JobID key directly — no .String() conversion needed.
+	if _, exists := rc.jobs[req.JobID]; !exists {
 		t.Errorf("job %s not found in controller", req.JobID)
 	}
 }
@@ -42,7 +43,7 @@ func TestRunControllerStartRunDuplicate(t *testing.T) {
 	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	req := StartRunRequest{
@@ -71,7 +72,7 @@ func TestRunControllerStopRun(t *testing.T) {
 	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	// Start a job first.
@@ -89,7 +90,7 @@ func TestRunControllerStopRun(t *testing.T) {
 
 	// Stop the run (which stops all jobs).
 	stopReq := StopRunRequest{
-		RunID:  "run-001",
+		RunID:  types.RunID("run-001"),
 		Reason: "test",
 	}
 
@@ -100,7 +101,8 @@ func TestRunControllerStopRun(t *testing.T) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	if _, exists := rc.jobs[startReq.JobID.String()]; exists {
+	// Use typed JobID key directly — no .String() conversion needed.
+	if _, exists := rc.jobs[startReq.JobID]; exists {
 		t.Errorf("job %s still exists after stop", startReq.JobID)
 	}
 }
@@ -110,11 +112,11 @@ func TestRunControllerStopNonExistent(t *testing.T) {
 	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	stopReq := StopRunRequest{
-		RunID:  "nonexistent",
+		RunID:  types.RunID("nonexistent"),
 		Reason: "test",
 	}
 

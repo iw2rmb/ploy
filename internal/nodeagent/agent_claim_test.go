@@ -140,7 +140,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -217,7 +217,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -325,7 +325,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -30,9 +31,10 @@ type Agent struct {
 
 // New constructs a new node agent.
 func New(cfg Config) (*Agent, error) {
+	// Initialize controller with typed JobID keys for compile-time safety.
 	controller := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	server, err := NewServer(cfg, controller)
