@@ -325,11 +325,23 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.Execution.RetainContainer = retain
 	}
 
-	// Parse command (polymorphic: string or []string).
-	if cmdStr, ok := opts["command"].(string); ok {
-		runOpts.Execution.Command.Shell = cmdStr
-	} else if cmdSlice, ok := opts["command"].([]string); ok {
-		runOpts.Execution.Command.Exec = cmdSlice
+	// Parse command (polymorphic: string, []string, or []any).
+	// The []any case handles JSON-unmarshaled arrays from modsSpecToOptions,
+	// which converts CommandSpec.Exec to []any via commandSpecToAnyForNested.
+	// Without this, single-step specs with exec-array commands (e.g., ["a","b"])
+	// would drop into empty command because []any != []string.
+	switch cmd := opts["command"].(type) {
+	case string:
+		runOpts.Execution.Command.Shell = cmd
+	case []string:
+		runOpts.Execution.Command.Exec = cmd
+	case []any:
+		// Convert []any to []string, filtering non-string elements.
+		for _, elem := range cmd {
+			if s, ok := elem.(string); ok {
+				runOpts.Execution.Command.Exec = append(runOpts.Execution.Command.Exec, s)
+			}
+		}
 	}
 
 	// Parse artifact options.
