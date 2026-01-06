@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -24,6 +25,13 @@ import (
 // with the configured artifact_name from the manifest options.
 //
 // Missing paths generate warnings but do not fail the upload operation.
+//
+// Security: Artifact paths are validated to prevent path traversal attacks.
+// Paths must be:
+//   - Relative (not absolute)
+//   - Contained within the workspace (no "../.." escaping)
+//
+// Invalid paths are skipped with a warning and no upload attempt is made.
 func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace string) {
 	// Use typed Artifacts.Paths from RunOptions (already parsed by parseRunOptions).
 	if len(typedOpts.Artifacts.Paths) == 0 {
@@ -31,8 +39,20 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 	}
 
 	// Resolve workspace-relative paths and validate existence.
+	// Security: Each path is validated against path traversal attacks before processing.
 	var paths []string
 	for _, p := range typedOpts.Artifacts.Paths {
+		// Validate artifact path to prevent path traversal outside workspace.
+		// This blocks attacks like artifact_paths: ["../../etc/passwd"]
+		if !isValidArtifactPath(p, workspace) {
+			slog.Warn("artifact path rejected: path traversal attempt or absolute path",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"path", p,
+			)
+			continue
+		}
+
 		fullPath := filepath.Join(workspace, p)
 		if _, err := os.Stat(fullPath); err == nil {
 			paths = append(paths, fullPath)
@@ -153,4 +173,52 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 	} else {
 		slog.Warn("failed to upload "+artifactName, "run_id", runID, "job_id", jobID, "error", uerr)
 	}
+}
+
+// isValidArtifactPath validates that an artifact path is safe for upload.
+// It prevents path traversal attacks by ensuring:
+//   - The path is not absolute (no "/etc/passwd" style paths)
+//   - The path does not escape the workspace (no "../../" traversal)
+//   - The resolved full path is contained within the workspace directory
+//
+// This security check protects against malicious artifact_paths specifications
+// that could exfiltrate arbitrary files from the host system.
+//
+// The function uses filepath.Rel to compute the relative path from workspace
+// to the joined full path. If the result starts with ".." then the path escapes
+// the workspace boundary.
+func isValidArtifactPath(artifactPath string, workspace string) bool {
+	// Reject empty paths.
+	if artifactPath == "" || strings.TrimSpace(artifactPath) == "" {
+		return false
+	}
+
+	// Reject absolute paths — artifact paths must be workspace-relative.
+	// filepath.IsAbs handles OS-specific absolute path detection (e.g., "/" on Unix, "C:\" on Windows).
+	if filepath.IsAbs(artifactPath) {
+		return false
+	}
+
+	// Join the workspace and artifact path, then clean it to resolve any ".." components.
+	// filepath.Join already calls filepath.Clean internally, but we call Clean explicitly
+	// to make the intent clear.
+	fullPath := filepath.Clean(filepath.Join(workspace, artifactPath))
+
+	// Compute the relative path from workspace to the resolved full path.
+	// If this fails or the result starts with "..", the path escapes the workspace.
+	rel, err := filepath.Rel(workspace, fullPath)
+	if err != nil {
+		// filepath.Rel can fail if paths are on different volumes (Windows).
+		// Treat any error as invalid for safety.
+		return false
+	}
+
+	// Check if the relative path starts with ".." which indicates traversal outside workspace.
+	// We check for both ".." exactly and "../" prefix to catch all escape attempts.
+	// After Clean, any path escaping the workspace will have ".." at the start.
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+
+	return true
 }
