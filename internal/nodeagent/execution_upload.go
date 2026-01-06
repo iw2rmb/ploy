@@ -53,7 +53,7 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 			continue
 		}
 
-		fullPath := filepath.Join(workspace, p)
+		fullPath := filepath.Clean(filepath.Join(workspace, p))
 		if _, err := os.Stat(fullPath); err == nil {
 			paths = append(paths, fullPath)
 		} else {
