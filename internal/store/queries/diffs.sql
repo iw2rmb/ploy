@@ -34,3 +34,14 @@ WHERE id = $1;
 -- name: DeleteDiffsOlderThan :exec
 DELETE FROM diffs
 WHERE created_at < $1;
+
+-- name: ListDiffsByRunRepo :many
+-- Returns diffs for a specific repo execution within a run.
+-- Per roadmap/v1/scope.md:85 and roadmap/v1/api.md:263, repo attribution comes from
+-- joining diffs.job_id → jobs.repo_id. This is the v1 repo-scoped endpoint for
+-- GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+-- Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
+SELECT d.* FROM diffs d
+JOIN jobs j ON j.id = d.job_id
+WHERE d.run_id = $1 AND j.repo_id = $2
+ORDER BY j.step_index ASC, d.created_at ASC;
