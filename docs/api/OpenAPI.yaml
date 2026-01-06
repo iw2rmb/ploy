@@ -72,6 +72,8 @@ paths:
     $ref: './paths/mods_mod_id_archive.yaml'
   /v1/mods/{mod_id}/unarchive:
     $ref: './paths/mods_mod_id_unarchive.yaml'
+  /v1/mods/{mod_id}/specs:
+    $ref: './paths/mods_mod_id_specs.yaml'
   # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
   # Legacy /v1/mods/{id}/cancel moved to /v1/runs/{id}/cancel (v1 API).
   # Legacy /v1/mods/{id}/resume removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
