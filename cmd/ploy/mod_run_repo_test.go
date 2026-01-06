@@ -185,8 +185,8 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Expect DELETE /v1/runs/{id}/repos/{repo_id}
-		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4" {
+		// Expect POST /v1/runs/{id}/repos/{repo_id}/cancel
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/cancel" {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -221,7 +221,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 		t.Fatalf("mod run repo remove error: %v", err)
 	}
 	if !called {
-		t.Fatal("expected DELETE /v1/runs/{id}/repos/{repo_id} to be called")
+		t.Fatal("expected POST /v1/runs/{id}/repos/{repo_id}/cancel to be called")
 	}
 }
 
@@ -404,7 +404,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRemoveServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/cancel" {
 			http.Error(w, "repo not found", http.StatusNotFound)
 			return
 		}

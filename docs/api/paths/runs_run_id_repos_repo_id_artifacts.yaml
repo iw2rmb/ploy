@@ -3,8 +3,8 @@
 #
 # This endpoint lists artifact bundles produced by jobs belonging to a
 # specific repository execution within a batch run. The response shape
-# is unchanged from the global artifact listing endpoint; v1 only filters
-# to bundles associated with jobs in the repo execution.
+# is unchanged from the global artifact listing endpoint (GET /v1/artifacts?cid=...);
+# v1 only filters to bundles associated with jobs in the repo execution.
 get:
   tags: [Artifacts]
   summary: List artifacts for a repo execution within a run
@@ -17,9 +17,8 @@ get:
     run_id, repo_id, and current attempt).
 
     Per roadmap/v1/api.md:265 and roadmap/v1/api.md:274:
-    - Response JSON shape is unchanged from global artifact listing
-    - v1 only filters the returned bundles to jobs belonging to the repo
-    - Each bundle includes id, name, job_id, and created_at metadata
+    - Response JSON shape is unchanged from global artifact listing (`GET /v1/artifacts?cid=...`)
+    - v1 only filters the returned bundles to jobs belonging to the repo execution
 
     Artifacts are ordered by job step_index (ascending), then by created_at
     (ascending).
@@ -44,7 +43,20 @@ get:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ArtifactListResponse'
+            type: object
+            properties:
+              artifacts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    cid: { type: string }
+                    digest: { type: string }
+                    name: { type: string, nullable: true }
+                    size: { type: integer, format: int64 }
+                  required: [id, cid, digest, size]
+            required: [artifacts]
     '400':
       description: Bad request (missing or empty run_id or repo_id)
       content:

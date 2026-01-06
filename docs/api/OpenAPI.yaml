@@ -161,8 +161,6 @@ paths:
     $ref: './paths/runs_id_timing.yaml'
   /v1/runs/{id}/repos:
     $ref: './paths/runs_id_repos.yaml'
-  /v1/runs/{id}/repos/{repo_id}:
-    $ref: './paths/runs_id_repos_repo_id.yaml'
   /v1/runs/{id}/repos/{repo_id}/restart:
     $ref: './paths/runs_id_repos_repo_id_restart.yaml'
   # v1 repo-scoped diffs listing — replaces legacy GET /v1/mods/{id}/diffs
@@ -331,11 +329,6 @@ components:
     # Single-repo run submission — POST /v1/runs
     CreateSingleRepoRunResponse:
       $ref: './components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse'
-    # Repo-scoped artifact listing — GET /v1/runs/{run_id}/repos/{repo_id}/artifacts
-    ArtifactListItem:
-      $ref: './components/schemas/controlplane.yaml#/ArtifactListItem'
-    ArtifactListResponse:
-      $ref: './components/schemas/controlplane.yaml#/ArtifactListResponse'
     # Repo-scoped diff listing — GET /v1/runs/{run_id}/repos/{repo_id}/diffs
     DiffItem:
       $ref: './components/schemas/controlplane.yaml#/DiffItem'
