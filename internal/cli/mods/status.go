@@ -1,7 +1,8 @@
 // status.go provides CLI client implementations for fetching diffs.
 //
 // This file implements helpers used by `ploy mod run pull`:
-//   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs.
+//   - ListAllDiffsCommand: Fetches all diffs for a run via GET /v1/mods/{id}/diffs (legacy).
+//   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
 //   - DownloadDiffCommand: Downloads a single diff via GET /v1/diffs/{diff_id}?download=true.
 package mods
 
@@ -77,6 +78,74 @@ func (c ListAllDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("list all diffs: decode response: %w", err)
+	}
+
+	// Sort diffs by step_index for correct application order.
+	// Lower step_index values should be applied first.
+	sort.Slice(result.Diffs, func(i, j int) bool {
+		return result.Diffs[i].StepIndex < result.Diffs[j].StepIndex
+	})
+
+	return result.Diffs, nil
+}
+
+// ListRunRepoDiffsCommand fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+// This is the v1 repo-scoped endpoint that replaces the legacy run-scoped GET /v1/mods/{id}/diffs.
+//
+// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
+// - Returns diffs filtered by repo_id via jobs.repo_id join
+// - Diffs for repo A are excluded from repo B listing
+// - Response shape is unchanged from legacy endpoint
+type ListRunRepoDiffsCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
+	RepoID  string            // Repo ID (NanoID-backed string)
+}
+
+// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
+// The diffs are sorted by step_index to ensure correct application order.
+func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
+	if c.Client == nil {
+		return nil, fmt.Errorf("list run repo diffs: http client required")
+	}
+	if c.BaseURL == nil {
+		return nil, fmt.Errorf("list run repo diffs: base url required")
+	}
+	if c.RunID.IsZero() {
+		return nil, fmt.Errorf("list run repo diffs: run id required")
+	}
+	if strings.TrimSpace(c.RepoID) == "" {
+		return nil, fmt.Errorf("list run repo diffs: repo id required")
+	}
+
+	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID), "diffs")
+	if err != nil {
+		return nil, fmt.Errorf("list run repo diffs: build url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list run repo diffs: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list run repo diffs: http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeHTTPError(resp, "list run repo diffs")
+	}
+
+	// Response structure: {"diffs": [...]}
+	var result struct {
+		Diffs []DiffEntry `json:"diffs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("list run repo diffs: decode response: %w", err)
 	}
 
 	// Sort diffs by step_index for correct application order.

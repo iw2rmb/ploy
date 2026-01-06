@@ -260,6 +260,12 @@ type mockStore struct {
 	listDiffsByRunResult []store.Diff
 	listDiffsByRunErr    error
 
+	// ListDiffsByRunRepo tracking (v1 repo-scoped diffs listing)
+	listDiffsByRunRepoCalled bool
+	listDiffsByRunRepoParams store.ListDiffsByRunRepoParams
+	listDiffsByRunRepoResult []store.Diff
+	listDiffsByRunRepoErr    error
+
 	// GetDiff tracking
 	getDiffCalled bool
 	getDiffParam  pgtype.UUID
@@ -873,6 +879,13 @@ func (m *mockStore) ListDiffsByRun(ctx context.Context, runID string) ([]store.D
 	m.listDiffsByRunCalled = true
 	m.listDiffsByRunParam = runID
 	return m.listDiffsByRunResult, m.listDiffsByRunErr
+}
+
+// ListDiffsByRunRepo implements the v1 repo-scoped diffs listing query.
+func (m *mockStore) ListDiffsByRunRepo(ctx context.Context, arg store.ListDiffsByRunRepoParams) ([]store.Diff, error) {
+	m.listDiffsByRunRepoCalled = true
+	m.listDiffsByRunRepoParams = arg
+	return m.listDiffsByRunRepoResult, m.listDiffsByRunRepoErr
 }
 
 func (m *mockStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, error) {

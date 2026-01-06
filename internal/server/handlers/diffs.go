@@ -95,6 +95,71 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
+// listRunRepoDiffsHandler returns a JSON list of diffs for a specific repo execution
+// within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
+// GET /v1/mods/{id}/diffs endpoint.
+//
+// GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+//
+// Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263:
+// - Repo attribution comes from joining diffs.job_id → jobs.repo_id
+// - Diffs for repo A are excluded from repo B listing
+// - Response shape is unchanged from legacy endpoint (diffListResponse)
+//
+// Run and job IDs are KSUID-backed strings; repo IDs are NanoID-backed strings.
+func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the run ID from the URL path parameter using the shared helper.
+		runID, err := requiredPathParam(r, "run_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Parse the repo ID from the URL path parameter using the shared helper.
+		repoID, err := requiredPathParam(r, "repo_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Query diffs filtered by run_id and repo_id via jobs.repo_id join.
+		diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
+			RunID:  runID,
+			RepoID: repoID,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
+			slog.Error("list run repo diffs: query failed", "run_id", runID, "repo_id", repoID, "err", err)
+			return
+		}
+
+		// Build response items in the same format as listRunDiffsHandler.
+		items := make([]diffItem, 0, len(diffs))
+		for _, d := range diffs {
+			var summary domaintypes.DiffSummary
+			if len(d.Summary) > 0 {
+				_ = json.Unmarshal(d.Summary, &summary)
+			}
+			// d.JobID is *string (KSUID-backed); convert to domaintypes.JobID.
+			var jobID domaintypes.JobID
+			if d.JobID != nil && *d.JobID != "" {
+				jobID = domaintypes.JobID(*d.JobID)
+			}
+			items = append(items, diffItem{
+				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
+				JobID:     jobID,                          // KSUID-backed domain type
+				CreatedAt: d.CreatedAt.Time,
+				Size:      len(d.Patch),
+				Summary:   summary,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
+	}
+}
+
 // getDiffHandler returns diff bytes for a diff id. When ?download=true, writes
 // the gzipped patch as application/gzip. Otherwise returns minimal JSON metadata.
 // GET /v1/diffs/{id}

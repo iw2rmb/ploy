@@ -82,6 +82,9 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/runs/{id}/repos/{repo_id}", deleteRunRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/scope.md:69-71, roadmap/v1/api.md:263): Repo-scoped diffs listing.
+	// Replaces legacy GET /v1/mods/{id}/diffs with repo-scoped addressing.
+	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 
 	// Repos — repo-centric view: list repos and show runs for a given repo.
 	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
