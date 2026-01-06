@@ -17,7 +17,7 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
 			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
 		},
@@ -59,7 +59,7 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 
 	st := &mockStore{
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
 			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
 		},

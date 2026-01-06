@@ -48,7 +48,7 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
-	if err := os.WriteFile(specPath, []byte("image: docker.io/test/image:v1\n"), 0o644); err != nil {
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: docker.io/test/image:v1\n"), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
-	if err := os.WriteFile(specPath, []byte("image: docker.io/test/image:v1\n"), 0o644); err != nil {
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: docker.io/test/image:v1\n"), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
 

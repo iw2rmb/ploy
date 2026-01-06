@@ -8,10 +8,12 @@ import (
 // TestParseModsSpecJSON_SingleStep tests parsing single-step spec JSON.
 func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 	input := `{
-		"image": "docker.io/user/mod:latest",
-		"command": "echo hello",
-		"env": {"FOO": "bar", "BAZ": "qux"},
-		"retain_container": true,
+		"steps": [{
+			"image": "docker.io/user/mod:latest",
+			"command": "echo hello",
+			"env": {"FOO": "bar", "BAZ": "qux"},
+			"retain_container": true
+		}],
 		"build_gate": {"enabled": true, "profile": "java-maven"},
 		"gitlab_pat": "secret",
 		"gitlab_domain": "gitlab.com",
@@ -32,31 +34,36 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 		t.Errorf("expected IsMultiStep() = false")
 	}
 
-	// Verify image (universal form).
-	if spec.Image.Universal != "docker.io/user/mod:latest" {
-		t.Errorf("image = %q, want %q", spec.Image.Universal, "docker.io/user/mod:latest")
+	if len(spec.Steps) != 1 {
+		t.Fatalf("len(steps) = %d, want 1", len(spec.Steps))
 	}
+	step := spec.Steps[0]
 
 	// Verify command (shell form).
-	if spec.Command.Shell != "echo hello" {
-		t.Errorf("command.Shell = %q, want %q", spec.Command.Shell, "echo hello")
+	if step.Command.Shell != "echo hello" {
+		t.Errorf("command.Shell = %q, want %q", step.Command.Shell, "echo hello")
 	}
 	expected := []string{"/bin/sh", "-c", "echo hello"}
-	got := spec.Command.ToSlice()
+	got := step.Command.ToSlice()
 	if len(got) != len(expected) {
 		t.Errorf("Command.ToSlice() = %v, want %v", got, expected)
 	}
 
-	// Verify env.
-	if spec.Env["FOO"] != "bar" {
-		t.Errorf("env[FOO] = %q, want %q", spec.Env["FOO"], "bar")
+	// Verify image (universal form).
+	if step.Image.Universal != "docker.io/user/mod:latest" {
+		t.Errorf("image = %q, want %q", step.Image.Universal, "docker.io/user/mod:latest")
 	}
-	if spec.Env["BAZ"] != "qux" {
-		t.Errorf("env[BAZ] = %q, want %q", spec.Env["BAZ"], "qux")
+
+	// Verify env.
+	if step.Env["FOO"] != "bar" {
+		t.Errorf("env[FOO] = %q, want %q", step.Env["FOO"], "bar")
+	}
+	if step.Env["BAZ"] != "qux" {
+		t.Errorf("env[BAZ] = %q, want %q", step.Env["BAZ"], "qux")
 	}
 
 	// Verify retain_container.
-	if !spec.RetainContainer {
+	if !step.RetainContainer {
 		t.Errorf("retain_container = false, want true")
 	}
 
@@ -89,17 +96,20 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 // TestParseModsSpecJSON_MultiStep tests parsing multi-step spec JSON.
 func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	input := `{
-		"mods": [
+		"steps": [
 			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}},
 			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}, "retain_container": true}
 		],
-		"build_gate": {"enabled": true, "profile": "auto"},
-		"build_gate_healing": {
-			"retries": 3,
-			"mod": {
-				"image": "docker.io/user/codex:latest",
-				"command": "fix-it",
-				"env": {"PROMPT": "fix the build"}
+		"build_gate": {
+			"enabled": true,
+			"profile": "auto",
+			"healing": {
+				"retries": 3,
+				"mod": {
+					"image": "docker.io/user/codex:latest",
+					"command": "fix-it",
+					"env": {"PROMPT": "fix the build"}
+				}
 			}
 		}
 	}`
@@ -117,64 +127,66 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 		t.Errorf("expected IsMultiStep() = true")
 	}
 
-	// Verify mods array.
-	if len(spec.Mods) != 2 {
-		t.Fatalf("len(mods) = %d, want 2", len(spec.Mods))
+	// Verify steps array.
+	if len(spec.Steps) != 2 {
+		t.Fatalf("len(steps) = %d, want 2", len(spec.Steps))
 	}
 
-	// Verify first mod.
-	mod1 := spec.Mods[0]
+	// Verify first step.
+	mod1 := spec.Steps[0]
 	if mod1.Name != "step-1" {
-		t.Errorf("mods[0].name = %q, want %q", mod1.Name, "step-1")
+		t.Errorf("steps[0].name = %q, want %q", mod1.Name, "step-1")
 	}
 	if mod1.Image.Universal != "docker.io/user/mod1:latest" {
-		t.Errorf("mods[0].image = %q, want %q", mod1.Image.Universal, "docker.io/user/mod1:latest")
+		t.Errorf("steps[0].image = %q, want %q", mod1.Image.Universal, "docker.io/user/mod1:latest")
 	}
 	// Command is exec array form.
 	if len(mod1.Command.Exec) != 2 || mod1.Command.Exec[0] != "echo" || mod1.Command.Exec[1] != "step1" {
-		t.Errorf("mods[0].command.Exec = %v, want [echo, step1]", mod1.Command.Exec)
+		t.Errorf("steps[0].command.Exec = %v, want [echo, step1]", mod1.Command.Exec)
 	}
 	if mod1.Env["STEP"] != "1" {
-		t.Errorf("mods[0].env[STEP] = %q, want %q", mod1.Env["STEP"], "1")
+		t.Errorf("steps[0].env[STEP] = %q, want %q", mod1.Env["STEP"], "1")
 	}
 
-	// Verify second mod.
-	mod2 := spec.Mods[1]
+	// Verify second step.
+	mod2 := spec.Steps[1]
 	if mod2.Name != "step-2" {
-		t.Errorf("mods[1].name = %q, want %q", mod2.Name, "step-2")
+		t.Errorf("steps[1].name = %q, want %q", mod2.Name, "step-2")
 	}
 	if !mod2.RetainContainer {
-		t.Errorf("mods[1].retain_container = false, want true")
+		t.Errorf("steps[1].retain_container = false, want true")
 	}
 
 	// Verify healing.
-	if spec.BuildGateHealing == nil {
-		t.Fatal("build_gate_healing is nil")
+	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
+		t.Fatal("build_gate.healing is nil")
 	}
-	if spec.BuildGateHealing.Retries != 3 {
-		t.Errorf("build_gate_healing.retries = %d, want 3", spec.BuildGateHealing.Retries)
+	if spec.BuildGate.Healing.Retries != 3 {
+		t.Errorf("build_gate.healing.retries = %d, want 3", spec.BuildGate.Healing.Retries)
 	}
-	if spec.BuildGateHealing.Mod == nil {
-		t.Fatal("build_gate_healing.mod is nil")
+	if spec.BuildGate.Healing.Mod == nil {
+		t.Fatal("build_gate.healing.mod is nil")
 	}
-	if spec.BuildGateHealing.Mod.Image.Universal != "docker.io/user/codex:latest" {
-		t.Errorf("build_gate_healing.mod.image = %q, want %q",
-			spec.BuildGateHealing.Mod.Image.Universal, "docker.io/user/codex:latest")
+	if spec.BuildGate.Healing.Mod.Image.Universal != "docker.io/user/codex:latest" {
+		t.Errorf("build_gate.healing.mod.image = %q, want %q",
+			spec.BuildGate.Healing.Mod.Image.Universal, "docker.io/user/codex:latest")
 	}
-	if spec.BuildGateHealing.Mod.Command.Shell != "fix-it" {
-		t.Errorf("build_gate_healing.mod.command = %q, want %q",
-			spec.BuildGateHealing.Mod.Command.Shell, "fix-it")
+	if spec.BuildGate.Healing.Mod.Command.Shell != "fix-it" {
+		t.Errorf("build_gate.healing.mod.command = %q, want %q",
+			spec.BuildGate.Healing.Mod.Command.Shell, "fix-it")
 	}
 }
 
 // TestParseModsSpecJSON_StackSpecificImage tests stack-specific image parsing.
 func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{
-		"image": {
-			"default": "docker.io/user/mod:default",
-			"java-maven": "docker.io/user/mod:maven",
-			"java-gradle": "docker.io/user/mod:gradle"
-		}
+		"steps": [{
+			"image": {
+				"default": "docker.io/user/mod:default",
+				"java-maven": "docker.io/user/mod:maven",
+				"java-gradle": "docker.io/user/mod:gradle"
+			}
+		}]
 	}`
 
 	spec, err := ParseModsSpecJSON([]byte(input))
@@ -182,15 +194,15 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
-	if spec.Image.IsUniversal() {
+	if spec.Steps[0].Image.IsUniversal() {
 		t.Errorf("expected stack-specific image, got universal")
 	}
-	if !spec.Image.IsStackSpecific() {
+	if !spec.Steps[0].Image.IsStackSpecific() {
 		t.Errorf("expected IsStackSpecific() = true")
 	}
 
 	// Verify resolution.
-	img, err := spec.Image.ResolveImage(ModStackJavaMaven)
+	img, err := spec.Steps[0].Image.ResolveImage(ModStackJavaMaven)
 	if err != nil {
 		t.Fatalf("ResolveImage(java-maven) failed: %v", err)
 	}
@@ -199,7 +211,7 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 
 	// Verify default fallback.
-	img, err = spec.Image.ResolveImage(ModStackUnknown)
+	img, err = spec.Steps[0].Image.ResolveImage(ModStackUnknown)
 	if err != nil {
 		t.Fatalf("ResolveImage(unknown) failed: %v", err)
 	}
@@ -214,9 +226,11 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	input := `{
 		"apiVersion": "ploy.mod/v1alpha1",
 		"kind": "ModRunSpec",
-		"image": "docker.io/user/mod:latest",
-		"command": "echo hello",
-		"env": {"FOO": "bar"},
+		"steps": [{
+			"image": "docker.io/user/mod:latest",
+			"command": "echo hello",
+			"env": {"FOO": "bar"}
+		}],
 		"build_gate": {"enabled": true, "profile": "auto"}
 	}`
 
@@ -231,37 +245,34 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	if spec.Kind != "ModRunSpec" {
 		t.Errorf("kind = %q, want %q", spec.Kind, "ModRunSpec")
 	}
-	if spec.Image.Universal != "docker.io/user/mod:latest" {
-		t.Errorf("image = %q, want %q", spec.Image.Universal, "docker.io/user/mod:latest")
+	if spec.Steps[0].Image.Universal != "docker.io/user/mod:latest" {
+		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "docker.io/user/mod:latest")
 	}
-	if spec.Command.Shell != "echo hello" {
-		t.Errorf("command = %q, want %q", spec.Command.Shell, "echo hello")
+	if spec.Steps[0].Command.Shell != "echo hello" {
+		t.Errorf("command = %q, want %q", spec.Steps[0].Command.Shell, "echo hello")
 	}
 }
 
 // TestParseModsSpecJSON_Empty tests empty input handling.
 func TestParseModsSpecJSON_Empty(t *testing.T) {
-	spec, err := ParseModsSpecJSON(nil)
-	if err != nil {
-		t.Fatalf("ParseModsSpecJSON(nil) failed: %v", err)
+	_, err := ParseModsSpecJSON(nil)
+	if err == nil {
+		t.Fatal("expected error for empty input")
 	}
-	if spec == nil {
-		t.Fatal("expected non-nil spec for empty input")
-	}
-	if err := spec.Validate(); err != nil {
-		t.Errorf("empty spec should validate: %v", err)
+	if want := "steps: required"; err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
 	}
 }
 
 // TestParseModsSpecJSON_ValidationError tests validation errors.
 func TestParseModsSpecJSON_ValidationError(t *testing.T) {
-	// Multi-step mod without image.
-	input := `{"mods": [{"name": "test"}]}`
+	// Step without image.
+	input := `{"steps": [{"name": "test"}]}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected validation error for mod without image")
 	}
-	if want := "mods[0]: image is required"; err.Error() != want {
+	if want := "steps[0].image: required"; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
 	}
 }
@@ -270,8 +281,8 @@ func TestParseModsSpecJSON_ValidationError(t *testing.T) {
 func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
 	// Healing mod without image.
 	input := `{
-		"image": "test:latest",
-		"build_gate_healing": {"retries": 1, "mod": {"command": "fix"}}
+		"steps": [{"image": "test:latest"}],
+		"build_gate": {"healing": {"retries": 1, "mod": {"command": "fix"}}}
 	}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
@@ -283,13 +294,15 @@ func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
 func TestModsSpec_ToMap(t *testing.T) {
 	mrOnSuccess := true
 	original := &ModsSpec{
-		Image:           ModImage{Universal: "docker.io/user/mod:latest"},
-		Command:         CommandSpec{Shell: "echo hello"},
-		Env:             map[string]string{"FOO": "bar"},
-		RetainContainer: true,
-		BuildGate:       &BuildGateConfig{Enabled: true, Profile: "auto"},
-		GitLabPAT:       "secret",
-		MROnSuccess:     &mrOnSuccess,
+		Steps: []ModStep{{
+			Image:           ModImage{Universal: "docker.io/user/mod:latest"},
+			Command:         CommandSpec{Shell: "echo hello"},
+			Env:             map[string]string{"FOO": "bar"},
+			RetainContainer: true,
+		}},
+		BuildGate:   &BuildGateConfig{Enabled: true, Profile: "auto"},
+		GitLabPAT:   "secret",
+		MROnSuccess: &mrOnSuccess,
 	}
 
 	m := original.ToMap()
@@ -306,13 +319,13 @@ func TestModsSpec_ToMap(t *testing.T) {
 	}
 
 	// Verify round-trip.
-	if parsed.Image.Universal != original.Image.Universal {
-		t.Errorf("image = %q, want %q", parsed.Image.Universal, original.Image.Universal)
+	if parsed.Steps[0].Image.Universal != original.Steps[0].Image.Universal {
+		t.Errorf("image = %q, want %q", parsed.Steps[0].Image.Universal, original.Steps[0].Image.Universal)
 	}
-	if parsed.Command.Shell != original.Command.Shell {
-		t.Errorf("command.Shell = %q, want %q", parsed.Command.Shell, original.Command.Shell)
+	if parsed.Steps[0].Command.Shell != original.Steps[0].Command.Shell {
+		t.Errorf("command.Shell = %q, want %q", parsed.Steps[0].Command.Shell, original.Steps[0].Command.Shell)
 	}
-	if !parsed.RetainContainer {
+	if !parsed.Steps[0].RetainContainer {
 		t.Errorf("retain_container = false, want true")
 	}
 	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
@@ -326,7 +339,7 @@ func TestModsSpec_ToMap(t *testing.T) {
 // TestModsSpec_ToMap_MultiStep tests ToMap for multi-step specs.
 func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 	original := &ModsSpec{
-		Mods: []ModStep{
+		Steps: []ModStep{
 			{Name: "step-1", Image: ModImage{Universal: "mod1:latest"}},
 			{Name: "step-2", Image: ModImage{ByStack: map[ModStack]string{
 				ModStackDefault:    "mod2:default",
@@ -334,10 +347,12 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 				ModStackJavaGradle: "mod2:gradle",
 			}}},
 		},
-		BuildGateHealing: &HealingSpec{
-			Retries: 2,
-			Mod: &HealingModSpec{
-				Image: ModImage{Universal: "codex:latest"},
+		BuildGate: &BuildGateConfig{
+			Healing: &HealingSpec{
+				Retries: 2,
+				Mod: &HealingModSpec{
+					Image: ModImage{Universal: "codex:latest"},
+				},
 			},
 		},
 	}
@@ -356,17 +371,17 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 	}
 
 	// Verify round-trip.
-	if len(parsed.Mods) != 2 {
-		t.Fatalf("len(mods) = %d, want 2", len(parsed.Mods))
+	if len(parsed.Steps) != 2 {
+		t.Fatalf("len(steps) = %d, want 2", len(parsed.Steps))
 	}
-	if parsed.Mods[0].Name != "step-1" {
-		t.Errorf("mods[0].name = %q, want %q", parsed.Mods[0].Name, "step-1")
+	if parsed.Steps[0].Name != "step-1" {
+		t.Errorf("steps[0].name = %q, want %q", parsed.Steps[0].Name, "step-1")
 	}
-	if !parsed.Mods[1].Image.IsStackSpecific() {
-		t.Errorf("mods[1].image should be stack-specific")
+	if !parsed.Steps[1].Image.IsStackSpecific() {
+		t.Errorf("steps[1].image should be stack-specific")
 	}
-	if parsed.BuildGateHealing == nil || parsed.BuildGateHealing.Retries != 2 {
-		t.Errorf("build_gate_healing.retries should be 2")
+	if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || parsed.BuildGate.Healing.Retries != 2 {
+		t.Errorf("build_gate.healing.retries should be 2")
 	}
 }
 
@@ -490,7 +505,7 @@ func TestCommandSpec_JSONUnmarshal(t *testing.T) {
 // TestModsSpec_ArtifactFields tests artifact configuration parsing.
 func TestModsSpec_ArtifactFields(t *testing.T) {
 	input := `{
-		"image": "test:latest",
+		"steps": [{"image": "test:latest"}],
 		"artifact_name": "my-bundle",
 		"artifact_paths": ["output/", "logs/app.log"]
 	}`
@@ -530,7 +545,7 @@ func TestParseModsSpecJSON_RejectsLegacyModShape(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for legacy 'mod' section shape")
 	}
-	wantErr := "mod: legacy spec shape is not supported; use top-level fields or mods[]"
+	wantErr := "mod: legacy spec shape is not supported; use steps[]"
 	if err.Error() != wantErr {
 		t.Errorf("error = %q, want %q", err.Error(), wantErr)
 	}

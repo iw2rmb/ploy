@@ -246,7 +246,8 @@ func TestBuildSpecPayloadWithEnvFromFile(t *testing.T) {
 
 		specPath := filepath.Join(tmpDir, "spec.yaml")
 		specContent := `
-image: docker.io/test/mod:latest
+steps:
+  - image: docker.io/test/mod:latest
 env:
   LITERAL_KEY: literal-value
 env_from_file:
@@ -293,7 +294,8 @@ env_from_file:
 
 		specPath := filepath.Join(tmpDir, "spec-inline.yaml")
 		specContent := `
-image: docker.io/test/mod:latest
+steps:
+  - image: docker.io/test/mod:latest
 env:
   LITERAL_KEY: literal-value
   SECRET_KEY:
@@ -334,14 +336,17 @@ env:
 
 		specPath := filepath.Join(tmpDir, "spec-healing.yaml")
 		specContent := `
-build_gate_healing:
-  retries: 1
-  mod:
-    image: docker.io/test/healer:latest
-    env:
-      HEALER_KEY: literal
-    env_from_file:
-      HEALER_AUTH: ` + healingAuthFile + `
+steps:
+  - image: docker.io/test/mod:latest
+build_gate:
+  healing:
+    retries: 1
+    mod:
+      image: docker.io/test/healer:latest
+      env:
+        HEALER_KEY: literal
+      env_from_file:
+        HEALER_AUTH: ` + healingAuthFile + `
 `
 		if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 			t.Fatalf("write spec file: %v", err)
@@ -357,14 +362,18 @@ build_gate_healing:
 			t.Fatalf("unmarshal payload: %v", err)
 		}
 
-		// Navigate to build_gate_healing.mod
-		healing, ok := result["build_gate_healing"].(map[string]any)
+		// Navigate to build_gate.healing.mod
+		buildGate, ok := result["build_gate"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected build_gate_healing in result")
+			t.Fatalf("expected build_gate in result")
+		}
+		healing, ok := buildGate["healing"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected build_gate.healing in result")
 		}
 		mod0, ok := healing["mod"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected build_gate_healing.mod to be a map")
+			t.Fatalf("expected build_gate.healing.mod to be a map")
 		}
 
 		// env_from_file should be removed from mod entry
@@ -388,6 +397,8 @@ build_gate_healing:
 	t.Run("env_from_file with nonexistent file", func(t *testing.T) {
 		specPath := filepath.Join(tmpDir, "spec-bad.yaml")
 		specContent := `
+steps:
+  - image: docker.io/test/mod:latest
 env_from_file:
   BAD_KEY: /nonexistent/path/file.txt
 `
@@ -431,6 +442,8 @@ env_from_file:
 
 		specPath := filepath.Join(tmpDir, "spec-tilde.yaml")
 		specContent := `
+steps:
+  - image: docker.io/test/mod:latest
 env_from_file:
   TILDE_AUTH: ` + tildePath + `
 `

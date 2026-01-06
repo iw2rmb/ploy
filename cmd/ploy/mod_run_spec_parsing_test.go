@@ -10,22 +10,23 @@ import (
 
 // TestBuildSpecPayloadFromYAML verifies that buildSpecPayload correctly parses
 // a YAML spec file and produces the expected JSON payload structure.
-// Uses the canonical single-step format with top-level fields.
+// Uses the canonical single-step format with steps[].
 func TestBuildSpecPayloadFromYAML(t *testing.T) {
 	// Create a temporary YAML spec file using canonical single-step format.
-	// Note: The legacy "mod" object format is deprecated; use top-level fields.
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
-image: docker.io/test/mod:latest
+steps:
+  - image: docker.io/test/mod:latest
+    retain_container: true
 env:
   KEY1: value1
   KEY2: value2
-retain_container: true
-build_gate_healing:
-  retries: 1
-  mod:
-    image: docker.io/test/healer:latest
+build_gate:
+  healing:
+    retries: 1
+    mod:
+      image: docker.io/test/healer:latest
 gitlab_domain: gitlab.example.com
 mr_on_success: true
 `
@@ -43,14 +44,25 @@ mr_on_success: true
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify the spec contains build_gate_healing
-	if _, ok := result["build_gate_healing"]; !ok {
-		t.Errorf("expected build_gate_healing in payload")
+	buildGate, ok := result["build_gate"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate in payload")
+	}
+	if _, ok := buildGate["healing"].(map[string]any); !ok {
+		t.Errorf("expected build_gate.healing in payload")
 	}
 
 	// Verify top-level settings (canonical single-step format).
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected image=docker.io/test/mod:latest, got %v", result["image"])
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0] in payload, got %T %v", result["steps"], result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mod:latest, got %v", step0["image"])
 	}
 	if env, ok := result["env"].(map[string]any); ok {
 		if env["KEY1"] != "value1" || env["KEY2"] != "value2" {
@@ -59,8 +71,8 @@ mr_on_success: true
 	} else {
 		t.Errorf("expected env in payload")
 	}
-	if retain, ok := result["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
+	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected steps[0].retain_container=true, got %v", step0["retain_container"])
 	}
 
 	// Verify gitlab_domain
@@ -81,14 +93,16 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.json")
 	specContent := `{
-  "image": "docker.io/test/mod:latest",
+  "steps": [{"image": "docker.io/test/mod:latest"}],
   "env": {
     "KEY1": "value1"
   },
-  "build_gate_healing": {
-    "retries": 2,
-    "mod": {
-      "image": "docker.io/test/healer:latest"
+  "build_gate": {
+    "healing": {
+      "retries": 2,
+      "mod": {
+        "image": "docker.io/test/healer:latest"
+      }
     }
   }
 }`
@@ -106,13 +120,17 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify the spec contains build_gate_healing
-	if healing, ok := result["build_gate_healing"].(map[string]any); ok {
-		if retries, ok := healing["retries"].(float64); !ok || retries != 2 {
-			t.Errorf("expected build_gate_healing.retries=2, got %v", healing["retries"])
-		}
-	} else {
-		t.Errorf("expected build_gate_healing in payload")
+	// Verify the spec contains build_gate.healing
+	buildGate, ok := result["build_gate"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate in payload")
+	}
+	healing, ok := buildGate["healing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing in payload")
+	}
+	if retries, ok := healing["retries"].(float64); !ok || retries != 2 {
+		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
 	}
 }
 
@@ -124,8 +142,9 @@ func TestBuildSpecPayloadCommand_MergesWithoutCLI(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
-image: docker.io/test/mod:latest
-command: ["/bin/sh", "-lc", "echo hi"]
+steps:
+  - image: docker.io/test/mod:latest
+    command: ["/bin/sh", "-lc", "echo hi"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
@@ -138,10 +157,18 @@ command: ["/bin/sh", "-lc", "echo hi"]
 	if err := json.Unmarshal(payload, &out); err != nil {
 		t.Fatalf("json: %v", err)
 	}
-	// Verify top-level command is preserved (canonical format).
-	cmd, ok := out["command"].([]any)
+	steps, ok := out["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0], got %v", out["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	// Verify steps[0].command is preserved.
+	cmd, ok := step0["command"].([]any)
 	if !ok || len(cmd) != 3 || cmd[0] != "/bin/sh" || cmd[1] != "-lc" || cmd[2] != "echo hi" {
-		t.Fatalf("expected command array preserved at top-level, got %v", out["command"])
+		t.Fatalf("expected steps[0].command array preserved, got %v", step0["command"])
 	}
 }
 
@@ -153,7 +180,9 @@ func TestBuildSpecPayloadCommand_CLIOverridesJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
-command: ["echo", "spec"]
+steps:
+  - image: docker.io/test/mod:latest
+    command: ["echo", "spec"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
@@ -166,10 +195,18 @@ command: ["echo", "spec"]
 	if err := json.Unmarshal(payload, &out); err != nil {
 		t.Fatalf("json: %v", err)
 	}
-	// Verify top-level command is overridden by CLI (canonical format).
-	cmd, ok := out["command"].([]any)
+	steps, ok := out["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0], got %v", out["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	// Verify steps[0].command is overridden by CLI.
+	cmd, ok := step0["command"].([]any)
 	if !ok || len(cmd) != 2 || cmd[0] != "echo" || cmd[1] != "cli" {
-		t.Fatalf("expected command overridden to [echo cli] at top-level, got %v", out["command"])
+		t.Fatalf("expected steps[0].command overridden to [echo cli], got %v", step0["command"])
 	}
 }
 
@@ -206,7 +243,7 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 	payload, err := buildSpecPayload(
 		"",
 		nil,
-		"",
+		"docker.io/test/mod:latest",
 		false,
 		`["/bin/sh", "-c", "echo test"]`,
 		"",
@@ -223,7 +260,15 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	if cmd, ok := result["command"].([]any); ok {
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0], got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if cmd, ok := step0["command"].([]any); ok {
 		if len(cmd) != 3 {
 			t.Errorf("expected command array length 3, got %d", len(cmd))
 		}
@@ -231,7 +276,7 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 			t.Errorf("expected command[0]=/bin/sh, got %v", cmd[0])
 		}
 	} else {
-		t.Errorf("expected command as array, got %T", result["command"])
+		t.Errorf("expected command as array, got %T", step0["command"])
 	}
 }
 
@@ -242,7 +287,7 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 	payload, err := buildSpecPayload(
 		"",
 		nil,
-		"",
+		"docker.io/test/mod:latest",
 		false,
 		"echo test",
 		"",
@@ -259,8 +304,16 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	if cmd, ok := result["command"].(string); !ok || cmd != "echo test" {
-		t.Errorf("expected command string 'echo test', got %v", result["command"])
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0], got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if cmd, ok := step0["command"].(string); !ok || cmd != "echo test" {
+		t.Errorf("expected command string 'echo test', got %v", step0["command"])
 	}
 }
 
@@ -268,18 +321,21 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 // structures (like build_gate_healing with retries and mod fields) are
 // correctly parsed from YAML and preserved in the payload.
 func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
-	// Test that build_gate_healing is preserved when present in spec
+	// Test that build_gate.healing is preserved when present in spec
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
-build_gate_healing:
-  retries: 2
-  mod:
-    image: docker.io/test/healer:latest
-    command: "heal.sh"
-    env:
-      HEALING_MODE: auto
-    retain_container: false
+steps:
+  - image: docker.io/test/mod:latest
+build_gate:
+  healing:
+    retries: 2
+    mod:
+      image: docker.io/test/healer:latest
+      command: "heal.sh"
+      env:
+        HEALING_MODE: auto
+      retain_container: false
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -295,21 +351,24 @@ build_gate_healing:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify build_gate_healing is present
-	healing, ok := result["build_gate_healing"].(map[string]any)
+	buildGate, ok := result["build_gate"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected build_gate_healing in payload")
+		t.Fatalf("expected build_gate in payload")
+	}
+	healing, ok := buildGate["healing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing in payload")
 	}
 
 	// Verify retries
 	if retries, ok := healing["retries"].(float64); !ok || retries != 2 {
-		t.Errorf("expected build_gate_healing.retries=2, got %v", healing["retries"])
+		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
 	}
 
 	// Verify mod entry
 	mod, ok := healing["mod"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected build_gate_healing.mod to be a map, got %T", healing["mod"])
+		t.Fatalf("expected build_gate.healing.mod to be a map, got %T", healing["mod"])
 	}
 
 	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/healer:latest" {
@@ -341,7 +400,7 @@ func TestBuildSpecPayloadMultiStepMods(t *testing.T) {
 	specContent := `
 apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
-mods:
+steps:
   - image: docker.io/test/mod-step1:latest
     env:
       STEP: "1"
@@ -357,10 +416,10 @@ mods:
 build_gate:
   enabled: true
   profile: auto
-build_gate_healing:
-  retries: 1
-  mods:
-    - image: docker.io/test/healer:latest
+  healing:
+    retries: 1
+    mod:
+      image: docker.io/test/healer:latest
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -376,55 +435,56 @@ build_gate_healing:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify mods[] array exists and has 3 entries
-	mods, ok := result["mods"].([]any)
+	// Verify steps[] array exists and has 3 entries
+	steps, ok := result["steps"].([]any)
 	if !ok {
-		t.Fatalf("expected mods array in payload, got %T", result["mods"])
+		t.Fatalf("expected steps array in payload, got %T", result["steps"])
 	}
-	if len(mods) != 3 {
-		t.Fatalf("expected 3 mods in array, got %d", len(mods))
+	if len(steps) != 3 {
+		t.Fatalf("expected 3 steps in array, got %d", len(steps))
 	}
 
 	// Verify first mod step
-	mod0, ok := mods[0].(map[string]any)
+	mod0, ok := steps[0].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[0] to be map, got %T", mods[0])
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
 	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/mod-step1:latest" {
-		t.Errorf("expected mods[0].image=docker.io/test/mod-step1:latest, got %v", mod0["image"])
+		t.Errorf("expected steps[0].image=docker.io/test/mod-step1:latest, got %v", mod0["image"])
 	}
 	env0, ok := mod0["env"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[0].env to be map, got %T", mod0["env"])
+		t.Fatalf("expected steps[0].env to be map, got %T", mod0["env"])
 	}
 	if step, ok := env0["STEP"].(string); !ok || step != "1" {
-		t.Errorf("expected mods[0].env.STEP=1, got %v", env0["STEP"])
+		t.Errorf("expected steps[0].env.STEP=1, got %v", env0["STEP"])
 	}
 
 	// Verify second mod step
-	mod1, ok := mods[1].(map[string]any)
+	mod1, ok := steps[1].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[1] to be map, got %T", mods[1])
+		t.Fatalf("expected steps[1] to be map, got %T", steps[1])
 	}
 	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/mod-step2:latest" {
-		t.Errorf("expected mods[1].image=docker.io/test/mod-step2:latest, got %v", mod1["image"])
+		t.Errorf("expected steps[1].image=docker.io/test/mod-step2:latest, got %v", mod1["image"])
 	}
 
 	// Verify third mod step
-	mod2, ok := mods[2].(map[string]any)
+	mod2, ok := steps[2].(map[string]any)
 	if !ok {
-		t.Fatalf("expected mods[2] to be map, got %T", mods[2])
+		t.Fatalf("expected steps[2] to be map, got %T", steps[2])
 	}
 	if img, ok := mod2["image"].(string); !ok || img != "docker.io/test/mod-step3:latest" {
-		t.Errorf("expected mods[2].image=docker.io/test/mod-step3:latest, got %v", mod2["image"])
+		t.Errorf("expected steps[2].image=docker.io/test/mod-step3:latest, got %v", mod2["image"])
 	}
 
-	// Verify global build_gate and build_gate_healing are preserved
-	if _, ok := result["build_gate"].(map[string]any); !ok {
+	// Verify global build_gate and build_gate.healing are preserved
+	buildGate, ok := result["build_gate"].(map[string]any)
+	if !ok {
 		t.Errorf("expected build_gate in payload")
 	}
-	if _, ok := result["build_gate_healing"].(map[string]any); !ok {
-		t.Errorf("expected build_gate_healing in payload")
+	if _, ok := buildGate["healing"].(map[string]any); !ok {
+		t.Errorf("expected build_gate.healing in payload")
 	}
 }
 
@@ -445,7 +505,7 @@ func TestBuildSpecPayloadMultiStepModsWithEnvFromFile(t *testing.T) {
 	// Create spec with mods[] using env_from_file
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	specContent := fmt.Sprintf(`
-mods:
+steps:
   - image: docker.io/test/mod1:latest
     env_from_file:
       TOKEN: %s
@@ -467,30 +527,30 @@ mods:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify env_from_file was resolved for both mods
-	mods, ok := result["mods"].([]any)
-	if !ok || len(mods) != 2 {
-		t.Fatalf("expected 2 mods in array, got %v", result["mods"])
+	// Verify env_from_file was resolved for both steps
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 2 {
+		t.Fatalf("expected 2 steps in array, got %v", result["steps"])
 	}
 
-	mod0 := mods[0].(map[string]any)
+	mod0 := steps[0].(map[string]any)
 	env0 := mod0["env"].(map[string]any)
 	if token, ok := env0["TOKEN"].(string); !ok || token != "secret-token-1" {
-		t.Errorf("expected mods[0].env.TOKEN=secret-token-1, got %v", env0["TOKEN"])
+		t.Errorf("expected steps[0].env.TOKEN=secret-token-1, got %v", env0["TOKEN"])
 	}
 
-	mod1 := mods[1].(map[string]any)
+	mod1 := steps[1].(map[string]any)
 	env1 := mod1["env"].(map[string]any)
 	if token, ok := env1["TOKEN"].(string); !ok || token != "secret-token-2" {
-		t.Errorf("expected mods[1].env.TOKEN=secret-token-2, got %v", env1["TOKEN"])
+		t.Errorf("expected steps[1].env.TOKEN=secret-token-2, got %v", env1["TOKEN"])
 	}
 
 	// Verify env_from_file was removed after resolution (clean spec)
 	if _, exists := mod0["env_from_file"]; exists {
-		t.Errorf("expected env_from_file to be removed from mods[0]")
+		t.Errorf("expected env_from_file to be removed from steps[0]")
 	}
 	if _, exists := mod1["env_from_file"]; exists {
-		t.Errorf("expected env_from_file to be removed from mods[1]")
+		t.Errorf("expected env_from_file to be removed from steps[1]")
 	}
 }
 
@@ -504,7 +564,8 @@ func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "single.yaml")
 	specContent := `
-image: docker.io/test/base:v1
+steps:
+  - image: docker.io/test/base:v1
 env:
   BASE_KEY: base_value
 `
@@ -533,15 +594,23 @@ env:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify CLI overrides are applied at top-level (canonical single-step format).
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0] in payload, got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+
 	// Image override applied.
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/override:v2" {
-		t.Errorf("expected image=docker.io/test/override:v2, got %v", result["image"])
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/override:v2" {
+		t.Errorf("expected steps[0].image=docker.io/test/override:v2, got %v", step0["image"])
 	}
 
 	// Retain override applied.
-	if retain, ok := result["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
+	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected steps[0].retain_container=true, got %v", step0["retain_container"])
 	}
 
 	// Env merged (CLI + spec).
@@ -556,9 +625,8 @@ env:
 		t.Errorf("expected env.CLI_KEY=cli_value, got %v", env["CLI_KEY"])
 	}
 
-	// Verify mods[] is NOT present (single-step format).
 	if _, exists := result["mods"]; exists {
-		t.Errorf("expected mods[] to be absent in single-step format")
+		t.Errorf("expected legacy mods[] to be absent")
 	}
 }
 
@@ -573,7 +641,7 @@ func TestBuildSpecPayload_MultiStepIgnoresCLIOverrides(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "multi.yaml")
 	specContent := `
-mods:
+steps:
   - image: docker.io/test/step1:v1
     env:
       STEP: "1"
@@ -606,56 +674,50 @@ mods:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	// Verify mods[] is present and unchanged.
-	mods, ok := result["mods"].([]any)
+	// Verify steps[] is present and unchanged.
+	steps, ok := result["steps"].([]any)
 	if !ok {
-		t.Fatalf("expected mods[] array in payload")
+		t.Fatalf("expected steps[] array in payload")
 	}
-	if len(mods) != 2 {
-		t.Fatalf("expected 2 mods in array, got %d", len(mods))
+	if len(steps) != 2 {
+		t.Fatalf("expected 2 steps in array, got %d", len(steps))
 	}
 
-	// Verify first mod is unchanged (CLI overrides not applied).
-	mod0 := mods[0].(map[string]any)
+	// Verify first step is unchanged (CLI overrides not applied).
+	mod0 := steps[0].(map[string]any)
 	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/step1:v1" {
-		t.Errorf("expected mods[0].image=docker.io/test/step1:v1, got %v", mod0["image"])
+		t.Errorf("expected steps[0].image=docker.io/test/step1:v1, got %v", mod0["image"])
 	}
 	if env0, ok := mod0["env"].(map[string]any); ok {
 		// Only STEP should be present (not CLI_KEY).
 		if len(env0) != 1 {
-			t.Errorf("expected mods[0].env to have 1 key, got %d: %v", len(env0), env0)
+			t.Errorf("expected steps[0].env to have 1 key, got %d: %v", len(env0), env0)
 		}
 		if step, ok := env0["STEP"].(string); !ok || step != "1" {
-			t.Errorf("expected mods[0].env.STEP=1, got %v", env0["STEP"])
+			t.Errorf("expected steps[0].env.STEP=1, got %v", env0["STEP"])
 		}
 	}
 
-	// Verify second mod is unchanged.
-	mod1 := mods[1].(map[string]any)
+	// Verify second step is unchanged.
+	mod1 := steps[1].(map[string]any)
 	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/step2:v1" {
-		t.Errorf("expected mods[1].image=docker.io/test/step2:v1, got %v", mod1["image"])
+		t.Errorf("expected steps[1].image=docker.io/test/step2:v1, got %v", mod1["image"])
 	}
 
-	// NOTE: buildSpecPayload currently applies CLI overrides to top-level fields even
-	// when mods[] is present. This is the current behavior: top-level env/image exist
-	// but are IGNORED by nodeagent when mods[] array is present in the spec.
-	// The nodeagent only uses mods[] entries for multi-step runs (see parseSpec and
-	// parseRunOptions which prioritize mods[] over top-level fields).
-	//
-	// This behavior is benign because:
-	// 1. CLI users should use spec files for multi-step mods[] (not CLI flags).
-	// 2. Nodeagent checks for mods[] presence and uses Steps instead of Execution.
-	// 3. Top-level fields are preserved for backward compatibility with single-mod specs.
-	//
-	// Verify that top-level overrides exist (current behavior, benign for multi-step).
+	// Verify top-level env override exists (applies to all steps).
 	if topEnv, ok := result["env"].(map[string]any); ok {
-		// Top-level env created by CLI override (ignored by nodeagent when mods[] present).
 		if cli, ok := topEnv["CLI_KEY"].(string); !ok || cli != "cli_value" {
-			t.Logf("top-level env.CLI_KEY=%v (benign, ignored when mods[] present)", topEnv["CLI_KEY"])
+			t.Errorf("expected env.CLI_KEY=cli_value, got %v", topEnv["CLI_KEY"])
 		}
+	} else {
+		t.Fatalf("expected env in payload")
 	}
-	if topImg, exists := result["image"]; exists {
-		// Top-level image created by CLI override (ignored by nodeagent when mods[] present).
-		t.Logf("top-level image=%v (benign, ignored when mods[] present)", topImg)
+
+	// Image/retain overrides are ignored for multi-step specs.
+	if _, exists := result["image"]; exists {
+		t.Errorf("expected top-level image to be absent")
+	}
+	if _, exists := result["retain_container"]; exists {
+		t.Errorf("expected top-level retain_container to be absent")
 	}
 }

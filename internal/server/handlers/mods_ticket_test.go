@@ -44,7 +44,11 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 		"repo_url":   "https://github.com/user/repo.git",
 		"base_ref":   "main",
 		"target_ref": "feature",
-		"spec":       map[string]any{},
+		"spec": map[string]any{
+			"steps": []any{
+				map[string]any{"image": "img1:latest"},
+			},
+		},
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
@@ -109,8 +113,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 
 	st := &mockStore{}
 
-	// Single mod spec (empty mods array uses single-mod path).
-	spec := []byte(`{}`)
+	spec := []byte(`{"steps":[{"image":"mod1:v1"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
 	if err != nil {
@@ -173,9 +176,9 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 
 	st := &mockStore{}
 
-	// Multi-step spec with 3 mods.
+	// Multi-step spec with 3 steps.
 	spec := []byte(`{
-		"mods": [
+		"steps": [
 			{"image": "mod1:v1"},
 			{"image": "mod2:v2"},
 			{"image": "mod3:v3"}
@@ -247,17 +250,17 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 	}{
 		{
 			name:         "single_mod",
-			spec:         []byte(`{}`),
+			spec:         []byte(`{"steps":[{"image":"a"}]}`),
 			expectedJobs: 3,
 		},
 		{
 			name:         "two_mods",
-			spec:         []byte(`{"mods":[{"image":"a"},{"image":"b"}]}`),
+			spec:         []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`),
 			expectedJobs: 4,
 		},
 		{
 			name:         "five_mods",
-			spec:         []byte(`{"mods":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`),
+			spec:         []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`),
 			expectedJobs: 7,
 		},
 	}
@@ -313,7 +316,7 @@ func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
 	)
 
 	st := &mockStore{}
-	spec := []byte(`{}`)
+	spec := []byte(`{"steps":[{"image":"a"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
 	if err != nil {
@@ -341,7 +344,7 @@ func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
-	spec := []byte(`{"mods":[{"image":"a"},{"image":"b"}]}`)
+	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, "run_123", "repo_456", "main", 1, spec)
 	if err != nil {
@@ -540,7 +543,7 @@ func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 		"base_ref":   "main",
 		"target_ref": "feature",
 		"spec": map[string]any{
-			"mods": []any{
+			"steps": []any{
 				map[string]any{"image": "img1:latest"},
 				map[string]any{"image": "img2:latest"},
 			},

@@ -183,7 +183,7 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		createModRepoResult: store.ModRepo{
 			ID:        repoID,
 			ModID:     "mod_1",
