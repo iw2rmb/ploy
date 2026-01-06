@@ -40,7 +40,7 @@ type LogStreamer struct {
 	httpClient *http.Client
 }
 
-// NewLogStreamer creates a new log streamer for a specific run.
+// NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
 // By default, uses NoOpLogHook (no PII scrubbing).
 func NewLogStreamer(cfg Config, runID string, jobID string) *LogStreamer {
 	ls := &LogStreamer{

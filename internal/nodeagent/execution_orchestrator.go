@@ -554,7 +554,7 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 //   - ctx: context for initialization operations
 //   - runID: run identifier for logging and telemetry
 //   - jobID: job identifier for associating log chunks with specific jobs; pass empty string
-//     for gate jobs or when job attribution is not required
+//     only when job attribution is not available
 func (r *runController) initializeRuntime(ctx context.Context, runID string, jobID string) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
 	// Initialize git fetcher without snapshot publishing (node agent operates on ephemeral workspaces).
 	gitFetcher, err := r.createGitFetcher()
