@@ -26,12 +26,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleModPull implements `ploy mod pull [--origin <remote>] [--dry-run] [--last-failed] [<mod-id|name>]`.
@@ -102,21 +102,18 @@ func handleModPull(args []string, stderr io.Writer) error {
 
 	// Step 1: Verify we are inside a git worktree.
 	if err := ensureInsideGitWorktree(ctx); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	// Step 2: Verify the working tree is clean.
 	if err := ensureCleanWorkingTree(ctx); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	// Step 3: Resolve the git remote URL for the specified origin.
 	rawOriginURL, err := resolveGitRemoteURL(ctx, *origin)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	_, _ = fmt.Fprintf(stderr, "mod pull: resolved origin %q → %s\n", *origin, rawOriginURL)
@@ -177,16 +174,14 @@ func handleModPull(args []string, stderr io.Writer) error {
 
 	// Step 8: Fetch the base ref from the origin remote.
 	if err := fetchRef(ctx, *origin, baseRef, stderr, *dryRun); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	baseCommit := ""
 	if !*dryRun {
 		commit, err := resolveFetchHeadSHA(ctx)
 		if err != nil {
-			errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-			return fmt.Errorf("mod pull: %s", errMsg)
+			return fmt.Errorf("mod pull: %w", err)
 		}
 		baseCommit = commit
 		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
@@ -194,16 +189,13 @@ func handleModPull(args []string, stderr io.Writer) error {
 
 	// Step 9: Check for branch collisions.
 	if err := checkBranchCollision(ctx, *origin, targetRef, stderr); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	// Step 10: Fetch diffs for this repo execution.
-	normalizedOriginURL := vcs.NormalizeRepoURL(rawOriginURL)
-	diffs, err := fetchRunRepoDiffs(ctx, domaintypes.RunID(resolution.RunID), normalizedOriginURL)
+	diffs, err := listRunRepoDiffs(ctx, httpClient, base, domaintypes.RunID(resolution.RunID), resolution.RepoID)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: list diffs: %w", err)
 	}
 	_, _ = fmt.Fprintf(stderr, "  diffs to apply: %d\n", len(diffs))
 
@@ -220,22 +212,19 @@ func handleModPull(args []string, stderr io.Writer) error {
 
 	// Step 12: Create the target branch at the fetched base commit.
 	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	// Step 13: Download and apply all diffs.
 	appliedCount, err := downloadAndApplyDiffs(ctx, diffs, stderr)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("mod pull: %s", errMsg)
+		return fmt.Errorf("mod pull: %w", err)
 	}
 
 	// Success message.
 	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, resolution.RunID, targetRef, *origin)
 	_, _ = fmt.Fprintf(stderr, "  mod: %s\n", modID)
-	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
 
 	return nil
 }
@@ -247,15 +236,12 @@ func handleModPull(args []string, stderr io.Writer) error {
 //   - If exactly one non-archived mod matches: return that mod's ID.
 //   - If multiple mods match: return error with list of matching mods.
 //   - If no mods match: return error.
-func inferModFromRepo(ctx context.Context, httpClient *http.Client, base interface{}, repoURL string, stderr io.Writer) (string, error) {
-	// Get base URL.
-	baseURLTyped, _, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return "", err
+func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url.URL, repoURL string, stderr io.Writer) (string, error) {
+	if baseURL == nil {
+		return "", errors.New("base url required")
 	}
 
-	// Build endpoint: GET /v1/mods?repo_url=<url>&archived=false
-	endpoint := baseURLTyped.JoinPath("/v1/mods")
+	endpoint := baseURL.JoinPath("/v1/mods")
 	q := endpoint.Query()
 	q.Set("repo_url", repoURL)
 	q.Set("archived", "false")

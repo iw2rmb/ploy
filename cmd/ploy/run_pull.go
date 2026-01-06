@@ -30,12 +30,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleRunPull implements `ploy run pull [--origin <remote>] [--dry-run] <run-id>`.
@@ -92,26 +92,22 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	defer cancel()
 
 	// Step 1: Verify we are inside a git worktree.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	if err := ensureInsideGitWorktree(ctx); err != nil {
-		// Reformat error to use "run pull" prefix.
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Step 2: Verify the working tree is clean.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	if err := ensureCleanWorkingTree(ctx); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Step 3: Resolve the git remote URL for the specified origin.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	rawOriginURL, err := resolveGitRemoteURL(ctx, *origin)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Log progress for user visibility.
@@ -159,37 +155,31 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 6: Fetch the base ref from the origin remote.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	if err := fetchRef(ctx, *origin, baseRef, stderr, *dryRun); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	baseCommit := ""
 	if !*dryRun {
 		commit, err := resolveFetchHeadSHA(ctx)
 		if err != nil {
-			errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-			return fmt.Errorf("run pull: %s", errMsg)
+			return fmt.Errorf("run pull: %w", err)
 		}
 		baseCommit = commit
 		_, _ = fmt.Fprintf(stderr, "  base commit: %s\n", baseCommit)
 	}
 
 	// Step 7: Check for branch collisions.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	if err := checkBranchCollision(ctx, *origin, targetRef, stderr); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Step 8: Fetch diffs for this repo execution.
-	// Uses the normalized repo URL for the diffs endpoint.
-	normalizedOriginURL := vcs.NormalizeRepoURL(rawOriginURL)
-	diffs, err := fetchRunRepoDiffs(ctx, domaintypes.RunID(runID), normalizedOriginURL)
+	diffs, err := listRunRepoDiffs(ctx, httpClient, base, domaintypes.RunID(runID), resolution.RepoID)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: list diffs: %w", err)
 	}
 	_, _ = fmt.Fprintf(stderr, "  diffs to apply: %d\n", len(diffs))
 
@@ -205,24 +195,21 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 10: Create the target branch at the fetched base commit.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	if err := createAndCheckoutBranch(ctx, targetRef, baseCommit, stderr); err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Step 11: Download and apply all diffs.
-	// Uses shared helper from mod_run_pull.go.
+	// Uses shared helper from pull_helpers.go.
 	appliedCount, err := downloadAndApplyDiffs(ctx, diffs, stderr)
 	if err != nil {
-		errMsg := strings.TrimPrefix(err.Error(), "mod run pull: ")
-		return fmt.Errorf("run pull: %s", errMsg)
+		return fmt.Errorf("run pull: %w", err)
 	}
 
 	// Success message.
 	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, runID, targetRef, *origin)
-	_, _ = fmt.Fprintf(stderr, "  normalized origin URL: %s\n", normalizedOriginURL)
 
 	return nil
 }
@@ -238,20 +225,12 @@ type runRepoDetails struct {
 
 // fetchRunRepoDetails fetches the repo details for a run/repo pair.
 // Queries GET /v1/runs/{run_id}/repos and filters by repo_id.
-func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, base interface{}, runID string, repoID string) (*runRepoDetails, error) {
-	// Type assert base to *url.URL
-	baseURL, ok := base.(*interface{})
-	_ = baseURL
-	_ = ok
-
-	// Get control plane connection (we already have it, but need the URL type).
-	baseURLTyped, _, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return nil, err
+func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID string, repoID string) (*runRepoDetails, error) {
+	if baseURL == nil {
+		return nil, errors.New("base url required")
 	}
 
-	// Build endpoint: GET /v1/runs/{run_id}/repos
-	endpoint := baseURLTyped.JoinPath("/v1/runs", runID, "repos")
+	endpoint := baseURL.JoinPath("/v1/runs", runID, "repos")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {

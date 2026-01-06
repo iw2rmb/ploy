@@ -177,32 +177,41 @@ ploy mod run repo remove \
 | `mod run repo add`       | Attach a repository to an existing batch      |
 | `mod run repo remove`    | Detach a repository from a batch              |
 | `mod run repo restart`   | Re-queue a repo job with optional new branch  |
-| `mod run pull`           | Pull Mods diffs into the current git worktree |
+| `run pull <run-id>`      | Pull diffs for the current repo from a run    |
+| `mod pull [<mod>]`       | Pull diffs for the current repo from a mod    |
 | `run logs <batch>`       | Stream logs/events for all repos in a batch   |
 
 See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
 ### Pull Mods Changes Locally
 
-After a batch run completes, you can pull the Mods-generated changes into your local
-repository using `mod run pull`. This command reconstructs the Mods branch locally by
-fetching stored diffs from the control plane and applying them to a new branch.
+After a run completes, you can pull the Mods-generated changes into your local
+repository using either `ploy run pull <run-id>` (run-based) or `ploy mod pull` (mod-based).
+These commands reconstruct the Mods branch locally by fetching stored diffs from the
+control plane and applying them to a new branch.
 
-	```bash
-	# From a repo that participated in a Mods batch:
-	cd service-a
-	ploy mod run pull 2xK9mNpL2pY6jYk3kQwY6a7HkKk
-	```
+```bash
+# From a repo that participated in a Mods run:
+cd service-a
+
+# Run-based pull (you know the run_id):
+ploy run pull <run-id>
+
+# Mod-based pull (default: last succeeded):
+ploy mod pull <mod-id|name>
+```
 
 **How it works:**
-1. Resolves `<run-id>` against the current git remote (default: `origin`).
+1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
-4. Creates a new branch at the fetched commit using the run's `target_ref`.
-5. Downloads and applies all stored Mods diffs via `git apply`.
+3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/mods/{mod_id}/pull` for mod-based pull).
+4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
+5. Creates a new branch at the fetched commit using the run's `target_ref`.
+6. Downloads and applies all stored Mods diffs via `git apply`.
 
 **Arguments:**
-- `<run-id>` — Run ID (KSUID string).
+- `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
+- `[<mod-id|name>]` — Mod ID or name (optional), for `ploy mod pull`.
 
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
@@ -212,16 +221,22 @@ fetching stored diffs from the control plane and applying them to a new branch.
 
 **Examples:**
 
-	```bash
-	# Pull changes from a run ID.
-	ploy mod run pull 2xK9mNpL2pY6jYk3kQwY6a7HkKk
-	
-	# Preview what would be pulled without making changes.
-	ploy mod run pull --dry-run 2xK9mNpL2pY6jYk3kQwY6a7HkKk
-	
-	# Pull from a run using a specific remote.
-	ploy mod run pull --origin upstream 2xK9mNpL2pY6jYk3kQwY6a7HkKk
-	```
+```bash
+# Pull changes from a run ID.
+ploy run pull <run-id>
+
+# Preview what would be pulled without making changes.
+ploy run pull --dry-run <run-id>
+
+# Pull from a run using a specific remote.
+ploy run pull --origin upstream <run-id>
+
+# Pull changes from the latest successful run for a mod.
+ploy mod pull <mod-id|name>
+
+# Pull changes from the latest failed run for a mod.
+ploy mod pull --last-failed <mod-id|name>
+```
 
 **Requirements:**
 - Must be run inside a git repository.

@@ -1,6 +1,6 @@
-// status.go provides CLI client implementations for fetching diffs.
+// status.go provides CLI client implementations for fetching diffs and patches.
 //
-// This file implements helpers used by `ploy mod run pull`:
+// This file implements helpers used by `ploy run pull` and `ploy mod pull`:
 //   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
 //   - DownloadDiffCommand: Downloads a single diff via GET /v1/diffs/{diff_id}?download=true.
 package mods

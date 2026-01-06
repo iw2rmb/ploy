@@ -604,31 +604,34 @@ repo attempt. It does not create per-repo child runs.
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
 | `jobs`      | Execution units (pre-gate, mod, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
-### Pulling Diffs Locally (`mod run pull`)
+### Pulling Diffs Locally (`run pull` / `mod pull`)
 
-The `ploy mod run pull` command enables developers to reconstruct Mods-generated changes
-in their local git repository. This is useful for reviewing, testing, or continuing work
-on changes produced by a batch run without relying on MR-based workflows.
+The `ploy run pull <run-id>` and `ploy mod pull` commands enable developers to reconstruct
+Mods-generated changes in their local git repository. This is useful for reviewing,
+testing, or continuing work on changes produced by a run without relying on MR-based
+workflows.
 
 **High-level sequence:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        mod run pull Workflow                                │
+│                        pull Workflow (v1)                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  1. Resolve repo + run                                                      │
+│  1. Resolve repo context                                                    │
 │     ├─ Get origin URL from `git remote get-url <origin>`                    │
-│     ├─ Call GET /v1/repos?contains=... to resolve repo_id                    │
-│     ├─ Call GET /v1/repos/{repo_id}/runs to list runs for this repo          │
-│     └─ Match <run-id> to find RepoRunSummary                                │
+│     ├─ (run pull) Call POST /v1/runs/{run_id}/pull with repo_url             │
+│     └─ (mod pull) Optionally infer mod via GET /v1/mods?repo_url=...         │
+│               then call POST /v1/mods/{mod_id}/pull with repo_url + mode     │
 │                                                                             │
 │  2. Fetch base snapshot                                                      │
-│     ├─ Use RepoRunSummary.base_ref + target_ref                              │
+│     ├─ Call GET /v1/runs/{run_id}/repos and find repo_id                     │
+│     ├─ Use run_repos.base_ref snapshot                                       │
 │     └─ git fetch <origin> <base_ref> --depth=1                               │
 │                                                                             │
 │  3. Create branch                                                            │
-│     ├─ Check no local/remote collision for target_ref                        │
+│     ├─ Use repo_target_ref (branch name snapshot)                            │
+│     ├─ Check no local/remote collision for repo_target_ref                   │
 │     ├─ git branch <target_ref> FETCH_HEAD                                    │
 │     └─ git checkout <target_ref>                                             │
 │                                                                             │
@@ -649,43 +652,49 @@ on changes produced by a batch run without relying on MR-based workflows.
 - **Clean working tree**: No staged or unstaged changes allowed (prevents data loss
   and ensures deterministic patch application).
 - **Resolvable remote**: The specified `--origin` remote must exist and have a URL
-  that matches the `repo_url` stored in `run_repos`.
+  that matches the `repo_url` stored in `mod_repos` / `run_repos` per `roadmap/v1/scope.md`
+  (“Repo URL rules (v1)”).
 
 **Key fields used:**
 
-| Field                     | Source                          | Purpose                                   |
-|---------------------------|---------------------------------|-------------------------------------------|
-| `mod_repos.repo_url`      | API / `GET /v1/repos`           | Match against local origin URL            |
-| `mod_repos.id`            | API / `GET /v1/repos`           | `repo_id` for repo-scoped endpoints       |
-| `run_repos.repo_base_ref` | API / `GET /v1/repos/{repo_id}/runs` | Base ref snapshot for branch base    |
-| `run_repos.repo_target_ref` | API / `GET /v1/repos/{repo_id}/runs` | Target branch name snapshot          |
+| Field                       | Source                          | Purpose                                   |
+|----------------------------|---------------------------------|-------------------------------------------|
+| `repo_id`                  | API / `POST /v1/*/pull`         | Identify the repo within the run          |
+| `repo_target_ref`          | API / `POST /v1/*/pull`         | Target branch name snapshot               |
+| `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Base ref snapshot for branch base     |
 | `diffs.summary.step_index` | diffs summary JSON              | Optional step index metadata for display  |
 
 **API endpoints consumed:**
 
-- `GET /v1/repos` — List repos (used to resolve `repo_url` → `repo_id`).
-- `GET /v1/repos/{repo_id}/runs` — List runs for the repository (`repo_id` is `mod_repos.id`).
+- `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` + `repo_target_ref` for the current repo within the run.
+- `POST /v1/mods/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
+- `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
 - `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
 
 **Normalization:**
 
-The CLI normalizes the local origin URL by stripping trailing slashes and `.git` suffixes
-for comparison purposes. However, the raw URL is used for API calls to ensure exact
-matching against stored `run_repos.repo_url` values.
+Repo URL matching follows `roadmap/v1/scope.md` (“Repo URL rules (v1)”). The CLI derives
+`repo_url` from the git remote URL; the server performs normalized matching to select the
+correct `run_repos` entry.
 
 **Example usage:**
 
 ```bash
-# After a batch run completes:
+# After a run completes:
 cd /path/to/service-a
-ploy mod run pull java17-fleet
+
+# Run-based pull:
+ploy run pull <run-id>
+
+# Mod-based pull:
+ploy mod pull <mod-id|name>
 
 # Preview without making changes:
-ploy mod run pull --dry-run java17-fleet
+ploy run pull --dry-run <run-id>
 
 # Use a different remote:
-ploy mod run pull --origin upstream java17-fleet
+ploy run pull --origin upstream <run-id>
 ```
 
 See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.

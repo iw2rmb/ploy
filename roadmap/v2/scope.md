@@ -8,7 +8,7 @@ Change entry: allow repo selectors by URL (human input), not internal ids.
 
 - Current (HEAD): repo scoping uses `repo_id` (`mod_repos.id`) in `/v1/runs/{run_id}/repos/{repo_id}/...` and in CLI flags (see `roadmap/v1/cli.md`).
 - Proposed (v2): allow repo selection by repo URL identity (`domain/owner/repo` or equivalent normalized form) for both API and CLI.
-- Where: route parsing and lookup logic in `internal/server/handlers/*` for `/v1/runs/{run_id}/repos/{repo_selector}/...`, plus CLI flag parsing/normalization under `cmd/ploy/*` (use v0 normalization patterns from `cmd/ploy/mod_run_pull.go`).
+- Where: route parsing and lookup logic in `internal/server/handlers/*` for `/v1/runs/{run_id}/repos/{repo_selector}/...`, plus CLI flag parsing/normalization under `cmd/ploy/*` (see existing repo URL normalization patterns in `internal/vcs` and CLI pull helpers in `cmd/ploy/pull_helpers.go`).
 - Compatibility: breaking if `repo_id` addressing is removed; additive if both selectors are accepted.
 - Unchanged: underlying storage still keys repos by `mod_repos.id`; URL selectors only change how callers identify the repo.
 

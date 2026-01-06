@@ -72,7 +72,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	// Build endpoint: POST /v1/runs/{run_id}/pull
-	endpoint := c.BaseURL.JoinPath("/v1/runs", url.PathEscape(runID), "pull")
+	endpoint := c.BaseURL.JoinPath("/v1/runs", runID, "pull")
 
 	// Build request body: {"repo_url": "..."}
 	reqBody := struct {
@@ -169,7 +169,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	// Build endpoint: POST /v1/mods/{mod_id}/pull
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(modID), "pull")
+	endpoint := c.BaseURL.JoinPath("/v1/mods", modID, "pull")
 
 	// Build request body: {"repo_url": "...", "mode": "..."}
 	reqBody := struct {
