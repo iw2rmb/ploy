@@ -261,7 +261,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// When build_gate_healing is configured, hydrate the healing manifest from the
 	// typed HealingConfig so that discrete healing jobs use the correct image/env.
-	if typedOpts.Healing != nil {
+	if typedOpts.Healing != nil && !typedOpts.Healing.Mod.Image.IsEmpty() {
 		healMod := typedOpts.Healing.Mod
 		manifest, err = buildHealingManifest(req, healMod, 0, "", stack)
 	}
