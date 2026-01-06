@@ -380,3 +380,56 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		t.Error("Mod retain_container: got false, want true")
 	}
 }
+
+// TestParseSpec_ProducesTypedOptions_SingleStepExecArray is a regression test
+// for the bug where single-step specs with exec-array commands (e.g., ["a","b"])
+// would drop into empty command because modsSpecToOptions returns []any but
+// parseRunOptions only checked for []string.
+//
+// This test verifies that TypedOptions.Execution.Command.Exec is populated
+// correctly for single-step specs with exec-array commands.
+func TestParseSpec_ProducesTypedOptions_SingleStepExecArray(t *testing.T) {
+	t.Parallel()
+
+	// Single-step spec with exec-array command (not shell string).
+	// This is the canonical format that was previously broken.
+	specJSON := `{
+		"steps": [{
+			"image": "docker.io/test/mod:latest",
+			"command": ["echo", "hello", "world"]
+		}]
+	}`
+
+	var raw json.RawMessage = []byte(specJSON)
+	_, _, typedOpts := parseSpec(raw)
+
+	// Verify that Execution.Command.Exec is populated (regression test).
+	// Before the fix, this would be empty because []any != []string.
+	wantExec := []string{"echo", "hello", "world"}
+	if len(typedOpts.Execution.Command.Exec) != len(wantExec) {
+		t.Fatalf("Execution.Command.Exec: got length %d, want %d (values: %v)",
+			len(typedOpts.Execution.Command.Exec), len(wantExec), typedOpts.Execution.Command.Exec)
+	}
+	for i, want := range wantExec {
+		if typedOpts.Execution.Command.Exec[i] != want {
+			t.Errorf("Execution.Command.Exec[%d]: got %q, want %q",
+				i, typedOpts.Execution.Command.Exec[i], want)
+		}
+	}
+
+	// Verify Shell is empty (exec-array takes precedence).
+	if typedOpts.Execution.Command.Shell != "" {
+		t.Errorf("Execution.Command.Shell: got %q, want empty", typedOpts.Execution.Command.Shell)
+	}
+
+	// Verify ToSlice returns the exec array directly (not wrapped in shell).
+	slice := typedOpts.Execution.Command.ToSlice()
+	if len(slice) != len(wantExec) {
+		t.Fatalf("ToSlice(): got length %d, want %d", len(slice), len(wantExec))
+	}
+	for i, want := range wantExec {
+		if slice[i] != want {
+			t.Errorf("ToSlice()[%d]: got %q, want %q", i, slice[i], want)
+		}
+	}
+}
