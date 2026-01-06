@@ -32,3 +32,5 @@ Notes
 
 - Ploy is transport‑only: image, command, and env are provided by the operator and passed through unchanged. Avoid relying on hidden defaults.
 - If you also want Ploy to bundle files under `/workspace`, coordinate with ops to supply `artifact_paths` in the run spec. `/out` is always bundled automatically.
+  - `artifact_paths` must be workspace-relative (no absolute paths like `/etc/passwd`).
+  - Path traversal that escapes `/workspace` (e.g. `../../etc/passwd`) is rejected and skipped.
