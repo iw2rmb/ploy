@@ -247,6 +247,8 @@ check_codex_healing_discipline() {
     local failed=0
     local repo_root
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    local nodeagent_dir="$repo_root/internal/nodeagent"
+    local healing_test_glob="$nodeagent_dir/*healing*_test.go"
 
     # 1. Verify unit tests exist for mod-codex.sh
     local mod_codex_tests="$repo_root/tests/unit/mod_codex_sh_test.sh"
@@ -258,33 +260,33 @@ check_codex_healing_discipline() {
     fi
 
     # 2. Verify Go tests for healing retry and session propagation exist.
-    local healing_tests="$repo_root/internal/nodeagent/execution_healing_retry_test.go"
-    if [[ -f "$healing_tests" ]]; then
+    # These tests may live across multiple files (gate/execute/retry), so scan all healing test files.
+    if [[ -d "$nodeagent_dir" ]]; then
         # Check for session propagation test coverage.
-        if grep -q "TestExecuteWithHealing_CodexSessionPropagation" "$healing_tests"; then
+        if grep -q "TestExecuteWithHealing_SessionPropagation" $healing_test_glob 2>/dev/null; then
             log_info "✓ Codex session propagation test exists"
         else
-            log_warn "✗ TestExecuteWithHealing_CodexSessionPropagation not found"
+            log_warn "✗ TestExecuteWithHealing_SessionPropagation not found"
             failed=1
         fi
 
         # Check for workspace diff handshake test coverage (no-diff → no re-gate).
-        if grep -q "TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails" "$healing_tests"; then
+        if grep -q "TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails" $healing_test_glob 2>/dev/null; then
             log_info "✓ Workspace diff handshake test coverage present"
         else
             log_warn "✗ Workspace diff handshake test coverage missing"
             failed=1
         fi
 
-        # Check for non-Codex healer isolation test.
-        if grep -q "TestExecuteWithHealing_NonCodexHealerNoResume" "$healing_tests"; then
-            log_info "✓ Non-Codex healer isolation test exists"
+        # Check for non-session-aware healer isolation test.
+        if grep -q "TestExecuteWithHealing_NonSessionAwareHealerNoResume" $healing_test_glob 2>/dev/null; then
+            log_info "✓ Non-session-aware healer isolation test exists"
         else
-            log_warn "✗ TestExecuteWithHealing_NonCodexHealerNoResume not found"
+            log_warn "✗ TestExecuteWithHealing_NonSessionAwareHealerNoResume not found"
             failed=1
         fi
     else
-        log_warn "✗ Healing retry tests not found at $healing_tests"
+        log_warn "✗ Nodeagent directory not found at $nodeagent_dir"
         failed=1
     fi
 
