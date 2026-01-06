@@ -4,8 +4,8 @@
 
 Change entry: move single-repo submission from `ploy mod run` to `ploy run`.
 
-- Current (HEAD): single-repo run submission uses `ploy mod run ...` and calls `POST /v1/mods` (see `internal/server/handlers/register.go`, and CLI docs in `docs/mods-lifecycle.md`).
-- Proposed (v1): `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` calls `POST /v1/runs` (see `roadmap/v1/api.md`).
+- Current (HEAD): single-repo run submission uses `ploy mod run ...` and calls `POST /v1/runs` (see `internal/server/handlers/register.go`, and CLI docs in `docs/mods-lifecycle.md`).
+- Current (HEAD): `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` calls `POST /v1/runs` (see `roadmap/v1/api.md`).
 - Where: CLI routing under `cmd/ploy/*` and HTTP client under `internal/cli/*`.
 - Compatibility: breaking CLI/API surface; no backward compatibility required.
 - Unchanged: existing run lifecycle surfaces under `ploy run ...` (list/status/cancel/logs) remain, with repo scoping added for multi-repo runs.
