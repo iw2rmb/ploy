@@ -50,6 +50,10 @@ func handleRun(args []string, stderr io.Writer) error {
 		return handleRunLogs(args[1:], stderr)
 	case "diff":
 		return handleRunDiff(args[1:], stderr)
+	case "pull":
+		// v1 pull command: replaces `ploy mod run pull` for run-based workflows.
+		// Per roadmap/v1/cli.md:123-139.
+		return handleRunPull(args[1:], stderr)
 	default:
 		printRunUsage(stderr)
 		return fmt.Errorf("unknown run subcommand %q", args[0])
