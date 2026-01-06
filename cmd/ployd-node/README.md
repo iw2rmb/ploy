@@ -38,6 +38,10 @@ http:
     cert_path: /etc/ploy/pki/node.crt
     key_path: /etc/ploy/pki/node.key
     ca_path: /etc/ploy/pki/ca.crt
+    # Optional CA bundle to verify the control-plane server during bootstrap
+    # (before node certificates are obtained). If omitted, ca_path is used
+    # when present; otherwise system roots are used.
+    bootstrap_ca_path: /etc/ploy/pki/ca.crt
 
 # Heartbeat configuration
 heartbeat:
