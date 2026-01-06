@@ -79,7 +79,8 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	// Initialize runtime components using shared helper.
 	// The cleanup function closes logStreamer on exit.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String())
+	// Pass jobID to associate log chunks with this specific job.
+	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -234,7 +235,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// Initialize runtime components using shared helper.
 	// The cleanup function closes logStreamer on exit.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String())
+	// Pass jobID to associate log chunks with this specific healing job.
+	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -547,7 +549,13 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 
 // initializeRuntime creates and configures all runtime components needed for step execution.
 // Returns a configured step.Runner, diff generator, and log streamer.
-func (r *runController) initializeRuntime(ctx context.Context, runID string) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
+//
+// Parameters:
+//   - ctx: context for initialization operations
+//   - runID: run identifier for logging and telemetry
+//   - jobID: job identifier for associating log chunks with specific jobs; pass empty string
+//     for gate jobs or when job attribution is not required
+func (r *runController) initializeRuntime(ctx context.Context, runID string, jobID string) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
 	// Initialize git fetcher without snapshot publishing (node agent operates on ephemeral workspaces).
 	gitFetcher, err := r.createGitFetcher()
 	if err != nil {
@@ -576,7 +584,9 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 	gateExecutor := step.NewDockerGateExecutor(containerRuntime)
 
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
-	logStreamer := NewLogStreamer(r.cfg, runID, "")
+	// The jobID parameter associates log chunks with a specific job, enabling
+	// per-job log attribution in the control plane.
+	logStreamer := NewLogStreamer(r.cfg, runID, jobID)
 
 	// Assemble the step runner with all components.
 	runner := step.Runner{

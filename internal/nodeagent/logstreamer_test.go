@@ -3,10 +3,16 @@ package nodeagent
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestLogStreamer_Write(t *testing.T) {
@@ -221,4 +227,137 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 	ls.mu.Unlock()
 
 	t.Logf("chunk_no after large write: %d (flush may have failed if server unavailable)", afterChunkNo)
+}
+
+// TestLogStreamer_JobIDInPayload verifies that the log streamer includes job_id
+// in the payload when a job ID is provided.
+//
+// This test validates the fix for "Attach log chunks to jobs — log streamer
+// currently omits job_id" (ROADMAP.md line 31). The server needs job_id to
+// associate log chunks with specific jobs, enabling per-job log retrieval.
+func TestLogStreamer_JobIDInPayload(t *testing.T) {
+	t.Parallel()
+
+	// logChunkPayload mirrors the structure sent by sendChunk.
+	type logChunkPayload struct {
+		RunID   domaintypes.RunID `json:"run_id"`
+		JobID   *string           `json:"job_id,omitempty"`
+		ChunkNo int32             `json:"chunk_no"`
+		Data    []byte            `json:"data"`
+	}
+
+	tests := []struct {
+		name       string
+		jobID      string
+		wantJobID  bool   // Whether job_id should be present in payload
+		wantJobIDV string // Expected job_id value (if wantJobID is true)
+	}{
+		{
+			name:       "with job_id",
+			jobID:      "job-abc123",
+			wantJobID:  true,
+			wantJobIDV: "job-abc123",
+		},
+		{
+			name:       "without job_id (empty string)",
+			jobID:      "",
+			wantJobID:  false,
+			wantJobIDV: "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt // capture loop variable for t.Parallel
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Track received payloads from the mock server.
+			var mu sync.Mutex
+			var receivedPayloads []logChunkPayload
+
+			// Create a mock server that captures log chunk requests.
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Verify this is a POST to the logs endpoint.
+				if r.Method != http.MethodPost {
+					t.Errorf("unexpected method: %s", r.Method)
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				if !strings.HasSuffix(r.URL.Path, "/logs") {
+					t.Errorf("unexpected path: %s", r.URL.Path)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+
+				// Parse the request body.
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("failed to read request body: %v", err)
+					http.Error(w, "bad request", http.StatusBadRequest)
+					return
+				}
+
+				var payload logChunkPayload
+				if err := json.Unmarshal(body, &payload); err != nil {
+					t.Errorf("failed to unmarshal payload: %v", err)
+					http.Error(w, "bad request", http.StatusBadRequest)
+					return
+				}
+
+				mu.Lock()
+				receivedPayloads = append(receivedPayloads, payload)
+				mu.Unlock()
+
+				w.WriteHeader(http.StatusCreated)
+			}))
+			defer server.Close()
+
+			// Create log streamer pointing to mock server.
+			cfg := Config{
+				NodeID:    "aB3xY9",
+				ServerURL: server.URL,
+			}
+			ls := NewLogStreamer(cfg, "run-xyz789", tt.jobID)
+
+			// Write some data to the log streamer.
+			_, err := ls.Write([]byte("test log line for job_id verification\n"))
+			if err != nil {
+				t.Fatalf("Write() failed: %v", err)
+			}
+
+			// Close to flush any remaining data.
+			if err := ls.Close(); err != nil {
+				t.Fatalf("Close() failed: %v", err)
+			}
+
+			// Verify we received at least one payload.
+			mu.Lock()
+			defer mu.Unlock()
+			if len(receivedPayloads) == 0 {
+				t.Fatal("expected at least one log chunk payload, got none")
+			}
+
+			// Check the first payload for job_id presence and value.
+			payload := receivedPayloads[0]
+
+			if tt.wantJobID {
+				// Expect job_id to be present and have the correct value.
+				if payload.JobID == nil {
+					t.Errorf("expected job_id to be present in payload, but it was nil")
+				} else if *payload.JobID != tt.wantJobIDV {
+					t.Errorf("job_id = %q, want %q", *payload.JobID, tt.wantJobIDV)
+				}
+			} else {
+				// Expect job_id to be absent (nil).
+				if payload.JobID != nil {
+					t.Errorf("expected job_id to be nil in payload, but got %q", *payload.JobID)
+				}
+			}
+
+			// Verify run_id is always present.
+			if string(payload.RunID) != "run-xyz789" {
+				t.Errorf("run_id = %q, want %q", payload.RunID, "run-xyz789")
+			}
+		})
+	}
 }
