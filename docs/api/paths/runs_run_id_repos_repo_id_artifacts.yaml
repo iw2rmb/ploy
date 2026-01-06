@@ -1,0 +1,65 @@
+# Repo-scoped artifact listing for a repo execution within a run.
+# Required by roadmap/v1/api.md:265 and roadmap/v1/api.md:274.
+#
+# This endpoint lists artifact bundles produced by jobs belonging to a
+# specific repository execution within a batch run. The response shape
+# is unchanged from the global artifact listing endpoint; v1 only filters
+# to bundles associated with jobs in the repo execution.
+get:
+  tags: [Artifacts]
+  summary: List artifacts for a repo execution within a run
+  description: |
+    Returns all artifact bundles produced by jobs for a specific repository
+    execution within a run.
+
+    This is the v1 repo-scoped endpoint that provides artifact listing
+    filtered to jobs belonging to the specified repo execution (matching
+    run_id, repo_id, and current attempt).
+
+    Per roadmap/v1/api.md:265 and roadmap/v1/api.md:274:
+    - Response JSON shape is unchanged from global artifact listing
+    - v1 only filters the returned bundles to jobs belonging to the repo
+    - Each bundle includes id, name, job_id, and created_at metadata
+
+    Artifacts are ordered by job step_index (ascending), then by created_at
+    (ascending).
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/ArtifactListResponse'
+    '400':
+      description: Bad request (missing or empty run_id or repo_id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Run or repo not found, or repo does not belong to the run
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

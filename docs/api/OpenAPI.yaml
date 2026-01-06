@@ -1,15 +1,31 @@
 openapi: 3.1.0
 info:
   title: Ploy Control Plane API
-  version: "0.1.0"
+  version: "1.0.0"
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require authentication. The server supports both mutual TLS and JWT bearer
     tokens (`Authorization: Bearer ...`) depending on client and deployment.
-    Primary endpoints expose mod projects under `/v1/mods` and run submission
-    under `/v1/runs` (plus run list/inspect/cancel/start under `/v1/runs/*`).
-    Legacy run-scoped endpoints still exist under `/v1/mods/{id}/*` for some
-    legacy run operations (graph/logs/diffs).
+
+    v1 API surfaces:
+    - `/v1/mods` — mod project CRUD (create/list/delete/archive).
+    - `/v1/mods/{mod_id}/specs` — spec management for mod projects.
+    - `/v1/mods/{mod_id}/repos` — repo set management (add/list/delete repos).
+    - `/v1/mods/{mod_id}/runs` — create multi-repo batch runs for a mod.
+    - `/v1/mods/{mod_id}/pull` — resolve repo execution for `ploy mod pull`.
+    - `/v1/runs` — single-repo run submission and run listing.
+    - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start/timing).
+    - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
+      - `/diffs` — list diffs for a repo execution.
+      - `/logs` — SSE stream of logs/events for a repo execution.
+      - `/artifacts` — list artifact bundles for a repo execution.
+      - `/cancel` — cancel a repo execution within a run.
+      - `/restart` — restart a repo execution within a run.
+    - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.
+
+    Legacy endpoints under `/v1/mods/{id}/*` (graph/logs/diffs) remain for
+    backward compatibility but are deprecated in favor of repo-scoped
+    `/v1/runs/{run_id}/repos/{repo_id}/*` endpoints.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -153,6 +169,18 @@ paths:
   # Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
     $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
+  # v1 repo-scoped logs SSE stream — filters run logs to jobs in this repo
+  # Per roadmap/v1/api.md:264 and roadmap/v1/api.md:273
+  /v1/runs/{run_id}/repos/{repo_id}/logs:
+    $ref: './paths/runs_run_id_repos_repo_id_logs.yaml'
+  # v1 repo-scoped artifact listing — filters artifacts to jobs in this repo
+  # Per roadmap/v1/api.md:265 and roadmap/v1/api.md:274
+  /v1/runs/{run_id}/repos/{repo_id}/artifacts:
+    $ref: './paths/runs_run_id_repos_repo_id_artifacts.yaml'
+  # v1 repo-scoped cancel — replaces HEAD DELETE /v1/runs/{id}/repos/{repo_id}
+  # Per roadmap/v1/api.md:266 and roadmap/v1/api.md:289-298
+  /v1/runs/{run_id}/repos/{repo_id}/cancel:
+    $ref: './paths/runs_run_id_repos_repo_id_cancel.yaml'
   /v1/runs/{run_id}/pull:
     $ref: './paths/runs_run_id_pull.yaml'
   # Repo-centric endpoints — list repos and show runs for a given repo
@@ -253,6 +281,66 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
     RepoRunSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
+    # Mod project CRUD types — required by roadmap/v1/api.md:254
+    # POST /v1/mods, GET /v1/mods, DELETE /v1/mods/{mod_id}
+    CreateModRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateModRequest'
+    CreateModResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateModResponse'
+    ModListItem:
+      $ref: './components/schemas/controlplane.yaml#/ModListItem'
+    ListModsResponse:
+      $ref: './components/schemas/controlplane.yaml#/ListModsResponse'
+    ModArchiveResponse:
+      $ref: './components/schemas/controlplane.yaml#/ModArchiveResponse'
+    # Spec management types — POST /v1/mods/{mod_id}/specs
+    SetModSpecRequest:
+      $ref: './components/schemas/controlplane.yaml#/SetModSpecRequest'
+    SetModSpecResponse:
+      $ref: './components/schemas/controlplane.yaml#/SetModSpecResponse'
+    # Mod repo types — required by roadmap/v1/api.md:254
+    # POST/GET /v1/mods/{mod_id}/repos, DELETE /v1/mods/{mod_id}/repos/{repo_id}
+    ModRepo:
+      $ref: './components/schemas/controlplane.yaml#/ModRepo'
+    AddModRepoRequest:
+      $ref: './components/schemas/controlplane.yaml#/AddModRepoRequest'
+    ListModReposResponse:
+      $ref: './components/schemas/controlplane.yaml#/ListModReposResponse'
+    BulkUpsertModReposResponse:
+      $ref: './components/schemas/controlplane.yaml#/BulkUpsertModReposResponse'
+    BulkUpsertError:
+      $ref: './components/schemas/controlplane.yaml#/BulkUpsertError'
+    # Mod run types — POST /v1/mods/{mod_id}/runs
+    RepoSelectorMode:
+      $ref: './components/schemas/controlplane.yaml#/RepoSelectorMode'
+    ModRepoSelector:
+      $ref: './components/schemas/controlplane.yaml#/ModRepoSelector'
+    CreateModRunRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateModRunRequest'
+    CreateModRunResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateModRunResponse'
+    # Pull resolution types — POST /v1/mods/{mod_id}/pull, POST /v1/runs/{run_id}/pull
+    PullResolutionMode:
+      $ref: './components/schemas/controlplane.yaml#/PullResolutionMode'
+    ModPullRequest:
+      $ref: './components/schemas/controlplane.yaml#/ModPullRequest'
+    RunPullRequest:
+      $ref: './components/schemas/controlplane.yaml#/RunPullRequest'
+    PullResolutionResponse:
+      $ref: './components/schemas/controlplane.yaml#/PullResolutionResponse'
+    # Single-repo run submission — POST /v1/runs
+    CreateSingleRepoRunResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse'
+    # Repo-scoped artifact listing — GET /v1/runs/{run_id}/repos/{repo_id}/artifacts
+    ArtifactListItem:
+      $ref: './components/schemas/controlplane.yaml#/ArtifactListItem'
+    ArtifactListResponse:
+      $ref: './components/schemas/controlplane.yaml#/ArtifactListResponse'
+    # Repo-scoped diff listing — GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+    DiffItem:
+      $ref: './components/schemas/controlplane.yaml#/DiffItem'
+    DiffListResponse:
+      $ref: './components/schemas/controlplane.yaml#/DiffListResponse'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed
