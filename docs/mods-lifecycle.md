@@ -673,8 +673,8 @@ workflows.
 **Repo URL rules:**
 
 Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see `internal/vcs/repourl.go`):
-- Validation: accept only `https://`, `ssh://`, and `file://` schemes.
 - Normalization: trim whitespace, strip trailing `/` and `.git` suffix.
+- Matching: compare normalized strings; no URL parsing or scheme validation is performed.
 The CLI derives `repo_url` from the git remote URL; the server performs normalized matching
 to select the correct `run_repos` entry.
 
