@@ -60,7 +60,7 @@ counts as having consumed `len(p)` bytes).
 Hooks must be set before any writes occur (not safe for concurrent use with `Write`):
 
 ```go
-logStreamer := NewLogStreamer(cfg, runID, stageID)
+logStreamer := NewLogStreamer(cfg, runID, jobID)
 
 // Install custom hook before writes begin
 customHook := &MyPIIScrubber{}
