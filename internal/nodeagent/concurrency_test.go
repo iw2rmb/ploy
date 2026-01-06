@@ -25,10 +25,10 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 		Concurrency: concurrency,
 	}
 
-	// Create controller with configured concurrency.
+	// Create controller with configured concurrency and typed JobID keys.
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	// Track concurrent execution count.
@@ -143,7 +143,7 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	// Track concurrent execution.
@@ -233,7 +233,7 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	// Acquire the only slot.
@@ -284,7 +284,7 @@ func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
 
 	rc := &runController{
 		cfg:  cfg,
-		jobs: make(map[string]*jobContext),
+		jobs: make(map[types.JobID]*jobContext),
 	}
 
 	// Acquire and release a slot multiple times.

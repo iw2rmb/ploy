@@ -37,7 +37,8 @@ import (
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	defer func() {
 		r.mu.Lock()
-		delete(r.jobs, req.JobID.String())
+		// Use typed JobID directly as map key — no string conversion needed.
+		delete(r.jobs, req.JobID)
 		r.mu.Unlock()
 
 		// Release the concurrency slot acquired in claimAndExecute.

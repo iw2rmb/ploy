@@ -87,10 +87,10 @@ func TestEndToEndFlow(t *testing.T) {
 			},
 		}
 
-		// Create the run controller.
+		// Create the run controller with typed JobID keys.
 		rc := &runController{
 			cfg:  cfg,
-			jobs: make(map[string]*jobContext),
+			jobs: make(map[types.JobID]*jobContext),
 		}
 
 		// Create a simple StartRunRequest that will execute quickly.
@@ -116,9 +116,9 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Fatalf("StartRun() failed: %v", err)
 		}
 
-		// Verify the job was registered.
+		// Verify the job was registered using typed JobID key.
 		rc.mu.Lock()
-		if _, exists := rc.jobs[req.JobID.String()]; !exists {
+		if _, exists := rc.jobs[req.JobID]; !exists {
 			t.Errorf("job %s not found after StartRun", req.JobID)
 		}
 		rc.mu.Unlock()
@@ -134,9 +134,9 @@ func TestEndToEndFlow(t *testing.T) {
 		// Wait a bit more for cleanup.
 		time.Sleep(500 * time.Millisecond)
 
-		// Verify the job was cleaned up from the controller.
+		// Verify the job was cleaned up from the controller using typed JobID key.
 		rc.mu.Lock()
-		if _, exists := rc.jobs[req.JobID.String()]; exists {
+		if _, exists := rc.jobs[req.JobID]; exists {
 			t.Errorf("job %s still exists after completion", req.JobID)
 		}
 		rc.mu.Unlock()
