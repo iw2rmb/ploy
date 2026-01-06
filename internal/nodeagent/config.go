@@ -59,6 +59,12 @@ type TLSConfig struct {
 
 	// CAPath is the path to the cluster CA certificate.
 	CAPath string `yaml:"ca_path"`
+
+	// BootstrapCAPath is the path to the CA certificate used to verify
+	// the server during bootstrap (before mTLS certificates are obtained).
+	// If empty, the cluster CA at CAPath is used if it exists; otherwise
+	// system roots are used (for public PKI scenarios).
+	BootstrapCAPath string `yaml:"bootstrap_ca_path"`
 }
 
 // HeartbeatConfig specifies heartbeat interval and timeout.
