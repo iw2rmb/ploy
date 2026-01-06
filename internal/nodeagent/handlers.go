@@ -1,7 +1,9 @@
 package nodeagent
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -90,10 +92,32 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	if err := s.controller.AcquireSlot(ctx); err != nil {
+		// If the request is canceled or times out while waiting, treat it as a
+		// client-side timeout.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			http.Error(w, err.Error(), http.StatusRequestTimeout)
+			return
+		}
+		http.Error(w, fmt.Sprintf("acquire concurrency slot failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	slotHeld := true
+	defer func() {
+		if slotHeld {
+			s.controller.ReleaseSlot()
+		}
+	}()
+
 	if err := s.controller.StartRun(ctx, req); err != nil {
 		http.Error(w, fmt.Sprintf("start run failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	// Transfer slot ownership to the controller. The slot is released when the
+	// job completes.
+	slotHeld = false
 
 	resp := StartRunResponse{
 		RunID:  req.RunID,

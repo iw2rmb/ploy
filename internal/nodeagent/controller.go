@@ -10,9 +10,9 @@ import (
 // Runs are tracked by job_id (not run_id) to support multiple jobs per run.
 //
 // Concurrency is enforced via the jobSem semaphore: callers must acquire a slot
-// via AcquireSlot before claiming work and release it via ReleaseSlot when the
-// job completes. This prevents the node from claiming more jobs than it can
-// execute concurrently.
+// via AcquireSlot before claiming/starting work. On StartRun success, the
+// controller releases the slot when the job completes. This prevents the node
+// from claiming more jobs than it can execute concurrently.
 type runController struct {
 	mu sync.Mutex
 

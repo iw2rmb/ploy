@@ -178,7 +178,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Invoke controller.StartRun to execute the claimed job.
 	if err := c.controller.StartRun(ctx, startReq); err != nil {
 		// Even if StartRun fails, we've already claimed the work.
-		// The controller's executeRun will upload terminal status.
+		// The node cannot execute this job, so the claim loop surfaces an error.
 		return true, fmt.Errorf("start run: %w", err)
 	}
 

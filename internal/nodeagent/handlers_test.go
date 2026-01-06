@@ -13,12 +13,14 @@ import (
 )
 
 type mockRunController struct {
-	startCalled bool
-	stopCalled  bool
-	startErr    error
-	stopErr     error
-	lastStart   StartRunRequest
-	lastStop    StopRunRequest
+	startCalled  bool
+	stopCalled   bool
+	startErr     error
+	stopErr      error
+	lastStart    StartRunRequest
+	lastStop     StopRunRequest
+	acquireCalls int
+	releaseCalls int
 
 	// slotSem is a mock concurrency semaphore. If nil, AcquireSlot/ReleaseSlot
 	// are no-ops. Tests can set this to simulate concurrency limiting.
@@ -40,6 +42,7 @@ func (m *mockRunController) StopRun(ctx context.Context, req StopRunRequest) err
 // AcquireSlot implements RunController. If slotSem is set, blocks until a slot
 // is available; otherwise returns immediately.
 func (m *mockRunController) AcquireSlot(ctx context.Context) error {
+	m.acquireCalls++
 	if m.slotSem == nil {
 		return nil
 	}
@@ -53,6 +56,7 @@ func (m *mockRunController) AcquireSlot(ctx context.Context) error {
 
 // ReleaseSlot implements RunController. If slotSem is set, releases a slot.
 func (m *mockRunController) ReleaseSlot() {
+	m.releaseCalls++
 	if m.slotSem == nil {
 		return
 	}
@@ -66,6 +70,8 @@ func TestHandleRunStart(t *testing.T) {
 		controllerErr error
 		wantStatus    int
 		wantCalled    bool
+		wantAcquire   int
+		wantRelease   int
 	}{
 		{
 			name: "valid request",
@@ -75,16 +81,20 @@ func TestHandleRunStart(t *testing.T) {
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
-			wantStatus: http.StatusAccepted,
-			wantCalled: true,
+			wantStatus:  http.StatusAccepted,
+			wantCalled:  true,
+			wantAcquire: 1,
+			wantRelease: 0,
 		},
 		{
 			name: "missing run_id",
 			request: StartRunRequest{
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
-			wantStatus: http.StatusBadRequest,
-			wantCalled: false,
+			wantStatus:  http.StatusBadRequest,
+			wantCalled:  false,
+			wantAcquire: 0,
+			wantRelease: 0,
 		},
 		{
 			name: "missing repo_url",
@@ -92,8 +102,10 @@ func TestHandleRunStart(t *testing.T) {
 				RunID: types.RunID("run-123"),
 				JobID: types.JobID("job-123"),
 			},
-			wantStatus: http.StatusBadRequest,
-			wantCalled: false,
+			wantStatus:  http.StatusBadRequest,
+			wantCalled:  false,
+			wantAcquire: 0,
+			wantRelease: 0,
 		},
 		{
 			name: "missing job_id",
@@ -101,8 +113,10 @@ func TestHandleRunStart(t *testing.T) {
 				RunID:   types.RunID("run-123"),
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
-			wantStatus: http.StatusBadRequest,
-			wantCalled: false,
+			wantStatus:  http.StatusBadRequest,
+			wantCalled:  false,
+			wantAcquire: 0,
+			wantRelease: 0,
 		},
 		{
 			name: "controller error",
@@ -114,6 +128,8 @@ func TestHandleRunStart(t *testing.T) {
 			controllerErr: fmt.Errorf("execution failed"),
 			wantStatus:    http.StatusInternalServerError,
 			wantCalled:    true,
+			wantAcquire:   1,
+			wantRelease:   1,
 		},
 	}
 
@@ -144,6 +160,13 @@ func TestHandleRunStart(t *testing.T) {
 
 			if tt.wantCalled && mock.lastStart.RunID.String() != tt.request.RunID.String() {
 				t.Errorf("controller received RunID = %q, want %q", mock.lastStart.RunID, tt.request.RunID)
+			}
+
+			if mock.acquireCalls != tt.wantAcquire {
+				t.Errorf("controller.AcquireSlot calls = %d, want %d", mock.acquireCalls, tt.wantAcquire)
+			}
+			if mock.releaseCalls != tt.wantRelease {
+				t.Errorf("controller.ReleaseSlot calls = %d, want %d", mock.releaseCalls, tt.wantRelease)
 			}
 		})
 	}
@@ -237,6 +260,10 @@ func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
 	}
+
+	if mock.acquireCalls != 0 || mock.releaseCalls != 0 {
+		t.Fatalf("AcquireSlot/ReleaseSlot calls = %d/%d, want 0/0", mock.acquireCalls, mock.releaseCalls)
+	}
 }
 
 func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
@@ -267,6 +294,10 @@ func TestHandleRunStart_InvalidJSON(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+
+	if mock.acquireCalls != 0 || mock.releaseCalls != 0 {
+		t.Fatalf("AcquireSlot/ReleaseSlot calls = %d/%d, want 0/0", mock.acquireCalls, mock.releaseCalls)
 	}
 }
 
