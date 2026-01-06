@@ -18,7 +18,7 @@ import (
 // gzipped patches for workspace rehydration during multi-step Mods runs.
 //
 // C2: The fetcher lists all diffs (mod + healing) for a run; rehydration callers
-// then select non-healing diffs (mod_type!="healing") with step_index <= k to
+// then select non-healing diffs (mod_type!=DiffModTypeHealing) with step_index <= k to
 // build the incremental patch chain for step k+1.
 type DiffFetcher struct {
 	cfg    Config

@@ -17,16 +17,16 @@ func TestShouldCreateMR(t *testing.T) {
 		options        map[string]any
 		want           bool
 	}{
-		{name: "success_flag_true", terminalStatus: "Success", options: map[string]any{"mr_on_success": true}, want: true},
-		{name: "success_flag_false", terminalStatus: "Success", options: map[string]any{"mr_on_success": false}, want: false},
-		{name: "success_flag_missing", terminalStatus: "Success", options: map[string]any{}, want: false},
-		{name: "fail_flag_true", terminalStatus: "Fail", options: map[string]any{"mr_on_fail": true}, want: true},
-		{name: "fail_flag_false", terminalStatus: "Fail", options: map[string]any{"mr_on_fail": false}, want: false},
-		{name: "fail_flag_missing", terminalStatus: "Fail", options: map[string]any{}, want: false},
-		{name: "non_bool_values_ignored_success", terminalStatus: "Success", options: map[string]any{"mr_on_success": "true"}, want: false},
-		{name: "non_bool_values_ignored_fail", terminalStatus: "Fail", options: map[string]any{"mr_on_fail": "true"}, want: false},
-		{name: "other_status_never_triggers", terminalStatus: "Cancelled", options: map[string]any{"mr_on_success": true, "mr_on_fail": true}, want: false},
-		{name: "gate_failure_with_mr_on_fail", terminalStatus: "Fail", options: map[string]any{"mr_on_fail": true}, want: true},
+		{name: "success_flag_true", terminalStatus: JobStatusSuccess.String(), options: map[string]any{"mr_on_success": true}, want: true},
+		{name: "success_flag_false", terminalStatus: JobStatusSuccess.String(), options: map[string]any{"mr_on_success": false}, want: false},
+		{name: "success_flag_missing", terminalStatus: JobStatusSuccess.String(), options: map[string]any{}, want: false},
+		{name: "fail_flag_true", terminalStatus: JobStatusFail.String(), options: map[string]any{"mr_on_fail": true}, want: true},
+		{name: "fail_flag_false", terminalStatus: JobStatusFail.String(), options: map[string]any{"mr_on_fail": false}, want: false},
+		{name: "fail_flag_missing", terminalStatus: JobStatusFail.String(), options: map[string]any{}, want: false},
+		{name: "non_bool_values_ignored_success", terminalStatus: JobStatusSuccess.String(), options: map[string]any{"mr_on_success": "true"}, want: false},
+		{name: "non_bool_values_ignored_fail", terminalStatus: JobStatusFail.String(), options: map[string]any{"mr_on_fail": "true"}, want: false},
+		{name: "other_status_never_triggers", terminalStatus: JobStatusCancelled.String(), options: map[string]any{"mr_on_success": true, "mr_on_fail": true}, want: false},
+		{name: "gate_failure_with_mr_on_fail", terminalStatus: JobStatusFail.String(), options: map[string]any{"mr_on_fail": true}, want: true},
 	}
 
 	for _, tt := range tests {

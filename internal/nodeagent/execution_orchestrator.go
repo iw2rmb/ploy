@@ -143,7 +143,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// diffs for this run and step index.
 	var modBaselineDir string
 	if execCtx.diffGenerator != nil {
-		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, "mod", workspace)
+		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, DiffModTypeMod, workspace)
 		defer snapshot.cleanup()
 		modBaselineDir = snapshot.dir
 	}
@@ -198,11 +198,19 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		// Determine status.
 		// v1 uses capitalized job status values: Success, Fail, Cancelled.
 		if runErr != nil {
-			var exitCode int32 = -1 // Use -1 to indicate runtime error
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload mod failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+			status := JobStatusFail
+			var exitCode *int32
+			if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
+				status = JobStatusCancelled
+			} else {
+				var runtimeExitCode int32 = -1 // Use -1 to indicate runtime error
+				exitCode = &runtimeExitCode
 			}
-			slog.Info("mod job failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr, "duration", duration)
+
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload mod terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+			}
+			slog.Info("mod job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", runErr, "duration", duration)
 			return nil
 		}
 
@@ -299,7 +307,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// this run and step index.
 	var healingBaselineDir string
 	if execCtx.diffGenerator != nil {
-		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, "healing", workspace)
+		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, DiffModTypeHealing, workspace)
 		defer snapshot.cleanup()
 		healingBaselineDir = snapshot.dir
 	}
@@ -404,11 +412,19 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			// Determine status.
 			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			if runErr != nil {
-				var exitCode int32 = -1 // Use -1 to indicate runtime error
-				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-					slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+				status := JobStatusFail
+				var exitCode *int32
+				if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
+					status = JobStatusCancelled
+				} else {
+					var runtimeExitCode int32 = -1 // Use -1 to indicate runtime error
+					exitCode = &runtimeExitCode
 				}
-				slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "error", runErr, "duration", duration)
+
+				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+					slog.Error("failed to upload healing terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+				}
+				slog.Info("healing job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status, "exit_code", result.ExitCode, "error", runErr, "duration", duration)
 				return nil
 			}
 
@@ -541,13 +557,21 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
-	var exitCode int32 = -1 // -1 indicates pre-execution failure
+	status := JobStatusFail
+	var exitCode *int32
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		status = JobStatusCancelled
+	} else {
+		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure
+		exitCode = &preExecutionExitCode
+	}
+
 	// Build stats using typed builder to eliminate map[string]any construction.
 	stats := types.NewRunStatsBuilder().
 		DurationMs(duration.Milliseconds()).
 		Error(err.Error()).
 		MustBuild()
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 }

@@ -74,8 +74,8 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 	}
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	if got, _ := capturedPayload["status"].(string); got != "Fail" {
-		t.Fatalf("status = %v, want %q", capturedPayload["status"], "Fail")
+	if got, _ := capturedPayload["status"].(string); got != JobStatusFail.String() {
+		t.Fatalf("status = %v, want %q", capturedPayload["status"], JobStatusFail.String())
 	}
 
 	if got, ok := capturedPayload["exit_code"].(float64); !ok || got != 1 {

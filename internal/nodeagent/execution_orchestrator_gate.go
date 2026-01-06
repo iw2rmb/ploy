@@ -3,6 +3,7 @@ package nodeagent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -79,6 +80,18 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Determine status and exit code.
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
+	if gateErr != nil && (errors.Is(gateErr, context.Canceled) || errors.Is(gateErr, context.DeadlineExceeded)) {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload gate cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		}
+		slog.Info("gate job cancelled",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"mod_type", req.ModType,
+			"duration", duration,
+		)
+		return
+	}
 	if gateErr != nil || !gatePassed {
 		// Gate failed - exit code 1 signals gate failure for healing.
 		var exitCode int32 = 1
