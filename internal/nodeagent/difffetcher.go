@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -115,7 +116,30 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 		relevantDiffs = append(relevantDiffs, d)
 	}
 
-	// Step 3: Fetch each diff's gzipped patch in order.
+	// Step 3: Sort diffs to ensure deterministic application order.
+	// Diffs are sorted by (step_index, created_at, id) to guarantee:
+	//   - Earlier steps are applied before later steps.
+	//   - Within a step, diffs are ordered chronologically by creation time.
+	//   - Ties in step_index and created_at are broken by lexicographic ID comparison.
+	// This ensures the patch chain is applied identically regardless of server response order.
+	sort.SliceStable(relevantDiffs, func(i, j int) bool {
+		// Primary sort key: step_index (ascending).
+		siI, _ := relevantDiffs[i].Summary.StepIndex()
+		siJ, _ := relevantDiffs[j].Summary.StepIndex()
+		if siI != siJ {
+			return siI < siJ
+		}
+
+		// Secondary sort key: created_at (ascending).
+		if !relevantDiffs[i].CreatedAt.Equal(relevantDiffs[j].CreatedAt) {
+			return relevantDiffs[i].CreatedAt.Before(relevantDiffs[j].CreatedAt)
+		}
+
+		// Tertiary sort key: id (lexicographic ascending, for determinism).
+		return relevantDiffs[i].ID < relevantDiffs[j].ID
+	})
+
+	// Step 4: Fetch each diff's gzipped patch in sorted order.
 	patches := make([][]byte, 0, len(relevantDiffs))
 	for _, d := range relevantDiffs {
 		patch, err := f.FetchRunRepoDiffPatch(ctx, runID, repoID, d.ID)
