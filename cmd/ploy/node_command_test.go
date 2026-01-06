@@ -418,6 +418,75 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 	}
 }
 
+func TestFetchCACertificate_HTTPS_UsesSSH(t *testing.T) {
+	ctx := context.Background()
+	var called bool
+
+	runner := deploy.RunnerFunc(func(_ context.Context, command string, args []string, _ io.Reader, streams deploy.IOStreams) error {
+		called = true
+		if command != "ssh" {
+			t.Fatalf("expected command ssh, got %q", command)
+		}
+		if !strings.Contains(strings.Join(args, " "), "cat /etc/ploy/pki/ca.crt") {
+			t.Fatalf("expected ssh args to cat CA cert, got: %q", strings.Join(args, " "))
+		}
+		_, _ = io.WriteString(streams.Stdout, "CA-PEM\n")
+		return nil
+	})
+
+	ca, err := fetchCACertificate(ctx, "https://example.com:8443", "root", 22, "/tmp/id", runner)
+	if err != nil {
+		t.Fatalf("fetchCACertificate error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected runner to be called")
+	}
+	if ca != "CA-PEM\n" {
+		t.Fatalf("expected CA cert, got %q", ca)
+	}
+}
+
+func TestFetchCACertificate_HTTP_SkipsSSH(t *testing.T) {
+	ctx := context.Background()
+	runner := deploy.RunnerFunc(func(_ context.Context, _ string, _ []string, _ io.Reader, _ deploy.IOStreams) error {
+		t.Fatalf("runner should not be called for http URLs")
+		return nil
+	})
+
+	ca, err := fetchCACertificate(ctx, "http://example.com:8080", "root", 22, "/tmp/id", runner)
+	if err != nil {
+		t.Fatalf("fetchCACertificate error: %v", err)
+	}
+	if ca != "" {
+		t.Fatalf("expected empty CA cert for http URLs, got %q", ca)
+	}
+}
+
+func TestFetchCACertificate_NoScheme_AssumesHTTPS(t *testing.T) {
+	ctx := context.Background()
+	var called bool
+
+	runner := deploy.RunnerFunc(func(_ context.Context, command string, _ []string, _ io.Reader, streams deploy.IOStreams) error {
+		called = true
+		if command != "ssh" {
+			t.Fatalf("expected command ssh, got %q", command)
+		}
+		_, _ = io.WriteString(streams.Stdout, "CA-PEM\n")
+		return nil
+	})
+
+	ca, err := fetchCACertificate(ctx, "example.com:8443", "root", 22, "/tmp/id", runner)
+	if err != nil {
+		t.Fatalf("fetchCACertificate error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected runner to be called")
+	}
+	if ca != "CA-PEM\n" {
+		t.Fatalf("expected CA cert, got %q", ca)
+	}
+}
+
 // mockNodeProvisionRunner is a test double for deploy.Runner for node provisioning.
 type mockNodeProvisionRunner struct {
 	t *testing.T
