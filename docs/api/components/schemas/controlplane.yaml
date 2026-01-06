@@ -297,6 +297,57 @@ SetModSpecResponse:
     created_at: { type: string, format: date-time }
   required: [id, created_at]
 
+AddModRepoRequest:
+  type: object
+  properties:
+    repo_url:
+      type: string
+      description: "Repository URL. Allowed schemes: https://, ssh://, file://."
+    base_ref: { type: string }
+    target_ref: { type: string }
+  required: [repo_url, base_ref, target_ref]
+
+ModRepo:
+  type: object
+  properties:
+    id: { type: string, description: "Repo ID (NanoID string)" }
+    mod_id: { type: string, description: "Mod ID (NanoID string)" }
+    repo_url:
+      type: string
+      description: "Repository URL (normalized for matching)."
+    base_ref: { type: string }
+    target_ref: { type: string }
+    created_at: { type: string, format: date-time }
+  required: [id, mod_id, repo_url, base_ref, target_ref, created_at]
+
+ListModReposResponse:
+  type: object
+  properties:
+    repos:
+      type: array
+      items:
+        $ref: '#/ModRepo'
+  required: [repos]
+
+BulkUpsertError:
+  type: object
+  properties:
+    line: { type: integer, format: int32 }
+    message: { type: string }
+  required: [line, message]
+
+BulkUpsertModReposResponse:
+  type: object
+  properties:
+    created: { type: integer, format: int32 }
+    updated: { type: integer, format: int32 }
+    failed: { type: integer, format: int32 }
+    errors:
+      type: array
+      items:
+        $ref: '#/BulkUpsertError'
+  required: [created, updated, failed, errors]
+
 ModListItem:
   type: object
   properties:
