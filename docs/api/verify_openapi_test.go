@@ -53,6 +53,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/{mod_id}", "delete"},
 		{"/v1/mods/{mod_id}/archive", "patch"},
 		{"/v1/mods/{mod_id}/unarchive", "patch"},
+		{"/v1/mods/{mod_id}/runs", "post"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},
