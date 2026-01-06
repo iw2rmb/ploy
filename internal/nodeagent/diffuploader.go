@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -128,17 +129,21 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 		}
 	}
 
-	// Read bearer token for control plane authentication
+	// Read bearer token for control plane authentication.
+	// Token files often contain trailing newlines or whitespace (e.g., when
+	// edited in text editors or generated via echo). Trim to prevent corrupted
+	// Authorization headers like "Bearer tok\n" which would cause auth failures.
 	tokenFile := bearerTokenPath()
-	bearerToken, err := os.ReadFile(tokenFile)
+	bearerTokenBytes, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return nil, fmt.Errorf("read bearer token: %w", err)
 	}
+	bearerToken := strings.TrimSpace(string(bearerTokenBytes))
 
 	// Wrap transport with bearer token injector
 	authenticatedTransport := &bearerTokenTransport{
 		base:   transport,
-		token:  string(bearerToken),
+		token:  bearerToken,
 		nodeID: cfg.NodeID,
 	}
 
