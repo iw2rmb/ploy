@@ -160,7 +160,7 @@ Semantics:
 Implementation references:
 
 - Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`).
-- Spec parsing: `internal/nodeagent/run_options.go` (`parseRunOptions`).
+- Spec parsing: `internal/nodeagent/claimer_spec.go` (`parseSpec`) and `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
 - Schema example: `docs/schemas/mod.example.yaml`.
 
 ### Workspace and rehydration semantics
