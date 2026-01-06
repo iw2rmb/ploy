@@ -539,14 +539,13 @@ code paths handle both cases:
 | Run (`runs`)   | Created (`Started`)              | Created (`Started`)                     |
 | `mod_repos`    | 1 repo created/managed           | N repos created/managed                 |
 | `run_repos`    | 1 (auto-created)                 | N (added via batch creation / repo add) |
-| Child runs     | None                             | None                                    |
 | Spec storage   | `specs` referenced by `runs.spec_id` | Same                                |
 
 ### State machines
 
-#### Parent run state machine
+#### Run derived status (v1)
 
-The control plane exposes a batch-level derived status from `run_repos` counts (`RunRepoCounts.derived_status`):
+The control plane exposes a run-level derived status from `run_repos` counts (`RunRepoCounts.derived_status`):
 
 ```
 	         ┌─────────────────────────────────────────────────────────┐
@@ -915,7 +914,7 @@ Nodeagents use `/v1/nodes/*` to execute work:
 
 - `POST /v1/nodes/{id}/heartbeat` — report node liveness.
 - `POST /v1/nodes/{id}/claim` — claim the next queued job from the unified
-  jobs queue (FIFO by `step_index`; returns the claimed job plus parent run
+  jobs queue (FIFO by `step_index`; returns the claimed job plus run
   metadata) and marks the repo as `Running` in `run_repos`.
   (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
