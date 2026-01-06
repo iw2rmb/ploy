@@ -4,17 +4,14 @@
 // This eliminates drift between CLI/server/nodeagent spec parsing by providing
 // a single source of truth for spec structure, validation, and serialization.
 //
-// ## Canonical Spec Shapes
+// ## Canonical Spec Shape
 //
-// The ModsSpec type supports two canonical shapes:
+// The ModsSpec type supports a single canonical shape:
+//   - All runs use steps[] (even single-step runs).
+//   - Global build gate policy lives under build_gate (including healing).
 //
-//  1. Single-step runs: Use top-level fields (Image, Command, Env, RetainContainer).
-//  2. Multi-step runs: Use the Mods[] array with one entry per step plus global
-//     BuildGate and BuildGateHealing configuration.
-//
-// Both shapes share common fields for build gate configuration, GitLab integration,
-// and healing policies. The parser validates that specs conform to one of these
-// canonical shapes and rejects malformed input with actionable error messages.
+// The parser validates that specs conform to this shape and rejects malformed
+// input with actionable error messages.
 //
 // ## Usage
 //
@@ -24,7 +21,7 @@
 //	if err != nil {
 //	    return err // structured validation error
 //	}
-//	// Use typed fields: spec.Image, spec.Mods, spec.BuildGate, etc.
+//	// Use typed fields: spec.Steps, spec.BuildGate, etc.
 //
 // ## YAML Support
 //
@@ -51,8 +48,7 @@ import (
 )
 
 // ModsSpec is the canonical typed representation of a Mods run specification.
-// It covers both single-step (top-level image/command/env) and multi-step
-// (mods[] array) run configurations.
+// All specs use steps[]; multi-step runs have len(steps) > 1.
 //
 // Wire compatibility: This struct marshals to/from JSON with stable field names
 // that match the existing spec schema. The JSON tags are the source of truth
@@ -70,7 +66,7 @@ type ModsSpec struct {
 	// JobID is the claimed job ID injected into the spec at claim time.
 	JobID string `json:"job_id,omitempty" yaml:"job_id,omitempty"`
 
-	// ModIndex maps a claimed mod job ("mod-N") to mods[N] in multi-step specs.
+	// ModIndex maps a claimed mod job ("mod-N") to steps[N] in multi-step specs.
 	// Only present for mod jobs in multi-step runs.
 	ModIndex *int `json:"mod_index,omitempty" yaml:"mod_index,omitempty"`
 
@@ -82,45 +78,20 @@ type ModsSpec struct {
 	// Informational only; the control plane forwards specs as opaque JSON.
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
-	// --- Single-step run fields (top-level) ---
+	// --- Steps (required) ---
 
-	// Image is the container image for single-step runs.
-	// Supports both universal images (string) and stack-specific images (map).
-	// For multi-step runs, this field is ignored in favor of Mods[].Image.
-	Image ModImage `json:"image,omitempty" yaml:"image,omitempty"`
+	// Steps holds the ordered list of mod steps.
+	// A spec must contain at least one step.
+	Steps []ModStep `json:"steps,omitempty" yaml:"steps,omitempty"`
 
-	// Command is the container command override for single-step runs.
-	// Can be a shell string or an exec array. For multi-step runs, this field
-	// is ignored in favor of Mods[].Command.
-	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
-
-	// Env holds environment variables for the run.
-	//
-	// Semantics:
-	//   - Single-step: this is the full container env map.
-	//   - Multi-step: this is the base env applied to every step (step env overrides on conflicts).
+	// Env holds environment variables applied to every step (step env overrides on conflicts).
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-
-	// RetainContainer controls whether to retain the container after execution.
-	// For single-step runs only; multi-step runs use Mods[].RetainContainer.
-	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
-
-	// --- Multi-step run fields ---
-
-	// Mods holds the list of mod steps for multi-step runs.
-	// When non-empty, this takes precedence over top-level Image/Command/Env.
-	// Each entry defines a sequential transformation step with gate+mod execution.
-	Mods []ModStep `json:"mods,omitempty" yaml:"mods,omitempty"`
 
 	// --- Shared configuration (applies to both single-step and multi-step) ---
 
-	// BuildGate configures pre-mod and post-mod Build Gate validation.
-	// Applies globally to all steps in multi-step runs.
+	// BuildGate configures Build Gate validation and healing policy.
+	// Applies globally to all steps.
 	BuildGate *BuildGateConfig `json:"build_gate,omitempty" yaml:"build_gate,omitempty"`
-
-	// BuildGateHealing configures the heal → re-gate loop when Build Gate fails.
-	// Applies globally to all steps in multi-step runs.
-	BuildGateHealing *HealingSpec `json:"build_gate_healing,omitempty" yaml:"build_gate_healing,omitempty"`
 
 	// --- GitLab MR integration ---
 
@@ -149,14 +120,14 @@ type ModsSpec struct {
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 }
 
-// ModStep describes a single mod step in a multi-step run (mods[] array).
+// ModStep describes a single mod step in a run (steps[] array).
 // Each step has its own image, command, and environment configuration.
 // Steps execute sequentially with shared workspace, each running gate+mod.
 type ModStep struct {
 	// Name is an optional human-readable name for this step.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	// Image is the container image for this step (required for multi-step mods).
+	// Image is the container image for this step (required).
 	// Supports both universal images (string) and stack-specific images (map).
 	Image ModImage `json:"image,omitempty" yaml:"image,omitempty"`
 
@@ -291,6 +262,10 @@ type BuildGateConfig struct {
 	// Profile specifies the gate profile name (e.g., "auto", "java-maven").
 	// The profile determines which static analysis tools and checks to run.
 	Profile string `json:"profile,omitempty" yaml:"profile,omitempty"`
+
+	// Healing configures the heal → re-gate loop when Build Gate fails.
+	// This is nested under build_gate to keep gate policy in one place.
+	Healing *HealingSpec `json:"healing,omitempty" yaml:"healing,omitempty"`
 }
 
 // HealingSpec describes the heal → re-gate loop configuration.
@@ -322,24 +297,21 @@ type HealingModSpec struct {
 	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
 }
 
-// IsMultiStep returns true if this spec defines a multi-step run (mods[] array).
-// When true, callers should use Mods[] instead of top-level Image/Command/Env.
+// IsMultiStep returns true if this spec defines more than one step.
 func (s ModsSpec) IsMultiStep() bool {
-	return len(s.Mods) > 0
+	return len(s.Steps) > 1
 }
 
-// IsSingleStep returns true if this spec defines a single-step run.
-// Single-step runs use top-level Image/Command/Env fields.
+// IsSingleStep returns true if this spec defines exactly one step.
 func (s ModsSpec) IsSingleStep() bool {
-	return len(s.Mods) == 0
+	return len(s.Steps) == 1
 }
 
 // Validate checks that the spec is structurally valid.
 // Returns nil if valid, or a descriptive error for invalid specs.
 //
 // Validation rules:
-//   - For multi-step runs: each mod entry must have a non-empty image.
-//   - For single-step runs: top-level image may be empty (run uses container CMD).
+//   - steps must be non-empty and each step must have a non-empty image.
 //   - HealingSpec.Mod must have a non-empty image when present.
 //   - Retries must be non-negative.
 func (s ModsSpec) Validate() error {
@@ -348,21 +320,24 @@ func (s ModsSpec) Validate() error {
 		return fmt.Errorf("mod_index: must be non-negative, got %d", *s.ModIndex)
 	}
 
-	// Validate multi-step mods.
-	for i, mod := range s.Mods {
+	// Validate steps.
+	if len(s.Steps) == 0 {
+		return fmt.Errorf("steps: required")
+	}
+	for i, mod := range s.Steps {
 		if mod.Image.IsEmpty() {
-			return fmt.Errorf("mods[%d]: image is required", i)
+			return fmt.Errorf("steps[%d].image: required", i)
 		}
 	}
 
 	// Validate healing spec.
-	if s.BuildGateHealing != nil {
-		if s.BuildGateHealing.Retries < 0 {
-			return fmt.Errorf("build_gate_healing.retries: must be non-negative, got %d",
-				s.BuildGateHealing.Retries)
+	if s.BuildGate != nil && s.BuildGate.Healing != nil {
+		if s.BuildGate.Healing.Retries < 0 {
+			return fmt.Errorf("build_gate.healing.retries: must be non-negative, got %d",
+				s.BuildGate.Healing.Retries)
 		}
-		if s.BuildGateHealing.Mod != nil && s.BuildGateHealing.Mod.Image.IsEmpty() {
-			return fmt.Errorf("build_gate_healing.mod.image: required when healing mod is specified")
+		if s.BuildGate.Healing.Mod != nil && s.BuildGate.Healing.Mod.Image.IsEmpty() {
+			return fmt.Errorf("build_gate.healing.mod.image: required when healing mod is specified")
 		}
 	}
 
@@ -373,14 +348,11 @@ func (s ModsSpec) Validate() error {
 // Returns a validated ModsSpec or an error for invalid/malformed input.
 //
 // Errors are structured with field paths for actionable debugging:
-//   - "mods[2].image: required" — missing required field in multi-step mod
-//   - "build_gate_healing.retries: must be non-negative" — invalid value
-//
-// Empty input (nil or empty bytes) returns an empty but valid ModsSpec.
+//   - "steps[2].image: required" — missing required field in step
+//   - "build_gate.healing.retries: must be non-negative" — invalid value
 func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
-	// Handle empty input.
 	if len(data) == 0 {
-		return &ModsSpec{}, nil
+		return nil, fmt.Errorf("steps: required")
 	}
 
 	// Unmarshal into intermediate map to handle polymorphic fields.
@@ -400,7 +372,19 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 
 	// Reject legacy spec shapes explicitly to avoid silent no-op parsing.
 	if _, ok := raw["mod"]; ok {
-		return nil, fmt.Errorf("mod: legacy spec shape is not supported; use top-level fields or mods[]")
+		return nil, fmt.Errorf("mod: legacy spec shape is not supported; use steps[]")
+	}
+	if _, ok := raw["mods"]; ok {
+		return nil, fmt.Errorf("mods: renamed to steps")
+	}
+	if _, ok := raw["image"]; ok {
+		return nil, fmt.Errorf("image: moved under steps[0].image")
+	}
+	if _, ok := raw["command"]; ok {
+		return nil, fmt.Errorf("command: moved under steps[0].command")
+	}
+	if _, ok := raw["retain_container"]; ok {
+		return nil, fmt.Errorf("retain_container: moved under steps[0].retain_container")
 	}
 
 	// Parse server-injected fields.
@@ -439,24 +423,6 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 		spec.Kind = strings.TrimSpace(s)
 	}
 
-	// Parse top-level image (polymorphic: string or map).
-	if v, ok := raw["image"]; ok && v != nil {
-		img, err := ParseModImage(v)
-		if err != nil {
-			return nil, fmt.Errorf("image: %w", err)
-		}
-		spec.Image = img
-	}
-
-	// Parse top-level command (polymorphic: string or array).
-	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := parseCommandSpec(v)
-		if err != nil {
-			return nil, fmt.Errorf("command: %w", err)
-		}
-		spec.Command = cmd
-	}
-
 	// Parse top-level env.
 	if v, ok := raw["env"]; ok && v != nil {
 		env, err := parseEnvMap(v, "env")
@@ -466,35 +432,29 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 		spec.Env = env
 	}
 
-	// Parse retain_container.
-	if v, ok := raw["retain_container"]; ok && v != nil {
-		b, ok := v.(bool)
-		if !ok {
-			return nil, fmt.Errorf("retain_container: expected bool, got %T", v)
-		}
-		spec.RetainContainer = b
+	// Parse steps[] array (required).
+	v, ok := raw["steps"]
+	if !ok || v == nil {
+		return nil, fmt.Errorf("steps: required")
 	}
-
-	// Parse mods[] array for multi-step runs.
-	if v, ok := raw["mods"]; ok && v != nil {
-		modsRaw, ok := v.([]any)
+	stepsRaw, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("steps: expected array, got %T", v)
+	}
+	if len(stepsRaw) == 0 {
+		return nil, fmt.Errorf("steps: required")
+	}
+	spec.Steps = make([]ModStep, 0, len(stepsRaw))
+	for i, stepRaw := range stepsRaw {
+		stepMap, ok := stepRaw.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("mods: expected array, got %T", v)
+			return nil, fmt.Errorf("steps[%d]: expected object, got %T", i, stepRaw)
 		}
-		if len(modsRaw) > 0 {
-			spec.Mods = make([]ModStep, 0, len(modsRaw))
-			for i, modRaw := range modsRaw {
-				modMap, ok := modRaw.(map[string]any)
-				if !ok {
-					return nil, fmt.Errorf("mods[%d]: expected object, got %T", i, modRaw)
-				}
-				step, err := parseModStep(modMap, i)
-				if err != nil {
-					return nil, err
-				}
-				spec.Mods = append(spec.Mods, step)
-			}
+		step, err := parseModStep(stepMap, i)
+		if err != nil {
+			return nil, err
 		}
+		spec.Steps = append(spec.Steps, step)
 	}
 
 	// Parse build_gate.
@@ -518,20 +478,21 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			}
 			bg.Profile = strings.TrimSpace(s)
 		}
+		if vv, ok := bgRaw["healing"]; ok && vv != nil {
+			healRaw, ok := vv.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("build_gate.healing: expected object, got %T", vv)
+			}
+			heal, err := parseHealingSpec(healRaw, "build_gate.healing")
+			if err != nil {
+				return nil, err
+			}
+			bg.Healing = heal
+		}
 		spec.BuildGate = bg
 	}
-
-	// Parse build_gate_healing.
-	if v, ok := raw["build_gate_healing"]; ok && v != nil {
-		healRaw, ok := v.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("build_gate_healing: expected object, got %T", v)
-		}
-		heal, err := parseHealingSpec(healRaw)
-		if err != nil {
-			return nil, err
-		}
-		spec.BuildGateHealing = heal
+	if _, ok := raw["build_gate_healing"]; ok {
+		return nil, fmt.Errorf("build_gate_healing: renamed to build_gate.healing")
 	}
 
 	// Parse GitLab integration.
@@ -593,10 +554,10 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 	return spec, nil
 }
 
-// parseModStep parses a single mod step entry from the mods[] array.
+// parseModStep parses a single mod step entry from the steps[] array.
 func parseModStep(raw map[string]any, index int) (ModStep, error) {
 	step := ModStep{}
-	prefix := fmt.Sprintf("mods[%d]", index)
+	prefix := fmt.Sprintf("steps[%d]", index)
 
 	// Parse optional name.
 	if v, ok := raw["name"]; ok && v != nil {
@@ -607,7 +568,7 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 		step.Name = strings.TrimSpace(s)
 	}
 
-	// Parse image (required for multi-step mods).
+	// Parse image.
 	if v, ok := raw["image"]; ok && v != nil {
 		img, err := ParseModImage(v)
 		if err != nil {
@@ -646,8 +607,7 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 	return step, nil
 }
 
-// parseHealingSpec parses the build_gate_healing configuration.
-func parseHealingSpec(raw map[string]any) (*HealingSpec, error) {
+func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 	heal := &HealingSpec{
 		Retries: 1, // Default to 1 retry.
 	}
@@ -659,7 +619,7 @@ func parseHealingSpec(raw map[string]any) (*HealingSpec, error) {
 		} else if rf, ok := v.(float64); ok {
 			heal.Retries = int(rf)
 		} else {
-			return nil, fmt.Errorf("build_gate_healing.retries: expected number, got %T", v)
+			return nil, fmt.Errorf("%s.retries: expected number, got %T", prefix, v)
 		}
 	}
 
@@ -667,9 +627,9 @@ func parseHealingSpec(raw map[string]any) (*HealingSpec, error) {
 	if v, ok := raw["mod"]; ok && v != nil {
 		modRaw, ok := v.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("build_gate_healing.mod: expected object, got %T", v)
+			return nil, fmt.Errorf("%s.mod: expected object, got %T", prefix, v)
 		}
-		mod, err := parseHealingModSpec(modRaw)
+		mod, err := parseHealingModSpec(modRaw, prefix+".mod")
 		if err != nil {
 			return nil, err
 		}
@@ -679,10 +639,8 @@ func parseHealingSpec(raw map[string]any) (*HealingSpec, error) {
 	return heal, nil
 }
 
-// parseHealingModSpec parses a healing mod specification.
-func parseHealingModSpec(raw map[string]any) (*HealingModSpec, error) {
+func parseHealingModSpec(raw map[string]any, prefix string) (*HealingModSpec, error) {
 	mod := &HealingModSpec{}
-	prefix := "build_gate_healing.mod"
 
 	// Parse image.
 	if v, ok := raw["image"]; ok && v != nil {
@@ -817,27 +775,17 @@ func (s ModsSpec) ToMap() map[string]any {
 		result["kind"] = s.Kind
 	}
 
-	// Single-step fields.
-	if !s.Image.IsEmpty() {
-		result["image"] = modImageToAny(s.Image)
-	}
-	if !s.Command.IsEmpty() {
-		result["command"] = commandSpecToAny(s.Command)
-	}
 	if len(s.Env) > 0 {
 		result["env"] = s.Env
 	}
-	if s.RetainContainer {
-		result["retain_container"] = true
-	}
 
-	// Multi-step mods.
-	if len(s.Mods) > 0 {
-		mods := make([]map[string]any, 0, len(s.Mods))
-		for _, mod := range s.Mods {
-			mods = append(mods, modStepToMap(mod))
+	// Steps.
+	if len(s.Steps) > 0 {
+		steps := make([]map[string]any, 0, len(s.Steps))
+		for _, step := range s.Steps {
+			steps = append(steps, modStepToMap(step))
 		}
-		result["mods"] = mods
+		result["steps"] = steps
 	}
 
 	// Build gate.
@@ -849,22 +797,20 @@ func (s ModsSpec) ToMap() map[string]any {
 		if s.BuildGate.Profile != "" {
 			bg["profile"] = s.BuildGate.Profile
 		}
+		if s.BuildGate.Healing != nil {
+			heal := make(map[string]any)
+			if s.BuildGate.Healing.Retries > 0 {
+				heal["retries"] = s.BuildGate.Healing.Retries
+			}
+			if s.BuildGate.Healing.Mod != nil {
+				heal["mod"] = healingModToMap(s.BuildGate.Healing.Mod)
+			}
+			if len(heal) > 0 {
+				bg["healing"] = heal
+			}
+		}
 		if len(bg) > 0 {
 			result["build_gate"] = bg
-		}
-	}
-
-	// Healing.
-	if s.BuildGateHealing != nil {
-		heal := make(map[string]any)
-		if s.BuildGateHealing.Retries > 0 {
-			heal["retries"] = s.BuildGateHealing.Retries
-		}
-		if s.BuildGateHealing.Mod != nil {
-			heal["mod"] = healingModToMap(s.BuildGateHealing.Mod)
-		}
-		if len(heal) > 0 {
-			result["build_gate_healing"] = heal
 		}
 	}
 

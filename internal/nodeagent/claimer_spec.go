@@ -26,31 +26,21 @@ func stringValue(s *string) string {
 // It uses the canonical contracts.ParseModsSpecJSON parser for structured
 // validation, then converts to the internal RunOptions format.
 //
-// The spec is expected to contain fields like "image", "command", "env",
-// "build_gate", "mods", and other configuration values. This function extracts
+// The spec is expected to contain fields like "steps", "env",
+// "build_gate", and other configuration values. This function extracts
 // and flattens nested structures according to the following rules:
 //
-//   - Top-level fields like "image", "command", "env" are extracted directly.
+//   - Single-step execution fields are taken from steps[0] (image, command, retain_container).
 //   - The "build_gate" object is flattened into "build_gate_enabled" and
 //     "build_gate_profile" options for manifest builder consumption.
 //   - Server-injected metadata like "job_id", "gitlab_pat", "gitlab_domain",
 //     "mr_on_success", and "mr_on_fail" are passed through as-is.
-//   - The "build_gate_healing" block is preserved in options to support heal → re-gate loops.
-//   - For multi-step runs, the "mods[]" array is preserved for step-by-step execution.
+//   - The "build_gate.healing" block is preserved in options to support heal → re-gate loops.
+//   - For multi-step runs, the "steps[]" array is preserved for step-by-step execution.
 //
-// ## Canonical Spec Shapes
+// ## Canonical Spec Shape
 //
-// Single-step runs use top-level fields:
-//
-//	{"image": "...", "command": "...", "env": {...}, "build_gate": {...}}
-//
-// Multi-step runs use the mods[] array:
-//
-//	{"mods": [{...}, {...}], "build_gate": {...}, "build_gate_healing": {...}}
-//
-// The legacy "mod" object fallback (where mod.image, mod.command, etc. were copied
-// to top-level when missing) is no longer supported. Specs must use one of the
-// canonical shapes above.
+// All runs use steps[] (even single-step runs).
 //
 // ## Return Values
 //
@@ -134,25 +124,6 @@ func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]str
 		env[k] = v
 	}
 
-	// Convert image to opts format.
-	if !spec.Image.IsEmpty() {
-		opts["image"] = modImageToAny(spec.Image)
-	}
-
-	// Convert command to opts format.
-	if !spec.Command.IsEmpty() {
-		if len(spec.Command.Exec) > 0 {
-			opts["command"] = spec.Command.Exec
-		} else if spec.Command.Shell != "" {
-			opts["command"] = spec.Command.Shell
-		}
-	}
-
-	// Retain container.
-	if spec.RetainContainer {
-		opts["retain_container"] = true
-	}
-
 	// Build gate - flatten enabled/profile and set enabled even when false.
 	if spec.BuildGate != nil {
 		// Always set build_gate_enabled when BuildGate is present (including false).
@@ -160,36 +131,54 @@ func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]str
 		if spec.BuildGate.Profile != "" {
 			opts["build_gate_profile"] = spec.BuildGate.Profile
 		}
-	}
 
-	// Build gate healing - preserve original types from rawMap for backwards compat.
-	// Use []any for command arrays to match JSON decoding and existing parsing helpers.
-	if spec.BuildGateHealing != nil {
-		healing := make(map[string]any)
-		healing["retries"] = spec.BuildGateHealing.Retries
-		if spec.BuildGateHealing.Mod != nil {
-			mod := make(map[string]any)
-			if !spec.BuildGateHealing.Mod.Image.IsEmpty() {
-				mod["image"] = modImageToAny(spec.BuildGateHealing.Mod.Image)
-			}
-			if !spec.BuildGateHealing.Mod.Command.IsEmpty() {
-				mod["command"] = commandSpecToAnyForNested(spec.BuildGateHealing.Mod.Command)
-			}
-			if len(spec.BuildGateHealing.Mod.Env) > 0 {
-				mod["env"] = stringMapToAnyMap(spec.BuildGateHealing.Mod.Env)
-			}
-			if spec.BuildGateHealing.Mod.RetainContainer {
-				mod["retain_container"] = true
-			}
-			healing["mod"] = mod
+		bg := make(map[string]any)
+		bg["enabled"] = spec.BuildGate.Enabled
+		if spec.BuildGate.Profile != "" {
+			bg["profile"] = spec.BuildGate.Profile
 		}
-		opts["build_gate_healing"] = healing
+		if spec.BuildGate.Healing != nil {
+			healing := make(map[string]any)
+			healing["retries"] = spec.BuildGate.Healing.Retries
+			if spec.BuildGate.Healing.Mod != nil {
+				mod := make(map[string]any)
+				if !spec.BuildGate.Healing.Mod.Image.IsEmpty() {
+					mod["image"] = modImageToAny(spec.BuildGate.Healing.Mod.Image)
+				}
+				if !spec.BuildGate.Healing.Mod.Command.IsEmpty() {
+					mod["command"] = commandSpecToAnyForNested(spec.BuildGate.Healing.Mod.Command)
+				}
+				if len(spec.BuildGate.Healing.Mod.Env) > 0 {
+					mod["env"] = stringMapToAnyMap(spec.BuildGate.Healing.Mod.Env)
+				}
+				if spec.BuildGate.Healing.Mod.RetainContainer {
+					mod["retain_container"] = true
+				}
+				healing["mod"] = mod
+			}
+			bg["healing"] = healing
+		}
+		opts["build_gate"] = bg
 	}
 
-	// Multi-step mods.
-	if len(spec.Mods) > 0 {
-		mods := make([]any, 0, len(spec.Mods))
-		for _, step := range spec.Mods {
+	// Steps.
+	if len(spec.Steps) == 1 {
+		step := spec.Steps[0]
+		if !step.Image.IsEmpty() {
+			opts["image"] = modImageToAny(step.Image)
+		}
+		if !step.Command.IsEmpty() {
+			opts["command"] = commandSpecToAnyForNested(step.Command)
+		}
+		if step.RetainContainer {
+			opts["retain_container"] = true
+		}
+		for k, v := range step.Env {
+			env[k] = v
+		}
+	} else if len(spec.Steps) > 1 {
+		steps := make([]any, 0, len(spec.Steps))
+		for _, step := range spec.Steps {
 			m := make(map[string]any)
 			if strings.TrimSpace(step.Name) != "" {
 				m["name"] = strings.TrimSpace(step.Name)
@@ -206,9 +195,9 @@ func modsSpecToOptions(spec *contracts.ModsSpec) (map[string]any, map[string]str
 			if step.RetainContainer {
 				m["retain_container"] = true
 			}
-			mods = append(mods, m)
+			steps = append(steps, m)
 		}
-		opts["mods"] = mods
+		opts["steps"] = steps
 	}
 
 	// GitLab integration.

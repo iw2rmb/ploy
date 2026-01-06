@@ -213,7 +213,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoI
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
-		for i, mod := range modsSpec.Mods {
+		for i, mod := range modsSpec.Steps {
 			modImage := ""
 			if mod.Image.Universal != "" {
 				modImage = strings.TrimSpace(mod.Image.Universal)
@@ -225,7 +225,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoI
 			}
 		}
 
-		postGateIndex := domaintypes.StepIndex(2000 + len(modsSpec.Mods)*1000)
+		postGateIndex := domaintypes.StepIndex(2000 + len(modsSpec.Steps)*1000)
 		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
 			return fmt.Errorf("create post-gate job: %w", err)
 		}
@@ -233,8 +233,8 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID string, repoI
 	}
 
 	modImage := ""
-	if modsSpec.Image.Universal != "" {
-		modImage = strings.TrimSpace(modsSpec.Image.Universal)
+	if len(modsSpec.Steps) > 0 && modsSpec.Steps[0].Image.Universal != "" {
+		modImage = strings.TrimSpace(modsSpec.Steps[0].Image.Universal)
 	}
 	return createSingleModJob(ctx, st, runID, repoID, repoBaseRef, attempt, modImage)
 }

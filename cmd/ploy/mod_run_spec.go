@@ -2,9 +2,9 @@
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
 // and resolves env_from_file references to inject file content as environment
-// variables. Specs are expected to use canonical shapes:
-//   - Single-step runs: top-level fields (image, command, env, retain_container).
-//   - Multi-step runs: mods[] array with one entry per step plus global build_gate[_healing].
+// variables. Specs use a single canonical shape:
+//   - steps[] array with one entry per step (even single-step runs)
+//   - global build gate policy under build_gate (including build_gate.healing)
 //
 // Spec parsing includes validation and error handling for missing files.
 // Isolating spec handling from execution flow enables focused testing
@@ -134,9 +134,9 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // Processing order:
 // 1. Load spec file (YAML or JSON format) if provided
 // 2. Resolve env_from_file references in:
-//   - top-level env (canonical single-step format)
-//   - mods[] (multi-step format)
-//   - build_gate_healing.mod (healing mod)
+//   - top-level env
+//   - steps[] entries
+//   - build_gate.healing.mod (healing mod)
 //
 // 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
 //
@@ -144,11 +144,11 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 //
 // Returns nil payload when neither spec file nor CLI overrides are provided.
 //
-// Multi-step semantics (mods[] array):
-// - Each entry in mods[] represents a sequential transformation step.
-// - All mods share the same repository and global build_gate/build_gate_healing policy.
-// - The CLI preserves mods[] without modification; overrides do not apply to multi-step format.
-// - The server copies mods[] indexes into jobs.step_index and diffs.step_index.
+// Multi-step semantics (steps[] array):
+// - Each entry in steps[] represents a sequential transformation step.
+// - All steps share the same repository and global build_gate policy (including healing).
+// - The CLI preserves steps[] without modification; image/command/retain overrides do not apply when len(steps) > 1.
+// - The server copies steps[] indexes into jobs.step_index and diffs.step_index.
 func buildSpecPayload(
 	specFile string,
 	modEnvs []string,
@@ -183,24 +183,23 @@ func buildSpecPayload(
 		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
-	// Resolve env_from_file references in build_gate_healing.mod if present.
-	if healing, ok := base["build_gate_healing"].(map[string]any); ok {
-		if modEntry, ok := healing["mod"].(map[string]any); ok {
-			if err := resolveEnvFromFileInPlace(modEntry); err != nil {
-				return nil, fmt.Errorf("resolve env from file (build_gate_healing.mod): %w", err)
+	// Resolve env_from_file references in build_gate.healing.mod if present.
+	if bg, ok := base["build_gate"].(map[string]any); ok {
+		if healing, ok := bg["healing"].(map[string]any); ok {
+			if modEntry, ok := healing["mod"].(map[string]any); ok {
+				if err := resolveEnvFromFileInPlace(modEntry); err != nil {
+					return nil, fmt.Errorf("resolve env from file (build_gate.healing.mod): %w", err)
+				}
 			}
 		}
 	}
 
-	// Resolve env_from_file references in top-level mods[] array (multi-step mods)
-	// This array holds sequential transformation steps that share the same global
-	// gate and healing policy. Each mod in the array has the same schema as the
-	// single-step top-level fields (image, command, env, env_from_file, retain_container).
-	if mods, ok := base["mods"].([]any); ok {
-		for i, m := range mods {
-			if modEntry, ok := m.(map[string]any); ok {
-				if err := resolveEnvFromFileInPlace(modEntry); err != nil {
-					return nil, fmt.Errorf("resolve env from file (mods[%d]): %w", i, err)
+	// Resolve env_from_file references in steps[] array entries.
+	if steps, ok := base["steps"].([]any); ok {
+		for i, s := range steps {
+			if stepEntry, ok := s.(map[string]any); ok {
+				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
+					return nil, fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
 				}
 			}
 		}
@@ -249,26 +248,44 @@ func buildSpecPayload(
 		}
 	}
 
-	if modImage != "" {
-		base["image"] = modImage
+	// Image/command/retain overrides apply only to single-step specs. For multi-step
+	// specs (len(steps) > 1), these overrides are ignored.
+	var stepsLen int
+	if steps, ok := base["steps"].([]any); ok {
+		stepsLen = len(steps)
 	}
-
-	if retain {
-		base["retain_container"] = true
-	}
-
-	if modCommand != "" {
-		// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
-		// Fallback to plain string when not a JSON array.
-		var asArray []string
-		if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
-			if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
-				base["command"] = asArray
-			} else {
-				base["command"] = modCommand
+	if stepsLen <= 1 && (modImage != "" || retain || modCommand != "") {
+		// Ensure steps[0] exists and is a map.
+		var step0 map[string]any
+		if stepsLen == 1 {
+			if m, ok := base["steps"].([]any)[0].(map[string]any); ok {
+				step0 = m
 			}
-		} else {
-			base["command"] = modCommand
+		}
+		if step0 == nil {
+			step0 = make(map[string]any)
+			base["steps"] = []any{step0}
+		}
+
+		if modImage != "" {
+			step0["image"] = modImage
+		}
+		if retain {
+			step0["retain_container"] = true
+		}
+		if modCommand != "" {
+			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
+			// Fallback to plain string when not a JSON array.
+			var asArray []string
+			if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
+				if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
+					step0["command"] = asArray
+				} else {
+					step0["command"] = modCommand
+				}
+			} else {
+				step0["command"] = modCommand
+			}
 		}
 	}
 
