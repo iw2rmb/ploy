@@ -398,3 +398,239 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 // Note: uploadDiff and associated mod diff metadata tests were removed along
 // with legacy HEAD-based diff generation. Mods now use baseline-aware
 // GenerateBetween semantics via dedicated helpers.
+
+// TestIsValidArtifactPath verifies path traversal prevention for artifact paths.
+// This is a security test ensuring malicious paths like "../../etc/passwd" are rejected.
+func TestIsValidArtifactPath(t *testing.T) {
+	t.Parallel()
+
+	// Use a realistic workspace path for testing.
+	workspace := "/workspace"
+
+	tests := []struct {
+		name         string
+		artifactPath string
+		workspace    string
+		wantValid    bool
+	}{
+		// Valid paths — should be accepted.
+		{
+			name:         "simple relative path",
+			artifactPath: "file.txt",
+			workspace:    workspace,
+			wantValid:    true,
+		},
+		{
+			name:         "nested relative path",
+			artifactPath: "dir/subdir/file.txt",
+			workspace:    workspace,
+			wantValid:    true,
+		},
+		{
+			name:         "path with safe relative component",
+			artifactPath: "dir/../file.txt",
+			workspace:    workspace,
+			wantValid:    true, // Resolves to /workspace/file.txt, still inside workspace
+		},
+		{
+			name:         "path with dot",
+			artifactPath: "./file.txt",
+			workspace:    workspace,
+			wantValid:    true,
+		},
+
+		// Invalid paths — should be rejected.
+		{
+			name:         "path traversal with ../../",
+			artifactPath: "../../etc/passwd",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "path traversal with multiple ..",
+			artifactPath: "../../../var/log/secret.log",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "path traversal at start",
+			artifactPath: "../sibling/file.txt",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "absolute path unix style",
+			artifactPath: "/etc/passwd",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "absolute path to sensitive file",
+			artifactPath: "/root/.ssh/id_rsa",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "empty path",
+			artifactPath: "",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "whitespace only path",
+			artifactPath: "   ",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+		{
+			name:         "nested traversal escaping workspace",
+			artifactPath: "subdir/../../secrets.txt",
+			workspace:    workspace,
+			wantValid:    false, // Resolves to /secrets.txt, outside workspace
+		},
+		{
+			name:         "deep nested traversal",
+			artifactPath: "a/b/c/../../../../etc/hosts",
+			workspace:    workspace,
+			wantValid:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := isValidArtifactPath(tt.artifactPath, tt.workspace)
+			if got != tt.wantValid {
+				t.Errorf("isValidArtifactPath(%q, %q) = %v, want %v",
+					tt.artifactPath, tt.workspace, got, tt.wantValid)
+			}
+		})
+	}
+}
+
+// TestRunController_uploadConfiguredArtifacts_PathTraversal verifies that
+// path traversal attempts in artifact_paths are rejected and do not trigger uploads.
+// This is a critical security test per ROADMAP.md security hardening requirements.
+func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		artifactPaths []string
+		createFiles   []string // Files to create relative to workspace
+		wantUpload    bool     // Whether upload should be called at all
+		description   string   // Security context
+	}{
+		{
+			name:          "path traversal ../../etc/passwd rejected",
+			artifactPaths: []string{"../../etc/passwd"},
+			createFiles:   []string{}, // Nothing to create — the path would be outside workspace
+			wantUpload:    false,
+			description:   "Malicious path attempting to exfiltrate /etc/passwd should be rejected",
+		},
+		{
+			name:          "mixed valid and traversal paths",
+			artifactPaths: []string{"valid.txt", "../../etc/passwd", "another_valid.txt"},
+			createFiles:   []string{"valid.txt", "another_valid.txt"},
+			wantUpload:    true, // Valid paths should still be uploaded
+			description:   "Valid paths should be uploaded even when mixed with invalid paths",
+		},
+		{
+			name:          "absolute path /etc/hosts rejected",
+			artifactPaths: []string{"/etc/hosts"},
+			createFiles:   []string{},
+			wantUpload:    false,
+			description:   "Absolute paths should be rejected to prevent arbitrary file access",
+		},
+		{
+			name:          "all paths are traversal attempts",
+			artifactPaths: []string{"../secret", "../../etc/shadow", "../../../root/.bashrc"},
+			createFiles:   []string{},
+			wantUpload:    false,
+			description:   "When all paths are invalid, no upload should occur",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			uploadCalled := false
+
+			// Mock server (job-scoped endpoint).
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
+				if r.URL.Path == "/v1/runs/test-run-traversal/jobs/test-job-traversal/artifact" {
+					uploadCalled = true
+					w.WriteHeader(http.StatusCreated)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"artifact_bundle_id": "test-id",
+						"cid":                "test-cid",
+					})
+				}
+			}))
+			defer server.Close()
+
+			// Create workspace with test files.
+			workspace, err := os.MkdirTemp("", "ploy-test-traversal-*")
+			if err != nil {
+				t.Fatalf("failed to create workspace: %v", err)
+			}
+			defer func() { _ = os.RemoveAll(workspace) }()
+
+			// Create files that should be uploadable.
+			for _, f := range tt.createFiles {
+				fullPath := filepath.Join(workspace, f)
+				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+					t.Fatalf("failed to create dir: %v", err)
+				}
+				if err := os.WriteFile(fullPath, []byte("test content"), 0644); err != nil {
+					t.Fatalf("failed to create file: %v", err)
+				}
+			}
+
+			// Initialize test infrastructure.
+			cfg := Config{
+				ServerURL: server.URL,
+				NodeID:    "test-node",
+				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+			}
+
+			controller := &runController{cfg: cfg}
+
+			// Build options with artifact paths including traversal attempts.
+			opts := map[string]any{
+				"artifact_paths": tt.artifactPaths,
+				"artifact_name":  "test-artifact",
+			}
+
+			// Parse options into typed RunOptions.
+			typedOpts := parseRunOptions(opts)
+
+			req := StartRunRequest{
+				RunID:        types.RunID("test-run-traversal"),
+				JobID:        "test-job-traversal",
+				TypedOptions: typedOpts,
+			}
+
+			manifest := contracts.StepManifest{
+				Image:   "test-image",
+				Command: []string{"test"},
+				Options: map[string]interface{}{
+					"job_id":        "test-job",
+					"artifact_name": "test-artifact",
+				},
+			}
+
+			// Execute upload with typed RunOptions.
+			ctx := context.Background()
+			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
+
+			// Verify upload call matches expectation.
+			if uploadCalled != tt.wantUpload {
+				t.Errorf("[%s] uploadCalled = %v, want %v", tt.description, uploadCalled, tt.wantUpload)
+			}
+		})
+	}
+}
