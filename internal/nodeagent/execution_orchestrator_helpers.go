@@ -28,7 +28,7 @@ import (
 //
 // Usage pattern:
 //
-//	ctx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String())
+//	ctx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
 //	if err != nil { /* handle error */ }
 //	defer cleanup()
 //	// use ctx.runner, ctx.diffGenerator
@@ -48,16 +48,21 @@ type jobExecutionContext struct {
 //
 // This extracts the common init + defer pattern from executeModJob/executeHealingJob:
 //
-//	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID)
+//	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
 //	if err != nil { ... }
 //	defer func() { _ = logStreamer.Close() }()
+//
+// Parameters:
+//   - ctx: context for initialization operations
+//   - runID: run identifier for logging and telemetry
+//   - jobID: job identifier for associating log chunks with specific jobs
 //
 // Returns:
 //   - ctx: jobExecutionContext with runner, diffGenerator, logStreamer
 //   - cleanup: function to close logStreamer (must be deferred)
 //   - err: non-nil if runtime initialization fails
-func (r *runController) initJobExecutionContext(ctx context.Context, runID string) (jobExecutionContext, func(), error) {
-	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID)
+func (r *runController) initJobExecutionContext(ctx context.Context, runID string, jobID string) (jobExecutionContext, func(), error) {
+	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
 	if err != nil {
 		return jobExecutionContext{}, nil, err
 	}
