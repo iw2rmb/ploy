@@ -190,9 +190,10 @@ func (r *runController) uploadModDiffWithBaseline(
 
 	// Build diff summary with step metadata for database storage.
 	// Uses typed builder to eliminate map[string]any construction.
+	// Mod job diffs use DiffModTypeMod so they participate in the rehydration chain.
 	summary := types.NewDiffSummaryBuilder().
 		StepIndex(int(stepIndex)).
-		ModType("mod").
+		ModType(DiffModTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
 			result.Timings.HydrationDuration.Milliseconds(),

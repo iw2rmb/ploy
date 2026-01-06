@@ -105,7 +105,7 @@ func (r *runController) uploadHealingJobDiff(
 	// Uses typed builder to eliminate map[string]any construction.
 	summary := types.NewDiffSummaryBuilder().
 		StepIndex(int(stepIndex)).
-		ModType("mod").
+		ModType(DiffModTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
 			result.Timings.HydrationDuration.Milliseconds(),
