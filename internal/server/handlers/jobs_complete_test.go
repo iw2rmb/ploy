@@ -2279,3 +2279,116 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 		t.Error("did not expect UpdateRunStatus to be called when not all repos are terminal")
 	}
 }
+
+// ===== v0 Status String Rejection Tests =====
+// v1 API uses capitalized status strings: Success, Fail, Cancelled.
+// v0 status strings (succeeded, failed, canceled) must be rejected with 400.
+// See roadmap/v1/statuses.md:127.
+
+// TestCompleteJob_RejectsV0StatusSucceeded verifies that v0 "succeeded" is rejected.
+func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{}
+	handler := completeJobHandler(st, nil)
+
+	// v0 status "succeeded" should be rejected in favor of v1 "Success".
+	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for v0 'succeeded', got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "status") {
+		t.Errorf("expected error message to mention status, got: %s", rr.Body.String())
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called for v0 status")
+	}
+}
+
+// TestCompleteJob_RejectsV0StatusFailed verifies that v0 "failed" is rejected.
+func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{}
+	handler := completeJobHandler(st, nil)
+
+	// v0 status "failed" should be rejected in favor of v1 "Fail".
+	body, _ := json.Marshal(map[string]any{"status": "failed"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for v0 'failed', got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "status") {
+		t.Errorf("expected error message to mention status, got: %s", rr.Body.String())
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called for v0 status")
+	}
+}
+
+// TestCompleteJob_RejectsV0StatusCanceled verifies that v0 "canceled" (single 'l') is rejected.
+func TestCompleteJob_RejectsV0StatusCanceled(t *testing.T) {
+	t.Parallel()
+
+	nodeID := domaintypes.NewNodeKey()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{}
+	handler := completeJobHandler(st, nil)
+
+	// v0 status "canceled" (American spelling) should be rejected in favor of v1 "Cancelled".
+	body, _ := json.Marshal(map[string]any{"status": "canceled"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeID)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeID,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for v0 'canceled', got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "status") {
+		t.Errorf("expected error message to mention status, got: %s", rr.Body.String())
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called for v0 status")
+	}
+}

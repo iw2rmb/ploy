@@ -23,15 +23,17 @@ import (
 // This file isolates MR creation workflow from core execution orchestration.
 
 // shouldCreateMR determines if an MR should be created based on terminal status and manifest options.
-// MR creation is triggered by mr_on_success (for succeeded runs) or mr_on_fail (for failed runs).
+// MR creation is triggered by mr_on_success (for Success runs) or mr_on_fail (for Fail runs).
 // Only boolean true values trigger MR creation; non-boolean values are ignored.
+// v1 uses capitalized job status values: Success, Fail, Cancelled
+// (see roadmap/v1/statuses.md:127).
 func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool {
-	if terminalStatus == "succeeded" {
+	if terminalStatus == "Success" {
 		if mrOnSuccess, ok := manifest.OptionBool("mr_on_success"); ok && mrOnSuccess {
 			return true
 		}
 	}
-	if terminalStatus == "failed" {
+	if terminalStatus == "Fail" {
 		if mrOnFail, ok := manifest.OptionBool("mr_on_fail"); ok && mrOnFail {
 			return true
 		}

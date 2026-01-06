@@ -73,8 +73,10 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 		t.Fatalf("PLOY_NODE_UUID header = %q, want %q", capturedHeaderNodeID, "node123")
 	}
 
-	if got, _ := capturedPayload["status"].(string); got != "failed" {
-		t.Fatalf("status = %v, want %q", capturedPayload["status"], "failed")
+	// v1 uses capitalized job status values: Success, Fail, Cancelled
+	// (see roadmap/v1/statuses.md:127).
+	if got, _ := capturedPayload["status"].(string); got != "Fail" {
+		t.Fatalf("status = %v, want %q", capturedPayload["status"], "Fail")
 	}
 
 	if got, ok := capturedPayload["exit_code"].(float64); !ok || got != 1 {
