@@ -452,6 +452,7 @@ Ploy supports distributed execution of multi-step Mods runs across a cluster usi
 **Diff Chain (Ordered Modifications)**:
 - A sequence of gzipped unified diffs captured after each step (gate + mod pair)
 - Stored in PostgreSQL with `step_index` metadata for ordering
+- Nodes apply the chain deterministically by sorting diffs by `(step_index, created_at, id)` before `git apply`
 - Each diff represents the workspace changes produced by one step
 
 **Workspace Rehydration**:

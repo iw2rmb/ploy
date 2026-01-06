@@ -194,7 +194,8 @@ Before `mod[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace
 step k from:
 
 1. **Base clone**: A cached copy of the initial repository state (base_ref).
-2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane and
+2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane,
+   sorted deterministically by `(step_index, created_at, id)` in the node agent, and
    applied in order using `git apply`.
 
 After `mod[k]` completes, its changes are present in the same workspace that the
