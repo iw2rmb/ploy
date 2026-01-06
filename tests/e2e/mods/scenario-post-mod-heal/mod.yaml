@@ -41,7 +41,7 @@ kind: ModRunSpec
 # failures to validate the healing flow. The fail-missing-symbol branch
 # contains code that references an undefined symbol (UnknownClass), which will
 # cause post-gate failures until healing creates the missing class.
-mods:
+steps:
   # Step 0: Apply code formatting as warmup (should pass)
   # This step uses a lightweight recipe that formats code without introducing errors.
   - image: docker.io/iwtormb/mods-orw-maven:latest
@@ -99,31 +99,31 @@ build_gate:
 # 3. Edits the workspace and exits; node agent re-gates only when workspace
 #    diffs are present. This tests the critical gate-heal-regate flow for
 #    post-mod failures using the workspace diff handshake.
-build_gate_healing:
-  retries: 2  # Allow multiple healing attempts for complex errors
-  mod:
-    # Codex healing container using the workspace diff handshake.
-    # For this E2E, Codex will analyze the compile error (missing class) and
-    # create the necessary stub class to fix the build.
-    image: docker.io/iwtormb/mods-codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Rules:
-        - Use /workspace and /in/build-gate.log to understand the compile error.
-        - The error is likely a missing class reference (UnknownClass or similar).
-        - Create the missing class in the appropriate package under /workspace.
-        - The class should have a minimal implementation (empty constructor, toString).
-        - Edit files under /workspace as needed to fix the error.
-        - When you believe the code is ready for a full build validation, stop editing and end the session.
+  healing:
+    retries: 2  # Allow multiple healing attempts for complex errors
+    mod:
+      # Codex healing container using the workspace diff handshake.
+      # For this E2E, Codex will analyze the compile error (missing class) and
+      # create the necessary stub class to fix the build.
+      image: docker.io/iwtormb/mods-codex:latest
+      env:
+        CODEX_PROMPT: |-
+          Rules:
+          - Use /workspace and /in/build-gate.log to understand the compile error.
+          - The error is likely a missing class reference (UnknownClass or similar).
+          - Create the missing class in the appropriate package under /workspace.
+          - The class should have a minimal implementation (empty constructor, toString).
+          - Edit files under /workspace as needed to fix the error.
+          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-        Task:
-        Fix the compilation error described in /in/build-gate.log.
-        This is a post-mod gate failure (the mod transformation broke the build).
-        Create any missing classes or fix any syntax errors introduced by the transformation.
-      E2E_STEP_NAME: "post-mod-healer-codex"
-    # Uncomment if you have Codex auth configured:
-    # env_from_file:
-    #   CODEX_AUTH_JSON: ~/.codex/auth.json
+          Task:
+          Fix the compilation error described in /in/build-gate.log.
+          This is a post-mod gate failure (the mod transformation broke the build).
+          Create any missing classes or fix any syntax errors introduced by the transformation.
+        E2E_STEP_NAME: "post-mod-healer-codex"
+      # Uncomment if you have Codex auth configured:
+      # env_from_file:
+      #   CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION
