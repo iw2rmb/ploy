@@ -245,11 +245,11 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// deleteRunRepoHandler cancels a repo execution within a run (legacy DELETE path).
-// DELETE /v1/runs/{id}/repos/{repo_id}
-func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
+// cancelRunRepoHandlerV1 cancels a repo execution within a run (v1 API).
+// POST /v1/runs/{run_id}/repos/{repo_id}/cancel
+func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr, err := requiredPathParam(r, "id")
+		runIDStr, err := requiredPathParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -267,7 +267,7 @@ func deleteRunRepoHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run repo: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+			slog.Error("cancel run repo: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
 			return
 		}
 

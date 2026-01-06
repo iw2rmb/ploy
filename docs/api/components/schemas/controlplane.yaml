@@ -823,31 +823,6 @@ CreateArtifactBundleRequest:
       contentEncoding: base64
   required: [bundle]
 
-# ArtifactListItem represents an artifact bundle in list responses.
-# Used by GET /v1/runs/{run_id}/repos/{repo_id}/artifacts (repo-scoped artifact listing).
-# Required by roadmap/v1/api.md:265 and roadmap/v1/api.md:274.
-ArtifactListItem:
-  type: object
-  properties:
-    id: { type: string, format: uuid, description: "Artifact bundle ID (UUID)" }
-    name: { type: string, nullable: true, description: "Artifact logical name" }
-    job_id: { type: string, description: "Job ID (KSUID string)" }
-    created_at: { type: string, format: date-time }
-    size: { type: integer, format: int32, description: "Size of gzipped bundle in bytes" }
-  required: [id, job_id, created_at]
-
-# ArtifactListResponse is the response for listing artifacts.
-# Used by GET /v1/runs/{run_id}/repos/{repo_id}/artifacts.
-# Required by roadmap/v1/api.md:265 and roadmap/v1/api.md:274.
-ArtifactListResponse:
-  type: object
-  properties:
-    artifacts:
-      type: array
-      items:
-        $ref: '#/ArtifactListItem'
-  required: [artifacts]
-
 # Node describes a registered worker node.
 # Note: node IDs are now NanoID(6) strings (6 characters from URL-safe alphabet).
 Node:

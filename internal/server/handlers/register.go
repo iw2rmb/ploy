@@ -78,14 +78,19 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
 
-	// RunRepo — manage repos within a batch (add/remove/restart/list).
+	// RunRepo — manage repos within a batch (add/restart/list).
 	s.HandleFunc("POST /v1/runs/{id}/repos", addRunRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/runs/{id}/repos/{repo_id}", deleteRunRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
 	// v1 change (roadmap/v1/scope.md:69-71, roadmap/v1/api.md:263): Repo-scoped diffs listing.
 	// Replaces legacy GET /v1/mods/{id}/diffs with repo-scoped addressing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
+	// v1 change (roadmap/v1/api.md:264): Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
+	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/api.md:265): Repo-scoped artifact listing.
+	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(st), auth.RoleControlPlane)
+	// v1 change (roadmap/v1/api.md:266): Repo-scoped cancel (replacement for DELETE /v1/runs/{id}/repos/{repo_id}).
+	s.HandleFunc("POST /v1/runs/{run_id}/repos/{repo_id}/cancel", cancelRunRepoHandlerV1(st), auth.RoleControlPlane)
 	// v1 change (roadmap/v1/api.md:227-249): Pull resolution for run repos.
 	s.HandleFunc("POST /v1/runs/{run_id}/pull", pullRunRepoHandler(st), auth.RoleControlPlane)
 

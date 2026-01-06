@@ -175,7 +175,7 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Send DELETE /v1/runs/{id}/repos/{repo_id}.
+	// Send POST /v1/runs/{id}/repos/{repo_id}/cancel.
 	resp, err := doRunRepoRemove(ctx, base, httpClient, batchID, strings.TrimSpace(*repoID))
 	if err != nil {
 		return err
@@ -366,11 +366,11 @@ func doRunRepoAdd(ctx context.Context, base *url.URL, client *http.Client, batch
 	return result, nil
 }
 
-// doRunRepoRemove sends DELETE /v1/runs/{id}/repos/{repo_id} to remove a repo.
+// doRunRepoRemove sends POST /v1/runs/{id}/repos/{repo_id}/cancel to cancel a repo execution.
 func doRunRepoRemove(ctx context.Context, base *url.URL, client *http.Client, batchID, repoID string) (runRepoResponse, error) {
-	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID)
+	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID, "cancel")
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return runRepoResponse{}, fmt.Errorf("create request: %w", err)
 	}

@@ -62,8 +62,13 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// RunRepo handlers (repos within a batch)
 		{"/v1/runs/{id}/repos", "get"},
 		{"/v1/runs/{id}/repos", "post"},
-		{"/v1/runs/{id}/repos/{repo_id}", "delete"},
 		{"/v1/runs/{id}/repos/{repo_id}/restart", "post"},
+		// v1 repo-scoped endpoints
+		{"/v1/runs/{run_id}/repos/{repo_id}/diffs", "get"},
+		{"/v1/runs/{run_id}/repos/{repo_id}/logs", "get"},
+		{"/v1/runs/{run_id}/repos/{repo_id}/artifacts", "get"},
+		{"/v1/runs/{run_id}/repos/{repo_id}/cancel", "post"},
+		{"/v1/runs/{run_id}/pull", "post"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management
