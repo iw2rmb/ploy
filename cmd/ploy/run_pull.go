@@ -202,7 +202,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 
 	// Step 11: Download and apply all diffs.
 	// Uses shared helper from pull_helpers.go.
-	appliedCount, err := downloadAndApplyDiffs(ctx, diffs, stderr)
+	appliedCount, err := downloadAndApplyDiffs(ctx, domaintypes.RunID(runID), resolution.RepoID, diffs, stderr)
 	if err != nil {
 		return fmt.Errorf("run pull: %w", err)
 	}

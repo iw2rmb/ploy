@@ -101,8 +101,14 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
+		if r.URL.Path != "/v1/runs/run-123/repos/repo-abc/diffs" {
+			t.Errorf("expected path /v1/runs/run-123/repos/repo-abc/diffs, got %s", r.URL.Path)
+		}
 		if r.URL.Query().Get("download") != "true" {
 			t.Error("expected download=true query param")
+		}
+		if r.URL.Query().Get("diff_id") != "diff-abc" {
+			t.Errorf("expected diff_id=diff-abc, got %s", r.URL.Query().Get("diff_id"))
 		}
 
 		// Write gzipped content.
@@ -117,6 +123,8 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 	cmd := DownloadDiffCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
+		RunID:   domaintypes.RunID("run-123"),
+		RepoID:  "repo-abc",
 		DiffID:  "diff-abc",
 	}
 
@@ -133,6 +141,15 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 // TestDownloadDiffCommand_EmptyPatch verifies handling of empty patches.
 func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/runs/run-123/repos/repo-abc/diffs" {
+			t.Errorf("expected path /v1/runs/run-123/repos/repo-abc/diffs, got %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("download") != "true" {
+			t.Error("expected download=true query param")
+		}
+		if r.URL.Query().Get("diff_id") != "diff-empty" {
+			t.Errorf("expected diff_id=diff-empty, got %s", r.URL.Query().Get("diff_id"))
+		}
 		// Write empty gzipped content.
 		w.Header().Set("Content-Type", "application/gzip")
 		gw := gzip.NewWriter(w)
@@ -144,6 +161,8 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	cmd := DownloadDiffCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
+		RunID:   domaintypes.RunID("run-123"),
+		RepoID:  "repo-abc",
 		DiffID:  "diff-empty",
 	}
 

@@ -637,7 +637,7 @@ workflows.
 │  4. Apply diffs                                                              │
 │     ├─ Call GET /v1/runs/{run_id}/repos/{repo_id}/diffs to list diffs        │
 │     ├─ For each diff (ordered by step_index):                               │
-│     │   ├─ Download via GET /v1/diffs/{id}?download=true                    │
+│     │   ├─ Download via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id> │
 │     │   ├─ Decompress gzipped patch                                         │
 │     │   └─ git apply (skip empty patches)                                   │
 │     └─ Print success summary                                                │
@@ -668,7 +668,7 @@ workflows.
 - `POST /v1/mods/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
 - `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
-- `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — Download gzipped patch content.
 
 **Repo URL rules:**
 
@@ -848,7 +848,7 @@ value is a `StageStatus` object describing that job's execution state.
     - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (`internal/server/handlers/diffs.go`)
       — returns a list of diffs with `job_id` and summary metadata, ordered by
       the producing job's `step_index` (ascending), then `created_at` (ascending).
-    - `GET /v1/diffs/{id}?download=true` — returns the gzipped unified diff.
+    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — returns the gzipped unified diff.
   - Diffs are ordered by job `step_index` for rehydration.
 
 ### 2.3 Artifacts
@@ -901,13 +901,13 @@ value is a `StageStatus` object describing that job's execution state.
     - Updates repos in `Queued|Running` to `Cancelled`.
     - Updates jobs in `Created|Queued|Running` to `Cancelled`.
 
-- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and `GET /v1/diffs/{id}` — diff list and download.
-  - Handler: `listRunRepoDiffsHandler` and `getDiffHandler`.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — diff list and download.
+  - Handler: `listRunRepoDiffsHandler` (download mode is query-driven).
   - Enable node and CLI callers to enumerate and fetch per-step diffs for a repo execution.
 
-- `POST /v1/mods/{id}/logs`, `POST /v1/mods/{id}/diffs`,
-  `POST /v1/mods/{id}/artifact_bundles` — control-plane write endpoints used by
-  nodeagents to persist logs, diffs and artifacts.
+- `POST /v1/runs/{id}/logs`, `POST /v1/runs/{id}/diffs`,
+  `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`, `POST /v1/runs/{run_id}/jobs/{job_id}/diff` —
+  write endpoints used by nodeagents to persist logs, diffs, and artifacts.
 
 ### 3.2 Node endpoints (`internal/server/handlers/register.go`)
 

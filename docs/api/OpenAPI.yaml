@@ -23,10 +23,6 @@ info:
       - `/restart` — restart a repo execution within a run.
     - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.
 
-    Legacy endpoints under `/v1/mods/{id}/*` (graph/logs/diffs) remain for
-    backward compatibility but are deprecated in favor of repo-scoped
-    `/v1/runs/{run_id}/repos/{repo_id}/*` endpoints.
-
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
     - Protocol values are restricted to `tcp` or `udp` and log levels to `debug|info|warn|error` in code; API fields remain strings.
@@ -75,11 +71,9 @@ paths:
     $ref: './paths/pki_sign_admin.yaml'
   /v1/pki/sign/client:
     $ref: './paths/pki_sign_client.yaml'
-  # Control-plane CRUD
-  # Jobs endpoints removed; legacy run-scoped control endpoints live under /v1/mods/{id}/*,
-  # with batch lifecycle under /v1/runs/*.
-  # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
-  # SSE events are exposed under /v1/runs/{id}/logs.
+  # Control-plane surfaces
+  # Run lifecycle and streaming are exposed under /v1/runs/*.
+  # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
   /v1/mods:
     $ref: './paths/mods.yaml'
   /v1/mods/{mod_id}:
@@ -100,19 +94,8 @@ paths:
     $ref: './paths/mods_mod_id_runs.yaml'
   /v1/mods/{mod_id}/pull:
     $ref: './paths/mods_mod_id_pull.yaml'
-  # Legacy Mods status endpoint removed; use /v1/runs/{id}/status instead.
-  # Legacy /v1/mods/{id}/cancel moved to /v1/runs/{id}/cancel (v1 API).
-  # Legacy /v1/mods/{id}/resume removed; v1 uses repo-level POST /v1/runs/{id}/repos/{repo_id}/restart.
-  /v1/mods/{id}/graph:
-    $ref: './paths/mods_id_graph.yaml'
   /v1/runs/{id}/logs:
     $ref: './paths/runs_id_logs.yaml'
-  /v1/mods/{id}/logs:
-    $ref: './paths/mods_id_logs.yaml'
-  /v1/mods/{id}/diffs:
-    $ref: './paths/mods_id_diffs.yaml'
-  /v1/diffs/{id}:
-    $ref: './paths/diffs_id.yaml'
   /v1/artifacts:
     $ref: './paths/artifacts.yaml'
   /v1/artifacts/{id}:
@@ -186,7 +169,7 @@ paths:
   # Job artifact bundle upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/artifact:
     $ref: './paths/runs_run_id_jobs_job_id_artifact.yaml'
-  # Legacy control-plane diff ingestion endpoint (alias of /v1/mods/{id}/diffs POST)
+  # Control-plane diff ingestion endpoint
   /v1/runs/{id}/diffs:
     $ref: './paths/runs_id_diffs.yaml'
   # Build Gate HTTP service removed: gate runs as jobs in the Mods pipeline.

@@ -213,7 +213,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 13: Download and apply all diffs.
-	appliedCount, err := downloadAndApplyDiffs(ctx, diffs, stderr)
+	appliedCount, err := downloadAndApplyDiffs(ctx, domaintypes.RunID(resolution.RunID), resolution.RepoID, diffs, stderr)
 	if err != nil {
 		return fmt.Errorf("mod pull: %w", err)
 	}

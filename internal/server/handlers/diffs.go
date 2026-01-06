@@ -38,22 +38,15 @@ type diffListResponse struct {
 	Diffs []diffItem `json:"diffs"`
 }
 
-// diffGetResponse is the typed response for getting a single diff's metadata.
-// NOTE: run_id and job_id are now KSUID-backed domain types.
-type diffGetResponse struct {
-	ID          string                  `json:"id"`
-	RunID       domaintypes.RunID       `json:"run_id"`           // Run ID (KSUID-backed)
-	JobID       *domaintypes.JobID      `json:"job_id,omitempty"` // Job ID (KSUID-backed, optional)
-	CreatedAt   time.Time               `json:"created_at"`
-	GzippedSize int                     `json:"gzipped_size"`
-	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
-}
-
 // listRunRepoDiffsHandler returns a JSON list of diffs for a specific repo execution
 // within a run. This is the v1 repo-scoped endpoint replacing the legacy run-scoped
 // diffs listing endpoint.
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
+//
+// Download mode:
+// - GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// - Returns the gzipped patch bytes for the requested diff, if it belongs to (run_id, repo_id).
 //
 // v1 repo-scoped diffs listing:
 // - Repo attribution comes from joining diffs.job_id → jobs.repo_id
@@ -74,6 +67,61 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 		repoID, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Optional download mode: serve the gzipped patch for a specific diff.
+		if r.URL.Query().Get("download") == "true" {
+			diffIDStr := strings.TrimSpace(r.URL.Query().Get("diff_id"))
+			if diffIDStr == "" {
+				http.Error(w, "diff_id is required when download=true", http.StatusBadRequest)
+				return
+			}
+			diffUUID, err := uuid.Parse(diffIDStr)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid diff_id: %v", err), http.StatusBadRequest)
+				return
+			}
+
+			d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(w, "diff not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, fmt.Sprintf("failed to get diff: %v", err), http.StatusInternalServerError)
+				slog.Error("download run repo diff: get diff failed", "run_id", runID, "repo_id", repoID, "diff_id", diffIDStr, "err", err)
+				return
+			}
+			// Ensure the diff belongs to this run.
+			if strings.TrimSpace(d.RunID) != runID {
+				http.Error(w, "diff not found", http.StatusNotFound)
+				return
+			}
+			// Ensure the diff belongs to this repo via job attribution.
+			if d.JobID == nil || strings.TrimSpace(*d.JobID) == "" {
+				http.Error(w, "diff not found", http.StatusNotFound)
+				return
+			}
+			job, err := st.GetJob(r.Context(), strings.TrimSpace(*d.JobID))
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(w, "diff not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, fmt.Sprintf("failed to get diff job: %v", err), http.StatusInternalServerError)
+				slog.Error("download run repo diff: get job failed", "run_id", runID, "repo_id", repoID, "diff_id", diffIDStr, "job_id", *d.JobID, "err", err)
+				return
+			}
+			if strings.TrimSpace(job.RepoID) != repoID {
+				http.Error(w, "diff not found", http.StatusNotFound)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/gzip")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=diff-%s.patch.gz", diffUUID.String()))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(d.Patch)
 			return
 		}
 
@@ -111,65 +159,5 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
-	}
-}
-
-// getDiffHandler returns diff bytes for a diff id. When ?download=true, writes
-// the gzipped patch as application/gzip. Otherwise returns minimal JSON metadata.
-// GET /v1/diffs/{id}
-//
-// NOTE: diffs.id is still UUID; run_id and job_id are KSUID strings.
-func getDiffHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse the diff ID from the URL path parameter using the shared helper.
-		idStr, err := requiredPathParam(r, "id")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		// diffs.id is still UUID (outside scope of this task).
-		diffUUID, err := uuid.Parse(idStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
-			return
-		}
-		d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "diff not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, fmt.Sprintf("failed to get diff: %v", err), http.StatusInternalServerError)
-			slog.Error("get diff: query failed", "diff_id", idStr, "err", err)
-			return
-		}
-
-		if strings.EqualFold(r.URL.Query().Get("download"), "true") {
-			w.Header().Set("Content-Type", "application/gzip")
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=diff-%s.patch.gz", diffUUID.String()))
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(d.Patch)
-			return
-		}
-
-		var summary domaintypes.DiffSummary
-		if len(d.Summary) > 0 {
-			_ = json.Unmarshal(d.Summary, &summary)
-		}
-		// d.ID is still pgtype.UUID; d.RunID and d.JobID are now KSUID strings.
-		// RunID and JobID are already domain types in the store model.
-		resp := diffGetResponse{
-			ID:          uuid.UUID(d.ID.Bytes).String(),
-			RunID:       domaintypes.RunID(d.RunID),
-			CreatedAt:   d.CreatedAt.Time,
-			GzippedSize: len(d.Patch),
-			Summary:     summary,
-		}
-		if d.JobID != nil && *d.JobID != "" {
-			jobID := domaintypes.JobID(*d.JobID)
-			resp.JobID = &jobID
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
 	}
 }

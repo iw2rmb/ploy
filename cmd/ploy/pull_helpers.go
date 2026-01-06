@@ -165,7 +165,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID string, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}
@@ -187,6 +187,8 @@ func downloadAndApplyDiffs(ctx context.Context, diffs []mods.DiffEntry, stderr i
 		downloadCmd := mods.DownloadDiffCommand{
 			Client:  httpClient,
 			BaseURL: base,
+			RunID:   runID,
+			RepoID:  repoID,
 			DiffID:  diff.ID,
 		}
 		patch, err := downloadCmd.Run(ctx)

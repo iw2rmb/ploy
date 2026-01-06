@@ -116,11 +116,9 @@ get:
 
 post:
   tags: [Control]
-  summary: Upload run log chunk (legacy alias)
+  summary: Upload run log chunk
   description: |
     Uploads a gzipped log chunk for a run with an optional job association.
-
-    Note: this is a legacy alias of `POST /v1/mods/{id}/logs` in the current API.
   requestBody:
     required: true
     content:

@@ -1,10 +1,8 @@
 post:
   tags: [Control]
-  summary: Upload run diff (legacy alias)
+  summary: Upload run diff
   description: |
     Uploads a gzipped diff for a run with an optional job association.
-
-    Note: this is a legacy alias of `POST /v1/mods/{id}/diffs` in the current API.
   parameters:
     - in: path
       name: id

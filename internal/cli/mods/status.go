@@ -2,7 +2,7 @@
 //
 // This file implements helpers used by `ploy run pull` and `ploy mod pull`:
 //   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
-//   - DownloadDiffCommand: Downloads a single diff via GET /v1/diffs/{diff_id}?download=true.
+//   - DownloadDiffCommand: Downloads a single diff via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>.
 package mods
 
 import (
@@ -89,15 +89,19 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	return result.Diffs, nil
 }
 
-// DownloadDiffCommand downloads a single diff patch via GET /v1/diffs/{id}?download=true.
+// DownloadDiffCommand downloads a single diff patch via:
+// GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
 // Returns the decompressed patch bytes ready for application via `git apply`.
 type DownloadDiffCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	DiffID  string // Diff ID (UUID string)
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
+	RepoID  string            // Repo ID (NanoID-backed string)
+	DiffID  string            // Diff ID (UUID string)
 }
 
-// Run executes GET /v1/diffs/{id}?download=true and returns the decompressed patch.
+// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// and returns the decompressed patch.
 func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if c.Client == nil {
 		return nil, fmt.Errorf("download diff: http client required")
@@ -105,16 +109,25 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("download diff: base url required")
 	}
+	if c.RunID.IsZero() {
+		return nil, fmt.Errorf("download diff: run id required")
+	}
+	if strings.TrimSpace(c.RepoID) == "" {
+		return nil, fmt.Errorf("download diff: repo id required")
+	}
 	if strings.TrimSpace(c.DiffID) == "" {
 		return nil, fmt.Errorf("download diff: diff id required")
 	}
 
-	// Build endpoint: /v1/diffs/{id}?download=true
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "diffs", url.PathEscape(c.DiffID))
+	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID), "diffs")
 	if err != nil {
 		return nil, fmt.Errorf("download diff: build url: %w", err)
 	}
-	endpoint += "?download=true"
+	q := url.Values{}
+	q.Set("download", "true")
+	q.Set("diff_id", strings.TrimSpace(c.DiffID))
+	endpoint += "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
