@@ -41,6 +41,9 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected 3 jobs to be created, got %d", st.createJobCallCount)
 	}
+	if st.createRunCalled {
+		t.Fatalf("expected CreateRun not to be called (no child runs per repo)")
+	}
 	if st.scheduleNextJobCalled {
 		t.Fatalf("expected ScheduleNextJob not to be called when creating jobs")
 	}
@@ -86,6 +89,9 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no jobs to be created, got %d", st.createJobCallCount)
 	}
+	if st.createRunCalled {
+		t.Fatalf("expected CreateRun not to be called (no child runs per repo)")
+	}
 }
 
 func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
@@ -108,5 +114,8 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	}
 	if st.listRunReposByRunCalled || st.listQueuedRunReposByRunCalled {
 		t.Fatalf("expected no repo queries for terminal run")
+	}
+	if st.createRunCalled {
+		t.Fatalf("expected CreateRun not to be called (no child runs per repo)")
 	}
 }
