@@ -97,6 +97,7 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-stats"),
+		JobID:     types.JobID("test-job-stats"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("test-branch"),
@@ -114,7 +115,7 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{

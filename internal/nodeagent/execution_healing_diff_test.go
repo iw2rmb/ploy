@@ -99,6 +99,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	// Request with repo metadata (matching the repo+diff model).
 	req := StartRunRequest{
 		RunID:     types.RunID("test-run-repo-diff"),
+		JobID:     types.JobID("test-job-repo-diff"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("e2e/fail-missing-symbol"),
 		TargetRef: types.GitRef("mods-upgrade-java17"),
@@ -117,7 +118,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(req.RunID),
+		ID:    types.StepID(req.JobID),
 		Name:  "Main mod",
 		Image: "test/main-mod:latest",
 		Inputs: []contracts.StepInput{
