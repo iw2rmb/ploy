@@ -107,15 +107,6 @@ SELECT repo_id FROM (
 ) AS last_status
 WHERE status = 'Fail';
 
--- name: GetRunRepoForPull :one
--- v1: Gets run_repos info for a specific repo_id within a run.
--- Used by POST /v1/runs/{run_id}/pull to resolve repo execution identifiers.
--- Joins mod_repos to get the repo_url for validation after normalization.
-SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
-FROM run_repos rr
-JOIN mod_repos mr ON rr.repo_id = mr.id
-WHERE rr.run_id = $1 AND rr.repo_id = $2;
-
 -- name: ListRunReposWithURLByRun :many
 -- v1: Lists all run_repos for a run with their repo_url (from mod_repos).
 -- Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
@@ -132,7 +123,7 @@ WHERE rr.run_id = $1;
 SELECT rr.run_id, rr.repo_id, rr.repo_target_ref
 FROM run_repos rr
 JOIN runs r ON rr.run_id = r.id
-WHERE rr.mod_id = $1
+WHERE r.mod_id = $1
   AND rr.repo_id = $2
   AND rr.status = $3
 ORDER BY rr.created_at DESC
