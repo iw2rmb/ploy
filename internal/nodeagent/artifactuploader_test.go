@@ -299,6 +299,132 @@ func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
 	}
 }
 
+// TestCreateTarGzBundle_SymlinkPreserved verifies that symlinks in a directory
+// are archived as symlinks (TypeSymlink header), not as regular files with
+// followed content. This is a security-critical behavior to prevent symlink-based
+// exfiltration of files outside the workspace.
+func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a directory structure:
+	//   workspace/
+	//     regular.txt        -> regular file with known content
+	//     link_to_external   -> symlink pointing to /etc/hosts (external path)
+	//     link_to_internal   -> symlink pointing to regular.txt (internal path)
+	workspaceDir := filepath.Join(tmpDir, "workspace")
+	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+
+	// Create a regular file inside workspace.
+	regularFile := filepath.Join(workspaceDir, "regular.txt")
+	regularContent := []byte("regular file content")
+	if err := os.WriteFile(regularFile, regularContent, 0o600); err != nil {
+		t.Fatalf("write regular file: %v", err)
+	}
+
+	// Create a symlink pointing to an external file (e.g., /etc/hosts).
+	// This tests that we don't read/exfiltrate external file contents.
+	externalLink := filepath.Join(workspaceDir, "link_to_external")
+	if err := os.Symlink("/etc/hosts", externalLink); err != nil {
+		t.Fatalf("create external symlink: %v", err)
+	}
+
+	// Create a symlink pointing to the internal regular file.
+	internalLink := filepath.Join(workspaceDir, "link_to_internal")
+	if err := os.Symlink("regular.txt", internalLink); err != nil {
+		t.Fatalf("create internal symlink: %v", err)
+	}
+
+	// Bundle the workspace directory.
+	bundleBytes, err := createTarGzBundle([]string{workspaceDir})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+
+	// Decompress and inspect the tar archive.
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundleBytes))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	tr := tar.NewReader(gzReader)
+
+	// Track what we find in the archive.
+	type entryInfo struct {
+		typeflag byte
+		linkname string
+		content  []byte
+	}
+	entries := make(map[string]entryInfo)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar read: %v", err)
+		}
+
+		var content []byte
+		if hdr.Typeflag == tar.TypeReg {
+			content, err = io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("read content: %v", err)
+			}
+		}
+
+		entries[hdr.Name] = entryInfo{
+			typeflag: hdr.Typeflag,
+			linkname: hdr.Linkname,
+			content:  content,
+		}
+	}
+
+	// Verify the regular file is archived correctly.
+	regularEntry, ok := entries[filepath.Join("workspace", "regular.txt")]
+	if !ok {
+		t.Fatal("regular.txt not found in archive")
+	}
+	if regularEntry.typeflag != tar.TypeReg {
+		t.Errorf("regular.txt: expected TypeReg (%d), got %d", tar.TypeReg, regularEntry.typeflag)
+	}
+	if !bytes.Equal(regularEntry.content, regularContent) {
+		t.Errorf("regular.txt content mismatch")
+	}
+
+	// Verify the external symlink is archived as a symlink, NOT as a regular file.
+	// If symlinks were followed, this would be TypeReg with /etc/hosts content.
+	externalEntry, ok := entries[filepath.Join("workspace", "link_to_external")]
+	if !ok {
+		t.Fatal("link_to_external not found in archive")
+	}
+	if externalEntry.typeflag != tar.TypeSymlink {
+		t.Errorf("link_to_external: expected TypeSymlink (%d), got %d - symlink was followed!", tar.TypeSymlink, externalEntry.typeflag)
+	}
+	if externalEntry.linkname != "/etc/hosts" {
+		t.Errorf("link_to_external: expected linkname '/etc/hosts', got %q", externalEntry.linkname)
+	}
+	// Critically: the archive should NOT contain the contents of /etc/hosts.
+	if len(externalEntry.content) > 0 {
+		t.Errorf("link_to_external: should have no content (is a symlink), but got %d bytes", len(externalEntry.content))
+	}
+
+	// Verify the internal symlink is also archived as a symlink.
+	internalEntry, ok := entries[filepath.Join("workspace", "link_to_internal")]
+	if !ok {
+		t.Fatal("link_to_internal not found in archive")
+	}
+	if internalEntry.typeflag != tar.TypeSymlink {
+		t.Errorf("link_to_internal: expected TypeSymlink (%d), got %d", tar.TypeSymlink, internalEntry.typeflag)
+	}
+	if internalEntry.linkname != "regular.txt" {
+		t.Errorf("link_to_internal: expected linkname 'regular.txt', got %q", internalEntry.linkname)
+	}
+}
+
 func TestArtifactUploader_SizeCap(t *testing.T) {
 	// Create a large file that will exceed the 1 MiB cap when bundled.
 	tmpDir := t.TempDir()

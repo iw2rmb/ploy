@@ -138,7 +138,12 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 				if p == absRoot { // already added root
 					return nil
 				}
-				fi, err := d.Info()
+				// Use os.Lstat instead of d.Info() to avoid following symlinks.
+				// d.Info() follows symlinks, which could:
+				//   1. Exfiltrate data from outside the workspace via symlinks
+				//   2. Cause the tar to contain file contents instead of symlink entries
+				// os.Lstat returns info about the symlink itself, not its target.
+				fi, err := os.Lstat(p)
 				if err != nil {
 					return err
 				}
