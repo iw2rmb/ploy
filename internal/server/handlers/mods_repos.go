@@ -169,6 +169,7 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 
 		type repoItem struct {
 			ID        string `json:"id"`
+			ModID     string `json:"mod_id"`
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
 			TargetRef string `json:"target_ref"`
@@ -179,6 +180,7 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 		for _, repo := range repos {
 			items = append(items, repoItem{
 				ID:        repo.ID,
+				ModID:     repo.ModID,
 				RepoURL:   repo.RepoUrl,
 				BaseRef:   repo.BaseRef,
 				TargetRef: repo.TargetRef,
@@ -319,8 +321,8 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 		// Parse CSV body.
 		reader := csv.NewReader(bufio.NewReader(r.Body))
 		reader.FieldsPerRecord = 3 // repo_url, base_ref, target_ref
-		reader.LazyQuotes = true   // Allow unescaped quotes inside fields
-		reader.TrimLeadingSpace = true
+		reader.LazyQuotes = false  // Strict CSV parsing per roadmap/v1/cli.md
+		reader.TrimLeadingSpace = false
 
 		// Collect results.
 		var created, updated, failed int
@@ -328,7 +330,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			Line    int    `json:"line"`
 			Message string `json:"message"`
 		}
-		var errs []lineError
+		errs := make([]lineError, 0)
 
 		lineNum := 0
 		headerRead := false
@@ -340,14 +342,12 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			}
 			lineNum++
 
-			if err != nil {
-				failed++
-				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("CSV parse error: %v", err)})
-				continue
-			}
-
 			// Skip header row (first line).
 			if !headerRead {
+				if err != nil {
+					http.Error(w, fmt.Sprintf("CSV parse error in header: %v", err), http.StatusBadRequest)
+					return
+				}
 				headerRead = true
 				// Validate header row has expected columns.
 				if len(record) != 3 || strings.ToLower(strings.TrimSpace(record[0])) != "repo_url" ||
@@ -356,6 +356,12 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 					http.Error(w, "CSV header must be: repo_url,base_ref,target_ref", http.StatusBadRequest)
 					return
 				}
+				continue
+			}
+
+			if err != nil {
+				failed++
+				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("CSV parse error: %v", err)})
 				continue
 			}
 
@@ -397,11 +403,16 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Check if repo already exists to determine if this is create or update.
-			existingRepo, err := st.GetModRepoByURL(r.Context(), store.GetModRepoByURLParams{
+			_, err = st.GetModRepoByURL(r.Context(), store.GetModRepoByURLParams{
 				ModID:   modIDStr,
 				RepoUrl: normalizedURL,
 			})
-			isUpdate := err == nil && existingRepo.ID != ""
+			isUpdate := err == nil
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				failed++
+				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("lookup failed: %v", err)})
+				continue
+			}
 
 			// Upsert the repo.
 			_, err = st.UpsertModRepo(r.Context(), store.UpsertModRepoParams{
@@ -424,7 +435,6 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		// Require at least one data row after header.
 		if !headerRead {
 			http.Error(w, "CSV file is empty or missing header", http.StatusBadRequest)
 			return
