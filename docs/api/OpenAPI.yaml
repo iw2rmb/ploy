@@ -163,20 +163,16 @@ paths:
     $ref: './paths/runs_id_repos.yaml'
   /v1/runs/{id}/repos/{repo_id}/restart:
     $ref: './paths/runs_id_repos_repo_id_restart.yaml'
-  # v1 repo-scoped diffs listing — replaces legacy GET /v1/mods/{id}/diffs
-  # Per roadmap/v1/scope.md:69-71 and roadmap/v1/api.md:263
+  # Repo-scoped diffs listing — see docs/mods-lifecycle.md § "Pulling Diffs Locally"
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
     $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
-  # v1 repo-scoped logs SSE stream — filters run logs to jobs in this repo
-  # Per roadmap/v1/api.md:264 and roadmap/v1/api.md:273
+  # Repo-scoped logs SSE stream — filters run logs to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/logs:
     $ref: './paths/runs_run_id_repos_repo_id_logs.yaml'
-  # v1 repo-scoped artifact listing — filters artifacts to jobs in this repo
-  # Per roadmap/v1/api.md:265 and roadmap/v1/api.md:274
+  # Repo-scoped artifact listing — filters artifacts to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/artifacts:
     $ref: './paths/runs_run_id_repos_repo_id_artifacts.yaml'
-  # v1 repo-scoped cancel — replaces HEAD DELETE /v1/runs/{id}/repos/{repo_id}
-  # Per roadmap/v1/api.md:266 and roadmap/v1/api.md:289-298
+  # Repo-scoped cancel — cancels a single repo execution within a run
   /v1/runs/{run_id}/repos/{repo_id}/cancel:
     $ref: './paths/runs_run_id_repos_repo_id_cancel.yaml'
   /v1/runs/{run_id}/pull:
@@ -279,8 +275,7 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
     RepoRunSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
-    # Mod project CRUD types — required by roadmap/v1/api.md:254
-    # POST /v1/mods, GET /v1/mods, DELETE /v1/mods/{mod_id}
+    # Mod project CRUD types — POST /v1/mods, GET /v1/mods, DELETE /v1/mods/{mod_id}
     CreateModRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateModRequest'
     CreateModResponse:
@@ -296,8 +291,7 @@ components:
       $ref: './components/schemas/controlplane.yaml#/SetModSpecRequest'
     SetModSpecResponse:
       $ref: './components/schemas/controlplane.yaml#/SetModSpecResponse'
-    # Mod repo types — required by roadmap/v1/api.md:254
-    # POST/GET /v1/mods/{mod_id}/repos, DELETE /v1/mods/{mod_id}/repos/{repo_id}
+    # Mod repo types — POST/GET /v1/mods/{mod_id}/repos, DELETE /v1/mods/{mod_id}/repos/{repo_id}
     ModRepo:
       $ref: './components/schemas/controlplane.yaml#/ModRepo'
     AddModRepoRequest:

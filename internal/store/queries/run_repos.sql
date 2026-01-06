@@ -94,9 +94,8 @@ LIMIT $2 OFFSET $3;
 
 -- name: ListFailedRepoIDsByMod :many
 -- Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
--- Per roadmap/v1/db.md:189: define "last terminal state" per repo_id by looking at
--- the newest run_repos row where status in (Fail, Success, Cancelled) and selecting
--- those where status='Fail'.
+-- "Last terminal state" per repo_id is determined by looking at the newest run_repos
+-- row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 -- Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
 SELECT repo_id FROM (
   SELECT DISTINCT ON (rr.repo_id) rr.repo_id, rr.status

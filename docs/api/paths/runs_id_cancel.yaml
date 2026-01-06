@@ -8,7 +8,6 @@ post:
     is idempotent: if the run is already in a terminal state (`Finished` or `Cancelled`), the handler
     returns the current summary with `200 OK`.
 
-    Required by roadmap/v1/scope.md:72 and roadmap/v1/statuses.md:177-184.
   parameters:
     - in: path
       name: id

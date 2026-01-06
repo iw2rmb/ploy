@@ -5,7 +5,7 @@ post:
     Resolves the repo execution for a given run and returns identifiers needed to
     pull diffs for the current repo.
 
-    Per roadmap/v1/api.md:227-249:
+    Behavior:
     - Request provides repo_url.
     - Server matches by joining run_repos to mod_repos and comparing normalized repo URLs.
     - Errors if no repo matches or multiple repos match.

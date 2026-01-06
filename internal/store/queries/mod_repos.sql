@@ -28,14 +28,14 @@ WHERE id = $1;
 
 -- name: DeleteModRepo :exec
 -- Deletes a mod_repo by id.
--- Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT (roadmap/v1/db.md).
+-- Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 -- This DELETE will fail if any run_repos/jobs rows still reference the repo.
 DELETE FROM mod_repos
 WHERE id = $1;
 
 -- name: UpsertModRepo :one
 -- Bulk upsert a mod_repo by normalized repo_url.
--- Per roadmap/v1/db.md:71, uniqueness is on (mod_id, repo_url).
+-- Uniqueness is on (mod_id, repo_url) to prevent duplicate repo URLs per mod.
 -- If a row exists, update refs; otherwise insert.
 INSERT INTO mod_repos (id, mod_id, repo_url, base_ref, target_ref)
 VALUES ($1, $2, $3, $4, $5)
@@ -48,7 +48,7 @@ RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at;
 -- name: HasModRepoHistory :one
 -- Checks if a mod_repo has any historical executions (run_repos references).
 -- Returns true if the repo cannot be deleted due to history, false otherwise.
--- Per roadmap/v1/api.md:198: Refuse deletion if the repo has historical executions.
+-- Deletion is refused if the repo has historical executions.
 SELECT EXISTS(
   SELECT 1 FROM run_repos WHERE repo_id = $1 LIMIT 1
 ) AS has_history;

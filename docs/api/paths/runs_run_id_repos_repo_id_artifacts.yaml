@@ -1,5 +1,4 @@
 # Repo-scoped artifact listing for a repo execution within a run.
-# Required by roadmap/v1/api.md:265 and roadmap/v1/api.md:274.
 #
 # This endpoint lists artifact bundles produced by jobs belonging to a
 # specific repository execution within a batch run. The response shape
@@ -16,9 +15,9 @@ get:
     filtered to jobs belonging to the specified repo execution (matching
     run_id, repo_id, and current attempt).
 
-    Per roadmap/v1/api.md:265 and roadmap/v1/api.md:274:
+    Behavior:
     - Response JSON shape is unchanged from global artifact listing (`GET /v1/artifacts?cid=...`)
-    - v1 only filters the returned bundles to jobs belonging to the repo execution
+    - Filters the returned bundles to jobs belonging to the repo execution
 
     Artifacts are ordered by job step_index (ascending), then by created_at
     (ascending).

@@ -651,8 +651,7 @@ workflows.
 - **Clean working tree**: No staged or unstaged changes allowed (prevents data loss
   and ensures deterministic patch application).
 - **Resolvable remote**: The specified `--origin` remote must exist and have a URL
-  that matches the `repo_url` stored in `mod_repos` / `run_repos` per `roadmap/v1/scope.md`
-  (“Repo URL rules (v1)”).
+  that matches the `repo_url` stored in `mod_repos` / `run_repos` (see "Repo URL rules" below).
 
 **Key fields used:**
 
@@ -671,11 +670,13 @@ workflows.
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
 - `GET /v1/diffs/{id}?download=true` — Download gzipped patch content.
 
-**Normalization:**
+**Repo URL rules:**
 
-Repo URL matching follows `roadmap/v1/scope.md` (“Repo URL rules (v1)”). The CLI derives
-`repo_url` from the git remote URL; the server performs normalized matching to select the
-correct `run_repos` entry.
+Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see `internal/vcs/repourl.go`):
+- Validation: accept only `https://`, `ssh://`, and `file://` schemes.
+- Normalization: trim whitespace, strip trailing `/` and `.git` suffix.
+The CLI derives `repo_url` from the git remote URL; the server performs normalized matching
+to select the correct `run_repos` entry.
 
 **Example usage:**
 
