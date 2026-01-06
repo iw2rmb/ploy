@@ -18,6 +18,7 @@ ploy help <command>            # Alternative help syntax
 Common command patterns:
 
 ```bash
+ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->  # submit a single-repo run
 ploy mod run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \

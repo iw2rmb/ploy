@@ -529,7 +529,8 @@ artifacts) remain job-addressed via `job_id`.
 
 ### Single-repo vs batch runs
 
-A single-repo submission via `ploy mod run --repo-url ... --spec ...` is
+Single-repo submission via `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
+(or via `ploy mod run --repo-url ... --spec ...`) is
 internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
 
