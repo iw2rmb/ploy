@@ -381,6 +381,12 @@ type mockStore struct {
 	hasModRepoHistoryResult bool
 	hasModRepoHistoryErr    error
 
+	// ListFailedRepoIDsByMod tracking (for "failed" repo selection)
+	listFailedRepoIDsByModCalled bool
+	listFailedRepoIDsByModParam  string
+	listFailedRepoIDsByModResult []string
+	listFailedRepoIDsByModErr    error
+
 	// GetRunRepo tracking — composite key (run_id, repo_id).
 	getRunRepoCalled bool
 	getRunRepoParam  store.GetRunRepoParams
@@ -1118,4 +1124,11 @@ func (m *mockStore) HasModRepoHistory(ctx context.Context, repoID string) (bool,
 	m.hasModRepoHistoryCalled = true
 	m.hasModRepoHistoryParam = repoID
 	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
+}
+
+// ListFailedRepoIDsByMod returns repo IDs whose last terminal status is 'Fail'.
+func (m *mockStore) ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error) {
+	m.listFailedRepoIDsByModCalled = true
+	m.listFailedRepoIDsByModParam = modID
+	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
 }

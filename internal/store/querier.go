@@ -128,6 +128,12 @@ type Querier interface {
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID string) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
+	// Per roadmap/v1/db.md:189: define "last terminal state" per repo_id by looking at
+	// the newest run_repos row where status in (Fail, Success, Cancelled) and selecting
+	// those where status='Fail'.
+	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
+	ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Per ROADMAP.md line 10-44: provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 	// Returns all global environment entries, ordered by key for consistent iteration.
