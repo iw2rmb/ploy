@@ -72,15 +72,6 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			return
 		}
 
-		// v1 repo status transition: Queued → Running on first claim for repo attempt.
-		// Per roadmap/v1/statuses.md:84, this is idempotent (already Running repos stay Running).
-		// The UpdateRunRepoStatus query sets started_at on first transition to Running.
-		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
-			RunID:  job.RunID,
-			RepoID: job.RepoID,
-			Status: store.RunRepoStatusRunning,
-		})
-
 		run, err := st.GetRun(r.Context(), job.RunID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
@@ -93,6 +84,21 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			http.Error(w, fmt.Sprintf("failed to get run repo for claimed job: %v", err), http.StatusInternalServerError)
 			slog.Error("claim: get run repo failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
 			return
+		}
+
+		// v1 repo status transition: Queued → Running on first claim for repo attempt.
+		// Per roadmap/v1/statuses.md:84, this is idempotent (already Running repos stay Running).
+		// MR jobs must not affect run_repos.status (roadmap/v1/statuses.md:77).
+		isMRJob := job.ModType == domaintypes.ModTypeMR.String()
+		if !isMRJob && rr.Status == store.RunRepoStatusQueued {
+			// The UpdateRunRepoStatus query sets started_at on first transition to Running.
+			if err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
+				RunID:  job.RunID,
+				RepoID: job.RepoID,
+				Status: store.RunRepoStatusRunning,
+			}); err != nil {
+				slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
+			}
 		}
 
 		modRepo, err := st.GetModRepo(r.Context(), job.RepoID)
