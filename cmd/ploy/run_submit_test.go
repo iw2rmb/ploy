@@ -20,8 +20,9 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	// Create a temporary spec file for the test.
 	specDir := t.TempDir()
 	specPath := filepath.Join(specDir, "spec.yaml")
-	specContent := `image: alpine:latest
-command: echo hello
+	specContent := `steps:
+  - image: alpine:latest
+    command: echo hello
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -88,11 +89,19 @@ command: echo hello
 	if !ok {
 		t.Fatalf("expected spec to be JSON object, got %T (%v)", capturedRequest["spec"], capturedRequest["spec"])
 	}
-	if spec["image"] != "alpine:latest" {
-		t.Errorf("expected spec.image='alpine:latest', got %v", spec["image"])
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected spec.steps[0], got %T (%v)", spec["steps"], spec["steps"])
 	}
-	if spec["command"] != "echo hello" {
-		t.Errorf("expected spec.command='echo hello', got %v", spec["command"])
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec.steps[0] to be object, got %T", steps[0])
+	}
+	if step0["image"] != "alpine:latest" {
+		t.Errorf("expected spec.steps[0].image='alpine:latest', got %v", step0["image"])
+	}
+	if step0["command"] != "echo hello" {
+		t.Errorf("expected spec.steps[0].command='echo hello', got %v", step0["command"])
 	}
 
 	// Validate output contains run_id and mod_id.
@@ -110,7 +119,7 @@ func TestRunSubmitMissingFlags(t *testing.T) {
 	// Create a temporary spec file for some tests.
 	specDir := t.TempDir()
 	specPath := filepath.Join(specDir, "spec.yaml")
-	if err := os.WriteFile(specPath, []byte(`image: alpine`), 0o644); err != nil {
+	if err := os.WriteFile(specPath, []byte("steps:\n  - image: alpine\n"), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
 	}
 
@@ -190,7 +199,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 		_ = r.Close()
 	}()
 
-	_, _ = w.Write([]byte("image: alpine:latest\ncommand: echo stdin\n"))
+	_, _ = w.Write([]byte("steps:\n  - image: alpine:latest\n    command: echo stdin\n"))
 	_ = w.Close()
 
 	var buf bytes.Buffer
@@ -211,8 +220,16 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected spec to be JSON object, got %T (%v)", capturedRequest["spec"], capturedRequest["spec"])
 	}
-	if spec["command"] != "echo stdin" {
-		t.Errorf("expected spec.command='echo stdin', got %v", spec["command"])
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected spec.steps[0], got %T (%v)", spec["steps"], spec["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec.steps[0] to be object, got %T", steps[0])
+	}
+	if step0["command"] != "echo stdin" {
+		t.Errorf("expected spec.steps[0].command='echo stdin', got %v", step0["command"])
 	}
 }
 
@@ -222,7 +239,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 
 	specDir := t.TempDir()
 	specPath := filepath.Join(specDir, "spec.json")
-	specContent := `{"image":"alpine:latest","command":"echo hello"}`
+	specContent := `{"steps":[{"image":"alpine:latest","command":"echo hello"}]}`
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
 	}

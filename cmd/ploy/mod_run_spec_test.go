@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -14,7 +15,8 @@ func TestBuildSpecPayloadCLIOverrides(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
-image: docker.io/test/mod:v1
+steps:
+  - image: docker.io/test/mod:v1
 env:
   KEY1: from_spec
   KEY2: value2
@@ -47,8 +49,16 @@ gitlab_domain: gitlab.com
 	}
 
 	// Verify CLI override for image
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:v2" {
-		t.Errorf("expected image=docker.io/test/mod:v2 (CLI override), got %v", result["image"])
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0] in payload, got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:v2" {
+		t.Errorf("expected steps[0].image=docker.io/test/mod:v2 (CLI override), got %v", step0["image"])
 	}
 
 	// Verify CLI override for env
@@ -67,8 +77,8 @@ gitlab_domain: gitlab.com
 	}
 
 	// Verify CLI override for retain_container
-	if retain, ok := result["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected retain_container=true (CLI override), got %v", result["retain_container"])
+	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected steps[0].retain_container=true (CLI override), got %v", step0["retain_container"])
 	}
 
 	// Verify CLI override for gitlab_domain
@@ -112,8 +122,16 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 	}
 
 	// Verify CLI-only values
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected image=docker.io/test/mod:latest, got %v", result["image"])
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0] in payload, got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mod:latest, got %v", step0["image"])
 	}
 
 	if env, ok := result["env"].(map[string]any); ok {
@@ -215,10 +233,14 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 				}
 			}
 
+			modImage := ""
+			if tt.gitlabPAT != "" || strings.TrimSpace(tt.specContent) != "" || tt.gitlabDomain != "" {
+				modImage = "docker.io/test/mod:latest"
+			}
 			payload, err := buildSpecPayload(
 				specFile,
 				nil,
-				"",
+				modImage,
 				false,
 				"",
 				tt.gitlabPAT,
@@ -266,7 +288,8 @@ func TestBuildSpecPayloadGitLabDomainDefaultingWithMRFlags(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
-image: docker.io/test/mod:latest
+steps:
+  - image: docker.io/test/mod:latest
 env:
   KEY1: value1
 `
@@ -316,7 +339,15 @@ env:
 	}
 
 	// Verify other spec values are preserved
-	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected image from spec to be preserved, got %v", result["image"])
+	steps, ok := result["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected steps[0] in payload, got %v", result["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
+	}
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected steps[0].image from spec to be preserved, got %v", step0["image"])
 	}
 }

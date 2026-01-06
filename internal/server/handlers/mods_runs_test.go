@@ -33,7 +33,7 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -106,7 +106,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -176,7 +176,7 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -238,7 +238,7 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -285,7 +285,7 @@ func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -492,7 +492,7 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -613,7 +613,7 @@ func TestModRuns_Create_ListModReposError(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModErr: errors.New("database connection failed"),
 	}
@@ -650,7 +650,7 @@ func TestModRuns_Create_CreateRunError(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -690,7 +690,7 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -730,7 +730,7 @@ func TestModRuns_Create_CreateJobError(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -770,7 +770,7 @@ func TestModRuns_Create_ListFailedReposError(t *testing.T) {
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"version":"0.2.0","env":{},"steps":[]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
 		},
 		listModReposByModResult: []store.ModRepo{
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},

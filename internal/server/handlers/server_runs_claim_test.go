@@ -59,7 +59,7 @@ func TestClaimJob_Success(t *testing.T) {
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{}, nil)
@@ -165,7 +165,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{}`)},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{}, nil)
