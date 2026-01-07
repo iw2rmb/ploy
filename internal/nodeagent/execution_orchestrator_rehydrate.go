@@ -203,10 +203,10 @@ func (r *runController) uploadModDiffWithBaseline(
 		).
 		MustBuild()
 
-	// Use the shared diff uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	if r.diffUploader == nil {
-		slog.Error("diff uploader not initialized", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
 		return
 	}
 
@@ -263,10 +263,10 @@ func (r *runController) uploadBaselineDiff(
 		ModType(modType).
 		MustBuild()
 
-	// Use the shared diff uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	if r.diffUploader == nil {
-		return fmt.Errorf("diff uploader not initialized")
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		return fmt.Errorf("initialize uploaders: %w", err)
 	}
 
 	// Upload diff to job-scoped endpoint. Step ordering is tracked in the summary metadata.
