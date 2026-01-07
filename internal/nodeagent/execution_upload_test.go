@@ -89,17 +89,15 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 				}
 			}
 
-			// Initialize test infrastructure with shared uploaders.
+			// Initialize test infrastructure.
+			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    "test-node",
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller, err := newTestRunController(cfg)
-			if err != nil {
-				t.Fatalf("failed to create test controller: %v", err)
-			}
+			controller := &runController{cfg: cfg}
 
 			typedOpts := RunOptions{
 				Artifacts: ArtifactOptions{
@@ -205,21 +203,19 @@ func TestRunController_uploadOutDir(t *testing.T) {
 				}
 			}
 
-			// Initialize test infrastructure with shared uploaders.
+			// Initialize test infrastructure.
+			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    "test-node",
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller, err := newTestRunController(cfg)
-			if err != nil {
-				t.Fatalf("failed to create test controller: %v", err)
-			}
+			controller := &runController{cfg: cfg}
 
 			// Execute upload.
 			ctx := context.Background()
-			err = controller.uploadOutDir(ctx, "test-run", "test-stage", outDir)
+			err := controller.uploadOutDir(ctx, "test-run", "test-stage", outDir)
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
@@ -272,24 +268,22 @@ func TestRunController_uploadStatus(t *testing.T) {
 			}))
 			defer server.Close()
 
-			// Initialize test infrastructure with shared uploaders.
+			// Initialize test infrastructure.
+			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    "test-node",
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller, err := newTestRunController(cfg)
-			if err != nil {
-				t.Fatalf("failed to create test controller: %v", err)
-			}
+			controller := &runController{cfg: cfg}
 
 			// Execute upload with job_id.
 			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
-			err = controller.uploadStatus(ctx, "test-run", JobStatusSuccess.String(), &exitCode, stats, 1000, "test-job-id")
+			err := controller.uploadStatus(ctx, "test-run", JobStatusSuccess.String(), &exitCode, stats, 1000, "test-job-id")
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
@@ -364,17 +358,15 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			}))
 			defer server.Close()
 
-			// Initialize test infrastructure with shared uploaders.
+			// Initialize test infrastructure.
+			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    "test-node",
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller, err := newTestRunController(cfg)
-			if err != nil {
-				t.Fatalf("failed to create test controller: %v", err)
-			}
+			controller := &runController{cfg: cfg}
 
 			phase := &types.RunStatsGatePhase{}
 
@@ -593,17 +585,15 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 				}
 			}
 
-			// Initialize test infrastructure with shared uploaders.
+			// Initialize test infrastructure.
+			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    "test-node",
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller, err := newTestRunController(cfg)
-			if err != nil {
-				t.Fatalf("failed to create test controller: %v", err)
-			}
+			controller := &runController{cfg: cfg}
 
 			typedOpts := RunOptions{
 				Artifacts: ArtifactOptions{

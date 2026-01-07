@@ -24,15 +24,14 @@ func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *tes
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    "test-node",
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-
-	rc, err := newTestRunController(cfg)
-	if err != nil {
-		t.Fatalf("failed to create test controller: %v", err)
+	// Initialize test infrastructure.
+	// Uploaders are lazily initialized by ensureUploaders() when needed.
+	rc := &runController{
+		cfg: Config{
+			ServerURL: server.URL,
+			NodeID:    "test-node",
+			HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+		},
 	}
 
 	req := StartRunRequest{
