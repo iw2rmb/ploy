@@ -239,35 +239,12 @@ func (r *runController) runGateWithHealing(
 
 		slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", modIndex, "image", healManifest.Image, "phase", gatePhase)
 
-		// Provide host workspace path for in-container build verification tools.
-		if healManifest.Env == nil {
-			healManifest.Env = map[string]string{}
-		}
-		healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-		// Inject server connection details so healing containers can talk to the control plane.
-		healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
-		healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
-		healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
-		healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
-		if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
-			healManifest.Env["PLOY_API_TOKEN"] = token
-		} else if !r.cfg.HTTP.TLS.Enabled {
-			if data, err := os.ReadFile(bearerTokenPath()); err == nil {
-				if token := strings.TrimSpace(string(data)); token != "" {
-					healManifest.Env["PLOY_API_TOKEN"] = token
-				}
-			} else {
-				slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
-			}
-		}
-
-		// Mount node's TLS certificates into healing container for authenticated control-plane access.
-		if healManifest.Options == nil {
-			healManifest.Options = make(map[string]any)
-		}
-		healManifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
-		healManifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
-		healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
+		// Inject healing-specific environment variables and TLS certificate mounts.
+		// Uses shared helpers (injectHealingEnvVars, mountHealingTLSCerts) to ensure
+		// consistent configuration between inline healing (runGateWithHealing) and
+		// discrete healing jobs (executeHealingJob).
+		r.injectHealingEnvVars(&healManifest, workspace)
+		r.mountHealingTLSCerts(&healManifest)
 
 		// Run the healing mod container.
 		// Pass RunID directly for consistent labeling and telemetry.

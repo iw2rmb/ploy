@@ -483,6 +483,17 @@ func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Conte
 
 // injectHealingEnvVars adds healing-specific environment variables to the manifest.
 // These variables provide Build Gate API access configuration to healing containers.
+//
+// This is a shared helper used by both:
+//   - Inline healing: runGateWithHealing in execution_healing.go
+//   - Discrete healing jobs: executeHealingJob in execution_orchestrator.go
+//
+// Injected environment variables:
+//   - PLOY_HOST_WORKSPACE: host filesystem path to workspace for in-container tooling
+//   - PLOY_SERVER_URL: control plane server URL for API calls
+//   - PLOY_CA_CERT_PATH, PLOY_CLIENT_CERT_PATH, PLOY_CLIENT_KEY_PATH: in-container paths
+//     where TLS certificates will be mounted (see mountHealingTLSCerts)
+//   - PLOY_API_TOKEN: bearer token for API authentication (from env or file fallback)
 func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, workspace string) {
 	if manifest.Env == nil {
 		manifest.Env = map[string]string{}
@@ -509,6 +520,14 @@ func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, w
 
 // mountHealingTLSCerts configures TLS certificate paths in manifest options.
 // This enables healing containers to access the Build Gate API over mTLS.
+//
+// This is a shared helper used by both:
+//   - Inline healing: runGateWithHealing in execution_healing.go
+//   - Discrete healing jobs: executeHealingJob in execution_orchestrator.go
+//
+// The options set here (ploy_ca_cert_path, ploy_client_cert_path, ploy_client_key_path)
+// are read by the container runtime to mount the node's TLS certificates into healing
+// containers at the paths specified by the PLOY_*_CERT_PATH environment variables.
 func (r *runController) mountHealingTLSCerts(manifest *contracts.StepManifest) {
 	if manifest.Options == nil {
 		manifest.Options = make(map[string]any)
