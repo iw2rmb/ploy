@@ -65,16 +65,18 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 		return
 	}
 
-	artifactUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create artifact uploader", "run_id", req.RunID, "error", err)
+	// Use the shared artifact uploader instead of creating a new one per call.
+	// The uploader is initialized once per runController and reused across all jobs.
+	// This enables HTTP connection pooling and reduces per-upload overhead.
+	if r.artifactUploader == nil {
+		slog.Error("artifact uploader not initialized", "run_id", req.RunID)
 		return
 	}
 
 	// Use typed artifact name from RunOptions.
 	artifactName := typedOpts.Artifacts.Name
 
-	if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID, req.JobID, paths, artifactName); err != nil {
+	if _, _, err := r.artifactUploader.UploadArtifact(ctx, req.RunID, req.JobID, paths, artifactName); err != nil {
 		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	} else {
 		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "job_id", req.JobID, "paths", len(paths))
@@ -93,12 +95,13 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return nil
 	}
 
-	artifactUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		return fmt.Errorf("create artifact uploader: %w", err)
+	// Use the shared artifact uploader instead of creating a new one per call.
+	// The uploader is initialized once per runController and reused across all jobs.
+	if r.artifactUploader == nil {
+		return fmt.Errorf("artifact uploader not initialized")
 	}
 
-	if _, _, err := artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mod-out"); err != nil {
+	if _, _, err := r.artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mod-out"); err != nil {
 		return fmt.Errorf("upload /out bundle: %w", err)
 	}
 
@@ -111,9 +114,10 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 // exitCode is the exit code from job execution (required for terminal status).
 // jobID is the authoritative job identifier (avoids float equality issues with step_index).
 func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex, jobID types.JobID) error {
-	statusUploader, err := NewStatusUploader(r.cfg)
-	if err != nil {
-		return fmt.Errorf("create status uploader: %w", err)
+	// Use the shared status uploader instead of creating a new one per call.
+	// The uploader is initialized once per runController and reused across all jobs.
+	if r.statusUploader == nil {
+		return fmt.Errorf("status uploader not initialized")
 	}
 
 	// Dereference exitCode for logging so we log the actual numeric code
@@ -129,7 +133,7 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats); uploadErr != nil {
+	if uploadErr := r.statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats); uploadErr != nil {
 		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
@@ -147,6 +151,12 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 		return
 	}
 
+	// Use the shared artifact uploader instead of creating a new one per call.
+	if r.artifactUploader == nil {
+		slog.Warn("artifact uploader not initialized, skipping gate logs upload", "run_id", runID, "job_id", jobID)
+		return
+	}
+
 	logFile, err := os.CreateTemp("", "ploy-gate-*.log")
 	if err != nil {
 		return
@@ -156,18 +166,13 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 	_, _ = logFile.WriteString(logsText)
 	_ = logFile.Close()
 
-	artUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		return
-	}
-
 	artifactName := "build-gate.log"
 	if artifactNameSuffix != "" {
 		artifactName = "build-gate-" + artifactNameSuffix + ".log"
 	}
 
 	// Upload with background context to ensure logs are uploaded even if run context is cancelled.
-	if id, cid, uerr := artUploader.UploadArtifact(context.Background(), runID, jobID, []string{logFile.Name()}, artifactName); uerr == nil {
+	if id, cid, uerr := r.artifactUploader.UploadArtifact(context.Background(), runID, jobID, []string{logFile.Name()}, artifactName); uerr == nil {
 		phase.LogsArtifactID = id
 		phase.LogsBundleCID = cid
 	} else {

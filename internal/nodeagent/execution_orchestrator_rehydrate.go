@@ -203,13 +203,14 @@ func (r *runController) uploadModDiffWithBaseline(
 		).
 		MustBuild()
 
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create diff uploader for mod", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+	// Use the shared diff uploader instead of creating a new one per call.
+	// The uploader is initialized once per runController and reused across all jobs.
+	if r.diffUploader == nil {
+		slog.Error("diff uploader not initialized", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
 		return
 	}
 
-	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		slog.Error("failed to upload mod diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
 		return
 	}
@@ -262,13 +263,14 @@ func (r *runController) uploadBaselineDiff(
 		ModType(modType).
 		MustBuild()
 
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		return fmt.Errorf("failed to create diff uploader: %w", err)
+	// Use the shared diff uploader instead of creating a new one per call.
+	// The uploader is initialized once per runController and reused across all jobs.
+	if r.diffUploader == nil {
+		return fmt.Errorf("diff uploader not initialized")
 	}
 
 	// Upload diff to job-scoped endpoint. Step ordering is tracked in the summary metadata.
-	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		return fmt.Errorf("failed to upload baseline diff: %w", err)
 	}
 

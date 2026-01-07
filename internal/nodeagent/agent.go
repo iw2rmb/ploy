@@ -31,10 +31,33 @@ type Agent struct {
 
 // New constructs a new node agent.
 func New(cfg Config) (*Agent, error) {
+	// Create shared HTTP uploaders once at initialization.
+	// These are reused across all jobs to avoid creating new HTTP clients per
+	// upload call, which enables connection pooling and reduces overhead.
+	// The underlying http.Client is safe for concurrent use by multiple goroutines.
+	diffUploader, err := NewDiffUploader(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create diff uploader: %w", err)
+	}
+
+	artifactUploader, err := NewArtifactUploader(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create artifact uploader: %w", err)
+	}
+
+	statusUploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create status uploader: %w", err)
+	}
+
 	// Initialize controller with typed JobID keys for compile-time safety.
+	// The shared uploaders are passed in to enable HTTP client reuse.
 	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
+		cfg:              cfg,
+		jobs:             make(map[types.JobID]*jobContext),
+		diffUploader:     diffUploader,
+		artifactUploader: artifactUploader,
+		statusUploader:   statusUploader,
 	}
 
 	server, err := NewServer(cfg, controller)

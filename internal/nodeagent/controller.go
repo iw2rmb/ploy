@@ -15,6 +15,12 @@ import (
 // via AcquireSlot before claiming/starting work. On StartRun success, the
 // controller releases the slot when the job completes. This prevents the node
 // from claiming more jobs than it can execute concurrently.
+//
+// HTTP uploaders (diffUploader, artifactUploader, statusUploader) are created
+// once at controller initialization and reused across all jobs. This avoids
+// the overhead of creating new HTTP clients per upload call and enables
+// connection pooling. The underlying http.Client is safe for concurrent use
+// by multiple goroutines (per Go's net/http documentation).
 type runController struct {
 	mu sync.Mutex
 
@@ -29,6 +35,21 @@ type runController struct {
 	// The capacity is set to Config.Concurrency (minimum 1).
 	// AcquireSlot sends to this channel; ReleaseSlot receives from it.
 	jobSem chan struct{}
+
+	// diffUploader is a shared HTTP uploader for diff uploads.
+	// Created once at controller initialization and reused across all jobs.
+	// Safe for concurrent use by multiple goroutines.
+	diffUploader *DiffUploader
+
+	// artifactUploader is a shared HTTP uploader for artifact bundle uploads.
+	// Created once at controller initialization and reused across all jobs.
+	// Safe for concurrent use by multiple goroutines.
+	artifactUploader *ArtifactUploader
+
+	// statusUploader is a shared HTTP uploader for terminal status uploads.
+	// Created once at controller initialization and reused across all jobs.
+	// Safe for concurrent use by multiple goroutines.
+	statusUploader *StatusUploader
 }
 
 type jobContext struct {
