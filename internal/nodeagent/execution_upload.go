@@ -65,11 +65,10 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 		return
 	}
 
-	// Use the shared artifact uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	// This enables HTTP connection pooling and reduces per-upload overhead.
-	if r.artifactUploader == nil {
-		slog.Error("artifact uploader not initialized", "run_id", req.RunID)
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		slog.Error("failed to initialize uploaders", "run_id", req.RunID, "error", err)
 		return
 	}
 
@@ -95,10 +94,10 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return nil
 	}
 
-	// Use the shared artifact uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	if r.artifactUploader == nil {
-		return fmt.Errorf("artifact uploader not initialized")
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		return fmt.Errorf("initialize uploaders: %w", err)
 	}
 
 	if _, _, err := r.artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mod-out"); err != nil {
@@ -114,10 +113,10 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 // exitCode is the exit code from job execution (required for terminal status).
 // jobID is the authoritative job identifier (avoids float equality issues with step_index).
 func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex, jobID types.JobID) error {
-	// Use the shared status uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	if r.statusUploader == nil {
-		return fmt.Errorf("status uploader not initialized")
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		return fmt.Errorf("initialize uploaders: %w", err)
 	}
 
 	// Dereference exitCode for logging so we log the actual numeric code
@@ -151,9 +150,10 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 		return
 	}
 
-	// Use the shared artifact uploader instead of creating a new one per call.
-	if r.artifactUploader == nil {
-		slog.Warn("artifact uploader not initialized, skipping gate logs upload", "run_id", runID, "job_id", jobID)
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		slog.Warn("failed to initialize uploaders, skipping gate logs upload", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 

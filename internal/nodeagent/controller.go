@@ -138,6 +138,45 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 	return nil
 }
 
+// ensureUploaders lazily initializes the shared uploaders if they haven't been
+// set. This provides backward compatibility for tests that construct runController
+// directly without going through agent.New(). In production, uploaders are
+// pre-initialized at agent startup for optimal HTTP connection reuse.
+//
+// Thread-safe: uses the controller's mutex to prevent concurrent initialization.
+// Returns an error if uploader creation fails.
+func (r *runController) ensureUploaders() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Check and initialize each uploader if nil.
+	// Creating uploaders reads the bearer token file and sets up HTTP transport.
+	var err error
+
+	if r.diffUploader == nil {
+		r.diffUploader, err = NewDiffUploader(r.cfg)
+		if err != nil {
+			return fmt.Errorf("create diff uploader: %w", err)
+		}
+	}
+
+	if r.artifactUploader == nil {
+		r.artifactUploader, err = NewArtifactUploader(r.cfg)
+		if err != nil {
+			return fmt.Errorf("create artifact uploader: %w", err)
+		}
+	}
+
+	if r.statusUploader == nil {
+		r.statusUploader, err = NewStatusUploader(r.cfg)
+		if err != nil {
+			return fmt.Errorf("create status uploader: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // StopRun cancels all jobs associated with a run_id.
 // Since jobs are tracked by job_id, this iterates to find matching run_ids.
 // Comparisons use typed types.RunID values directly for type safety.

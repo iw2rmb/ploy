@@ -115,10 +115,10 @@ func (r *runController) uploadHealingJobDiff(
 		).
 		MustBuild()
 
-	// Use the shared diff uploader instead of creating a new one per call.
-	// The uploader is initialized once per runController and reused across all jobs.
-	if r.diffUploader == nil {
-		slog.Error("diff uploader not initialized", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
+	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
+	// In production, uploaders are pre-initialized at agent startup.
+	if err := r.ensureUploaders(); err != nil {
+		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
 		return
 	}
 
