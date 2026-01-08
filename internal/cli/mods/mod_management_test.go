@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestAddModCommand_Run validates AddModCommand responses.
@@ -252,7 +254,7 @@ func TestRemoveModCommand_Run(t *testing.T) {
 			cmd := RemoveModCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				ModID:   tc.modID,
+				ModRef:  types.ModRef(tc.modID),
 			}
 
 			err := cmd.Run(context.Background())
@@ -295,7 +297,7 @@ func TestArchiveModCommand_Run(t *testing.T) {
 	cmd := ArchiveModCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
+		ModRef:  types.ModRef("mod-001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -330,7 +332,7 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 	cmd := UnarchiveModCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
+		ModRef:  types.ModRef("mod-001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -366,7 +368,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	cmd := SetModSpecCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
+		ModRef:  types.ModRef("mod-001"),
 		Spec:    json.RawMessage(`{"version":"v1"}`),
 	}
 
@@ -376,6 +378,72 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	}
 	if result.ID != "spec-001" {
 		t.Errorf("got ID %q, want %q", result.ID, "spec-001")
+	}
+}
+
+// TestResolveModByNameNoHeuristic verifies that ResolveModByNameCommand does NOT
+// special-case "UUID-like" inputs. The command should always query the server for
+// name resolution, regardless of input format. This test ensures there are no
+// client-side heuristics that bypass server resolution.
+func TestResolveModByNameNoHeuristic(t *testing.T) {
+	t.Parallel()
+
+	// A UUID-like string that historically was special-cased.
+	// The old code would return this as-is without querying the server.
+	uuidLike := "12345678-1234-1234-1234-123456789012"
+
+	// Track whether the server was queried.
+	serverQueried := false
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverQueried = true
+
+		// Verify it's a list request with name_substring filter.
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if !strings.HasPrefix(r.URL.Path, "/v1/mods") {
+			t.Errorf("expected path /v1/mods, got %s", r.URL.Path)
+		}
+
+		// Check that the UUID-like string is passed as a filter.
+		nameSubstring := r.URL.Query().Get("name_substring")
+		if nameSubstring != uuidLike {
+			t.Errorf("expected name_substring=%q, got %q", uuidLike, nameSubstring)
+		}
+
+		// Return empty list (no match).
+		resp := struct {
+			Mods []ModSummary `json:"mods"`
+		}{Mods: []ModSummary{}}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	t.Cleanup(srv.Close)
+
+	baseURL, _ := url.Parse(srv.URL)
+
+	cmd := ResolveModByNameCommand{
+		Client:  srv.Client(),
+		BaseURL: baseURL,
+		ModRef:  types.ModRef(uuidLike),
+	}
+
+	result, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// The key assertion: server MUST have been queried even for UUID-like inputs.
+	// This verifies no client-side heuristic bypassed the server.
+	if !serverQueried {
+		t.Error("server was not queried for UUID-like input; heuristic may still exist")
+	}
+
+	// Result should be the original ref (no name match found).
+	if result != uuidLike {
+		t.Errorf("got result %q, want %q", result, uuidLike)
 	}
 }
 

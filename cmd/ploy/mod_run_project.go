@@ -21,6 +21,7 @@ import (
 	"io"
 
 	climods "github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRunProject implements 'ploy mod run <mod-id|name> [--repo <url>...] [--failed]'.
@@ -74,7 +75,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	resolveCmd := climods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
