@@ -27,7 +27,7 @@ type Options struct {
 // context so clients can correlate log lines with specific nodes, jobs, and
 // Mods pipeline stages. These fields are optional — older or internal-only
 // log sources may omit them.
-// Uses domain types (NodeID, JobID) for type-safe identification.
+// Uses domain types (NodeID, JobID, ModType, StepIndex) for type-safe identification.
 type LogRecord struct {
 	Timestamp string `json:"timestamp"`
 	Stream    string `json:"stream"`
@@ -41,13 +41,14 @@ type LogRecord struct {
 	// Empty for events not tied to a specific job.
 	JobID domaintypes.JobID `json:"job_id,omitempty"`
 
-	// ModType indicates the Mods step type (e.g., "mod", "hook", "gate").
-	// Empty when not applicable or unknown.
-	ModType string `json:"mod_type,omitempty"`
+	// ModType indicates the Mods step type (e.g., "pre_gate", "mod", "post_gate", "heal", "re_gate").
+	// Empty when not applicable or unknown. Uses domain type for type-safe identification.
+	ModType domaintypes.ModType `json:"mod_type,omitempty"`
 
-	// StepIndex is the zero-based index of the step within the Mods pipeline.
-	// Defaults to 0; use -1 or omit to indicate "not applicable" when serializing.
-	StepIndex int `json:"step_index,omitempty"`
+	// StepIndex is the ordering value of the step within the Mods pipeline.
+	// Uses domain type StepIndex (float64-backed) to preserve ordering without lossy casts.
+	// Zero when omitted; use StepIndex.IsZero() to check for unset values.
+	StepIndex domaintypes.StepIndex `json:"step_index,omitempty"`
 }
 
 // RetentionHint carries retention metadata emitted on the stream.

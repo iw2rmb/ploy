@@ -2,6 +2,11 @@
 // enriched log events from the run SSE stream. The `ploy run logs` command
 // delegates to this printer to ensure consistent formatting across all
 // log-consuming commands.
+//
+// This package uses the canonical stream.LogRecord type from internal/stream
+// to ensure a single source of truth for log payload structures across the
+// server publish path and CLI decode path. This eliminates duplicate struct
+// definitions and prevents drift between server and CLI.
 package logs
 
 import (
@@ -10,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // Format controls log rendering style.
@@ -23,39 +28,14 @@ const (
 	FormatRaw Format = "raw"
 )
 
-// LogRecord represents an enriched log event from the Mods SSE stream.
-// Fields mirror internal/stream.LogRecord for consistency; optional fields
-// (NodeID, JobID, ModType, StepIndex) provide execution context when available.
-// Uses domain types (NodeID, JobID) for type-safe identification.
-type LogRecord struct {
-	Timestamp string `json:"timestamp"`
-	Stream    string `json:"stream"`
-	Line      string `json:"line"`
+// LogRecord is an alias to the canonical stream.LogRecord type.
+// This eliminates duplicate struct definitions and ensures CLI and server
+// use the same payload structure with typed fields (ModType, StepIndex).
+type LogRecord = logstream.LogRecord
 
-	// NodeID identifies the execution node that produced this log line (NanoID-backed).
-	// Empty when the source is not node-bound.
-	NodeID domaintypes.NodeID `json:"node_id,omitempty"`
-
-	// JobID is the ID of the job that produced this log line (KSUID-backed).
-	// Empty for events not tied to a specific job.
-	JobID domaintypes.JobID `json:"job_id,omitempty"`
-
-	// ModType indicates the Mods step type (e.g., "pre_gate", "mod", "post_gate", "heal", "re_gate").
-	// Empty when not applicable or unknown.
-	ModType string `json:"mod_type,omitempty"`
-
-	// StepIndex mirrors jobs.step_index and is used to order steps within a Mods run.
-	// Typical values are float-style indices (1000, 1500, 2000, 3000); zero when omitted.
-	StepIndex int `json:"step_index,omitempty"`
-}
-
-// RetentionHint carries retention metadata emitted at stream completion.
-type RetentionHint struct {
-	Retained bool   `json:"retained"`
-	TTL      string `json:"ttl"`
-	Expires  string `json:"expires_at"`
-	Bundle   string `json:"bundle_cid"`
-}
+// RetentionHint is an alias to the canonical stream.RetentionHint type.
+// This ensures CLI and server use the same retention metadata structure.
+type RetentionHint = logstream.RetentionHint
 
 // Printer formats and writes log records to an output stream.
 // Thread-safe for use in SSE event handlers.
@@ -121,19 +101,22 @@ func (p *Printer) PrintLog(rec LogRecord) {
 			ctx.WriteString("node=")
 			ctx.WriteString(rec.NodeID.String())
 		}
-		if rec.ModType != "" {
+		// ModType is now types.ModType; use IsZero() for consistent checking.
+		if !rec.ModType.IsZero() {
 			if ctx.Len() > 0 {
 				ctx.WriteByte(' ')
 			}
 			ctx.WriteString("mod=")
-			ctx.WriteString(rec.ModType)
+			ctx.WriteString(rec.ModType.String())
 		}
-		// StepIndex: include if > 0 (zero typically means "not set").
-		if rec.StepIndex > 0 {
+		// StepIndex is now types.StepIndex (float64-backed); include if > 0.
+		// Use !IsZero() to check for non-zero values consistently.
+		if !rec.StepIndex.IsZero() {
 			if ctx.Len() > 0 {
 				ctx.WriteByte(' ')
 			}
-			fmt.Fprintf(&ctx, "step=%d", rec.StepIndex)
+			// Format as integer since valid StepIndex values are integer-like.
+			fmt.Fprintf(&ctx, "step=%.0f", rec.StepIndex.Float64())
 		}
 		if !rec.JobID.IsZero() {
 			if ctx.Len() > 0 {
