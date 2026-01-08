@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // TestCompleteJobDurationNeverNull verifies that duration_ms is always non-null
@@ -148,6 +149,52 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		}
 	})
 
+	t.Run("UpdateJobStatus to Running sets started_at", func(t *testing.T) {
+		jobID := types.NewJobID()
+		job, err := db.CreateJob(ctx, CreateJobParams{
+			ID:          jobID,
+			RunID:       fixture.Run.ID,
+			RepoID:      fixture.ModRepo.ID,
+			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
+			Attempt:     fixture.RunRepo.Attempt,
+			Name:        "test-job-running-started-at",
+			Status:      JobStatusQueued,
+			ModType:     "mod",
+			ModImage:    "test-image",
+			StepIndex:   types.StepIndex(2500),
+			Meta:        []byte(`{}`),
+		})
+		if err != nil {
+			t.Fatalf("CreateJob() failed: %v", err)
+		}
+		defer func() { _ = db.DeleteJob(ctx, job.ID) }()
+
+		if job.StartedAt.Valid {
+			t.Fatalf("expected started_at to be NULL after CreateJob, got %v", job.StartedAt.Time)
+		}
+
+		if err := db.UpdateJobStatus(ctx, UpdateJobStatusParams{
+			ID:         job.ID,
+			Status:     JobStatusRunning,
+			StartedAt:  pgtype.Timestamptz{}, // invalid/null input; store should set now() on transition
+			FinishedAt: pgtype.Timestamptz{},
+			DurationMs: 0,
+		}); err != nil {
+			t.Fatalf("UpdateJobStatus() failed: %v", err)
+		}
+
+		running, err := db.GetJob(ctx, job.ID)
+		if err != nil {
+			t.Fatalf("GetJob() failed: %v", err)
+		}
+		if running.Status != JobStatusRunning {
+			t.Fatalf("status=%q, want %q", running.Status, JobStatusRunning)
+		}
+		if !running.StartedAt.Valid {
+			t.Fatal("expected started_at to be set after UpdateJobStatus(Running)")
+		}
+	})
+
 	t.Run("UpdateJobCompletion with valid started_at", func(t *testing.T) {
 		// Create and claim a job (started_at will be set during claim).
 		jobID := types.NewJobID()
@@ -173,9 +220,10 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		nodeID := types.NodeID(types.NewNodeKey())
 		ipAddr, _ := netip.ParseAddr("192.0.2.1")
 		_, err = db.CreateNode(ctx, CreateNodeParams{
-			ID:        nodeID,
-			Name:      "test-node-" + string(nodeID),
-			IpAddress: ipAddr,
+			ID:          nodeID,
+			Name:        "test-node-" + string(nodeID),
+			IpAddress:   ipAddr,
+			Concurrency: 1,
 		})
 		if err != nil {
 			t.Fatalf("CreateNode() failed: %v", err)

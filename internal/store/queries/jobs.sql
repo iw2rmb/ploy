@@ -100,7 +100,15 @@ RETURNING
 
 -- name: UpdateJobStatus :exec
 UPDATE jobs
-SET status = $2, started_at = $3, finished_at = $4, duration_ms = $5
+SET status = $2,
+    -- started_at: set when transitioning to Running (defensive; preserves existing started_at).
+    started_at = CASE
+      WHEN $2 = 'Running'::job_status AND started_at IS NULL THEN now()
+      WHEN $2 = 'Running'::job_status THEN started_at
+      ELSE $3
+    END,
+    finished_at = $4,
+    duration_ms = $5
 WHERE id = $1;
 
 -- name: DeleteJob :exec
