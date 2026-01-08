@@ -51,7 +51,9 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			} `json:"events"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
 			// Return 413 when MaxBytesReader trips the size cap.
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {

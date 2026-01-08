@@ -38,14 +38,13 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := domaintypes.ModID(modIDStr)
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req struct {
 			RepoURL   string `json:"repo_url"`
 			BaseRef   string `json:"base_ref"`
 			TargetRef string `json:"target_ref"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

@@ -34,14 +34,13 @@ var errCANotConfigured = errors.New("CA not configured")
 // Response: { "token": "eyJ...", "node_id": "...", "expires_at": "..." }
 func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse request.
+		// Parse request with strict validation.
 		var req struct {
 			NodeID           string `json:"node_id"`
 			ExpiresInMinutes int    `json:"expires_in_minutes"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -202,13 +201,12 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			return
 		}
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req struct {
 			CSR string `json:"csr"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

@@ -19,6 +19,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+// maxModSpecSize is the body size limit for mod spec creation endpoints.
+// Specs can be large (JSON blobs), so we allow up to 4 MiB.
+const maxModSpecSize = 4 << 20
+
 // createModHandler creates a new mod project.
 // Endpoint: POST /v1/mods
 // Request: {name, spec?}
@@ -35,8 +39,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			CreatedBy *string          `json:"created_by,omitempty"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxModSpecSize); err != nil {
 			return
 		}
 
@@ -522,14 +525,13 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req struct {
 			Name      string          `json:"name,omitempty"`
 			Spec      json.RawMessage `json:"spec"`
 			CreatedBy *string         `json:"created_by,omitempty"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxModSpecSize); err != nil {
 			return
 		}
 

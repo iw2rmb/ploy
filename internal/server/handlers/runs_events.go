@@ -47,14 +47,16 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
-		// Decode request body.
+		// Decode request body with strict validation.
 		// Note: build_id removed; logs are now grouped at job level only.
 		var req struct {
 			JobID   *string `json:"job_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {
 				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
