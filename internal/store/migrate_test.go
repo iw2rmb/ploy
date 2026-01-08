@@ -43,6 +43,9 @@ func TestRunMigrations(t *testing.T) {
 	if version == 0 {
 		t.Fatal("expected version > 0 after migrations")
 	}
+	if version != SchemaVersion {
+		t.Fatalf("version mismatch: got %d, want %d", version, SchemaVersion)
+	}
 
 	// Run migrations again (should be idempotent).
 	if err := RunMigrations(ctx, st.Pool()); err != nil {
@@ -108,6 +111,12 @@ func TestGetCurrentVersion(t *testing.T) {
 		t.Fatalf("ensureVersionTable: %v", err)
 	}
 
+	// Clear any existing versions for a clean test.
+	_, err = st.Pool().Exec(ctx, "DELETE FROM ploy.schema_version")
+	if err != nil {
+		t.Fatalf("clear schema_version: %v", err)
+	}
+
 	// Get version (should be 0 initially).
 	version, err := getCurrentVersion(ctx, st.Pool())
 	if err != nil {
@@ -118,7 +127,7 @@ func TestGetCurrentVersion(t *testing.T) {
 	}
 
 	// Insert a version.
-	_, err = st.Pool().Exec(ctx, "INSERT INTO ploy.schema_version (version, name) VALUES (5, 'test')")
+	_, err = st.Pool().Exec(ctx, "INSERT INTO ploy.schema_version (version) VALUES (5)")
 	if err != nil {
 		t.Fatalf("insert version: %v", err)
 	}
