@@ -86,7 +86,8 @@ type StageStatus struct {
 	// healing jobs at midpoints (e.g., 1500, 1750). The control plane uses this
 	// to order jobs when rehydrating workspaces with diffs from prior steps.
 	// Diffs are fetched ordered by jobs.step_index for correct rehydration.
-	StepIndex int `json:"step_index,omitempty"`
+	// Uses types.StepIndex to preserve ordering without lossy int casts.
+	StepIndex domaintypes.StepIndex `json:"step_index,omitempty"`
 }
 
 // StageMetadata captures job-level metadata for Mods runs.

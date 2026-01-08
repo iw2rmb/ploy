@@ -101,7 +101,7 @@ func TestDiffSummary_StepIndex(t *testing.T) {
 	tests := []struct {
 		name      string
 		json      string
-		wantIdx   int
+		wantIdx   StepIndex
 		wantFound bool
 	}{
 		{
@@ -129,7 +129,7 @@ func TestDiffSummary_StepIndex(t *testing.T) {
 			summary := mustParseDiffSummary(t, tt.json)
 			idx, found := summary.StepIndex()
 			if idx != tt.wantIdx || found != tt.wantFound {
-				t.Errorf("StepIndex() = (%d, %v), want (%d, %v)", idx, found, tt.wantIdx, tt.wantFound)
+				t.Errorf("StepIndex() = (%v, %v), want (%v, %v)", idx, found, tt.wantIdx, tt.wantFound)
 			}
 		})
 	}
@@ -251,7 +251,7 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	// Verify step index.
 	idx, found := summary.StepIndex()
 	if !found || idx != 1 {
-		t.Errorf("StepIndex() = (%d, %v), want (1, true)", idx, found)
+		t.Errorf("StepIndex() = (%v, %v), want (1, true)", idx, found)
 	}
 
 	// Verify mod type.
@@ -265,7 +265,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("basic fields", func(t *testing.T) {
 		summary := NewDiffSummaryBuilder().
 			ExitCode(0).
-			StepIndex(1).
+			StepIndex(StepIndex(1)).
 			ModType("mod").
 			MustBuild()
 
@@ -276,7 +276,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 
 		idx, found := summary.StepIndex()
 		if !found || idx != 1 {
-			t.Errorf("StepIndex() = (%d, %v), want (1, true)", idx, found)
+			t.Errorf("StepIndex() = (%v, %v), want (1, true)", idx, found)
 		}
 
 		modType := summary.ModType()
@@ -312,7 +312,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("JSON roundtrip", func(t *testing.T) {
 		original := NewDiffSummaryBuilder().
 			ExitCode(0).
-			StepIndex(2).
+			StepIndex(StepIndex(2)).
 			ModType("healing").
 			FilesChanged(5).
 			MustBuild()
@@ -337,7 +337,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 
 		idx, found := parsed.StepIndex()
 		if !found || idx != 2 {
-			t.Errorf("StepIndex() = (%d, %v), want (2, true)", idx, found)
+			t.Errorf("StepIndex() = (%v, %v), want (2, true)", idx, found)
 		}
 
 		modType := parsed.ModType()

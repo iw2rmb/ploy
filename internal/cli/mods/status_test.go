@@ -59,10 +59,10 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 
 	if got, ok := result[0].Summary.StepIndex(); !ok || got != 1000 {
-		t.Fatalf("result[0].Summary.StepIndex()=%d ok=%v, want 1000 true", got, ok)
+		t.Fatalf("result[0].Summary.StepIndex()=%v ok=%v, want 1000 true", got, ok)
 	}
 	if got, ok := result[2].Summary.StepIndex(); !ok || got != 3000 {
-		t.Fatalf("result[2].Summary.StepIndex()=%d ok=%v, want 3000 true", got, ok)
+		t.Fatalf("result[2].Summary.StepIndex()=%v ok=%v, want 3000 true", got, ok)
 	}
 }
 

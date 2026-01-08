@@ -179,7 +179,7 @@ func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID 
 	for i, diff := range diffs {
 		stepLabel := "?"
 		if si, ok := diff.Summary.StepIndex(); ok {
-			stepLabel = fmt.Sprintf("%d", si)
+			stepLabel = fmt.Sprintf("%v", si)
 		}
 		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s (step %s)...\n",
 			i+1, len(diffs), diff.ID, stepLabel)

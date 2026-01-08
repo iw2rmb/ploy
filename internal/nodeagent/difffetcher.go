@@ -104,7 +104,7 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 		if !ok {
 			continue
 		}
-		if types.StepIndex(si) > stepIndex {
+		if si > stepIndex {
 			continue
 		}
 

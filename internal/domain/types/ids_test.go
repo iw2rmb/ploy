@@ -422,6 +422,68 @@ func TestStepIndex_IsZero(t *testing.T) {
 	}
 }
 
+// TestStepIndexNoTruncation verifies that fractional step indices are rejected
+// (not silently truncated to integers) at all boundaries where StepIndex.Valid()
+// is enforced. This test ensures the refactor correctly prevents lossy float64->int casts.
+//
+// Per roadmap/refactor/contracts.md § "StepIndex (Ordering Invariant)":
+//   - Reject fractional values (must be integer-like).
+//   - Do not cast StepIndex to int for sorting/serialization; that destroys ordering.
+func TestStepIndexNoTruncation(t *testing.T) {
+	t.Parallel()
+
+	// Fractional step indices that would be silently truncated by int() cast.
+	// These MUST be rejected by Valid(), not silently converted.
+	fractionalCases := []struct {
+		name    string
+		value   float64
+		truncTo int // What int() would produce (lossy).
+	}{
+		{"half", 1000.5, 1000},
+		{"quarter", 2500.25, 2500},
+		{"near_integer", 1999.9999, 1999},
+		{"small_fraction", 3000.1, 3000},
+		{"negative_half", -500.5, -500},
+		{"healing_midpoint_fraction", 1750.75, 1750},
+	}
+
+	for _, tt := range fractionalCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			idx := StepIndex(tt.value)
+
+			// Verify that Valid() rejects the fractional value.
+			if idx.Valid() {
+				t.Errorf("StepIndex(%v).Valid() = true; want false (fractional values must be rejected)", tt.value)
+			}
+
+			// Verify that Float64() preserves the exact value (no truncation).
+			if got := idx.Float64(); got != tt.value {
+				t.Errorf("StepIndex(%v).Float64() = %v; value was unexpectedly modified", tt.value, got)
+			}
+
+			// Document what a lossy int() cast would produce (for reference).
+			// This is what we are PREVENTING by using types.StepIndex end-to-end.
+			lossyCast := int(tt.value)
+			if lossyCast != tt.truncTo {
+				t.Errorf("int(%v) = %d; expected %d (test case incorrect)", tt.value, lossyCast, tt.truncTo)
+			}
+		})
+	}
+
+	// Valid integer-like step indices (baseline sanity check).
+	integerCases := []float64{0, 1000, 1500, 2000, 3000, -1000}
+	for _, v := range integerCases {
+		t.Run("integer_"+string(rune(int(v))), func(t *testing.T) {
+			idx := StepIndex(v)
+			if !idx.Valid() {
+				t.Errorf("StepIndex(%v).Valid() = false; want true (integer values must be valid)", v)
+			}
+		})
+	}
+}
+
 // TestEventID tests the EventID type for SSE cursor validation and serialization.
 func TestEventID(t *testing.T) {
 	t.Parallel()
