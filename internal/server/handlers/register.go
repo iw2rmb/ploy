@@ -39,11 +39,11 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// /v1/mods endpoints handle mod project CRUD operations.
 	s.HandleFunc("POST /v1/mods", createModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods", listModsHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/mods/{mod_id}", deleteModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("PATCH /v1/mods/{mod_id}/archive", archiveModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("PATCH /v1/mods/{mod_id}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/mods/{mod_ref}", deleteModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/mods/{mod_ref}/archive", archiveModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/mods/{mod_ref}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
 	// Set mod spec (append-only specs + mods.spec_id pointer).
-	s.HandleFunc("POST /v1/mods/{mod_id}/specs", setModSpecHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/mods/{mod_ref}/specs", setModSpecHandler(st), auth.RoleControlPlane)
 	// Mod repo set management (add/list/delete + bulk CSV upsert).
 	s.HandleFunc("POST /v1/mods/{mod_id}/repos", addModRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{mod_id}/repos", listModReposHandler(st), auth.RoleControlPlane)

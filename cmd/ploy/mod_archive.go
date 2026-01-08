@@ -36,22 +36,11 @@ func handleModArchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports both name and ID).
-	resolveCmd := mods.ResolveModByNameCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
-	}
-	modID, err := resolveCmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
 	// Execute mod archive command.
 	cmd := mods.ArchiveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modID),
+		ModRef:  types.ModRef(modRef),
 	}
 
 	result, err := cmd.Run(ctx)

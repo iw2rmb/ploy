@@ -42,6 +42,11 @@ type mockStore struct {
 	getModResult store.Mod
 	getModErr    error
 
+	getModByNameCalled bool
+	getModByNameParam  string
+	getModByNameResult store.Mod
+	getModByNameErr    error
+
 	deleteModCalled bool
 	deleteModParam  string
 	deleteModErr    error
@@ -523,6 +528,24 @@ func (m *mockStore) GetMod(ctx context.Context, id string) (store.Mod, error) {
 	}
 	if result.Name == "" {
 		result.Name = "mod-" + id
+	}
+	return result, nil
+}
+
+func (m *mockStore) GetModByName(ctx context.Context, name string) (store.Mod, error) {
+	m.getModByNameCalled = true
+	m.getModByNameParam = name
+	if m.getModByNameErr != nil {
+		return store.Mod{}, m.getModByNameErr
+	}
+
+	// Default behavior: not found unless explicitly configured.
+	result := m.getModByNameResult
+	if result.ID == "" && result.Name == "" {
+		return store.Mod{}, pgx.ErrNoRows
+	}
+	if result.Name == "" {
+		result.Name = name
 	}
 	return result, nil
 }

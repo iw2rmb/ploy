@@ -141,6 +141,27 @@ func TestMods_Create_EmptyName(t *testing.T) {
 	}
 }
 
+func TestMods_Create_InvalidName(t *testing.T) {
+	st := &mockStore{}
+	handler := createModHandler(st)
+
+	reqBody := map[string]any{"name": "my mod"}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
+	}
+	if st.createModCalled {
+		t.Error("store.CreateMod should not be called for invalid name")
+	}
+}
+
 // TestMods_Create_DuplicateName verifies POST /v1/mods returns 409 for duplicate name.
 // Mod names must be unique.
 func TestMods_Create_DuplicateName(t *testing.T) {
@@ -451,10 +472,10 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 }
 
 // =============================================================================
-// DELETE /v1/mods/{mod_id} — Delete Mod
+// DELETE /v1/mods/{mod_ref} — Delete Mod
 // =============================================================================
 
-// TestMods_Delete_Success verifies DELETE /v1/mods/{mod_id} deletes a mod.
+// TestMods_Delete_Success verifies DELETE /v1/mods/{mod_ref} deletes a mod.
 // Tests mod deletion when no runs exist.
 func TestMods_Delete_Success(t *testing.T) {
 	st := &mockStore{
@@ -464,7 +485,7 @@ func TestMods_Delete_Success(t *testing.T) {
 	handler := deleteModHandler(st)
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/mods/mod123", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -485,7 +506,7 @@ func TestMods_Delete_Success(t *testing.T) {
 	}
 }
 
-// TestMods_Delete_NotFound verifies DELETE /v1/mods/{mod_id} returns 404 for missing mod.
+// TestMods_Delete_NotFound verifies DELETE /v1/mods/{mod_ref} returns 404 for missing mod.
 func TestMods_Delete_NotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -493,7 +514,7 @@ func TestMods_Delete_NotFound(t *testing.T) {
 	handler := deleteModHandler(st)
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/mods/nonexistent", nil)
-	req.SetPathValue("mod_id", "nonexistent")
+	req.SetPathValue("mod_ref", "nonexistent")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -508,7 +529,7 @@ func TestMods_Delete_NotFound(t *testing.T) {
 	}
 }
 
-// TestMods_Delete_RefusesWithRuns verifies DELETE /v1/mods/{mod_id} returns 409
+// TestMods_Delete_RefusesWithRuns verifies DELETE /v1/mods/{mod_ref} returns 409
 // when runs exist for the mod.
 // Deletion is refused if any runs exist for the mod.
 func TestMods_Delete_RefusesWithRuns(t *testing.T) {
@@ -521,7 +542,7 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	handler := deleteModHandler(st)
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/mods/mod123", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -536,11 +557,37 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	}
 }
 
+func TestMods_Delete_ByName(t *testing.T) {
+	st := &mockStore{
+		getModErr:          pgx.ErrNoRows,
+		getModByNameResult: store.Mod{ID: "mod123", Name: "my-mod"},
+		// No runs exist for this mod.
+		listRunsResult: []store.Run{},
+	}
+	handler := deleteModHandler(st)
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/mods/my-mod", nil)
+	req.SetPathValue("mod_ref", "my-mod")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNoContent, rr.Body.String())
+	}
+	if !st.getModByNameCalled {
+		t.Error("store.GetModByName was not called")
+	}
+	if st.deleteModParam != "mod123" {
+		t.Errorf("DeleteMod param = %q, want %q", st.deleteModParam, "mod123")
+	}
+}
+
 // =============================================================================
-// PATCH /v1/mods/{mod_id}/archive — Archive Mod
+// PATCH /v1/mods/{mod_ref}/archive — Archive Mod
 // =============================================================================
 
-// TestMods_Archive_Success verifies PATCH /v1/mods/{mod_id}/archive archives a mod.
+// TestMods_Archive_Success verifies PATCH /v1/mods/{mod_ref}/archive archives a mod.
 // Tests mod archiving to prevent execution.
 func TestMods_Archive_Success(t *testing.T) {
 	st := &mockStore{
@@ -555,7 +602,7 @@ func TestMods_Archive_Success(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -601,7 +648,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -615,7 +662,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 	}
 }
 
-// TestMods_Archive_NotFound verifies PATCH /v1/mods/{mod_id}/archive returns 404.
+// TestMods_Archive_NotFound verifies PATCH /v1/mods/{mod_ref}/archive returns 404.
 func TestMods_Archive_NotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -623,7 +670,7 @@ func TestMods_Archive_NotFound(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/nonexistent/archive", nil)
-	req.SetPathValue("mod_id", "nonexistent")
+	req.SetPathValue("mod_ref", "nonexistent")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -633,7 +680,7 @@ func TestMods_Archive_NotFound(t *testing.T) {
 	}
 }
 
-// TestMods_Archive_RefusesWithRunningJobs verifies PATCH /v1/mods/{mod_id}/archive
+// TestMods_Archive_RefusesWithRunningJobs verifies PATCH /v1/mods/{mod_ref}/archive
 // returns 409 when running jobs exist.
 // Archive refuses if running jobs exist.
 func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
@@ -655,7 +702,7 @@ func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -670,7 +717,7 @@ func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
 	}
 }
 
-// TestMods_Archive_RefusesWithQueuedJobs verifies PATCH /v1/mods/{mod_id}/archive
+// TestMods_Archive_RefusesWithQueuedJobs verifies PATCH /v1/mods/{mod_ref}/archive
 // returns 409 when queued jobs exist (also considered "running").
 func TestMods_Archive_RefusesWithQueuedJobs(t *testing.T) {
 	st := &mockStore{
@@ -689,7 +736,7 @@ func TestMods_Archive_RefusesWithQueuedJobs(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -719,7 +766,7 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -732,11 +779,36 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 	}
 }
 
+func TestMods_Archive_ByName(t *testing.T) {
+	st := &mockStore{
+		getModErr:          pgx.ErrNoRows,
+		getModByNameResult: store.Mod{ID: "mod123", Name: "my-mod", ArchivedAt: pgtype.Timestamptz{Valid: false}},
+		listRunsResult:     []store.Run{},
+	}
+	handler := archiveModHandler(st)
+
+	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/my-mod/archive", nil)
+	req.SetPathValue("mod_ref", "my-mod")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if !st.getModByNameCalled {
+		t.Error("store.GetModByName was not called")
+	}
+	if st.archiveModParam != "mod123" {
+		t.Errorf("ArchiveMod param = %q, want %q", st.archiveModParam, "mod123")
+	}
+}
+
 // =============================================================================
-// PATCH /v1/mods/{mod_id}/unarchive — Unarchive Mod
+// PATCH /v1/mods/{mod_ref}/unarchive — Unarchive Mod
 // =============================================================================
 
-// TestMods_Unarchive_Success verifies PATCH /v1/mods/{mod_id}/unarchive unarchives a mod.
+// TestMods_Unarchive_Success verifies PATCH /v1/mods/{mod_ref}/unarchive unarchives a mod.
 // Tests mod unarchiving to allow execution again.
 func TestMods_Unarchive_Success(t *testing.T) {
 	st := &mockStore{
@@ -749,7 +821,7 @@ func TestMods_Unarchive_Success(t *testing.T) {
 	handler := unarchiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/unarchive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -792,7 +864,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 	handler := unarchiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/unarchive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -806,7 +878,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 	}
 }
 
-// TestMods_Unarchive_NotFound verifies PATCH /v1/mods/{mod_id}/unarchive returns 404.
+// TestMods_Unarchive_NotFound verifies PATCH /v1/mods/{mod_ref}/unarchive returns 404.
 func TestMods_Unarchive_NotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -814,7 +886,7 @@ func TestMods_Unarchive_NotFound(t *testing.T) {
 	handler := unarchiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/nonexistent/unarchive", nil)
-	req.SetPathValue("mod_id", "nonexistent")
+	req.SetPathValue("mod_ref", "nonexistent")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -866,7 +938,7 @@ func TestMods_List_StoreError(t *testing.T) {
 	}
 }
 
-// TestMods_Delete_StoreError verifies DELETE /v1/mods/{mod_id} returns 500 on store error.
+// TestMods_Delete_StoreError verifies DELETE /v1/mods/{mod_ref} returns 500 on store error.
 func TestMods_Delete_StoreError(t *testing.T) {
 	st := &mockStore{
 		listRunsResult: []store.Run{}, // No runs.
@@ -875,7 +947,7 @@ func TestMods_Delete_StoreError(t *testing.T) {
 	handler := deleteModHandler(st)
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/mods/mod123", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -885,7 +957,7 @@ func TestMods_Delete_StoreError(t *testing.T) {
 	}
 }
 
-// TestMods_Archive_StoreError verifies PATCH /v1/mods/{mod_id}/archive returns 500 on store error.
+// TestMods_Archive_StoreError verifies PATCH /v1/mods/{mod_ref}/archive returns 500 on store error.
 func TestMods_Archive_StoreError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -899,7 +971,7 @@ func TestMods_Archive_StoreError(t *testing.T) {
 	handler := archiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/archive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -909,7 +981,7 @@ func TestMods_Archive_StoreError(t *testing.T) {
 	}
 }
 
-// TestMods_Unarchive_StoreError verifies PATCH /v1/mods/{mod_id}/unarchive returns 500 on store error.
+// TestMods_Unarchive_StoreError verifies PATCH /v1/mods/{mod_ref}/unarchive returns 500 on store error.
 func TestMods_Unarchive_StoreError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -922,7 +994,7 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 	handler := unarchiveModHandler(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/v1/mods/mod123/unarchive", nil)
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -933,10 +1005,10 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 }
 
 // =============================================================================
-// POST /v1/mods/{mod_id}/specs — Set Mod Spec
+// POST /v1/mods/{mod_ref}/specs — Set Mod Spec
 // =============================================================================
 
-// TestMods_SetSpec_Success verifies POST /v1/mods/{mod_id}/specs creates a new spec and updates mods.spec_id.
+// TestMods_SetSpec_Success verifies POST /v1/mods/{mod_ref}/specs creates a new spec and updates mods.spec_id.
 // Tests append-only spec creation with mods.spec_id update.
 func TestMods_SetSpec_Success(t *testing.T) {
 	st := &mockStore{
@@ -959,7 +1031,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -996,7 +1068,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_WithName verifies POST /v1/mods/{mod_id}/specs accepts optional name.
+// TestMods_SetSpec_WithName verifies POST /v1/mods/{mod_ref}/specs accepts optional name.
 func TestMods_SetSpec_WithName(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -1019,7 +1091,7 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1057,7 +1129,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	body1, _ := json.Marshal(reqBody1)
 
 	req1 := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body1))
-	req1.SetPathValue("mod_id", "mod123")
+	req1.SetPathValue("mod_ref", "mod123")
 	req1.Header.Set("Content-Type", "application/json")
 	rr1 := httptest.NewRecorder()
 
@@ -1087,7 +1159,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	body2, _ := json.Marshal(reqBody2)
 
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body2))
-	req2.SetPathValue("mod_id", "mod123")
+	req2.SetPathValue("mod_ref", "mod123")
 	req2.Header.Set("Content-Type", "application/json")
 	rr2 := httptest.NewRecorder()
 
@@ -1117,7 +1189,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_MissingSpec verifies POST /v1/mods/{mod_id}/specs rejects missing spec.
+// TestMods_SetSpec_MissingSpec verifies POST /v1/mods/{mod_ref}/specs rejects missing spec.
 func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := setModSpecHandler(st)
@@ -1126,7 +1198,7 @@ func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1142,7 +1214,7 @@ func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_InvalidSpec verifies POST /v1/mods/{mod_id}/specs rejects invalid spec JSON.
+// TestMods_SetSpec_InvalidSpec verifies POST /v1/mods/{mod_ref}/specs rejects invalid spec JSON.
 func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := setModSpecHandler(st)
@@ -1154,7 +1226,7 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1165,7 +1237,7 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_ModNotFound verifies POST /v1/mods/{mod_id}/specs returns 404 for missing mod.
+// TestMods_SetSpec_ModNotFound verifies POST /v1/mods/{mod_ref}/specs returns 404 for missing mod.
 func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -1181,7 +1253,7 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/nonexistent/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "nonexistent")
+	req.SetPathValue("mod_ref", "nonexistent")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1197,7 +1269,7 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_ArchivedMod verifies POST /v1/mods/{mod_id}/specs rejects archived mods.
+// TestMods_SetSpec_ArchivedMod verifies POST /v1/mods/{mod_ref}/specs rejects archived mods.
 func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -1217,7 +1289,7 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1233,13 +1305,13 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_InvalidJSON verifies POST /v1/mods/{mod_id}/specs rejects malformed JSON body.
+// TestMods_SetSpec_InvalidJSON verifies POST /v1/mods/{mod_ref}/specs rejects malformed JSON body.
 func TestMods_SetSpec_InvalidJSON(t *testing.T) {
 	st := &mockStore{}
 	handler := setModSpecHandler(st)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader([]byte("not json")))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1250,7 +1322,7 @@ func TestMods_SetSpec_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_CreateSpecError verifies POST /v1/mods/{mod_id}/specs returns 500 on CreateSpec failure.
+// TestMods_SetSpec_CreateSpecError verifies POST /v1/mods/{mod_ref}/specs returns 500 on CreateSpec failure.
 func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -1271,7 +1343,7 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -1282,7 +1354,7 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_UpdateModSpecError verifies POST /v1/mods/{mod_id}/specs returns 500 on UpdateModSpec failure.
+// TestMods_SetSpec_UpdateModSpecError verifies POST /v1/mods/{mod_ref}/specs returns 500 on UpdateModSpec failure.
 func TestMods_SetSpec_UpdateModSpecError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{
@@ -1303,7 +1375,7 @@ func TestMods_SetSpec_UpdateModSpecError(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "mod123")
+	req.SetPathValue("mod_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
