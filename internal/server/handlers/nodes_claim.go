@@ -59,7 +59,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Claim the next pending job. ClaimJob requires a non-empty nodeID.
-		job, err := st.ClaimJob(r.Context(), nodeID)
+		job, err := st.ClaimJob(r.Context(), domaintypes.NodeID(nodeID))
 		if err != nil {
 			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {

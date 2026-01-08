@@ -17,9 +17,6 @@ var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
 // The sqlc-generated Queries type will implement the query methods.
 type Store interface {
 	Querier
-	// ClaimJob atomically claims the next claimable job for a node.
-	// Requires a non-empty nodeID; returns ErrEmptyNodeID if empty.
-	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -84,5 +81,5 @@ func (s *PgStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 	if nodeID.IsZero() {
 		return Job{}, ErrEmptyNodeID
 	}
-	return s.claimJobInternal(ctx, &nodeID)
+	return s.Queries.ClaimJob(ctx, nodeID)
 }
