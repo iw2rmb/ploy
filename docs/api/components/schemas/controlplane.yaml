@@ -36,10 +36,12 @@ Run:
       description: Run ID (KSUID string)
     mod_id:
       type: string
-      description: Mod (project) ID (NanoID string)
+      minLength: 1
+      description: Mod (project) ID (NanoID string). Must be non-empty.
     spec_id:
       type: string
-      description: Spec ID (NanoID string)
+      minLength: 1
+      description: Spec ID (NanoID string). Must be non-empty.
     created_by:
       type: string
       nullable: true
