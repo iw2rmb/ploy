@@ -319,14 +319,9 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 // - Refuses deletion if any runs exist for the mod.
 func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRefStr, err := requiredPathParam(r, "mod_ref")
+		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		modRef := domaintypes.ModRef(modRefStr)
-		if err := modRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -338,7 +333,7 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("delete mod: get mod failed", "mod_ref", modRefStr, "err", err)
+			slog.Error("delete mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
@@ -396,14 +391,9 @@ func modHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.ModID)
 // - Cannot archive a mod with running jobs.
 func archiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRefStr, err := requiredPathParam(r, "mod_ref")
+		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		modRef := domaintypes.ModRef(modRefStr)
-		if err := modRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -415,7 +405,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("archive mod: get mod failed", "mod_ref", modRefStr, "err", err)
+			slog.Error("archive mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
@@ -514,14 +504,9 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 // - This is the canonical way to "set" or "update" a mod's spec.
 func setModSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRefStr, err := requiredPathParam(r, "mod_ref")
+		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		modRef := domaintypes.ModRef(modRefStr)
-		if err := modRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -555,7 +540,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("set mod spec: get mod failed", "mod_ref", modRefStr, "err", err)
+			slog.Error("set mod spec: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
@@ -614,14 +599,9 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 // - Unarchives a mod (allows execution again).
 func unarchiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRefStr, err := requiredPathParam(r, "mod_ref")
+		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		modRef := domaintypes.ModRef(modRefStr)
-		if err := modRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -633,7 +613,7 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("unarchive mod: get mod failed", "mod_ref", modRefStr, "err", err)
+			slog.Error("unarchive mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID

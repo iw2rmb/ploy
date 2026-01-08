@@ -17,12 +17,11 @@ import (
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeIDStr, err := requiredPathParam(r, "id")
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)
@@ -58,12 +57,11 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeIDStr, err := requiredPathParam(r, "id")
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)

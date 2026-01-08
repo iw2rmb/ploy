@@ -31,13 +31,12 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run id from path parameter using the shared helper.
-		runIDStr, err := requiredPathParam(r, "id")
+		// Extract run id from path parameter using domain type helper.
+		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		runID := domaintypes.RunID(runIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
@@ -86,7 +85,7 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		logRow, err := eventsService.CreateAndPublishLog(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
-			slog.Error("run logs: create failed", "run_id", runIDStr, "chunk_no", req.ChunkNo, "err", err)
+			slog.Error("run logs: create failed", "run_id", runID, "chunk_no", req.ChunkNo, "err", err)
 			return
 		}
 

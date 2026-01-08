@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -21,19 +20,16 @@ import (
 func getRunTimingHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Accept id from path parameter first, then fallback to query parameter.
-		// Uses optionalPathParam since query fallback is supported.
-		runIDStr := ""
-		if idPtr := optionalPathParam(r, "id"); idPtr != nil {
-			runIDStr = *idPtr
-		} else if qID := strings.TrimSpace(r.URL.Query().Get("id")); qID != "" {
-			runIDStr = qID
-		}
-		if runIDStr == "" {
+		// Uses domain type helpers for validation at the boundary.
+		var runID domaintypes.RunID
+		if idPtr := domaintypes.OptionalRunIDParam(r, "id"); idPtr != nil {
+			runID = *idPtr
+		} else if qID := domaintypes.OptionalRunIDQuery(r, "id"); qID != nil {
+			runID = *qID
+		} else {
 			http.Error(w, "id query parameter is required", http.StatusBadRequest)
 			return
 		}
-
-		runID := domaintypes.RunID(runIDStr)
 		timing, err := st.GetRunTiming(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -41,7 +37,7 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get run timing: %v", err), http.StatusInternalServerError)
-			slog.Error("get run timing: database error", "run_id", runIDStr, "err", err)
+			slog.Error("get run timing: database error", "run_id", runID, "err", err)
 			return
 		}
 
@@ -72,16 +68,14 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 // IDs are treated as opaque; validation is limited to non-empty checks.
 func deleteRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract id from path parameter using the shared helper.
-		runIDStr, err := requiredPathParam(r, "id")
+		// Extract id from path parameter using domain type helper.
+		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Check if the run exists before attempting to delete.
-		// No UUID parsing needed; store accepts KSUID strings.
-		runID := domaintypes.RunID(runIDStr)
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -89,7 +83,7 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run: check failed", "run_id", runIDStr, "err", err)
+			slog.Error("delete run: check failed", "run_id", runID, "err", err)
 			return
 		}
 
@@ -97,11 +91,11 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 		err = st.DeleteRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to delete run: %v", err), http.StatusInternalServerError)
-			slog.Error("delete run: database error", "run_id", runIDStr, "err", err)
+			slog.Error("delete run: database error", "run_id", runID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("run deleted", "run_id", runIDStr)
+		slog.Info("run deleted", "run_id", runID)
 	}
 }
