@@ -115,7 +115,7 @@ WHERE ($3::boolean IS NULL OR
        ($3::boolean = true AND archived_at IS NOT NULL) OR
        ($3::boolean = false AND archived_at IS NULL))
   AND ($4::text IS NULL OR $4::text = '' OR name ILIKE '%' || $4::text || '%')
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 

@@ -330,7 +330,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
-ORDER BY step_index ASC
+ORDER BY step_index ASC, id ASC
 `
 
 type ListCreatedJobsByRunRepoAttemptParams struct {
@@ -396,7 +396,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1
-ORDER BY repo_id ASC, attempt ASC, step_index ASC
+ORDER BY repo_id ASC, attempt ASC, step_index ASC, id ASC
 `
 
 func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error) {
@@ -456,7 +456,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
-ORDER BY step_index ASC
+ORDER BY step_index ASC, id ASC
 `
 
 type ListJobsByRunRepoAttemptParams struct {

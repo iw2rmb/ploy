@@ -99,7 +99,7 @@ func (q *Queries) GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming,
 const listRuns = `-- name: ListRuns :many
 SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 

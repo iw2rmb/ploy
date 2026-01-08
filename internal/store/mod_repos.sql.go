@@ -138,7 +138,7 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) rr ON true
 WHERE ($1::text IS NULL OR $1 = '' OR mr.repo_url ILIKE '%' || $1 || '%')
-ORDER BY mr.repo_url ASC
+ORDER BY mr.repo_url ASC, mr.id ASC
 `
 
 type ListDistinctReposRow struct {
@@ -178,7 +178,7 @@ const listModReposByMod = `-- name: ListModReposByMod :many
 SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
 FROM mod_repos
 WHERE mod_id = $1
-ORDER BY created_at ASC
+ORDER BY created_at ASC, id ASC
 `
 
 func (q *Queries) ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error) {

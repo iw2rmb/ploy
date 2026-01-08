@@ -15,7 +15,7 @@ WHERE run_id = $1 AND repo_id = $2;
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, repo_id ASC;
 
 -- name: UpdateRunRepoStatus :exec
 -- Updates repo status + timing fields.
@@ -63,7 +63,7 @@ WHERE run_id = $1 AND repo_id = $2;
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND status = 'Queued'
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, repo_id ASC;
 
 -- name: ListRunsWithQueuedRepos :many
 -- Lists runs that have queued work (at least one Queued run_repos row).
@@ -89,7 +89,7 @@ SELECT
 FROM run_repos rr
 JOIN runs r ON rr.run_id = r.id
 WHERE rr.repo_id = $1
-ORDER BY rr.created_at DESC
+ORDER BY rr.created_at DESC, rr.run_id DESC
 LIMIT $2 OFFSET $3;
 
 -- name: ListFailedRepoIDsByMod :many

@@ -166,7 +166,7 @@ SELECT
     created_by
 FROM api_tokens
 WHERE cluster_id = $1
-ORDER BY created_at DESC
+ORDER BY created_at DESC, token_id DESC
 `
 
 type ListAPITokensRow struct {

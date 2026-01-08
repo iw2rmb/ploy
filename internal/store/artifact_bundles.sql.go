@@ -95,7 +95,7 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 const listArtifactBundlesByCID = `-- name: ListArtifactBundlesByCID :many
 SELECT id, run_id, job_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE cid = $1
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error) {
@@ -130,7 +130,7 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
 SELECT id, run_id, job_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error) {
@@ -165,7 +165,7 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunI
 const listArtifactBundlesByRunAndJob = `-- name: ListArtifactBundlesByRunAndJob :many
 SELECT id, run_id, job_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1 AND job_id = $2
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 `
 
 type ListArtifactBundlesByRunAndJobParams struct {

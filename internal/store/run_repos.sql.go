@@ -224,7 +224,7 @@ const listQueuedRunReposByRun = `-- name: ListQueuedRunReposByRun :many
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND status = 'Queued'
-ORDER BY created_at ASC
+ORDER BY created_at ASC, repo_id ASC
 `
 
 func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error) {
@@ -263,7 +263,7 @@ const listRunReposByRun = `-- name: ListRunReposByRun :many
 SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
-ORDER BY created_at ASC
+ORDER BY created_at ASC, repo_id ASC
 `
 
 // Lists all repos associated with a run, ordered by creation time.
@@ -354,7 +354,7 @@ SELECT
 FROM run_repos rr
 JOIN runs r ON rr.run_id = r.id
 WHERE rr.repo_id = $1
-ORDER BY rr.created_at DESC
+ORDER BY rr.created_at DESC, rr.run_id DESC
 LIMIT $2 OFFSET $3
 `
 

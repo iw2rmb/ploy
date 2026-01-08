@@ -18,7 +18,7 @@ WHERE mod_id = $1 AND repo_url = $2;
 SELECT id, mod_id, repo_url, base_ref, target_ref, created_at
 FROM mod_repos
 WHERE mod_id = $1
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, id ASC;
 
 -- name: UpdateModRepoRefs :exec
 UPDATE mod_repos
@@ -71,4 +71,4 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) rr ON true
 WHERE (@filter::text IS NULL OR @filter = '' OR mr.repo_url ILIKE '%' || @filter || '%')
-ORDER BY mr.repo_url ASC;
+ORDER BY mr.repo_url ASC, mr.id ASC;
