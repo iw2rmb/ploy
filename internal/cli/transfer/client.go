@@ -33,6 +33,25 @@ type UploadSlotRequest struct {
 	Digest domaintypes.Digest        `json:"digest,omitempty"`
 }
 
+func (v UploadSlotRequest) Validate() error {
+	if v.JobID.IsZero() {
+		return errors.New("transfer: job id required")
+	}
+	if v.NodeID.IsZero() {
+		return errors.New("transfer: node id required")
+	}
+	if err := v.Stage.Validate(); err != nil {
+		return fmt.Errorf("transfer: invalid stage: %w", err)
+	}
+	if err := v.Kind.Validate(); err != nil {
+		return fmt.Errorf("transfer: invalid kind: %w", err)
+	}
+	if err := v.Digest.Validate(); err != nil {
+		return fmt.Errorf("transfer: invalid digest: %w", err)
+	}
+	return nil
+}
+
 // DownloadSlotRequest reserves a download slot for a job artifact.
 // Uses domain types (JobID, NodeID) for type-safe identification.
 type DownloadSlotRequest struct {
@@ -40,6 +59,18 @@ type DownloadSlotRequest struct {
 	Kind       domaintypes.TransferKind `json:"kind,omitempty"`
 	ArtifactID string                   `json:"artifact_id,omitempty"`
 	NodeID     domaintypes.NodeID       `json:"node_id,omitempty"` // Node ID (NanoID-backed, optional)
+}
+
+func (v DownloadSlotRequest) Validate() error {
+	if v.JobID.IsZero() {
+		return errors.New("transfer: job id required")
+	}
+	if v.Kind != "" {
+		if err := v.Kind.Validate(); err != nil {
+			return fmt.Errorf("transfer: invalid kind: %w", err)
+		}
+	}
+	return nil
 }
 
 // Slot describes a reserved transfer slot.
@@ -61,13 +92,29 @@ type CommitRequest struct {
 	Digest domaintypes.Digest `json:"digest"`
 }
 
+func (v CommitRequest) Validate() error {
+	if v.Digest == "" {
+		return errors.New("transfer: digest required")
+	}
+	if err := v.Digest.Validate(); err != nil {
+		return fmt.Errorf("transfer: invalid digest: %w", err)
+	}
+	return nil
+}
+
 // UploadSlot requests a new upload slot for the provided job metadata.
 func (c Client) UploadSlot(ctx context.Context, req UploadSlotRequest) (Slot, error) {
+	if err := req.Validate(); err != nil {
+		return Slot{}, err
+	}
 	return c.requestSlot(ctx, "/v1/transfers/upload", req)
 }
 
 // DownloadSlot requests a download slot for the supplied artifact metadata.
 func (c Client) DownloadSlot(ctx context.Context, req DownloadSlotRequest) (Slot, error) {
+	if err := req.Validate(); err != nil {
+		return Slot{}, err
+	}
 	return c.requestSlot(ctx, "/v1/transfers/download", req)
 }
 
@@ -82,7 +129,10 @@ func (c Client) Commit(ctx context.Context, slotID domaintypes.SlotID, req Commi
 	if err := slotID.Validate(); err != nil {
 		return errors.New("transfer: slot id required")
 	}
-	endpoint := fmt.Sprintf("/v1/transfers/%s/commit", slotID)
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("/v1/transfers/%s/commit", url.PathEscape(slotID.String()))
 	_, err := doReq[CommitRequest, emptyResponse](ctx, c, http.MethodPost, endpoint, req)
 	return err
 }
@@ -92,7 +142,7 @@ func (c Client) Abort(ctx context.Context, slotID domaintypes.SlotID) error {
 	if err := slotID.Validate(); err != nil {
 		return errors.New("transfer: slot id required")
 	}
-	endpoint := fmt.Sprintf("/v1/transfers/%s/abort", slotID)
+	endpoint := fmt.Sprintf("/v1/transfers/%s/abort", url.PathEscape(slotID.String()))
 	_, err := doReq[emptyRequest, emptyResponse](ctx, c, http.MethodPost, endpoint, emptyRequest{})
 	return err
 }

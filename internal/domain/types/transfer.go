@@ -25,8 +25,14 @@ func (v SlotID) IsZero() bool { return IsEmpty(string(v)) }
 // Validate checks that the SlotID is non-empty and URL-safe.
 // URL-safe means no whitespace and no / or ? characters.
 func (v SlotID) Validate() error {
-	s := Normalize(string(v))
-	if s == "" {
+	s := string(v)
+	if IsEmpty(s) {
+		return ErrInvalidSlotID
+	}
+	if s == "." || s == ".." {
+		return ErrInvalidSlotID
+	}
+	if Normalize(s) != s {
 		return ErrInvalidSlotID
 	}
 	for _, c := range s {
@@ -47,7 +53,7 @@ func (v SlotID) MarshalText() ([]byte, error) {
 	if err := v.Validate(); err != nil {
 		return nil, err
 	}
-	return []byte(Normalize(string(v))), nil
+	return []byte(string(v)), nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -213,12 +219,15 @@ func (v Digest) String() string { return string(v) }
 func (v Digest) IsZero() bool { return IsEmpty(string(v)) }
 
 // Validate checks that the Digest is in valid sha256:<hex> format.
-// Empty values are valid (digest may be optional in some contexts).
+// Empty string is valid (digest may be optional in some contexts), but
+// whitespace-only values are rejected.
 func (v Digest) Validate() error {
+	if v == "" {
+		return nil
+	}
 	s := Normalize(string(v))
 	if s == "" {
-		// Empty is valid (optional field).
-		return nil
+		return ErrEmpty
 	}
 	if !digestPattern.MatchString(s) {
 		return ErrInvalidDigest
@@ -233,9 +242,12 @@ var _ interface {
 
 // MarshalText implements encoding.TextMarshaler.
 func (v Digest) MarshalText() ([]byte, error) {
+	if v == "" {
+		return []byte{}, nil
+	}
 	s := Normalize(string(v))
 	if s == "" {
-		return []byte{}, nil
+		return nil, ErrEmpty
 	}
 	if !digestPattern.MatchString(s) {
 		return nil, ErrInvalidDigest
@@ -245,10 +257,14 @@ func (v Digest) MarshalText() ([]byte, error) {
 
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (v *Digest) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
+	raw := string(b)
+	s := Normalize(raw)
 	if s == "" {
-		*v = ""
-		return nil
+		if raw == "" {
+			*v = ""
+			return nil
+		}
+		return ErrEmpty
 	}
 	if !digestPattern.MatchString(s) {
 		return ErrInvalidDigest

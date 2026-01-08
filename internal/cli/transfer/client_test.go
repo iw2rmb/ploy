@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,12 +77,44 @@ func TestTransferErrors(t *testing.T) {
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
 	client = transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
-	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j"}); err == nil {
+	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j", Kind: domaintypes.TransferKindRepo, NodeID: "node-a"}); err == nil {
 		t.Fatalf("expected upload error")
 	}
 	if err := client.Commit(context.Background(), "x", transfer.CommitRequest{Size: 1, Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}); err == nil {
 		t.Fatalf("expected commit error")
 	}
+}
+
+func TestDigestValidate(t *testing.T) {
+	var hit atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	base, _ := url.Parse(srv.URL)
+	client := transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
+
+	t.Run("invalid digest rejected before HTTP", func(t *testing.T) {
+		hit.Store(false)
+		if err := client.Commit(context.Background(), "slot-1", transfer.CommitRequest{Size: 1, Digest: "not-a-digest"}); err == nil {
+			t.Fatalf("expected digest validation error")
+		}
+		if hit.Load() {
+			t.Fatalf("expected digest validation to fail before HTTP")
+		}
+	})
+
+	t.Run("whitespace-only digest rejected before HTTP", func(t *testing.T) {
+		hit.Store(false)
+		if err := client.Commit(context.Background(), "slot-1", transfer.CommitRequest{Size: 1, Digest: "   "}); err == nil {
+			t.Fatalf("expected digest validation error")
+		}
+		if hit.Load() {
+			t.Fatalf("expected digest validation to fail before HTTP")
+		}
+	})
 }
 
 func TestAbortSuccess(t *testing.T) {
@@ -210,7 +243,7 @@ func TestUploadSlotDecodeError(t *testing.T) {
 
 	base, _ := url.Parse(server.URL)
 	client := transfer.Client{BaseURL: base, HTTPClient: server.Client()}
-	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j"}); err == nil {
+	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j", Kind: domaintypes.TransferKindRepo, NodeID: "node-a"}); err == nil {
 		t.Fatalf("expected JSON decode error")
 	}
 }

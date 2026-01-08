@@ -14,9 +14,10 @@ func TestDigestValidate(t *testing.T) {
 		// Valid cases
 		{name: "valid sha256 digest", digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", wantErr: false},
 		{name: "empty is valid (optional)", digest: "", wantErr: false},
-		{name: "whitespace-only is valid (empty)", digest: "   ", wantErr: false},
+		{name: "leading/trailing spaces are allowed", digest: " sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef ", wantErr: false},
 
 		// Invalid cases
+		{name: "whitespace-only is invalid", digest: "   ", wantErr: true},
 		{name: "wrong prefix", digest: "sha512:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", wantErr: true},
 		{name: "uppercase hex rejected", digest: "sha256:0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", wantErr: true},
 		{name: "too short hex", digest: "sha256:0123456789abcdef", wantErr: true},
@@ -55,6 +56,9 @@ func TestDigestJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(`"invalid-digest"`), &decoded); err == nil {
 		t.Error("expected error unmarshaling invalid digest")
 	}
+	if err := json.Unmarshal([]byte(`"   "`), &decoded); err == nil {
+		t.Error("expected error unmarshaling whitespace-only digest")
+	}
 }
 
 func TestSlotIDValidate(t *testing.T) {
@@ -68,6 +72,7 @@ func TestSlotIDValidate(t *testing.T) {
 		{name: "valid with dashes", slotID: "slot-abc-123", wantErr: false},
 		{name: "empty is invalid", slotID: "", wantErr: true},
 		{name: "whitespace-only is invalid", slotID: "   ", wantErr: true},
+		{name: "leading/trailing spaces is invalid", slotID: " slot-123 ", wantErr: true},
 		{name: "contains slash is invalid", slotID: "slot/123", wantErr: true},
 		{name: "contains question mark is invalid", slotID: "slot?123", wantErr: true},
 		{name: "contains space is invalid", slotID: "slot 123", wantErr: true},
