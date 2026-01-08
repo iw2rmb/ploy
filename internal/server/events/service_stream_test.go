@@ -29,9 +29,10 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	hub := svc.Hub()
+	runID := domaintypes.NewRunID()
 
 	// Publish a log event.
-	if err := hub.PublishLog(ctx, "test-stream", logstream.LogRecord{
+	if err := hub.PublishLog(ctx, runID, logstream.LogRecord{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Stream:    "stdout",
 		Line:      "test log line",
@@ -40,14 +41,14 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	}
 
 	// Subscribe to the stream.
-	sub, err := hub.Subscribe(ctx, "test-stream", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("failed to subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
 	// Publish a status event to close the stream.
-	if err := hub.PublishStatus(ctx, "test-stream", logstream.Status{
+	if err := hub.PublishStatus(ctx, runID, logstream.Status{
 		Status: "completed",
 	}); err != nil {
 		t.Fatalf("failed to publish status: %v", err)

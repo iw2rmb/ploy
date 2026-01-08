@@ -32,6 +32,12 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
+		// Reject blank/whitespace-only run IDs at the HTTP boundary.
+		if domaintypes.IsEmpty(runIDStr) {
+			http.Error(w, "invalid run_id", http.StatusBadRequest)
+			return
+		}
+
 		// Reject obviously invalid IDs (Run IDs are KSUID strings, 27 characters).
 		if len(runIDStr) != 27 {
 			http.Error(w, "invalid run_id", http.StatusBadRequest)
