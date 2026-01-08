@@ -3,10 +3,12 @@ package store
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TestNewStore verifies that Store creation works with a valid DSN.
@@ -41,6 +43,30 @@ func TestConnectSearchPath(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_PG_DSN not set; skipping search_path test")
+	}
+
+	// Ensure the test does not rely on DSN formatting (e.g. `search_path=` in the DSN).
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("parse dsn: %v", err)
+	}
+	if cfg.ConnConfig.RuntimeParams != nil {
+		delete(cfg.ConnConfig.RuntimeParams, "search_path")
+		// If the DSN specifies search_path via `options`, drop options entirely so this
+		// test is not coupled to any DSN-level search_path formatting.
+		if opt, ok := cfg.ConnConfig.RuntimeParams["options"]; ok && strings.Contains(opt, "search_path") {
+			delete(cfg.ConnConfig.RuntimeParams, "options")
+		}
+	}
+	dsn = cfg.ConnConfig.ConnString()
+	cfg2, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("parse sanitized dsn: %v", err)
+	}
+	if cfg2.ConnConfig.RuntimeParams != nil {
+		if _, ok := cfg2.ConnConfig.RuntimeParams["search_path"]; ok {
+			t.Fatalf("sanitized dsn must not include search_path runtime param")
+		}
 	}
 
 	ctx := context.Background()
