@@ -599,29 +599,23 @@ func TestEventID(t *testing.T) {
 		}
 	})
 
-	t.Run("JSONUnmarshalAcceptsNull", func(t *testing.T) {
+	t.Run("JSONUnmarshalRejectsNull", func(t *testing.T) {
 		t.Parallel()
 
 		var eid EventID
 		err := json.Unmarshal([]byte("null"), &eid)
-		if err != nil {
-			t.Fatalf("json.Unmarshal(null): %v", err)
-		}
-		if eid != 0 {
-			t.Errorf("json.Unmarshal(null) = %d, want 0", eid)
+		if err == nil {
+			t.Fatalf("json.Unmarshal(null) should fail, got nil (eid=%d)", eid)
 		}
 	})
 
-	t.Run("JSONUnmarshalAcceptsString", func(t *testing.T) {
+	t.Run("JSONUnmarshalRejectsString", func(t *testing.T) {
 		t.Parallel()
 
 		var eid EventID
 		err := json.Unmarshal([]byte(`"42"`), &eid)
-		if err != nil {
-			t.Fatalf("json.Unmarshal(\"42\"): %v", err)
-		}
-		if eid != 42 {
-			t.Errorf("json.Unmarshal(\"42\") = %d, want 42", eid)
+		if err == nil {
+			t.Fatalf("json.Unmarshal(\"42\") should fail, got nil (eid=%d)", eid)
 		}
 	})
 }

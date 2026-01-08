@@ -6,6 +6,7 @@ package types
 
 import (
 	"encoding"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -288,23 +289,16 @@ func (v EventID) MarshalJSON() ([]byte, error) {
 	if !v.Valid() {
 		return nil, errors.New("types: invalid EventID (negative)")
 	}
-	return []byte(v.String()), nil
+	return json.Marshal(int64(v))
 }
 
 // UnmarshalJSON decodes a JSON number into an EventID.
 func (v *EventID) UnmarshalJSON(b []byte) error {
-	// Handle JSON number (unquoted) or string (quoted).
-	s := strings.TrimSpace(string(b))
-	// Remove quotes if present (JSON string).
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		s = s[1 : len(s)-1]
+	if strings.TrimSpace(string(b)) == "null" {
+		return errors.New("types: invalid EventID JSON null")
 	}
-	if s == "" || s == "null" {
-		*v = 0
-		return nil
-	}
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
+	var n int64
+	if err := json.Unmarshal(b, &n); err != nil {
 		return fmt.Errorf("types: invalid EventID JSON %q: %w", string(b), err)
 	}
 	if n < 0 {

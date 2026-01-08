@@ -69,6 +69,16 @@ func TestHubPublishAndResume(t *testing.T) {
 	}
 }
 
+func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
+	ctx := context.Background()
+
+	_, err := hub.Subscribe(ctx, "job-1", domaintypes.EventID(-1))
+	if err == nil {
+		t.Fatal("expected error for negative sinceID, got nil")
+	}
+}
+
 func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 4})
 	ctx := context.Background()
