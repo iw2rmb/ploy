@@ -43,8 +43,10 @@ func (d DiffSummary) decode() diffSummaryAccessor {
 	if len(d) == 0 {
 		return acc
 	}
-	// Silently ignore decode errors; accessors return zero values.
-	_ = json.Unmarshal(d, &acc)
+	// Return an empty accessor on decode errors (strict contract).
+	if err := json.Unmarshal(d, &acc); err != nil {
+		return diffSummaryAccessor{}
+	}
 	return acc
 }
 

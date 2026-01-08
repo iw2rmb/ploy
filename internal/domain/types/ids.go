@@ -56,6 +56,11 @@ type ModRef string
 // integer-like values (e.g., 1000, 2000, 1500) encode ordering.
 type StepIndex float64
 
+var _ interface {
+	json.Marshaler
+	json.Unmarshaler
+} = (*StepIndex)(nil)
+
 // String returns the underlying string value.
 func (v RunID) String() string { return string(v) }
 
@@ -146,6 +151,29 @@ func (v StepIndex) Valid() bool {
 	}
 	// Require integer-like value (no fractional part).
 	return f == math.Trunc(f)
+}
+
+func (v StepIndex) MarshalJSON() ([]byte, error) {
+	if !v.Valid() {
+		return nil, fmt.Errorf("invalid step_index")
+	}
+	return json.Marshal(float64(v))
+}
+
+func (v *StepIndex) UnmarshalJSON(b []byte) error {
+	if v == nil {
+		return errors.New("StepIndex: UnmarshalJSON on nil pointer")
+	}
+	var f float64
+	if err := json.Unmarshal(b, &f); err != nil {
+		return err
+	}
+	si := StepIndex(f)
+	if !si.Valid() {
+		return fmt.Errorf("invalid step_index")
+	}
+	*v = si
+	return nil
 }
 
 // The following methods implement encoding.TextMarshaler/TextUnmarshaler and

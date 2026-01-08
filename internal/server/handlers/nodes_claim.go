@@ -147,6 +147,11 @@ func buildAndSendJobClaimResponse(
 		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
 	}
 
+	stepIndex := domaintypes.StepIndex(job.StepIndex)
+	if !stepIndex.Valid() {
+		return fmt.Errorf("invalid step_index for job_id=%s", job.ID)
+	}
+
 	// Merge job_id into spec for downstream execution.
 	// Job IDs are now KSUID strings.
 	mergedSpec := mergeJobIDIntoSpec(spec, job.ID)
@@ -199,7 +204,7 @@ func buildAndSendJobClaimResponse(
 		JobName:   job.Name,
 		ModType:   modType,
 		ModImage:  job.ModImage,
-		StepIndex: domaintypes.StepIndex(job.StepIndex),
+		StepIndex: stepIndex,
 		RepoURL:   modRepo.RepoUrl,
 		Status:    run.Status,
 		NodeID:    domaintypes.NodeID(stringPtrOrEmpty(job.NodeID)), // Convert to domain type

@@ -432,53 +432,55 @@ func TestStepIndex_IsZero(t *testing.T) {
 func TestStepIndexNoTruncation(t *testing.T) {
 	t.Parallel()
 
-	// Fractional step indices that would be silently truncated by int() cast.
-	// These MUST be rejected by Valid(), not silently converted.
-	fractionalCases := []struct {
-		name    string
-		value   float64
-		truncTo int // What int() would produce (lossy).
-	}{
-		{"half", 1000.5, 1000},
-		{"quarter", 2500.25, 2500},
-		{"near_integer", 1999.9999, 1999},
-		{"small_fraction", 3000.1, 3000},
-		{"negative_half", -500.5, -500},
-		{"healing_midpoint_fraction", 1750.75, 1750},
+	fractionalJSON := []string{
+		"1000.5",
+		"2500.25",
+		"1999.9999",
+		"3000.1",
+		"-500.5",
+		"1750.75",
 	}
 
-	for _, tt := range fractionalCases {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, lit := range fractionalJSON {
+		lit := lit
+		t.Run("reject_fractional_json_"+lit, func(t *testing.T) {
 			t.Parallel()
 
-			idx := StepIndex(tt.value)
-
-			// Verify that Valid() rejects the fractional value.
-			if idx.Valid() {
-				t.Errorf("StepIndex(%v).Valid() = true; want false (fractional values must be rejected)", tt.value)
+			var idx StepIndex
+			if err := json.Unmarshal([]byte(lit), &idx); err == nil {
+				t.Fatalf("json.Unmarshal(%q, *StepIndex) succeeded with %v; want error", lit, idx)
 			}
 
-			// Verify that Float64() preserves the exact value (no truncation).
-			if got := idx.Float64(); got != tt.value {
-				t.Errorf("StepIndex(%v).Float64() = %v; value was unexpectedly modified", tt.value, got)
-			}
-
-			// Document what a lossy int() cast would produce (for reference).
-			// This is what we are PREVENTING by using types.StepIndex end-to-end.
-			lossyCast := int(tt.value)
-			if lossyCast != tt.truncTo {
-				t.Errorf("int(%v) = %d; expected %d (test case incorrect)", tt.value, lossyCast, tt.truncTo)
+			// DiffSummary boundary decode must not accept fractional step_index values.
+			summary := DiffSummary([]byte(`{"step_index":` + lit + `}`))
+			if got, ok := summary.StepIndex(); ok {
+				t.Fatalf("DiffSummary.StepIndex()=(%v,true) for %q; want ok=false", got, lit)
 			}
 		})
 	}
 
-	// Valid integer-like step indices (baseline sanity check).
-	integerCases := []float64{0, 1000, 1500, 2000, 3000, -1000}
-	for _, v := range integerCases {
-		t.Run("integer_"+string(rune(int(v))), func(t *testing.T) {
-			idx := StepIndex(v)
+	integerJSON := []string{"0", "1000", "1500", "2000", "3000", "-1000"}
+	for _, lit := range integerJSON {
+		lit := lit
+		t.Run("accept_integer_json_"+lit, func(t *testing.T) {
+			t.Parallel()
+
+			var idx StepIndex
+			if err := json.Unmarshal([]byte(lit), &idx); err != nil {
+				t.Fatalf("json.Unmarshal(%q, *StepIndex) error: %v", lit, err)
+			}
 			if !idx.Valid() {
-				t.Errorf("StepIndex(%v).Valid() = false; want true (integer values must be valid)", v)
+				t.Fatalf("StepIndex(%v).Valid() = false; want true", idx)
+			}
+
+			var payload struct {
+				StepIndex StepIndex `json:"step_index"`
+			}
+			if err := json.Unmarshal([]byte(`{"step_index":`+lit+`}`), &payload); err != nil {
+				t.Fatalf("json.Unmarshal(payload with step_index=%q) error: %v", lit, err)
+			}
+			if payload.StepIndex != idx {
+				t.Fatalf("payload.StepIndex=%v; want %v", payload.StepIndex, idx)
 			}
 		})
 	}
