@@ -40,8 +40,8 @@ func runToSummary(run store.Run) RunSummary {
 		// run.ID is now a string (KSUID); cast directly to domain type.
 		ID:        domaintypes.RunID(run.ID),
 		Status:    string(run.Status),
-		ModID:     run.ModID,
-		SpecID:    run.SpecID,
+		ModID:     domaintypes.ModID(run.ModID),
+		SpecID:    domaintypes.SpecID(run.SpecID),
 		CreatedBy: run.CreatedBy,
 		CreatedAt: run.CreatedAt.Time,
 	}
