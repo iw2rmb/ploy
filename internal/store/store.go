@@ -3,6 +3,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -12,6 +13,9 @@ import (
 
 // ErrEmptyNodeID is returned when ClaimJob is called with an empty NodeID.
 var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
+
+// ErrInvalidJSON is returned when a JSONB column receives invalid JSON bytes.
+var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 
 // Store defines the interface for database operations.
 // The sqlc-generated Queries type will implement the query methods.
@@ -82,4 +86,67 @@ func (s *PgStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		return Job{}, ErrEmptyNodeID
 	}
 	return s.Queries.ClaimJob(ctx, nodeID)
+}
+
+// validateJSONB validates that non-empty byte slices contain valid JSON.
+// Empty/nil slices are allowed (treated as NULL in the database).
+func validateJSONB(raw []byte) error {
+	if len(raw) > 0 && !json.Valid(raw) {
+		return ErrInvalidJSON
+	}
+	return nil
+}
+
+// CreateJob validates the Meta JSONB field and creates a new job.
+// Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
+func (s *PgStore) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
+	if err := validateJSONB(arg.Meta); err != nil {
+		return Job{}, fmt.Errorf("jobs.meta: %w", err)
+	}
+	return s.Queries.CreateJob(ctx, arg)
+}
+
+// CreateSpec validates the Spec JSONB field and creates a new spec.
+// Returns ErrInvalidJSON if Spec contains invalid JSON bytes.
+func (s *PgStore) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error) {
+	if err := validateJSONB(arg.Spec); err != nil {
+		return Spec{}, fmt.Errorf("specs.spec: %w", err)
+	}
+	return s.Queries.CreateSpec(ctx, arg)
+}
+
+// CreateDiff validates the Summary JSONB field and creates a new diff.
+// Returns ErrInvalidJSON if Summary contains invalid JSON bytes.
+func (s *PgStore) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
+	if err := validateJSONB(arg.Summary); err != nil {
+		return Diff{}, fmt.Errorf("diffs.summary: %w", err)
+	}
+	return s.Queries.CreateDiff(ctx, arg)
+}
+
+// UpdateJobMeta validates the Meta JSONB field and updates job metadata.
+// Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
+func (s *PgStore) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
+	if err := validateJSONB(arg.Meta); err != nil {
+		return fmt.Errorf("jobs.meta: %w", err)
+	}
+	return s.Queries.UpdateJobMeta(ctx, arg)
+}
+
+// UpdateJobCompletionWithMeta validates the Meta JSONB field and completes a job with metadata.
+// Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
+func (s *PgStore) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
+	if err := validateJSONB(arg.Meta); err != nil {
+		return fmt.Errorf("jobs.meta: %w", err)
+	}
+	return s.Queries.UpdateJobCompletionWithMeta(ctx, arg)
+}
+
+// UpdateRunCompletion validates the Stats JSONB field and completes a run.
+// Returns ErrInvalidJSON if Stats contains invalid JSON bytes.
+func (s *PgStore) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
+	if err := validateJSONB(arg.Stats); err != nil {
+		return fmt.Errorf("runs.stats: %w", err)
+	}
+	return s.Queries.UpdateRunCompletion(ctx, arg)
 }
