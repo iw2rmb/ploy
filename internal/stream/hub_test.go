@@ -753,7 +753,7 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 		Line:      longLine,
 		NodeID:    "aabbccdd-eeff-0011-2233-445566778899",
 		JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
-		ModType:   "gate",
+		ModType:   domaintypes.ModTypePreGate,
 		StepIndex: 999,
 	}
 

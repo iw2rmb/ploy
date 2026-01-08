@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -40,6 +41,7 @@ type RetentionHint = logstream.RetentionHint
 // Printer formats and writes log records to an output stream.
 // Thread-safe for use in SSE event handlers.
 type Printer struct {
+	mu        sync.Mutex
 	format    Format
 	out       io.Writer
 	retention *RetentionHint
@@ -75,6 +77,9 @@ func NewPrinter(format Format, out io.Writer) *Printer {
 //
 //	Step started
 func (p *Printer) PrintLog(rec LogRecord) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	// Strip trailing newlines to avoid double line breaks.
 	line := strings.TrimRight(rec.Line, "\r\n")
 
@@ -139,6 +144,9 @@ func (p *Printer) PrintLog(rec LogRecord) {
 // RecordRetention stores a retention hint to be printed at stream completion.
 // Only the last recorded hint is printed (calls overwrite previous hints).
 func (p *Printer) RecordRetention(hint RetentionHint) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	copy := hint
 	p.retention = &copy
 }
@@ -146,6 +154,9 @@ func (p *Printer) RecordRetention(hint RetentionHint) {
 // PrintRetentionSummary outputs the stored retention hint, if any.
 // Call this after all log events have been processed.
 func (p *Printer) PrintRetentionSummary() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.retention == nil {
 		return
 	}

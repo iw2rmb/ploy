@@ -594,6 +594,84 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 }
 
+// TestLogRecord_LogEnrichmentPreservesTypedFields is a contract test that runs under
+// `-run TestLogRecord` and ensures the server publish path emits the canonical
+// logstream.LogRecord shape with typed enriched fields without truncation.
+func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
+	t.Parallel()
+
+	runID := "run-logrecord-123"
+	jobID := "job-logrecord-123"
+	nodeID := "node-logrecord-123"
+
+	logLine := "hello\n"
+	gzippedLog := gzipData(t, logLine)
+
+	mock := &mockStore{
+		createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
+			return store.Log{
+				ID:        1,
+				RunID:     arg.RunID,
+				JobID:     arg.JobID,
+				ChunkNo:   arg.ChunkNo,
+				Data:      arg.Data,
+				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}, nil
+		},
+		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+			return store.Job{
+				ID:        jobID,
+				RunID:     runID,
+				Name:      "pre-gate",
+				ModType:   "pre_gate",
+				StepIndex: 2000,
+				NodeID:    &nodeID,
+			}, nil
+		},
+	}
+
+	svc, err := New(Options{BufferSize: 4, HistorySize: 8, Store: mock})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	ctx := context.Background()
+	_, err = svc.CreateAndPublishLog(ctx, store.CreateLogParams{
+		RunID:   runID,
+		JobID:   &jobID,
+		ChunkNo: 1,
+		Data:    gzippedLog,
+	})
+	if err != nil {
+		t.Fatalf("CreateAndPublishLog failed: %v", err)
+	}
+
+	snapshot := svc.Hub().Snapshot(strings.TrimSpace(runID))
+	if len(snapshot) == 0 {
+		t.Fatal("expected log event in hub snapshot, got none")
+	}
+	if snapshot[0].Type != domaintypes.SSEEventLog {
+		t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
+	}
+
+	var rec logstream.LogRecord
+	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
+		t.Fatalf("failed to unmarshal log record: %v", err)
+	}
+	if rec.NodeID != domaintypes.NodeID(nodeID) {
+		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
+	}
+	if rec.JobID != domaintypes.JobID(jobID) {
+		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
+	}
+	if rec.ModType != domaintypes.ModTypePreGate {
+		t.Errorf("mod_type: got %q, want %q", rec.ModType, domaintypes.ModTypePreGate)
+	}
+	if rec.StepIndex != 2000 {
+		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
+	}
+}
+
 // TestStorage_LogEnrichmentWithoutJobID verifies that logs without a valid
 // job_id are still published without enrichment (graceful degradation).
 func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {

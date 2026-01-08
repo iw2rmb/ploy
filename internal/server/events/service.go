@@ -288,15 +288,54 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 		return jobContext{}
 	}
 
-	// job.ID is now a string (KSUID-backed).
-	// job.NodeID is now *string (NanoID-backed after node ID migration).
-	// job.StepIndex is float64 — preserve as types.StepIndex to avoid lossy truncation.
-	// job.ModType is string — wrap in types.ModType for type-safe handling.
+	// Normalize and validate job metadata before enrichment.
+	//
+	// job.ID is a string (KSUID-backed). job.NodeID is *string (NanoID-backed after
+	// node ID migration). job.StepIndex is float64 (historically `jobs.step_index`)
+	// and must satisfy StepIndex.Valid(). job.ModType is a string and must satisfy
+	// ModType.Validate().
+	//
+	// Invalid values are omitted from enrichment to keep the emitted SSE payload
+	// contract strict.
+
+	normalizedJobID := domaintypes.Normalize(job.ID)
+	var jid domaintypes.JobID
+	if !domaintypes.IsEmpty(normalizedJobID) {
+		jid = domaintypes.JobID(normalizedJobID)
+	}
+
+	normalizedNodeID := domaintypes.Normalize(stringPtrToString(job.NodeID))
+	var nid domaintypes.NodeID
+	if !domaintypes.IsEmpty(normalizedNodeID) {
+		nid = domaintypes.NodeID(normalizedNodeID)
+	}
+
+	mt := domaintypes.ModType(domaintypes.Normalize(job.ModType))
+	if !mt.IsZero() {
+		if err := mt.Validate(); err != nil {
+			s.logger.Debug("invalid mod_type for log enrichment",
+				"job_id", job.ID,
+				"mod_type", job.ModType,
+				"error", err,
+			)
+			mt = ""
+		}
+	}
+
+	si := domaintypes.StepIndex(job.StepIndex)
+	if !si.IsZero() && !si.Valid() {
+		s.logger.Debug("invalid step_index for log enrichment",
+			"job_id", job.ID,
+			"step_index", job.StepIndex,
+		)
+		si = 0
+	}
+
 	return jobContext{
-		NodeID:    domaintypes.NodeID(stringPtrToString(job.NodeID)),
-		JobID:     domaintypes.JobID(job.ID),
-		ModType:   domaintypes.ModType(job.ModType),
-		StepIndex: domaintypes.StepIndex(job.StepIndex),
+		NodeID:    nid,
+		JobID:     jid,
+		ModType:   mt,
+		StepIndex: si,
 	}
 }
 
