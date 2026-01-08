@@ -5,27 +5,27 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // parseLastEventID parses the Last-Event-ID header to support SSE resumption.
-// Returns 0 if the header is absent or invalid.
-func parseLastEventID(header string) int64 {
+// Returns 0 if the header is absent, invalid, or negative.
+// Uses types.EventID for type-safe cursor handling.
+func parseLastEventID(header string) domaintypes.EventID {
 	if header == "" {
 		return 0
 	}
-	id, err := strconv.ParseInt(strings.TrimSpace(header), 10, 64)
-	if err != nil {
+	var eid domaintypes.EventID
+	if err := eid.UnmarshalText([]byte(header)); err != nil {
 		return 0
 	}
-	return id
+	return eid
 }
 
 // getRunLogsHandler returns an HTTP handler that streams run logs and events over SSE.

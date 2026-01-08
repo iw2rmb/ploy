@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/tmaxmax/go-sse"
 )
@@ -61,7 +62,7 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 		logger = slog.Default()
 	}
 
-	var lastID string
+	var lastEventID domaintypes.EventID // typed cursor for SSE resumption
 	retries := 0
 	maxRetries := c.MaxRetries
 
@@ -77,8 +78,9 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 		}
 		req.Header.Set("Accept", "text/event-stream")
 		// Include Last-Event-ID header to resume from the last successfully processed event.
-		if lastID != "" {
-			req.Header.Set("Last-Event-ID", lastID)
+		// Stringify the typed EventID only at the HTTP header boundary.
+		if lastEventID > 0 {
+			req.Header.Set("Last-Event-ID", lastEventID.String())
 		}
 
 		resp, err := c.HTTPClient.Do(req)
@@ -181,8 +183,12 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			}
 
 			// Track Last-Event-ID for resumption on reconnect.
+			// Parse and validate the event ID from the wire to our typed cursor.
 			if event.ID != "" {
-				lastID = event.ID
+				var eid domaintypes.EventID
+				if err := eid.UnmarshalText([]byte(event.ID)); err == nil && eid.Valid() {
+					lastEventID = eid
+				}
 			}
 
 			// Invoke the user's event handler.

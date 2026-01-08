@@ -6,7 +6,11 @@ package types
 
 import (
 	"encoding"
+	"errors"
+	"fmt"
 	"math"
+	"strconv"
+	"strings"
 )
 
 // RunID identifies a run instance (workflow execution).
@@ -226,3 +230,86 @@ func (v ModRepoID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v
 func (v *ModRepoID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
 // StepIndex uses standard float64 JSON marshaling (not text-based like string IDs).
+
+// EventID identifies an SSE event in a stream for resumption semantics.
+// The value must be non-negative; zero is a valid ID representing "from the beginning".
+// Negative values are invalid and should be rejected at boundaries (e.g., header parsing).
+type EventID int64
+
+// Int64 returns the underlying int64 value.
+func (v EventID) Int64() int64 { return int64(v) }
+
+// IsZero reports whether the event ID is zero.
+func (v EventID) IsZero() bool { return v == 0 }
+
+// Valid reports whether the EventID represents a valid SSE cursor.
+// A valid EventID must be non-negative (>= 0).
+func (v EventID) Valid() bool { return v >= 0 }
+
+// String returns the decimal string representation of the event ID.
+func (v EventID) String() string { return strconv.FormatInt(int64(v), 10) }
+
+// EventID implements encoding.TextMarshaler and encoding.TextUnmarshaler
+// for text-based serialization (Last-Event-ID header, etc.).
+var _ interface {
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+} = (*EventID)(nil)
+
+// MarshalText encodes the EventID as a decimal string.
+// Returns an error if the value is invalid (negative).
+func (v EventID) MarshalText() ([]byte, error) {
+	if !v.Valid() {
+		return nil, errors.New("types: invalid EventID (negative)")
+	}
+	return []byte(v.String()), nil
+}
+
+// UnmarshalText decodes a decimal string into an EventID.
+// Returns an error if the string is empty, not a valid integer, or negative.
+func (v *EventID) UnmarshalText(b []byte) error {
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return errors.New("types: empty EventID")
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("types: invalid EventID %q: %w", s, err)
+	}
+	if n < 0 {
+		return fmt.Errorf("types: invalid EventID %d (negative)", n)
+	}
+	*v = EventID(n)
+	return nil
+}
+
+// MarshalJSON encodes the EventID as a JSON number.
+func (v EventID) MarshalJSON() ([]byte, error) {
+	if !v.Valid() {
+		return nil, errors.New("types: invalid EventID (negative)")
+	}
+	return []byte(v.String()), nil
+}
+
+// UnmarshalJSON decodes a JSON number into an EventID.
+func (v *EventID) UnmarshalJSON(b []byte) error {
+	// Handle JSON number (unquoted) or string (quoted).
+	s := strings.TrimSpace(string(b))
+	// Remove quotes if present (JSON string).
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		s = s[1 : len(s)-1]
+	}
+	if s == "" || s == "null" {
+		*v = 0
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("types: invalid EventID JSON %q: %w", string(b), err)
+	}
+	if n < 0 {
+		return fmt.Errorf("types: invalid EventID %d (negative)", n)
+	}
+	*v = EventID(n)
+	return nil
+}
