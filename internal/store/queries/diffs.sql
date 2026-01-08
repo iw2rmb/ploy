@@ -10,7 +10,7 @@ SELECT d.* FROM diffs d
 INNER JOIN jobs j ON d.job_id = j.id
 WHERE d.run_id = $1
   AND j.step_index <= $2
-ORDER BY j.step_index ASC, d.created_at ASC;
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
 
 -- name: CreateDiff :one
 -- Creates a new diff entry associated with a job.
@@ -35,4 +35,4 @@ WHERE created_at < $1;
 SELECT d.* FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC;
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;

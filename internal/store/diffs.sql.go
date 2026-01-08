@@ -90,7 +90,7 @@ SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
 INNER JOIN jobs j ON d.job_id = j.id
 WHERE d.run_id = $1
   AND j.step_index <= $2
-ORDER BY j.step_index ASC, d.created_at ASC
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
 `
 
 type ListDiffsBeforeStepParams struct {
@@ -132,7 +132,7 @@ const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
 `
 
 type ListDiffsByRunRepoParams struct {

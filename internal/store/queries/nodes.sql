@@ -4,7 +4,7 @@ WHERE id = $1;
 
 -- name: ListNodes :many
 SELECT * FROM nodes
-ORDER BY created_at DESC;
+ORDER BY created_at DESC, id DESC;
 
 -- name: CreateNode :one
 -- Creates a new node with an application-supplied NanoID(6) as the primary key.

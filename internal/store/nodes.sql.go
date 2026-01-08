@@ -111,7 +111,7 @@ func (q *Queries) GetNode(ctx context.Context, id types.NodeID) (Node, error) {
 
 const listNodes = `-- name: ListNodes :many
 SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListNodes(ctx context.Context) ([]Node, error) {

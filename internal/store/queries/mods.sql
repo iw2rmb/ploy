@@ -23,7 +23,7 @@ WHERE (sqlc.narg(archived_only)::boolean IS NULL OR
        (sqlc.narg(archived_only)::boolean = true AND archived_at IS NOT NULL) OR
        (sqlc.narg(archived_only)::boolean = false AND archived_at IS NULL))
   AND (sqlc.narg(name_filter)::text IS NULL OR sqlc.narg(name_filter)::text = '' OR name ILIKE '%' || sqlc.narg(name_filter)::text || '%')
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
 -- name: UpdateModSpec :exec

@@ -66,7 +66,7 @@ func (q *Queries) GetSpec(ctx context.Context, id types.SpecID) (Spec, error) {
 const listSpecs = `-- name: ListSpecs :many
 SELECT id, name, spec, created_by, created_at, archived_at
 FROM specs
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 

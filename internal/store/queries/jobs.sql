@@ -39,7 +39,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1
-ORDER BY repo_id ASC, attempt ASC, step_index ASC;
+ORDER BY repo_id ASC, attempt ASC, step_index ASC, id ASC;
 
 -- name: ListJobsByRunRepoAttempt :many
 SELECT
@@ -61,7 +61,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
-ORDER BY step_index ASC;
+ORDER BY step_index ASC, id ASC;
 
 -- name: CreateJob :one
 -- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -180,7 +180,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
-ORDER BY step_index ASC;
+ORDER BY step_index ASC, id ASC;
 
 -- name: ScheduleNextJob :one
 -- Atomically promote the next job in a repo attempt: Created -> Queued.

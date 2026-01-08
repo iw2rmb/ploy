@@ -6,7 +6,7 @@ WHERE id = $1;
 -- name: ListRuns :many
 SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CreateRun :one

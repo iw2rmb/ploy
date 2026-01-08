@@ -13,6 +13,6 @@ WHERE id = $1;
 -- There is an index on created_at to optimize this query.
 SELECT id, name, spec, created_by, created_at, archived_at
 FROM specs
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
