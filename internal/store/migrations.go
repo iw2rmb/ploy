@@ -8,47 +8,58 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Migration represents a single database migration script.
-// Kept for backwards compatibility but no longer used.
-type Migration struct {
-	Version int
-	Name    string
-	SQL     string
-}
+// SchemaVersion is the version number for the embedded schema.sql.
+// Increment this when schema.sql changes to trigger re-application on existing databases.
+// This uses a timestamp-like versioning scheme (YYYYMMDDNN) for clarity.
+const SchemaVersion int64 = 2026010801
 
-// RunMigrations ensures the database schema is present.
-// Since there are no production deployments, this simply executes internal/store/schema.sql
-// to create all tables from scratch. No incremental migrations needed.
+// RunMigrations ensures the database schema is present and records the version.
+// Uses execMigrationSQL for statement-by-statement execution within a transaction.
+// Schema versions are tracked in ploy.schema_version for deterministic migrations.
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	slog.Info("applying schema from internal/store/schema.sql")
+	slog.Info("running migrations", "target_version", SchemaVersion)
 
-	// First check if the core schema already exists. When the runs table is
-	// present in the ploy schema, we treat migrations as already applied and
-	// skip executing the embedded schema.sql. This makes RunMigrations safe
-	// to call on every server startup without failing on CREATE TYPE/CREATE
-	// TABLE statements that are not idempotent.
-	const existsSQL = `
-SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.tables
-  WHERE table_schema = 'ploy' AND table_name = 'runs'
-)`
-
-	var exists bool
-	if err := pool.QueryRow(ctx, existsSQL).Scan(&exists); err != nil {
-		return fmt.Errorf("check existing schema: %w", err)
+	// Ensure schema_version table exists before checking version.
+	// This must happen outside the main transaction so we can read version.
+	if err := ensureVersionTable(ctx, pool); err != nil {
+		return fmt.Errorf("ensure version table: %w", err)
 	}
-	if exists {
-		slog.Info("schema already present, skipping schema.sql execution")
+
+	// Check current version.
+	currentVersion, err := getCurrentVersion(ctx, pool)
+	if err != nil {
+		return fmt.Errorf("get current version: %w", err)
+	}
+
+	if currentVersion >= SchemaVersion {
+		slog.Info("schema already at target version", "current", currentVersion, "target", SchemaVersion)
 		return nil
 	}
 
-	// Execute schema SQL (supports multi-statement files).
+	slog.Info("applying schema", "from_version", currentVersion, "to_version", SchemaVersion)
+
+	// Execute schema in a transaction using execMigrationSQL for proper
+	// statement-by-statement execution.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
 	schemaSQL := getSchemaSQL()
-	if _, err := pool.Exec(ctx, schemaSQL); err != nil {
+	if err := execMigrationSQL(ctx, tx, schemaSQL); err != nil {
 		return fmt.Errorf("execute schema: %w", err)
 	}
 
-	slog.Info("schema applied successfully")
+	// Record the migration version.
+	if err := recordMigration(ctx, tx, SchemaVersion); err != nil {
+		return fmt.Errorf("record migration: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit migration: %w", err)
+	}
+
+	slog.Info("schema applied successfully", "version", SchemaVersion)
 	return nil
 }
