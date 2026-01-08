@@ -127,7 +127,7 @@ WITH eligible AS (
       (j.mod_type = 'mr' AND r.status = 'Finished') OR
       (j.mod_type != 'mr' AND r.status = 'Started')
     )
-  ORDER BY j.step_index ASC, j.id ASC
+  ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.step_index ASC, j.id ASC
   FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
 )
