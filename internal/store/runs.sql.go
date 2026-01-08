@@ -89,7 +89,7 @@ FROM runs_timing
 WHERE id = $1
 `
 
-func (q *Queries) GetRunTiming(ctx context.Context, id string) (RunsTiming, error) {
+func (q *Queries) GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error) {
 	row := q.db.QueryRow(ctx, getRunTiming, id)
 	var i RunsTiming
 	err := row.Scan(&i.ID, &i.QueueMs, &i.RunMs)

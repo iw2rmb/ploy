@@ -104,7 +104,7 @@ type Querier interface {
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
-	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
+	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Checks if a mod_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.

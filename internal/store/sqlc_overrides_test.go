@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -14,9 +15,23 @@ import (
 // - Primary key IDs use domain newtypes (RunID, JobID, NodeID, ModID, SpecID, ModRepoID)
 // - Foreign key references use matching domain newtypes
 // - jobs.step_index uses types.StepIndex (not float64)
+// - any derived run id columns (e.g. runs_timing.id) also use types.RunID
 //
 // If sqlc overrides are removed or misconfigured, this test will fail to compile.
 func TestSQLCOverridesCompile(t *testing.T) {
+	// Verify a few key Querier method signatures use typed IDs (compile-time).
+	// This ensures sqlc overrides apply not only to models, but also to query args/returns.
+	type typedIDQuerier interface {
+		GetRun(ctx context.Context, id types.RunID) (Run, error)
+		GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
+		GetJob(ctx context.Context, id types.JobID) (Job, error)
+		GetNode(ctx context.Context, id types.NodeID) (Node, error)
+		GetMod(ctx context.Context, id types.ModID) (Mod, error)
+		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
+		GetModRepo(ctx context.Context, id types.ModRepoID) (ModRepo, error)
+	}
+	var _ typedIDQuerier = (Querier)(nil)
+
 	// Verify Run struct field types.
 	var run Run
 	var _ types.RunID = run.ID
@@ -92,31 +107,8 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	if si.Valid() {
 		t.Error("StepIndex(1000.5) should be invalid (fractional)")
 	}
-}
 
-// TestSQLCOverridesQuerierSignatures verifies that the Querier interface methods
-// use typed IDs in their signatures. This is a compile-time check.
-func TestSQLCOverridesQuerierSignatures(t *testing.T) {
-	// We can't call these without a real database, but we can verify
-	// that the types align by assigning to interface variables.
-
-	// Verify the interface exists and accepts typed parameters.
-	// The compiler will fail if the signatures don't match.
-	var q Querier
-
-	// Suppress "variable declared and not used" by using blank identifier pattern.
-	_ = q
-
-	// Create typed values to verify compatibility with Querier method signatures.
-	// This verifies that the generated code uses typed parameters, not raw strings.
-	var runID types.RunID
-	var jobID types.JobID
-	var nodeID types.NodeID
-	var modID types.ModID
-	var specID types.SpecID
-	var modRepoID types.ModRepoID
-	var stepIndex types.StepIndex
-
-	// Suppress unused variable warnings.
-	_, _, _, _, _, _, _ = runID, jobID, nodeID, modID, specID, modRepoID, stepIndex
+	// Verify derived timing view row types preserve RunID typing.
+	var timing RunsTiming
+	var _ types.RunID = timing.ID
 }
