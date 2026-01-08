@@ -31,6 +31,13 @@ func NewStore(ctx context.Context, dsn string) (Store, error) {
 		return nil, fmt.Errorf("parse dsn: %w", err)
 	}
 
+	// Set search_path so unqualified table names resolve to the ploy schema.
+	// This ensures correctness regardless of DSN formatting.
+	if config.ConnConfig.RuntimeParams == nil {
+		config.ConnConfig.RuntimeParams = make(map[string]string)
+	}
+	config.ConnConfig.RuntimeParams["search_path"] = "ploy,public"
+
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)

@@ -35,6 +35,39 @@ func TestNewStore_InvalidDSN(t *testing.T) {
 	}
 }
 
+// TestConnectSearchPath verifies that NewStore sets search_path so unqualified
+// table names resolve to the ploy schema, regardless of DSN formatting.
+func TestConnectSearchPath(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping search_path test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Query the current search_path to verify it includes "ploy".
+	var searchPath string
+	err = db.Pool().QueryRow(ctx, "SHOW search_path").Scan(&searchPath)
+	if err != nil {
+		t.Fatalf("SHOW search_path failed: %v", err)
+	}
+	if searchPath != "ploy, public" {
+		t.Fatalf("search_path=%q, want %q", searchPath, "ploy, public")
+	}
+
+	// Verify that an unqualified query to a ploy schema table works.
+	// Use "runs" which is defined in ploy schema (internal/store/schema.sql).
+	_, err = db.Pool().Exec(ctx, "SELECT id FROM runs LIMIT 0")
+	if err != nil {
+		t.Fatalf("unqualified query to ploy.runs failed: %v", err)
+	}
+}
+
 func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
