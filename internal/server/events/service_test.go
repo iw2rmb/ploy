@@ -590,7 +590,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 		t.Errorf("mod_type: got %q, want %q", rec.ModType, "mod")
 	}
 	if rec.StepIndex != 2000 {
-		t.Errorf("step_index: got %d, want %d", rec.StepIndex, 2000)
+		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
 	}
 }
 
@@ -667,11 +667,11 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	if !rec.JobID.IsZero() {
 		t.Errorf("job_id should be empty, got %q", rec.JobID)
 	}
-	if rec.ModType != "" {
+	if !rec.ModType.IsZero() {
 		t.Errorf("mod_type should be empty, got %q", rec.ModType)
 	}
-	if rec.StepIndex != 0 {
-		t.Errorf("step_index should be 0, got %d", rec.StepIndex)
+	if !rec.StepIndex.IsZero() {
+		t.Errorf("step_index should be 0, got %v", rec.StepIndex)
 	}
 }
 

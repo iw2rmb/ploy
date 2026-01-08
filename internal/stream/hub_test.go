@@ -689,7 +689,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			NodeID:    "aabbccdd-eeff-0011-2233-445566778899",
 			JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
 			ModType:   "mod",
-			StepIndex: i,
+			StepIndex: domaintypes.StepIndex(i),
 		}
 		if err := hub.PublishLog(ctx, "high-volume-stream", record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)
@@ -788,7 +788,7 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 			t.Errorf("node_id: got %q, want %q", received.NodeID, record.NodeID)
 		}
 		if received.StepIndex != record.StepIndex {
-			t.Errorf("step_index: got %d, want %d", received.StepIndex, record.StepIndex)
+			t.Errorf("step_index: got %v, want %v", received.StepIndex, record.StepIndex)
 		}
 
 	case <-time.After(500 * time.Millisecond):
@@ -822,7 +822,7 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			NodeID:    "node-backpressure",
 			JobID:     "job-backpressure",
 			ModType:   "mod",
-			StepIndex: i,
+			StepIndex: domaintypes.StepIndex(i),
 		}
 		// Should not block; slow subscriber should be dropped.
 		if err := hub.PublishLog(ctx, "backpressure-stream", record); err != nil {
