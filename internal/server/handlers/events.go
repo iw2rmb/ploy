@@ -51,6 +51,9 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 			return
 		}
 
+		// Convert to typed RunID for type-safe stream operations.
+		runID := domaintypes.RunID(runIDStr)
+
 		// Verify run exists in the database using string ID directly.
 		// No UUID parsing needed; store accepts KSUID strings.
 		_, err = st.GetRun(r.Context(), runIDStr)
@@ -72,10 +75,15 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		hub := eventsService.Hub()
 
 		// Ensure the stream exists (creates if not present).
-		hub.Ensure(runIDStr)
+		// Validation happens inside Ensure; errors are logged but stream proceeds.
+		if err := hub.Ensure(runID); err != nil {
+			slog.Error("ensure stream failed", "run_id", runIDStr, "err", err)
+			http.Error(w, "invalid run id", http.StatusBadRequest)
+			return
+		}
 
 		// Delegate to logstream.Serve for SSE streaming.
-		if err := logstream.Serve(w, r, hub, runIDStr, sinceID); err != nil {
+		if err := logstream.Serve(w, r, hub, runID, sinceID); err != nil {
 			// Only log non-cancellation errors (client disconnect is normal).
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream run logs", "run_id", runIDStr, "err", err)

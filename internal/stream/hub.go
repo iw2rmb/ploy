@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"sync"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -13,6 +12,9 @@ import (
 
 // ErrStreamClosed indicates the target stream is closed.
 var ErrStreamClosed = errors.New("logstream: stream closed")
+
+// ErrInvalidRunID indicates a blank or whitespace-only run ID was provided.
+var ErrInvalidRunID = errors.New("logstream: invalid run ID (blank or whitespace)")
 
 // Options configures the hub.
 type Options struct {
@@ -100,25 +102,30 @@ func NewHub(opts Options) *Hub {
 }
 
 // Ensure creates the stream if it does not already exist.
-func (h *Hub) Ensure(streamID string) {
-	if strings.TrimSpace(streamID) == "" {
-		return
+// Returns an error if the run ID is blank or whitespace-only.
+func (h *Hub) Ensure(runID domaintypes.RunID) error {
+	if runID.IsZero() {
+		return ErrInvalidRunID
 	}
+	streamID := runID.String()
 	h.mu.Lock()
 	if _, exists := h.streams[streamID]; !exists {
 		h.streams[streamID] = newStream(streamID, h.opts)
 	}
 	h.mu.Unlock()
+	return nil
 }
 
 // PublishLog appends a log record to a stream.
-func (h *Hub) PublishLog(ctx context.Context, streamID string, record LogRecord) error {
-	return h.publish(ctx, streamID, domaintypes.SSEEventLog, record)
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) PublishLog(ctx context.Context, runID domaintypes.RunID, record LogRecord) error {
+	return h.publish(ctx, runID, domaintypes.SSEEventLog, record)
 }
 
 // PublishRetention appends a retention hint to a stream.
-func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint RetentionHint) error {
-	return h.publish(ctx, streamID, domaintypes.SSEEventRetention, hint)
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) PublishRetention(ctx context.Context, runID domaintypes.RunID, hint RetentionHint) error {
+	return h.publish(ctx, runID, domaintypes.SSEEventRetention, hint)
 }
 
 // PublishStatus appends a terminal status event to a stream.
@@ -128,11 +135,13 @@ func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint Retent
 //   - "run": api.RunSummary snapshot
 //   - "stage": stage status update
 //   - "done": Status {Status: "done"} sentinel for stream completion.
-func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status) error {
-	if err := h.publish(ctx, streamID, domaintypes.SSEEventDone, status); err != nil {
+//
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status Status) error {
+	if err := h.publish(ctx, runID, domaintypes.SSEEventDone, status); err != nil {
 		return err
 	}
-	stream := h.getStream(streamID)
+	stream := h.getStream(runID.String())
 	if stream != nil {
 		stream.finish()
 	}
@@ -145,16 +154,18 @@ func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status)
 // publication of non‑JSON payloads (e.g., raw []byte or strings). The hub
 // still performs generic JSON marshaling internally, but this boundary keeps
 // the "run" event contract consistent and JSON‑serializable.
-func (h *Hub) PublishRun(ctx context.Context, streamID string, run api.RunSummary) error {
-	return h.publish(ctx, streamID, domaintypes.SSEEventRun, run)
+//
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) PublishRun(ctx context.Context, runID domaintypes.RunID, run api.RunSummary) error {
+	return h.publish(ctx, runID, domaintypes.SSEEventRun, run)
 }
 
 // ErrInvalidEventType indicates an unknown SSE event type was provided.
 var ErrInvalidEventType = errors.New("logstream: invalid event type")
 
-func (h *Hub) publish(ctx context.Context, streamID string, eventType domaintypes.SSEEventType, payload any) error {
-	if strings.TrimSpace(streamID) == "" {
-		return nil
+func (h *Hub) publish(ctx context.Context, runID domaintypes.RunID, eventType domaintypes.SSEEventType, payload any) error {
+	if runID.IsZero() {
+		return ErrInvalidRunID
 	}
 	if err := eventType.Validate(); err != nil {
 		return ErrInvalidEventType
@@ -162,6 +173,7 @@ func (h *Hub) publish(ctx context.Context, streamID string, eventType domaintype
 	if ctx != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
+	streamID := runID.String()
 	stream := h.getOrCreate(streamID)
 	if stream == nil {
 		return nil
@@ -175,9 +187,10 @@ func (h *Hub) publish(ctx context.Context, streamID string, eventType domaintype
 
 // Subscribe registers a consumer for the stream starting after the provided id.
 // The sinceID must be a valid EventID (non-negative); invalid IDs are rejected.
-func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID domaintypes.EventID) (Subscription, error) {
-	if strings.TrimSpace(streamID) == "" {
-		return Subscription{}, errors.New("logstream: stream id required")
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID domaintypes.EventID) (Subscription, error) {
+	if runID.IsZero() {
+		return Subscription{}, ErrInvalidRunID
 	}
 	if !sinceID.Valid() {
 		return Subscription{}, errors.New("logstream: invalid since id")
@@ -185,6 +198,7 @@ func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID domaintype
 	if ctx != nil && ctx.Err() != nil {
 		return Subscription{}, ctx.Err()
 	}
+	streamID := runID.String()
 	stream := h.getOrCreate(streamID)
 	if stream == nil {
 		return Subscription{}, errors.New("logstream: stream unavailable")
@@ -213,8 +227,12 @@ func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID domaintype
 	}, nil
 }
 
-// Close tears down the stream.
-func (h *Hub) Close(streamID string) {
+// Close tears down the stream. No-op if the run ID is blank.
+func (h *Hub) Close(runID domaintypes.RunID) {
+	if runID.IsZero() {
+		return
+	}
+	streamID := runID.String()
 	h.mu.Lock()
 	stream, ok := h.streams[streamID]
 	if ok {
@@ -251,8 +269,12 @@ func (h *Hub) getStream(streamID string) *stream {
 }
 
 // Snapshot returns a copy of buffered events for the stream.
-func (h *Hub) Snapshot(streamID string) []Event {
-	stream := h.getStream(streamID)
+// Returns nil if the run ID is blank or the stream does not exist.
+func (h *Hub) Snapshot(runID domaintypes.RunID) []Event {
+	if runID.IsZero() {
+		return nil
+	}
+	stream := h.getStream(runID.String())
 	if stream == nil {
 		return nil
 	}

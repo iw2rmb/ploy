@@ -188,7 +188,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		if err := eventsService.PublishRun(ctx, runID, summary); err != nil {
 			slog.Error("complete run: publish run event failed", "run_id", runID, "err", err)
 		}
-		if err := eventsService.Hub().PublishStatus(ctx, runID.String(), logstream.Status{Status: "done"}); err != nil {
+		if err := eventsService.Hub().PublishStatus(ctx, runID, logstream.Status{Status: "done"}); err != nil {
 			slog.Error("complete run: publish done status failed", "run_id", runID, "err", err)
 		}
 	}

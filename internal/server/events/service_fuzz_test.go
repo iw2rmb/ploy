@@ -47,7 +47,7 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Fatalf("publish run: %v", err)
 		}
-		snap := svc.Hub().Snapshot(streamRunID)
+		snap := svc.Hub().Snapshot(domaintypes.RunID(streamRunID))
 		if len(snap) == 0 {
 			t.Fatalf("expected at least one event in snapshot")
 		}

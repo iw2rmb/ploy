@@ -97,7 +97,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	}
 
 	// Verify events were published to the hub.
-	snapshot := eventsService.Hub().Snapshot(runID.String())
+	snapshot := eventsService.Hub().Snapshot(runID)
 	if len(snapshot) < 2 {
 		t.Fatalf("expected at least 2 events (run + done), got %d", len(snapshot))
 	}

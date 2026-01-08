@@ -14,7 +14,8 @@ var errNoHub = errors.New("logstream: hub unavailable")
 
 // Serve streams events for the provided stream over SSE.
 // sinceID must be a valid EventID (non-negative); callers should validate before calling.
-func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID domaintypes.EventID) error {
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.RunID, sinceID domaintypes.EventID) error {
 	if hub == nil {
 		return errNoHub
 	}
@@ -23,8 +24,10 @@ func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, si
 		return errors.New("logstream: response does not support streaming")
 	}
 
-	hub.Ensure(streamID)
-	sub, err := hub.Subscribe(r.Context(), streamID, sinceID)
+	if err := hub.Ensure(runID); err != nil {
+		return err
+	}
+	sub, err := hub.Subscribe(r.Context(), runID, sinceID)
 	if err != nil {
 		return err
 	}
@@ -64,7 +67,8 @@ func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, si
 //
 // If filter returns ok=false, the event is skipped.
 // sinceID must be a valid EventID (non-negative); callers should validate before calling.
-func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID domaintypes.EventID, filter func(Event) (Event, bool)) error {
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.RunID, sinceID domaintypes.EventID, filter func(Event) (Event, bool)) error {
 	if hub == nil {
 		return errNoHub
 	}
@@ -73,8 +77,10 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID st
 		return errors.New("logstream: response does not support streaming")
 	}
 
-	hub.Ensure(streamID)
-	sub, err := hub.Subscribe(r.Context(), streamID, sinceID)
+	if err := hub.Ensure(runID); err != nil {
+		return err
+	}
+	sub, err := hub.Subscribe(r.Context(), runID, sinceID)
 	if err != nil {
 		return err
 	}
