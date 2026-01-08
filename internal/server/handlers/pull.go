@@ -81,10 +81,9 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		runID := domaintypes.RunID(runIDStr)
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req runPullRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -189,10 +188,9 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := domaintypes.ModID(modIDStr)
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req modPullRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

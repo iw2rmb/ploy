@@ -128,8 +128,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		var req globalEnvPutRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

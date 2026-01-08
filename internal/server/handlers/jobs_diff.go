@@ -47,13 +47,15 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		// Limit request body size to avoid memory exhaustion but allow base64 overhead.
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
-		// Decode request body.
+		// Decode request body with strict validation.
 		var req struct {
 			Patch   []byte                  `json:"patch"`   // gzipped diff (raw bytes)
 			Summary domaintypes.DiffSummary `json:"summary"` // optional summary metadata
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
 			// Return 413 when MaxBytesReader trips the size cap.
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -137,8 +136,7 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			Token  string `json:"token"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

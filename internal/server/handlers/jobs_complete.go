@@ -154,10 +154,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Decode request body for status, exit_code, and stats.
+		// Decode request body for status, exit_code, and stats with strict validation.
 		var req completeJobRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

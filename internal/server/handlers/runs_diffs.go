@@ -40,7 +40,9 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			Patch   []byte                  `json:"patch"`
 			Summary domaintypes.DiffSummary `json:"summary"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {
 				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)

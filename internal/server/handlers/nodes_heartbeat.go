@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -27,7 +26,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		}
 		nodeID := domaintypes.NodeID(nodeIDStr)
 
-		// Decode request body.
+		// Decode request body with strict validation.
 		var req struct {
 			CPUFreeMilli  float64 `json:"cpu_free_millis"`
 			CPUTotalMilli float64 `json:"cpu_total_millis"`
@@ -38,8 +37,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			Version       string  `json:"version,omitempty"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

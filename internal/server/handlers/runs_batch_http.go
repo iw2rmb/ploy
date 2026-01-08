@@ -142,8 +142,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			BaseRef   domaintypes.GitRef  `json:"base_ref"`
 			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 		if err := req.RepoURL.Validate(); err != nil {
@@ -366,8 +365,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
 		}
 		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+			if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 				return
 			}
 			if req.BaseRef != nil {

@@ -39,7 +39,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := domaintypes.ModID(modIDStr)
 
-		// Parse request body.
+		// Parse request body with strict validation.
 		var req struct {
 			RepoSelector struct {
 				Mode  string   `json:"mode"`            // "all" | "failed" | "explicit"
@@ -47,8 +47,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 			} `json:"repo_selector"`
 			CreatedBy *string `json:"created_by,omitempty"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

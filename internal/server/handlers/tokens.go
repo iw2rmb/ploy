@@ -23,15 +23,14 @@ import (
 // Response: { "token": "eyJ...", "token_id": "...", "expires_at": "..." }
 func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse request.
+		// Parse request with strict validation.
 		var req struct {
 			Role          string `json:"role"`
 			Description   string `json:"description"`
 			ExpiresInDays int    `json:"expires_in_days"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

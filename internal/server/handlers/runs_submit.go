@@ -29,8 +29,10 @@ import (
 //
 // This handler replaces the previous POST /v1/mods endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
+	const maxBodySize = 4 << 20
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Decode request body with domain types for VCS fields.
+		// Decode request body with strict validation and domain types for VCS fields.
 		// JSON unmarshaling will automatically validate repo URL scheme and non-empty refs.
 		var req struct {
 			RepoURL   domaintypes.RepoURL `json:"repo_url"`
@@ -40,8 +42,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			CreatedBy *string             `json:"created_by,omitempty"`
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 
