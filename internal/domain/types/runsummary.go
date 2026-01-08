@@ -8,8 +8,8 @@ import "time"
 type RunSummary struct {
 	ID         RunID          `json:"id"`
 	Status     string         `json:"status"`
-	ModID      string         `json:"mod_id"`
-	SpecID     string         `json:"spec_id"`
+	ModID      ModID          `json:"mod_id"`
+	SpecID     SpecID         `json:"spec_id"`
 	CreatedBy  *string        `json:"created_by,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`
 	StartedAt  *time.Time     `json:"started_at,omitempty"`
