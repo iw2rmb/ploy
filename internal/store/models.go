@@ -25,15 +25,23 @@ const (
 )
 
 func (e *JobStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
+	var s string
+	switch v := src.(type) {
 	case []byte:
-		*e = JobStatus(s)
+		s = string(v)
 	case string:
-		*e = JobStatus(s)
+		s = v
 	default:
 		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
 	}
-	return nil
+	switch JobStatus(s) {
+	case JobStatusCreated, JobStatusQueued, JobStatusRunning,
+		JobStatusSuccess, JobStatusFail, JobStatusCancelled:
+		*e = JobStatus(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown JobStatus %q", s)
+	}
 }
 
 type NullJobStatus struct {
@@ -70,15 +78,23 @@ const (
 )
 
 func (e *RunRepoStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
+	var s string
+	switch v := src.(type) {
 	case []byte:
-		*e = RunRepoStatus(s)
+		s = string(v)
 	case string:
-		*e = RunRepoStatus(s)
+		s = v
 	default:
 		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
 	}
-	return nil
+	switch RunRepoStatus(s) {
+	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled,
+		RunRepoStatusFail, RunRepoStatusSuccess:
+		*e = RunRepoStatus(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown RunRepoStatus %q", s)
+	}
 }
 
 type NullRunRepoStatus struct {
@@ -113,15 +129,22 @@ const (
 )
 
 func (e *RunStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
+	var s string
+	switch v := src.(type) {
 	case []byte:
-		*e = RunStatus(s)
+		s = string(v)
 	case string:
-		*e = RunStatus(s)
+		s = v
 	default:
 		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
 	}
-	return nil
+	switch RunStatus(s) {
+	case RunStatusStarted, RunStatusCancelled, RunStatusFinished:
+		*e = RunStatus(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown RunStatus %q", s)
+	}
 }
 
 type NullRunStatus struct {
