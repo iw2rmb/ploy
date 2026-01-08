@@ -65,7 +65,7 @@ type Status struct {
 
 // Event represents a server-sent event frame produced by the hub.
 type Event struct {
-	ID   int64
+	ID   domaintypes.EventID
 	Type string
 	Data []byte
 }
@@ -166,7 +166,8 @@ func (h *Hub) publish(ctx context.Context, streamID, eventType string, payload a
 }
 
 // Subscribe registers a consumer for the stream starting after the provided id.
-func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID int64) (Subscription, error) {
+// The sinceID must be a valid EventID (non-negative); invalid IDs are rejected.
+func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID domaintypes.EventID) (Subscription, error) {
 	if strings.TrimSpace(streamID) == "" {
 		return Subscription{}, errors.New("logstream: stream id required")
 	}
@@ -276,7 +277,7 @@ type stream struct {
 	mu          sync.Mutex
 	history     []Event
 	subscribers map[int]*subscriber
-	nextEventID int64
+	nextEventID domaintypes.EventID
 	nextSubID   int
 	closed      bool
 }
@@ -343,7 +344,7 @@ func (s *stream) publish(evt Event) error {
 	return nil
 }
 
-func (s *stream) subscribe(sinceID int64) (*subscriber, []Event, bool) {
+func (s *stream) subscribe(sinceID domaintypes.EventID) (*subscriber, []Event, bool) {
 	buffer := s.opts.buffer
 	if buffer <= 0 {
 		buffer = 1
@@ -395,7 +396,7 @@ func (s *stream) finish() {
 	}
 }
 
-func (s *stream) historyAfterLocked(since int64) []Event {
+func (s *stream) historyAfterLocked(since domaintypes.EventID) []Event {
 	if since <= 0 {
 		return append([]Event(nil), s.history...)
 	}

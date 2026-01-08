@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -589,7 +590,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 	// Track events received by each subscriber using concurrent goroutines.
 	type result struct {
 		count       int
-		receivedIDs []int64
+		receivedIDs []domaintypes.EventID
 		sawDone     bool
 	}
 	results := make(chan result, numSubscribers)

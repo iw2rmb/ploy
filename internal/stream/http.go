@@ -6,12 +6,15 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 var errNoHub = errors.New("logstream: hub unavailable")
 
 // Serve streams events for the provided stream over SSE.
-func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID int64) error {
+// sinceID must be a valid EventID (non-negative); callers should validate before calling.
+func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID domaintypes.EventID) error {
 	if hub == nil {
 		return errNoHub
 	}
@@ -60,7 +63,8 @@ func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, si
 // filter/transform function before writing frames.
 //
 // If filter returns ok=false, the event is skipped.
-func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID int64, filter func(Event) (Event, bool)) error {
+// sinceID must be a valid EventID (non-negative); callers should validate before calling.
+func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, sinceID domaintypes.EventID, filter func(Event) (Event, bool)) error {
 	if hub == nil {
 		return errNoHub
 	}
@@ -114,7 +118,7 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID st
 
 func writeEventFrame(w io.Writer, evt Event) error {
 	if evt.ID > 0 {
-		if _, err := fmt.Fprintf(w, "id: %d\n", evt.ID); err != nil {
+		if _, err := fmt.Fprintf(w, "id: %s\n", evt.ID.String()); err != nil {
 			return err
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/tmaxmax/go-sse"
 )
 
@@ -56,7 +57,7 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 		logger = slog.Default()
 	}
 
-	var lastEventID string
+	var lastEventID domaintypes.EventID // typed cursor for SSE resumption
 	retries := 0
 	maxRetries := c.MaxRetries
 	initialBackoff := c.InitialBackoff
@@ -81,8 +82,9 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 		req.Header.Set("Accept", "text/event-stream")
 		req.Header.Set("Cache-Control", "no-cache")
 		// Include Last-Event-ID header to resume from the last successfully processed event.
-		if lastEventID != "" {
-			req.Header.Set("Last-Event-ID", lastEventID)
+		// Stringify the typed EventID only at the HTTP header boundary.
+		if lastEventID > 0 {
+			req.Header.Set("Last-Event-ID", lastEventID.String())
 		}
 
 		resp, err := c.HTTPClient.Do(req)
@@ -186,8 +188,12 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 			}
 
 			// Track the last event ID for resumption on reconnect.
+			// Parse and validate the event ID from the wire to our typed cursor.
 			if evt.ID != "" {
-				lastEventID = evt.ID
+				var eid domaintypes.EventID
+				if err := eid.UnmarshalText([]byte(evt.ID)); err == nil && eid.Valid() {
+					lastEventID = eid
+				}
 			}
 
 			// Note: go-sse's Read function does not expose the "retry" field.

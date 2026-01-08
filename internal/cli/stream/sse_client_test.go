@@ -190,8 +190,9 @@ func TestSSEClientSendsLastEventIDOnReconnect(t *testing.T) {
 		}
 		if first {
 			first = false
-			// First connection: send an event with id, then EOF to trigger reconnect.
-			_, _ = fmt.Fprintf(w, "id: event-7\n")
+			// First connection: send an event with numeric id, then EOF to trigger reconnect.
+			// EventID is typed as int64, so we use numeric IDs.
+			_, _ = fmt.Fprintf(w, "id: 7\n")
 			_, _ = fmt.Fprintf(w, "event: data\n")
 			_, _ = fmt.Fprintf(w, "data: payload\n\n")
 			return
@@ -218,8 +219,9 @@ func TestSSEClientSendsLastEventIDOnReconnect(t *testing.T) {
 		t.Fatalf("Stream error: %v", err)
 	}
 
-	if sawLastEventID != "event-7" {
-		t.Errorf("expected Last-Event-ID=event-7, got %q", sawLastEventID)
+	// EventID is typed as int64; the header should contain the stringified numeric ID.
+	if sawLastEventID != "7" {
+		t.Errorf("expected Last-Event-ID=7, got %q", sawLastEventID)
 	}
 }
 
@@ -638,9 +640,10 @@ func TestSSEClientReconnectWithEnrichedLogs(t *testing.T) {
 
 		if connectionCount == 1 {
 			// First connection: send enriched log events then close.
+			// EventID is typed as int64, so we use numeric IDs.
 			for i := 1; i <= 5; i++ {
 				data := fmt.Sprintf(`{"timestamp":"2025-12-01T10:00:0%d.000000Z","stream":"stdout","line":"Line %d","node_id":"node-reconnect","job_id":"job-reconnect","mod_type":"mod","step_index":%d}`, i, i, i*100)
-				_, _ = fmt.Fprintf(w, "id: log-%d\n", i)
+				_, _ = fmt.Fprintf(w, "id: %d\n", i)
 				_, _ = fmt.Fprintf(w, "event: log\n")
 				_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			}
@@ -650,7 +653,7 @@ func TestSSEClientReconnectWithEnrichedLogs(t *testing.T) {
 
 		// Second connection: capture Last-Event-ID and complete.
 		sawLastEventID = r.Header.Get("Last-Event-ID")
-		_, _ = fmt.Fprintf(w, "id: log-6\n")
+		_, _ = fmt.Fprintf(w, "id: 6\n")
 		_, _ = fmt.Fprintf(w, "event: log\n")
 		_, _ = fmt.Fprintf(w, "data: {\"timestamp\":\"2025-12-01T10:00:06.000000Z\",\"stream\":\"stdout\",\"line\":\"Resumed line\",\"node_id\":\"node-reconnect\",\"job_id\":\"job-reconnect\",\"mod_type\":\"mod\",\"step_index\":600}\n\n")
 		_, _ = fmt.Fprintf(w, "event: done\n\n")
@@ -676,8 +679,9 @@ func TestSSEClientReconnectWithEnrichedLogs(t *testing.T) {
 	}
 
 	// Verify Last-Event-ID was sent on reconnect.
-	if sawLastEventID != "log-5" {
-		t.Errorf("expected Last-Event-ID=log-5, got %q", sawLastEventID)
+	// EventID is typed as int64; the header should contain "5" (last event from first connection).
+	if sawLastEventID != "5" {
+		t.Errorf("expected Last-Event-ID=5, got %q", sawLastEventID)
 	}
 
 	// Should receive 5 events from first connection + 1 log + done from second.
