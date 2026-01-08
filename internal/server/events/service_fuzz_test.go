@@ -51,8 +51,8 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 		if len(snap) == 0 {
 			t.Fatalf("expected at least one event in snapshot")
 		}
-		if got := strings.ToLower(snap[0].Type); got != "run" {
-			t.Fatalf("unexpected event type: %s", got)
+		if snap[0].Type != domaintypes.SSEEventRun {
+			t.Fatalf("unexpected event type: %s", snap[0].Type)
 		}
 		var out modsapi.RunSummary
 		if err := json.Unmarshal(snap[0].Data, &out); err != nil {

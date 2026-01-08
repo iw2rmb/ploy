@@ -52,7 +52,7 @@ func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, streamID string, si
 				return err
 			}
 			flusher.Flush()
-			if strings.EqualFold(evt.Type, "done") {
+			if evt.Type == domaintypes.SSEEventDone {
 				return nil
 			}
 		}
@@ -109,7 +109,7 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, streamID st
 				return err
 			}
 			flusher.Flush()
-			if strings.EqualFold(evt.Type, "done") {
+			if evt.Type == domaintypes.SSEEventDone {
 				return nil
 			}
 		}
