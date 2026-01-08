@@ -182,13 +182,16 @@ RunSummary:
   properties:
     id:
       type: string
-      description: Unique run identifier (KSUID string).
+      minLength: 1
+      description: Unique run identifier (KSUID string). Must be non-empty.
     mod_id:
       type: string
-      description: Mod (project) identifier for the run.
+      minLength: 1
+      description: Mod (project) identifier for the run. Must be non-empty.
     spec_id:
       type: string
-      description: Spec identifier for the run.
+      minLength: 1
+      description: Spec identifier for the run. Must be non-empty.
     status:
       type: string
       description: |

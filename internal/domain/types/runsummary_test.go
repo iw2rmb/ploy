@@ -19,8 +19,8 @@ func TestRunSummaryJSON(t *testing.T) {
 		finished := now.Add(time.Minute)
 
 		original := RunSummary{
-			ID:         RunID("run-abc123"),
-			Status:     "Running",
+			ID:         RunID("2NQPoBfVkc8dFmGAQqJnUwMu9jR"),
+			Status:     "Started",
 			ModID:      ModID("mod-x1"),
 			SpecID:     SpecID("spec-y2"),
 			CreatedBy:  ptr("test-user"),
@@ -67,8 +67,8 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		// JSON with empty mod_id should fail to unmarshal.
 		jsonData := `{
-			"id": "run-abc123",
-			"status": "Running",
+			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+			"status": "Started",
 			"mod_id": "",
 			"spec_id": "spec-y2",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -86,8 +86,8 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		// JSON with empty spec_id should fail to unmarshal.
 		jsonData := `{
-			"id": "run-abc123",
-			"status": "Running",
+			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+			"status": "Started",
 			"mod_id": "mod-x1",
 			"spec_id": "",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -105,8 +105,8 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		// JSON with whitespace-only mod_id should fail to unmarshal.
 		jsonData := `{
-			"id": "run-abc123",
-			"status": "Running",
+			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+			"status": "Started",
 			"mod_id": "   ",
 			"spec_id": "spec-y2",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -124,8 +124,8 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		// JSON with whitespace-only spec_id should fail to unmarshal.
 		jsonData := `{
-			"id": "run-abc123",
-			"status": "Running",
+			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
+			"status": "Started",
 			"mod_id": "mod-x1",
 			"spec_id": "   ",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -144,7 +144,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// JSON with empty id should fail to unmarshal.
 		jsonData := `{
 			"id": "",
-			"status": "Running",
+			"status": "Started",
 			"mod_id": "mod-x1",
 			"spec_id": "spec-y2",
 			"created_at": "2024-01-01T00:00:00Z"
@@ -165,7 +165,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			ID:        RunID("run-1"),
 			ModID:     ModID("mod-1"),
 			SpecID:    SpecID("spec-1"),
-			Status:    "Running",
+			Status:    "Started",
 			CreatedAt: time.Now(),
 		}
 
