@@ -170,3 +170,93 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 	}
 	return items, nil
 }
+
+const listDiffsMetaByRun = `-- name: ListDiffsMetaByRun :many
+SELECT id, run_id, job_id, summary, created_at FROM diffs
+WHERE run_id = $1
+ORDER BY created_at ASC, id ASC
+`
+
+type ListDiffsMetaByRunRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	Summary   []byte             `json:"summary"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns diff metadata (without the patch blob) for a run.
+// Use GetDiff to fetch the actual patch data by id.
+func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]ListDiffsMetaByRunRow, error) {
+	rows, err := q.db.Query(ctx, listDiffsMetaByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDiffsMetaByRunRow{}
+	for rows.Next() {
+		var i ListDiffsMetaByRunRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.Summary,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDiffsMetaByRunRepo = `-- name: ListDiffsMetaByRunRepo :many
+SELECT d.id, d.run_id, d.job_id, d.summary, d.created_at FROM diffs d
+JOIN jobs j ON j.id = d.job_id
+WHERE d.run_id = $1 AND j.repo_id = $2
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
+`
+
+type ListDiffsMetaByRunRepoParams struct {
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
+}
+
+type ListDiffsMetaByRunRepoRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	Summary   []byte             `json:"summary"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns diff metadata (without the patch blob) for a specific repo within a run.
+// Use GetDiff to fetch the actual patch data by id.
+func (q *Queries) ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]ListDiffsMetaByRunRepoRow, error) {
+	rows, err := q.db.Query(ctx, listDiffsMetaByRunRepo, arg.RunID, arg.RepoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDiffsMetaByRunRepoRow{}
+	for rows.Next() {
+		var i ListDiffsMetaByRunRepoRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.Summary,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

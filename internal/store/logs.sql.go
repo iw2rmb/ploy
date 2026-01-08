@@ -231,3 +231,92 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 	}
 	return items, nil
 }
+
+const listLogsMetaByRun = `-- name: ListLogsMetaByRun :many
+SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+WHERE run_id = $1
+ORDER BY chunk_no ASC, id ASC
+`
+
+type ListLogsMetaByRunRow struct {
+	ID        int64              `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	ChunkNo   int32              `json:"chunk_no"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns log metadata (without the data blob) for a run.
+// Use GetLog to fetch the actual log data by id.
+func (q *Queries) ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error) {
+	rows, err := q.db.Query(ctx, listLogsMetaByRun, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLogsMetaByRunRow{}
+	for rows.Next() {
+		var i ListLogsMetaByRunRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.ChunkNo,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsMetaByRunAndJob = `-- name: ListLogsMetaByRunAndJob :many
+SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+WHERE run_id = $1 AND job_id = $2
+ORDER BY chunk_no ASC, id ASC
+`
+
+type ListLogsMetaByRunAndJobParams struct {
+	RunID types.RunID  `json:"run_id"`
+	JobID *types.JobID `json:"job_id"`
+}
+
+type ListLogsMetaByRunAndJobRow struct {
+	ID        int64              `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	ChunkNo   int32              `json:"chunk_no"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns log metadata (without the data blob) for a run and job.
+// Use GetLog to fetch the actual log data by id.
+func (q *Queries) ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error) {
+	rows, err := q.db.Query(ctx, listLogsMetaByRunAndJob, arg.RunID, arg.JobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLogsMetaByRunAndJobRow{}
+	for rows.Next() {
+		var i ListLogsMetaByRunAndJobRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.ChunkNo,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

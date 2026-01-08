@@ -36,3 +36,18 @@ SELECT d.* FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
+
+-- name: ListDiffsMetaByRun :many
+-- Returns diff metadata (without the patch blob) for a run.
+-- Use GetDiff to fetch the actual patch data by id.
+SELECT id, run_id, job_id, summary, created_at FROM diffs
+WHERE run_id = $1
+ORDER BY created_at ASC, id ASC;
+
+-- name: ListDiffsMetaByRunRepo :many
+-- Returns diff metadata (without the patch blob) for a specific repo within a run.
+-- Use GetDiff to fetch the actual patch data by id.
+SELECT d.id, d.run_id, d.job_id, d.summary, d.created_at FROM diffs d
+JOIN jobs j ON j.id = d.job_id
+WHERE d.run_id = $1 AND j.repo_id = $2
+ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;

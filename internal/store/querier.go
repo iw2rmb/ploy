@@ -121,6 +121,12 @@ type Querier interface {
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata (without the bundle blob) for a run.
+	// Use GetArtifactBundle to fetch the actual bundle data by id.
+	ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]ListArtifactBundlesMetaByRunRow, error)
+	// Returns artifact bundle metadata (without the bundle blob) for a run and job.
+	// Use GetArtifactBundle to fetch the actual bundle data by id.
+	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ListArtifactBundlesMetaByRunAndJobRow, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
 	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
@@ -131,12 +137,24 @@ type Querier interface {
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 	// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
+	// Returns diff metadata (without the patch blob) for a run.
+	// Use GetDiff to fetch the actual patch data by id.
+	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]ListDiffsMetaByRunRow, error)
+	// Returns diff metadata (without the patch blob) for a specific repo within a run.
+	// Use GetDiff to fetch the actual patch data by id.
+	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]ListDiffsMetaByRunRepoRow, error)
 	// v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	// Returns event metadata (without the meta blob) for a run.
+	// Use GetEvent to fetch the full event with meta by id.
+	ListEventsMetaByRun(ctx context.Context, runID types.RunID) ([]ListEventsMetaByRunRow, error)
+	// Returns event metadata (without the meta blob) for a run since a given id.
+	// Use GetEvent to fetch the full event with meta by id.
+	ListEventsMetaByRunSince(ctx context.Context, arg ListEventsMetaByRunSinceParams) ([]ListEventsMetaByRunSinceRow, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
@@ -155,6 +173,12 @@ type Querier interface {
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
+	// Returns log metadata (without the data blob) for a run.
+	// Use GetLog to fetch the actual log data by id.
+	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error)
+	// Returns log metadata (without the data blob) for a run and job.
+	// Use GetLog to fetch the actual log data by id.
+	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error)
 	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
