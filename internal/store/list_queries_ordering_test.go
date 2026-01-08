@@ -39,6 +39,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// mod_repos.sql - created_at and repo_url need id tie-breakers
 		{"ListModReposByMod", listModReposByMod, "ORDER BY created_at ASC, id ASC"},
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY mr.repo_url ASC, mr.id ASC"},
+		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
 		// diffs.sql - step_index+created_at need id tie-breaker
 		{"ListDiffsBeforeStep", listDiffsBeforeStep, "ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC"},
@@ -56,6 +57,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunReposByRun", listRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
 		{"ListQueuedRunReposByRun", listQueuedRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
+		{"ListFailedRepoIDsByMod", listFailedRepoIDsByMod, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
 		// logs.sql and events.sql already have id tie-breakers (verified in logs_sql_ordering_test.go)
 	}

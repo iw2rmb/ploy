@@ -134,7 +134,7 @@ LEFT JOIN LATERAL (
     rrr.status AS last_status
   FROM run_repos rrr
   WHERE rrr.repo_id = mr.id
-  ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC
+  ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC
   LIMIT 1
 ) rr ON true
 WHERE ($1::text IS NULL OR $1 = '' OR mr.repo_url ILIKE '%' || $1 || '%')

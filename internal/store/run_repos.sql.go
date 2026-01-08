@@ -191,7 +191,7 @@ SELECT repo_id FROM (
   FROM run_repos rr
   WHERE rr.mod_id = $1
     AND rr.status IN ('Fail', 'Success', 'Cancelled')
-  ORDER BY rr.repo_id, rr.created_at DESC
+  ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC
 ) AS last_status
 WHERE status = 'Fail'
 `
