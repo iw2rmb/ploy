@@ -66,7 +66,7 @@ type Status struct {
 // Event represents a server-sent event frame produced by the hub.
 type Event struct {
 	ID   domaintypes.EventID
-	Type string
+	Type domaintypes.SSEEventType
 	Data []byte
 }
 
@@ -112,12 +112,12 @@ func (h *Hub) Ensure(streamID string) {
 
 // PublishLog appends a log record to a stream.
 func (h *Hub) PublishLog(ctx context.Context, streamID string, record LogRecord) error {
-	return h.publish(ctx, streamID, "log", record)
+	return h.publish(ctx, streamID, domaintypes.SSEEventLog, record)
 }
 
 // PublishRetention appends a retention hint to a stream.
 func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint RetentionHint) error {
-	return h.publish(ctx, streamID, "retention", hint)
+	return h.publish(ctx, streamID, domaintypes.SSEEventRetention, hint)
 }
 
 // PublishStatus appends a terminal status event to a stream.
@@ -125,9 +125,10 @@ func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint Retent
 //   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, ModType, StepIndex}
 //   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
 //   - "run": api.RunSummary snapshot
+//   - "stage": stage status update
 //   - "done": Status {Status: "done"} sentinel for stream completion.
 func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status) error {
-	if err := h.publish(ctx, streamID, "done", status); err != nil {
+	if err := h.publish(ctx, streamID, domaintypes.SSEEventDone, status); err != nil {
 		return err
 	}
 	stream := h.getStream(streamID)
@@ -144,12 +145,18 @@ func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status)
 // still performs generic JSON marshaling internally, but this boundary keeps
 // the "run" event contract consistent and JSON‑serializable.
 func (h *Hub) PublishRun(ctx context.Context, streamID string, run api.RunSummary) error {
-	return h.publish(ctx, streamID, "run", run)
+	return h.publish(ctx, streamID, domaintypes.SSEEventRun, run)
 }
 
-func (h *Hub) publish(ctx context.Context, streamID, eventType string, payload any) error {
+// ErrInvalidEventType indicates an unknown SSE event type was provided.
+var ErrInvalidEventType = errors.New("logstream: invalid event type")
+
+func (h *Hub) publish(ctx context.Context, streamID string, eventType domaintypes.SSEEventType, payload any) error {
 	if strings.TrimSpace(streamID) == "" {
 		return nil
+	}
+	if err := eventType.Validate(); err != nil {
+		return ErrInvalidEventType
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return ctx.Err()

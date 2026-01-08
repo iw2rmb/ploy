@@ -6,10 +6,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -71,8 +71,8 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 		hub.Ensure(runIDStr)
 
 		filter := func(evt logstream.Event) (logstream.Event, bool) {
-			switch strings.ToLower(strings.TrimSpace(evt.Type)) {
-			case "log":
+			switch evt.Type {
+			case domaintypes.SSEEventLog:
 				// Filter log events by job_id.
 				var payload struct {
 					JobID string `json:"job_id,omitempty"`
@@ -85,7 +85,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 				}
 				_, ok := allowedJobs[payload.JobID]
 				return evt, ok
-			case "run":
+			case domaintypes.SSEEventRun:
 				// Filter stages map to this repo's jobs (payload schema stays RunSummary).
 				var summary api.RunSummary
 				if err := json.Unmarshal(evt.Data, &summary); err != nil {

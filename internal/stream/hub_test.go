@@ -33,11 +33,11 @@ func TestHubPublishAndResume(t *testing.T) {
 	}
 	defer sub.Cancel()
 
-	expect := []string{"log", "retention", "done"}
-	received := make([]string, 0, len(expect))
+	expect := []domaintypes.SSEEventType{domaintypes.SSEEventLog, domaintypes.SSEEventRetention, domaintypes.SSEEventDone}
+	received := make([]domaintypes.SSEEventType, 0, len(expect))
 	for evt := range sub.Events {
 		received = append(received, evt.Type)
-		if evt.Type == "done" {
+		if evt.Type == domaintypes.SSEEventDone {
 			break
 		}
 	}
@@ -56,11 +56,11 @@ func TestHubPublishAndResume(t *testing.T) {
 	}
 	defer resume.Cancel()
 
-	resumed := make([]string, 0, 2)
+	resumed := make([]domaintypes.SSEEventType, 0, 2)
 	for evt := range resume.Events {
 		resumed = append(resumed, evt.Type)
 	}
-	if len(resumed) != 2 || resumed[0] != "retention" || resumed[1] != "done" {
+	if len(resumed) != 2 || resumed[0] != domaintypes.SSEEventRetention || resumed[1] != domaintypes.SSEEventDone {
 		t.Fatalf("unexpected resumed events: %v", resumed)
 	}
 
@@ -76,6 +76,41 @@ func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 	_, err := hub.Subscribe(ctx, "job-1", domaintypes.EventID(-1))
 	if err == nil {
 		t.Fatal("expected error for negative sinceID, got nil")
+	}
+}
+
+// TestHubRejectsUnknownEventType verifies that the SSEEventType validation
+// correctly rejects unknown event types. The hub uses a closed set of allowed
+// event types (log, retention, run, stage, done) to prevent drift and
+// accidental publication of invalid types.
+func TestHubRejectsUnknownEventType(t *testing.T) {
+	tests := []struct {
+		name      string
+		eventType domaintypes.SSEEventType
+		wantValid bool
+	}{
+		{"log is valid", domaintypes.SSEEventLog, true},
+		{"retention is valid", domaintypes.SSEEventRetention, true},
+		{"run is valid", domaintypes.SSEEventRun, true},
+		{"stage is valid", domaintypes.SSEEventStage, true},
+		{"done is valid", domaintypes.SSEEventDone, true},
+		{"empty is invalid", domaintypes.SSEEventType(""), false},
+		{"unknown is invalid", domaintypes.SSEEventType("unknown"), false},
+		{"status is invalid", domaintypes.SSEEventType("status"), false},
+		{"LOG uppercase is invalid", domaintypes.SSEEventType("LOG"), false},
+		{"whitespace-only is invalid", domaintypes.SSEEventType("   "), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.eventType.Validate()
+			if tt.wantValid && err != nil {
+				t.Errorf("Validate() returned error for valid type %q: %v", tt.eventType, err)
+			}
+			if !tt.wantValid && err == nil {
+				t.Errorf("Validate() returned nil for invalid type %q", tt.eventType)
+			}
+		})
 	}
 }
 
@@ -100,7 +135,7 @@ func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 	if !ok {
 		t.Fatal("expected first log event before drop")
 	}
-	if evt.Type != "log" {
+	if evt.Type != domaintypes.SSEEventLog {
 		t.Fatalf("unexpected event type %s", evt.Type)
 	}
 	if _, ok := <-sub.Events; ok {
@@ -261,7 +296,7 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	// All three subscribers should receive the status event.
 	select {
 	case evt := <-sub1.Events:
-		if evt.Type != "done" || evt.ID != 5 {
+		if evt.Type != domaintypes.SSEEventDone || evt.ID != 5 {
 			t.Fatalf("sub1: unexpected final event: type=%s id=%d", evt.Type, evt.ID)
 		}
 	case <-time.After(100 * time.Millisecond):
@@ -270,7 +305,7 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 
 	select {
 	case evt := <-sub2.Events:
-		if evt.Type != "done" || evt.ID != 5 {
+		if evt.Type != domaintypes.SSEEventDone || evt.ID != 5 {
 			t.Fatalf("sub2: unexpected final event: type=%s id=%d", evt.Type, evt.ID)
 		}
 	case <-time.After(100 * time.Millisecond):
@@ -279,7 +314,7 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 
 	select {
 	case evt := <-sub3.Events:
-		if evt.Type != "done" || evt.ID != 5 {
+		if evt.Type != domaintypes.SSEEventDone || evt.ID != 5 {
 			t.Fatalf("sub3: unexpected final event: type=%s id=%d", evt.Type, evt.ID)
 		}
 	case <-time.After(100 * time.Millisecond):
@@ -422,7 +457,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 			}
 
 			evt := snapshot[len(snapshot)-1]
-			if evt.Type != "log" {
+			if evt.Type != domaintypes.SSEEventLog {
 				t.Fatalf("expected event type 'log', got %s", evt.Type)
 			}
 
@@ -479,7 +514,7 @@ func TestPublishRunTypedPayload(t *testing.T) {
 
 	select {
 	case evt := <-sub.Events:
-		if evt.Type != "run" {
+		if evt.Type != domaintypes.SSEEventRun {
 			t.Fatalf("expected event type 'run', got %s", evt.Type)
 		}
 		// Unmarshal and verify the payload.
@@ -625,7 +660,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 					}
 					r.count++
 					r.receivedIDs = append(r.receivedIDs, evt.ID)
-					if evt.Type == "done" {
+					if evt.Type == domaintypes.SSEEventDone {
 						r.sawDone = true
 						results <- r
 						return
@@ -730,7 +765,7 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 	// Verify subscriber receives the full record.
 	select {
 	case evt := <-sub.Events:
-		if evt.Type != "log" {
+		if evt.Type != domaintypes.SSEEventLog {
 			t.Fatalf("expected event type 'log', got %s", evt.Type)
 		}
 
@@ -795,7 +830,7 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			t.Log("subscriber channel closed (expected due to backpressure)")
 			return
 		}
-		if evt.Type != "log" {
+		if evt.Type != domaintypes.SSEEventLog {
 			t.Fatalf("expected event type 'log', got %s", evt.Type)
 		}
 	case <-time.After(100 * time.Millisecond):

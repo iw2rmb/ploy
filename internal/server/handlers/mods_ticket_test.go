@@ -516,7 +516,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 
 	foundRunEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "run" {
+		if evt.Type == domaintypes.SSEEventRun {
 			foundRunEvent = true
 			if !strings.Contains(string(evt.Data), "\"state\":\"running\"") {
 				t.Fatalf("expected run event data to contain state \"running\", got: %s", string(evt.Data))

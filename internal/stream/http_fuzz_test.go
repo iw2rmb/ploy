@@ -3,6 +3,8 @@ package logstream
 import (
 	"bytes"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // FuzzWriteEventFrame ensures writeEventFrame handles arbitrary data payloads
@@ -15,7 +17,7 @@ func FuzzWriteEventFrame(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var buf bytes.Buffer
-		evt := Event{ID: 1, Type: "log", Data: data}
+		evt := Event{ID: 1, Type: domaintypes.SSEEventLog, Data: data}
 		if err := writeEventFrame(&buf, evt); err != nil {
 			t.Fatalf("writeEventFrame error: %v", err)
 		}

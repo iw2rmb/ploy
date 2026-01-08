@@ -57,7 +57,7 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	events := make([]logstream.Event, 0)
 	for evt := range sub.Events {
 		events = append(events, evt)
-		if evt.Type == "done" {
+		if evt.Type == domaintypes.SSEEventDone {
 			break
 		}
 	}
@@ -66,10 +66,10 @@ func TestStream_ServiceHubIntegration(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
-	if events[0].Type != "log" {
+	if events[0].Type != domaintypes.SSEEventLog {
 		t.Fatalf("expected first event type 'log', got %s", events[0].Type)
 	}
-	if events[1].Type != "done" {
+	if events[1].Type != domaintypes.SSEEventDone {
 		t.Fatalf("expected second event type 'done', got %s", events[1].Type)
 	}
 }
@@ -188,7 +188,7 @@ func TestStream_PublishRun(t *testing.T) {
 				if len(snapshot) == 0 {
 					t.Fatal("expected run event in hub snapshot, got none")
 				}
-				if snapshot[0].Type != "run" {
+				if snapshot[0].Type != domaintypes.SSEEventRun {
 					t.Fatalf("expected event type 'run', got %s", snapshot[0].Type)
 				}
 

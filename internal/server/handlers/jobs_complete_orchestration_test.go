@@ -106,13 +106,13 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	foundRunEvent := false
 	foundDoneEvent := false
 	for _, evt := range snapshot {
-		if evt.Type == "run" {
+		if evt.Type == domaintypes.SSEEventRun {
 			foundRunEvent = true
 			if !strings.Contains(string(evt.Data), "succeeded") {
 				t.Errorf("expected run event data to contain 'succeeded', got: %s", string(evt.Data))
 			}
 		}
-		if evt.Type == "done" {
+		if evt.Type == domaintypes.SSEEventDone {
 			foundDoneEvent = true
 		}
 	}
