@@ -47,7 +47,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Verify node exists before attempting to claim work.
-		_, err = st.GetNode(r.Context(), nodeID)
+		_, err = st.GetNode(r.Context(), domaintypes.NodeID(nodeID))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -198,7 +198,7 @@ func buildAndSendJobClaimResponse(
 	}{
 		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
 		Name:      nil,
-		RepoID:    job.RepoID,
+		RepoID:    job.RepoID.String(),
 		Attempt:   job.Attempt,
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,
@@ -207,7 +207,7 @@ func buildAndSendJobClaimResponse(
 		StepIndex: stepIndex,
 		RepoURL:   modRepo.RepoUrl,
 		Status:    run.Status,
-		NodeID:    domaintypes.NodeID(stringPtrOrEmpty(job.NodeID)), // Convert to domain type
+		NodeID:    nodeIDPtrOrZero(job.NodeID),
 		BaseRef:   job.RepoBaseRef,
 		TargetRef: runRepo.RepoTargetRef,
 		StartedAt: run.StartedAt.Time.Format(time.RFC3339),
@@ -224,12 +224,12 @@ func buildAndSendJobClaimResponse(
 }
 
 // mergeJobIDIntoSpec injects job_id into the spec JSONB for downstream execution.
-func mergeJobIDIntoSpec(spec []byte, jobID string) json.RawMessage {
+func mergeJobIDIntoSpec(spec []byte, jobID domaintypes.JobID) json.RawMessage {
 	var m map[string]interface{}
 	if err := json.Unmarshal(spec, &m); err != nil {
 		m = make(map[string]interface{})
 	}
-	m["job_id"] = jobID
+	m["job_id"] = jobID.String()
 	merged, _ := json.Marshal(m)
 	return merged
 }
@@ -263,11 +263,9 @@ func parseModIndex(name string) (int, error) {
 	return idx, nil
 }
 
-// stringPtrOrEmpty dereferences a *string, returning empty string if nil.
-// Used for nullable TEXT FK fields like node_id.
-func stringPtrOrEmpty(s *string) string {
-	if s == nil {
+func nodeIDPtrOrZero(id *domaintypes.NodeID) domaintypes.NodeID {
+	if id == nil {
 		return ""
 	}
-	return *s
+	return *id
 }

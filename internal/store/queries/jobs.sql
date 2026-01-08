@@ -107,31 +107,32 @@ WHERE id = $1;
 DELETE FROM jobs
 WHERE id = $1;
 
--- name: claimJobInternal :one
--- Internal: Atomically claim the next claimable job for a node (unified queue).
--- Use ClaimJob wrapper instead, which enforces non-empty nodeID at the API boundary.
+-- name: ClaimJob :one
+-- Atomically claim the next claimable job for a node (unified queue).
 -- v1:
 -- - claimable jobs have status='Queued'
 -- - normal jobs are claimable only when runs.status='Started'
 -- - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
--- - nodeID must be non-empty (enforced by WHERE clause guard)
+-- - nodeID must be non-empty
 WITH eligible AS (
-  SELECT j.id
-  FROM jobs j
+  SELECT j.id, n.id AS node_id
+  FROM nodes n
+  JOIN jobs j ON TRUE
   JOIN runs r ON j.run_id = r.id
-  WHERE j.status = 'Queued'
+  WHERE n.id = @node_id
+    AND @node_id::TEXT != ''
+    AND j.status = 'Queued'
     AND j.node_id IS NULL
     AND (
       (j.mod_type = 'mr' AND r.status = 'Finished') OR
       (j.mod_type != 'mr' AND r.status = 'Started')
     )
-    AND @node_id::TEXT != ''
   ORDER BY j.step_index ASC
-  FOR UPDATE SKIP LOCKED
+  FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
 )
 UPDATE jobs
-SET status = 'Running', node_id = @node_id, started_at = now()
+SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
 RETURNING jobs.*;
