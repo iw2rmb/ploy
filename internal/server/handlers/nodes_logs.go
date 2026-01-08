@@ -50,9 +50,6 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		// Limit request body but allow base64 overhead.
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
-
 		// Decode request body with strict validation.
 		// Note: build_id removed; logs are now grouped at job level only.
 		// Uses domain types (RunID, JobID) for type-safe request parsing.
@@ -63,16 +60,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			Data    []byte             `json:"data"`
 		}
 
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			// Return 413 when MaxBytesReader trips the size cap.
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 

@@ -35,10 +35,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			return
 		}
 
-		// Limit request body to 1 MiB to prevent memory exhaustion.
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
-
-		// Decode request body.
+		// Decode request body with strict validation.
 		// Uses domain types (RunID, JobID) for type-safe request parsing.
 		var req struct {
 			RunID  domaintypes.RunID `json:"run_id"` // Run ID (KSUID-backed)
@@ -51,16 +48,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			} `json:"events"`
 		}
 
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			// Return 413 when MaxBytesReader trips the size cap.
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxRequestSize); err != nil {
 			return
 		}
 

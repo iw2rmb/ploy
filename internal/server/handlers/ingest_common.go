@@ -80,7 +80,7 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 		// Return 413 when MaxBytesReader trips the size cap.
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
 			return err
 		}
 		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)

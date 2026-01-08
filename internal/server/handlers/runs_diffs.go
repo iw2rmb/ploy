@@ -33,22 +33,14 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		var req struct {
 			JobID   *string                 `json:"job_id,omitempty"`
 			Patch   []byte                  `json:"patch"`
 			Summary domaintypes.DiffSummary `json:"summary"`
 		}
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+
+		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 		if len(req.Patch) == 0 {

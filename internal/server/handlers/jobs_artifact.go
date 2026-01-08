@@ -47,9 +47,6 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Limit request body size to avoid memory exhaustion but allow base64 overhead.
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
-
 		// Decode request body with strict validation.
 		// Note: build_id removed; artifacts are now grouped at job level only.
 		var req struct {
@@ -57,16 +54,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			Bundle []byte  `json:"bundle"` // gzipped tar (raw bytes)
 		}
 
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			// Return 413 when MaxBytesReader trips the size cap.
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 
