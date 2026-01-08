@@ -25,6 +25,9 @@ func parseLastEventID(header string) domaintypes.EventID {
 	if err := eid.UnmarshalText([]byte(header)); err != nil {
 		return 0
 	}
+	if !eid.Valid() {
+		return 0
+	}
 	return eid
 }
 
@@ -42,6 +45,12 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		runIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Reject blank/whitespace-only IDs at the HTTP boundary.
+		if domaintypes.IsEmpty(runIDStr) {
+			http.Error(w, "invalid id", http.StatusBadRequest)
 			return
 		}
 
