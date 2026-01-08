@@ -39,15 +39,15 @@ import (
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract node id from path parameter.
-		nodeID, err := requiredPathParam(r, "id")
+		// Extract node id from path parameter using domain type helper.
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Verify node exists before attempting to claim work.
-		_, err = st.GetNode(r.Context(), domaintypes.NodeID(nodeID))
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -59,7 +59,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Claim the next pending job. ClaimJob requires a non-empty nodeID.
-		job, err := st.ClaimJob(r.Context(), domaintypes.NodeID(nodeID))
+		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
 			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {

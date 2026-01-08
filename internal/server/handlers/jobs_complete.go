@@ -139,9 +139,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Extract job_id from URL path parameter.
-		// Job IDs are KSUID strings; treated as opaque identifiers.
-		jobIDStr, err := requiredPathParam(r, "job_id")
+		// Extract job_id from URL path parameter using domain type helper.
+		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -224,14 +223,14 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Look up the job by job_id (KSUID-backed).
-		job, err := st.GetJob(ctx, domaintypes.JobID(jobIDStr))
+		job, err := st.GetJob(ctx, jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get job: %v", err), http.StatusInternalServerError)
-			slog.Error("complete job: get job failed", "job_id", jobIDStr, "err", err)
+			slog.Error("complete job: get job failed", "job_id", jobID, "err", err)
 			return
 		}
 
@@ -284,7 +283,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to complete job: %v", err), http.StatusInternalServerError)
 			slog.Error("complete job: update failed",
-				"job_id", jobIDStr,
+				"job_id", jobID,
 				"step_index", job.StepIndex,
 				"node_id", nodeIDHeader,
 				"err", err,
@@ -293,7 +292,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		slog.Info("job completed",
-			"job_id", jobIDStr,
+			"job_id", jobID,
 			"step_index", job.StepIndex,
 			"node_id", nodeIDHeader,
 			"status", jobStatus,
@@ -305,7 +304,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		run, err := st.GetRun(ctx, runID)
 		if err != nil {
 			// Log error but don't fail the job completion (job is already marked complete).
-			slog.Error("complete job: get run failed", "job_id", jobIDStr, "run_id", runID, "err", err)
+			slog.Error("complete job: get run failed", "job_id", jobID, "run_id", runID, "err", err)
 		}
 
 		// When a job fails, either:
@@ -318,7 +317,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			modType := domaintypes.ModType(job.ModType)
 			if err := modType.Validate(); err != nil {
 				slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
-					"job_id", jobIDStr,
+					"job_id", jobID,
 					"mod_type", job.ModType,
 					"err", err,
 				)
@@ -329,13 +328,13 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				// MR jobs are best-effort and must not trigger healing or
 				// cancellation of other jobs when they fail.
 				slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
-					"job_id", jobIDStr,
+					"job_id", jobID,
 					"step_index", job.StepIndex,
 				)
 			case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
 				if healErr := maybeCreateHealingJobs(ctx, st, run, job.RunID, job.RepoID, job.Attempt, job.StepIndex); healErr != nil {
 					slog.Error("complete job: failed to create healing jobs",
-						"job_id", jobIDStr,
+						"job_id", jobID,
 						"step_index", job.StepIndex,
 						"err", healErr,
 					)
@@ -343,7 +342,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			default:
 				if err := cancelRemainingJobsAfterFailure(ctx, st, job.RunID, job.RepoID, job.Attempt, job.StepIndex); err != nil {
 					slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
-						"job_id", jobIDStr,
+						"job_id", jobID,
 						"step_index", job.StepIndex,
 						"err", err,
 					)
@@ -356,7 +355,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			if _, err := st.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: job.RunID, RepoID: job.RepoID, Attempt: job.Attempt}); err != nil {
 				if !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to schedule next job",
-						"job_id", jobIDStr,
+						"job_id", jobID,
 						"step_index", job.StepIndex,
 						"err", err,
 					)
@@ -374,7 +373,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			repoUpdated, repoErr := maybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
 			if repoErr != nil {
 				slog.Error("complete job: failed to check repo completion",
-					"job_id", jobIDStr,
+					"job_id", jobID,
 					"repo_id", job.RepoID,
 					"attempt", job.Attempt,
 					"err", repoErr,
@@ -386,7 +385,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			if repoUpdated {
 				if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, runID); completeErr != nil {
 					slog.Error("complete job: failed to check run completion",
-						"job_id", jobIDStr,
+						"job_id", jobID,
 						"step_index", job.StepIndex,
 						"err", completeErr,
 					)
@@ -407,7 +406,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				MrUrl: mrURL,
 			}); updateErr != nil {
 				slog.Error("complete job: failed to merge MR URL into run stats",
-					"job_id", jobIDStr,
+					"job_id", jobID,
 					"run_id", runID,
 					"err", updateErr,
 				)
