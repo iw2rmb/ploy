@@ -9,6 +9,13 @@ SET search_path TO ploy, public;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Schema version tracking for deterministic migrations.
+-- Tracks which migration versions have been applied to this database.
+CREATE TABLE IF NOT EXISTS schema_version (
+  version    BIGINT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Enums
 --
 -- Status model (see docs/mods-lifecycle.md § "State machines"):
