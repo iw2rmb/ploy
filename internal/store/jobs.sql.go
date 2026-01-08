@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -38,7 +39,7 @@ RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, 
 // - claimable jobs have status='Queued'
 // - normal jobs are claimable only when runs.status='Started'
 // - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
-func (q *Queries) ClaimJob(ctx context.Context, nodeID *string) (Job, error) {
+func (q *Queries) ClaimJob(ctx context.Context, nodeID *types.NodeID) (Job, error) {
 	row := q.db.QueryRow(ctx, claimJob, nodeID)
 	var i Job
 	err := row.Scan(
@@ -67,7 +68,7 @@ SELECT COUNT(*) FROM jobs
 WHERE run_id = $1
 `
 
-func (q *Queries) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
+func (q *Queries) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
 	row := q.db.QueryRow(ctx, countJobsByRun, runID)
 	var count int64
 	err := row.Scan(&count)
@@ -80,8 +81,8 @@ WHERE run_id = $1 AND status = $2
 `
 
 type CountJobsByRunAndStatusParams struct {
-	RunID  string    `json:"run_id"`
-	Status JobStatus `json:"status"`
+	RunID  types.RunID `json:"run_id"`
+	Status JobStatus   `json:"status"`
 }
 
 func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error) {
@@ -102,9 +103,9 @@ GROUP BY status
 `
 
 type CountJobsByRunRepoAttemptGroupByStatusParams struct {
-	RunID   string `json:"run_id"`
-	RepoID  string `json:"repo_id"`
-	Attempt int32  `json:"attempt"`
+	RunID   types.RunID     `json:"run_id"`
+	RepoID  types.ModRepoID `json:"repo_id"`
+	Attempt int32           `json:"attempt"`
 }
 
 type CountJobsByRunRepoAttemptGroupByStatusRow struct {
@@ -171,17 +172,17 @@ RETURNING
 `
 
 type CreateJobParams struct {
-	ID          string    `json:"id"`
-	RunID       string    `json:"run_id"`
-	RepoID      string    `json:"repo_id"`
-	RepoBaseRef string    `json:"repo_base_ref"`
-	Attempt     int32     `json:"attempt"`
-	Name        string    `json:"name"`
-	Status      JobStatus `json:"status"`
-	ModType     string    `json:"mod_type"`
-	ModImage    string    `json:"mod_image"`
-	StepIndex   float64   `json:"step_index"`
-	Meta        []byte    `json:"meta"`
+	ID          types.JobID     `json:"id"`
+	RunID       types.RunID     `json:"run_id"`
+	RepoID      types.ModRepoID `json:"repo_id"`
+	RepoBaseRef string          `json:"repo_base_ref"`
+	Attempt     int32           `json:"attempt"`
+	Name        string          `json:"name"`
+	Status      JobStatus       `json:"status"`
+	ModType     string          `json:"mod_type"`
+	ModImage    string          `json:"mod_image"`
+	StepIndex   types.StepIndex `json:"step_index"`
+	Meta        []byte          `json:"meta"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -226,7 +227,7 @@ DELETE FROM jobs
 WHERE id = $1
 `
 
-func (q *Queries) DeleteJob(ctx context.Context, id string) error {
+func (q *Queries) DeleteJob(ctx context.Context, id types.JobID) error {
 	_, err := q.db.Exec(ctx, deleteJob, id)
 	return err
 }
@@ -247,12 +248,12 @@ WHERE j1.id = $1
 `
 
 type GetAdjacentJobIndicesRow struct {
-	PrevIndex float64     `json:"prev_index"`
-	NextIndex interface{} `json:"next_index"`
+	PrevIndex types.StepIndex `json:"prev_index"`
+	NextIndex interface{}     `json:"next_index"`
 }
 
 // Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
-func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error) {
+func (q *Queries) GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error) {
 	row := q.db.QueryRow(ctx, getAdjacentJobIndices, id)
 	var i GetAdjacentJobIndicesRow
 	err := row.Scan(&i.PrevIndex, &i.NextIndex)
@@ -281,7 +282,7 @@ FROM jobs
 WHERE id = $1
 `
 
-func (q *Queries) GetJob(ctx context.Context, id string) (Job, error) {
+func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 	row := q.db.QueryRow(ctx, getJob, id)
 	var i Job
 	err := row.Scan(
@@ -329,9 +330,9 @@ ORDER BY step_index ASC
 `
 
 type ListCreatedJobsByRunRepoAttemptParams struct {
-	RunID   string `json:"run_id"`
-	RepoID  string `json:"repo_id"`
-	Attempt int32  `json:"attempt"`
+	RunID   types.RunID     `json:"run_id"`
+	RepoID  types.ModRepoID `json:"repo_id"`
+	Attempt int32           `json:"attempt"`
 }
 
 func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error) {
@@ -394,7 +395,7 @@ WHERE run_id = $1
 ORDER BY repo_id ASC, attempt ASC, step_index ASC
 `
 
-func (q *Queries) ListJobsByRun(ctx context.Context, runID string) ([]Job, error) {
+func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listJobsByRun, runID)
 	if err != nil {
 		return nil, err
@@ -455,9 +456,9 @@ ORDER BY step_index ASC
 `
 
 type ListJobsByRunRepoAttemptParams struct {
-	RunID   string `json:"run_id"`
-	RepoID  string `json:"repo_id"`
-	Attempt int32  `json:"attempt"`
+	RunID   types.RunID     `json:"run_id"`
+	RepoID  types.ModRepoID `json:"repo_id"`
+	Attempt int32           `json:"attempt"`
 }
 
 func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error) {
@@ -530,9 +531,9 @@ RETURNING
 `
 
 type ScheduleNextJobParams struct {
-	RunID   string `json:"run_id"`
-	RepoID  string `json:"repo_id"`
-	Attempt int32  `json:"attempt"`
+	RunID   types.RunID     `json:"run_id"`
+	RepoID  types.ModRepoID `json:"repo_id"`
+	Attempt int32           `json:"attempt"`
 }
 
 // Promote the next job in a repo attempt: Created -> Queued.
@@ -570,9 +571,9 @@ WHERE id = $1
 `
 
 type UpdateJobCompletionParams struct {
-	ID       string    `json:"id"`
-	Status   JobStatus `json:"status"`
-	ExitCode *int32    `json:"exit_code"`
+	ID       types.JobID `json:"id"`
+	Status   JobStatus   `json:"status"`
+	ExitCode *int32      `json:"exit_code"`
 }
 
 func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error {
@@ -591,10 +592,10 @@ WHERE id = $1
 `
 
 type UpdateJobCompletionWithMetaParams struct {
-	ID       string    `json:"id"`
-	Status   JobStatus `json:"status"`
-	ExitCode *int32    `json:"exit_code"`
-	Meta     []byte    `json:"meta"`
+	ID       types.JobID `json:"id"`
+	Status   JobStatus   `json:"status"`
+	ExitCode *int32      `json:"exit_code"`
+	Meta     []byte      `json:"meta"`
 }
 
 func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
@@ -614,8 +615,8 @@ WHERE id = $1
 `
 
 type UpdateJobMetaParams struct {
-	ID   string `json:"id"`
-	Meta []byte `json:"meta"`
+	ID   types.JobID `json:"id"`
+	Meta []byte      `json:"meta"`
 }
 
 func (q *Queries) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
@@ -630,7 +631,7 @@ WHERE id = $1
 `
 
 type UpdateJobStatusParams struct {
-	ID         string             `json:"id"`
+	ID         types.JobID        `json:"id"`
 	Status     JobStatus          `json:"status"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`

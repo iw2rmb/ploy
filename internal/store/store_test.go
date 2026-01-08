@@ -109,7 +109,7 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 
 	createdBy := "test-user"
 
-	specID := types.NewSpecID().String()
+	specID := types.NewSpecID()
 	spec, err := db.CreateSpec(ctx, CreateSpecParams{
 		ID:        specID,
 		Name:      "test-spec",
@@ -120,10 +120,10 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := types.NewModID().String()
+	modID := types.NewModID()
 	_, err = db.CreateMod(ctx, CreateModParams{
 		ID:        modID,
-		Name:      "test-mod-" + modID,
+		Name:      "test-mod-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -131,7 +131,7 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 		t.Fatalf("CreateMod() failed: %v", err)
 	}
 
-	runID := types.NewRunID().String()
+	runID := types.NewRunID()
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        runID,
 		ModID:     modID,
@@ -195,7 +195,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	}
 
 	// Add a second repo for the mod and run.
-	modRepo2ID := types.NewModRepoID().String()
+	modRepo2ID := types.NewModRepoID()
 	_, err = db.CreateModRepo(ctx, CreateModRepoParams{
 		ID:        modRepo2ID,
 		ModID:     fx.Mod.ID,

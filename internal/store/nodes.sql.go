@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/netip"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -26,11 +27,11 @@ RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free
 `
 
 type CreateNodeParams struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	IpAddress   netip.Addr `json:"ip_address"`
-	Version     *string    `json:"version"`
-	Concurrency int32      `json:"concurrency"`
+	ID          types.NodeID `json:"id"`
+	Name        string       `json:"name"`
+	IpAddress   netip.Addr   `json:"ip_address"`
+	Version     *string      `json:"version"`
+	Concurrency int32        `json:"concurrency"`
 }
 
 // Creates a new node with an application-supplied NanoID(6) as the primary key.
@@ -72,7 +73,7 @@ DELETE FROM nodes
 WHERE id = $1
 `
 
-func (q *Queries) DeleteNode(ctx context.Context, id string) error {
+func (q *Queries) DeleteNode(ctx context.Context, id types.NodeID) error {
 	_, err := q.db.Exec(ctx, deleteNode, id)
 	return err
 }
@@ -82,7 +83,7 @@ SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_mi
 WHERE id = $1
 `
 
-func (q *Queries) GetNode(ctx context.Context, id string) (Node, error) {
+func (q *Queries) GetNode(ctx context.Context, id types.NodeID) (Node, error) {
 	row := q.db.QueryRow(ctx, getNode, id)
 	var i Node
 	err := row.Scan(
@@ -163,7 +164,7 @@ WHERE id = $1
 `
 
 type UpdateNodeCertMetadataParams struct {
-	ID              string             `json:"id"`
+	ID              types.NodeID       `json:"id"`
 	CertSerial      *string            `json:"cert_serial"`
 	CertFingerprint *string            `json:"cert_fingerprint"`
 	CertNotBefore   pgtype.Timestamptz `json:"cert_not_before"`
@@ -188,8 +189,8 @@ WHERE id = $1
 `
 
 type UpdateNodeDrainedParams struct {
-	ID      string `json:"id"`
-	Drained bool   `json:"drained"`
+	ID      types.NodeID `json:"id"`
+	Drained bool         `json:"drained"`
 }
 
 func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error {
@@ -213,7 +214,7 @@ WHERE id = $1
 `
 
 type UpdateNodeHeartbeatParams struct {
-	ID             string             `json:"id"`
+	ID             types.NodeID       `json:"id"`
 	LastHeartbeat  pgtype.Timestamptz `json:"last_heartbeat"`
 	CpuTotalMillis int32              `json:"cpu_total_millis"`
 	CpuFreeMillis  int32              `json:"cpu_free_millis"`

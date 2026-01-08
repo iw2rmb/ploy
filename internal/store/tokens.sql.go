@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -52,7 +53,7 @@ LIMIT 1
 `
 
 type GetBootstrapTokenRow struct {
-	NodeID       *string            `json:"node_id"`
+	NodeID       *types.NodeID      `json:"node_id"`
 	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
@@ -133,7 +134,7 @@ INSERT INTO bootstrap_tokens (
 type InsertBootstrapTokenParams struct {
 	TokenHash string             `json:"token_hash"`
 	TokenID   string             `json:"token_id"`
-	NodeID    *string            `json:"node_id"`
+	NodeID    *types.NodeID      `json:"node_id"`
 	ClusterID *string            `json:"cluster_id"`
 	IssuedAt  pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`

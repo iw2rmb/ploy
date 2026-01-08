@@ -7,6 +7,8 @@ package store
 
 import (
 	"context"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const createRun = `-- name: CreateRun :one
@@ -16,10 +18,10 @@ RETURNING id, mod_id, spec_id, created_by, status, created_at, started_at, finis
 `
 
 type CreateRunParams struct {
-	ID        string  `json:"id"`
-	ModID     string  `json:"mod_id"`
-	SpecID    string  `json:"spec_id"`
-	CreatedBy *string `json:"created_by"`
+	ID        types.RunID  `json:"id"`
+	ModID     types.ModID  `json:"mod_id"`
+	SpecID    types.SpecID `json:"spec_id"`
+	CreatedBy *string      `json:"created_by"`
 }
 
 // v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
@@ -51,7 +53,7 @@ DELETE FROM runs
 WHERE id = $1
 `
 
-func (q *Queries) DeleteRun(ctx context.Context, id string) error {
+func (q *Queries) DeleteRun(ctx context.Context, id types.RunID) error {
 	_, err := q.db.Exec(ctx, deleteRun, id)
 	return err
 }
@@ -62,7 +64,7 @@ FROM runs
 WHERE id = $1
 `
 
-func (q *Queries) GetRun(ctx context.Context, id string) (Run, error) {
+func (q *Queries) GetRun(ctx context.Context, id types.RunID) (Run, error) {
 	row := q.db.QueryRow(ctx, getRun, id)
 	var i Run
 	err := row.Scan(
@@ -177,9 +179,9 @@ WHERE id = $1
 `
 
 type UpdateRunCompletionParams struct {
-	ID     string    `json:"id"`
-	Status RunStatus `json:"status"`
-	Stats  []byte    `json:"stats"`
+	ID     types.RunID `json:"id"`
+	Status RunStatus   `json:"status"`
+	Stats  []byte      `json:"stats"`
 }
 
 func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
@@ -198,7 +200,7 @@ WHERE id = $1
 
 // Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 // Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
-func (q *Queries) UpdateRunResume(ctx context.Context, id string) error {
+func (q *Queries) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	_, err := q.db.Exec(ctx, updateRunResume, id)
 	return err
 }
@@ -213,7 +215,7 @@ const updateRunStatsMRURL = `-- name: UpdateRunStatsMRURL :exec
 `
 
 type UpdateRunStatsMRURLParams struct {
-	ID    string      `json:"id"`
+	ID    types.RunID `json:"id"`
 	MrUrl interface{} `json:"mr_url"`
 }
 
@@ -235,8 +237,8 @@ WHERE id = $1
 `
 
 type UpdateRunStatusParams struct {
-	ID     string    `json:"id"`
-	Status RunStatus `json:"status"`
+	ID     types.RunID `json:"id"`
+	Status RunStatus   `json:"status"`
 }
 
 func (q *Queries) UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error {

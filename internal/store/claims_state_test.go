@@ -41,7 +41,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	// Create a Queued job for the run (v1 status model: Queued replaces pending).
 	// Job ID is now KSUID-backed; generate via types.NewJobID().
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -59,7 +59,7 @@ func TestClaimJob_Basic(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-1",
 		IpAddress: mustParseAddr(t, "192.168.1.100"),
 	})
@@ -118,7 +118,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create three pending jobs with different step_index values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -135,7 +135,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -152,7 +152,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	job3, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -170,7 +170,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create test nodes.
 	node1, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-fifo-1",
 		IpAddress: mustParseAddr(t, "192.168.2.100"),
 	})
@@ -179,7 +179,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	node2, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-fifo-2",
 		IpAddress: mustParseAddr(t, "192.168.2.101"),
 	})
@@ -188,7 +188,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	node3, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-fifo-3",
 		IpAddress: mustParseAddr(t, "192.168.2.102"),
 	})
@@ -245,7 +245,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	jobs := make([]Job, numJobs)
 	for i := 0; i < numJobs; i++ {
 		job, err := db.CreateJob(ctx, CreateJobParams{
-			ID:          string(types.NewJobID()),
+			ID:          types.NewJobID(),
 			RunID:       run.ID,
 			RepoID:      fx.ModRepo.ID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -254,7 +254,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			ModType:     "",
 			ModImage:    "",
 			Status:      JobStatusQueued,
-			StepIndex:   float64(1000 + i*100),
+			StepIndex:   types.StepIndex(1000 + i*100),
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -268,7 +268,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	nodes := make([]Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		node, err := db.CreateNode(ctx, CreateNodeParams{
-			ID:        types.NewNodeKey(),
+			ID:        types.NodeID(types.NewNodeKey()),
 			Name:      nodeNameForTest(t, "concurrent", i),
 			IpAddress: mustParseAddr(t, ipForTest(3, i)),
 		})
@@ -296,10 +296,10 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 
 	// Count successful claims.
 	successCount := 0
-	// Job IDs are now strings (KSUID-backed), use map[string]bool for deduplication.
-	claimedIDs := make(map[string]bool)
-	// Node IDs are now strings (NanoID-backed); use map[string]bool for deduplication.
-	validNode := make(map[string]bool, numNodes)
+	// Job IDs use types.JobID, use map for deduplication.
+	claimedIDs := make(map[types.JobID]bool)
+	// Node IDs use types.NodeID, use map for deduplication.
+	validNode := make(map[types.NodeID]bool, numNodes)
 	for i := range nodes {
 		validNode[nodes[i].ID] = true
 	}
@@ -307,7 +307,6 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		if errors[i] == nil {
 			successCount++
 			// Verify each job is claimed only once.
-			// Job ID is now a string.
 			jobID := claimedJobs[i].ID
 			if claimedIDs[jobID] {
 				t.Errorf("Job %v was claimed multiple times", claimedJobs[i].ID)
@@ -354,7 +353,7 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-empty",
 		IpAddress: mustParseAddr(t, "192.168.4.100"),
 	})
@@ -388,7 +387,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	run := fx.Run
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -406,7 +405,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-drained",
 		IpAddress: mustParseAddr(t, "192.168.6.100"),
 	})
@@ -458,7 +457,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	run := fx.Run
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -476,7 +475,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-undrained",
 		IpAddress: mustParseAddr(t, "192.168.7.100"),
 	})
@@ -537,7 +536,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create jobs in reverse step_index order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -554,7 +553,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	job1, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -571,7 +570,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	job2, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -589,7 +588,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-step-order",
 		IpAddress: mustParseAddr(t, "192.168.10.100"),
 	})
@@ -643,7 +642,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a non-pending job (already running).
 	_, err = db.CreateJob(ctx, CreateJobParams{
-		ID:          string(types.NewJobID()),
+		ID:          types.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      fx.ModRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
@@ -661,7 +660,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NewNodeKey(),
+		ID:        types.NodeID(types.NewNodeKey()),
 		Name:      "test-node-only-pending",
 		IpAddress: mustParseAddr(t, "192.168.11.100"),
 	})

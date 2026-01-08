@@ -7,21 +7,21 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/segmentio/ksuid"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // mockStore implements store.Store for testing.
-// Uses string IDs (KSUID-backed) per the KSUID migration.
+// Uses types.RunID (KSUID-backed) per the typed IDs migration.
 type mockStore struct {
 	store.Store
-	listRunsWithQueuedReposResult []string
+	listRunsWithQueuedReposResult []types.RunID
 	listRunsWithQueuedReposErr    error
 	listRunsWithQueuedReposCalled bool
 }
 
-func (m *mockStore) ListRunsWithQueuedRepos(ctx context.Context) ([]string, error) {
+func (m *mockStore) ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error) {
 	m.listRunsWithQueuedReposCalled = true
 	return m.listRunsWithQueuedReposResult, m.listRunsWithQueuedReposErr
 }
@@ -33,22 +33,22 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 }
 
 // mockRepoStarter implements RepoStarter for testing.
-// Uses string IDs (KSUID-backed) per the KSUID migration.
+// Uses types.RunID (KSUID-backed) per the typed IDs migration.
 type mockRepoStarter struct {
-	startCalls   []string
-	startResults map[string]StartPendingReposResult
-	startErrors  map[string]error
+	startCalls   []types.RunID
+	startResults map[types.RunID]StartPendingReposResult
+	startErrors  map[types.RunID]error
 }
 
 func newMockRepoStarter() *mockRepoStarter {
 	return &mockRepoStarter{
-		startCalls:   []string{},
-		startResults: make(map[string]StartPendingReposResult),
-		startErrors:  make(map[string]error),
+		startCalls:   []types.RunID{},
+		startResults: make(map[types.RunID]StartPendingReposResult),
+		startErrors:  make(map[types.RunID]error),
 	}
 }
 
-func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID string) (StartPendingReposResult, error) {
+func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID types.RunID) (StartPendingReposResult, error) {
 	m.startCalls = append(m.startCalls, runID)
 	if err, ok := m.startErrors[runID]; ok && err != nil {
 		return StartPendingReposResult{}, err
@@ -59,9 +59,9 @@ func (m *mockRepoStarter) StartPendingRepos(ctx context.Context, runID string) (
 	return StartPendingReposResult{}, nil
 }
 
-// newTestKSUID generates a new KSUID string for test IDs.
-func newTestKSUID() string {
-	return ksuid.New().String()
+// newTestRunID generates a new types.RunID (KSUID-backed) for test IDs.
+func newTestRunID() types.RunID {
+	return types.NewRunID()
 }
 
 func TestNew(t *testing.T) {
@@ -159,7 +159,7 @@ func TestScheduler_Run(t *testing.T) {
 
 	t.Run("no runs with pending repos", func(t *testing.T) {
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []string{},
+			listRunsWithQueuedReposResult: []types.RunID{},
 		}
 		mockStarter := newMockRepoStarter()
 
@@ -185,12 +185,12 @@ func TestScheduler_Run(t *testing.T) {
 	})
 
 	t.Run("starts repos for each batch run", func(t *testing.T) {
-		// Use KSUID-backed string IDs per the migration.
-		runID1 := newTestKSUID()
-		runID2 := newTestKSUID()
+		// Use types.RunID (KSUID-backed) per the typed IDs migration.
+		runID1 := newTestRunID()
+		runID2 := newTestRunID()
 
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []string{runID1, runID2},
+			listRunsWithQueuedReposResult: []types.RunID{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()
@@ -214,7 +214,7 @@ func TestScheduler_Run(t *testing.T) {
 		}
 
 		// Verify both runs were processed.
-		processedRuns := make(map[string]bool)
+		processedRuns := make(map[types.RunID]bool)
 		for _, runID := range mockStarter.startCalls {
 			processedRuns[runID] = true
 		}
@@ -228,12 +228,12 @@ func TestScheduler_Run(t *testing.T) {
 	})
 
 	t.Run("continues on error", func(t *testing.T) {
-		// Use KSUID-backed string IDs per the migration.
-		runID1 := newTestKSUID()
-		runID2 := newTestKSUID()
+		// Use types.RunID (KSUID-backed) per the typed IDs migration.
+		runID1 := newTestRunID()
+		runID2 := newTestRunID()
 
 		mockSt := &mockStore{
-			listRunsWithQueuedReposResult: []string{runID1, runID2},
+			listRunsWithQueuedReposResult: []types.RunID{runID1, runID2},
 		}
 
 		mockStarter := newMockRepoStarter()

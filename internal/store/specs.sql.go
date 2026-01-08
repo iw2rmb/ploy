@@ -7,6 +7,8 @@ package store
 
 import (
 	"context"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const createSpec = `-- name: CreateSpec :one
@@ -16,10 +18,10 @@ RETURNING id, name, spec, created_by, created_at, archived_at
 `
 
 type CreateSpecParams struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Spec      []byte  `json:"spec"`
-	CreatedBy *string `json:"created_by"`
+	ID        types.SpecID `json:"id"`
+	Name      string       `json:"name"`
+	Spec      []byte       `json:"spec"`
+	CreatedBy *string      `json:"created_by"`
 }
 
 func (q *Queries) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error) {
@@ -47,7 +49,7 @@ FROM specs
 WHERE id = $1
 `
 
-func (q *Queries) GetSpec(ctx context.Context, id string) (Spec, error) {
+func (q *Queries) GetSpec(ctx context.Context, id types.SpecID) (Spec, error) {
 	row := q.db.QueryRow(ctx, getSpec, id)
 	var i Spec
 	err := row.Scan(

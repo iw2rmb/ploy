@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,11 +19,11 @@ RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at
 `
 
 type CreateModRepoParams struct {
-	ID        string `json:"id"`
-	ModID     string `json:"mod_id"`
-	RepoUrl   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	ID        types.ModRepoID `json:"id"`
+	ModID     types.ModID     `json:"mod_id"`
+	RepoUrl   string          `json:"repo_url"`
+	BaseRef   string          `json:"base_ref"`
+	TargetRef string          `json:"target_ref"`
 }
 
 func (q *Queries) CreateModRepo(ctx context.Context, arg CreateModRepoParams) (ModRepo, error) {
@@ -53,7 +54,7 @@ WHERE id = $1
 // Deletes a mod_repo by id.
 // Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 // This DELETE will fail if any run_repos/jobs rows still reference the repo.
-func (q *Queries) DeleteModRepo(ctx context.Context, id string) error {
+func (q *Queries) DeleteModRepo(ctx context.Context, id types.ModRepoID) error {
 	_, err := q.db.Exec(ctx, deleteModRepo, id)
 	return err
 }
@@ -64,7 +65,7 @@ FROM mod_repos
 WHERE id = $1
 `
 
-func (q *Queries) GetModRepo(ctx context.Context, id string) (ModRepo, error) {
+func (q *Queries) GetModRepo(ctx context.Context, id types.ModRepoID) (ModRepo, error) {
 	row := q.db.QueryRow(ctx, getModRepo, id)
 	var i ModRepo
 	err := row.Scan(
@@ -85,8 +86,8 @@ WHERE mod_id = $1 AND repo_url = $2
 `
 
 type GetModRepoByURLParams struct {
-	ModID   string `json:"mod_id"`
-	RepoUrl string `json:"repo_url"`
+	ModID   types.ModID `json:"mod_id"`
+	RepoUrl string      `json:"repo_url"`
 }
 
 // Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
@@ -113,7 +114,7 @@ SELECT EXISTS(
 // Checks if a mod_repo has any historical executions (run_repos references).
 // Returns true if the repo cannot be deleted due to history, false otherwise.
 // Deletion is refused if the repo has historical executions.
-func (q *Queries) HasModRepoHistory(ctx context.Context, repoID string) (bool, error) {
+func (q *Queries) HasModRepoHistory(ctx context.Context, repoID types.ModRepoID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasModRepoHistory, repoID)
 	var has_history bool
 	err := row.Scan(&has_history)
@@ -141,7 +142,7 @@ ORDER BY mr.repo_url ASC
 `
 
 type ListDistinctReposRow struct {
-	RepoID     string             `json:"repo_id"`
+	RepoID     types.ModRepoID    `json:"repo_id"`
 	RepoUrl    string             `json:"repo_url"`
 	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
 	LastStatus interface{}        `json:"last_status"`
@@ -180,7 +181,7 @@ WHERE mod_id = $1
 ORDER BY created_at ASC
 `
 
-func (q *Queries) ListModReposByMod(ctx context.Context, modID string) ([]ModRepo, error) {
+func (q *Queries) ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error) {
 	rows, err := q.db.Query(ctx, listModReposByMod, modID)
 	if err != nil {
 		return nil, err
@@ -215,9 +216,9 @@ WHERE id = $1
 `
 
 type UpdateModRepoRefsParams struct {
-	ID        string `json:"id"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	ID        types.ModRepoID `json:"id"`
+	BaseRef   string          `json:"base_ref"`
+	TargetRef string          `json:"target_ref"`
 }
 
 func (q *Queries) UpdateModRepoRefs(ctx context.Context, arg UpdateModRepoRefsParams) error {
@@ -236,11 +237,11 @@ RETURNING id, mod_id, repo_url, base_ref, target_ref, created_at
 `
 
 type UpsertModRepoParams struct {
-	ID        string `json:"id"`
-	ModID     string `json:"mod_id"`
-	RepoUrl   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
+	ID        types.ModRepoID `json:"id"`
+	ModID     types.ModID     `json:"mod_id"`
+	RepoUrl   string          `json:"repo_url"`
+	BaseRef   string          `json:"base_ref"`
+	TargetRef string          `json:"target_ref"`
 }
 
 // Bulk upsert a mod_repo by normalized repo_url.

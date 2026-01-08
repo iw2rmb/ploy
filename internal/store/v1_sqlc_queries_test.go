@@ -29,8 +29,8 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 
 	createdBy := "test-user"
 
-	modID1 := types.NewModID().String()
-	modName1 := "v1-sqlc-mod-alpha-" + modID1
+	modID1 := types.NewModID()
+	modName1 := "v1-sqlc-mod-alpha-" + modID1.String()
 	mod1, err := db.CreateMod(ctx, CreateModParams{
 		ID:        modID1,
 		Name:      modName1,
@@ -42,8 +42,8 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 	}
 	defer func() { _ = db.DeleteMod(ctx, mod1.ID) }()
 
-	modID2 := types.NewModID().String()
-	modName2 := "v1-sqlc-mod-beta-" + modID2
+	modID2 := types.NewModID()
+	modName2 := "v1-sqlc-mod-beta-" + modID2.String()
 	mod2, err := db.CreateMod(ctx, CreateModParams{
 		ID:        modID2,
 		Name:      modName2,
@@ -168,10 +168,10 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	defer db.Close()
 
 	createdBy := "test-user"
-	modID := types.NewModID().String()
+	modID := types.NewModID()
 	mod, err := db.CreateMod(ctx, CreateModParams{
 		ID:        modID,
-		Name:      "v1-sqlc-mod-repos-" + modID,
+		Name:      "v1-sqlc-mod-repos-" + modID.String(),
 		SpecID:    nil,
 		CreatedBy: &createdBy,
 	})
@@ -182,7 +182,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 
 	repoURL := "https://github.com/iw2rmb/ploy-test-repo.git"
 
-	repoID1 := types.NewModRepoID().String()
+	repoID1 := types.NewModRepoID()
 	inserted, err := db.UpsertModRepo(ctx, UpsertModRepoParams{
 		ID:        repoID1,
 		ModID:     mod.ID,
@@ -195,7 +195,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	}
 
 	// Conflict path: provide a different id but same (mod_id, repo_url). ID must remain stable.
-	repoID2 := types.NewModRepoID().String()
+	repoID2 := types.NewModRepoID()
 	updated, err := db.UpsertModRepo(ctx, UpsertModRepoParams{
 		ID:        repoID2,
 		ModID:     mod.ID,
@@ -258,7 +258,7 @@ func TestV1SQLCQueries_Specs(t *testing.T) {
 
 	createdBy := "test-user"
 
-	specID1 := types.NewSpecID().String()
+	specID1 := types.NewSpecID()
 	spec1, err := db.CreateSpec(ctx, CreateSpecParams{
 		ID:        specID1,
 		Name:      "v1-sqlc-spec-1",
@@ -270,7 +270,7 @@ func TestV1SQLCQueries_Specs(t *testing.T) {
 	}
 	defer func() { _, _ = db.Pool().Exec(ctx, "DELETE FROM specs WHERE id=$1", spec1.ID) }()
 
-	specID2 := types.NewSpecID().String()
+	specID2 := types.NewSpecID()
 	spec2, err := db.CreateSpec(ctx, CreateSpecParams{
 		ID:        specID2,
 		Name:      "v1-sqlc-spec-2",

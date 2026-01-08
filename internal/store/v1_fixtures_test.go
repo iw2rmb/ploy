@@ -20,7 +20,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 
 	createdBy := "test-user"
 
-	specID := types.NewSpecID().String()
+	specID := types.NewSpecID()
 	spec, err := db.CreateSpec(ctx, CreateSpecParams{
 		ID:        specID,
 		Name:      "test-spec",
@@ -31,10 +31,10 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := types.NewModID().String()
+	modID := types.NewModID()
 	mod, err := db.CreateMod(ctx, CreateModParams{
 		ID:        modID,
-		Name:      "test-mod-" + modID,
+		Name:      "test-mod-" + modID.String(),
 		SpecID:    &specID,
 		CreatedBy: &createdBy,
 	})
@@ -42,7 +42,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateMod() failed: %v", err)
 	}
 
-	modRepoID := types.NewModRepoID().String()
+	modRepoID := types.NewModRepoID()
 	modRepo, err := db.CreateModRepo(ctx, CreateModRepoParams{
 		ID:        modRepoID,
 		ModID:     modID,
@@ -54,7 +54,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateModRepo() failed: %v", err)
 	}
 
-	runID := types.NewRunID().String()
+	runID := types.NewRunID()
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        runID,
 		ModID:     modID,
