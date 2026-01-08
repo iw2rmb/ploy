@@ -175,36 +175,43 @@ WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
 ORDER BY step_index ASC;
 
 -- name: ScheduleNextJob :one
--- Promote the next job in a repo attempt: Created -> Queued.
-UPDATE jobs
-SET status = 'Queued'
-WHERE id = (
+-- Atomically promote the next job in a repo attempt: Created -> Queued.
+-- Uses FOR UPDATE SKIP LOCKED to prevent scheduler races:
+-- - Concurrent schedulers selecting the same row will skip it if locked
+-- - The status predicate ensures we only update rows still in 'Created' state
+WITH next_job AS (
   SELECT j.id
   FROM jobs j
   WHERE j.run_id = $1
     AND j.repo_id = $2
     AND j.attempt = $3
     AND j.status = 'Created'
-  ORDER BY j.step_index ASC
+  ORDER BY j.step_index ASC, j.id ASC
+  FOR UPDATE SKIP LOCKED
   LIMIT 1
 )
+UPDATE jobs
+SET status = 'Queued'
+FROM next_job
+WHERE jobs.id = next_job.id
+  AND jobs.status = 'Created'
 RETURNING
-  id,
-  run_id,
-  repo_id,
-  repo_base_ref,
-  attempt,
-  name,
-  status,
-  mod_type,
-  mod_image,
-  step_index,
-  node_id,
-  exit_code,
-  started_at,
-  finished_at,
-  duration_ms,
-  meta;
+  jobs.id,
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.repo_base_ref,
+  jobs.attempt,
+  jobs.name,
+  jobs.status,
+  jobs.mod_type,
+  jobs.mod_image,
+  jobs.step_index,
+  jobs.node_id,
+  jobs.exit_code,
+  jobs.started_at,
+  jobs.finished_at,
+  jobs.duration_ms,
+  jobs.meta;
 
 -- name: CountJobsByRun :one
 SELECT COUNT(*) FROM jobs
