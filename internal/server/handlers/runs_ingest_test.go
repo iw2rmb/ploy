@@ -29,7 +29,7 @@ func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParam
 }
 
 // GetJob returns an empty job for log enrichment (no-op for this test).
-func (m *mockStoreRunLogs) GetJob(_ context.Context, id string) (store.Job, error) {
+func (m *mockStoreRunLogs) GetJob(_ context.Context, id domaintypes.JobID) (store.Job, error) {
 	return store.Job{}, nil
 }
 
@@ -42,9 +42,10 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	}
 	h := createRunLogHandler(ms, eventsService)
 	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID().String()
+	jobID := domaintypes.NewJobID()
+	jobIDStr := jobID.String()
 	// Note: build_id removed; logs are now grouped at job level only.
-	payload := map[string]any{"job_id": jobID, "chunk_no": 2, "data": []byte("hello")}
+	payload := map[string]any{"job_id": jobIDStr, "chunk_no": 2, "data": []byte("hello")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/logs", bytes.NewReader(b))
 	req.SetPathValue("id", runID.String())
@@ -54,7 +55,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
 	}
-	if ms.lastCreate.RunID != runID.String() {
+	if ms.lastCreate.RunID != runID {
 		t.Fatalf("runID mismatch")
 	}
 }
@@ -89,10 +90,10 @@ type mockStoreRunDiffs struct {
 	created store.CreateDiffParams
 }
 
-func (m *mockStoreRunDiffs) GetJob(_ context.Context, id string) (store.Job, error) {
+func (m *mockStoreRunDiffs) GetJob(_ context.Context, id domaintypes.JobID) (store.Job, error) {
 	return m.job, nil
 }
-func (m *mockStoreRunDiffs) GetRun(_ context.Context, id string) (store.Run, error) {
+func (m *mockStoreRunDiffs) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
 	return m.run, nil
 }
 func (m *mockStoreRunDiffs) CreateDiff(_ context.Context, p store.CreateDiffParams) (store.Diff, error) {
@@ -104,8 +105,8 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	ms := &mockStoreRunDiffs{
-		job: store.Job{ID: jobID.String(), RunID: runID.String()},
-		run: store.Run{ID: runID.String()},
+		job: store.Job{ID: jobID, RunID: runID},
+		run: store.Run{ID: runID},
 	}
 	h := createRunDiffHandler(ms)
 	payload := map[string]any{"job_id": jobID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
@@ -128,10 +129,10 @@ type mockStoreRunArtifacts struct {
 	created store.CreateArtifactBundleParams
 }
 
-func (m *mockStoreRunArtifacts) GetJob(_ context.Context, id string) (store.Job, error) {
+func (m *mockStoreRunArtifacts) GetJob(_ context.Context, id domaintypes.JobID) (store.Job, error) {
 	return m.job, nil
 }
-func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id string) (store.Run, error) {
+func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
 	return m.run, nil
 }
 func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
@@ -152,10 +153,11 @@ func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.
 func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	ms := &mockStoreRunArtifacts{
-		job: store.Job{ID: jobID.String(), RunID: runID.String(), NodeID: &nodeID},
-		run: store.Run{ID: runID.String()},
+		job: store.Job{ID: jobID, RunID: runID, NodeID: &nodeID},
+		run: store.Run{ID: runID},
 	}
 	h := createJobArtifactHandler(ms)
 	payload := map[string]any{"name": "artifact-name", "bundle": []byte("gz-tar")}
@@ -164,7 +166,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusCreated {
@@ -185,7 +187,7 @@ type mockStoreRunArtifactsNotFound struct {
 	store.Store
 }
 
-func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id string) (store.Run, error) {
+func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
 	return store.Run{}, pgx.ErrNoRows
 }
 

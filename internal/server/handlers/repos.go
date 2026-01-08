@@ -74,7 +74,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoSummary, 0, len(repos))
 		for _, repo := range repos {
 			summary := RepoSummary{
-				RepoID:  repo.RepoID,
+				RepoID:  repo.RepoID.String(),
 				RepoURL: repo.RepoUrl,
 			}
 			// Include last run timing if available.
@@ -123,15 +123,16 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoID, err := requiredPathParam(r, "repo_id")
+		repoIDStr, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if repoID == "" {
+		if repoIDStr == "" {
 			http.Error(w, "repo_id cannot be empty", http.StatusBadRequest)
 			return
 		}
+		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		// Parse pagination parameters with defaults.
 		limit := int32(50)
@@ -175,8 +176,8 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoRunSummary, 0, len(runs))
 		for _, run := range runs {
 			summary := RepoRunSummary{
-				RunID:      domaintypes.RunID(run.RunID),
-				ModID:      run.ModID,
+				RunID:      run.RunID,
+				ModID:      run.ModID.String(),
 				RunStatus:  string(run.RunStatus),
 				RepoStatus: string(run.RepoStatus),
 				BaseRef:    run.RepoBaseRef,

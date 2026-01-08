@@ -21,22 +21,22 @@ import (
 func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -58,10 +58,10 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -85,22 +85,22 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -122,10 +122,10 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -150,22 +150,22 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -188,10 +188,10 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -212,22 +212,22 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -255,10 +255,10 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -290,22 +290,22 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -327,10 +327,10 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -359,22 +359,22 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1500,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -400,10 +400,10 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -433,22 +433,22 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -469,10 +469,10 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -497,22 +497,22 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 2000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -533,10 +533,10 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 

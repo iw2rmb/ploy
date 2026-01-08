@@ -57,18 +57,21 @@ type diffListResponse struct {
 func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter using the shared helper.
-		runID, err := requiredPathParam(r, "run_id")
+		runIDStr, err := requiredPathParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoID, err := requiredPathParam(r, "repo_id")
+		repoIDStr, err := requiredPathParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		runID := domaintypes.RunID(runIDStr)
+		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		// Optional download mode: serve the gzipped patch for a specific diff.
 		if r.URL.Query().Get("download") == "true" {
@@ -94,26 +97,26 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			// Ensure the diff belongs to this run.
-			if strings.TrimSpace(d.RunID) != runID {
+			if d.RunID != runID {
 				http.Error(w, "diff not found", http.StatusNotFound)
 				return
 			}
 			// Ensure the diff belongs to this repo via job attribution.
-			if d.JobID == nil || strings.TrimSpace(*d.JobID) == "" {
+			if d.JobID == nil || d.JobID.IsZero() {
 				http.Error(w, "diff not found", http.StatusNotFound)
 				return
 			}
-			job, err := st.GetJob(r.Context(), strings.TrimSpace(*d.JobID))
+			job, err := st.GetJob(r.Context(), *d.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					http.Error(w, "diff not found", http.StatusNotFound)
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to get diff job: %v", err), http.StatusInternalServerError)
-				slog.Error("download run repo diff: get job failed", "run_id", runID, "repo_id", repoID, "diff_id", diffIDStr, "job_id", *d.JobID, "err", err)
+				slog.Error("download run repo diff: get job failed", "run_id", runIDStr, "repo_id", repoIDStr, "diff_id", diffIDStr, "job_id", d.JobID.String(), "err", err)
 				return
 			}
-			if strings.TrimSpace(job.RepoID) != repoID {
+			if job.RepoID != repoID {
 				http.Error(w, "diff not found", http.StatusNotFound)
 				return
 			}
@@ -132,7 +135,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repo diffs: query failed", "run_id", runID, "repo_id", repoID, "err", err)
+			slog.Error("list run repo diffs: query failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
 			return
 		}
 
@@ -143,10 +146,9 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
-			// d.JobID is *string (KSUID-backed); convert to domaintypes.JobID.
 			var jobID domaintypes.JobID
-			if d.JobID != nil && *d.JobID != "" {
-				jobID = domaintypes.JobID(*d.JobID)
+			if d.JobID != nil && !d.JobID.IsZero() {
+				jobID = *d.JobID
 			}
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID

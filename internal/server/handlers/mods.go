@@ -61,7 +61,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 
 		// Create mod (create spec only after the mod row exists to avoid creating
 		// orphaned specs on mod-name collisions).
-		modID := domaintypes.NewModID().String()
+		modID := domaintypes.NewModID()
 		mod, err := st.CreateMod(r.Context(), store.CreateModParams{
 			ID:        modID,
 			Name:      name,
@@ -76,14 +76,14 @@ func createModHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to create mod: %v", err), http.StatusInternalServerError)
-			slog.Error("create mod: create mod failed", "mod_id", modID, "err", err)
+			slog.Error("create mod: create mod failed", "mod_id", modID.String(), "err", err)
 			return
 		}
 
 		// Create spec if provided and attach it to the mod.
 		var specIDPtr *string
 		if req.Spec != nil && len(*req.Spec) > 0 {
-			specID := domaintypes.NewSpecID().String()
+			specID := domaintypes.NewSpecID()
 			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
 				ID:        specID,
 				Name:      "",
@@ -92,15 +92,16 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
-				slog.Error("create mod: create spec failed", "mod_id", modID, "err", err)
+				slog.Error("create mod: create spec failed", "mod_id", modID.String(), "err", err)
 				return
 			}
 			if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
 				http.Error(w, fmt.Sprintf("failed to update mod spec: %v", err), http.StatusInternalServerError)
-				slog.Error("create mod: update spec failed", "mod_id", modID, "spec_id", createdSpec.ID, "err", err)
+				slog.Error("create mod: update spec failed", "mod_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
-			specIDPtr = &createdSpec.ID
+			s := createdSpec.ID.String()
+			specIDPtr = &s
 		}
 
 		// Build response
@@ -111,7 +112,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			CreatedBy *string `json:"created_by,omitempty"`
 			CreatedAt string  `json:"created_at"`
 		}{
-			ID:        mod.ID,
+			ID:        mod.ID.String(),
 			Name:      mod.Name,
 			SpecID:    specIDPtr,
 			CreatedBy: mod.CreatedBy,
@@ -124,13 +125,13 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			slog.Error("create mod: encode response failed", "err", err)
 		}
 
-		slog.Info("mod created", "mod_id", mod.ID, "name", mod.Name)
+		slog.Info("mod created", "mod_id", mod.ID.String(), "name", mod.Name)
 	}
 }
 
 func resolveModByRef(ctx context.Context, st store.Store, ref domaintypes.ModRef) (store.Mod, error) {
 	// Prefer direct ID lookup; fall back to exact name lookup.
-	mod, err := st.GetMod(ctx, ref.String())
+	mod, err := st.GetMod(ctx, domaintypes.ModID(ref.String()))
 	if err == nil {
 		return mod, nil
 	}
@@ -281,10 +282,15 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 
 	items := make([]modItem, 0, len(mods))
 	for _, mod := range mods {
+		var specIDStrPtr *string
+		if mod.SpecID != nil && !mod.SpecID.IsZero() {
+			s := mod.SpecID.String()
+			specIDStrPtr = &s
+		}
 		items = append(items, modItem{
-			ID:        mod.ID,
+			ID:        mod.ID.String(),
 			Name:      mod.Name,
-			SpecID:    mod.SpecID,
+			SpecID:    specIDStrPtr,
 			CreatedBy: mod.CreatedBy,
 			Archived:  mod.ArchivedAt.Valid,
 			CreatedAt: mod.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
@@ -358,7 +364,7 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func modHasAnyRuns(ctx context.Context, st store.Store, modID string) (bool, error) {
+func modHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.ModID) (bool, error) {
 	const pageLimit = int32(200)
 	pageOffset := int32(0)
 	for {
@@ -421,7 +427,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 				Name     string `json:"name"`
 				Archived bool   `json:"archived"`
 			}{
-				ID:       mod.ID,
+				ID:       mod.ID.String(),
 				Name:     mod.Name,
 				Archived: true,
 			}
@@ -455,7 +461,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 			Name     string `json:"name"`
 			Archived bool   `json:"archived"`
 		}{
-			ID:       mod.ID,
+			ID:       mod.ID.String(),
 			Name:     mod.Name,
 			Archived: true,
 		}
@@ -465,7 +471,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID string) (bool, error) {
+func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes.ModID) (bool, error) {
 	const pageLimit = int32(200)
 	pageOffset := int32(0)
 	for {
@@ -559,7 +565,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Create new spec row (append-only).
-		specID := domaintypes.NewSpecID().String()
+		specID := domaintypes.NewSpecID()
 		createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
 			ID:        specID,
 			Name:      req.Name,
@@ -584,7 +590,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			ID        string `json:"id"`
 			CreatedAt string `json:"created_at"`
 		}{
-			ID:        createdSpec.ID,
+			ID:        createdSpec.ID.String(),
 			CreatedAt: createdSpec.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
@@ -594,7 +600,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			slog.Error("set mod spec: encode response failed", "err", err)
 		}
 
-		slog.Info("mod spec set", "mod_id", modID, "spec_id", createdSpec.ID)
+		slog.Info("mod spec set", "mod_id", modID, "spec_id", createdSpec.ID.String())
 	}
 }
 
@@ -640,7 +646,7 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 				Name     string `json:"name"`
 				Archived bool   `json:"archived"`
 			}{
-				ID:       mod.ID,
+				ID:       mod.ID.String(),
 				Name:     mod.Name,
 				Archived: false,
 			}
@@ -662,7 +668,7 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 			Name     string `json:"name"`
 			Archived bool   `json:"archived"`
 		}{
-			ID:       mod.ID,
+			ID:       mod.ID.String(),
 			Name:     mod.Name,
 			Archived: false,
 		}

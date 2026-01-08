@@ -29,8 +29,8 @@ import (
 func maybeUpdateRunRepoStatus(
 	ctx context.Context,
 	st store.Store,
-	runID string,
-	repoID string,
+	runID domaintypes.RunID,
+	repoID domaintypes.ModRepoID,
 	attempt int32,
 ) (bool, error) {
 	// Count jobs by status for this repo attempt, excluding MR jobs.
@@ -129,7 +129,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		return nil
 	}
 
-	counts, err := st.CountRunReposByStatus(ctx, runID.String())
+	counts, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
 		return fmt.Errorf("count run repos: %w", err)
 	}
@@ -158,13 +158,13 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		return nil
 	}
 
-	if err := st.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: runID.String(), Status: store.RunStatusFinished}); err != nil {
+	if err := st.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: runID, Status: store.RunStatusFinished}); err != nil {
 		return fmt.Errorf("update run status: %w", err)
 	}
 
 	if eventsService != nil {
 		repoURL := ""
-		if repos, err := st.ListRunReposByRun(ctx, runID.String()); err == nil && len(repos) > 0 {
+		if repos, err := st.ListRunReposByRun(ctx, runID); err == nil && len(repos) > 0 {
 			if mr, err := st.GetModRepo(ctx, repos[0].RepoID); err == nil {
 				repoURL = mr.RepoUrl
 			}

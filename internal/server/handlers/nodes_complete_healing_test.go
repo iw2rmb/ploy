@@ -13,9 +13,9 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
@@ -38,7 +38,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 		getSpecResult: store.Spec{ID: specID, Spec: specBytes},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -50,7 +50,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Meta:        []byte(`{}`),
 			},
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -109,9 +109,9 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
@@ -135,7 +135,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 		getSpecResult: store.Spec{ID: specID, Spec: specBytes},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -147,7 +147,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Meta:        []byte(`{}`),
 			},
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -159,7 +159,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Meta:        []byte(`{}`),
 			},
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -167,11 +167,11 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				ModType:     domaintypes.ModTypeReGate.String(),
-				StepIndex:   reGateStepIndex,
+				StepIndex:   domaintypes.StepIndex(reGateStepIndex),
 				Meta:        []byte(`{}`),
 			},
 			{
-				ID:          domaintypes.NewJobID().String(),
+				ID:          domaintypes.NewJobID(),
 				RunID:       runID,
 				RepoID:      repoID,
 				RepoBaseRef: "main",
@@ -221,7 +221,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 		},
 	}
 
-	run := store.Run{ID: runID.String(), Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, Status: store.RunStatusStarted}
 	if err := maybeCompleteMultiStepRun(ctx, st, nil, run, runID); err != nil {
 		t.Fatalf("maybeCompleteMultiStepRun returned error: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	if !st.updateRunStatusCalled {
 		t.Fatalf("expected UpdateRunStatus to be called")
 	}
-	if st.updateRunStatusParams.ID != runID.String() || st.updateRunStatusParams.Status != store.RunStatusFinished {
+	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusFinished {
 		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
 	}
 }

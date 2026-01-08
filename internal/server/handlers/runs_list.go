@@ -69,7 +69,7 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runIDStr)
+		run, err := st.GetRun(r.Context(), domaintypes.RunID(runIDStr))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)

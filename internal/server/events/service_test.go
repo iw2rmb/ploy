@@ -112,7 +112,7 @@ type mockStore struct {
 	store.Querier
 	createEventFunc func(ctx context.Context, arg store.CreateEventParams) (store.Event, error)
 	createLogFunc   func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
-	getJobFunc      func(ctx context.Context, id string) (store.Job, error)
+	getJobFunc      func(ctx context.Context, id domaintypes.JobID) (store.Job, error)
 }
 
 func (m *mockStore) CreateEvent(ctx context.Context, arg store.CreateEventParams) (store.Event, error) {
@@ -130,7 +130,7 @@ func (m *mockStore) CreateLog(ctx context.Context, arg store.CreateLogParams) (s
 }
 
 // GetJob returns job metadata for log enrichment.
-func (m *mockStore) GetJob(ctx context.Context, id string) (store.Job, error) {
+func (m *mockStore) GetJob(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 	if m.getJobFunc != nil {
 		return m.getJobFunc(ctx, id)
 	}
@@ -147,7 +147,7 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 // database and published to the SSE hub. It tests successful creation, database
 // errors, and invalid run ID handling.
 func TestStorage_CreateAndPublishEvent(t *testing.T) {
-	runID := "run-events-123"
+	runID := domaintypes.RunID("run-events-123")
 
 	tests := []struct {
 		name        string
@@ -205,7 +205,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			},
 			params: store.CreateEventParams{
 				// Whitespace-only run ID is treated as invalid for SSE stream.
-				RunID:   "   ",
+				RunID:   domaintypes.RunID("   "),
 				Level:   "warn",
 				Message: "invalid run id event",
 			},
@@ -246,7 +246,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 
 			// Check if event was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID)
+				streamID := strings.TrimSpace(tt.params.RunID.String())
 				snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
@@ -264,7 +264,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 // empty levels default to "info". This ensures consistent level representation
 // in both database storage and SSE streams.
 func TestStorage_LevelNormalization(t *testing.T) {
-	runID := "run-level-normalization"
+	runID := domaintypes.RunID("run-level-normalization")
 
 	type testCase struct {
 		inLevel   string
@@ -324,7 +324,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			}
 
 			// Verify SSE stream used normalized level in LogRecord.Stream
-			streamID := strings.TrimSpace(params.RunID)
+			streamID := strings.TrimSpace(params.RunID.String())
 			snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
@@ -347,7 +347,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 // the database and published to the SSE hub. It tests successful creation,
 // database errors, and invalid run ID handling for log records.
 func TestStorage_CreateAndPublishLog(t *testing.T) {
-	runID := "run-logs-123"
+	runID := domaintypes.RunID("run-logs-123")
 
 	tests := []struct {
 		name        string
@@ -401,7 +401,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				}, nil
 			},
 			params: store.CreateLogParams{
-				RunID:   "   ",
+				RunID:   domaintypes.RunID("   "),
 				ChunkNo: 3,
 				Data:    []byte("invalid run id log"),
 			},
@@ -442,7 +442,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 
 			// Check if log was published to hub.
 			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.params.RunID)
+				streamID := strings.TrimSpace(tt.params.RunID.String())
 				snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 				if len(snapshot) == 0 {
 					t.Fatal("expected log event in hub snapshot, got none")
@@ -504,9 +504,9 @@ func gzipData(t *testing.T, data string) []byte {
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	t.Parallel()
 
-	runID := "run-log-enrich-123"
-	jobID := "job-log-enrich-123"
-	nodeID := "node-log-enrich-123"
+	runID := domaintypes.RunID("run-log-enrich-123")
+	jobID := domaintypes.JobID("job-log-enrich-123")
+	nodeID := domaintypes.NodeID("node-log-enrich-123")
 
 	// Create log data (gzipped, since that's how logs come from nodes).
 	logLine := "Build step completed successfully\n"
@@ -525,7 +525,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 			}, nil
 		},
 		// GetJob returns job metadata for enrichment.
-		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			if id != jobID {
 				t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
 			}
@@ -563,7 +563,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	// Verify SSE event contains enriched fields.
-	streamID := strings.TrimSpace(runID)
+	streamID := strings.TrimSpace(runID.String())
 	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
@@ -580,10 +580,10 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 
 	// Verify enriched fields are present.
 	// Compare as domain types (LogRecord fields are now NodeID/JobID domain types).
-	if rec.NodeID != domaintypes.NodeID(nodeID) {
+	if rec.NodeID != nodeID {
 		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
 	}
-	if rec.JobID != domaintypes.JobID(jobID) {
+	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
 	if rec.ModType != "mod" {
@@ -600,9 +600,9 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	t.Parallel()
 
-	runID := "run-logrecord-123"
-	jobID := "job-logrecord-123"
-	nodeID := "node-logrecord-123"
+	runID := domaintypes.RunID("run-logrecord-123")
+	jobID := domaintypes.JobID("job-logrecord-123")
+	nodeID := domaintypes.NodeID("node-logrecord-123")
 
 	logLine := "hello\n"
 	gzippedLog := gzipData(t, logLine)
@@ -618,7 +618,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			}, nil
 		},
-		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{
 				ID:        jobID,
 				RunID:     runID,
@@ -646,7 +646,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	snapshot := svc.Hub().Snapshot(domaintypes.RunID(strings.TrimSpace(runID)))
+	snapshot := svc.Hub().Snapshot(domaintypes.RunID(strings.TrimSpace(runID.String())))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
 	}
@@ -658,10 +658,10 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
 		t.Fatalf("failed to unmarshal log record: %v", err)
 	}
-	if rec.NodeID != domaintypes.NodeID(nodeID) {
+	if rec.NodeID != nodeID {
 		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
 	}
-	if rec.JobID != domaintypes.JobID(jobID) {
+	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
 	if rec.ModType != domaintypes.ModTypePreGate {
@@ -677,7 +677,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	t.Parallel()
 
-	runID := "run-log-no-job"
+	runID := domaintypes.RunID("run-log-no-job")
 
 	logLine := "System log without job context\n"
 	gzippedLog := gzipData(t, logLine)
@@ -693,7 +693,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			}, nil
 		},
-		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			getJobCalled = true
 			return store.Job{}, nil
 		},
@@ -727,7 +727,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 
 	// Verify log was still published (without enrichment).
-	streamID := strings.TrimSpace(runID)
+	streamID := strings.TrimSpace(runID.String())
 	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
@@ -758,8 +758,8 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	t.Parallel()
 
-	runID := "run-log-lookup-fail"
-	jobID := "job-log-lookup-fail"
+	runID := domaintypes.RunID("run-log-lookup-fail")
+	jobID := domaintypes.JobID("job-log-lookup-fail")
 
 	logLine := "Log with failing job lookup\n"
 	gzippedLog := gzipData(t, logLine)
@@ -775,7 +775,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 			}, nil
 		},
 		// Simulate job lookup failure.
-		getJobFunc: func(ctx context.Context, id string) (store.Job, error) {
+		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{}, context.DeadlineExceeded
 		},
 	}
@@ -804,7 +804,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	}
 
 	// Verify log was published (without enrichment due to lookup failure).
-	streamID := strings.TrimSpace(runID)
+	streamID := strings.TrimSpace(runID.String())
 	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -23,7 +24,7 @@ import (
 // creates a run with all repos from the mod's repo set.
 // Tests multi-repo run creation with repo_selector mode.
 func TestModRuns_Create_AllRepos(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -96,7 +97,7 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 // only selects repos whose last terminal status is 'Fail'.
 // Tests failed repo selection using last terminal run_repos status.
 func TestModRuns_Create_FailedRepos(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -114,7 +115,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 			{ID: "repo3", ModID: "mod123", RepoUrl: "https://github.com/org/repo3", BaseRef: "main", TargetRef: "feature3"},
 		},
 		// Only repo2 has a failed last status.
-		listFailedRepoIDsByModResult: []string{"repo2"},
+		listFailedRepoIDsByModResult: []domaintypes.ModRepoID{"repo2"},
 	}
 	handler := createModRunHandler(st)
 
@@ -166,7 +167,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 // only selects repos matching the provided repo URLs.
 // Tests explicit repo selection by normalized URL matching.
 func TestModRuns_Create_ExplicitRepos(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -228,7 +229,7 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 
 // TestModRuns_Create_WithCreatedBy verifies POST /v1/mods/{mod_id}/runs passes created_by to store.
 func TestModRuns_Create_WithCreatedBy(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -275,7 +276,7 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 // and immediately claimable (v1 job queueing rules).
 // Scope: ROADMAP.md:342 — "first job is claimable".
 func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -417,7 +418,7 @@ func TestModRuns_Create_ModNotFound(t *testing.T) {
 // TestModRuns_Create_ArchivedMod verifies POST /v1/mods/{mod_id}/runs rejects archived mods.
 // Archived mods cannot be executed.
 func TestModRuns_Create_ArchivedMod(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -482,7 +483,7 @@ func TestModRuns_Create_NoSpec(t *testing.T) {
 // TestModRuns_Create_NoReposSelected verifies POST /v1/mods/{mod_id}/runs returns error
 // when no repos are selected (e.g., "failed" mode with no failed repos).
 func TestModRuns_Create_NoReposSelected(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -498,7 +499,7 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 			{ID: "repo1", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		// No failed repos.
-		listFailedRepoIDsByModResult: []string{},
+		listFailedRepoIDsByModResult: []domaintypes.ModRepoID{},
 	}
 	handler := createModRunHandler(st)
 
@@ -570,7 +571,7 @@ func TestModRuns_Create_GetModError(t *testing.T) {
 
 // TestModRuns_Create_GetSpecError verifies POST /v1/mods/{mod_id}/runs returns 500 on GetSpec failure.
 func TestModRuns_Create_GetSpecError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -603,7 +604,7 @@ func TestModRuns_Create_GetSpecError(t *testing.T) {
 
 // TestModRuns_Create_ListModReposError verifies POST /v1/mods/{mod_id}/runs returns 500 on ListModReposByMod failure.
 func TestModRuns_Create_ListModReposError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -640,7 +641,7 @@ func TestModRuns_Create_ListModReposError(t *testing.T) {
 
 // TestModRuns_Create_CreateRunError verifies POST /v1/mods/{mod_id}/runs returns 500 on CreateRun failure.
 func TestModRuns_Create_CreateRunError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -680,7 +681,7 @@ func TestModRuns_Create_CreateRunError(t *testing.T) {
 
 // TestModRuns_Create_CreateRunRepoError verifies POST /v1/mods/{mod_id}/runs returns 500 on CreateRunRepo failure.
 func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -720,7 +721,7 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 
 // TestModRuns_Create_CreateJobError verifies POST /v1/mods/{mod_id}/runs returns 500 on CreateJob failure.
 func TestModRuns_Create_CreateJobError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",
@@ -760,7 +761,7 @@ func TestModRuns_Create_CreateJobError(t *testing.T) {
 
 // TestModRuns_Create_ListFailedReposError verifies POST /v1/mods/{mod_id}/runs returns 500 on ListFailedRepoIDsByMod failure.
 func TestModRuns_Create_ListFailedReposError(t *testing.T) {
-	specID := "spec123"
+	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mod{
 			ID:         "mod123",

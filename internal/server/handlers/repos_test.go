@@ -212,8 +212,8 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if !st.listRunsForRepoCalled {
 		t.Fatalf("expected ListRunsForRepo to be called")
 	}
-	if st.listRunsForRepoParams.RepoID != repoID {
-		t.Fatalf("expected repo_id %q, got %q", repoID, st.listRunsForRepoParams.RepoID)
+	if st.listRunsForRepoParams.RepoID.String() != repoID {
+		t.Fatalf("expected repo_id %q, got %q", repoID, st.listRunsForRepoParams.RepoID.String())
 	}
 	if st.listRunsForRepoParams.Limit != 50 {
 		t.Fatalf("expected default limit 50, got %d", st.listRunsForRepoParams.Limit)

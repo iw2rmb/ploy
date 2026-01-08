@@ -395,7 +395,7 @@ type mockStore struct {
 	// ListFailedRepoIDsByMod tracking (for "failed" repo selection)
 	listFailedRepoIDsByModCalled bool
 	listFailedRepoIDsByModParam  string
-	listFailedRepoIDsByModResult []string
+	listFailedRepoIDsByModResult []types.ModRepoID
 	listFailedRepoIDsByModErr    error
 
 	// ListRunReposWithURLByRun tracking (for pull resolution)
@@ -469,7 +469,7 @@ func (m *mockStore) CreateSpec(ctx context.Context, params store.CreateSpecParam
 	m.createSpecParams = params
 
 	result := m.createSpecResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
 	if result.Spec == nil {
@@ -484,7 +484,7 @@ func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams)
 	m.createModParams = params
 
 	result := m.createModResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
 	if result.Name == "" {
@@ -516,18 +516,18 @@ func (m *mockStore) ListMods(ctx context.Context, params store.ListModsParams) (
 	return m.listModsResult[params.Offset:end], m.listModsErr
 }
 
-func (m *mockStore) GetMod(ctx context.Context, id string) (store.Mod, error) {
+func (m *mockStore) GetMod(ctx context.Context, id types.ModID) (store.Mod, error) {
 	m.getModCalled = true
-	m.getModParam = id
+	m.getModParam = id.String()
 	if m.getModErr != nil {
 		return store.Mod{}, m.getModErr
 	}
 	result := m.getModResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = id
 	}
 	if result.Name == "" {
-		result.Name = "mod-" + id
+		result.Name = "mod-" + id.String()
 	}
 	return result, nil
 }
@@ -541,7 +541,7 @@ func (m *mockStore) GetModByName(ctx context.Context, name string) (store.Mod, e
 
 	// Default behavior: not found unless explicitly configured.
 	result := m.getModByNameResult
-	if result.ID == "" && result.Name == "" {
+	if result.ID.IsZero() && result.Name == "" {
 		return store.Mod{}, pgx.ErrNoRows
 	}
 	if result.Name == "" {
@@ -550,21 +550,21 @@ func (m *mockStore) GetModByName(ctx context.Context, name string) (store.Mod, e
 	return result, nil
 }
 
-func (m *mockStore) DeleteMod(ctx context.Context, id string) error {
+func (m *mockStore) DeleteMod(ctx context.Context, id types.ModID) error {
 	m.deleteModCalled = true
-	m.deleteModParam = id
+	m.deleteModParam = id.String()
 	return m.deleteModErr
 }
 
-func (m *mockStore) ArchiveMod(ctx context.Context, id string) error {
+func (m *mockStore) ArchiveMod(ctx context.Context, id types.ModID) error {
 	m.archiveModCalled = true
-	m.archiveModParam = id
+	m.archiveModParam = id.String()
 	return m.archiveModErr
 }
 
-func (m *mockStore) UnarchiveMod(ctx context.Context, id string) error {
+func (m *mockStore) UnarchiveMod(ctx context.Context, id types.ModID) error {
 	m.unarchiveModCalled = true
-	m.unarchiveModParam = id
+	m.unarchiveModParam = id.String()
 	return m.unarchiveModErr
 }
 
@@ -573,10 +573,10 @@ func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRep
 	m.createModRepoParams = params
 
 	result := m.createModRepoResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
-	if result.ModID == "" {
+	if result.ModID.IsZero() {
 		result.ModID = params.ModID
 	}
 	if result.RepoUrl == "" {
@@ -591,17 +591,18 @@ func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRep
 	return result, m.createModRepoErr
 }
 
-func (m *mockStore) GetModRepo(ctx context.Context, id string) (store.ModRepo, error) {
+func (m *mockStore) GetModRepo(ctx context.Context, id types.ModRepoID) (store.ModRepo, error) {
 	m.getModRepoCalled = true
-	m.getModRepoParam = id
+	m.getModRepoParam = id.String()
 	return m.getModRepoResult, m.getModRepoErr
 }
 
-func (m *mockStore) ListModReposByMod(ctx context.Context, modID string) ([]store.ModRepo, error) {
+func (m *mockStore) ListModReposByMod(ctx context.Context, modID types.ModID) ([]store.ModRepo, error) {
 	m.listModReposByModCalled = true
-	m.listModReposByModParam = modID
+	modIDStr := modID.String()
+	m.listModReposByModParam = modIDStr
 	if m.listModReposByModResults != nil {
-		if repos, ok := m.listModReposByModResults[modID]; ok {
+		if repos, ok := m.listModReposByModResults[modIDStr]; ok {
 			return repos, m.listModReposByModErr
 		}
 	}
@@ -632,34 +633,34 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 		return m.createRunResults[idx], err
 	}
 	result := m.createRunResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
-	if result.ModID == "" {
+	if result.ModID.IsZero() {
 		result.ModID = params.ModID
 	}
-	if result.SpecID == "" {
+	if result.SpecID.IsZero() {
 		result.SpecID = params.SpecID
 	}
 	result.CreatedBy = params.CreatedBy
 	return result, err
 }
 
-func (m *mockStore) GetRun(ctx context.Context, id string) (store.Run, error) {
+func (m *mockStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
 	m.getRunCalled = true
-	m.getRunParams = id
+	m.getRunParams = id.String()
 	return m.getRunResult, m.getRunErr
 }
 
-func (m *mockStore) GetSpec(ctx context.Context, id string) (store.Spec, error) {
+func (m *mockStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
 	m.getSpecCalled = true
-	m.getSpecParam = id
+	m.getSpecParam = id.String()
 	return m.getSpecResult, m.getSpecErr
 }
 
-func (m *mockStore) GetRunTiming(ctx context.Context, id string) (store.RunsTiming, error) {
+func (m *mockStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {
 	m.getRunTimingCalled = true
-	m.getRunTimingParams = id
+	m.getRunTimingParams = id.String()
 	return m.getRunTimingResult, m.getRunTimingErr
 }
 
@@ -669,9 +670,9 @@ func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimin
 	return m.listRunsTimingsResult, m.listRunsTimingsErr
 }
 
-func (m *mockStore) DeleteRun(ctx context.Context, id string) error {
+func (m *mockStore) DeleteRun(ctx context.Context, id types.RunID) error {
 	m.deleteRunCalled = true
-	m.deleteRunParams = id
+	m.deleteRunParams = id.String()
 	return m.deleteRunErr
 }
 
@@ -692,15 +693,15 @@ func (m *mockStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Jo
 	if m.claimJobErr != nil {
 		return store.Job{}, m.claimJobErr
 	}
-	if m.claimJobResult.ID == "" {
+	if m.claimJobResult.ID.IsZero() {
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.claimJobResult, nil
 }
 
-func (m *mockStore) GetNode(ctx context.Context, id string) (store.Node, error) {
+func (m *mockStore) GetNode(ctx context.Context, id types.NodeID) (store.Node, error) {
 	m.getNodeCalled = true
-	m.getNodeParams = id
+	m.getNodeParams = id.String()
 	return m.getNodeResult, m.getNodeErr
 }
 
@@ -716,9 +717,9 @@ func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventPar
 	return m.createEventResult, m.createEventErr
 }
 
-func (m *mockStore) GetJob(ctx context.Context, id string) (store.Job, error) {
+func (m *mockStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
 	m.getJobCalled = true
-	m.getJobParams = id
+	m.getJobParams = id.String()
 	return m.getJobResult, m.getJobErr
 }
 
@@ -752,9 +753,9 @@ func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunS
 	return m.updateRunStatusErr
 }
 
-func (m *mockStore) UpdateRunResume(ctx context.Context, id string) error {
+func (m *mockStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
 	m.updateRunResumeCalled = true
-	m.updateRunResumeParam = id
+	m.updateRunResumeParam = id.String()
 	return m.updateRunResumeErr
 }
 
@@ -781,9 +782,9 @@ func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) (
 	return m.listArtifactBundlesByCIDResult, m.listArtifactBundlesByCIDErr
 }
 
-func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID string) ([]store.ArtifactBundle, error) {
+func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
 	m.listArtifactBundlesByRunCalled = true
-	m.listArtifactBundlesByRunParam = runID
+	m.listArtifactBundlesByRunParam = runID.String()
 	return m.listArtifactBundlesByRunResult, m.listArtifactBundlesByRunErr
 }
 
@@ -807,9 +808,9 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 
 	// Build a result job for this call.
 	result := m.createJobResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		// Provide a default job id when not preset by the test.
-		result.ID = types.NewJobID().String()
+		result.ID = types.NewJobID()
 	}
 	result.RunID = params.RunID
 	result.Name = params.Name
@@ -820,9 +821,9 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 	return result, m.createJobErr
 }
 
-func (m *mockStore) ListJobsByRun(ctx context.Context, runID string) ([]store.Job, error) {
+func (m *mockStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
 	m.listJobsByRunCalled = true
-	m.listJobsByRunParam = runID
+	m.listJobsByRunParam = runID.String()
 
 	// Return a copy with updated status from UpdateJobCompletion applied.
 	// This ensures maybeCompleteMultiStepRun sees the correct job statuses.
@@ -843,9 +844,9 @@ func (m *mockStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.List
 	return m.listJobsByRunRepoAttemptResult, m.listJobsByRunRepoAttemptErr
 }
 
-func (m *mockStore) CountJobsByRun(ctx context.Context, runID string) (int64, error) {
+func (m *mockStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
 	m.countJobsByRunCalled = true
-	m.countJobsByRunParam = runID
+	m.countJobsByRunParam = runID.String()
 	if m.countJobsByRunErr != nil {
 		return 0, m.countJobsByRunErr
 	}
@@ -914,7 +915,7 @@ func (m *mockStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJ
 		return store.Job{}, m.scheduleNextJobErr
 	}
 	// Return no rows by default if no result configured.
-	if m.scheduleNextJobResult.ID == "" {
+	if m.scheduleNextJobResult.ID.IsZero() {
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.scheduleNextJobResult, nil
@@ -1021,16 +1022,16 @@ func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) (
 }
 
 // ListRunReposByRun — run IDs are now strings (KSUID).
-func (m *mockStore) ListRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
+func (m *mockStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
 	m.listRunReposByRunCalled = true
-	m.listRunReposByRunParam = runID
+	m.listRunReposByRunParam = runID.String()
 	return m.listRunReposByRunResult, m.listRunReposByRunErr
 }
 
 // CountRunReposByStatus — run IDs are now strings (KSUID).
-func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID string) ([]store.CountRunReposByStatusRow, error) {
+func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
 	m.countRunReposByStatusCalled = true
-	m.countRunReposByStatusParam = runID
+	m.countRunReposByStatusParam = runID.String()
 	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
 }
 
@@ -1050,13 +1051,13 @@ func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRep
 	m.createRunRepoCalled = true
 	m.createRunRepoParams = params
 	result := m.createRunRepoResult
-	if result.ModID == "" {
+	if result.ModID.IsZero() {
 		result.ModID = params.ModID
 	}
-	if result.RunID == "" {
+	if result.RunID.IsZero() {
 		result.RunID = params.RunID
 	}
-	if result.RepoID == "" {
+	if result.RepoID.IsZero() {
 		result.RepoID = params.RepoID
 	}
 	if result.RepoBaseRef == "" {
@@ -1089,9 +1090,9 @@ func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, arg store.Incre
 }
 
 // ListQueuedRunReposByRun — run IDs are now strings (KSUID).
-func (m *mockStore) ListQueuedRunReposByRun(ctx context.Context, runID string) ([]store.RunRepo, error) {
+func (m *mockStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
 	m.listQueuedRunReposByRunCalled = true
-	m.listQueuedRunReposByRunParam = runID
+	m.listQueuedRunReposByRunParam = runID.String()
 	return m.listQueuedRunReposByRunResult, m.listQueuedRunReposByRunErr
 }
 
@@ -1146,10 +1147,10 @@ func (m *mockStore) UpsertModRepo(ctx context.Context, arg store.UpsertModRepoPa
 	m.upsertModRepoCalled = true
 	m.upsertModRepoParams = arg
 	result := m.upsertModRepoResult
-	if result.ID == "" {
+	if result.ID.IsZero() {
 		result.ID = arg.ID
 	}
-	if result.ModID == "" {
+	if result.ModID.IsZero() {
 		result.ModID = arg.ModID
 	}
 	if result.RepoUrl == "" {
@@ -1165,30 +1166,30 @@ func (m *mockStore) UpsertModRepo(ctx context.Context, arg store.UpsertModRepoPa
 }
 
 // DeleteModRepo deletes a mod_repo by id.
-func (m *mockStore) DeleteModRepo(ctx context.Context, id string) error {
+func (m *mockStore) DeleteModRepo(ctx context.Context, id types.ModRepoID) error {
 	m.deleteModRepoCalled = true
-	m.deleteModRepoParam = id
+	m.deleteModRepoParam = id.String()
 	return m.deleteModRepoErr
 }
 
 // HasModRepoHistory checks if a mod_repo has any historical executions.
-func (m *mockStore) HasModRepoHistory(ctx context.Context, repoID string) (bool, error) {
+func (m *mockStore) HasModRepoHistory(ctx context.Context, repoID types.ModRepoID) (bool, error) {
 	m.hasModRepoHistoryCalled = true
-	m.hasModRepoHistoryParam = repoID
+	m.hasModRepoHistoryParam = repoID.String()
 	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
 }
 
 // ListFailedRepoIDsByMod returns repo IDs whose last terminal status is 'Fail'.
-func (m *mockStore) ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error) {
+func (m *mockStore) ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error) {
 	m.listFailedRepoIDsByModCalled = true
-	m.listFailedRepoIDsByModParam = modID
+	m.listFailedRepoIDsByModParam = modID.String()
 	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
 }
 
 // ListRunReposWithURLByRun returns run repos with their repo_url for pull resolution.
-func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID string) ([]store.ListRunReposWithURLByRunRow, error) {
+func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
 	m.listRunReposWithURLByRunCalled = true
-	m.listRunReposWithURLByRunParam = runID
+	m.listRunReposWithURLByRunParam = runID.String()
 	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
 }
 

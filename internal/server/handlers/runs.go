@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -32,9 +33,8 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Get timing data from the database using string ID directly.
-		// No UUID parsing needed; store accepts KSUID strings.
-		timing, err := st.GetRunTiming(r.Context(), runIDStr)
+		runID := domaintypes.RunID(runIDStr)
+		timing, err := st.GetRunTiming(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -51,7 +51,7 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 			QueueMs int64  `json:"queue_ms"`
 			RunMs   int64  `json:"run_ms"`
 		}{
-			ID:      timing.ID,
+			ID:      timing.ID.String(),
 			QueueMs: timing.QueueMs,
 			RunMs:   timing.RunMs,
 		}
@@ -81,7 +81,8 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 
 		// Check if the run exists before attempting to delete.
 		// No UUID parsing needed; store accepts KSUID strings.
-		_, err = st.GetRun(r.Context(), runIDStr)
+		runID := domaintypes.RunID(runIDStr)
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -93,7 +94,7 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Delete the run using string ID directly.
-		err = st.DeleteRun(r.Context(), runIDStr)
+		err = st.DeleteRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to delete run: %v", err), http.StatusInternalServerError)
 			slog.Error("delete run: database error", "run_id", runIDStr, "err", err)

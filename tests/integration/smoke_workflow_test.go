@@ -25,7 +25,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	createdBy := "smoke-test"
 
-	specID := domaintypes.NewSpecID().String()
+	specID := domaintypes.NewSpecID()
 	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
 		ID:        specID,
 		Name:      "smoke-workflow",
@@ -36,10 +36,10 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewModID()
 	mod, err := db.CreateMod(ctx, store.CreateModParams{
 		ID:        modID,
-		Name:      "smoke-" + modID,
+		Name:      "smoke-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -47,7 +47,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 		t.Fatalf("CreateMod() failed: %v", err)
 	}
 
-	modRepoID := domaintypes.NewModRepoID().String()
+	modRepoID := domaintypes.NewModRepoID()
 	modRepo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
 		ID:        modRepoID,
 		ModID:     modID,
@@ -59,7 +59,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 		t.Fatalf("CreateModRepo() failed: %v", err)
 	}
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
 		ModID:     modID,
@@ -72,8 +72,8 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
 		ModID:         modID,
-		RunID:         runID,
-		RepoID:        modRepoID,
+		RunID:         run.ID,
+		RepoID:        modRepo.ID,
 		RepoBaseRef:   baseRef,
 		RepoTargetRef: targetRef,
 	})
@@ -136,7 +136,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Step 2: Create multiple jobs representing the workflow phases.
 	// Stage 1: Build Gate (pre-validation)
 	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,
@@ -155,7 +155,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 2: Main mod execution
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,
@@ -174,7 +174,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 
 	// Stage 3: Post-processing (e.g., artifact upload)
 	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,
@@ -478,7 +478,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create jobs for step 0 and step 1 so ListDiffsBeforeStep can filter by jobs.step_index.
 	jobStep0, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,
@@ -496,7 +496,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 0 job: id=%v", jobStep0.ID)
 
 	jobStep1, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,

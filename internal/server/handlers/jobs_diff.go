@@ -76,8 +76,11 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the run exists. Run IDs are KSUID strings.
-		_, err = st.GetRun(r.Context(), runIDStr)
+		runID := domaintypes.RunID(runIDStr)
+		jobID := domaintypes.JobID(jobIDStr)
+
+		// Check if the run exists.
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -88,8 +91,8 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the job exists. Job IDs are KSUID strings.
-		job, err := st.GetJob(r.Context(), jobIDStr)
+		// Check if the job exists.
+		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -101,20 +104,18 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the job belongs to the provided run.
-		if job.RunID != runIDStr {
+		if job.RunID != runID {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
-		// Node IDs are now NanoID(6) strings.
-		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-		if nodeIDHeader == "" {
+		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
+		if nodeIDHeader.IsZero() {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
-		// job.NodeID is *string after node ID migration.
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
@@ -129,8 +130,8 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 
 		// Store params use domain RunID (KSUID-backed) and string job ID.
 		params := store.CreateDiffParams{
-			RunID:   runIDStr,
-			JobID:   &jobIDStr,
+			RunID:   runID,
+			JobID:   &jobID,
 			Patch:   req.Patch,
 			Summary: summaryBytes,
 		}

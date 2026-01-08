@@ -23,7 +23,8 @@ func strPtr(s string) *string {
 
 // TestDrainNodeHandlerSuccess verifies successful node draining.
 func TestDrainNodeHandlerSuccess(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	now := time.Now()
 
 	st := &mockStore{
@@ -39,8 +40,8 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil)
+	req.SetPathValue("id", nodeIDStr)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -115,7 +116,8 @@ func TestDrainNodeHandlerNotFound(t *testing.T) {
 
 // TestDrainNodeHandlerAlreadyDrained verifies 409 when node is already drained.
 func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	now := time.Now()
 
 	st := &mockStore{
@@ -131,8 +133,8 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil)
+	req.SetPathValue("id", nodeIDStr)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -150,7 +152,8 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 
 // TestUndrainNodeHandlerSuccess verifies successful node undraining.
 func TestUndrainNodeHandlerSuccess(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	now := time.Now()
 
 	st := &mockStore{
@@ -166,8 +169,8 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil)
+	req.SetPathValue("id", nodeIDStr)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -242,7 +245,8 @@ func TestUndrainNodeHandlerNotFound(t *testing.T) {
 
 // TestUndrainNodeHandlerNotDrained verifies 409 when node is not drained.
 func TestUndrainNodeHandlerNotDrained(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	now := time.Now()
 
 	st := &mockStore{
@@ -258,8 +262,8 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil)
+	req.SetPathValue("id", nodeIDStr)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -277,8 +281,8 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 
 // TestListNodesHandlerSuccess verifies successful node listing.
 func TestListNodesHandlerSuccess(t *testing.T) {
-	node1ID := domaintypes.NewNodeKey()
-	node2ID := domaintypes.NewNodeKey()
+	node1ID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	node2ID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	now := time.Now()
 
 	st := &mockStore{
@@ -360,8 +364,8 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	}
 
 	// Check first node.
-	if resp[0].ID != node1ID {
-		t.Errorf("expected id %s, got %s", node1ID, resp[0].ID)
+	if resp[0].ID != node1ID.String() {
+		t.Errorf("expected id %s, got %s", node1ID.String(), resp[0].ID)
 	}
 	if resp[0].Name != "worker-1" {
 		t.Errorf("expected name worker-1, got %s", resp[0].Name)
@@ -380,8 +384,8 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	}
 
 	// Check second node.
-	if resp[1].ID != node2ID {
-		t.Errorf("expected id %s, got %s", node2ID, resp[1].ID)
+	if resp[1].ID != node2ID.String() {
+		t.Errorf("expected id %s, got %s", node2ID.String(), resp[1].ID)
 	}
 	if resp[1].Name != "worker-2" {
 		t.Errorf("expected name worker-2, got %s", resp[1].Name)

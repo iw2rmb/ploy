@@ -224,9 +224,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
-		// Look up the job by job_id using string ID directly.
-		// No UUID parsing needed; store accepts KSUID strings.
-		job, err := st.GetJob(ctx, jobIDStr)
+		// Look up the job by job_id (KSUID-backed).
+		job, err := st.GetJob(ctx, domaintypes.JobID(jobIDStr))
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -243,15 +242,13 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Derive node ID from required header. auth middleware already enforces
 		// presence for worker-role callers; this handler performs an additional
 		// check and uses the value for job ownership validation.
-		// Node IDs are now NanoID(6) strings.
-		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-		if nodeIDHeader == "" {
+		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
+		if nodeIDHeader.IsZero() {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
 
 		// Verify the job is assigned to the calling node.
-		// job.NodeID is *string after node ID migration.
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
@@ -337,7 +334,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					"step_index", job.StepIndex,
 				)
 			case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
-				if healErr := maybeCreateHealingJobs(ctx, st, run, job.RunID, job.RepoID, job.Attempt, domaintypes.StepIndex(job.StepIndex)); healErr != nil {
+				if healErr := maybeCreateHealingJobs(ctx, st, run, job.RunID, job.RepoID, job.Attempt, job.StepIndex); healErr != nil {
 					slog.Error("complete job: failed to create healing jobs",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,
@@ -345,7 +342,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					)
 				}
 			default:
-				if err := cancelRemainingJobsAfterFailure(ctx, st, job.RunID, job.RepoID, job.Attempt, domaintypes.StepIndex(job.StepIndex)); err != nil {
+				if err := cancelRemainingJobsAfterFailure(ctx, st, job.RunID, job.RepoID, job.Attempt, job.StepIndex); err != nil {
 					slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,
@@ -388,7 +385,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			// If the repo reached terminal state, check if the run should transition to Finished.
 			// runs.status becomes Finished when all repos are terminal.
 			if repoUpdated {
-				if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, domaintypes.RunID(runID)); completeErr != nil {
+				if completeErr := maybeCompleteMultiStepRun(ctx, st, eventsService, run, runID); completeErr != nil {
 					slog.Error("complete job: failed to check run completion",
 						"job_id", jobIDStr,
 						"step_index", job.StepIndex,

@@ -37,11 +37,12 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := requiredPathParam(r, "id")
+		nodeIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
@@ -99,20 +100,19 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("node logs: check failed", "node_id", nodeID, "err", err)
+			slog.Error("node logs: check failed", "node_id", nodeIDStr, "err", err)
 			return
 		}
 
-		// Parse job_id if provided; convert domain type to string for store.
-		var jobID *string
+		// Parse job_id if provided.
+		var jobID *domaintypes.JobID
 		if req.JobID != nil && !req.JobID.IsZero() {
-			s := req.JobID.String()
-			jobID = &s
+			jobID = req.JobID
 		}
 
 		// Store the gzipped log chunk in the database using domain RunID.
 		params := store.CreateLogParams{
-			RunID:   req.RunID.String(),
+			RunID:   req.RunID,
 			JobID:   jobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
@@ -123,7 +123,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		log, err := eventsService.CreateAndPublishLog(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
-			slog.Error("node logs: create failed", "node_id", nodeID, "run_id", req.RunID.String(), "chunk_no", req.ChunkNo, "err", err)
+			slog.Error("node logs: create failed", "node_id", nodeIDStr, "run_id", req.RunID.String(), "chunk_no", req.ChunkNo, "err", err)
 			return
 		}
 
@@ -139,7 +139,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		slog.Debug("log chunk stored",
-			"node_id", nodeID,
+			"node_id", nodeIDStr,
 			"run_id", req.RunID.String(),
 			"chunk_no", req.ChunkNo,
 			"size", len(req.Data),

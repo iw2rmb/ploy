@@ -72,9 +72,9 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	}
 
 	// Verify mod name == mod id (v1 contract).
-	if st.createModParams.Name != st.createModParams.ID {
+	if st.createModParams.Name != st.createModParams.ID.String() {
 		t.Errorf("mod name (%q) != mod id (%q); v1 requires name == id for single-repo runs",
-			st.createModParams.Name, st.createModParams.ID)
+			st.createModParams.Name, st.createModParams.ID.String())
 	}
 
 	// Verify spec_id was linked to mod.

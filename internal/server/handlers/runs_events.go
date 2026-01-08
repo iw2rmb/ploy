@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -37,6 +38,7 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		runID := domaintypes.RunID(runIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
@@ -72,11 +74,16 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		// Normalize optional job ID (KSUID string; no UUID parsing).
-		jobID := normalizeOptionalID(req.JobID)
+		jobIDStr := normalizeOptionalID(req.JobID)
+		var jobID *domaintypes.JobID
+		if jobIDStr != nil {
+			jid := domaintypes.JobID(*jobIDStr)
+			jobID = &jid
+		}
 
 		// Create log row using string run ID and string job ID.
 		params := store.CreateLogParams{
-			RunID:   runIDStr,
+			RunID:   runID,
 			JobID:   jobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,

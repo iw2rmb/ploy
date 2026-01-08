@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
 )
@@ -30,8 +31,9 @@ func NewBatchRepoStarter(st store.Store) *BatchRepoStarter {
 
 // StartPendingRepos creates (or advances) repo-scoped job queues for queued run_repos rows.
 // v1 removes per-repo execution runs; jobs are created directly for (run_id, repo_id, attempt).
-func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) (StartPendingReposResult, error) {
+func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domaintypes.RunID) (StartPendingReposResult, error) {
 	result := StartPendingReposResult{}
+	runIDStr := runID.String()
 
 	run, err := s.store.GetRun(ctx, runID)
 	if err != nil {
@@ -78,13 +80,13 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 			Attempt: rr.Attempt,
 		})
 		if err != nil {
-			slog.Error("start queued repos: list jobs failed", "run_id", runID, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
+			slog.Error("start queued repos: list jobs failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
 			continue
 		}
 
 		if len(jobs) == 0 {
-			if err := createJobsFromSpec(ctx, s.store, runID, rr.RepoID, rr.RepoBaseRef, rr.Attempt, spec.Spec); err != nil {
-				slog.Error("start queued repos: create jobs failed", "run_id", runID, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
+			if err := createJobsFromSpec(ctx, s.store, runIDStr, rr.RepoID.String(), rr.RepoBaseRef, rr.Attempt, spec.Spec); err != nil {
+				slog.Error("start queued repos: create jobs failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
 				_ = s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{RunID: runID, RepoID: rr.RepoID, LastError: ptr(fmt.Sprintf("create jobs: %v", err))})
 				continue
 			}
@@ -104,7 +106,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID string) 
 		}
 
 		if _, err := s.store.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: runID, RepoID: rr.RepoID, Attempt: rr.Attempt}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			slog.Error("start queued repos: schedule next job failed", "run_id", runID, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
+			slog.Error("start queued repos: schedule next job failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
 			continue
 		}
 		result.Started++

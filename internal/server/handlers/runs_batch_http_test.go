@@ -18,7 +18,8 @@ import (
 func TestListRunsHandler_Success(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
 	st := &mockStore{
 		listRunsResult: []store.Run{
 			{
@@ -49,7 +50,7 @@ func TestListRunsHandler_Success(t *testing.T) {
 	if len(resp.Runs) != 1 {
 		t.Fatalf("expected 1 run, got %d", len(resp.Runs))
 	}
-	if resp.Runs[0].ID.String() != runID {
+	if resp.Runs[0].ID.String() != runIDStr {
 		t.Fatalf("unexpected run id: %s", resp.Runs[0].ID.String())
 	}
 }
@@ -57,7 +58,8 @@ func TestListRunsHandler_Success(t *testing.T) {
 func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
@@ -72,8 +74,8 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID, nil)
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr, nil)
+	req.SetPathValue("id", runIDStr)
 	rr := httptest.NewRecorder()
 
 	getRunHandler(st).ServeHTTP(rr, req)
@@ -86,7 +88,7 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.ID.String() != runID {
+	if resp.ID.String() != runIDStr {
 		t.Fatalf("unexpected run id: %s", resp.ID.String())
 	}
 	if resp.Counts == nil || resp.Counts.Total != 2 {
@@ -99,9 +101,10 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
-	queuedRepoID := domaintypes.NewModRepoID().String()
-	runningRepoID := domaintypes.NewModRepoID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	queuedRepoID := domaintypes.NewModRepoID()
+	runningRepoID := domaintypes.NewModRepoID()
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -117,15 +120,15 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 			{RunID: runID, RepoID: "repo_done", Status: store.RunRepoStatusSuccess},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusCreated},
-			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusQueued},
-			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-5 * time.Second).UTC(), Valid: true}},
-			{ID: domaintypes.NewJobID().String(), RunID: runID, Status: store.JobStatusSuccess},
+			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusCreated},
+			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusQueued},
+			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-5 * time.Second).UTC(), Valid: true}},
+			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusSuccess},
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/cancel", nil)
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/cancel", nil)
+	req.SetPathValue("id", runIDStr)
 	rr := httptest.NewRecorder()
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
@@ -144,15 +147,15 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	}
 	updatedRepos := map[string]store.UpdateRunRepoStatusParams{}
 	for _, p := range st.updateRunRepoStatusParams {
-		updatedRepos[p.RepoID] = p
+		updatedRepos[p.RepoID.String()] = p
 	}
-	for _, repoID := range []string{queuedRepoID, runningRepoID} {
-		p, ok := updatedRepos[repoID]
+	for _, repoID := range []domaintypes.ModRepoID{queuedRepoID, runningRepoID} {
+		p, ok := updatedRepos[repoID.String()]
 		if !ok {
-			t.Fatalf("expected repo %s to be cancelled", repoID)
+			t.Fatalf("expected repo %s to be cancelled", repoID.String())
 		}
 		if p.RunID != runID || p.Status != store.RunRepoStatusCancelled {
-			t.Fatalf("unexpected UpdateRunRepoStatus params for repo %s: %+v", repoID, p)
+			t.Fatalf("unexpected UpdateRunRepoStatus params for repo %s: %+v", repoID.String(), p)
 		}
 	}
 	if len(st.updateJobStatusCalls) != 3 {
@@ -171,9 +174,10 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -199,8 +203,8 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 		"target_ref": "feature",
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/repos", bytes.NewReader(body))
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/repos", bytes.NewReader(body))
+	req.SetPathValue("id", runIDStr)
 	rr := httptest.NewRecorder()
 
 	addRunRepoHandler(st).ServeHTTP(rr, req)
@@ -219,8 +223,10 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 func TestListRunReposHandler_Success(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	repoID := domaintypes.NewModRepoID()
+	repoIDStr := repoID.String()
 
 	st := &mockStore{
 		listRunReposByRunResult: []store.RunRepo{
@@ -229,8 +235,8 @@ func TestListRunReposHandler_Success(t *testing.T) {
 		getModRepoResult: store.ModRepo{ID: repoID, RepoUrl: "https://github.com/org/repo.git"},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/repos", nil)
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr+"/repos", nil)
+	req.SetPathValue("id", runIDStr)
 	rr := httptest.NewRecorder()
 
 	listRunReposHandler(st).ServeHTTP(rr, req)
@@ -245,7 +251,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoID || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
+	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoIDStr || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
 		t.Fatalf("unexpected repos response: %+v", resp.Repos)
 	}
 }

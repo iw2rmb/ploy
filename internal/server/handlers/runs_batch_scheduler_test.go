@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -11,9 +12,9 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := "run_1"
-	specID := "spec_1"
-	repoID := "repo_1"
+	runID := domaintypes.RunID("run_1")
+	specID := domaintypes.SpecID("spec_1")
+	repoID := domaintypes.ModRepoID("repo_1")
 
 	st := &mockStore{
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
@@ -53,9 +54,9 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := "run_1"
-	specID := "spec_1"
-	repoID := "repo_1"
+	runID := domaintypes.RunID("run_1")
+	specID := domaintypes.SpecID("spec_1")
+	repoID := domaintypes.ModRepoID("repo_1")
 
 	st := &mockStore{
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
@@ -67,8 +68,8 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: "job_1", RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
-			{ID: "job_2", RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
+			{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
+			{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
 		},
 	}
 
@@ -98,10 +99,10 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runID := "run_1"
+	runID := domaintypes.RunID("run_1")
 
 	st := &mockStore{
-		getRunResult: store.Run{ID: runID, SpecID: "spec_1", Status: store.RunStatusFinished},
+		getRunResult: store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: store.RunStatusFinished},
 	}
 
 	starter := NewBatchRepoStarter(st)

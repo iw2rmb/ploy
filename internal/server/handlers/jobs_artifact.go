@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -79,8 +80,11 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the run exists using string ID directly.
-		_, err = st.GetRun(r.Context(), runIDStr)
+		runID := domaintypes.RunID(runIDStr)
+		jobID := domaintypes.JobID(jobIDStr)
+
+		// Check if the run exists.
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -91,8 +95,8 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check if the job exists using string ID directly.
-		job, err := st.GetJob(r.Context(), jobIDStr)
+		// Check if the job exists.
+		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
@@ -104,7 +108,7 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the job belongs to the provided run.
-		if strings.TrimSpace(job.RunID) != runIDStr {
+		if job.RunID != runID {
 			http.Error(w, "job does not belong to run", http.StatusBadRequest)
 			return
 		}
@@ -112,12 +116,11 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
 		// Node IDs are now NanoID(6) strings; validate non-empty and match job assignment.
-		nodeIDHeader := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
-		if nodeIDHeader == "" {
+		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
+		if nodeIDHeader.IsZero() {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
 			return
 		}
-		// job.NodeID is *string after node ID migration.
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
 			http.Error(w, "job not assigned to this node", http.StatusForbidden)
 			return
@@ -128,8 +131,8 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Create artifact bundle params using domain RunID.
 		params := store.CreateArtifactBundleParams{
-			RunID:  runIDStr,
-			JobID:  &jobIDStr,
+			RunID:  runID,
+			JobID:  &jobID,
 			Name:   req.Name,
 			Bundle: req.Bundle,
 			Cid:    &cid,

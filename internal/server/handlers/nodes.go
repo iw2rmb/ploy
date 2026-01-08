@@ -10,17 +10,19 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := requiredPathParam(r, "id")
+		nodeIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)
@@ -56,11 +58,12 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := requiredPathParam(r, "id")
+		nodeIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)
@@ -128,7 +131,7 @@ func listNodesHandler(st store.Store) http.HandlerFunc {
 		resp := make([]nodeResponse, 0, len(nodes))
 		for _, node := range nodes {
 			nr := nodeResponse{
-				ID:              node.ID, // Node ID is now a NanoID(6) string.
+				ID:              node.ID.String(),
 				Name:            node.Name,
 				IPAddress:       node.IpAddress.String(),
 				Version:         node.Version,

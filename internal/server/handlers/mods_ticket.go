@@ -48,9 +48,10 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		runID := domaintypes.RunID(runIDStr)
 
-		// Fetch run using string ID directly (no UUID parsing needed).
-		run, err := st.GetRun(r.Context(), runIDStr)
+		// Fetch run.
+		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -90,9 +91,8 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			repoURL = mr.RepoUrl
 		}
 
-		// run.ID is now a string (KSUID). Construct RunSummary with RunID.
 		summary := modsapi.RunSummary{
-			RunID:      domaintypes.RunID(run.ID),
+			RunID:      run.ID,
 			State:      runState,
 			Submitter:  "",
 			Repository: repoURL,
@@ -146,14 +146,14 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 		for _, job := range jobs {
+			jobIDStr := job.ID.String()
 			// Use conversion helper to map store.JobStatus -> modsapi.StageState
 			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
-			// job.ID and run.ID are now strings (KSUID).
 			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
-				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", job.ID, "err", err)
+				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", jobIDStr, "err", err)
 				return
 			}
 			for _, b := range bundles {
@@ -168,17 +168,16 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 			// Use job's step_index directly without lossy int cast.
 			// Validate that step_index is a valid StepIndex (integer-like, non-NaN/Inf).
-			stepIndex := domaintypes.StepIndex(job.StepIndex)
+			stepIndex := job.StepIndex
 			if !stepIndex.Valid() {
-				http.Error(w, fmt.Sprintf("invalid step_index for job %s", job.ID), http.StatusInternalServerError)
-				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", job.ID, "step_index", job.StepIndex)
+				http.Error(w, fmt.Sprintf("invalid step_index for job %s", jobIDStr), http.StatusInternalServerError)
+				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", jobIDStr, "step_index", float64(job.StepIndex))
 				return
 			}
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.
-			// job.ID is now a string (KSUID).
-			summary.Stages[job.ID] = modsapi.StageStatus{
+			summary.Stages[jobIDStr] = modsapi.StageStatus{
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
@@ -262,16 +261,16 @@ func createSingleModJob(ctx context.Context, st store.Store, runID string, repoI
 func createJobWithIndex(ctx context.Context, st store.Store, runID string, repoID string, repoBaseRef string, attempt int32, name string, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus) error {
 	jobID := domaintypes.NewJobID()
 	_, err := st.CreateJob(ctx, store.CreateJobParams{
-		ID:          string(jobID),
-		RunID:       runID,
-		RepoID:      repoID,
+		ID:          jobID,
+		RunID:       domaintypes.RunID(runID),
+		RepoID:      domaintypes.ModRepoID(repoID),
 		RepoBaseRef: repoBaseRef,
 		Attempt:     attempt,
 		Name:        name,
 		Status:      status,
 		ModType:     modType,
 		ModImage:    modImage,
-		StepIndex:   stepIndex.Float64(),
+		StepIndex:   stepIndex,
 		Meta:        []byte(`{}`),
 	})
 	return err

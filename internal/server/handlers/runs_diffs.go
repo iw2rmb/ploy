@@ -27,7 +27,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		runID := runIDStr
+		runID := domaintypes.RunID(runIDStr)
 
 		if r.ContentLength > maxBodySize {
 			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
@@ -59,9 +59,9 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate job belongs to run if provided.
-		var jobID *string
+		var jobID *domaintypes.JobID
 		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			job, err := st.GetJob(r.Context(), *req.JobID)
+			job, err := st.GetJob(r.Context(), domaintypes.JobID(*req.JobID))
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					http.Error(w, "job not found", http.StatusNotFound)

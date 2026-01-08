@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -31,7 +31,10 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
+		runID := domaintypes.RunID(runIDStr)
+		repoID := domaintypes.ModRepoID(repoIDStr)
+
+		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
@@ -44,8 +47,8 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
-			RunID:   runIDStr,
-			RepoID:  repoIDStr,
+			RunID:   runID,
+			RepoID:  repoID,
 			Attempt: rr.Attempt,
 		})
 		if err != nil {
@@ -54,12 +57,12 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		jobStepIndex := make(map[string]float64, len(jobs))
+		jobStepIndex := make(map[string]domaintypes.StepIndex, len(jobs))
 		for _, job := range jobs {
-			jobStepIndex[strings.TrimSpace(job.ID)] = job.StepIndex
+			jobStepIndex[job.ID.String()] = job.StepIndex
 		}
 
-		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runIDStr)
+		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
 			slog.Error("list run repo artifacts: list bundles failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
@@ -75,16 +78,16 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		}
 		type artifactRow struct {
 			summary   artifactSummary
-			stepIndex float64
+			stepIndex domaintypes.StepIndex
 			createdAt int64
 		}
 
 		artifacts := make([]artifactRow, 0, len(bundles))
 		for _, bundle := range bundles {
-			if bundle.JobID == nil || strings.TrimSpace(*bundle.JobID) == "" {
+			if bundle.JobID == nil || bundle.JobID.IsZero() {
 				continue
 			}
-			stepIndex, ok := jobStepIndex[*bundle.JobID]
+			stepIndex, ok := jobStepIndex[bundle.JobID.String()]
 			if !ok {
 				continue
 			}
