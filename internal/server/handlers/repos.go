@@ -123,16 +123,11 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoIDStr, err := requiredPathParam(r, "repo_id")
+		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if repoIDStr == "" {
-			http.Error(w, "repo_id cannot be empty", http.StatusBadRequest)
-			return
-		}
-		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		// Parse pagination parameters with defaults.
 		limit := int32(50)

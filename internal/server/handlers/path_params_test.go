@@ -4,434 +4,131 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestPathParamsUseDomainTypes validates that handlers correctly use domain type
-// helpers to parse path parameters, returning 400 errors for invalid/blank IDs
-// before making store calls.
-//
-// This test ensures the handler boundary validation pattern:
-//   - Empty path params → 400 Bad Request
-//   - Whitespace-only params → 400 Bad Request
-//   - Valid params → typed domain value
+// TestPathParamsUseDomainTypes validates that handlers reject invalid/blank
+// path IDs with a 400 before making any store calls.
 func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ParseRunIDParam", func(t *testing.T) {
+	t.Run("GET /v1/runs/{id} rejects empty id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantID    domaintypes.RunID
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid KSUID",
-				pathKey:   "id",
-				pathValue: "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				wantID:    domaintypes.RunID("2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "id",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "id path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "id",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "id path parameter is required",
-			},
-			{
-				name:      "whitespace trimmed",
-				pathKey:   "run_id",
-				pathValue: "  abc123  ",
-				wantID:    domaintypes.RunID("abc123"),
-				wantErr:   false,
-			},
+		st := &mockStore{}
+		h := getRunHandler(st)
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
+		req.SetPathValue("id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				id, err := domaintypes.ParseRunIDParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if id != tt.wantID {
-					t.Errorf("id = %q, want %q", id, tt.wantID)
-				}
-			})
+		if st.getRunCalled {
+			t.Fatalf("expected no store calls, but GetRun was called")
 		}
 	})
 
-	t.Run("ParseJobIDParam", func(t *testing.T) {
+	t.Run("GET /v1/runs/{id} rejects whitespace id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantID    domaintypes.JobID
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid KSUID",
-				pathKey:   "job_id",
-				pathValue: "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				wantID:    domaintypes.JobID("2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "job_id",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "job_id path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "job_id",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "job_id path parameter is required",
-			},
+		st := &mockStore{}
+		h := getRunHandler(st)
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
+		req.SetPathValue("id", "   ")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				id, err := domaintypes.ParseJobIDParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if id != tt.wantID {
-					t.Errorf("id = %q, want %q", id, tt.wantID)
-				}
-			})
+		if st.getRunCalled {
+			t.Fatalf("expected no store calls, but GetRun was called")
 		}
 	})
 
-	t.Run("ParseNodeIDParam", func(t *testing.T) {
+	t.Run("POST /v1/runs/{run_id}/jobs/{job_id}/diff rejects empty ids before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantID    domaintypes.NodeID
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid NanoID",
-				pathKey:   "id",
-				pathValue: "abc123",
-				wantID:    domaintypes.NodeID("abc123"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "id",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "id path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "id",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "id path parameter is required",
-			},
+		st := &mockStore{}
+		h := createJobDiffHandler(st)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/runs//jobs//diff", nil)
+		req.SetPathValue("run_id", "")
+		req.SetPathValue("job_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				id, err := domaintypes.ParseNodeIDParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if id != tt.wantID {
-					t.Errorf("id = %q, want %q", id, tt.wantID)
-				}
-			})
+		if st.getRunCalled || st.getJobCalled || st.createDiffCalled {
+			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRunCalled, st.getJobCalled, st.createDiffCalled)
 		}
 	})
 
-	t.Run("ParseModIDParam", func(t *testing.T) {
+	t.Run("POST /v1/mods/{mod_id}/runs rejects empty mod_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantID    domaintypes.ModID
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid NanoID",
-				pathKey:   "mod_id",
-				pathValue: "abc123",
-				wantID:    domaintypes.ModID("abc123"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "mod_id",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "mod_id path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "mod_id",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "mod_id path parameter is required",
-			},
+		st := &mockStore{}
+		h := createModRunHandler(st)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/mods//runs", nil)
+		req.SetPathValue("mod_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				id, err := domaintypes.ParseModIDParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if id != tt.wantID {
-					t.Errorf("id = %q, want %q", id, tt.wantID)
-				}
-			})
+		if st.getModCalled || st.createRunCalled {
+			t.Fatalf("expected no store calls, but got GetMod=%v CreateRun=%v", st.getModCalled, st.createRunCalled)
 		}
 	})
 
-	t.Run("ParseModRefParam", func(t *testing.T) {
+	t.Run("GET /v1/repos/{repo_id}/runs rejects empty repo_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantRef   domaintypes.ModRef
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid mod name",
-				pathKey:   "mod_ref",
-				pathValue: "my-mod",
-				wantRef:   domaintypes.ModRef("my-mod"),
-				wantErr:   false,
-			},
-			{
-				name:      "valid mod id",
-				pathKey:   "mod_ref",
-				pathValue: "abc123",
-				wantRef:   domaintypes.ModRef("abc123"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "mod_ref",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "mod_ref path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "mod_ref",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "mod_ref path parameter is required",
-			},
-			{
-				name:      "invalid chars (slash) returns 400",
-				pathKey:   "mod_ref",
-				pathValue: "my/mod",
-				wantErr:   true,
-				errSubstr: "invalid mod ref",
-			},
-			{
-				name:      "invalid chars (question mark) returns 400",
-				pathKey:   "mod_ref",
-				pathValue: "mod?name",
-				wantErr:   true,
-				errSubstr: "invalid mod ref",
-			},
+		st := &mockStore{}
+		h := listRunsForRepoHandler(st)
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/repos//runs", nil)
+		req.SetPathValue("repo_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				ref, err := domaintypes.ParseModRefParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if ref != tt.wantRef {
-					t.Errorf("ref = %q, want %q", ref, tt.wantRef)
-				}
-			})
+		if st.listRunsForRepoCalled {
+			t.Fatalf("expected no store calls, but ListRunsForRepo was called")
 		}
 	})
 
-	t.Run("ParseModRepoIDParam", func(t *testing.T) {
+	t.Run("POST /v1/nodes/{id}/heartbeat rejects empty node id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []struct {
-			name      string
-			pathKey   string
-			pathValue string
-			wantID    domaintypes.ModRepoID
-			wantErr   bool
-			errSubstr string
-		}{
-			{
-				name:      "valid NanoID",
-				pathKey:   "repo_id",
-				pathValue: "abc12345",
-				wantID:    domaintypes.ModRepoID("abc12345"),
-				wantErr:   false,
-			},
-			{
-				name:      "empty returns 400",
-				pathKey:   "repo_id",
-				pathValue: "",
-				wantErr:   true,
-				errSubstr: "repo_id path parameter is required",
-			},
-			{
-				name:      "whitespace-only returns 400",
-				pathKey:   "repo_id",
-				pathValue: "   ",
-				wantErr:   true,
-				errSubstr: "repo_id path parameter is required",
-			},
+		st := &mockStore{}
+		h := heartbeatHandler(st)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/nodes//heartbeat", nil)
+		req.SetPathValue("id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-
-				id, err := domaintypes.ParseModRepoIDParam(req, tt.pathKey)
-
-				if tt.wantErr {
-					if err == nil {
-						t.Fatalf("expected error but got nil")
-					}
-					if !containsSubstr(err.Error(), tt.errSubstr) {
-						t.Errorf("error = %q, want to contain %q", err.Error(), tt.errSubstr)
-					}
-					return
-				}
-
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if id != tt.wantID {
-					t.Errorf("id = %q, want %q", id, tt.wantID)
-				}
-			})
+		if st.getNodeCalled || st.updateNodeHeartbeatCalled {
+			t.Fatalf("expected no store calls, but got GetNode=%v UpdateNodeHeartbeat=%v", st.getNodeCalled, st.updateNodeHeartbeatCalled)
 		}
 	})
-}
-
-// containsSubstr checks if s contains substr.
-func containsSubstr(s, substr string) bool {
-	for i := 0; i+len(substr) <= len(s); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

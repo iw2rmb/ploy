@@ -22,12 +22,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeIDStr, err := requiredPathParam(r, "id")
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxRequestSize {
@@ -139,7 +138,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to create event: %v", err), http.StatusInternalServerError)
-				slog.Error("node events: create failed", "node_id", nodeIDStr, "run_id", req.RunID.String(), "index", i, "err", err)
+				slog.Error("node events: create failed", "node_id", nodeID.String(), "run_id", req.RunID.String(), "index", i, "err", err)
 				return
 			}
 
@@ -154,7 +153,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		slog.Debug("node events created",
-			"node_id", nodeIDStr,
+			"node_id", nodeID.String(),
 			"run_id", req.RunID.String(),
 			"count", count,
 		)

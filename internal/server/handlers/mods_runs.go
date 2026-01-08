@@ -32,12 +32,11 @@ import (
 func createModRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse mod_id from URL path.
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		modID := domaintypes.ModID(modIDStr)
 
 		// Parse request body with strict validation.
 		var req struct {
@@ -74,7 +73,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("create mod run: get mod failed", "mod_id", modIDStr, "err", err)
+			slog.Error("create mod run: get mod failed", "mod_id", modID.String(), "err", err)
 			return
 		}
 
@@ -94,7 +93,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 		spec, err := st.GetSpec(r.Context(), *mod.SpecID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to get spec: %v", err), http.StatusInternalServerError)
-			slog.Error("create mod run: get spec failed", "mod_id", modIDStr, "spec_id", *mod.SpecID, "err", err)
+			slog.Error("create mod run: get spec failed", "mod_id", modID.String(), "spec_id", *mod.SpecID, "err", err)
 			return
 		}
 
@@ -102,7 +101,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 		selectedRepos, err := selectReposForRun(r.Context(), st, modID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to select repos: %v", err), http.StatusInternalServerError)
-			slog.Error("create mod run: select repos failed", "mod_id", modIDStr, "mode", req.RepoSelector.Mode, "err", err)
+			slog.Error("create mod run: select repos failed", "mod_id", modID.String(), "mode", req.RepoSelector.Mode, "err", err)
 			return
 		}
 
@@ -122,7 +121,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("create mod run: create run failed", "mod_id", modIDStr, "run_id", runID, "err", err)
+			slog.Error("create mod run: create run failed", "mod_id", modID.String(), "run_id", runID, "err", err)
 			return
 		}
 
@@ -150,7 +149,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 
 			// Create repo-scoped jobs for the queued repo.
 			// v1 immediate start: jobs are created and made immediately runnable.
-			if err := createJobsFromSpec(r.Context(), st, run.ID.String(), runRepo.RepoID.String(), runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
+			if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
 				http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 				slog.Error("create mod run: create jobs failed",
 					"run_id", run.ID,
@@ -176,7 +175,7 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 
 		slog.Info("mod run created",
 			"run_id", run.ID,
-			"mod_id", modIDStr,
+			"mod_id", modID.String(),
 			"spec_id", *mod.SpecID,
 			"repo_count", len(selectedRepos),
 			"mode", req.RepoSelector.Mode,

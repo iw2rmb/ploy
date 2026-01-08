@@ -74,12 +74,11 @@ type pullResponse struct {
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path.
-		runIDStr, err := requiredPathParam(r, "run_id")
+		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		runID := domaintypes.RunID(runIDStr)
 
 		// Parse request body with strict validation.
 		var req runPullRequest
@@ -156,7 +155,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("pull run repo resolved",
-			"run_id", runIDStr,
+			"run_id", runID.String(),
 			"repo_id", match.RepoID,
 			"repo_url", req.RepoURL,
 		)
@@ -181,12 +180,11 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 func pullModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract mod_id from path.
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		modID := domaintypes.ModID(modIDStr)
 
 		// Parse request body with strict validation.
 		var req modPullRequest
@@ -291,7 +289,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("pull mod repo resolved",
-			"mod_id", modIDStr,
+			"mod_id", modID.String(),
 			"run_id", latestRunRepo.RunID,
 			"repo_id", latestRunRepo.RepoID.String(),
 			"mode", mode,

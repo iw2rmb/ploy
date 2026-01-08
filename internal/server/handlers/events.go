@@ -40,28 +40,11 @@ func parseLastEventID(header string) domaintypes.EventID {
 // database layer enforces existence.
 func getRunLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run ID from path parameter.
-		// Run IDs are KSUID strings (27 chars); treated as opaque identifiers.
-		runIDStr, err := requiredPathParam(r, "id")
+		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Reject blank/whitespace-only IDs at the HTTP boundary.
-		if domaintypes.IsEmpty(runIDStr) {
-			http.Error(w, "invalid id", http.StatusBadRequest)
-			return
-		}
-
-		// Reject obviously invalid IDs to avoid hanging SSE streams on garbage.
-		if len(runIDStr) != 27 {
-			http.Error(w, "invalid id", http.StatusBadRequest)
-			return
-		}
-
-		// Convert to typed RunID for type-safe stream operations.
-		runID := domaintypes.RunID(runIDStr)
 
 		// Verify run exists in the database.
 		_, err = st.GetRun(r.Context(), runID)
@@ -70,7 +53,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 			case errors.Is(err, pgx.ErrNoRows):
 				http.Error(w, "run not found", http.StatusNotFound)
 			default:
-				slog.Error("get run logs: database error", "run_id", runIDStr, "err", err)
+				slog.Error("get run logs: database error", "run_id", runID.String(), "err", err)
 				http.Error(w, "failed to get run", http.StatusInternalServerError)
 			}
 			return
@@ -85,7 +68,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		// Ensure the stream exists (creates if not present).
 		// Validation happens inside Ensure; errors are logged but stream proceeds.
 		if err := hub.Ensure(runID); err != nil {
-			slog.Error("ensure stream failed", "run_id", runIDStr, "err", err)
+			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
 			http.Error(w, "invalid run id", http.StatusBadRequest)
 			return
 		}
@@ -94,7 +77,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		if err := logstream.Serve(w, r, hub, runID, sinceID); err != nil {
 			// Only log non-cancellation errors (client disconnect is normal).
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream run logs", "run_id", runIDStr, "err", err)
+				slog.Error("stream run logs", "run_id", runID.String(), "err", err)
 			}
 		}
 	}

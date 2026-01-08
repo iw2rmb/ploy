@@ -19,12 +19,11 @@ import (
 func heartbeatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeIDStr, err := requiredPathParam(r, "id")
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Decode request body with strict validation.
 		var req struct {

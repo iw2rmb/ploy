@@ -24,15 +24,13 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxPatchSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract run_id from path parameter (KSUID-backed string).
-		runIDStr, err := requiredPathParam(r, "run_id")
+		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Extract job_id from path parameter (KSUID-backed string).
-		jobIDStr, err := requiredPathParam(r, "job_id")
+		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -66,9 +64,6 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		runID := domaintypes.RunID(runIDStr)
-		jobID := domaintypes.JobID(jobIDStr)
-
 		// Check if the run exists.
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
@@ -77,7 +72,7 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
-			slog.Error("diff: run check failed", "run_id", runIDStr, "err", err)
+			slog.Error("diff: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
@@ -89,7 +84,7 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
-			slog.Error("diff: job check failed", "job_id", jobIDStr, "err", err)
+			slog.Error("diff: job check failed", "job_id", jobID.String(), "err", err)
 			return
 		}
 
@@ -136,7 +131,7 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to create diff: %v", err), http.StatusInternalServerError)
-			slog.Error("diff: create failed", "run_id", runIDStr, "job_id", jobIDStr, "err", err)
+			slog.Error("diff: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}
 
@@ -150,8 +145,8 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Debug("diff created",
-			"run_id", runIDStr,
-			"job_id", jobIDStr,
+			"run_id", runID.String(),
+			"job_id", jobID.String(),
 			"diff_id", diff.ID.Bytes,
 		)
 	}

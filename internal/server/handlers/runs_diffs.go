@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -22,12 +21,11 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxPatchSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr, err := requiredPathParam(r, "id")
+		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		runID := domaintypes.RunID(runIDStr)
 
 		if r.ContentLength > maxBodySize {
 			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
@@ -35,7 +33,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		var req struct {
-			JobID   *string                 `json:"job_id,omitempty"`
+			JobID   *domaintypes.JobID      `json:"job_id,omitempty"`
 			Patch   []byte                  `json:"patch"`
 			Summary domaintypes.DiffSummary `json:"summary"`
 		}
@@ -54,15 +52,15 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 
 		// Validate job belongs to run if provided.
 		var jobID *domaintypes.JobID
-		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
-			job, err := st.GetJob(r.Context(), domaintypes.JobID(*req.JobID))
+		if req.JobID != nil && !req.JobID.IsZero() {
+			job, err := st.GetJob(r.Context(), *req.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					http.Error(w, "job not found", http.StatusNotFound)
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
-				slog.Error("run diff: job check failed", "job_id", *req.JobID, "err", err)
+				slog.Error("run diff: job check failed", "job_id", req.JobID.String(), "err", err)
 				return
 			}
 			if job.RunID != runID {
@@ -79,7 +77,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
-			slog.Error("run diff: run check failed", "run_id", runIDStr, "err", err)
+			slog.Error("run diff: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
@@ -97,7 +95,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		diff, err := st.CreateDiff(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create diff: %v", err), http.StatusInternalServerError)
-			slog.Error("run diff: create failed", "run_id", runIDStr, "err", err)
+			slog.Error("run diff: create failed", "run_id", runID.String(), "err", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
