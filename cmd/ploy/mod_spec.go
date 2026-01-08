@@ -66,22 +66,11 @@ func handleModSpecSet(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports both name and ID).
-	resolveCmd := mods.ResolveModByNameCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
-	}
-	modID, err := resolveCmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
 	// Execute set mod spec command.
 	cmd := mods.SetModSpecCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modID),
+		ModRef:  types.ModRef(modRef),
 		Spec:    specData,
 	}
 

@@ -4,9 +4,9 @@
 // These commands call the server endpoints:
 // - POST /v1/mods (create mod)
 // - GET /v1/mods (list mods)
-// - DELETE /v1/mods/{mod_id} (delete mod)
-// - PATCH /v1/mods/{mod_id}/archive (archive mod)
-// - PATCH /v1/mods/{mod_id}/unarchive (unarchive mod)
+// - DELETE /v1/mods/{mod_ref} (delete mod)
+// - PATCH /v1/mods/{mod_ref}/archive (archive mod)
+// - PATCH /v1/mods/{mod_ref}/unarchive (unarchive mod)
 //
 // These commands implement the mod management surfaces (create, list, delete, archive).
 package mods
@@ -82,7 +82,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 	}
 
 	// POST /v1/mods to create the mod.
-	endpoint := c.BaseURL.JoinPath("/v1/mods")
+	endpoint := c.BaseURL.JoinPath("v1", "mods")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return AddModResult{}, fmt.Errorf("mod add: build request: %w", err)
@@ -131,7 +131,7 @@ func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 	}
 
 	// Build endpoint with query params.
-	endpoint := c.BaseURL.JoinPath("/v1/mods")
+	endpoint := c.BaseURL.JoinPath("v1", "mods")
 	q := endpoint.Query()
 	if c.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", c.Limit))
@@ -198,7 +198,7 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 	}
 
 	// DELETE /v1/mods/{mod_ref}
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()))
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("mod remove: build request: %w", err)
@@ -247,7 +247,7 @@ func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 	}
 
 	// PATCH /v1/mods/{mod_ref}/archive
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "archive")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "archive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
 		return ArchiveModResult{}, fmt.Errorf("mod archive: build request: %w", err)
@@ -299,7 +299,7 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 	}
 
 	// PATCH /v1/mods/{mod_ref}/unarchive
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "unarchive")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "unarchive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
 		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: build request: %w", err)
@@ -374,7 +374,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	}
 
 	// POST /v1/mods/{mod_ref}/specs
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "specs")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "specs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: build request: %w", err)

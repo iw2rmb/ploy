@@ -40,9 +40,14 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate name is not empty
-		if req.Name == "" {
+		// Validate and normalize name.
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
 			http.Error(w, "name is required", http.StatusBadRequest)
+			return
+		}
+		if err := domaintypes.ModRef(name).Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("name: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -59,7 +64,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 		modID := domaintypes.NewModID().String()
 		mod, err := st.CreateMod(r.Context(), store.CreateModParams{
 			ID:        modID,
-			Name:      req.Name,
+			Name:      name,
 			SpecID:    nil,
 			CreatedBy: req.CreatedBy,
 		})
@@ -121,6 +126,18 @@ func createModHandler(st store.Store) http.HandlerFunc {
 
 		slog.Info("mod created", "mod_id", mod.ID, "name", mod.Name)
 	}
+}
+
+func resolveModByRef(ctx context.Context, st store.Store, ref domaintypes.ModRef) (store.Mod, error) {
+	// Prefer direct ID lookup; fall back to exact name lookup.
+	mod, err := st.GetMod(ctx, ref.String())
+	if err == nil {
+		return mod, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return store.Mod{}, err
+	}
+	return st.GetModByName(ctx, ref.String())
 }
 
 // listModsHandler lists mod projects with optional filters.
@@ -286,36 +303,42 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 }
 
 // deleteModHandler deletes a mod project.
-// Endpoint: DELETE /v1/mods/{mod_id}
+// Endpoint: DELETE /v1/mods/{mod_ref}
 // Response: 204 No Content on success
 //
 // v1 contract:
 // - Refuses deletion if any runs exist for the mod.
 func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modRefStr, err := requiredPathParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		modRef := domaintypes.ModRef(modRefStr)
+		if err := modRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
+			return
+		}
 
-		// Check if mod exists
-		_, err = st.GetMod(r.Context(), modIDStr)
+		// Resolve mod by ID-or-name.
+		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "mod not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("delete mod: get mod failed", "mod_id", modIDStr, "err", err)
+			slog.Error("delete mod: get mod failed", "mod_ref", modRefStr, "err", err)
 			return
 		}
+		modID := mod.ID
 
 		// Check if any runs exist for this mod
-		hasRuns, err := modHasAnyRuns(r.Context(), st, modIDStr)
+		hasRuns, err := modHasAnyRuns(r.Context(), st, modID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to check runs: %v", err), http.StatusInternalServerError)
-			slog.Error("delete mod: check runs failed", "mod_id", modIDStr, "err", err)
+			slog.Error("delete mod: check runs failed", "mod_id", modID, "err", err)
 			return
 		}
 		if hasRuns {
@@ -324,14 +347,14 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Delete the mod
-		if err := st.DeleteMod(r.Context(), modIDStr); err != nil {
+		if err := st.DeleteMod(r.Context(), modID); err != nil {
 			http.Error(w, fmt.Sprintf("failed to delete mod: %v", err), http.StatusInternalServerError)
-			slog.Error("delete mod: database error", "mod_id", modIDStr, "err", err)
+			slog.Error("delete mod: database error", "mod_id", modID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("mod deleted", "mod_id", modIDStr)
+		slog.Info("mod deleted", "mod_id", modID)
 	}
 }
 
@@ -356,7 +379,7 @@ func modHasAnyRuns(ctx context.Context, st store.Store, modID string) (bool, err
 }
 
 // archiveModHandler archives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_id}/archive
+// Endpoint: PATCH /v1/mods/{mod_ref}/archive
 // Response: 200 OK with mod details
 //
 // v1 contract:
@@ -364,23 +387,29 @@ func modHasAnyRuns(ctx context.Context, st store.Store, modID string) (bool, err
 // - Cannot archive a mod with running jobs.
 func archiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modRefStr, err := requiredPathParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		modRef := domaintypes.ModRef(modRefStr)
+		if err := modRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
+			return
+		}
 
-		// Check if mod exists
-		mod, err := st.GetMod(r.Context(), modIDStr)
+		// Resolve mod by ID-or-name.
+		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "mod not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("archive mod: get mod failed", "mod_id", modIDStr, "err", err)
+			slog.Error("archive mod: get mod failed", "mod_ref", modRefStr, "err", err)
 			return
 		}
+		modID := mod.ID
 
 		// Check if already archived
 		if mod.ArchivedAt.Valid {
@@ -401,10 +430,10 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check for running jobs in this mod's runs
-		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modIDStr)
+		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to check jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("archive mod: check jobs failed", "mod_id", modIDStr, "err", err)
+			slog.Error("archive mod: check jobs failed", "mod_id", modID, "err", err)
 			return
 		}
 		if hasRunningJobs {
@@ -413,9 +442,9 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Archive the mod
-		if err := st.ArchiveMod(r.Context(), modIDStr); err != nil {
+		if err := st.ArchiveMod(r.Context(), modID); err != nil {
 			http.Error(w, fmt.Sprintf("failed to archive mod: %v", err), http.StatusInternalServerError)
-			slog.Error("archive mod: database error", "mod_id", modIDStr, "err", err)
+			slog.Error("archive mod: database error", "mod_id", modID, "err", err)
 			return
 		}
 
@@ -432,7 +461,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod archived", "mod_id", modIDStr)
+		slog.Info("mod archived", "mod_id", modID)
 	}
 }
 
@@ -466,7 +495,7 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID string) (bo
 }
 
 // setModSpecHandler creates a new spec row and updates mods.spec_id to point at it.
-// Endpoint: POST /v1/mods/{mod_id}/specs
+// Endpoint: POST /v1/mods/{mod_ref}/specs
 // Request: {name?, spec}
 // Response: 201 Created with spec details (id, created_at)
 //
@@ -476,9 +505,14 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID string) (bo
 // - This is the canonical way to "set" or "update" a mod's spec.
 func setModSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modRefStr, err := requiredPathParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		modRef := domaintypes.ModRef(modRefStr)
+		if err := modRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
 			return
 		}
 
@@ -505,17 +539,18 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists.
-		mod, err := st.GetMod(r.Context(), modIDStr)
+		// Resolve mod by ID-or-name.
+		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "mod not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("set mod spec: get mod failed", "mod_id", modIDStr, "err", err)
+			slog.Error("set mod spec: get mod failed", "mod_ref", modRefStr, "err", err)
 			return
 		}
+		modID := mod.ID
 
 		// Check if mod is archived — cannot update spec on archived mods.
 		if mod.ArchivedAt.Valid {
@@ -533,14 +568,14 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
-			slog.Error("set mod spec: create spec failed", "mod_id", modIDStr, "err", err)
+			slog.Error("set mod spec: create spec failed", "mod_id", modID, "err", err)
 			return
 		}
 
 		// Update mods.spec_id to point at the new spec.
-		if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modIDStr, SpecID: &createdSpec.ID}); err != nil {
+		if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
 			http.Error(w, fmt.Sprintf("failed to update mod spec: %v", err), http.StatusInternalServerError)
-			slog.Error("set mod spec: update mod failed", "mod_id", modIDStr, "spec_id", createdSpec.ID, "err", err)
+			slog.Error("set mod spec: update mod failed", "mod_id", modID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
 
@@ -559,35 +594,41 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			slog.Error("set mod spec: encode response failed", "err", err)
 		}
 
-		slog.Info("mod spec set", "mod_id", modIDStr, "spec_id", createdSpec.ID)
+		slog.Info("mod spec set", "mod_id", modID, "spec_id", createdSpec.ID)
 	}
 }
 
 // unarchiveModHandler unarchives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_id}/unarchive
+// Endpoint: PATCH /v1/mods/{mod_ref}/unarchive
 // Response: 200 OK with mod details
 //
 // v1 contract:
 // - Unarchives a mod (allows execution again).
 func unarchiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modIDStr, err := requiredPathParam(r, "mod_id")
+		modRefStr, err := requiredPathParam(r, "mod_ref")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		modRef := domaintypes.ModRef(modRefStr)
+		if err := modRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("mod_ref: %v", err), http.StatusBadRequest)
+			return
+		}
 
-		// Check if mod exists
-		mod, err := st.GetMod(r.Context(), modIDStr)
+		// Resolve mod by ID-or-name.
+		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "mod not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
-			slog.Error("unarchive mod: get mod failed", "mod_id", modIDStr, "err", err)
+			slog.Error("unarchive mod: get mod failed", "mod_ref", modRefStr, "err", err)
 			return
 		}
+		modID := mod.ID
 
 		// Check if not archived
 		if !mod.ArchivedAt.Valid {
@@ -608,9 +649,9 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Unarchive the mod
-		if err := st.UnarchiveMod(r.Context(), modIDStr); err != nil {
+		if err := st.UnarchiveMod(r.Context(), modID); err != nil {
 			http.Error(w, fmt.Sprintf("failed to unarchive mod: %v", err), http.StatusInternalServerError)
-			slog.Error("unarchive mod: database error", "mod_id", modIDStr, "err", err)
+			slog.Error("unarchive mod: database error", "mod_id", modID, "err", err)
 			return
 		}
 
@@ -627,6 +668,6 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod unarchived", "mod_id", modIDStr)
+		slog.Info("mod unarchived", "mod_id", modID)
 	}
 }

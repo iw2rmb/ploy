@@ -36,29 +36,18 @@ func handleModRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports both name and ID).
-	resolveCmd := mods.ResolveModByNameCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
-	}
-	modID, err := resolveCmd.Run(ctx)
-	if err != nil {
-		return err
-	}
-
 	// Execute mod remove command.
 	cmd := mods.RemoveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modID),
+		ModRef:  types.ModRef(modRef),
 	}
 
 	if err := cmd.Run(ctx); err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Mod deleted: %s\n", modID)
+	_, _ = fmt.Fprintf(stderr, "Mod deleted: %s\n", modRef)
 	return nil
 }
 
