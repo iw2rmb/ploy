@@ -171,6 +171,9 @@ func (h *Hub) Subscribe(ctx context.Context, streamID string, sinceID domaintype
 	if strings.TrimSpace(streamID) == "" {
 		return Subscription{}, errors.New("logstream: stream id required")
 	}
+	if !sinceID.Valid() {
+		return Subscription{}, errors.New("logstream: invalid since id")
+	}
 	if ctx != nil && ctx.Err() != nil {
 		return Subscription{}, ctx.Err()
 	}
