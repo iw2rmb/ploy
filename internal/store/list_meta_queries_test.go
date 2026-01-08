@@ -27,8 +27,18 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 			excludedCols: []string{", data,", ", data "},
 		},
 		{
+			name:         "ListLogsMetaByRunSince",
+			sql:          listLogsMetaByRunSince,
+			excludedCols: []string{", data,", ", data "},
+		},
+		{
 			name:         "ListLogsMetaByRunAndJob",
 			sql:          listLogsMetaByRunAndJob,
+			excludedCols: []string{", data,", ", data "},
+		},
+		{
+			name:         "ListLogsMetaByRunAndJobSince",
+			sql:          listLogsMetaByRunAndJobSince,
 			excludedCols: []string{", data,", ", data "},
 		},
 
@@ -53,6 +63,11 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 		{
 			name:         "ListArtifactBundlesMetaByRunAndJob",
 			sql:          listArtifactBundlesMetaByRunAndJob,
+			excludedCols: []string{", bundle,", ", bundle "},
+		},
+		{
+			name:         "ListArtifactBundlesMetaByCID",
+			sql:          listArtifactBundlesMetaByCID,
 			excludedCols: []string{", bundle,", ", bundle "},
 		},
 
@@ -102,6 +117,8 @@ func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 		// logs.sql - chunk_no ASC, id ASC
 		{"ListLogsMetaByRun", listLogsMetaByRun, "ORDER BY chunk_no ASC, id ASC"},
 		{"ListLogsMetaByRunAndJob", listLogsMetaByRunAndJob, "ORDER BY chunk_no ASC, id ASC"},
+		{"ListLogsMetaByRunSince", listLogsMetaByRunSince, "ORDER BY chunk_no ASC, id ASC"},
+		{"ListLogsMetaByRunAndJobSince", listLogsMetaByRunAndJobSince, "ORDER BY chunk_no ASC, id ASC"},
 
 		// diffs.sql - created_at ASC, id ASC (or step_index+created_at+id for repo)
 		{"ListDiffsMetaByRun", listDiffsMetaByRun, "ORDER BY created_at ASC, id ASC"},
@@ -110,6 +127,7 @@ func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 		// artifact_bundles.sql - created_at DESC, id DESC
 		{"ListArtifactBundlesMetaByRun", listArtifactBundlesMetaByRun, "ORDER BY created_at DESC, id DESC"},
 		{"ListArtifactBundlesMetaByRunAndJob", listArtifactBundlesMetaByRunAndJob, "ORDER BY created_at DESC, id DESC"},
+		{"ListArtifactBundlesMetaByCID", listArtifactBundlesMetaByCID, "ORDER BY created_at DESC, id DESC"},
 
 		// events.sql - time ASC, id ASC
 		{"ListEventsMetaByRun", listEventsMetaByRun, "ORDER BY time ASC, id ASC"},

@@ -202,6 +202,52 @@ func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListAr
 	return items, nil
 }
 
+const listArtifactBundlesMetaByCID = `-- name: ListArtifactBundlesMetaByCID :many
+SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
+WHERE cid = $1
+ORDER BY created_at DESC, id DESC
+`
+
+type ListArtifactBundlesMetaByCIDRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	Name      *string            `json:"name"`
+	Cid       *string            `json:"cid"`
+	Digest    *string            `json:"digest"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns artifact bundle metadata (without the bundle blob) for a given cid.
+// Use GetArtifactBundle to fetch the actual bundle data by id.
+func (q *Queries) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ListArtifactBundlesMetaByCIDRow, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlesMetaByCID, cid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArtifactBundlesMetaByCIDRow{}
+	for rows.Next() {
+		var i ListArtifactBundlesMetaByCIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.Name,
+			&i.Cid,
+			&i.Digest,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listArtifactBundlesMetaByRun = `-- name: ListArtifactBundlesMetaByRun :many
 SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1

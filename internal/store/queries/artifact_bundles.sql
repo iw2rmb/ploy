@@ -31,6 +31,13 @@ SELECT * FROM artifact_bundles
 WHERE cid = $1
 ORDER BY created_at DESC, id DESC;
 
+-- name: ListArtifactBundlesMetaByCID :many
+-- Returns artifact bundle metadata (without the bundle blob) for a given cid.
+-- Use GetArtifactBundle to fetch the actual bundle data by id.
+SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
+WHERE cid = $1
+ORDER BY created_at DESC, id DESC;
+
 -- name: ListArtifactBundlesMetaByRun :many
 -- Returns artifact bundle metadata (without the bundle blob) for a run.
 -- Use GetArtifactBundle to fetch the actual bundle data by id.

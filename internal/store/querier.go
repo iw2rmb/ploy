@@ -121,6 +121,9 @@ type Querier interface {
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata (without the bundle blob) for a given cid.
+	// Use GetArtifactBundle to fetch the actual bundle data by id.
+	ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ListArtifactBundlesMetaByCIDRow, error)
 	// Returns artifact bundle metadata (without the bundle blob) for a run.
 	// Use GetArtifactBundle to fetch the actual bundle data by id.
 	ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]ListArtifactBundlesMetaByRunRow, error)
@@ -176,9 +179,15 @@ type Querier interface {
 	// Returns log metadata (without the data blob) for a run.
 	// Use GetLog to fetch the actual log data by id.
 	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error)
+	// Returns log metadata (without the data blob) for a run since a given id.
+	// Use GetLog to fetch the actual log data by id.
+	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error)
 	// Returns log metadata (without the data blob) for a run and job.
 	// Use GetLog to fetch the actual log data by id.
 	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error)
+	// Returns log metadata (without the data blob) for a run and job since a given id.
+	// Use GetLog to fetch the actual log data by id.
+	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]ListLogsMetaByRunAndJobSinceRow, error)
 	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
