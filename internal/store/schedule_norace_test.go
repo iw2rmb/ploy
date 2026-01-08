@@ -2,11 +2,13 @@ package store
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/jackc/pgx/v5"
 )
 
 // TestScheduleNextJobNoRace verifies that concurrent calls to ScheduleNextJob
@@ -34,21 +36,23 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	if db.Pool().Config().MaxConns < 2 {
+		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent schedulers", db.Pool().Config().MaxConns)
+	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-norace", "main", "feature", []byte(`{"type":"norace"}`))
 
 	// Create multiple jobs in Created status (not Queued).
 	const numJobs = 10
-	jobIDs := make([]types.JobID, numJobs)
 	for i := 0; i < numJobs; i++ {
-		jobIDs[i] = types.NewJobID()
+		jobID := types.NewJobID()
 		_, err := db.CreateJob(ctx, CreateJobParams{
-			ID:          jobIDs[i],
+			ID:          jobID,
 			RunID:       fx.Run.ID,
 			RepoID:      fx.ModRepo.ID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
-			Name:        "job-norace-" + jobIDs[i].String(),
+			Name:        "job-norace-" + jobID.String(),
 			ModType:     "",
 			ModImage:    "",
 			Status:      JobStatusCreated, // Created, not Queued
@@ -61,78 +65,99 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 	}
 
 	// Run concurrent schedulers trying to schedule the next job.
-	const numSchedulers = 20
+	const numSchedulers = numJobs * 2
+	start := make(chan struct{})
 	var wg sync.WaitGroup
-	results := make(chan *Job, numSchedulers)
-	errors := make(chan error, numSchedulers)
+	scheduled := make(chan types.JobID, numSchedulers)
+	errs := make(chan error, numSchedulers)
 
 	wg.Add(numSchedulers)
 	for i := 0; i < numSchedulers; i++ {
 		go func() {
 			defer wg.Done()
+			<-start
 			job, err := db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 				RunID:   fx.Run.ID,
 				RepoID:  fx.ModRepo.ID,
 				Attempt: fx.RunRepo.Attempt,
 			})
 			if err != nil {
-				errors <- err
+				errs <- err
 				return
 			}
-			results <- &job
+			scheduled <- job.ID
 		}()
 	}
 
+	close(start)
 	wg.Wait()
-	close(results)
-	close(errors)
+	close(scheduled)
+	close(errs)
 
 	// Collect results.
-	var scheduledJobs []*Job
+	var scheduledIDs []types.JobID
 	var scheduleErrors []error
-	for job := range results {
-		scheduledJobs = append(scheduledJobs, job)
+	for id := range scheduled {
+		scheduledIDs = append(scheduledIDs, id)
 	}
-	for err := range errors {
+	for err := range errs {
 		scheduleErrors = append(scheduleErrors, err)
 	}
 
-	// Exactly one scheduler should succeed per job.
-	// Since we have numJobs jobs and numSchedulers concurrent calls,
-	// and all calls target the same repo attempt, we expect:
-	// - Some calls succeed (up to numJobs)
-	// - The rest fail with "no rows" (pgx.ErrNoRows)
-	if len(scheduledJobs) == 0 {
-		t.Fatal("Expected at least one job to be scheduled, got none")
+	if len(scheduledIDs) != numJobs {
+		t.Fatalf("scheduled=%d, want %d (every Created job should be promoted)", len(scheduledIDs), numJobs)
+	}
+	if len(scheduleErrors) != (numSchedulers - numJobs) {
+		t.Fatalf("errors=%d, want %d (extra schedulers should get no rows)", len(scheduleErrors), numSchedulers-numJobs)
+	}
+	for _, err := range scheduleErrors {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			t.Fatalf("unexpected ScheduleNextJob error: %v", err)
+		}
 	}
 
 	// Verify no duplicate job IDs were scheduled.
-	seenIDs := make(map[types.JobID]bool)
-	for _, job := range scheduledJobs {
-		if seenIDs[job.ID] {
-			t.Errorf("Job %s was scheduled multiple times (race condition!)", job.ID)
+	seenIDs := make(map[types.JobID]struct{}, numJobs)
+	for _, id := range scheduledIDs {
+		if _, ok := seenIDs[id]; ok {
+			t.Fatalf("job %s scheduled multiple times (scheduler race)", id)
 		}
-		seenIDs[job.ID] = true
+		seenIDs[id] = struct{}{}
 	}
 
-	// Verify all scheduled jobs are now in Queued status.
-	for _, job := range scheduledJobs {
+	// Verify all scheduled jobs are now in Queued status in the DB.
+	for id := range seenIDs {
+		job, err := db.GetJob(ctx, id)
+		if err != nil {
+			t.Fatalf("GetJob(%s) failed: %v", id, err)
+		}
 		if job.Status != JobStatusQueued {
-			t.Errorf("Scheduled job %s has status %s, expected Queued", job.ID, job.Status)
+			t.Fatalf("job %s status=%s, want %s", id, job.Status, JobStatusQueued)
 		}
 	}
 
-	// Verify total scheduled count: should be min(numJobs, numSchedulers).
-	expectedMax := numJobs
-	if numSchedulers < numJobs {
-		expectedMax = numSchedulers
+	// Verify no Created jobs remain and exactly numJobs are Queued for the repo attempt.
+	rows, err := db.CountJobsByRunRepoAttemptGroupByStatus(ctx, CountJobsByRunRepoAttemptGroupByStatusParams{
+		RunID:   fx.Run.ID,
+		RepoID:  fx.ModRepo.ID,
+		Attempt: fx.RunRepo.Attempt,
+	})
+	if err != nil {
+		t.Fatalf("CountJobsByRunRepoAttemptGroupByStatus() failed: %v", err)
 	}
-	if len(scheduledJobs) > expectedMax {
-		t.Errorf("Too many jobs scheduled: got %d, expected at most %d", len(scheduledJobs), expectedMax)
+	counts := make(map[JobStatus]int32, len(rows))
+	for _, r := range rows {
+		counts[r.Status] = r.Count
+	}
+	if got := counts[JobStatusQueued]; got != numJobs {
+		t.Fatalf("Queued jobs=%d, want %d", got, numJobs)
+	}
+	if got := counts[JobStatusCreated]; got != 0 {
+		t.Fatalf("Created jobs=%d, want 0", got)
 	}
 
 	t.Logf("Concurrent schedulers: %d, Jobs created: %d, Jobs scheduled: %d, Errors (no rows): %d",
-		numSchedulers, numJobs, len(scheduledJobs), len(scheduleErrors))
+		numSchedulers, numJobs, len(scheduledIDs), len(scheduleErrors))
 }
 
 // TestScheduleNextJobSequential verifies that sequential calls to ScheduleNextJob
@@ -227,8 +252,8 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		RepoID:  fx.ModRepo.ID,
 		Attempt: fx.RunRepo.Attempt,
 	})
-	if err == nil {
-		t.Error("Expected ScheduleNextJob to fail when no Created jobs remain, but it succeeded")
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("expected no rows when no Created jobs remain, got: %v", err)
 	}
 
 	t.Logf("Jobs scheduled in expected step_index order")
