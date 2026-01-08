@@ -20,17 +20,17 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
 	jobID := domaintypes.NewJobID()
-	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	patch := []byte{0x1f, 0x8b, 0x08, 0x00}
+	repoIDTyped := domaintypes.ModRepoID(repoID)
 
 	st.getDiffResult = store.Diff{
 		ID:    pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID: runID.String(),
-		JobID: &jobIDStr,
+		RunID: runID,
+		JobID: &jobID,
 		Patch: patch,
 	}
-	st.getJobResult = store.Job{ID: jobIDStr, RunID: runID.String(), RepoID: repoID}
+	st.getJobResult = store.Job{ID: jobID, RunID: runID, RepoID: repoIDTyped}
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&diff_id="+diffID.String(), nil)
 	req.SetPathValue("run_id", runID.String())
@@ -66,6 +66,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoAID := "repoAAAA" // NanoID-backed
 	repoBID := "repoBBBB" // NanoID-backed
+	repoBIDTyped := domaintypes.ModRepoID(repoBID)
 
 	// Setup: diff for repo A (via job_id -> jobs.repo_id join)
 	jobAID := domaintypes.NewJobID()
@@ -101,11 +102,11 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	if !st.listDiffsByRunRepoCalled {
 		t.Fatal("expected ListDiffsByRunRepo to be called")
 	}
-	if st.listDiffsByRunRepoParams.RunID != runID.String() {
-		t.Errorf("run_id=%q, want %q", st.listDiffsByRunRepoParams.RunID, runID.String())
+	if st.listDiffsByRunRepoParams.RunID != runID {
+		t.Errorf("run_id=%q, want %q", st.listDiffsByRunRepoParams.RunID, runID)
 	}
-	if st.listDiffsByRunRepoParams.RepoID != repoBID {
-		t.Errorf("repo_id=%q, want %q", st.listDiffsByRunRepoParams.RepoID, repoBID)
+	if st.listDiffsByRunRepoParams.RepoID != repoBIDTyped {
+		t.Errorf("repo_id=%q, want %q", st.listDiffsByRunRepoParams.RepoID, repoBIDTyped)
 	}
 
 	var resp diffListResponse
@@ -126,15 +127,14 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA" // NanoID-backed
 	jobID := domaintypes.NewJobID()
-	jobIDStr := jobID.String()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
 	// Store returns the diff that belongs to this repo
 	st.listDiffsByRunRepoResult = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     runID.String(),
-		JobID:     &jobIDStr,
+		RunID:     runID,
+		JobID:     &jobID,
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0,"mod_type":"mod"}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -163,7 +163,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	if item.ID != diffID.String() {
 		t.Errorf("id=%q, want %q", item.ID, diffID.String())
 	}
-	if item.JobID != domaintypes.JobID(jobID.String()) {
+	if item.JobID != jobID {
 		t.Errorf("job_id=%q, want %q", item.JobID, jobID.String())
 	}
 	if !item.CreatedAt.Equal(createdAt) {

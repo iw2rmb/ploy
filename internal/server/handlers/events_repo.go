@@ -46,8 +46,9 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		// Convert to typed RunID for type-safe stream operations.
 		runID := domaintypes.RunID(runIDStr)
+		repoID := domaintypes.ModRepoID(repoIDStr)
 
-		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
+		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
@@ -60,8 +61,8 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{
-			RunID:   runIDStr,
-			RepoID:  repoIDStr,
+			RunID:   runID,
+			RepoID:  repoID,
 			Attempt: rr.Attempt,
 		})
 		if err != nil {
@@ -72,7 +73,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		allowedJobs := make(map[string]struct{}, len(jobs))
 		for _, job := range jobs {
-			allowedJobs[job.ID] = struct{}{}
+			allowedJobs[job.ID.String()] = struct{}{}
 		}
 
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))

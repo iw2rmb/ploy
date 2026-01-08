@@ -95,7 +95,7 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: runID}}
+	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
 	h := getRunLogsHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
@@ -134,7 +134,7 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: runID}}
+	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
 	h := getRunLogsHandler(st, eventsService)
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
@@ -187,7 +187,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	hub := eventsService.Hub()
 
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: runID}}
+	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
 	h := getRunLogsHandler(st, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)

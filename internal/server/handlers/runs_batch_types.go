@@ -59,7 +59,7 @@ func runToSummary(run store.Run) RunSummary {
 // getRunRepoCounts fetches and aggregates repo counts by status for a run.
 // runID is now a KSUID-backed domain type.
 func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*RunRepoCounts, error) {
-	rows, err := st.CountRunReposByStatus(ctx, runID.String())
+	rows, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ type RunRepoResponse struct {
 func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
 	resp := RunRepoResponse{
 		RunID:     domaintypes.RunID(rr.RunID),
-		RepoID:    rr.RepoID,
+		RepoID:    rr.RepoID.String(),
 		RepoURL:   repoURL,
 		BaseRef:   rr.RepoBaseRef,
 		TargetRef: rr.RepoTargetRef,

@@ -22,11 +22,12 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := requiredPathParam(r, "id")
+		nodeIDStr, err := requiredPathParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxRequestSize {
@@ -98,11 +99,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 				return
 			}
 
-			// Parse job_id if provided; convert domain type to string for store.
-			var jobID *string
+			// Parse job_id if provided.
+			var jobID *domaintypes.JobID
 			if evt.JobID != nil && !evt.JobID.IsZero() {
-				s := evt.JobID.String()
-				jobID = &s
+				jobID = evt.JobID
 			}
 
 			// Parse event time if provided, otherwise use server time.
@@ -134,7 +134,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID: req.RunID.String(),
+				RunID: req.RunID,
 				JobID: jobID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,
@@ -149,7 +149,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to create event: %v", err), http.StatusInternalServerError)
-				slog.Error("node events: create failed", "node_id", nodeID, "run_id", req.RunID.String(), "index", i, "err", err)
+				slog.Error("node events: create failed", "node_id", nodeIDStr, "run_id", req.RunID.String(), "index", i, "err", err)
 				return
 			}
 
@@ -164,7 +164,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		slog.Debug("node events created",
-			"node_id", nodeID,
+			"node_id", nodeIDStr,
 			"run_id", req.RunID.String(),
 			"count", count,
 		)

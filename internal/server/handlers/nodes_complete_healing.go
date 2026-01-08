@@ -31,8 +31,8 @@ func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
 	run store.Run,
-	runID string,
-	repoID string,
+	runID domaintypes.RunID,
+	repoID domaintypes.ModRepoID,
 	attempt int32,
 	failedStepIndex domaintypes.StepIndex,
 ) error {
@@ -48,7 +48,7 @@ func maybeCreateHealingJobs(
 	// Find the failed gate job by step_index.
 	var failedJob *store.Job
 	for i := range jobs {
-		if jobs[i].StepIndex == float64(failedStepIndex) {
+		if jobs[i].StepIndex == failedStepIndex {
 			failedJob = &jobs[i]
 			break
 		}
@@ -127,12 +127,12 @@ func maybeCreateHealingJobs(
 			if mt != domaintypes.ModTypePreGate && mt != domaintypes.ModTypePostGate {
 				continue
 			}
-			if job.StepIndex > float64(failedStepIndex) {
+			if float64(job.StepIndex) > float64(failedStepIndex) {
 				continue
 			}
-			if !baseFound || job.StepIndex > baseStepIndex {
+			if !baseFound || float64(job.StepIndex) > baseStepIndex {
 				baseFound = true
-				baseStepIndex = job.StepIndex
+				baseStepIndex = float64(job.StepIndex)
 			}
 		}
 		if baseFound {
@@ -153,7 +153,7 @@ func maybeCreateHealingJobs(
 		}
 	)
 	for _, job := range jobs {
-		if job.StepIndex <= windowStart {
+		if float64(job.StepIndex) <= windowStart {
 			continue
 		}
 		jt := domaintypes.ModType(job.ModType)
@@ -168,9 +168,9 @@ func maybeCreateHealingJobs(
 			// must not terminate it.
 			continue
 		}
-		if !hasWindowEnd || job.StepIndex < windowEnd {
+		if !hasWindowEnd || float64(job.StepIndex) < windowEnd {
 			hasWindowEnd = true
-			windowEnd = job.StepIndex
+			windowEnd = float64(job.StepIndex)
 		}
 	}
 
@@ -185,10 +185,10 @@ func maybeCreateHealingJobs(
 		if jt != domaintypes.ModTypeHeal {
 			continue
 		}
-		if job.StepIndex <= windowStart {
+		if float64(job.StepIndex) <= windowStart {
 			continue
 		}
-		if hasWindowEnd && job.StepIndex >= windowEnd {
+		if hasWindowEnd && float64(job.StepIndex) >= windowEnd {
 			continue
 		}
 		healingAttempts++
@@ -221,9 +221,9 @@ func maybeCreateHealingJobs(
 	// Find the next job after the failed gate to calculate insertion range.
 	nextStepIndex := float64(failedStepIndex) + 1000 // Default gap
 	for _, job := range jobs {
-		if job.StepIndex > float64(failedStepIndex) {
-			if job.StepIndex < nextStepIndex {
-				nextStepIndex = job.StepIndex
+		if float64(job.StepIndex) > float64(failedStepIndex) {
+			if float64(job.StepIndex) < nextStepIndex {
+				nextStepIndex = float64(job.StepIndex)
 			}
 		}
 	}
@@ -256,7 +256,7 @@ func maybeCreateHealingJobs(
 	// Create a single healing job for this attempt.
 	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          string(domaintypes.NewJobID()),
+		ID:          domaintypes.NewJobID(),
 		RunID:       runID,
 		RepoID:      repoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
@@ -265,7 +265,7 @@ func maybeCreateHealingJobs(
 		ModType:     domaintypes.ModTypeHeal.String(),
 		ModImage:    modImage,
 		Status:      store.JobStatusQueued,
-		StepIndex:   healStepIndex,
+		StepIndex:   domaintypes.StepIndex(healStepIndex),
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -283,7 +283,7 @@ func maybeCreateHealingJobs(
 	// Create a single re-gate job for this attempt.
 	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          string(domaintypes.NewJobID()),
+		ID:          domaintypes.NewJobID(),
 		RunID:       runID,
 		RepoID:      repoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
@@ -292,7 +292,7 @@ func maybeCreateHealingJobs(
 		ModType:     domaintypes.ModTypeReGate.String(),
 		ModImage:    "",
 		Status:      store.JobStatusCreated,
-		StepIndex:   reGateStepIndex,
+		StepIndex:   domaintypes.StepIndex(reGateStepIndex),
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -316,8 +316,8 @@ func maybeCreateHealingJobs(
 func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
-	runID string,
-	repoID string,
+	runID domaintypes.RunID,
+	repoID domaintypes.ModRepoID,
 	attempt int32,
 	failedStepIndex domaintypes.StepIndex,
 ) error {
@@ -333,7 +333,7 @@ func cancelRemainingJobsAfterFailure(
 	}
 
 	for _, job := range jobs {
-		if job.StepIndex <= float64(failedStepIndex) {
+		if job.StepIndex <= failedStepIndex {
 			continue
 		}
 

@@ -70,7 +70,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// v1 side-effect: Create spec row
-		specID := domaintypes.NewSpecID().String()
+		specID := domaintypes.NewSpecID()
 		createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
 			ID:        specID,
 			Name:      "",
@@ -84,10 +84,10 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// v1 side-effect: Create mod project with name == id
-		modID := domaintypes.NewModID().String()
+		modID := domaintypes.NewModID()
 		if _, err := st.CreateMod(r.Context(), store.CreateModParams{
 			ID:        modID,
-			Name:      modID,
+			Name:      modID.String(),
 			SpecID:    &createdSpec.ID,
 			CreatedBy: req.CreatedBy,
 		}); err != nil {
@@ -98,7 +98,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// Create mod repo for the provided repo_url
 		normalizedRepoURL := vcs.NormalizeRepoURL(req.RepoURL.String())
-		modRepoID := domaintypes.NewModRepoID().String()
+		modRepoID := domaintypes.NewModRepoID()
 		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
 			ID:        modRepoID,
 			ModID:     modID,
@@ -113,7 +113,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// Create run
-		runID := domaintypes.NewRunID().String()
+		runID := domaintypes.NewRunID()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
 			ModID:     modID,
@@ -142,7 +142,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// v1 immediate start: Create repo-scoped jobs for the queued repo.
 		// This ensures the run starts execution immediately.
-		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
+		if err := createJobsFromSpec(r.Context(), st, run.ID.String(), runRepo.RepoID.String(), runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("create single-repo run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return
@@ -154,9 +154,9 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			ModID  string `json:"mod_id"`
 			SpecID string `json:"spec_id"`
 		}{
-			RunID:  run.ID,
-			ModID:  modID,
-			SpecID: createdSpec.ID,
+			RunID:  run.ID.String(),
+			ModID:  modID.String(),
+			SpecID: createdSpec.ID.String(),
 		}
 
 		// Publish queued event to SSE hub for the run
@@ -164,7 +164,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			// Build a minimal run summary for the event using modsapi.RunSummary
 			// (matching the event structure expected by eventsService.PublishRun)
 			summary := modsapi.RunSummary{
-				RunID:      domaintypes.RunID(run.ID),
+				RunID:      run.ID,
 				State:      modsapi.RunStatusFromStore(run.Status),
 				Submitter:  "",
 				Repository: modRepo.RepoUrl,
@@ -176,7 +176,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 				UpdatedAt: time.Now().UTC(),
 				Stages:    make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishRun(r.Context(), domaintypes.RunID(run.ID), summary); err != nil {
+			if err := eventsService.PublishRun(r.Context(), run.ID, summary); err != nil {
 				slog.Error("create single-repo run: publish run event failed", "run_id", run.ID, "err", err)
 			}
 		}
@@ -189,7 +189,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		slog.Info("single-repo run created",
 			"run_id", run.ID,
-			"mod_id", modID,
+			"mod_id", modID.String(),
 			"spec_id", createdSpec.ID,
 			"repo_id", runRepo.RepoID,
 			"repo_url", req.RepoURL,

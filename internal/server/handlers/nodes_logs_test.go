@@ -14,7 +14,8 @@ import (
 func TestCreateNodeLogs_Success(t *testing.T) {
 	t.Parallel()
 	st := &mockStore{}
-	nodeID := domaintypes.NewNodeKey()
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	logID := int64(123)
 	chunkNo := int32(5)
@@ -27,7 +28,7 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
 	st.createLogResult = store.Log{
 		ID:      logID,
-		RunID:   runID.String(),
+		RunID:   runID,
 		ChunkNo: chunkNo,
 		Data:    []byte{0x1f, 0x8b},
 	}
@@ -50,8 +51,8 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/logs", bytes.NewReader(bodyBytes))
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/logs", bytes.NewReader(bodyBytes))
+	req.SetPathValue("id", nodeIDStr)
 	req.Header.Set("Content-Type", "application/json")
 
 	createNodeLogsHandler(st, eventsService).ServeHTTP(rr, req)

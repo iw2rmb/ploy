@@ -23,7 +23,7 @@ func TestGetRunTiming_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunTimingResult: store.RunsTiming{
-			ID:      runID.String(),
+			ID:      runID,
 			QueueMs: 1500,
 			RunMs:   3000,
 		},

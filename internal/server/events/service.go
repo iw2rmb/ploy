@@ -86,7 +86,7 @@ func (s *Service) Stop(ctx context.Context) error {
 // Returns the created event from the database. If persistence fails, an error
 // is returned; SSE fanout errors are logged but do not fail the operation.
 //
-// params.RunID is a string (KSUID-backed); converted to types.RunID for hub operations.
+// params.RunID is a KSUID-backed RunID; normalized for hub operations.
 func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
@@ -101,8 +101,8 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 		return store.Event{}, fmt.Errorf("persist event: %w", err)
 	}
 
-	// Convert string runID to typed RunID for hub operations.
-	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID))
+	// Normalize for hub operations.
+	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID.String()))
 	if runID.IsZero() {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
@@ -122,7 +122,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 // The runID is used as the streamID for SSE fanout. Log data is decoded into per-line
 // stdout LogRecord frames before fanout so clients see structured "log" events.
 //
-// params.RunID is a string (KSUID-backed); converted to types.RunID for hub operations.
+// params.RunID is a KSUID-backed RunID; normalized for hub operations.
 func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	if s.store == nil {
 		return store.Log{}, errors.New("events: store not configured")
@@ -134,8 +134,8 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 		return store.Log{}, fmt.Errorf("persist log: %w", err)
 	}
 
-	// Convert string runID to typed RunID for hub operations.
-	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID))
+	// Normalize for hub operations.
+	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID.String()))
 	if runID.IsZero() {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
@@ -192,7 +192,6 @@ func (s *Service) publishLogToHub(ctx context.Context, runID domaintypes.RunID, 
 	// Fetch job metadata to enrich log records with execution context.
 	// If the job lookup fails (e.g., job doesn't exist yet or store unavailable),
 	// we still publish logs without enrichment to avoid losing data.
-	// log.JobID is now *string (KSUID-backed).
 	jobCtx := s.loadJobContext(ctx, log.JobID)
 
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
@@ -266,11 +265,9 @@ type jobContext struct {
 // fields needed to enrich log records. Returns an empty context if the
 // job ID is nil/empty or the lookup fails (logs are still published without
 // enrichment in these cases).
-//
-// jobID is now *string (KSUID-backed).
-func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext {
+func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) jobContext {
 	// If job ID is nil or empty, return empty context.
-	if jobID == nil || strings.TrimSpace(*jobID) == "" {
+	if jobID == nil || jobID.IsZero() {
 		return jobContext{}
 	}
 	// If store is not configured, return empty context (log-only mode).
@@ -282,38 +279,31 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 	if err != nil {
 		// Log lookup failure but don't block log publishing.
 		s.logger.Debug("job lookup failed for log enrichment",
-			"job_id", *jobID,
+			"job_id", jobID.String(),
 			"error", err)
 		return jobContext{}
 	}
 
 	// Normalize and validate job metadata before enrichment.
 	//
-	// job.ID is a string (KSUID-backed). job.NodeID is *string (NanoID-backed after
-	// node ID migration). job.StepIndex is float64 (historically `jobs.step_index`)
-	// and must satisfy StepIndex.Valid(). job.ModType is a string and must satisfy
-	// ModType.Validate().
+	// job.ID/job.NodeID are typed IDs; job.StepIndex must satisfy StepIndex.Valid();
+	// job.ModType must satisfy ModType.Validate().
 	//
 	// Invalid values are omitted from enrichment to keep the emitted SSE payload
 	// contract strict.
 
-	normalizedJobID := domaintypes.Normalize(job.ID)
-	var jid domaintypes.JobID
-	if !domaintypes.IsEmpty(normalizedJobID) {
-		jid = domaintypes.JobID(normalizedJobID)
-	}
+	jid := job.ID
 
-	normalizedNodeID := domaintypes.Normalize(stringPtrToString(job.NodeID))
 	var nid domaintypes.NodeID
-	if !domaintypes.IsEmpty(normalizedNodeID) {
-		nid = domaintypes.NodeID(normalizedNodeID)
+	if job.NodeID != nil && !job.NodeID.IsZero() {
+		nid = *job.NodeID
 	}
 
 	mt := domaintypes.ModType(domaintypes.Normalize(job.ModType))
 	if !mt.IsZero() {
 		if err := mt.Validate(); err != nil {
 			s.logger.Debug("invalid mod_type for log enrichment",
-				"job_id", job.ID,
+				"job_id", job.ID.String(),
 				"mod_type", job.ModType,
 				"error", err,
 			)
@@ -321,11 +311,11 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 		}
 	}
 
-	si := domaintypes.StepIndex(job.StepIndex)
+	si := job.StepIndex
 	if !si.IsZero() && !si.Valid() {
 		s.logger.Debug("invalid step_index for log enrichment",
-			"job_id", job.ID,
-			"step_index", job.StepIndex,
+			"job_id", job.ID.String(),
+			"step_index", float64(job.StepIndex),
 		)
 		si = 0
 	}
@@ -336,15 +326,6 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *string) jobContext 
 		ModType:   mt,
 		StepIndex: si,
 	}
-}
-
-// stringPtrToString dereferences a *string, returning empty string if nil.
-// Used for nullable TEXT fields like node_id (now NanoID-backed strings).
-func stringPtrToString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.

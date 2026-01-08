@@ -20,6 +20,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/vcs"
 )
@@ -73,11 +74,12 @@ type pullResponse struct {
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path.
-		runID, err := requiredPathParam(r, "run_id")
+		runIDStr, err := requiredPathParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		runID := domaintypes.RunID(runIDStr)
 
 		// Parse request body.
 		var req runPullRequest
@@ -143,8 +145,8 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Single match found — return the pull response.
 		match := matches[0]
 		resp := pullResponse{
-			RunID:         match.RunID,
-			RepoID:        match.RepoID,
+			RunID:         match.RunID.String(),
+			RepoID:        match.RepoID.String(),
 			RepoTargetRef: match.RepoTargetRef,
 		}
 
@@ -155,7 +157,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("pull run repo resolved",
-			"run_id", runID,
+			"run_id", runIDStr,
 			"repo_id", match.RepoID,
 			"repo_url", req.RepoURL,
 		)
@@ -180,11 +182,12 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 func pullModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract mod_id from path.
-		modID, err := requiredPathParam(r, "mod_id")
+		modIDStr, err := requiredPathParam(r, "mod_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		modID := domaintypes.ModID(modIDStr)
 
 		// Parse request body.
 		var req modPullRequest
@@ -241,7 +244,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Find the repo_id matching the normalized URL.
-		var matchedRepoID string
+		var matchedRepoID domaintypes.ModRepoID
 		for _, mr := range modRepos {
 			if vcs.NormalizeRepoURL(mr.RepoUrl) == normalizedURL {
 				matchedRepoID = mr.ID
@@ -249,7 +252,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		if matchedRepoID == "" {
+		if matchedRepoID.IsZero() {
 			http.Error(w, "no matching repo found in mod", http.StatusNotFound)
 			return
 		}
@@ -278,8 +281,8 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Return the pull response.
 		resp := pullResponse{
-			RunID:         latestRunRepo.RunID,
-			RepoID:        latestRunRepo.RepoID,
+			RunID:         latestRunRepo.RunID.String(),
+			RepoID:        latestRunRepo.RepoID.String(),
 			RepoTargetRef: latestRunRepo.RepoTargetRef,
 		}
 
@@ -290,9 +293,9 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("pull mod repo resolved",
-			"mod_id", modID,
+			"mod_id", modIDStr,
 			"run_id", latestRunRepo.RunID,
-			"repo_id", latestRunRepo.RepoID,
+			"repo_id", latestRunRepo.RepoID.String(),
 			"mode", mode,
 			"repo_url", req.RepoURL,
 		)

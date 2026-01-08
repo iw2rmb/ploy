@@ -28,21 +28,21 @@ import (
 func TestCompleteJob_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now()
 
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewModRepoID()
 
 	job := store.Job{
-		ID:          jobID.String(),
-		RunID:       runID.String(),
+		ID:          jobID,
+		RunID:       runID,
 		RepoID:      repoID,
 		RepoBaseRef: "main",
 		Attempt:     1,
-		NodeID:      &nodeIDStr,
+		NodeID:      &nodeID,
 		Name:        "mod-0",
 		Status:      store.JobStatusRunning,
 		ModType:     "mod",
@@ -51,7 +51,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:        runID.String(),
+			ID:        runID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
@@ -81,11 +81,11 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -129,30 +129,30 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	nextJobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	nextJob := store.Job{
-		ID:        nextJobID.String(),
-		RunID:     runID.String(),
+		ID:        nextJobID,
+		RunID:     runID,
 		Status:    store.JobStatusCreated,
 		StepIndex: 2000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:          job,
@@ -165,11 +165,11 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -191,22 +191,22 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -218,11 +218,11 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "Fail"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -245,42 +245,42 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewModRepoID()
 	modJobID := domaintypes.NewJobID()
 	postJobID := domaintypes.NewJobID()
 
 	// Jobs: pre-gate succeeded, mod failed, post-gate created.
 	jobs := []store.Job{
 		{
-			ID:          domaintypes.NewJobID().String(),
-			RunID:       runID.String(),
+			ID:          domaintypes.NewJobID(),
+			RunID:       runID,
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			NodeID:      &nodeIDStr,
+			NodeID:      &nodeID,
 			Status:      store.JobStatusSuccess,
 			ModType:     domaintypes.ModTypePreGate.String(),
 			StepIndex:   1000,
 			Meta:        []byte(`{}`),
 		},
 		{
-			ID:          modJobID.String(),
-			RunID:       runID.String(),
+			ID:          modJobID,
+			RunID:       runID,
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			NodeID:      &nodeIDStr,
+			NodeID:      &nodeID,
 			Status:      store.JobStatusRunning,
 			ModType:     domaintypes.ModTypeMod.String(),
 			StepIndex:   2000,
 			Meta:        []byte(`{}`),
 		},
 		{
-			ID:          postJobID.String(),
-			RunID:       runID.String(),
+			ID:          postJobID,
+			RunID:       runID,
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
@@ -293,7 +293,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:                   jobs[1], // mod job
@@ -309,11 +309,11 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+modJobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", modJobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -357,22 +357,22 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID.String(),
-		RunID:     runID.String(),
-		NodeID:    &nodeIDStr,
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID.String(),
+			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
 		getJobResult:        job,
@@ -384,11 +384,11 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "Cancelled"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		CommonName: nodeIDStr,
 	})
 	req = req.WithContext(ctx)
 

@@ -44,11 +44,11 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 	gzippedData := buf.Bytes()
 
 	// Prepare request payload.
-	runID := domaintypes.NewRunID().String()
-	jobID := domaintypes.NewJobID().String()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	payload := map[string]interface{}{
-		"run_id":   runID,
-		"job_id":   jobID,
+		"run_id":   runID.String(),
+		"job_id":   jobID.String(),
 		"chunk_no": 0,
 		"data":     gzippedData,
 	}
@@ -110,11 +110,11 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 	gzippedData := buf.Bytes()
 
 	// Prepare request payload including job_id.
-	runID := domaintypes.NewRunID().String()
-	jobID := domaintypes.NewJobID().String()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 	payload := map[string]interface{}{
-		"run_id":   runID,
-		"job_id":   jobID,
+		"run_id":   runID.String(),
+		"job_id":   jobID.String(),
 		"chunk_no": 1,
 		"data":     gzippedData,
 	}
@@ -148,7 +148,7 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 		t.Fatal("expected JobID to be set")
 	}
 	if *mockStore.lastCreateLog.JobID != jobID {
-		t.Fatalf("JobID mismatch: got %s, want %s", *mockStore.lastCreateLog.JobID, jobID)
+		t.Fatalf("JobID mismatch: got %s, want %s", mockStore.lastCreateLog.JobID.String(), jobID.String())
 	}
 }
 
@@ -371,7 +371,7 @@ type mockStoreForLogs struct {
 	lastCreateLog store.CreateLogParams
 }
 
-func (m *mockStoreForLogs) GetNode(ctx context.Context, id string) (store.Node, error) {
+func (m *mockStoreForLogs) GetNode(ctx context.Context, id domaintypes.NodeID) (store.Node, error) {
 	if !m.nodeExists {
 		return store.Node{}, pgx.ErrNoRows
 	}
@@ -392,6 +392,6 @@ func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogPar
 }
 
 // GetJob returns an empty job for log enrichment (no-op for this test).
-func (m *mockStoreForLogs) GetJob(ctx context.Context, id string) (store.Job, error) {
+func (m *mockStoreForLogs) GetJob(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 	return store.Job{}, nil
 }

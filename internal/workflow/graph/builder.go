@@ -61,16 +61,13 @@ func jobToNode(job store.Job) (*GraphNode, error) {
 		finishedAt = &t
 	}
 
-	// Convert raw float64 from store.Job to domaintypes.StepIndex.
-	// This centralizes the type boundary between persistence (float64) and
-	// domain logic (domaintypes.StepIndex with validation invariants).
-	stepIndex := domaintypes.StepIndex(job.StepIndex)
+	stepIndex := job.StepIndex
 	if !stepIndex.Valid() {
-		return nil, fmt.Errorf("job %q has invalid step_index %v: %w", job.ID, job.StepIndex, ErrInvalidStepIndex)
+		return nil, fmt.Errorf("job %q has invalid step_index %v: %w", job.ID.String(), float64(job.StepIndex), ErrInvalidStepIndex)
 	}
 
 	return &GraphNode{
-		ID:         job.ID, // job.ID is now a string (KSUID-backed).
+		ID:         job.ID.String(),
 		Name:       job.Name,
 		Type:       nodeType,
 		StepIndex:  stepIndex,

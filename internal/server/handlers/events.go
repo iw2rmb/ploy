@@ -63,9 +63,8 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		// Convert to typed RunID for type-safe stream operations.
 		runID := domaintypes.RunID(runIDStr)
 
-		// Verify run exists in the database using string ID directly.
-		// No UUID parsing needed; store accepts KSUID strings.
-		_, err = st.GetRun(r.Context(), runIDStr)
+		// Verify run exists in the database.
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):

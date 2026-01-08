@@ -22,7 +22,7 @@ func TestDeleteRun_Success(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID: runID.String(),
+			ID: runID,
 		},
 	}
 

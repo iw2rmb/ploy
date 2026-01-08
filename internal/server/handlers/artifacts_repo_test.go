@@ -23,6 +23,11 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	job1 := domaintypes.NewJobID().String()
 	job2 := domaintypes.NewJobID().String()
 	otherJob := domaintypes.NewJobID().String()
+	runIDTyped := domaintypes.RunID(runID)
+	repoIDTyped := domaintypes.ModRepoID(repoID)
+	job1Typed := domaintypes.JobID(job1)
+	job2Typed := domaintypes.JobID(job2)
+	otherJobTyped := domaintypes.JobID(otherJob)
 
 	t1 := time.Date(2026, 1, 6, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(1 * time.Minute)
@@ -42,20 +47,20 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 
 	st := &mockStore{
 		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
+			RunID:   runIDTyped,
+			RepoID:  repoIDTyped,
 			Status:  store.RunRepoStatusRunning,
 			Attempt: 1,
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: job1, RunID: runID, RepoID: repoID, Attempt: 1, StepIndex: 1000},
-			{ID: job2, RunID: runID, RepoID: repoID, Attempt: 1, StepIndex: 2000},
+			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(1000)},
+			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(2000)},
 		},
 		listArtifactBundlesByRunResult: []store.ArtifactBundle{
 			{
 				ID:        pgtype.UUID{Bytes: id2, Valid: true},
-				RunID:     runID,
-				JobID:     &job1,
+				RunID:     runIDTyped,
+				JobID:     &job1Typed,
 				Name:      &name2,
 				Bundle:    []byte("bb"),
 				Cid:       &cid2,
@@ -64,8 +69,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			},
 			{
 				ID:        pgtype.UUID{Bytes: id1, Valid: true},
-				RunID:     runID,
-				JobID:     &job1,
+				RunID:     runIDTyped,
+				JobID:     &job1Typed,
 				Name:      &name1,
 				Bundle:    []byte("a"),
 				Cid:       &cid1,
@@ -74,8 +79,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			},
 			{
 				ID:        pgtype.UUID{Bytes: idOther, Valid: true},
-				RunID:     runID,
-				JobID:     &otherJob,
+				RunID:     runIDTyped,
+				JobID:     &otherJobTyped,
 				Name:      nil,
 				Bundle:    []byte("zzz"),
 				Cid:       &cidOther,

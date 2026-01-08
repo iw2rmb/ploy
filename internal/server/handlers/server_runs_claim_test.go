@@ -17,12 +17,12 @@ import (
 func TestClaimJob_Success(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
-	jobID := domaintypes.NewJobID().String()
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
 	st := &mockStore{
@@ -33,11 +33,11 @@ func TestClaimJob_Success(t *testing.T) {
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			NodeID:      &nodeIDStr,
+			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
 			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   2000,
+			StepIndex:   domaintypes.StepIndex(2000),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -63,8 +63,8 @@ func TestClaimJob_Success(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{}, nil)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -72,7 +72,7 @@ func TestClaimJob_Success(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.claimJobCalled || string(st.claimJobParams) != nodeID {
+	if !st.claimJobCalled || string(st.claimJobParams) != nodeID.String() {
 		t.Fatalf("expected ClaimJob to be called with node id")
 	}
 	if len(st.updateRunRepoStatusParams) == 0 {
@@ -84,14 +84,14 @@ func TestClaimJob_Success(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp["id"] != runID {
-		t.Fatalf("expected id (run_id) %s, got %v", runID, resp["id"])
+	if resp["id"] != runID.String() {
+		t.Fatalf("expected id (run_id) %s, got %v", runID.String(), resp["id"])
 	}
-	if resp["job_id"] != jobID {
-		t.Fatalf("expected job_id %s, got %v", jobID, resp["job_id"])
+	if resp["job_id"] != jobID.String() {
+		t.Fatalf("expected job_id %s, got %v", jobID.String(), resp["job_id"])
 	}
-	if resp["repo_id"] != repoID {
-		t.Fatalf("expected repo_id %s, got %v", repoID, resp["repo_id"])
+	if resp["repo_id"] != repoID.String() {
+		t.Fatalf("expected repo_id %s, got %v", repoID.String(), resp["repo_id"])
 	}
 	if resp["repo_url"] != "https://github.com/user/repo.git" {
 		t.Fatalf("expected repo_url, got %v", resp["repo_url"])
@@ -112,8 +112,8 @@ func TestClaimJob_Success(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected spec to be an object, got %T", resp["spec"])
 	}
-	if spec["job_id"] != jobID {
-		t.Fatalf("expected spec.job_id %s, got %v", jobID, spec["job_id"])
+	if spec["job_id"] != jobID.String() {
+		t.Fatalf("expected spec.job_id %s, got %v", jobID.String(), spec["job_id"])
 	}
 	if mi, ok := spec["mod_index"].(float64); !ok || mi != 0 {
 		t.Fatalf("expected spec.mod_index 0, got %v", spec["mod_index"])
@@ -123,12 +123,12 @@ func TestClaimJob_Success(t *testing.T) {
 func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
-	jobID := domaintypes.NewJobID().String()
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
 	st := &mockStore{
@@ -139,11 +139,11 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			NodeID:      &nodeIDStr,
+			NodeID:      &nodeID,
 			Name:        "mr-0",
 			Status:      store.JobStatusRunning,
 			ModType:     domaintypes.ModTypeMR.String(),
-			StepIndex:   2000,
+			StepIndex:   domaintypes.StepIndex(2000),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -169,8 +169,8 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{}, nil)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -203,15 +203,15 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	st := &mockStore{
 		getNodeResult: store.Node{ID: nodeID},
 		// claimJobResult left empty: mock ClaimJob returns pgx.ErrNoRows.
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{}, nil)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
+	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -242,12 +242,12 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	nodeIDStr := nodeID
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
-	specID := domaintypes.NewSpecID().String()
-	jobID := domaintypes.NewJobID().String()
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
 	runSpec := []byte(`{"env":{"CA_CERTS_PEM_BUNDLE":"per-run-cert","PER_RUN_ONLY":"value"}}`)
@@ -260,11 +260,11 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			NodeID:      &nodeIDStr,
+			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
 			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   2000,
+			StepIndex:   domaintypes.StepIndex(2000),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -295,8 +295,8 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	configHolder.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false})
 
 	handler := claimJobHandler(st, configHolder, nil)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
-	req.SetPathValue("id", nodeID)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

@@ -352,7 +352,7 @@ func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
 	}
 
 	// Verify step_index ordering: pre-gate < mod-0 < mod-1 < post-gate.
-	var prevIndex float64 = 0
+	var prevIndex domaintypes.StepIndex
 	for i, p := range st.createJobParams {
 		if p.StepIndex <= prevIndex && i > 0 {
 			t.Errorf("job %d (%s): step_index %.0f is not greater than previous %.0f", i, p.Name, p.StepIndex, prevIndex)
@@ -362,7 +362,7 @@ func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
 
 	// Verify expected step_index values per mods_ticket.go layout:
 	// pre-gate=1000, mod-0=2000, mod-1=3000, post-gate=4000.
-	expectedIndices := []float64{1000, 2000, 3000, 4000}
+	expectedIndices := []domaintypes.StepIndex{1000, 2000, 3000, 4000}
 	for i, exp := range expectedIndices {
 		if st.createJobParams[i].StepIndex != exp {
 			t.Errorf("job %d: expected step_index %.0f, got %.0f", i, exp, st.createJobParams[i].StepIndex)
@@ -576,8 +576,10 @@ func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 func TestGetRunStatusHandler_Success(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
-	jobID := domaintypes.NewJobID().String()
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	jobID := domaintypes.NewJobID()
+	jobIDStr := jobID.String()
 	now := time.Now().UTC()
 
 	st := &mockStore{
@@ -591,13 +593,13 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		},
 		getModRepoResult: store.ModRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
-			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, StepIndex: 1000},
+			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, StepIndex: domaintypes.StepIndex(1000)},
 		},
 	}
 
 	handler := getRunStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/status", nil)
-	req.SetPathValue("id", runID)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr+"/status", nil)
+	req.SetPathValue("id", runIDStr)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -611,8 +613,8 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if string(resp.RunID) != runID {
-		t.Fatalf("expected run_id %s, got %s", runID, string(resp.RunID))
+	if resp.RunID.String() != runIDStr {
+		t.Fatalf("expected run_id %s, got %s", runIDStr, resp.RunID.String())
 	}
 	if resp.State != modsapi.RunStateRunning {
 		t.Fatalf("expected status running, got %s", resp.State)
@@ -629,7 +631,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	if len(resp.Stages) != 1 {
 		t.Fatalf("expected 1 stage, got %d", len(resp.Stages))
 	}
-	if got := resp.Stages[jobID].State; got != modsapi.StageStatePending {
+	if got := resp.Stages[jobIDStr].State; got != modsapi.StageStatePending {
 		t.Fatalf("expected stage to be pending, got %s", got)
 	}
 

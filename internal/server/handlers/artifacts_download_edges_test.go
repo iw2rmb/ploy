@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -41,10 +42,10 @@ func TestGetArtifactHandler_DBError(t *testing.T) {
 // Sanity check: metadata path includes CreatedAt only when valid and always returns non-empty IDs.
 func TestGetArtifactHandler_Metadata_Fields(t *testing.T) {
 	id := uuid.New()
-	run := uuid.New()
+	runID := domaintypes.NewRunID()
 	st := &mockStore{getArtifactBundleResult: store.ArtifactBundle{
 		ID:    pgtype.UUID{Bytes: id, Valid: true},
-		RunID: run.String(),
+		RunID: runID,
 		// no CreatedAt valid timestamp here; handler should omit formatting without panicking
 		Bundle: []byte("x"),
 	}}

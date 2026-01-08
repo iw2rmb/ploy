@@ -34,7 +34,7 @@ func TestLabSmoke(t *testing.T) {
 	// Step 1: Create v1 entities: spec → mod → mod_repo → run → run_repo.
 	createdBy := "smoke-test"
 	specJSON := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
-	specID := domaintypes.NewSpecID().String()
+	specID := domaintypes.NewSpecID()
 	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
 		ID:        specID,
 		Name:      "smoke-test",
@@ -45,10 +45,10 @@ func TestLabSmoke(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewModID()
 	_, err = db.CreateMod(ctx, store.CreateModParams{
 		ID:        modID,
-		Name:      "smoke-test-" + modID,
+		Name:      "smoke-test-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -60,7 +60,7 @@ func TestLabSmoke(t *testing.T) {
 	baseRef := "main"
 	targetRef := "feature/smoke-test"
 
-	modRepoID := domaintypes.NewModRepoID().String()
+	modRepoID := domaintypes.NewModRepoID()
 	modRepo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
 		ID:        modRepoID,
 		ModID:     modID,
@@ -72,7 +72,7 @@ func TestLabSmoke(t *testing.T) {
 		t.Fatalf("CreateModRepo() failed: %v", err)
 	}
 
-	runID := domaintypes.NewRunID().String()
+	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
 		ModID:     modID,
@@ -97,7 +97,7 @@ func TestLabSmoke(t *testing.T) {
 
 	// Step 4: Simulate node operations - Create a job for the run.
 	job, err := db.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID().String(),
+		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
 		RepoID:      runRepo.RepoID,
 		RepoBaseRef: runRepo.RepoBaseRef,
