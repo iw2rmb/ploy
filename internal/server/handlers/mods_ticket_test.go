@@ -104,9 +104,9 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.RunID("run_test_12345678901234567")
+	repoID := domaintypes.ModRepoID("repo_abc")
 	const (
-		runID       = "run_test_12345678901234567"
-		repoID      = "repo_abc"
 		repoBaseRef = "main"
 		attempt     = int32(1)
 	)
@@ -167,9 +167,9 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.RunID("run_multistep_0123456789")
+	repoID := domaintypes.ModRepoID("repo_multi")
 	const (
-		runID       = "run_multistep_0123456789"
-		repoID      = "repo_multi"
 		repoBaseRef = "develop"
 		attempt     = int32(2)
 	)
@@ -269,7 +269,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := &mockStore{}
 
-			err := createJobsFromSpec(context.Background(), st, "run_123", "repo_456", "main", 1, tc.spec)
+			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.ModRepoID("repo_456"), "main", 1, tc.spec)
 			if err != nil {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
@@ -308,9 +308,9 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.RunID("run_v1_direct_addressing_12")
+	repoID := domaintypes.ModRepoID("repo_direct_addr")
 	const (
-		runID       = "run_v1_direct_addressing_12"
-		repoID      = "repo_direct_addr"
 		repoBaseRef = "feature/test"
 		attempt     = int32(3)
 	)
@@ -346,7 +346,7 @@ func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
 	st := &mockStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, "run_123", "repo_456", "main", 1, spec)
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.ModRepoID("repo_456"), "main", 1, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}

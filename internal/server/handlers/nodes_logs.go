@@ -36,13 +36,11 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 	const maxBodySize = 2 << 20  // 2 MiB
 	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract node id from path parameter.
-		nodeIDStr, err := requiredPathParam(r, "id")
+		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		nodeID := domaintypes.NodeID(nodeIDStr)
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
@@ -90,7 +88,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("node logs: check failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("node logs: check failed", "node_id", nodeID.String(), "err", err)
 			return
 		}
 
@@ -113,7 +111,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		log, err := eventsService.CreateAndPublishLog(r.Context(), params)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
-			slog.Error("node logs: create failed", "node_id", nodeIDStr, "run_id", req.RunID.String(), "chunk_no", req.ChunkNo, "err", err)
+			slog.Error("node logs: create failed", "node_id", nodeID.String(), "run_id", req.RunID.String(), "chunk_no", req.ChunkNo, "err", err)
 			return
 		}
 
@@ -129,7 +127,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		slog.Debug("log chunk stored",
-			"node_id", nodeIDStr,
+			"node_id", nodeID.String(),
 			"run_id", req.RunID.String(),
 			"chunk_no", req.ChunkNo,
 			"size", len(req.Data),

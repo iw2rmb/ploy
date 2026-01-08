@@ -143,7 +143,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// v1 immediate start: Create repo-scoped jobs for the queued repo.
 		// This ensures the run starts execution immediately.
-		if err := createJobsFromSpec(r.Context(), st, run.ID.String(), runRepo.RepoID.String(), runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
+		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
 			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
 			slog.Error("create single-repo run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return

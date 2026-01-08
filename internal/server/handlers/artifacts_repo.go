@@ -20,19 +20,16 @@ import (
 // GET /v1/runs/{run_id}/repos/{repo_id}/artifacts
 func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr, err := requiredPathParam(r, "run_id")
+		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		repoIDStr, err := requiredPathParam(r, "repo_id")
+		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		runID := domaintypes.RunID(runIDStr)
-		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
@@ -41,7 +38,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 				http.Error(w, "repo not found", http.StatusNotFound)
 			default:
 				http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
-				slog.Error("list run repo artifacts: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+				slog.Error("list run repo artifacts: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			}
 			return
 		}
@@ -53,7 +50,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repo artifacts: list jobs failed", "run_id", runIDStr, "repo_id", repoIDStr, "attempt", rr.Attempt, "err", err)
+			slog.Error("list run repo artifacts: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", rr.Attempt, "err", err)
 			return
 		}
 
@@ -65,7 +62,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repo artifacts: list bundles failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+			slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
 

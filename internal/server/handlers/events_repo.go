@@ -21,32 +21,16 @@ import (
 // GET /v1/runs/{run_id}/repos/{repo_id}/logs
 func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr, err := requiredPathParam(r, "run_id")
+		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		repoIDStr, err := requiredPathParam(r, "repo_id")
+		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Reject blank/whitespace-only run IDs at the HTTP boundary.
-		if domaintypes.IsEmpty(runIDStr) {
-			http.Error(w, "invalid run_id", http.StatusBadRequest)
-			return
-		}
-
-		// Reject obviously invalid IDs (Run IDs are KSUID strings, 27 characters).
-		if len(runIDStr) != 27 {
-			http.Error(w, "invalid run_id", http.StatusBadRequest)
-			return
-		}
-
-		// Convert to typed RunID for type-safe stream operations.
-		runID := domaintypes.RunID(runIDStr)
-		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
@@ -54,7 +38,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			case errors.Is(err, pgx.ErrNoRows):
 				http.Error(w, "repo not found", http.StatusNotFound)
 			default:
-				slog.Error("get run repo logs: get repo failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+				slog.Error("get run repo logs: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 				http.Error(w, "failed to get repo", http.StatusInternalServerError)
 			}
 			return
@@ -66,7 +50,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			Attempt: rr.Attempt,
 		})
 		if err != nil {
-			slog.Error("get run repo logs: list jobs failed", "run_id", runIDStr, "repo_id", repoIDStr, "attempt", rr.Attempt, "err", err)
+			slog.Error("get run repo logs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", rr.Attempt, "err", err)
 			http.Error(w, "failed to list jobs", http.StatusInternalServerError)
 			return
 		}
@@ -79,7 +63,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 		hub := eventsService.Hub()
 		if err := hub.Ensure(runID); err != nil {
-			slog.Error("ensure stream failed", "run_id", runIDStr, "err", err)
+			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
 			http.Error(w, "invalid run id", http.StatusBadRequest)
 			return
 		}
@@ -126,7 +110,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		if err := logstream.ServeFiltered(w, r, hub, runID, sinceID, filter); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				slog.Error("stream run repo logs", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+				slog.Error("stream run repo logs", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			}
 		}
 	}

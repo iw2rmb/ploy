@@ -57,21 +57,18 @@ type diffListResponse struct {
 func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter using the shared helper.
-		runIDStr, err := requiredPathParam(r, "run_id")
+		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoIDStr, err := requiredPathParam(r, "repo_id")
+		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		runID := domaintypes.RunID(runIDStr)
-		repoID := domaintypes.ModRepoID(repoIDStr)
 
 		// Optional download mode: serve the gzipped patch for a specific diff.
 		if r.URL.Query().Get("download") == "true" {
@@ -113,7 +110,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to get diff job: %v", err), http.StatusInternalServerError)
-				slog.Error("download run repo diff: get job failed", "run_id", runIDStr, "repo_id", repoIDStr, "diff_id", diffIDStr, "job_id", d.JobID.String(), "err", err)
+				slog.Error("download run repo diff: get job failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffIDStr, "job_id", d.JobID.String(), "err", err)
 				return
 			}
 			if job.RepoID != repoID {
@@ -135,7 +132,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list diffs: %v", err), http.StatusInternalServerError)
-			slog.Error("list run repo diffs: query failed", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
+			slog.Error("list run repo diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
 

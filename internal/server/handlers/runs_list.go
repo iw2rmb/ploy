@@ -63,25 +63,25 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runIDStr, err := requiredPathParam(r, "id")
+		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), domaintypes.RunID(runIDStr))
+		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
-			slog.Error("get run: fetch failed", "run_id", runIDStr, "err", err)
+			slog.Error("get run: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
 		summary := runToSummary(run)
-		if counts, _ := getRunRepoCounts(r.Context(), st, domaintypes.RunID(run.ID)); counts != nil && counts.Total > 0 {
+		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}
 
