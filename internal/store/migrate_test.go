@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestRunMigrations(t *testing.T) {
@@ -33,6 +34,16 @@ func TestRunMigrations(t *testing.T) {
 	}
 	if count == 0 {
 		t.Fatal("expected at least one migration to be applied")
+	}
+
+	// Verify the latest entry has a non-zero applied_at.
+	var appliedAt time.Time
+	err = st.Pool().QueryRow(ctx, "SELECT applied_at FROM ploy.schema_version WHERE version = $1", SchemaVersion).Scan(&appliedAt)
+	if err != nil {
+		t.Fatalf("query applied_at: %v", err)
+	}
+	if appliedAt.IsZero() {
+		t.Fatal("expected applied_at to be set for applied migration")
 	}
 
 	// Get the current version.
@@ -127,7 +138,7 @@ func TestGetCurrentVersion(t *testing.T) {
 	}
 
 	// Insert a version.
-	_, err = st.Pool().Exec(ctx, "INSERT INTO ploy.schema_version (version) VALUES (5)")
+	_, err = st.Pool().Exec(ctx, "INSERT INTO ploy.schema_version (version, applied_at) VALUES (5, now())")
 	if err != nil {
 		t.Fatalf("insert version: %v", err)
 	}
