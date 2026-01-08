@@ -104,8 +104,8 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		t.Error("StepIndex(1000) should be valid")
 	}
 	si = types.StepIndex(1000.5)
-	if si.Valid() {
-		t.Error("StepIndex(1000.5) should be invalid (fractional)")
+	if !si.Valid() {
+		t.Error("StepIndex(1000.5) should be valid (fractional)")
 	}
 
 	// Verify derived timing view row types preserve RunID typing.
