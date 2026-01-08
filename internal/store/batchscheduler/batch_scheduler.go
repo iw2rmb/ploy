@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -35,9 +36,9 @@ type StartPendingReposResult struct {
 // Implemented by handlers.BatchRepoStarter to decouple scheduler from HTTP layer.
 type RepoStarter interface {
 	// StartPendingRepos starts execution for all pending repos in a batch run.
-	// runID is a KSUID-backed string identifier for the batch run.
+	// runID is a types.RunID (KSUID-backed) identifier for the batch run.
 	// Returns StartPendingReposResult with counts of started, already done, and pending repos.
-	StartPendingRepos(ctx context.Context, runID string) (StartPendingReposResult, error)
+	StartPendingRepos(ctx context.Context, runID types.RunID) (StartPendingReposResult, error)
 }
 
 // Options configures the batch scheduler.

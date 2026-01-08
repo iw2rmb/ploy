@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -23,7 +24,7 @@ type CountRunReposByStatusRow struct {
 	Count  int32         `json:"count"`
 }
 
-func (q *Queries) CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error) {
+func (q *Queries) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error) {
 	rows, err := q.db.Query(ctx, countRunReposByStatus, runID)
 	if err != nil {
 		return nil, err
@@ -50,11 +51,11 @@ RETURNING mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attem
 `
 
 type CreateRunRepoParams struct {
-	ModID         string `json:"mod_id"`
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoBaseRef   string `json:"repo_base_ref"`
-	RepoTargetRef string `json:"repo_target_ref"`
+	ModID         types.ModID     `json:"mod_id"`
+	RunID         types.RunID     `json:"run_id"`
+	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoBaseRef   string          `json:"repo_base_ref"`
+	RepoTargetRef string          `json:"repo_target_ref"`
 }
 
 // v1: Creates a new run_repos row scoped to (run_id, repo_id).
@@ -90,8 +91,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type DeleteRunRepoParams struct {
-	RunID  string `json:"run_id"`
-	RepoID string `json:"repo_id"`
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
 }
 
 func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error {
@@ -111,15 +112,15 @@ LIMIT 1
 `
 
 type GetLatestRunRepoByModAndRepoStatusParams struct {
-	ModID  string        `json:"mod_id"`
-	RepoID string        `json:"repo_id"`
-	Status RunRepoStatus `json:"status"`
+	ModID  types.ModID     `json:"mod_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
+	Status RunRepoStatus   `json:"status"`
 }
 
 type GetLatestRunRepoByModAndRepoStatusRow struct {
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoTargetRef string `json:"repo_target_ref"`
+	RunID         types.RunID     `json:"run_id"`
+	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoTargetRef string          `json:"repo_target_ref"`
 }
 
 // v1: Gets the newest run_repos row for a specific repo_id in a mod,
@@ -140,8 +141,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type GetRunRepoParams struct {
-	RunID  string `json:"run_id"`
-	RepoID string `json:"repo_id"`
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
 }
 
 func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error) {
@@ -174,8 +175,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type IncrementRunRepoAttemptParams struct {
-	RunID  string `json:"run_id"`
-	RepoID string `json:"repo_id"`
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
 }
 
 // Increments attempt and resets status/timing for a fresh repo execution attempt.
@@ -199,15 +200,15 @@ WHERE status = 'Fail'
 // "Last terminal state" per repo_id is determined by looking at the newest run_repos
 // row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 // Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-func (q *Queries) ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error) {
+func (q *Queries) ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error) {
 	rows, err := q.db.Query(ctx, listFailedRepoIDsByMod, modID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []types.ModRepoID{}
 	for rows.Next() {
-		var repo_id string
+		var repo_id types.ModRepoID
 		if err := rows.Scan(&repo_id); err != nil {
 			return nil, err
 		}
@@ -226,7 +227,7 @@ WHERE run_id = $1 AND status = 'Queued'
 ORDER BY created_at ASC
 `
 
-func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
+func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error) {
 	rows, err := q.db.Query(ctx, listQueuedRunReposByRun, runID)
 	if err != nil {
 		return nil, err
@@ -266,7 +267,7 @@ ORDER BY created_at ASC
 `
 
 // Lists all repos associated with a run, ordered by creation time.
-func (q *Queries) ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error) {
+func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error) {
 	rows, err := q.db.Query(ctx, listRunReposByRun, runID)
 	if err != nil {
 		return nil, err
@@ -306,15 +307,15 @@ WHERE rr.run_id = $1
 `
 
 type ListRunReposWithURLByRunRow struct {
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoTargetRef string `json:"repo_target_ref"`
-	RepoUrl       string `json:"repo_url"`
+	RunID         types.RunID     `json:"run_id"`
+	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoTargetRef string          `json:"repo_target_ref"`
+	RepoUrl       string          `json:"repo_url"`
 }
 
 // v1: Lists all run_repos for a run with their repo_url (from mod_repos).
 // Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
-func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID string) ([]ListRunReposWithURLByRunRow, error) {
+func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error) {
 	rows, err := q.db.Query(ctx, listRunReposWithURLByRun, runID)
 	if err != nil {
 		return nil, err
@@ -358,14 +359,14 @@ LIMIT $2 OFFSET $3
 `
 
 type ListRunsForRepoParams struct {
-	RepoID string `json:"repo_id"`
-	Limit  int32  `json:"limit"`
-	Offset int32  `json:"offset"`
+	RepoID types.ModRepoID `json:"repo_id"`
+	Limit  int32           `json:"limit"`
+	Offset int32           `json:"offset"`
 }
 
 type ListRunsForRepoRow struct {
-	RunID         string             `json:"run_id"`
-	ModID         string             `json:"mod_id"`
+	RunID         types.RunID        `json:"run_id"`
+	ModID         types.ModID        `json:"mod_id"`
 	RunStatus     RunStatus          `json:"run_status"`
 	RepoStatus    RunRepoStatus      `json:"repo_status"`
 	RepoBaseRef   string             `json:"repo_base_ref"`
@@ -416,15 +417,15 @@ ORDER BY r.id
 `
 
 // Lists runs that have queued work (at least one Queued run_repos row).
-func (q *Queries) ListRunsWithQueuedRepos(ctx context.Context) ([]string, error) {
+func (q *Queries) ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error) {
 	rows, err := q.db.Query(ctx, listRunsWithQueuedRepos)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []types.RunID{}
 	for rows.Next() {
-		var id string
+		var id types.RunID
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
@@ -443,9 +444,9 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoErrorParams struct {
-	RunID     string  `json:"run_id"`
-	RepoID    string  `json:"repo_id"`
-	LastError *string `json:"last_error"`
+	RunID     types.RunID     `json:"run_id"`
+	RepoID    types.ModRepoID `json:"repo_id"`
+	LastError *string         `json:"last_error"`
 }
 
 func (q *Queries) UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error {
@@ -461,10 +462,10 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoRefsParams struct {
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoBaseRef   string `json:"repo_base_ref"`
-	RepoTargetRef string `json:"repo_target_ref"`
+	RunID         types.RunID     `json:"run_id"`
+	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoBaseRef   string          `json:"repo_base_ref"`
+	RepoTargetRef string          `json:"repo_target_ref"`
 }
 
 // Updates snapshot refs for the run repo (used when restarting with new refs).
@@ -487,9 +488,9 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoStatusParams struct {
-	RunID  string        `json:"run_id"`
-	RepoID string        `json:"repo_id"`
-	Status RunRepoStatus `json:"status"`
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
+	Status RunRepoStatus   `json:"status"`
 }
 
 // Updates repo status + timing fields.

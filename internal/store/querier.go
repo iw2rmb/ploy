@@ -7,6 +7,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -14,7 +15,7 @@ type Querier interface {
 	// Archives a mod by setting archived_at to now().
 	// Archiving must be refused when the mod has any jobs in a running state.
 	// This query only sets the timestamp; validation logic must be in the caller.
-	ArchiveMod(ctx context.Context, id string) error
+	ArchiveMod(ctx context.Context, id types.ModID) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	// Atomically claim the next claimable job for a node (unified queue).
@@ -22,14 +23,14 @@ type Querier interface {
 	// - claimable jobs have status='Queued'
 	// - normal jobs are claimable only when runs.status='Started'
 	// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
-	ClaimJob(ctx context.Context, nodeID *string) (Job, error)
-	CountJobsByRun(ctx context.Context, runID string) (int64, error)
+	ClaimJob(ctx context.Context, nodeID *types.NodeID) (Job, error)
+	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
 	// Used by repo-scoped terminal detection to determine run_repos.status.
 	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
-	CountRunReposByStatus(ctx context.Context, runID string) ([]CountRunReposByStatusRow, error)
+	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
 	// Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	// Creates a new diff entry associated with a job.
@@ -67,20 +68,20 @@ type Querier interface {
 	// Removes an environment entry by key.
 	// No-op if the key does not exist (exec returns no error).
 	DeleteGlobalEnv(ctx context.Context, key string) error
-	DeleteJob(ctx context.Context, id string) error
+	DeleteJob(ctx context.Context, id types.JobID) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Deletes a mod. Use with caution; should only be called when safe to remove.
-	DeleteMod(ctx context.Context, id string) error
+	DeleteMod(ctx context.Context, id types.ModID) error
 	// Deletes a mod_repo by id.
 	// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 	// This DELETE will fail if any run_repos/jobs rows still reference the repo.
-	DeleteModRepo(ctx context.Context, id string) error
-	DeleteNode(ctx context.Context, id string) error
-	DeleteRun(ctx context.Context, id string) error
+	DeleteModRepo(ctx context.Context, id types.ModRepoID) error
+	DeleteNode(ctx context.Context, id types.NodeID) error
+	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
 	// Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
-	GetAdjacentJobIndices(ctx context.Context, id string) (GetAdjacentJobIndicesRow, error)
+	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
@@ -88,27 +89,27 @@ type Querier interface {
 	// Retrieves a single environment entry by key.
 	// Returns pgx.ErrNoRows if the key does not exist.
 	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
-	GetJob(ctx context.Context, id string) (Job, error)
+	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	// v1: Gets the newest run_repos row for a specific repo_id in a mod,
 	// filtered by terminal status (Success or Fail).
 	// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
 	// Order by created_at DESC to get the newest matching run_repos row.
 	GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
-	GetMod(ctx context.Context, id string) (Mod, error)
+	GetMod(ctx context.Context, id types.ModID) (Mod, error)
 	GetModByName(ctx context.Context, name string) (Mod, error)
-	GetModRepo(ctx context.Context, id string) (ModRepo, error)
+	GetModRepo(ctx context.Context, id types.ModRepoID) (ModRepo, error)
 	// Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
 	GetModRepoByURL(ctx context.Context, arg GetModRepoByURLParams) (ModRepo, error)
-	GetNode(ctx context.Context, id string) (Node, error)
-	GetRun(ctx context.Context, id string) (Run, error)
+	GetNode(ctx context.Context, id types.NodeID) (Node, error)
+	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id string) (RunsTiming, error)
-	GetSpec(ctx context.Context, id string) (Spec, error)
+	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Checks if a mod_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	// Deletion is refused if the repo has historical executions.
-	HasModRepoHistory(ctx context.Context, repoID string) (bool, error)
+	HasModRepoHistory(ctx context.Context, repoID types.ModRepoID) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -117,7 +118,7 @@ type Querier interface {
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
-	ListArtifactBundlesByRun(ctx context.Context, runID string) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
@@ -133,27 +134,27 @@ type Querier interface {
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
-	ListEventsByRun(ctx context.Context, runID string) ([]Event, error)
+	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-	ListFailedRepoIDsByMod(ctx context.Context, modID string) ([]string, error)
+	ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Per ROADMAP.md line 10-44: provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 	// Returns all global environment entries, ordered by key for consistent iteration.
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
-	ListJobsByRun(ctx context.Context, runID string) ([]Job, error)
+	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
-	ListLogsByRun(ctx context.Context, runID string) ([]Log, error)
+	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
-	ListModReposByMod(ctx context.Context, modID string) ([]ModRepo, error)
+	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
 	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
@@ -161,18 +162,18 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
-	ListQueuedRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
+	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.
-	ListRunReposByRun(ctx context.Context, runID string) ([]RunRepo, error)
+	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
 	// Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
-	ListRunReposWithURLByRun(ctx context.Context, runID string) ([]ListRunReposWithURLByRunRow, error)
+	ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	// Lists runs for a given repo_id (mod_repos.id).
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
-	ListRunsWithQueuedRepos(ctx context.Context) ([]string, error)
+	ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error)
 	// Lists specs ordered by created_at descending (most recent first).
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
@@ -181,7 +182,7 @@ type Querier interface {
 	// Promote the next job in a repo attempt: Created -> Queued.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	// Unarchives a mod by clearing archived_at.
-	UnarchiveMod(ctx context.Context, id string) error
+	UnarchiveMod(ctx context.Context, id types.ModID) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
@@ -203,7 +204,7 @@ type Querier interface {
 	UpdateRunRepoStatus(ctx context.Context, arg UpdateRunRepoStatusParams) error
 	// Increments resume_count and updates last_resumed_at timestamp in runs.stats.
 	// Uses JSONB merge (||) to preserve existing stats while adding resume metadata.
-	UpdateRunResume(ctx context.Context, id string) error
+	UpdateRunResume(ctx context.Context, id types.RunID) error
 	// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
 	// Preserves existing stats and metadata keys via JSONB merge.
 	UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error

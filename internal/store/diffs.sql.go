@@ -8,6 +8,7 @@ package store
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,10 +19,10 @@ RETURNING id, run_id, job_id, patch, summary, created_at
 `
 
 type CreateDiffParams struct {
-	RunID   string  `json:"run_id"`
-	JobID   *string `json:"job_id"`
-	Patch   []byte  `json:"patch"`
-	Summary []byte  `json:"summary"`
+	RunID   types.RunID  `json:"run_id"`
+	JobID   *types.JobID `json:"job_id"`
+	Patch   []byte       `json:"patch"`
+	Summary []byte       `json:"summary"`
 }
 
 // Creates a new diff entry associated with a job.
@@ -93,8 +94,8 @@ ORDER BY j.step_index ASC, d.created_at ASC
 `
 
 type ListDiffsBeforeStepParams struct {
-	RunID     string  `json:"run_id"`
-	StepIndex float64 `json:"step_index"`
+	RunID     types.RunID     `json:"run_id"`
+	StepIndex types.StepIndex `json:"step_index"`
 }
 
 // Returns all diffs for a run up to (and including) the specified step_index.
@@ -135,8 +136,8 @@ ORDER BY j.step_index ASC, d.created_at ASC
 `
 
 type ListDiffsByRunRepoParams struct {
-	RunID  string `json:"run_id"`
-	RepoID string `json:"repo_id"`
+	RunID  types.RunID     `json:"run_id"`
+	RepoID types.ModRepoID `json:"repo_id"`
 }
 
 // Returns diffs for a specific repo execution within a run.

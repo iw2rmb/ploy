@@ -7,6 +7,8 @@ package store
 
 import (
 	"context"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const archiveMod = `-- name: ArchiveMod :exec
@@ -18,7 +20,7 @@ WHERE id = $1 AND archived_at IS NULL
 // Archives a mod by setting archived_at to now().
 // Archiving must be refused when the mod has any jobs in a running state.
 // This query only sets the timestamp; validation logic must be in the caller.
-func (q *Queries) ArchiveMod(ctx context.Context, id string) error {
+func (q *Queries) ArchiveMod(ctx context.Context, id types.ModID) error {
 	_, err := q.db.Exec(ctx, archiveMod, id)
 	return err
 }
@@ -30,10 +32,10 @@ RETURNING id, name, spec_id, created_by, created_at, archived_at
 `
 
 type CreateModParams struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	SpecID    *string `json:"spec_id"`
-	CreatedBy *string `json:"created_by"`
+	ID        types.ModID   `json:"id"`
+	Name      string        `json:"name"`
+	SpecID    *types.SpecID `json:"spec_id"`
+	CreatedBy *string       `json:"created_by"`
 }
 
 func (q *Queries) CreateMod(ctx context.Context, arg CreateModParams) (Mod, error) {
@@ -61,7 +63,7 @@ WHERE id = $1
 `
 
 // Deletes a mod. Use with caution; should only be called when safe to remove.
-func (q *Queries) DeleteMod(ctx context.Context, id string) error {
+func (q *Queries) DeleteMod(ctx context.Context, id types.ModID) error {
 	_, err := q.db.Exec(ctx, deleteMod, id)
 	return err
 }
@@ -72,7 +74,7 @@ FROM mods
 WHERE id = $1
 `
 
-func (q *Queries) GetMod(ctx context.Context, id string) (Mod, error) {
+func (q *Queries) GetMod(ctx context.Context, id types.ModID) (Mod, error) {
 	row := q.db.QueryRow(ctx, getMod, id)
 	var i Mod
 	err := row.Scan(
@@ -166,7 +168,7 @@ WHERE id = $1 AND archived_at IS NOT NULL
 `
 
 // Unarchives a mod by clearing archived_at.
-func (q *Queries) UnarchiveMod(ctx context.Context, id string) error {
+func (q *Queries) UnarchiveMod(ctx context.Context, id types.ModID) error {
 	_, err := q.db.Exec(ctx, unarchiveMod, id)
 	return err
 }
@@ -178,8 +180,8 @@ WHERE id = $1
 `
 
 type UpdateModSpecParams struct {
-	ID     string  `json:"id"`
-	SpecID *string `json:"spec_id"`
+	ID     types.ModID   `json:"id"`
+	SpecID *types.SpecID `json:"spec_id"`
 }
 
 func (q *Queries) UpdateModSpec(ctx context.Context, arg UpdateModSpecParams) error {

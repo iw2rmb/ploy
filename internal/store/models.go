@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -163,8 +164,8 @@ type ApiToken struct {
 
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     string             `json:"run_id"`
-	JobID     *string            `json:"job_id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
 	Cid       *string            `json:"cid"`
@@ -176,7 +177,7 @@ type BootstrapToken struct {
 	ID           pgtype.UUID        `json:"id"`
 	TokenHash    string             `json:"token_hash"`
 	TokenID      string             `json:"token_id"`
-	NodeID       *string            `json:"node_id"`
+	NodeID       *types.NodeID      `json:"node_id"`
 	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
@@ -196,8 +197,8 @@ type ConfigEnv struct {
 
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
-	RunID     string             `json:"run_id"`
-	JobID     *string            `json:"job_id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -205,8 +206,8 @@ type Diff struct {
 
 type Event struct {
 	ID      int64              `json:"id"`
-	RunID   string             `json:"run_id"`
-	JobID   *string            `json:"job_id"`
+	RunID   types.RunID        `json:"run_id"`
+	JobID   *types.JobID       `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
 	Message string             `json:"message"`
@@ -214,17 +215,17 @@ type Event struct {
 }
 
 type Job struct {
-	ID          string             `json:"id"`
-	RunID       string             `json:"run_id"`
-	RepoID      string             `json:"repo_id"`
+	ID          types.JobID        `json:"id"`
+	RunID       types.RunID        `json:"run_id"`
+	RepoID      types.ModRepoID    `json:"repo_id"`
 	RepoBaseRef string             `json:"repo_base_ref"`
 	Attempt     int32              `json:"attempt"`
 	Name        string             `json:"name"`
 	Status      JobStatus          `json:"status"`
 	ModType     string             `json:"mod_type"`
 	ModImage    string             `json:"mod_image"`
-	StepIndex   float64            `json:"step_index"`
-	NodeID      *string            `json:"node_id"`
+	StepIndex   types.StepIndex    `json:"step_index"`
+	NodeID      *types.NodeID      `json:"node_id"`
 	ExitCode    *int32             `json:"exit_code"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
 	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
@@ -234,25 +235,25 @@ type Job struct {
 
 type Log struct {
 	ID        int64              `json:"id"`
-	RunID     string             `json:"run_id"`
-	JobID     *string            `json:"job_id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Mod struct {
-	ID         string             `json:"id"`
+	ID         types.ModID        `json:"id"`
 	Name       string             `json:"name"`
-	SpecID     *string            `json:"spec_id"`
+	SpecID     *types.SpecID      `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
 }
 
 type ModRepo struct {
-	ID        string             `json:"id"`
-	ModID     string             `json:"mod_id"`
+	ID        types.ModRepoID    `json:"id"`
+	ModID     types.ModID        `json:"mod_id"`
 	RepoUrl   string             `json:"repo_url"`
 	BaseRef   string             `json:"base_ref"`
 	TargetRef string             `json:"target_ref"`
@@ -260,7 +261,7 @@ type ModRepo struct {
 }
 
 type Node struct {
-	ID              string             `json:"id"`
+	ID              types.NodeID       `json:"id"`
 	Name            string             `json:"name"`
 	IpAddress       netip.Addr         `json:"ip_address"`
 	Version         *string            `json:"version"`
@@ -282,7 +283,7 @@ type Node struct {
 
 type NodeMetric struct {
 	ID             int64              `json:"id"`
-	NodeID         string             `json:"node_id"`
+	NodeID         types.NodeID       `json:"node_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	CpuTotalMillis int32              `json:"cpu_total_millis"`
 	CpuFreeMillis  int32              `json:"cpu_free_millis"`
@@ -292,10 +293,15 @@ type NodeMetric struct {
 	DiskFreeBytes  int64              `json:"disk_free_bytes"`
 }
 
+type PloySchemaVersion struct {
+	Version   int64              `json:"version"`
+	AppliedAt pgtype.Timestamptz `json:"applied_at"`
+}
+
 type Run struct {
-	ID         string             `json:"id"`
-	ModID      string             `json:"mod_id"`
-	SpecID     string             `json:"spec_id"`
+	ID         types.RunID        `json:"id"`
+	ModID      types.ModID        `json:"mod_id"`
+	SpecID     types.SpecID       `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
 	Status     RunStatus          `json:"status"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
@@ -305,9 +311,9 @@ type Run struct {
 }
 
 type RunRepo struct {
-	ModID         string             `json:"mod_id"`
-	RunID         string             `json:"run_id"`
-	RepoID        string             `json:"repo_id"`
+	ModID         types.ModID        `json:"mod_id"`
+	RunID         types.RunID        `json:"run_id"`
+	RepoID        types.ModRepoID    `json:"repo_id"`
 	RepoBaseRef   string             `json:"repo_base_ref"`
 	RepoTargetRef string             `json:"repo_target_ref"`
 	Status        RunRepoStatus      `json:"status"`
@@ -325,7 +331,7 @@ type RunsTiming struct {
 }
 
 type Spec struct {
-	ID         string             `json:"id"`
+	ID         types.SpecID       `json:"id"`
 	Name       string             `json:"name"`
 	Spec       []byte             `json:"spec"`
 	CreatedBy  *string            `json:"created_by"`
