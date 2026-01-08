@@ -72,7 +72,7 @@ func TestClaimJob_Success(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.claimJobCalled || st.claimJobParams == nil || *st.claimJobParams != nodeID {
+	if !st.claimJobCalled || string(st.claimJobParams) != nodeID {
 		t.Fatalf("expected ClaimJob to be called with node id")
 	}
 	if len(st.updateRunRepoStatusParams) == 0 {

@@ -12,57 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const claimJob = `-- name: ClaimJob :one
-WITH eligible AS (
-  SELECT j.id
-  FROM jobs j
-  JOIN runs r ON j.run_id = r.id
-  WHERE j.status = 'Queued'
-    AND j.node_id IS NULL
-    AND (
-      (j.mod_type = 'mr' AND r.status = 'Finished') OR
-      (j.mod_type != 'mr' AND r.status = 'Started')
-    )
-  ORDER BY j.step_index ASC
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1
-)
-UPDATE jobs
-SET status = 'Running', node_id = $1, started_at = now()
-FROM eligible
-WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
-`
-
-// Atomically claim the next claimable job for a node (unified queue).
-// v1:
-// - claimable jobs have status='Queued'
-// - normal jobs are claimable only when runs.status='Started'
-// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
-func (q *Queries) ClaimJob(ctx context.Context, nodeID *types.NodeID) (Job, error) {
-	row := q.db.QueryRow(ctx, claimJob, nodeID)
-	var i Job
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.RepoID,
-		&i.RepoBaseRef,
-		&i.Attempt,
-		&i.Name,
-		&i.Status,
-		&i.ModType,
-		&i.ModImage,
-		&i.StepIndex,
-		&i.NodeID,
-		&i.ExitCode,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.DurationMs,
-		&i.Meta,
-	)
-	return i, err
-}
-
 const countJobsByRun = `-- name: CountJobsByRun :one
 SELECT COUNT(*) FROM jobs
 WHERE run_id = $1
@@ -647,4 +596,58 @@ func (q *Queries) UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams
 		arg.DurationMs,
 	)
 	return err
+}
+
+const claimJobInternal = `-- name: claimJobInternal :one
+WITH eligible AS (
+  SELECT j.id
+  FROM jobs j
+  JOIN runs r ON j.run_id = r.id
+  WHERE j.status = 'Queued'
+    AND j.node_id IS NULL
+    AND (
+      (j.mod_type = 'mr' AND r.status = 'Finished') OR
+      (j.mod_type != 'mr' AND r.status = 'Started')
+    )
+    AND $1::TEXT != ''
+  ORDER BY j.step_index ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1
+)
+UPDATE jobs
+SET status = 'Running', node_id = $1, started_at = now()
+FROM eligible
+WHERE jobs.id = eligible.id
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.mod_type, jobs.mod_image, jobs.step_index, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
+`
+
+// Internal: Atomically claim the next claimable job for a node (unified queue).
+// Use ClaimJob wrapper instead, which enforces non-empty nodeID at the API boundary.
+// v1:
+// - claimable jobs have status='Queued'
+// - normal jobs are claimable only when runs.status='Started'
+// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+// - nodeID must be non-empty (enforced by WHERE clause guard)
+func (q *Queries) claimJobInternal(ctx context.Context, nodeID *types.NodeID) (Job, error) {
+	row := q.db.QueryRow(ctx, claimJobInternal, nodeID)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
+		&i.Name,
+		&i.Status,
+		&i.ModType,
+		&i.ModImage,
+		&i.StepIndex,
+		&i.NodeID,
+		&i.ExitCode,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.Meta,
+	)
+	return i, err
 }

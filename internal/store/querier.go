@@ -18,12 +18,6 @@ type Querier interface {
 	ArchiveMod(ctx context.Context, id types.ModID) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
-	// Atomically claim the next claimable job for a node (unified queue).
-	// v1:
-	// - claimable jobs have status='Queued'
-	// - normal jobs are claimable only when runs.status='Started'
-	// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
-	ClaimJob(ctx context.Context, nodeID *types.NodeID) (Job, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
@@ -217,6 +211,14 @@ type Querier interface {
 	// Uniqueness is on (mod_id, repo_url) to prevent duplicate repo URLs per mod.
 	// If a row exists, update refs; otherwise insert.
 	UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error)
+	// Internal: Atomically claim the next claimable job for a node (unified queue).
+	// Use ClaimJob wrapper instead, which enforces non-empty nodeID at the API boundary.
+	// v1:
+	// - claimable jobs have status='Queued'
+	// - normal jobs are claimable only when runs.status='Started'
+	// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+	// - nodeID must be non-empty (enforced by WHERE clause guard)
+	claimJobInternal(ctx context.Context, nodeID *types.NodeID) (Job, error)
 }
 
 var _ Querier = (*Queries)(nil)

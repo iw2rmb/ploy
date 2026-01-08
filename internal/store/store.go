@@ -3,15 +3,23 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrEmptyNodeID is returned when ClaimJob is called with an empty NodeID.
+var ErrEmptyNodeID = errors.New("store: ClaimJob requires non-empty nodeID")
 
 // Store defines the interface for database operations.
 // The sqlc-generated Queries type will implement the query methods.
 type Store interface {
 	Querier
+	// ClaimJob atomically claims the next claimable job for a node.
+	// Requires a non-empty nodeID; returns ErrEmptyNodeID if empty.
+	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -67,4 +75,14 @@ func (s *PgStore) Close() {
 // such as partition management.
 func (s *PgStore) Pool() *pgxpool.Pool {
 	return s.pool
+}
+
+// ClaimJob atomically claims the next claimable job for a node.
+// Requires a non-empty nodeID; returns ErrEmptyNodeID if the nodeID is empty.
+// This prevents jobs from entering Running state with node_id=NULL.
+func (s *PgStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error) {
+	if nodeID.IsZero() {
+		return Job{}, ErrEmptyNodeID
+	}
+	return s.claimJobInternal(ctx, &nodeID)
 }
