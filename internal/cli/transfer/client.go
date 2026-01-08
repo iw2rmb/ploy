@@ -25,40 +25,40 @@ type Client struct {
 // UploadSlotRequest reserves an upload slot for a job.
 // Uses domain types (JobID, NodeID) for type-safe identification.
 type UploadSlotRequest struct {
-	JobID  domaintypes.JobID  `json:"job_id"` // Job ID (KSUID-backed)
-	Stage  string             `json:"stage,omitempty"`
-	Kind   string             `json:"kind"`
-	NodeID domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
-	Size   int64              `json:"size,omitempty"`
-	Digest string             `json:"digest,omitempty"`
+	JobID  domaintypes.JobID         `json:"job_id"` // Job ID (KSUID-backed)
+	Stage  domaintypes.TransferStage `json:"stage,omitempty"`
+	Kind   domaintypes.TransferKind  `json:"kind"`
+	NodeID domaintypes.NodeID        `json:"node_id"` // Node ID (NanoID-backed)
+	Size   int64                     `json:"size,omitempty"`
+	Digest domaintypes.Digest        `json:"digest,omitempty"`
 }
 
 // DownloadSlotRequest reserves a download slot for a job artifact.
 // Uses domain types (JobID, NodeID) for type-safe identification.
 type DownloadSlotRequest struct {
-	JobID      domaintypes.JobID  `json:"job_id"` // Job ID (KSUID-backed)
-	Kind       string             `json:"kind,omitempty"`
-	ArtifactID string             `json:"artifact_id,omitempty"`
-	NodeID     domaintypes.NodeID `json:"node_id,omitempty"` // Node ID (NanoID-backed, optional)
+	JobID      domaintypes.JobID        `json:"job_id"` // Job ID (KSUID-backed)
+	Kind       domaintypes.TransferKind `json:"kind,omitempty"`
+	ArtifactID string                   `json:"artifact_id,omitempty"`
+	NodeID     domaintypes.NodeID       `json:"node_id,omitempty"` // Node ID (NanoID-backed, optional)
 }
 
 // Slot describes a reserved transfer slot.
 // Uses domain types (JobID, NodeID) for type-safe identification.
 type Slot struct {
-	ID         string             `json:"slot_id"`
-	Kind       string             `json:"kind"`
-	JobID      domaintypes.JobID  `json:"job_id"`  // Job ID (KSUID-backed)
-	NodeID     domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
-	RemotePath string             `json:"remote_path"`
-	MaxSize    int64              `json:"max_size"`
-	ExpiresAt  time.Time          `json:"expires_at"`
-	Digest     string             `json:"digest,omitempty"`
+	ID         domaintypes.SlotID       `json:"slot_id"`
+	Kind       domaintypes.TransferKind `json:"kind"`
+	JobID      domaintypes.JobID        `json:"job_id"`  // Job ID (KSUID-backed)
+	NodeID     domaintypes.NodeID       `json:"node_id"` // Node ID (NanoID-backed)
+	RemotePath string                   `json:"remote_path"`
+	MaxSize    int64                    `json:"max_size"`
+	ExpiresAt  time.Time                `json:"expires_at"`
+	Digest     domaintypes.Digest       `json:"digest,omitempty"`
 }
 
 // CommitRequest finalises a slot after the transfer completes.
 type CommitRequest struct {
-	Size   int64  `json:"size"`
-	Digest string `json:"digest"`
+	Size   int64              `json:"size"`
+	Digest domaintypes.Digest `json:"digest"`
 }
 
 // UploadSlot requests a new upload slot for the provided job metadata.
@@ -78,9 +78,8 @@ type emptyRequest struct{}
 type emptyResponse struct{}
 
 // Commit notifies the control plane that the slot finished transferring successfully.
-func (c Client) Commit(ctx context.Context, slotID string, req CommitRequest) error {
-	slotID = strings.TrimSpace(slotID)
-	if slotID == "" {
+func (c Client) Commit(ctx context.Context, slotID domaintypes.SlotID, req CommitRequest) error {
+	if err := slotID.Validate(); err != nil {
 		return errors.New("transfer: slot id required")
 	}
 	endpoint := fmt.Sprintf("/v1/transfers/%s/commit", slotID)
@@ -89,9 +88,8 @@ func (c Client) Commit(ctx context.Context, slotID string, req CommitRequest) er
 }
 
 // Abort releases the slot without committing the transfer.
-func (c Client) Abort(ctx context.Context, slotID string) error {
-	slotID = strings.TrimSpace(slotID)
-	if slotID == "" {
+func (c Client) Abort(ctx context.Context, slotID domaintypes.SlotID) error {
+	if err := slotID.Validate(); err != nil {
 		return errors.New("transfer: slot id required")
 	}
 	endpoint := fmt.Sprintf("/v1/transfers/%s/abort", slotID)

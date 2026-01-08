@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/transfer"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestUploadSlot(t *testing.T) {
@@ -27,7 +28,7 @@ func TestUploadSlot(t *testing.T) {
 		if payload.JobID != "job-1" {
 			t.Fatalf("unexpected job id: %s", payload.JobID)
 		}
-		if payload.Stage != "plan" {
+		if payload.Stage != domaintypes.TransferStagePlan {
 			t.Fatalf("unexpected stage: %s", payload.Stage)
 		}
 		resp := transfer.Slot{
@@ -48,8 +49,8 @@ func TestUploadSlot(t *testing.T) {
 	client := transfer.Client{BaseURL: base, HTTPClient: server.Client()}
 	slot, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{
 		JobID:  "job-1",
-		Stage:  "plan",
-		Kind:   "repo",
+		Stage:  domaintypes.TransferStagePlan,
+		Kind:   domaintypes.TransferKindRepo,
 		NodeID: "node-a",
 	})
 	if err != nil {
@@ -78,7 +79,7 @@ func TestTransferErrors(t *testing.T) {
 	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j"}); err == nil {
 		t.Fatalf("expected upload error")
 	}
-	if err := client.Commit(context.Background(), "x", transfer.CommitRequest{Size: 1, Digest: "d"}); err == nil {
+	if err := client.Commit(context.Background(), "x", transfer.CommitRequest{Size: 1, Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}); err == nil {
 		t.Fatalf("expected commit error")
 	}
 }
@@ -110,7 +111,7 @@ func TestDownloadSlot(t *testing.T) {
 		if payload.JobID != "job-2" {
 			t.Fatalf("unexpected job id: %s", payload.JobID)
 		}
-		if payload.Kind != "artifact" {
+		if payload.Kind != domaintypes.TransferKindArtifact {
 			t.Fatalf("unexpected kind: %s", payload.Kind)
 		}
 		resp := transfer.Slot{
@@ -131,7 +132,7 @@ func TestDownloadSlot(t *testing.T) {
 	client := transfer.Client{BaseURL: base, HTTPClient: server.Client()}
 	slot, err := client.DownloadSlot(context.Background(), transfer.DownloadSlotRequest{
 		JobID:      "job-2",
-		Kind:       "artifact",
+		Kind:       domaintypes.TransferKindArtifact,
 		ArtifactID: "art-123",
 		NodeID:     "node-b",
 	})
@@ -156,7 +157,7 @@ func TestCommitSuccess(t *testing.T) {
 		if req.Size != 1024 {
 			t.Fatalf("unexpected size: %d", req.Size)
 		}
-		if req.Digest != "sha256:abc" {
+		if req.Digest != "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" {
 			t.Fatalf("unexpected digest: %s", req.Digest)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -167,7 +168,7 @@ func TestCommitSuccess(t *testing.T) {
 	client := transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
 	err := client.Commit(context.Background(), "slot-999", transfer.CommitRequest{
 		Size:   1024,
-		Digest: "sha256:abc",
+		Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 	})
 	if err != nil {
 		t.Fatalf("Commit error: %v", err)
@@ -178,7 +179,7 @@ func TestCommitNoContentAndEmptyIDValidation(t *testing.T) {
 	// Empty slot id should be rejected client-side.
 	baseURL, _ := url.Parse("http://127.0.0.1") // base is irrelevant; validation triggers before HTTP
 	c := transfer.Client{BaseURL: baseURL, HTTPClient: http.DefaultClient}
-	if err := c.Commit(context.Background(), "", transfer.CommitRequest{Size: 1, Digest: "d"}); err == nil || err.Error() != "transfer: slot id required" {
+	if err := c.Commit(context.Background(), "", transfer.CommitRequest{Size: 1, Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}); err == nil || err.Error() != "transfer: slot id required" {
 		t.Fatalf("expected slot id validation error, got: %v", err)
 	}
 
@@ -191,7 +192,7 @@ func TestCommitNoContentAndEmptyIDValidation(t *testing.T) {
 	defer srv.Close()
 	base, _ := url.Parse(srv.URL)
 	client := transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
-	if err := client.Commit(context.Background(), "ok", transfer.CommitRequest{Size: 1, Digest: "d"}); err != nil {
+	if err := client.Commit(context.Background(), "ok", transfer.CommitRequest{Size: 1, Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}); err != nil {
 		t.Fatalf("Commit 204 No Content unexpected error: %v", err)
 	}
 }
