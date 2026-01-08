@@ -112,10 +112,10 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Timestamp: "2025-10-22T10:00:02Z",
 				Stream:    "stderr",
 				Line:      "gate failure",
-				ModType:   "gate",
+				ModType:   "pre_gate",
 				JobID:     "job-456",
 			},
-			want: "2025-10-22T10:00:02Z stderr mod=gate job=job-456 gate failure\n",
+			want: "2025-10-22T10:00:02Z stderr mod=pre_gate job=job-456 gate failure\n",
 		},
 		{
 			name: "step_index zero omitted",
@@ -327,5 +327,30 @@ func TestMultipleLogs(t *testing.T) {
 
 	if got := buf.String(); got != want {
 		t.Errorf("output mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// TestLogRecord_PrinterStructuredRendersEnrichedFields runs under `-run TestLogRecord`
+// and ensures the CLI prints the canonical stream.LogRecord enriched fields without
+// relying on a duplicate payload struct.
+func TestLogRecord_PrinterStructuredRendersEnrichedFields(t *testing.T) {
+	t.Parallel()
+
+	buf := &bytes.Buffer{}
+	p := NewPrinter(FormatStructured, buf)
+
+	p.PrintLog(LogRecord{
+		Timestamp: "2025-10-22T10:00:00Z",
+		Stream:    "stdout",
+		Line:      "hello",
+		NodeID:    "node-abc",
+		ModType:   "pre_gate",
+		StepIndex: 2000,
+		JobID:     "job-123",
+	})
+
+	want := "2025-10-22T10:00:00Z stdout node=node-abc mod=pre_gate step=2000 job=job-123 hello\n"
+	if got := buf.String(); got != want {
+		t.Errorf("PrintLog() =\n%q\nwant:\n%q", got, want)
 	}
 }

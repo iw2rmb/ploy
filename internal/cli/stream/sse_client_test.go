@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // TestSSEClientRequiresHTTPClientAndHandler verifies that SSEClient.Stream
@@ -834,7 +836,7 @@ func TestSSEClientLargeEnrichedPayload(t *testing.T) {
 		// Emit a large enriched log event.
 		// Note: JSON encoding will escape newlines.
 		escapedLine := strings.ReplaceAll(largeLine, "\n", "\\n")
-		data := fmt.Sprintf(`{"timestamp":"2025-12-01T10:00:00Z","stream":"stderr","line":"%s","node_id":"node-large","job_id":"job-large","mod_type":"gate","step_index":999}`, escapedLine)
+		data := fmt.Sprintf(`{"timestamp":"2025-12-01T10:00:00Z","stream":"stderr","line":"%s","node_id":"node-large","job_id":"job-large","mod_type":"pre_gate","step_index":999}`, escapedLine)
 		_, _ = fmt.Fprintf(w, "id: 1\n")
 		_, _ = fmt.Fprintf(w, "event: log\n")
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
@@ -867,12 +869,7 @@ func TestSSEClientLargeEnrichedPayload(t *testing.T) {
 	}
 
 	// Parse the JSON and verify the line content.
-	type LogRecord struct {
-		Line      string `json:"line"`
-		NodeID    string `json:"node_id"`
-		StepIndex int    `json:"step_index"`
-	}
-	var rec LogRecord
+	var rec logstream.LogRecord
 	if err := json.Unmarshal(receivedData, &rec); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -884,6 +881,6 @@ func TestSSEClientLargeEnrichedPayload(t *testing.T) {
 		t.Errorf("node_id: got %q, want %q", rec.NodeID, "node-large")
 	}
 	if rec.StepIndex != 999 {
-		t.Errorf("step_index: got %d, want %d", rec.StepIndex, 999)
+		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 999)
 	}
 }
