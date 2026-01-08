@@ -84,31 +84,38 @@ func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 // event types (log, retention, run, stage, done) to prevent drift and
 // accidental publication of invalid types.
 func TestHubRejectsUnknownEventType(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 1, HistorySize: 1})
+	ctx := context.Background()
+
+	if err := hub.publish(ctx, "valid-stream", domaintypes.SSEEventLog, LogRecord{
+		Timestamp: "2025-10-22T12:00:00Z",
+		Stream:    "stdout",
+		Line:      "hello",
+	}); err != nil {
+		t.Fatalf("expected valid publish to succeed: %v", err)
+	}
+
+	invalidStreamID := "invalid-stream"
 	tests := []struct {
 		name      string
 		eventType domaintypes.SSEEventType
-		wantValid bool
 	}{
-		{"log is valid", domaintypes.SSEEventLog, true},
-		{"retention is valid", domaintypes.SSEEventRetention, true},
-		{"run is valid", domaintypes.SSEEventRun, true},
-		{"stage is valid", domaintypes.SSEEventStage, true},
-		{"done is valid", domaintypes.SSEEventDone, true},
-		{"empty is invalid", domaintypes.SSEEventType(""), false},
-		{"unknown is invalid", domaintypes.SSEEventType("unknown"), false},
-		{"status is invalid", domaintypes.SSEEventType("status"), false},
-		{"LOG uppercase is invalid", domaintypes.SSEEventType("LOG"), false},
-		{"whitespace-only is invalid", domaintypes.SSEEventType("   "), false},
+		{"empty", domaintypes.SSEEventType("")},
+		{"unknown", domaintypes.SSEEventType("unknown")},
+		{"status", domaintypes.SSEEventType("status")},
+		{"uppercase", domaintypes.SSEEventType("LOG")},
+		{"whitespace-only", domaintypes.SSEEventType("   ")},
+		{"leading/trailing whitespace", domaintypes.SSEEventType(" log ")},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.eventType.Validate()
-			if tt.wantValid && err != nil {
-				t.Errorf("Validate() returned error for valid type %q: %v", tt.eventType, err)
+			err := hub.publish(ctx, invalidStreamID, tt.eventType, Status{Status: "noop"})
+			if !errors.Is(err, ErrInvalidEventType) {
+				t.Fatalf("expected ErrInvalidEventType, got %v", err)
 			}
-			if !tt.wantValid && err == nil {
-				t.Errorf("Validate() returned nil for invalid type %q", tt.eventType)
+			if hub.getStream(invalidStreamID) != nil {
+				t.Fatalf("expected no stream creation for invalid event type")
 			}
 		})
 	}

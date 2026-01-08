@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"strings"
 )
 
 // SSEEventType identifies the type of an SSE event in the streaming system.
@@ -34,11 +33,13 @@ func (v SSEEventType) IsZero() bool { return IsEmpty(string(v)) }
 
 // Validate ensures the value is one of the known SSEEventType constants.
 func (v SSEEventType) Validate() error {
-	s := strings.TrimSpace(string(v))
-	switch SSEEventType(s) {
+	if v.IsZero() {
+		return ErrEmpty
+	}
+	switch v {
 	case SSEEventLog, SSEEventRetention, SSEEventRun, SSEEventStage, SSEEventDone:
 		return nil
 	default:
-		return fmt.Errorf("invalid SSE event type %q", s)
+		return fmt.Errorf("invalid SSE event type %q", string(v))
 	}
 }
