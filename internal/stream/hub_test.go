@@ -16,18 +16,19 @@ import (
 func TestHubPublishAndResume(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-1")
 
-	if err := hub.PublishLog(ctx, "job-1", LogRecord{Timestamp: "2025-10-22T12:00:00Z", Stream: "stdout", Line: "line one"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:00Z", Stream: "stdout", Line: "line one"}); err != nil {
 		t.Fatalf("publish log: %v", err)
 	}
-	if err := hub.PublishRetention(ctx, "job-1", RetentionHint{Retained: true, TTL: "72h", Bundle: "bafy-logs"}); err != nil {
+	if err := hub.PublishRetention(ctx, runID, RetentionHint{Retained: true, TTL: "72h", Bundle: "bafy-logs"}); err != nil {
 		t.Fatalf("publish retention: %v", err)
 	}
-	if err := hub.PublishStatus(ctx, "job-1", Status{Status: "completed"}); err != nil {
+	if err := hub.PublishStatus(ctx, runID, Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
 	}
 
-	sub, err := hub.Subscribe(ctx, "job-1", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestHubPublishAndResume(t *testing.T) {
 		}
 	}
 
-	resume, err := hub.Subscribe(ctx, "job-1", 1)
+	resume, err := hub.Subscribe(ctx, runID, 1)
 	if err != nil {
 		t.Fatalf("resume subscribe: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestHubPublishAndResume(t *testing.T) {
 		t.Fatalf("unexpected resumed events: %v", resumed)
 	}
 
-	if err := hub.PublishLog(ctx, "job-1", LogRecord{Timestamp: "2025-10-22T12:00:01Z", Stream: "stdout", Line: "late"}); !errors.Is(err, ErrStreamClosed) {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:01Z", Stream: "stdout", Line: "late"}); !errors.Is(err, ErrStreamClosed) {
 		t.Fatalf("expected ErrStreamClosed, got %v", err)
 	}
 }
@@ -72,8 +73,9 @@ func TestHubPublishAndResume(t *testing.T) {
 func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-1")
 
-	_, err := hub.Subscribe(ctx, "job-1", domaintypes.EventID(-1))
+	_, err := hub.Subscribe(ctx, runID, domaintypes.EventID(-1))
 	if err == nil {
 		t.Fatal("expected error for negative sinceID, got nil")
 	}
@@ -86,8 +88,10 @@ func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 func TestHubRejectsUnknownEventType(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 1})
 	ctx := context.Background()
+	validRunID := domaintypes.RunID("valid-stream")
+	invalidRunID := domaintypes.RunID("invalid-stream")
 
-	if err := hub.publish(ctx, "valid-stream", domaintypes.SSEEventLog, LogRecord{
+	if err := hub.publish(ctx, validRunID, domaintypes.SSEEventLog, LogRecord{
 		Timestamp: "2025-10-22T12:00:00Z",
 		Stream:    "stdout",
 		Line:      "hello",
@@ -95,7 +99,6 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 		t.Fatalf("expected valid publish to succeed: %v", err)
 	}
 
-	invalidStreamID := "invalid-stream"
 	tests := []struct {
 		name      string
 		eventType domaintypes.SSEEventType
@@ -110,11 +113,11 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := hub.publish(ctx, invalidStreamID, tt.eventType, Status{Status: "noop"})
+			err := hub.publish(ctx, invalidRunID, tt.eventType, Status{Status: "noop"})
 			if !errors.Is(err, ErrInvalidEventType) {
 				t.Fatalf("expected ErrInvalidEventType, got %v", err)
 			}
-			if hub.getStream(invalidStreamID) != nil {
+			if hub.getStream(invalidRunID.String()) != nil {
 				t.Fatalf("expected no stream creation for invalid event type")
 			}
 		})
@@ -124,17 +127,18 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 4})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-2")
 
-	sub, err := hub.Subscribe(ctx, "job-2", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	if err := hub.PublishLog(ctx, "job-2", LogRecord{Timestamp: "2025-10-22T12:05:00Z", Stream: "stdout", Line: "first"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:00Z", Stream: "stdout", Line: "first"}); err != nil {
 		t.Fatalf("publish log first: %v", err)
 	}
-	if err := hub.PublishLog(ctx, "job-2", LogRecord{Timestamp: "2025-10-22T12:05:01Z", Stream: "stdout", Line: "second"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:05:01Z", Stream: "stdout", Line: "second"}); err != nil {
 		t.Fatalf("publish log second: %v", err)
 	}
 
@@ -153,17 +157,18 @@ func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 func TestServeWritesSSEFrames(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-http")
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		_ = hub.PublishLog(ctx, "job-http", LogRecord{Timestamp: "2025-10-22T12:10:00Z", Stream: "stdout", Line: "hello"})
-		_ = hub.PublishStatus(ctx, "job-http", Status{Status: "completed"})
+		_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:10:00Z", Stream: "stdout", Line: "hello"})
+		_ = hub.PublishStatus(ctx, runID, Status{Status: "completed"})
 	}()
 
 	req := httptest.NewRequest("GET", "/", nil)
 	recorder := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
-	if err := Serve(recorder, req, hub, "job-http", 0); err != nil {
+	if err := Serve(recorder, req, hub, runID, 0); err != nil {
 		t.Fatalf("serve: %v", err)
 	}
 
@@ -176,24 +181,25 @@ func TestServeWritesSSEFrames(t *testing.T) {
 func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 8, HistorySize: 16})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-concurrent")
 
 	// Publish initial events before any subscribers join.
-	if err := hub.PublishLog(ctx, "job-concurrent", LogRecord{Timestamp: "2025-10-22T14:00:00Z", Stream: "stdout", Line: "event 1"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:00Z", Stream: "stdout", Line: "event 1"}); err != nil {
 		t.Fatalf("publish log 1: %v", err)
 	}
-	if err := hub.PublishLog(ctx, "job-concurrent", LogRecord{Timestamp: "2025-10-22T14:00:01Z", Stream: "stdout", Line: "event 2"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:01Z", Stream: "stdout", Line: "event 2"}); err != nil {
 		t.Fatalf("publish log 2: %v", err)
 	}
 
 	// First subscriber joins from the start (sinceID=0).
-	sub1, err := hub.Subscribe(ctx, "job-concurrent", 0)
+	sub1, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe sub1: %v", err)
 	}
 	defer sub1.Cancel()
 
 	// Second subscriber joins with resumption (sinceID=1, should get events 2+).
-	sub2, err := hub.Subscribe(ctx, "job-concurrent", 1)
+	sub2, err := hub.Subscribe(ctx, runID, 1)
 	if err != nil {
 		t.Fatalf("subscribe sub2: %v", err)
 	}
@@ -235,15 +241,15 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	}
 
 	// Publish new events that both subscribers should receive concurrently.
-	if err := hub.PublishLog(ctx, "job-concurrent", LogRecord{Timestamp: "2025-10-22T14:00:02Z", Stream: "stdout", Line: "event 3"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:02Z", Stream: "stdout", Line: "event 3"}); err != nil {
 		t.Fatalf("publish log 3: %v", err)
 	}
-	if err := hub.PublishLog(ctx, "job-concurrent", LogRecord{Timestamp: "2025-10-22T14:00:03Z", Stream: "stdout", Line: "event 4"}); err != nil {
+	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:03Z", Stream: "stdout", Line: "event 4"}); err != nil {
 		t.Fatalf("publish log 4: %v", err)
 	}
 
 	// Third subscriber joins mid-stream with resumption (sinceID=3, should get event 4+).
-	sub3, err := hub.Subscribe(ctx, "job-concurrent", 3)
+	sub3, err := hub.Subscribe(ctx, runID, 3)
 	if err != nil {
 		t.Fatalf("subscribe sub3: %v", err)
 	}
@@ -296,7 +302,7 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	}
 
 	// Publish final status event.
-	if err := hub.PublishStatus(ctx, "job-concurrent", Status{Status: "completed"}); err != nil {
+	if err := hub.PublishStatus(ctx, runID, Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
 	}
 
@@ -353,14 +359,15 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 func TestSubscribeClosedStreamFutureSince(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	runID := domaintypes.RunID("job-closed")
 
 	// Publish a couple of events and close the stream.
-	_ = hub.PublishLog(ctx, "job-closed", LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
-	_ = hub.PublishLog(ctx, "job-closed", LogRecord{Timestamp: "2025-10-22T15:00:01Z", Stream: "stdout", Line: "e2"})
-	_ = hub.PublishStatus(ctx, "job-closed", Status{Status: "completed"})
+	_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
+	_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:01Z", Stream: "stdout", Line: "e2"})
+	_ = hub.PublishStatus(ctx, runID, Status{Status: "completed"})
 
 	// Subscribe with sinceID far in the future; expect immediate close and no events.
-	sub, err := hub.Subscribe(ctx, "job-closed", 999)
+	sub, err := hub.Subscribe(ctx, runID, 999)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -452,13 +459,13 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			streamID := "enriched-test-" + string(rune('0'+i))
+			runID := domaintypes.RunID("enriched-test-" + string(rune('0'+i)))
 
-			if err := hub.PublishLog(ctx, streamID, tt.record); err != nil {
+			if err := hub.PublishLog(ctx, runID, tt.record); err != nil {
 				t.Fatalf("publish log: %v", err)
 			}
 
-			snapshot := hub.Snapshot(streamID)
+			snapshot := hub.Snapshot(runID)
 			if len(snapshot) == 0 {
 				t.Fatal("expected event in snapshot")
 			}
@@ -499,6 +506,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 func TestPublishRunTypedPayload(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	runID := domaintypes.RunID("run-1")
 
 	// Construct a typed RunSummary payload with RunID field.
 	run := api.RunSummary{
@@ -508,12 +516,12 @@ func TestPublishRunTypedPayload(t *testing.T) {
 	}
 
 	// Publish the run event using renamed PublishRun method.
-	if err := hub.PublishRun(ctx, "run-1", run); err != nil {
+	if err := hub.PublishRun(ctx, runID, run); err != nil {
 		t.Fatalf("publish run: %v", err)
 	}
 
 	// Subscribe and receive the event.
-	sub, err := hub.Subscribe(ctx, "run-1", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -554,6 +562,7 @@ func TestPublishRunTypedPayload(t *testing.T) {
 func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
+	runID := domaintypes.RunID("bench-stream")
 
 	// Create a fully enriched log record matching real-world usage.
 	record := LogRecord{
@@ -569,7 +578,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = hub.PublishLog(ctx, "bench-stream", record)
+		_ = hub.PublishLog(ctx, runID, record)
 	}
 }
 
@@ -579,6 +588,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 func BenchmarkHubPublishMinimalLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
+	runID := domaintypes.RunID("bench-stream")
 
 	// Create a minimal log record without enrichment fields.
 	record := LogRecord{
@@ -590,7 +600,7 @@ func BenchmarkHubPublishMinimalLog(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = hub.PublishLog(ctx, "bench-stream", record)
+		_ = hub.PublishLog(ctx, runID, record)
 	}
 }
 
@@ -600,6 +610,7 @@ func BenchmarkHubPublishMinimalLog(b *testing.B) {
 func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
+	runID := domaintypes.RunID("bench-concurrent")
 
 	record := LogRecord{
 		Timestamp: "2025-12-01T10:00:00.000000Z",
@@ -615,7 +626,7 @@ func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_ = hub.PublishLog(ctx, "bench-concurrent", record)
+			_ = hub.PublishLog(ctx, runID, record)
 		}
 	})
 }
@@ -638,6 +649,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 		HistorySize: 2 * numLogs,
 	})
 	ctx := context.Background()
+	runID := domaintypes.RunID("high-volume-stream")
 
 	// Track events received by each subscriber using concurrent goroutines.
 	type result struct {
@@ -649,7 +661,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 
 	// Start subscriber goroutines that actively consume events.
 	for i := 0; i < numSubscribers; i++ {
-		sub, err := hub.Subscribe(ctx, "high-volume-stream", 0)
+		sub, err := hub.Subscribe(ctx, runID, 0)
 		if err != nil {
 			t.Fatalf("subscribe %d: %v", i, err)
 		}
@@ -691,13 +703,13 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			ModType:   "mod",
 			StepIndex: domaintypes.StepIndex(i),
 		}
-		if err := hub.PublishLog(ctx, "high-volume-stream", record); err != nil {
+		if err := hub.PublishLog(ctx, runID, record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)
 		}
 	}
 
 	// Publish terminal status to signal completion.
-	if err := hub.PublishStatus(ctx, "high-volume-stream", Status{Status: "done"}); err != nil {
+	if err := hub.PublishStatus(ctx, runID, Status{Status: "done"}); err != nil {
 		t.Fatalf("publish status: %v", err)
 	}
 
@@ -742,6 +754,7 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 
 	hub := NewHub(Options{BufferSize: 8, HistorySize: 16})
 	ctx := context.Background()
+	runID := domaintypes.RunID("large-payload-stream")
 
 	// Create a log record with maximum reasonable field sizes.
 	// Real-world logs can have long lines from stack traces, build output, etc.
@@ -758,14 +771,14 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 	}
 
 	// Subscribe before publishing.
-	sub, err := hub.Subscribe(ctx, "large-payload-stream", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
 	// Publish the large log record.
-	if err := hub.PublishLog(ctx, "large-payload-stream", record); err != nil {
+	if err := hub.PublishLog(ctx, runID, record); err != nil {
 		t.Fatalf("publish log: %v", err)
 	}
 
@@ -805,9 +818,10 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 	// Use minimal buffer size to trigger backpressure quickly.
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 4})
 	ctx := context.Background()
+	runID := domaintypes.RunID("backpressure-stream")
 
 	// Subscribe with a slow consumer (never drains the channel).
-	sub, err := hub.Subscribe(ctx, "backpressure-stream", 0)
+	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -825,7 +839,7 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			StepIndex: domaintypes.StepIndex(i),
 		}
 		// Should not block; slow subscriber should be dropped.
-		if err := hub.PublishLog(ctx, "backpressure-stream", record); err != nil {
+		if err := hub.PublishLog(ctx, runID, record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)
 		}
 	}
@@ -855,4 +869,134 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Log("no additional events or close (buffer may have absorbed)")
 	}
+}
+
+// TestRunIDRejectedAtStreamBoundary verifies that blank/whitespace run IDs fail
+// before publish/subscribe operations. This enforces the typed boundary contract
+// where invalid run IDs are rejected at the API layer rather than being silently
+// accepted or causing downstream errors.
+func TestRunIDRejectedAtStreamBoundary(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
+	ctx := context.Background()
+
+	// Test cases for invalid run IDs that should be rejected.
+	invalidRunIDs := []struct {
+		name  string
+		runID domaintypes.RunID
+	}{
+		{"empty", domaintypes.RunID("")},
+		{"whitespace-only-space", domaintypes.RunID("   ")},
+		{"whitespace-only-tab", domaintypes.RunID("\t\t")},
+		{"whitespace-only-newline", domaintypes.RunID("\n")},
+		{"whitespace-only-mixed", domaintypes.RunID(" \t\n ")},
+	}
+
+	// Test PublishLog rejects invalid run IDs.
+	t.Run("PublishLog", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				err := hub.PublishLog(ctx, tt.runID, LogRecord{
+					Timestamp: "2025-12-01T10:00:00Z",
+					Stream:    "stdout",
+					Line:      "test line",
+				})
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("PublishLog: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Test PublishRetention rejects invalid run IDs.
+	t.Run("PublishRetention", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				err := hub.PublishRetention(ctx, tt.runID, RetentionHint{
+					Retained: true,
+					TTL:      "72h",
+				})
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("PublishRetention: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Test PublishStatus rejects invalid run IDs.
+	t.Run("PublishStatus", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				err := hub.PublishStatus(ctx, tt.runID, Status{Status: "completed"})
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("PublishStatus: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Test PublishRun rejects invalid run IDs.
+	t.Run("PublishRun", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				err := hub.PublishRun(ctx, tt.runID, api.RunSummary{
+					RunID: "test-run",
+					State: api.RunStateRunning,
+				})
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("PublishRun: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Test Subscribe rejects invalid run IDs.
+	t.Run("Subscribe", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := hub.Subscribe(ctx, tt.runID, 0)
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("Subscribe: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Test Ensure rejects invalid run IDs.
+	t.Run("Ensure", func(t *testing.T) {
+		for _, tt := range invalidRunIDs {
+			t.Run(tt.name, func(t *testing.T) {
+				err := hub.Ensure(tt.runID)
+				if !errors.Is(err, ErrInvalidRunID) {
+					t.Errorf("Ensure: expected ErrInvalidRunID, got %v", err)
+				}
+			})
+		}
+	})
+
+	// Verify that valid run IDs are accepted (contrast test).
+	t.Run("ValidRunIDsAccepted", func(t *testing.T) {
+		validRunID := domaintypes.RunID("valid-run-id-12345")
+
+		// Ensure should succeed.
+		if err := hub.Ensure(validRunID); err != nil {
+			t.Errorf("Ensure: unexpected error for valid run ID: %v", err)
+		}
+
+		// PublishLog should succeed.
+		if err := hub.PublishLog(ctx, validRunID, LogRecord{
+			Timestamp: "2025-12-01T10:00:00Z",
+			Stream:    "stdout",
+			Line:      "valid log",
+		}); err != nil {
+			t.Errorf("PublishLog: unexpected error for valid run ID: %v", err)
+		}
+
+		// Subscribe should succeed.
+		sub, err := hub.Subscribe(ctx, validRunID, 0)
+		if err != nil {
+			t.Errorf("Subscribe: unexpected error for valid run ID: %v", err)
+		} else {
+			sub.Cancel()
+		}
+	})
 }

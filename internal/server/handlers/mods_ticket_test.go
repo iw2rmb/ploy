@@ -509,7 +509,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	}
 	runID := resp.RunID
 
-	snapshot := eventsService.Hub().Snapshot(runID)
+	snapshot := eventsService.Hub().Snapshot(domaintypes.RunID(runID))
 	if len(snapshot) == 0 {
 		t.Fatalf("expected at least one run event to be published")
 	}

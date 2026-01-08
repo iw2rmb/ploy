@@ -184,7 +184,7 @@ func TestStream_PublishRun(t *testing.T) {
 
 			// Check if run event was published to hub.
 			if tt.checkEvents {
-				snapshot := svc.Hub().Snapshot(tt.runID)
+				snapshot := svc.Hub().Snapshot(domaintypes.RunID(tt.runID))
 				if len(snapshot) == 0 {
 					t.Fatal("expected run event in hub snapshot, got none")
 				}

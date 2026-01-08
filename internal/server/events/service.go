@@ -86,7 +86,7 @@ func (s *Service) Stop(ctx context.Context) error {
 // Returns the created event from the database. If persistence fails, an error
 // is returned; SSE fanout errors are logged but do not fail the operation.
 //
-// params.RunID is now a string (KSUID-backed); used directly as streamID.
+// params.RunID is a string (KSUID-backed); converted to types.RunID for hub operations.
 func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
@@ -101,16 +101,16 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 		return store.Event{}, fmt.Errorf("persist event: %w", err)
 	}
 
-	// Use runID string directly as streamID (KSUID-backed).
-	streamID := strings.TrimSpace(params.RunID)
-	if streamID == "" {
+	// Convert string runID to typed RunID for hub operations.
+	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID))
+	if runID.IsZero() {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
 		return event, nil
 	}
 
 	// Fan out to SSE hub.
-	if err := s.publishEventToHub(ctx, streamID, event); err != nil {
+	if err := s.publishEventToHub(ctx, runID, event); err != nil {
 		// Log the error but don't fail the operation since DB write succeeded.
 		s.logger.Error("event persisted but SSE fanout failed", "event_id", event.ID, "error", err)
 	}
@@ -122,7 +122,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 // The runID is used as the streamID for SSE fanout. Log data is decoded into per-line
 // stdout LogRecord frames before fanout so clients see structured "log" events.
 //
-// params.RunID is now a string (KSUID-backed); used directly as streamID.
+// params.RunID is a string (KSUID-backed); converted to types.RunID for hub operations.
 func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	if s.store == nil {
 		return store.Log{}, errors.New("events: store not configured")
@@ -134,16 +134,16 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 		return store.Log{}, fmt.Errorf("persist log: %w", err)
 	}
 
-	// Use runID string directly as streamID (KSUID-backed).
-	streamID := strings.TrimSpace(params.RunID)
-	if streamID == "" {
+	// Convert string runID to typed RunID for hub operations.
+	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID))
+	if runID.IsZero() {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
 		return log, nil
 	}
 
 	// Fan out to SSE hub.
-	if err := s.publishLogToHub(ctx, streamID, log); err != nil {
+	if err := s.publishLogToHub(ctx, runID, log); err != nil {
 		// Log the error but don't fail the operation since DB write succeeded.
 		s.logger.Error("log persisted but SSE fanout failed", "log_id", log.ID, "error", err)
 	}
@@ -160,19 +160,18 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 // "done" status via Hub().PublishStatus when the run reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
 func (s *Service) PublishRun(ctx context.Context, runID domaintypes.RunID, payload modsapi.RunSummary) error {
-	streamID := strings.TrimSpace(runID.String())
-	if streamID == "" {
-		return errors.New("events: runID required for run publish")
+	if runID.IsZero() {
+		return logstream.ErrInvalidRunID
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	return s.hub.PublishRun(ctx, streamID, payload)
+	return s.hub.PublishRun(ctx, runID, payload)
 }
 
 // publishEventToHub converts a database event to a logstream event and publishes it.
-func (s *Service) publishEventToHub(ctx context.Context, streamID string, event store.Event) error {
+func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
 	// Convert event to log record format for SSE.
 	// Use the event level as stream and message as line.
 	record := logstream.LogRecord{
@@ -181,13 +180,13 @@ func (s *Service) publishEventToHub(ctx context.Context, streamID string, event 
 		Line:      event.Message,
 	}
 
-	return s.hub.PublishLog(ctx, streamID, record)
+	return s.hub.PublishLog(ctx, runID, record)
 }
 
 // publishLogToHub converts a database log to a logstream event and publishes it.
 // It enriches each LogRecord with execution context (node_id, job_id, mod_type,
 // step_index) by looking up the associated job metadata when available.
-func (s *Service) publishLogToHub(ctx context.Context, streamID string, log store.Log) error {
+func (s *Service) publishLogToHub(ctx context.Context, runID domaintypes.RunID, log store.Log) error {
 	ts := timestampToString(log.CreatedAt)
 
 	// Fetch job metadata to enrich log records with execution context.
@@ -221,7 +220,7 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 				ModType:   jobCtx.ModType,
 				StepIndex: jobCtx.StepIndex,
 			}
-			if err := s.hub.PublishLog(ctx, streamID, rec); err != nil {
+			if err := s.hub.PublishLog(ctx, runID, rec); err != nil {
 				return err
 			}
 		}
@@ -236,7 +235,7 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 				ModType:   jobCtx.ModType,
 				StepIndex: jobCtx.StepIndex,
 			}
-			_ = s.hub.PublishLog(ctx, streamID, rec)
+			_ = s.hub.PublishLog(ctx, runID, rec)
 		}
 		return nil
 	}
@@ -250,7 +249,7 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 		ModType:   jobCtx.ModType,
 		StepIndex: jobCtx.StepIndex,
 	}
-	return s.hub.PublishLog(ctx, streamID, rec)
+	return s.hub.PublishLog(ctx, runID, rec)
 }
 
 // jobContext holds execution context extracted from job metadata.

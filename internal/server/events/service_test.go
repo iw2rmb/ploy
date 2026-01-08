@@ -247,7 +247,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			// Check if event was published to hub.
 			if tt.checkEvents {
 				streamID := strings.TrimSpace(tt.params.RunID)
-				snapshot := svc.Hub().Snapshot(streamID)
+				snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
 				}
@@ -325,7 +325,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 
 			// Verify SSE stream used normalized level in LogRecord.Stream
 			streamID := strings.TrimSpace(params.RunID)
-			snapshot := svc.Hub().Snapshot(streamID)
+			snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
 			}
@@ -443,7 +443,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			// Check if log was published to hub.
 			if tt.checkEvents {
 				streamID := strings.TrimSpace(tt.params.RunID)
-				snapshot := svc.Hub().Snapshot(streamID)
+				snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 				if len(snapshot) == 0 {
 					t.Fatal("expected log event in hub snapshot, got none")
 				}
@@ -564,7 +564,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 
 	// Verify SSE event contains enriched fields.
 	streamID := strings.TrimSpace(runID)
-	snapshot := svc.Hub().Snapshot(streamID)
+	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
 	}
@@ -646,7 +646,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	snapshot := svc.Hub().Snapshot(strings.TrimSpace(runID))
+	snapshot := svc.Hub().Snapshot(domaintypes.RunID(strings.TrimSpace(runID)))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
 	}
@@ -728,7 +728,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 
 	// Verify log was still published (without enrichment).
 	streamID := strings.TrimSpace(runID)
-	snapshot := svc.Hub().Snapshot(streamID)
+	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
 	}
@@ -805,7 +805,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 
 	// Verify log was published (without enrichment due to lookup failure).
 	streamID := strings.TrimSpace(runID)
-	snapshot := svc.Hub().Snapshot(streamID)
+	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in hub snapshot, got none")
 	}

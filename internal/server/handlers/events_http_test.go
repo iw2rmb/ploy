@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
@@ -110,8 +111,8 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 	// Allow subscription to establish
 	time.Sleep(25 * time.Millisecond)
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "hello"})
-	_ = hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"})
+	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "hello"})
+	_ = hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"})
 
 	select {
 	case <-done:
@@ -138,7 +139,7 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
+	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
@@ -153,8 +154,8 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 
 	// Allow subscription to establish, then publish id=2 and done
 	time.Sleep(25 * time.Millisecond)
-	_ = hub.PublishLog(ctx, runID, logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "second"})
-	_ = hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"})
+	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "second"})
+	_ = hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"})
 
 	select {
 	case <-done:
@@ -212,10 +213,10 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 		ModType:   "mod",
 		StepIndex: 2000,
 	}
-	if err := hub.PublishLog(ctx, runID, enriched); err != nil {
+	if err := hub.PublishLog(ctx, domaintypes.RunID(runID), enriched); err != nil {
 		t.Fatalf("publish enriched log: %v", err)
 	}
-	if err := hub.PublishStatus(ctx, runID, logstream.Status{Status: "completed"}); err != nil {
+	if err := hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
 	}
 

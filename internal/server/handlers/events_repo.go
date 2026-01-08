@@ -38,6 +38,9 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
+		// Convert to typed RunID for type-safe stream operations.
+		runID := domaintypes.RunID(runIDStr)
+
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runIDStr, RepoID: repoIDStr})
 		if err != nil {
 			switch {
@@ -68,7 +71,11 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 		hub := eventsService.Hub()
-		hub.Ensure(runIDStr)
+		if err := hub.Ensure(runID); err != nil {
+			slog.Error("ensure stream failed", "run_id", runIDStr, "err", err)
+			http.Error(w, "invalid run id", http.StatusBadRequest)
+			return
+		}
 
 		filter := func(evt logstream.Event) (logstream.Event, bool) {
 			switch evt.Type {
@@ -110,7 +117,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			}
 		}
 
-		if err := logstream.ServeFiltered(w, r, hub, runIDStr, sinceID, filter); err != nil {
+		if err := logstream.ServeFiltered(w, r, hub, runID, sinceID, filter); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream run repo logs", "run_id", runIDStr, "repo_id", repoIDStr, "err", err)
 			}
