@@ -210,7 +210,6 @@ func TestBuildFromJobs_InvalidStepIndex(t *testing.T) {
 	}{
 		{"nan", math.NaN()},
 		{"inf", math.Inf(1)},
-		{"fractional", 1000.5},
 	}
 
 	for _, tt := range tests {
@@ -236,6 +235,28 @@ func TestBuildFromJobs_InvalidStepIndex(t *testing.T) {
 				t.Fatalf("expected ErrInvalidStepIndex, got %v", err)
 			}
 		})
+	}
+}
+
+func TestBuildFromJobs_FractionalStepIndexAllowed(t *testing.T) {
+	t.Parallel()
+
+	runID := "run-fractional-stepindex"
+
+	jobs := []store.Job{
+		{
+			ID:        domaintypes.JobID("job-1"),
+			RunID:     domaintypes.RunID(runID),
+			Name:      "job-1",
+			Status:    store.JobStatusQueued,
+			ModType:   "mod",
+			StepIndex: domaintypes.StepIndex(1000.5),
+		},
+	}
+
+	_, err := BuildFromJobs(domaintypes.RunID(runID), jobs)
+	if err != nil {
+		t.Fatalf("expected fractional StepIndex to be allowed, got error: %v", err)
 	}
 }
 

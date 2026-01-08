@@ -339,12 +339,18 @@ func TestStepIndex_Valid(t *testing.T) {
 		value float64
 		want  bool
 	}{
-		// Valid integer-like values (common step indices).
+		// Valid finite values (common step indices).
 		{"zero", 0, true},
 		{"positive_integer", 1000, true},
 		{"midpoint_healing", 1500, true},
 		{"large_integer", 9999999, true},
 		{"negative_integer", -1000, true},
+
+		// Valid: fractional values (used for healing/re-gate insertion).
+		{"fractional_half", 1000.5, true},
+		{"fractional_small", 1000.1, true},
+		{"fractional_large", 1000.999, true},
+		{"negative_fractional", -500.25, true},
 
 		// Invalid: NaN.
 		{"nan", math.NaN(), false},
@@ -352,12 +358,6 @@ func TestStepIndex_Valid(t *testing.T) {
 		// Invalid: positive/negative infinity.
 		{"positive_inf", math.Inf(1), false},
 		{"negative_inf", math.Inf(-1), false},
-
-		// Invalid: non-integer floats (fractional part).
-		{"fractional_half", 1000.5, false},
-		{"fractional_small", 1000.1, false},
-		{"fractional_large", 1000.999, false},
-		{"negative_fractional", -500.25, false},
 	}
 
 	for _, tt := range tests {
@@ -422,13 +422,8 @@ func TestStepIndex_IsZero(t *testing.T) {
 	}
 }
 
-// TestStepIndexNoTruncation verifies that fractional step indices are rejected
-// (not silently truncated to integers) at all boundaries where StepIndex.Valid()
-// is enforced. This test ensures the refactor correctly prevents lossy float64->int casts.
-//
-// Per roadmap/refactor/contracts.md § "StepIndex (Ordering Invariant)":
-//   - Reject fractional values (must be integer-like).
-//   - Do not cast StepIndex to int for sorting/serialization; that destroys ordering.
+// TestStepIndexNoTruncation verifies that fractional step indices are preserved
+// (not silently truncated) at boundaries where StepIndex is decoded.
 func TestStepIndexNoTruncation(t *testing.T) {
 	t.Parallel()
 
@@ -443,18 +438,25 @@ func TestStepIndexNoTruncation(t *testing.T) {
 
 	for _, lit := range fractionalJSON {
 		lit := lit
-		t.Run("reject_fractional_json_"+lit, func(t *testing.T) {
+		t.Run("accept_fractional_json_"+lit, func(t *testing.T) {
 			t.Parallel()
 
 			var idx StepIndex
-			if err := json.Unmarshal([]byte(lit), &idx); err == nil {
-				t.Fatalf("json.Unmarshal(%q, *StepIndex) succeeded with %v; want error", lit, idx)
+			if err := json.Unmarshal([]byte(lit), &idx); err != nil {
+				t.Fatalf("json.Unmarshal(%q, *StepIndex) error: %v", lit, err)
+			}
+			if !idx.Valid() {
+				t.Fatalf("StepIndex(%v).Valid() = false; want true", idx)
 			}
 
-			// DiffSummary boundary decode must not accept fractional step_index values.
+			// DiffSummary boundary decode must preserve fractional step_index values.
 			summary := DiffSummary([]byte(`{"step_index":` + lit + `}`))
-			if got, ok := summary.StepIndex(); ok {
-				t.Fatalf("DiffSummary.StepIndex()=(%v,true) for %q; want ok=false", got, lit)
+			got, ok := summary.StepIndex()
+			if !ok {
+				t.Fatalf("DiffSummary.StepIndex() ok=false for %q; want ok=true", lit)
+			}
+			if got != idx {
+				t.Fatalf("DiffSummary.StepIndex()=%v for %q; want %v", got, lit, idx)
 			}
 		})
 	}

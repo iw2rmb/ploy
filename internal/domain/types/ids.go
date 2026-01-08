@@ -139,18 +139,17 @@ func (v StepIndex) IsZero() bool { return v == 0 }
 // Valid reports whether the StepIndex represents a valid step ordering value.
 // A valid StepIndex must:
 //   - Not be NaN or Inf (rejects special floating-point values)
-//   - Have a zero fractional part (e.g., 1000.0 is valid, 1000.5 is not)
 //
 // This centralizes invariants for step indices, ensuring they represent
-// discrete positions in the execution sequence (e.g., 1000, 2000, 1500).
+// stable ordering values used across the system. Fractional values are valid
+// and are used to insert healing/re-gate jobs between existing jobs.
 func (v StepIndex) Valid() bool {
 	f := float64(v)
 	// Reject NaN and Inf.
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return false
 	}
-	// Require integer-like value (no fractional part).
-	return f == math.Trunc(f)
+	return true
 }
 
 func (v StepIndex) MarshalJSON() ([]byte, error) {
