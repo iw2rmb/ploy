@@ -18,7 +18,7 @@ func ensureVersionTable(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	_, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS ploy.schema_version (
         version BIGINT PRIMARY KEY,
-        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        applied_at TIMESTAMPTZ NOT NULL
     )`)
 	return err
 }
@@ -36,6 +36,6 @@ func getCurrentVersion(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
 
 // recordMigration inserts a migration version into schema_version within a transaction.
 func recordMigration(ctx context.Context, tx pgx.Tx, version int64) error {
-	_, err := tx.Exec(ctx, `INSERT INTO ploy.schema_version (version) VALUES ($1)`, version)
+	_, err := tx.Exec(ctx, `INSERT INTO ploy.schema_version (version, applied_at) VALUES ($1, now())`, version)
 	return err
 }
