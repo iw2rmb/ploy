@@ -217,9 +217,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 			repoID:    "repo-abc",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -235,9 +235,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 			repoID:    "repo-abc",
 			stepIndex: 2,
 			diffs: []diffListItem{
-				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-0", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -253,12 +253,12 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 			repoID:    "repo-abc",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0-mod", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-0-heal", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeHealing.String()).MustBuild()},
-				{ID: "diff-1-mod", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-1-heal1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeHealing.String()).MustBuild()},
-				{ID: "diff-1-heal2", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeHealing.String()).MustBuild()},
-				{ID: "diff-2-mod", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-0-mod", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-0-heal", JobID: "job-0", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeHealing.String()).MustBuild()},
+				{ID: "diff-1-mod", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-1-heal1", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeHealing.String()).MustBuild()},
+				{ID: "diff-1-heal2", JobID: "job-1", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeHealing.String()).MustBuild()},
+				{ID: "diff-2-mod", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
 				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
@@ -351,9 +351,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			name: "shuffled by step_index - sorted correctly",
 			diffs: []diffListItem{
 				// Server returns diffs out of step order.
-				{ID: "diff-step2", JobID: "job-2", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(2).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-step0", JobID: "job-0", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-step1", JobID: "job-1", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-step2", JobID: "job-2", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-step0", JobID: "job-0", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-step1", JobID: "job-1", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			expectedPatchIDs: []string{"diff-step0", "diff-step1", "diff-step2"},
 			stepIndex:        2,
@@ -362,9 +362,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			name: "same step_index - sorted by created_at",
 			diffs: []diffListItem{
 				// Same step, different creation times (shuffled).
-				{ID: "diff-late", JobID: "job-late", CreatedAt: t2, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-early", JobID: "job-early", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-mid", JobID: "job-mid", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-late", JobID: "job-late", CreatedAt: t2, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-early", JobID: "job-early", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-mid", JobID: "job-mid", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			expectedPatchIDs: []string{"diff-early", "diff-mid", "diff-late"},
 			stepIndex:        0,
@@ -373,9 +373,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			name: "same step_index and created_at - sorted by id",
 			diffs: []diffListItem{
 				// Same step and timestamp, different IDs (shuffled).
-				{ID: "diff-c", JobID: "job-c", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-a", JobID: "job-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "diff-b", JobID: "job-b", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-c", JobID: "job-c", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-a", JobID: "job-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "diff-b", JobID: "job-b", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			expectedPatchIDs: []string{"diff-a", "diff-b", "diff-c"},
 			stepIndex:        0,
@@ -384,11 +384,11 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			name: "complex mixed ordering - all sort keys exercised",
 			diffs: []diffListItem{
 				// Mix of step_index, created_at, and id variations (shuffled).
-				{ID: "s1-t1-b", JobID: "job-s1-t1-b", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "s0-t0-a", JobID: "job-s0-t0-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "s1-t0-a", JobID: "job-s1-t0-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "s0-t0-b", JobID: "job-s0-t0-b", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(0).ModType(DiffModTypeMod.String()).MustBuild()},
-				{ID: "s1-t1-a", JobID: "job-s1-t1-a", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(1).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "s1-t1-b", JobID: "job-s1-t1-b", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "s0-t0-a", JobID: "job-s0-t0-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "s1-t0-a", JobID: "job-s1-t0-a", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "s0-t0-b", JobID: "job-s0-t0-b", CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
+				{ID: "s1-t1-a", JobID: "job-s1-t1-a", CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(1)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			// Expected: step 0 first, then step 1.
 			// Within step 0: t0-a before t0-b (same time, id tiebreaker).

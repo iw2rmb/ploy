@@ -104,7 +104,7 @@ func (r *runController) uploadHealingJobDiff(
 	// the rehydration chain (healing diffs are not intermediate states here).
 	// Uses typed builder to eliminate map[string]any construction.
 	summary := types.NewDiffSummaryBuilder().
-		StepIndex(int(stepIndex)).
+		StepIndex(stepIndex).
 		ModType(DiffModTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(

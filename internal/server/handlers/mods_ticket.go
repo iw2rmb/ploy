@@ -166,8 +166,14 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
-			// Use job's step_index directly for ordering (float, but expose as int for API).
-			stepIndex := int(job.StepIndex)
+			// Use job's step_index directly without lossy int cast.
+			// Validate that step_index is a valid StepIndex (integer-like, non-NaN/Inf).
+			stepIndex := domaintypes.StepIndex(job.StepIndex)
+			if !stepIndex.Valid() {
+				http.Error(w, fmt.Sprintf("invalid step_index for job %s", job.ID), http.StatusInternalServerError)
+				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", job.ID, "step_index", job.StepIndex)
+				return
+			}
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.

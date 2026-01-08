@@ -192,7 +192,7 @@ func (r *runController) uploadModDiffWithBaseline(
 	// Uses typed builder to eliminate map[string]any construction.
 	// Mod job diffs use DiffModTypeMod so they participate in the rehydration chain.
 	summary := types.NewDiffSummaryBuilder().
-		StepIndex(int(stepIndex)).
+		StepIndex(stepIndex).
 		ModType(DiffModTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
