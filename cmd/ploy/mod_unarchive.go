@@ -10,6 +10,7 @@ import (
 	"io"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModUnarchive implements 'ploy mod unarchive <mod-id|name>'.
@@ -38,7 +39,7 @@ func handleModUnarchive(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -49,7 +50,7 @@ func handleModUnarchive(args []string, stderr io.Writer) error {
 	cmd := mods.UnarchiveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModID:   modID,
+		ModRef:  types.ModRef(modID),
 	}
 
 	result, err := cmd.Run(ctx)

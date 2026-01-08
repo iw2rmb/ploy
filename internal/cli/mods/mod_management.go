@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ModSummary represents a mod project returned by the server.
@@ -175,15 +177,15 @@ func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 }
 
 // RemoveModCommand deletes a mod project.
-// Endpoint: DELETE /v1/mods/{mod_id}
+// Endpoint: DELETE /v1/mods/{mod_ref}
 // Refuses deletion if the mod has any runs.
 type RemoveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name to delete.
+	ModRef  types.ModRef // Required: mod ID or name to delete.
 }
 
-// Run executes DELETE /v1/mods/{mod_id} to delete a mod.
+// Run executes DELETE /v1/mods/{mod_ref} to delete a mod.
 func (c RemoveModCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return fmt.Errorf("mod remove: http client required")
@@ -191,12 +193,12 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return fmt.Errorf("mod remove: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
-		return fmt.Errorf("mod remove: mod id is required")
+	if err := c.ModRef.Validate(); err != nil {
+		return fmt.Errorf("mod remove: mod ref is required")
 	}
 
-	// DELETE /v1/mods/{mod_id}
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)))
+	// DELETE /v1/mods/{mod_ref}
+	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()))
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("mod remove: build request: %w", err)
@@ -217,12 +219,12 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 }
 
 // ArchiveModCommand archives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_id}/archive
+// Endpoint: PATCH /v1/mods/{mod_ref}/archive
 // Refuses archival if the mod has running jobs.
 type ArchiveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name to archive.
+	ModRef  types.ModRef // Required: mod ID or name to archive.
 }
 
 // ArchiveModResult contains the response from archiving a mod.
@@ -232,7 +234,7 @@ type ArchiveModResult struct {
 	Archived bool   `json:"archived"`
 }
 
-// Run executes PATCH /v1/mods/{mod_id}/archive to archive a mod.
+// Run executes PATCH /v1/mods/{mod_ref}/archive to archive a mod.
 func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 	if c.Client == nil {
 		return ArchiveModResult{}, fmt.Errorf("mod archive: http client required")
@@ -240,12 +242,12 @@ func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 	if c.BaseURL == nil {
 		return ArchiveModResult{}, fmt.Errorf("mod archive: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: mod id is required")
+	if err := c.ModRef.Validate(); err != nil {
+		return ArchiveModResult{}, fmt.Errorf("mod archive: mod ref is required")
 	}
 
-	// PATCH /v1/mods/{mod_id}/archive
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "archive")
+	// PATCH /v1/mods/{mod_ref}/archive
+	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "archive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
 		return ArchiveModResult{}, fmt.Errorf("mod archive: build request: %w", err)
@@ -269,12 +271,12 @@ func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 }
 
 // UnarchiveModCommand unarchives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_id}/unarchive
+// Endpoint: PATCH /v1/mods/{mod_ref}/unarchive
 // Restores an archived mod to active status.
 type UnarchiveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name to unarchive.
+	ModRef  types.ModRef // Required: mod ID or name to unarchive.
 }
 
 // UnarchiveModResult contains the response from unarchiving a mod.
@@ -284,7 +286,7 @@ type UnarchiveModResult struct {
 	Archived bool   `json:"archived"`
 }
 
-// Run executes PATCH /v1/mods/{mod_id}/unarchive to unarchive a mod.
+// Run executes PATCH /v1/mods/{mod_ref}/unarchive to unarchive a mod.
 func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error) {
 	if c.Client == nil {
 		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: http client required")
@@ -292,12 +294,12 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 	if c.BaseURL == nil {
 		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: mod id is required")
+	if err := c.ModRef.Validate(); err != nil {
+		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: mod ref is required")
 	}
 
-	// PATCH /v1/mods/{mod_id}/unarchive
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "unarchive")
+	// PATCH /v1/mods/{mod_ref}/unarchive
+	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "unarchive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
 		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: build request: %w", err)
@@ -321,12 +323,12 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 }
 
 // SetModSpecCommand creates a new spec row and updates mods.spec_id.
-// Endpoint: POST /v1/mods/{mod_id}/specs
+// Endpoint: POST /v1/mods/{mod_ref}/specs
 // Sets the mod's current spec by creating a new spec row.
 type SetModSpecCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	ModID     string          // Required: mod ID or name.
+	ModRef    types.ModRef    // Required: mod ID or name.
 	Spec      json.RawMessage // Required: spec content (YAML/JSON parsed to JSON).
 	Name      *string         // Optional: spec name.
 	CreatedBy *string         // Optional: creator identifier.
@@ -338,7 +340,7 @@ type SetModSpecResult struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// Run executes POST /v1/mods/{mod_id}/specs to set the mod's spec.
+// Run executes POST /v1/mods/{mod_ref}/specs to set the mod's spec.
 func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	if c.Client == nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: http client required")
@@ -346,8 +348,8 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	if c.BaseURL == nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
-		return SetModSpecResult{}, fmt.Errorf("mod spec set: mod id is required")
+	if err := c.ModRef.Validate(); err != nil {
+		return SetModSpecResult{}, fmt.Errorf("mod spec set: mod ref is required")
 	}
 	if len(c.Spec) == 0 {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: spec is required")
@@ -371,8 +373,8 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: marshal request: %w", err)
 	}
 
-	// POST /v1/mods/{mod_id}/specs
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "specs")
+	// POST /v1/mods/{mod_ref}/specs
+	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(c.ModRef.String()), "specs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: build request: %w", err)
@@ -397,16 +399,19 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	return SetModSpecResult{}, decodeHTTPError(resp, "mod spec set")
 }
 
-// ResolveModByNameCommand attempts to resolve a mod by name (if not a valid ID format).
-// It lists mods and finds an exact name match, supporting both ID and name lookups.
+// ResolveModByNameCommand attempts to resolve a mod reference (ID or name) to a mod ID.
+// It queries the server to find an exact name match, supporting both ID and name lookups.
+// This command does NOT use any client-side heuristics to distinguish IDs from names;
+// it always queries the server for resolution.
 type ResolveModByNameCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  string // Mod reference (could be ID or name).
+	ModRef  types.ModRef // Mod reference (could be ID or name).
 }
 
 // Run attempts to resolve a mod ID from a name reference.
-// Returns the mod ID if found (either as-is if it looks like an ID, or resolved from name).
+// Returns the mod ID if found by exact name match, or the reference as-is if no match.
+// No client-side heuristics are used to distinguish IDs from names.
 func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 	if c.Client == nil {
 		return "", fmt.Errorf("resolve mod: http client required")
@@ -414,19 +419,13 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 	if c.BaseURL == nil {
 		return "", fmt.Errorf("resolve mod: base url required")
 	}
-	ref := strings.TrimSpace(c.ModRef)
-	if ref == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return "", fmt.Errorf("resolve mod: mod reference is required")
 	}
+	ref := c.ModRef.String()
 
-	// If it looks like a UUID-style ID (contains hyphens and is 36 chars), return as-is.
-	// This is a heuristic; the server will validate the actual ID.
-	if len(ref) == 36 && strings.Count(ref, "-") == 4 {
-		return ref, nil
-	}
-
-	// Otherwise, try to find by name using the list endpoint with name filter.
-	// Prefer exact name match.
+	// Try to find by name using the list endpoint with name filter.
+	// No heuristics - always query the server.
 	listCmd := ListModsCommand{
 		Client:        c.Client,
 		BaseURL:       c.BaseURL,

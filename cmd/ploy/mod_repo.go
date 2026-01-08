@@ -16,6 +16,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRepo routes mod repo subcommands.
@@ -97,7 +98,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -149,7 +150,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -227,7 +228,7 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -299,7 +300,7 @@ func handleModRepoImport(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  modRef,
+		ModRef:  types.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
