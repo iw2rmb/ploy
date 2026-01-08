@@ -325,9 +325,9 @@ type RunRepo struct {
 }
 
 type RunsTiming struct {
-	ID      string `json:"id"`
-	QueueMs int64  `json:"queue_ms"`
-	RunMs   int64  `json:"run_ms"`
+	ID      types.RunID `json:"id"`
+	QueueMs int64       `json:"queue_ms"`
+	RunMs   int64       `json:"run_ms"`
 }
 
 type Spec struct {
