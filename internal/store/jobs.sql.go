@@ -577,7 +577,7 @@ UPDATE jobs
 SET status = $2,
     exit_code = $3,
     finished_at = now(),
-    duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000
+    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
 WHERE id = $1
 `
 
@@ -597,7 +597,7 @@ UPDATE jobs
 SET status = $2,
     exit_code = $3,
     finished_at = now(),
-    duration_ms = EXTRACT(EPOCH FROM (now() - started_at)) * 1000,
+    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
     meta = $4
 WHERE id = $1
 `
