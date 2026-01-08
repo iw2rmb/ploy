@@ -58,8 +58,8 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			return
 		}
 
-		// Claim the next pending job. ClaimJob expects *string for nullable FK.
-		job, err := st.ClaimJob(r.Context(), &nodeID)
+		// Claim the next pending job. ClaimJob requires a non-empty nodeID.
+		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
 			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {

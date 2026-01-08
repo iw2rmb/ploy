@@ -114,7 +114,7 @@ type mockStore struct {
 	claimRunErr    error
 
 	claimJobCalled bool
-	claimJobParams *string
+	claimJobParams types.NodeID
 	claimJobResult store.Job
 	claimJobErr    error
 
@@ -682,9 +682,13 @@ func (m *mockStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, er
 }
 
 // ClaimJob implements job claiming for the new unified job model.
-func (m *mockStore) ClaimJob(ctx context.Context, nodeID *string) (store.Job, error) {
+// Requires a non-empty nodeID (ErrEmptyNodeID is returned otherwise).
+func (m *mockStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
 	m.claimJobCalled = true
 	m.claimJobParams = nodeID
+	if nodeID.IsZero() {
+		return store.Job{}, store.ErrEmptyNodeID
+	}
 	if m.claimJobErr != nil {
 		return store.Job{}, m.claimJobErr
 	}
