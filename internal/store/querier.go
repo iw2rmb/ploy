@@ -180,7 +180,10 @@ type Querier interface {
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
-	// Promote the next job in a repo attempt: Created -> Queued.
+	// Atomically promote the next job in a repo attempt: Created -> Queued.
+	// Uses FOR UPDATE SKIP LOCKED to prevent scheduler races:
+	// - Concurrent schedulers selecting the same row will skip it if locked
+	// - The status predicate ensures we only update rows still in 'Created' state
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	// Unarchives a mod by clearing archived_at.
 	UnarchiveMod(ctx context.Context, id types.ModID) error

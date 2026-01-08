@@ -503,35 +503,39 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 }
 
 const scheduleNextJob = `-- name: ScheduleNextJob :one
-UPDATE jobs
-SET status = 'Queued'
-WHERE id = (
+WITH next_job AS (
   SELECT j.id
   FROM jobs j
   WHERE j.run_id = $1
     AND j.repo_id = $2
     AND j.attempt = $3
     AND j.status = 'Created'
-  ORDER BY j.step_index ASC
+  ORDER BY j.step_index ASC, j.id ASC
+  FOR UPDATE SKIP LOCKED
   LIMIT 1
 )
+UPDATE jobs
+SET status = 'Queued'
+FROM next_job
+WHERE jobs.id = next_job.id
+  AND jobs.status = 'Created'
 RETURNING
-  id,
-  run_id,
-  repo_id,
-  repo_base_ref,
-  attempt,
-  name,
-  status,
-  mod_type,
-  mod_image,
-  step_index,
-  node_id,
-  exit_code,
-  started_at,
-  finished_at,
-  duration_ms,
-  meta
+  jobs.id,
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.repo_base_ref,
+  jobs.attempt,
+  jobs.name,
+  jobs.status,
+  jobs.mod_type,
+  jobs.mod_image,
+  jobs.step_index,
+  jobs.node_id,
+  jobs.exit_code,
+  jobs.started_at,
+  jobs.finished_at,
+  jobs.duration_ms,
+  jobs.meta
 `
 
 type ScheduleNextJobParams struct {
@@ -540,7 +544,10 @@ type ScheduleNextJobParams struct {
 	Attempt int32           `json:"attempt"`
 }
 
-// Promote the next job in a repo attempt: Created -> Queued.
+// Atomically promote the next job in a repo attempt: Created -> Queued.
+// Uses FOR UPDATE SKIP LOCKED to prevent scheduler races:
+// - Concurrent schedulers selecting the same row will skip it if locked
+// - The status predicate ensures we only update rows still in 'Created' state
 func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error) {
 	row := q.db.QueryRow(ctx, scheduleNextJob, arg.RunID, arg.RepoID, arg.Attempt)
 	var i Job
