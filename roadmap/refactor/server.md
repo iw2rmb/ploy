@@ -39,13 +39,12 @@
 ## Likely Bugs / Risks
 
 - Healing step index generation can violate the StepIndex invariant:
-  - `domaintypes.StepIndex` is float64 but requires integer-like values (`internal/domain/types/ids.go:43`).
-  - For `re_gate` failures, `baseGateIndex` can become a non-integer if it was derived from a prior healing `StepIndex` (`internal/server/handlers/nodes_complete_healing.go:116`).
+  - `domaintypes.StepIndex` must be finite (reject NaN/Inf) (`internal/domain/types/ids.go`).
   - New heal/re-gate indices are computed from `failedStepIndex` using fractional math (`gapSize*0.5`, `gapSize*0.75`) (`internal/server/handlers/nodes_complete_healing.go:221`).
   - Solution: follow `roadmap/refactor/contracts.md` § "StepIndex (Ordering Invariant)".
 - Log enrichment truncates ordering:
-  - `job.StepIndex` (float64) is cast to `int` for stream records (`internal/server/events/service.go:296`).
-  - Merged slice: implement the SSE/log payload contract end-to-end so this path no longer casts (`roadmap/refactor/scope.md`, `roadmap/refactor/contracts.md`).
+  - Any `float -> int` cast of `job.StepIndex` would silently truncate and break ordering/cutoffs.
+  - Ensure log enrichment publishes `types.StepIndex` end-to-end without truncation (`roadmap/refactor/scope.md`, `roadmap/refactor/contracts.md`).
 - Config watcher reload context + debounce race:
   - Reload uses `context.Background()` (no cancellation/timeout), and `time.AfterFunc` can fire after stop (`internal/server/config/watcher.go:149`, `internal/server/config/watcher.go:176`).
   - Solution: thread a bounded context (timeout + cancellation) into reload, and ensure the debounce timer is stopped/drained on shutdown.

@@ -13,8 +13,8 @@
   - Solution: use `map[types.JobID]StageStatus`; `types.JobID` implements `encoding.TextMarshaler`, so JSON keys remain strings while internal call sites become type-safe.
 - Fix `StepIndex` type in API payloads.
   - `StageStatus.StepIndex` is `int` (`internal/mods/api/types.go:76`) but is described as `jobs.step_index` with midpoint insertion semantics (`internal/mods/api/types.go:84`).
-  - Server currently casts `float64` -> `int` (`internal/server/handlers/mods_ticket.go:169`), which can silently truncate if any non-integer-like values appear.
-  - Solution: use `types.StepIndex` and enforce `StepIndex.Valid()` (see `roadmap/refactor/contracts.md` § "StepIndex (Ordering Invariant)").
+  - `jobs.step_index` is float and fractional values are valid; any `float -> int` cast would silently truncate ordering.
+  - Solution: use `types.StepIndex` end-to-end and do not cast to `int` (see `roadmap/refactor/contracts.md` § "StepIndex (Ordering Invariant)").
 - Replace `ModType string` with a validated domain type.
   - `StageMetadata.ModType` is a free-form string (`internal/mods/api/types.go:101`), and `IsGateJob` casts it to `types.ModType` without validation (`internal/mods/api/status_conversion.go:138`).
   - Solution: make `StageMetadata.ModType` be `types.ModType` (`internal/domain/types/mods.go`) and validate on decode (reject unknown mod types).
@@ -37,8 +37,8 @@
   - `store.RunStatusFinished` maps to `RunStateSucceeded` unconditionally (`internal/mods/api/status_conversion.go:57`), but “finished” does not mean “succeeded” if any jobs/repos failed.
   - Solution: derive API `RunState` from outcomes (e.g., inspect per-job/per-repo results or stats), or introduce an explicit run outcome field separate from lifecycle state.
 - Silent truncation of step ordering.
-  - `mods_ticket` exposes `step_index := int(job.StepIndex)` (`internal/server/handlers/mods_ticket.go:169`), and event streaming similarly casts (`internal/server/events/service.go:296`).
-  - Solution: represent it as `types.StepIndex` end-to-end and reject fractional/invalid values at boundaries per `roadmap/refactor/contracts.md`.
+  - Any `float -> int` cast of `jobs.step_index` would silently truncate (e.g. `1750.75 -> 1750`) and break stable ordering/cutoffs.
+  - Solution: represent it as `types.StepIndex` end-to-end, reject NaN/Inf at boundaries, and preserve fractional ordering without truncation per `roadmap/refactor/contracts.md`.
 - Weak spec validation boundary.
   - `RunSubmitRequest.Spec` is `json.RawMessage` (`internal/mods/api/types.go:50`) but the type does not require `json.Valid` or “must be object”.
   - Solution: validate spec shape at the server boundary (object-only if it will be merged/inspected) and cap request size per `roadmap/refactor/contracts.md` § "JSON Boundary Decoding (Server)".
