@@ -35,7 +35,7 @@
   - Solution: follow `roadmap/refactor/contracts.md` § "IDs and Newtypes (`internal/domain/types`)" (sqlc overrides + end-to-end typed IDs).
 - Make `step_index` harder to misuse:
   - DB type is `FLOAT` (`internal/store/schema.sql:191`) and Go type is `float64` (`internal/store/models.go:226`).
-  - If floats are kept, wrap in a dedicated type and validate “integer-like” invariants at boundaries.
+  - If floats are kept, wrap in a dedicated type and validate invariants at boundaries (reject NaN/Inf).
   - Solution: follow `roadmap/refactor/contracts.md` § "StepIndex (Ordering Invariant)" (map `jobs.step_index` to `types.StepIndex`, validate via `StepIndex.Valid()`).
 - Avoid nullable “must-be-present” inputs at the store boundary:
   - `ClaimJob(ctx, nodeID *string)` (`internal/store/querier.go:25`) should be non-nullable (wrapper method or query change).

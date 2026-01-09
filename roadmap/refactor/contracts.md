@@ -69,9 +69,8 @@ This file centralizes cross-cutting “contract” decisions that otherwise repe
 - Use `types.StepIndex` (`internal/domain/types/ids.go`) end-to-end where a step ordering value exists (store rows, workflow graph, server events).
 - Enforce invariants via `StepIndex.Valid()`:
   - Reject NaN/Inf.
-  - Reject fractional values (must be integer-like).
 - Do not cast `StepIndex` to `int` for sorting/serialization; that destroys ordering.
-- Any generation of new step indices (healing/re-gate, etc.) must produce integer-like values only.
+- Fractional values are valid and used for inserting healing/re-gate steps between existing jobs.
 - Any sorting based on `StepIndex` must be deterministic:
   - Use a tie-breaker (`JobID`/node id) when `StepIndex` matches.
   - Treat duplicate IDs (graph nodes) as an error, not overwrite.
