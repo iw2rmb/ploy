@@ -166,7 +166,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Use job's step_index directly without lossy int cast.
-			// Validate that step_index is a valid StepIndex (integer-like, non-NaN/Inf).
+			// Validate that step_index is finite (reject NaN/Inf).
 			stepIndex := job.StepIndex
 			if !stepIndex.Valid() {
 				http.Error(w, fmt.Sprintf("invalid step_index for job %s", jobIDStr), http.StatusInternalServerError)

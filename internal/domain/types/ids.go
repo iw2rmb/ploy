@@ -53,7 +53,8 @@ type ModRef string
 
 // StepIndex identifies a job's ordering value within a run execution sequence.
 // It is stored/transported as a float64 (historically `jobs.step_index`) where
-// integer-like values (e.g., 1000, 2000, 1500) encode ordering.
+// values encode ordering (e.g., 1000, 2000) and fractional values are used to
+// insert healing/re-gate jobs between existing jobs (e.g., 1500.5, 1750.75).
 type StepIndex float64
 
 var _ interface {

@@ -12,6 +12,7 @@ package logs
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -120,8 +121,8 @@ func (p *Printer) PrintLog(rec LogRecord) {
 			if ctx.Len() > 0 {
 				ctx.WriteByte(' ')
 			}
-			// Format as integer since valid StepIndex values are integer-like.
-			fmt.Fprintf(&ctx, "step=%.0f", rec.StepIndex.Float64())
+			ctx.WriteString("step=")
+			ctx.WriteString(strconv.FormatFloat(rec.StepIndex.Float64(), 'f', -1, 64))
 		}
 		if !rec.JobID.IsZero() {
 			if ctx.Len() > 0 {
