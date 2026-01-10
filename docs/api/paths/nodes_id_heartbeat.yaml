@@ -19,41 +19,41 @@ post:
           required:
             - cpu_free_millis
             - cpu_total_millis
-            - mem_free_mb
-            - mem_total_mb
-            - disk_free_mb
-            - disk_total_mb
+            - mem_free_bytes
+            - mem_total_bytes
+            - disk_free_bytes
+            - disk_total_bytes
           properties:
             cpu_free_millis:
-              type: number
-              format: double
-              description: Free CPU in millicores
-              example: 1500.0
+              type: integer
+              format: int32
+              description: Free CPU in millicores (millis)
+              example: 1500
             cpu_total_millis:
-              type: number
-              format: double
-              description: Total CPU in millicores
-              example: 4000.0
-            mem_free_mb:
-              type: number
-              format: double
-              description: Free memory in megabytes
-              example: 2048.0
-            mem_total_mb:
-              type: number
-              format: double
-              description: Total memory in megabytes
-              example: 8192.0
-            disk_free_mb:
-              type: number
-              format: double
-              description: Free disk space in megabytes
-              example: 10240.0
-            disk_total_mb:
-              type: number
-              format: double
-              description: Total disk space in megabytes
-              example: 51200.0
+              type: integer
+              format: int32
+              description: Total CPU in millicores (millis)
+              example: 4000
+            mem_free_bytes:
+              type: integer
+              format: int64
+              description: Free memory in bytes
+              example: 2147483648
+            mem_total_bytes:
+              type: integer
+              format: int64
+              description: Total memory in bytes
+              example: 8589934592
+            disk_free_bytes:
+              type: integer
+              format: int64
+              description: Free disk space in bytes
+              example: 10737418240
+            disk_total_bytes:
+              type: integer
+              format: int64
+              description: Total disk space in bytes
+              example: 53687091200
             version:
               type: string
               description: Optional node agent version string. When omitted or empty, the stored version remains unchanged.
@@ -62,21 +62,21 @@ post:
           minimal:
             summary: Minimal heartbeat (all required fields)
             value:
-              cpu_free_millis: 1500.0
-              cpu_total_millis: 4000.0
-              mem_free_mb: 2048.0
-              mem_total_mb: 8192.0
-              disk_free_mb: 10240.0
-              disk_total_mb: 51200.0
+              cpu_free_millis: 1500
+              cpu_total_millis: 4000
+              mem_free_bytes: 2147483648
+              mem_total_bytes: 8589934592
+              disk_free_bytes: 10737418240
+              disk_total_bytes: 53687091200
           with_version:
             summary: Heartbeat with agent version
             value:
-              cpu_free_millis: 2800.0
-              cpu_total_millis: 4000.0
-              mem_free_mb: 5632.0
-              mem_total_mb: 16384.0
-              disk_free_mb: 204800.0
-              disk_total_mb: 512000.0
+              cpu_free_millis: 2800
+              cpu_total_millis: 4000
+              mem_free_bytes: 5905580032
+              mem_total_bytes: 17179869184
+              disk_free_bytes: 214748364800
+              disk_total_bytes: 536870912000
               version: "ployd-node/1.2.3 (linux/amd64)"
   responses:
     '204':
