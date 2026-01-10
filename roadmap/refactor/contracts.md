@@ -8,7 +8,3 @@ This file is an index; detailed slices live in:
 ## Spec Merge Strictness (Server)
 
 See `roadmap/refactor/contracts-spec-merge.md`.
-
-## HTTP Boundary Decoding (CLI)
-
-See `roadmap/refactor/contracts-cli-http.md`.
