@@ -11,12 +11,18 @@ import (
 // are provided, the spec is returned unchanged.
 func TestMergeGlobalEnvIntoSpec_EmptyEnv(t *testing.T) {
 	spec := json.RawMessage(`{"foo":"bar"}`)
-	result := mergeGlobalEnvIntoSpec(spec, nil, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, nil, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	if string(result) != string(spec) {
 		t.Errorf("expected spec unchanged, got %s", result)
 	}
 
-	result = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, domaintypes.ModTypeMod)
+	result, err = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	if string(result) != string(spec) {
 		t.Errorf("expected spec unchanged, got %s", result)
 	}
@@ -30,25 +36,21 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 	}
 
 	// Test with nil spec.
-	result := mergeGlobalEnvIntoSpec(nil, env, domaintypes.ModTypeMod)
+	_, err := mergeGlobalEnvIntoSpec(nil, env, domaintypes.ModTypeMod)
+	if err == nil {
+		t.Fatalf("expected error for nil spec, got nil")
+	}
+
+	// Test with empty JSON spec.
+	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 	em, ok := m["env"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected env map in result, got %v", m)
-	}
-	if em["API_KEY"] != "secret123" {
-		t.Errorf("expected API_KEY=secret123, got %v", em["API_KEY"])
-	}
-
-	// Test with empty JSON spec.
-	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
-	}
-	em, ok = m["env"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected env map in result, got %v", m)
 	}
@@ -107,7 +109,10 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, tt.jobType)
+			result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, tt.jobType)
+			if err != nil {
+				t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+			}
 			var m map[string]any
 			if err := json.Unmarshal(result, &m); err != nil {
 				t.Fatalf("failed to unmarshal result: %v", err)
@@ -142,7 +147,10 @@ func TestMergeGlobalEnvIntoSpec_PerRunEnvPrecedence(t *testing.T) {
 		"NEW_KEY": {Value: "new-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
-	result := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -177,7 +185,10 @@ func TestMergeGlobalEnvIntoSpec_PreservesOtherSpecFields(t *testing.T) {
 		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
 	}
 
-	result := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -208,15 +219,9 @@ func TestMergeGlobalEnvIntoSpec_InvalidJSON(t *testing.T) {
 		"KEY": {Value: "value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
-	// Invalid JSON should not cause a crash; global env should still be injected.
-	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, domaintypes.ModTypeMod)
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
-	}
-	em, _ := m["env"].(map[string]any)
-	if em["KEY"] != "value" {
-		t.Errorf("expected KEY=value even with invalid input spec, got %v", em["KEY"])
+	_, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, domaintypes.ModTypeMod)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
 	}
 }
 
@@ -230,7 +235,10 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test mod job should receive all three keys.
-	result := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -248,7 +256,10 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test pre_gate job should only receive CA_CERTS_PEM_BUNDLE (scope=all).
-	result = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypePreGate)
+	result, err = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypePreGate)
+	if err != nil {
+		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
+	}
 	if err := json.Unmarshal(result, &m); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}

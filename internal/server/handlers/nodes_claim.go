@@ -154,26 +154,38 @@ func buildAndSendJobClaimResponse(
 
 	// Merge job_id into spec for downstream execution.
 	// Job IDs are now KSUID strings.
-	mergedSpec := mergeJobIDIntoSpec(spec, job.ID)
+	mergedSpec, err := mergeJobIDIntoSpec(spec, job.ID)
+	if err != nil {
+		return fmt.Errorf("merge job_id into spec: %w", err)
+	}
 
 	// For mod jobs (names following "mod-N" pattern), inject a numeric
 	// mod_index derived from job name so the node agent can map this job
 	// to mods[N] in multi-step specs.
 	if strings.HasPrefix(job.Name, "mod-") {
 		if idx, err := parseModIndex(job.Name); err == nil {
-			mergedSpec = mergeModIndexIntoSpec(mergedSpec, idx)
+			mergedSpec, err = mergeModIndexIntoSpec(mergedSpec, idx)
+			if err != nil {
+				return fmt.Errorf("merge mod_index into spec: %w", err)
+			}
 		}
 	}
 
 	// Merge server default GitLab config (token/domain) into spec if configured.
 	// Per-run overrides (already in spec) take precedence over server defaults.
 	gitlabCfg := configHolder.GetGitLab()
-	mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
+	mergedSpec, err = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
+	if err != nil {
+		return fmt.Errorf("merge gitlab defaults into spec: %w", err)
+	}
 
 	// Merge global env vars (CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, OPENAI_API_KEY, etc.)
 	// into spec.env based on job type and scope matching.
 	// Per-run env vars in spec take precedence over global env.
-	mergedSpec = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), modType)
+	mergedSpec, err = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), modType)
+	if err != nil {
+		return fmt.Errorf("merge global env into spec: %w", err)
+	}
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
@@ -224,26 +236,32 @@ func buildAndSendJobClaimResponse(
 }
 
 // mergeJobIDIntoSpec injects job_id into the spec JSONB for downstream execution.
-func mergeJobIDIntoSpec(spec []byte, jobID domaintypes.JobID) json.RawMessage {
-	var m map[string]interface{}
-	if err := json.Unmarshal(spec, &m); err != nil {
-		m = make(map[string]interface{})
+func mergeJobIDIntoSpec(spec []byte, jobID domaintypes.JobID) (json.RawMessage, error) {
+	m, err := parseSpecObjectStrict(json.RawMessage(spec))
+	if err != nil {
+		return nil, err
 	}
 	m["job_id"] = jobID.String()
-	merged, _ := json.Marshal(m)
-	return merged
+	merged, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return merged, nil
 }
 
 // mergeModIndexIntoSpec injects mod_index into the spec JSONB for downstream execution.
 // mod_index maps a mod job (mod-N) to mods[N] in multi-step specs.
-func mergeModIndexIntoSpec(spec []byte, modIndex int) json.RawMessage {
-	var m map[string]interface{}
-	if err := json.Unmarshal(spec, &m); err != nil {
-		m = make(map[string]interface{})
+func mergeModIndexIntoSpec(spec json.RawMessage, modIndex int) (json.RawMessage, error) {
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
 	}
 	m["mod_index"] = modIndex
-	merged, _ := json.Marshal(m)
-	return merged
+	merged, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return merged, nil
 }
 
 // parseModIndex extracts the numeric index from a mod job name ("mod-N").

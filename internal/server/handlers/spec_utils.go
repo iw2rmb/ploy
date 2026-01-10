@@ -1,12 +1,29 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
+
+func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
+	if len(bytes.TrimSpace(spec)) == 0 {
+		return nil, fmt.Errorf("spec: expected JSON object, got empty")
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(spec, &m); err != nil {
+		return nil, fmt.Errorf("spec: expected JSON object: %w", err)
+	}
+	if m == nil {
+		return nil, fmt.Errorf("spec: expected JSON object, got null")
+	}
+	return m, nil
+}
 
 // mergeGlobalEnvIntoSpec injects global environment variables into the spec's "env" map.
 // Global env vars are only merged if their scope matches the job type.
@@ -19,24 +36,27 @@ import (
 //   - modType: The job's mod_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
 //
 // Returns the modified spec with global env vars merged into the "env" field.
-func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.ModType) json.RawMessage {
+func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.ModType) (json.RawMessage, error) {
 	// If no global env vars exist, return spec unchanged.
 	if len(env) == 0 {
-		return spec
+		return spec, nil
 	}
 
-	// Parse the spec JSON into a map.
-	var m map[string]any
-	if len(spec) > 0 && json.Valid(spec) {
-		_ = json.Unmarshal(spec, &m)
-	}
-	if m == nil {
-		m = map[string]any{}
+	// Parse the spec JSON into an object map.
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	// Extract existing env map from spec, or create empty one.
-	em, _ := m["env"].(map[string]any)
-	if em == nil {
+	var em map[string]any
+	if v, ok := m["env"]; ok && v != nil {
+		var ok2 bool
+		em, ok2 = v.(map[string]any)
+		if !ok2 {
+			return nil, fmt.Errorf("spec.env: expected object, got %T", v)
+		}
+	} else {
 		em = map[string]any{}
 	}
 
@@ -57,25 +77,25 @@ func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, m
 
 	// Update the spec with merged env and serialize back to JSON.
 	m["env"] = em
-	b, _ := json.Marshal(m)
-	return json.RawMessage(b)
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return json.RawMessage(b), nil
 }
 
 // mergeGitLabConfigIntoSpec merges GitLab default token and domain into the JSON spec payload.
 // Only merges values if they are non-empty and not already present in the spec.
 // Per-run values (already in spec) take precedence over server defaults.
-func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) json.RawMessage {
+func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) (json.RawMessage, error) {
 	// If config is empty, return spec unchanged.
 	if strings.TrimSpace(cfg.Token) == "" && strings.TrimSpace(cfg.Domain) == "" {
-		return spec
+		return spec, nil
 	}
 
-	var m map[string]any
-	if len(spec) > 0 && json.Valid(spec) {
-		_ = json.Unmarshal(spec, &m)
-	}
-	if m == nil {
-		m = map[string]any{}
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
 	}
 
 	// Only add server defaults if per-run overrides are not present.
@@ -86,6 +106,9 @@ func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) js
 		m["gitlab_domain"] = cfg.Domain
 	}
 
-	b, _ := json.Marshal(m)
-	return json.RawMessage(b)
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return json.RawMessage(b), nil
 }

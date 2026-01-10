@@ -15,7 +15,10 @@ func TestMergeGitLabConfigIntoSpec_EmptyConfig(t *testing.T) {
 	spec := json.RawMessage(`{"job_id":"abc123"}`)
 	cfg := config.GitLabConfig{}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
@@ -44,7 +47,10 @@ func TestMergeGitLabConfigIntoSpec_ServerDefaults(t *testing.T) {
 		Token:  "server-token-default",
 	}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
@@ -77,7 +83,10 @@ func TestMergeGitLabConfigIntoSpec_PerRunOverrides(t *testing.T) {
 		Token:  "server-token-default",
 	}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
@@ -110,7 +119,10 @@ func TestMergeGitLabConfigIntoSpec_PartialOverrides(t *testing.T) {
 		Token:  "server-token-default",
 	}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
@@ -133,12 +145,15 @@ func TestMergeGitLabConfigIntoSpec_EmptySpec(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		spec json.RawMessage
+		name    string
+		spec    json.RawMessage
+		wantErr bool
 	}{
-		{"nil spec", nil},
-		{"empty spec", json.RawMessage(`{}`)},
-		{"whitespace spec", json.RawMessage(`   `)},
+		{"empty spec object", json.RawMessage(`{}`), false},
+		{"nil spec", nil, true},
+		{"whitespace spec", json.RawMessage(`   `), true},
+		{"invalid json", json.RawMessage(`{invalid`), true},
+		{"non-object json", json.RawMessage(`[]`), true},
 	}
 
 	cfg := config.GitLabConfig{
@@ -148,7 +163,16 @@ func TestMergeGitLabConfigIntoSpec_EmptySpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := mergeGitLabConfigIntoSpec(tt.spec, cfg)
+			result, err := mergeGitLabConfigIntoSpec(tt.spec, cfg)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+			}
 
 			var m map[string]any
 			if err := json.Unmarshal(result, &m); err != nil {
@@ -175,7 +199,10 @@ func TestMergeGitLabConfigIntoSpec_OnlyToken(t *testing.T) {
 		Token: "server-token-only",
 	}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
@@ -200,7 +227,10 @@ func TestMergeGitLabConfigIntoSpec_OnlyDomain(t *testing.T) {
 		Domain: "https://gitlab.example.com",
 	}
 
-	result := mergeGitLabConfigIntoSpec(spec, cfg)
+	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
+	if err != nil {
+		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+	}
 
 	var m map[string]any
 	if err := json.Unmarshal(result, &m); err != nil {
