@@ -7,56 +7,98 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/server/auth"
-	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
-	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 )
 
 // TestConfigGitLab_AdminOnly verifies GET/PUT require cli-admin role
-// and are rejected for default control-plane callers.
+// and are rejected for control-plane and worker callers.
 func TestConfigGitLab_AdminOnly(t *testing.T) {
-	// Server with default role: control-plane (not admin)
-	aCP := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: auth.RoleControlPlane})
-	sCP, err := httpapi.New(httpapi.Options{Authorizer: aCP})
-	if err != nil {
-		t.Fatalf("http server: %v", err)
-	}
-	ev, err := events.New(events.Options{})
-	if err != nil {
-		t.Fatalf("events: %v", err)
-	}
-	RegisterRoutes(sCP, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
-
-	// GET should be forbidden for control-plane.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/config/gitlab", nil)
-	sCP.Handler().ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("GET status=%d, want 403", rr.Code)
-	}
-
-	// PUT should be forbidden for control-plane.
-	rr = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPut, "/v1/config/gitlab", bytes.NewBufferString(`{"domain":"d","token":"t"}`))
-	req.Header.Set("Content-Type", "application/json")
-	sCP.Handler().ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("PUT status=%d, want 403", rr.Code)
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{
+			name:   "GET /v1/config/gitlab",
+			method: http.MethodGet,
+			path:   "/v1/config/gitlab",
+		},
+		{
+			name:   "PUT /v1/config/gitlab",
+			method: http.MethodPut,
+			path:   "/v1/config/gitlab",
+			body:   `{"domain":"https://gitlab.example.com","token":"test-token"}`,
+		},
 	}
 
-	// Server with default role: cli-admin (allowed)
-	aAdmin := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: auth.RoleCLIAdmin})
-	sAdmin, err := httpapi.New(httpapi.Options{Authorizer: aAdmin})
-	if err != nil {
-		t.Fatalf("http server: %v", err)
-	}
-	RegisterRoutes(sAdmin, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Control-plane callers should be forbidden.
+			t.Run("control-plane forbidden", func(t *testing.T) {
+				srv := newTestServerWithRole(t, auth.RoleControlPlane)
+				var body *bytes.Buffer
+				if tt.body != "" {
+					body = bytes.NewBufferString(tt.body)
+				}
+				var req *http.Request
+				if body != nil {
+					req = httptest.NewRequest(tt.method, tt.path, body)
+					req.Header.Set("Content-Type", "application/json")
+				} else {
+					req = httptest.NewRequest(tt.method, tt.path, nil)
+				}
+				rr := httptest.NewRecorder()
+				srv.Handler().ServeHTTP(rr, req)
 
-	// GET should succeed for cli-admin.
-	rr = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/v1/config/gitlab", nil)
-	sAdmin.Handler().ServeHTTP(rr, req)
-	if rr.Code == http.StatusForbidden || rr.Code == http.StatusNotFound {
-		t.Fatalf("GET status=%d, want not 403/404", rr.Code)
+				if rr.Code != http.StatusForbidden {
+					t.Errorf("control-plane: got %d, want %d", rr.Code, http.StatusForbidden)
+				}
+			})
+
+			// Worker callers should be forbidden.
+			t.Run("worker forbidden", func(t *testing.T) {
+				srv := newTestServerWithRole(t, auth.RoleWorker)
+				var body *bytes.Buffer
+				if tt.body != "" {
+					body = bytes.NewBufferString(tt.body)
+				}
+				var req *http.Request
+				if body != nil {
+					req = httptest.NewRequest(tt.method, tt.path, body)
+					req.Header.Set("Content-Type", "application/json")
+				} else {
+					req = httptest.NewRequest(tt.method, tt.path, nil)
+				}
+				rr := httptest.NewRecorder()
+				srv.Handler().ServeHTTP(rr, req)
+
+				if rr.Code != http.StatusForbidden {
+					t.Errorf("worker: got %d, want %d", rr.Code, http.StatusForbidden)
+				}
+			})
+
+			// CLI admin callers should be allowed (not forbidden).
+			t.Run("cli-admin allowed", func(t *testing.T) {
+				srv := newTestServerWithRole(t, auth.RoleCLIAdmin)
+				var body *bytes.Buffer
+				if tt.body != "" {
+					body = bytes.NewBufferString(tt.body)
+				}
+				var req *http.Request
+				if body != nil {
+					req = httptest.NewRequest(tt.method, tt.path, body)
+					req.Header.Set("Content-Type", "application/json")
+				} else {
+					req = httptest.NewRequest(tt.method, tt.path, nil)
+				}
+				rr := httptest.NewRecorder()
+				srv.Handler().ServeHTTP(rr, req)
+
+				// Should not be forbidden (may return other errors, but not 403).
+				if rr.Code == http.StatusForbidden {
+					t.Errorf("cli-admin: got %d, want not 403", rr.Code)
+				}
+			})
+		})
 	}
 }
