@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -98,7 +99,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result AddModResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return AddModResult{}, fmt.Errorf("mod add: decode response: %w", err)
 		}
 		return result, nil
@@ -169,7 +170,7 @@ func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 	var result struct {
 		Mods []ModSummary `json:"mods"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mod list: decode response: %w", err)
 	}
 
@@ -261,7 +262,7 @@ func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
 
 	if resp.StatusCode == http.StatusOK {
 		var result ArchiveModResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return ArchiveModResult{}, fmt.Errorf("mod archive: decode response: %w", err)
 		}
 		return result, nil
@@ -313,7 +314,7 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 
 	if resp.StatusCode == http.StatusOK {
 		var result UnarchiveModResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return UnarchiveModResult{}, fmt.Errorf("mod unarchive: decode response: %w", err)
 		}
 		return result, nil
@@ -390,7 +391,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result SetModSpecResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return SetModSpecResult{}, fmt.Errorf("mod spec set: decode response: %w", err)
 		}
 		return result, nil

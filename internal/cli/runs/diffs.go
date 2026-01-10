@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -62,12 +62,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return fmt.Errorf("run diffs: %s", msg)
+		return httpx.WrapError("run diffs", resp.Status, resp.Body)
 	}
 	var listing struct {
 		Diffs []struct {
@@ -77,7 +72,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 			Size      int               `json:"gzipped_size"`
 		} `json:"diffs"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 
@@ -154,12 +149,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return fmt.Errorf("run repo diffs: %s", msg)
+		return httpx.WrapError("run repo diffs", resp.Status, resp.Body)
 	}
 	var listing struct {
 		Diffs []struct {
@@ -169,7 +159,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 			Size      int               `json:"gzipped_size"`
 		} `json:"diffs"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 
@@ -209,14 +199,9 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp2.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp2.Status
-		}
-		return fmt.Errorf("run repo diffs: %s", msg)
+		return httpx.WrapError("run repo diffs", resp2.Status, resp2.Body)
 	}
-	gzData, err := io.ReadAll(resp2.Body)
+	gzData, err := io.ReadAll(io.LimitReader(resp2.Body, httpx.MaxDownloadBodyBytes))
 	if err != nil {
 		return err
 	}

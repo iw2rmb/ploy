@@ -2,7 +2,6 @@ package mods
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
@@ -49,16 +49,11 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return fmt.Errorf("mods artifacts: %s", msg)
+		return httpx.WrapError("mods artifacts", resp.Status, resp.Body)
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
 	var summary modsapi.RunSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 	if c.Output == nil {

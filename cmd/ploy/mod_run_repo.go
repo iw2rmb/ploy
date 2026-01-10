@@ -335,7 +335,7 @@ type runRepoResponse struct {
 
 // doRunRepoAdd sends POST /v1/runs/{id}/repos to add a repo to a batch.
 func doRunRepoAdd(ctx context.Context, base *url.URL, client *http.Client, batchID string, req runRepoAddRequest) (runRepoResponse, error) {
-	endpoint := base.JoinPath("/v1/runs", batchID, "repos")
+	endpoint := base.JoinPath("v1", "runs", batchID, "repos")
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -368,7 +368,7 @@ func doRunRepoAdd(ctx context.Context, base *url.URL, client *http.Client, batch
 
 // doRunRepoRemove sends POST /v1/runs/{id}/repos/{repo_id}/cancel to cancel a repo execution.
 func doRunRepoRemove(ctx context.Context, base *url.URL, client *http.Client, batchID, repoID string) (runRepoResponse, error) {
-	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID, "cancel")
+	endpoint := base.JoinPath("v1", "runs", batchID, "repos", repoID, "cancel")
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
@@ -395,7 +395,7 @@ func doRunRepoRemove(ctx context.Context, base *url.URL, client *http.Client, ba
 
 // doRunRepoRestart sends POST /v1/runs/{id}/repos/{repo_id}/restart to restart a repo.
 func doRunRepoRestart(ctx context.Context, base *url.URL, client *http.Client, batchID, repoID string, req runRepoRestartRequest) (runRepoResponse, error) {
-	endpoint := base.JoinPath("/v1/runs", batchID, "repos", repoID, "restart")
+	endpoint := base.JoinPath("v1", "runs", batchID, "repos", repoID, "restart")
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -428,7 +428,7 @@ func doRunRepoRestart(ctx context.Context, base *url.URL, client *http.Client, b
 
 // doRunRepoList sends GET /v1/runs/{id}/repos to list repos within a batch.
 func doRunRepoList(ctx context.Context, base *url.URL, client *http.Client, batchID string) ([]runRepoResponse, error) {
-	endpoint := base.JoinPath("/v1/runs", batchID, "repos")
+	endpoint := base.JoinPath("v1", "runs", batchID, "repos")
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {

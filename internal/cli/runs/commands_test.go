@@ -20,7 +20,7 @@ func TestGetStatusCommandDelegates(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"run-123","status":"running","repo_url":"https://example.com/repo.git","base_ref":"main","target_ref":"feature","created_at":"2024-01-01T00:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"id":"run-123","status":"running","mod_id":"mod-123","spec_id":"spec-123","created_at":"2024-01-01T00:00:00Z"}`))
 	}))
 	t.Cleanup(srv.Close)
 

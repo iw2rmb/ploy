@@ -138,7 +138,7 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 		return "", "", fmt.Errorf("run submit: http client required")
 	}
 
-	endpoint := base.ResolveReference(&url.URL{Path: "/v1/runs"})
+	endpoint := base.JoinPath("v1", "runs")
 	payload, err := json.Marshal(request)
 	if err != nil {
 		return "", "", fmt.Errorf("run submit: marshal request: %w", err)

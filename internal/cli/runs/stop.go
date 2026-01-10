@@ -2,13 +2,11 @@ package runs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -33,7 +31,7 @@ func (c StopCommand) Run(ctx context.Context) (Summary, error) {
 		return zero, fmt.Errorf("run stop: run id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String(), "cancel")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "cancel")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
 		return zero, fmt.Errorf("run stop: build request: %w", err)
@@ -46,16 +44,11 @@ func (c StopCommand) Run(ctx context.Context) (Summary, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return zero, fmt.Errorf("run stop: %s", msg)
+		return zero, httpx.WrapError("run stop", resp.Status, resp.Body)
 	}
 
 	var summary Summary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return zero, fmt.Errorf("run stop: decode response: %w", err)
 	}
 

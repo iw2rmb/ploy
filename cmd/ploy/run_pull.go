@@ -230,7 +230,7 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 		return nil, errors.New("base url required")
 	}
 
-	endpoint := baseURL.JoinPath("/v1/runs", runID, "repos")
+	endpoint := baseURL.JoinPath("v1", "runs", runID, "repos")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
