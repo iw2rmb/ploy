@@ -264,10 +264,20 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/server/handlers -run TestMergeRejectsNonObject` — arrays/strings/invalid JSON rejected
 
-- [ ] Update heartbeat contract to integer + unit-explicit fields — remove float truncation risk
+- [ ] Introduce integer resource unit types — unblock strict heartbeat + worker resource accounting
+  - Repository: ploy
+  - Component: `internal/domain/types` + `internal/server` + `internal/worker`
+  - Scope: Introduce unitful integer types (bytes, millis, etc.) and thread them through worker snapshot/resource producers and server boundaries before the wire/schema flip; delete float64 unitful fields where possible (`internal/domain/types/resources.go`, worker lifecycle/resource code, server heartbeat validation helpers) (`roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`, `roadmap/refactor/worker.md`).
+  - Snippets:
+    - ```go
+      type Bytes int64
+      ```
+  - Tests: `go test ./internal/domain/types ./internal/worker/... -run TestResourceUnitsAreIntegers` — unitful quantities are integers and validated
+
+- [ ] Update heartbeat contract + schema to integer + unit-explicit fields — remove float truncation risk
   - Repository: ploy
   - Component: `internal/server` + `internal/nodeagent` + `internal/store`
-  - Scope: Replace float/MB fields with integer bytes/millis fields; remove or enforce redundant `node_id` in heartbeat body; validate invariants and fit-range before DB writes (`internal/server/handlers/nodes_heartbeat.go`, `internal/nodeagent/heartbeat.go`, nodes schema fields in `internal/store/schema.sql`) (`roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`).
+  - Scope: Replace float/MB fields with integer bytes/millis fields; remove or enforce redundant `node_id` in heartbeat body; validate invariants and fit-range before DB writes; update nodes schema fields (`internal/server/handlers/nodes_heartbeat.go`, `internal/nodeagent/heartbeat.go`, nodes schema fields in `internal/store/schema.sql`) (`roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`).
   - Snippets:
     - ```go
       type HeartbeatRequest struct { MemFreeBytes int64 `json:"mem_free_bytes"` }
@@ -294,15 +304,15 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/server/handlers -run TestModsListRepoURLFilterUsesStoreQuery` — handler returns correct filtered results
 
-- [ ] Standardize token revocation “no rows” handling — remove string/pg error-code matching
+- [ ] Harden token authorizer side effects — idempotent revocation + bounded last-used updates
   - Repository: ploy
   - Component: `internal/server`
-  - Scope: Replace mixed `sql.ErrNoRows`/code/string checks with a single `errors.Is(err, pgx.ErrNoRows)` path (`internal/server/auth/authorizer.go`) (`roadmap/refactor/server.md`).
+  - Scope: Replace mixed `sql.ErrNoRows`/code/string checks with a single `errors.Is(err, pgx.ErrNoRows)` path and stop spawning unbounded `updateTokenLastUsed` goroutines; honor request cancellation or a short timeout (`internal/server/auth/authorizer.go`) (`roadmap/refactor/server.md`).
   - Snippets:
     - ```go
       if errors.Is(err, pgx.ErrNoRows) { return nil }
       ```
-  - Tests: `go test ./internal/server/auth -run TestRevokeTokenNoRowsIsNotError` — revocation is idempotent
+  - Tests: `go test ./internal/server/auth -run TestRevokeTokenNoRowsIsNotError; go test ./internal/server/auth -run TestUpdateTokenLastUsedRespectsContext` — revocation is idempotent; update cancels promptly
 
 - [ ] Fix config watcher debounce/reload lifetime — stop timers firing after shutdown
   - Repository: ploy
@@ -313,16 +323,6 @@ Legend: [ ] todo, [x] done.
       ctx, cancel := context.WithTimeout(parent, 5*time.Second); defer cancel()
       ```
   - Tests: `go test ./internal/server/config -run TestWatcherStopCancelsDebounce` — no late reload after Stop
-
-- [ ] Stop spawning unbounded auth goroutines — honor request cancellation / use bounded worker
-  - Repository: ploy
-  - Component: `internal/server`
-  - Scope: Replace `go updateTokenLastUsed(context.Background(), ...)` with a bounded update path using request ctx or short timeout (`internal/server/auth/authorizer.go`) (`roadmap/refactor/server.md`).
-  - Snippets:
-    - ```go
-      ctx, cancel := context.WithTimeout(req.Context(), 250*time.Millisecond)
-      ```
-  - Tests: `go test ./internal/server/auth -run TestUpdateTokenLastUsedRespectsContext` — update cancels promptly
 
 - [ ] Fix metrics server reload context handling — stop storing a canceled parent context
   - Repository: ploy
@@ -365,35 +365,25 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run TestHandlerConstructorNilDeps` — constructors return errors, no panics
 
 ## Stream (hub safety + SSE framing + retention)
-- [ ] Make blank stream IDs an error — stop silent “publish succeeded” no-ops
+- [ ] Harden hub publish/subscribe safety — reject blank IDs + make send/close race-free
   - Repository: ploy
   - Component: `internal/stream`
-  - Scope: Change `Hub.publish`/`Ensure` behavior to reject blank IDs and return an error; follow-on: move call sites to typed stream IDs (`types.RunID`) (`internal/stream/hub.go`) (`roadmap/refactor/stream.md`).
+  - Scope: Change `Hub.publish`/`Ensure` behavior to reject blank IDs and return an error; ensure no goroutine can send to a closed subscriber channel; stop closing in `subscriber.send` and only close after removal under lock; make send safe against concurrent drop/finish (`internal/stream/hub.go`) (`roadmap/refactor/stream.md`).
   - Snippets:
     - ```go
       if strings.TrimSpace(streamID) == "" { return errors.New("stream id required") }
       ```
-  - Tests: `go test ./internal/stream -run TestPublishBlankStreamID` — publish returns an error for blank IDs
+  - Tests: `go test ./internal/stream -run TestPublishBlankStreamID; go test ./internal/stream -run TestConcurrentPublishDropNoPanic` — blank IDs error; stress publish/drop without panics
 
-- [ ] Fix “send on closed channel” risk — make subscriber send/close race-free
+- [ ] Unify SSE serve path + remove framing allocations — keep one codepath, write bytes
   - Repository: ploy
   - Component: `internal/stream`
-  - Scope: Ensure no goroutine can send to a closed subscriber channel; stop closing in `subscriber.send` and only close after removal under lock; make send safe against concurrent drop/finish (`internal/stream/hub.go`) (`roadmap/refactor/stream.md`).
-  - Snippets:
-    - ```go
-      // Rule: only close(ch) under stream.mu after removal.
-      ```
-  - Tests: `go test ./internal/stream -run TestConcurrentPublishDropNoPanic` — stress publish/drop without panics
-
-- [ ] Unify `Serve` and `ServeFiltered` — remove duplicated SSE server codepaths
-  - Repository: ploy
-  - Component: `internal/stream`
-  - Scope: Keep one implementation with an optional filter function; delete the other and its tests (`internal/stream/http.go`) (`roadmap/refactor/stream.md`).
+  - Scope: Keep one implementation with an optional filter function; delete the other and its tests; update framing to split by `\n` at byte level and write bytes directly; keep fuzz coverage (`internal/stream/http.go`, `internal/stream/http_fuzz_test.go`) (`roadmap/refactor/stream.md`).
   - Snippets:
     - ```go
       func Serve(w http.ResponseWriter, r *http.Request, sub Subscription, filter func(Event) bool)
       ```
-  - Tests: `go test ./internal/stream -run TestServeFiltered` — filtered and unfiltered serving still works
+  - Tests: `go test ./internal/stream -run TestServeFiltered; go test ./internal/stream -run FuzzWriteEventFrame` — serve still works; fuzz still passes with non-UTF8 data
 
 - [ ] Make history retention O(1) — replace slice-copy truncation with ring buffer
   - Repository: ploy
@@ -415,46 +405,16 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/stream -run TestHistoryAfterBinarySearch` — returns same results as prior implementation
 
-- [ ] Remove `string(evt.Data)` allocations in framing — split on bytes, write bytes
-  - Repository: ploy
-  - Component: `internal/stream`
-  - Scope: Update `writeEventFrame` to split by `\n` at byte level and write bytes directly; keep fuzz coverage (`internal/stream/http.go`, `internal/stream/http_fuzz_test.go`) (`roadmap/refactor/stream.md`).
-  - Snippets:
-    - ```go
-      for _, line := range bytes.Split(data, []byte{'\n'}) { ... }
-      ```
-  - Tests: `go test ./internal/stream -run FuzzWriteEventFrame` — fuzz still passes with non-UTF8 data
-
 ## Workflow (spec parsing + deterministic graph + runtime correctness)
-- [ ] Reject `mod_index` in external specs — make ordering internal-only
+- [ ] Tighten mods spec numeric/ordering semantics — reject mod_index + reject fractional ints + preserve retries:0
   - Repository: ploy
   - Component: `internal/workflow`
-  - Scope: Delete parse/serialize support for `mod_index` and return a validation error when present (`internal/workflow/contracts/mods_spec.go`) (`roadmap/refactor/workflow.md`).
-  - Snippets:
-    - ```go
-      if raw.ModIndex != nil { return fmt.Errorf("mod_index is not allowed") }
-      ```
-  - Tests: `go test ./internal/workflow/... -run TestSpecRejectsModIndex` — specs containing mod_index fail validation
-
-- [ ] Replace float-to-int truncations in spec parsing — reject fractional inputs
-  - Repository: ploy
-  - Component: `internal/workflow`
-  - Scope: Replace `int(float64)` casts with `types.IntFromAny` / `types.Int64FromAny` and surface field-path errors (`internal/workflow/contracts/mods_spec.go`) (`roadmap/refactor/workflow.md`, `roadmap/refactor/contracts.md`).
-  - Snippets:
-    - ```go
-      retries, err := domaintypes.IntFromAny(v)
-      ```
-  - Tests: `go test ./internal/workflow/... -run TestSpecRejectsFractionalIntFields` — `1.5` rejects instead of truncating
-
-- [ ] Preserve explicit `retries: 0` in round-trip — stop implicit defaulting to `1`
-  - Repository: ploy
-  - Component: `internal/workflow`
-  - Scope: Represent retries as `*int` (unset vs explicitly 0) or custom marshal/unmarshal; keep spec semantics stable (`internal/workflow/contracts/mods_spec.go`) (`roadmap/refactor/workflow.md`).
+  - Scope: Delete parse/serialize support for `mod_index` and return a validation error when present; replace `int(float64)` casts with `types.IntFromAny` / `types.Int64FromAny` and surface field-path errors; preserve explicit `retries: 0` vs unset (e.g., pointer field or custom marshal/unmarshal) (`internal/workflow/contracts/mods_spec.go`) (`roadmap/refactor/workflow.md`, `roadmap/refactor/contracts.md`).
   - Snippets:
     - ```go
       type Retries struct{ Value *int }
       ```
-  - Tests: `go test ./internal/workflow/... -run TestRetriesZeroRoundTrip` — marshal/unmarshal preserves explicit zero
+  - Tests: `go test ./internal/workflow/... -run TestSpecRejectsModIndex; go test ./internal/workflow/... -run TestSpecRejectsFractionalIntFields; go test ./internal/workflow/... -run TestRetriesZeroRoundTrip` — reject mod_index; reject fractional ints; preserve explicit zero
 
 - [ ] Type server-injected IDs in specs — stop “job_id as string” drift
   - Repository: ploy
@@ -568,35 +528,15 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/mods/api -run TestModsAPIRejectsUnknownStates` — unknown states fail validation
 
-- [ ] Decide and enforce `queued` mapping (remove or make consistent) — stop asymmetric conversions
+- [ ] Make status/state/outcome mappings explicit — fix queued, round-trip conversions, derive outcomes
   - Repository: ploy
   - Component: `internal/mods/api`
-  - Scope: Either remove `StageStateQueued` from public types or map it consistently in both directions; add round-trip tests (`internal/mods/api/status_conversion.go`) (`roadmap/refactor/mods-api.md`).
+  - Scope: Either remove `StageStateQueued` from public types or map it consistently in both directions; consolidate conversions into explicit maps + helpers; derive API run outcome from real outcomes instead of mapping `Finished => Succeeded` unconditionally; define “unknown” behavior explicitly and test it (`internal/mods/api/status_conversion.go`) (`roadmap/refactor/mods-api.md`).
   - Snippets:
     - ```go
       var stageToStore = map[StageState]store.JobStatus{ ... }
       ```
-  - Tests: `go test ./internal/mods/api -run TestStageStateMappingIsConsistent` — forward/back mappings agree
-
-- [ ] Consolidate status conversions into explicit maps — reduce drift between forward/back mappings
-  - Repository: ploy
-  - Component: `internal/mods/api`
-  - Scope: Replace repetitive switch statements with explicit conversion maps + helpers; define “unknown” behavior explicitly and test it (`internal/mods/api/status_conversion.go`) (`roadmap/refactor/mods-api.md`).
-  - Snippets:
-    - ```go
-      var runFromStore = map[store.RunStatus]RunState{ ... }
-      ```
-  - Tests: `go test ./internal/mods/api -run TestStatusConversionsRoundTrip` — conversions are consistent and unknowns error
-
-- [ ] Derive API run outcome from real outcomes — stop mapping `Finished => Succeeded` unconditionally
-  - Repository: ploy
-  - Component: `internal/mods/api`
-  - Scope: Change `RunStatusFromStore` to use job/repo results (or stats) to derive success/failure/cancel; keep lifecycle state separate if needed (`internal/mods/api/status_conversion.go`) (`roadmap/refactor/mods-api.md`).
-  - Snippets:
-    - ```go
-      if counts.Fail > 0 { return RunStateFailed }
-      ```
-  - Tests: `go test ./internal/mods/api -run TestRunStateFromStoreUsesOutcomes` — finished runs with failures are not “succeeded”
+  - Tests: `go test ./internal/mods/api -run TestStageStateMappingIsConsistent; go test ./internal/mods/api -run TestStatusConversionsRoundTrip; go test ./internal/mods/api -run TestRunStateFromStoreUsesOutcomes` — mappings are consistent and outcomes are derived
 
 - [ ] Validate submit `spec` shape at the server boundary — require object-only when merge/inspect is needed
   - Repository: ploy
@@ -659,16 +599,6 @@ Legend: [ ] todo, [x] done.
       if len(ifaces) == 0 { ifaces = nil }
       ```
   - Tests: `go test ./internal/worker/... -run TestNoInterfacesProducesNil` — empty interface collections do not allocate
-
-- [ ] Align worker resource units with heartbeat contract — stop using `float64` for unitful quantities
-  - Repository: ploy
-  - Component: `internal/worker` + `internal/domain/types`
-  - Scope: Replace `float64` resource numbers with unit types from `internal/domain/types/resources.go` (bytes, millis, etc.) and keep consistent with the heartbeat contract (`roadmap/refactor/worker.md`, `roadmap/refactor/contracts.md`).
-  - Snippets:
-    - ```go
-      type Bytes int64
-      ```
-  - Tests: `go test ./internal/worker/... -run TestResourceUnitsAreIntegers` — units are integer and validated
 
 - [ ] Simplify `bumpToFrontLocked` — remove unnecessary sort + index scans
   - Repository: ploy
@@ -792,15 +722,35 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/cli/... -run TestHTTPHelperStrictDecode` — unknown fields and overlarge bodies are rejected
 
-- [ ] Migrate Runs/Mods/Transfer CLI code to the shared HTTP helper — delete per-command boilerplate
+- [ ] Migrate Runs CLI to the shared HTTP helper — delete per-command boilerplate
   - Repository: ploy
-  - Component: `internal/cli/runs`, `internal/cli/mods`, `internal/cli/transfer`
-  - Scope: Replace direct `http.NewRequest` + ad-hoc response decoding in each command/client with the shared helper; delete duplicated `decodeHTTPError` implementations and normalize URL building rules (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-runs.md`, `roadmap/refactor/cli-mods.md`, `roadmap/refactor/cli-trasnfer.md`).
+  - Component: `internal/cli/runs`
+  - Scope: Replace direct `http.NewRequest` + ad-hoc response decoding in runs commands/clients with the shared helper; delete duplicated error decoding and normalize URL building rules (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-runs.md`).
   - Snippets:
     - ```go
       return httpx.DoJSON(ctx, client, req, &out)
       ```
-  - Tests: `go test ./internal/cli/...` — all CLI packages compile and their unit tests pass
+  - Tests: `go test ./internal/cli/runs` — package compiles and unit tests pass
+
+- [ ] Migrate Mods CLI to the shared HTTP helper — delete per-command boilerplate
+  - Repository: ploy
+  - Component: `internal/cli/mods`
+  - Scope: Replace direct `http.NewRequest` + ad-hoc response decoding in mods commands/clients with the shared helper; delete duplicated error decoding and normalize URL building rules (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-mods.md`).
+  - Snippets:
+    - ```go
+      return httpx.DoJSON(ctx, client, req, &out)
+      ```
+  - Tests: `go test ./internal/cli/mods` — package compiles and unit tests pass
+
+- [ ] Migrate Transfer CLI to the shared HTTP helper — delete per-command boilerplate
+  - Repository: ploy
+  - Component: `internal/cli/transfer`
+  - Scope: Replace direct `http.NewRequest` + ad-hoc response decoding in transfer commands/clients with the shared helper; delete duplicated error decoding and normalize URL building rules (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-trasnfer.md`).
+  - Snippets:
+    - ```go
+      return httpx.DoJSON(ctx, client, req, &out)
+      ```
+  - Tests: `go test ./internal/cli/transfer` — package compiles and unit tests pass
 
 - [ ] Add shared streaming gunzip helper for diff downloads — stop buffering entire gz payloads
   - Repository: ploy
@@ -814,36 +764,16 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/cli/runs -run TestDiffDownloadStreamsGunzip` — does not allocate full payload; output matches expected
 
 ## CLI stream (`internal/cli/stream`) (runtime correctness + de-duplication)
-- [ ] Fix idle-timeout cancellation correctness — stop timers canceling the wrong connection
+- [ ] Fix stream client cancel/request behavior — idle timeout correctness + cancel classification + no-cache header
   - Repository: ploy
   - Component: `internal/cli/stream`
-  - Scope: Fix closure capture; stop using `defer cancelConn()` inside reconnect loops; stop/drain timers per iteration (`internal/cli/stream/client.go`, `internal/cli/stream/sse_client.go`) (`roadmap/refactor/cli-stream.md`).
+  - Scope: Fix closure capture; stop using `defer cancelConn()` inside reconnect loops; stop/drain timers per iteration; classify idle-timeout vs parent ctx cancellation correctly; ensure SSE requests set `Cache-Control: no-cache` (`internal/cli/stream/client.go`, `internal/cli/stream/sse_client.go`) (`roadmap/refactor/cli-stream.md`).
   - Snippets:
     - ```go
       cancel := cancelConn
       timer := time.AfterFunc(idle, func() { cancel() })
       ```
-  - Tests: `go test ./internal/cli/stream -run TestIdleTimeoutDoesNotCancelNewConn` — reconnect loop cancels only the active conn
-
-- [ ] Classify idle-timeout vs parent context cancellation correctly — stop reporting “idle timeout” for user cancel
-  - Repository: ploy
-  - Component: `internal/cli/stream`
-  - Scope: Track whether the idle timer fired; if parent ctx canceled, return `ctx.Err()` not idle-timeout (`internal/cli/stream/client.go`) (`roadmap/refactor/cli-stream.md`).
-  - Snippets:
-    - ```go
-      var idleFired atomic.Bool
-      ```
-  - Tests: `go test ./internal/cli/stream -run TestCancelIsNotIdleTimeout` — user cancel returns context cancellation
-
-- [ ] Set `Cache-Control: no-cache` for SSE requests — reduce proxy buffering risk
-  - Repository: ploy
-  - Component: `internal/cli/stream`
-  - Scope: Ensure the primary streaming client sets `Cache-Control: no-cache` for SSE requests (`internal/cli/stream/client.go`) (`roadmap/refactor/cli-stream.md`).
-  - Snippets:
-    - ```go
-      req.Header.Set("Cache-Control", "no-cache")
-      ```
-  - Tests: `go test ./internal/cli/stream -run TestRequestHasNoCacheHeader` — header is always set
+  - Tests: `go test ./internal/cli/stream -run TestIdleTimeoutDoesNotCancelNewConn; go test ./internal/cli/stream -run TestCancelIsNotIdleTimeout; go test ./internal/cli/stream -run TestRequestHasNoCacheHeader` — idle timeout is per-conn; user cancel is ctx cancel; header is set
 
 - [ ] Decide `retry:` hint policy — either implement it or delete claims/fields
   - Repository: ploy
