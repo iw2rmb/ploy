@@ -1,12 +1,6 @@
 # CLI Stream Refactor Notes (`internal/cli/stream`)
 
-- Cross-cutting SSE contracts live in `roadmap/refactor/contracts.md` (cursor, event types, canonical payload structs, StepIndex semantics).
-- Merged work item: SSE + log payload contract (cursor/event types/payload structs) is implemented as one slice (see `roadmap/refactor/scope.md`); this file keeps only `internal/cli/stream`-specific runtime correctness items.
-
-## Type Hardening
-
-- Apply typed cursor/event types + canonical payload structs (merged slice).
-  - Implement `types.EventID`, event-type allow-list, and canonical `LogRecord` per `roadmap/refactor/contracts.md`.
+This file tracks remaining `internal/cli/stream` runtime correctness and cleanup.
 
 ## Streamlining / Simplification
 

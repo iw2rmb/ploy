@@ -2,10 +2,6 @@
 
 - Cross-cutting contracts live in `roadmap/refactor/contracts.md` (IDs/newtypes, JSON decoding rules, SSE cursor/event types, canonical log payload).
 - Mods API type hardening is tracked in `roadmap/refactor/mods-api.md`.
-- Merged work items (see `roadmap/refactor/scope.md`):
-  - SSE/log payload contract changes are implemented once (not per-CLI-command).
-  - CLI HTTP boundary behavior (URL building, strict decode, error shaping) is implemented once across `internal/cli/*`.
-  - Gzip diff download streaming is implemented once and reused.
 
 ## Type Hardening
 

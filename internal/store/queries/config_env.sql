@@ -1,5 +1,5 @@
 -- config_env.sql — CRUD queries for global environment variables (config_env table).
--- Per ROADMAP.md line 10-44: provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
+-- Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 
 -- name: ListGlobalEnv :many
 -- Returns all global environment entries, ordered by key for consistent iteration.

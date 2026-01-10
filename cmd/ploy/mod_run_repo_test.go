@@ -396,7 +396,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 }
 
 // =========================================================================
-// Focused batch run workflow CLI tests (ROADMAP.md line 267):
+// Focused batch run workflow CLI tests:
 // Verifies that CLI subcommands validate arguments and call correct endpoints.
 // =========================================================================
 

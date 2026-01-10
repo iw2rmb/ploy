@@ -34,19 +34,19 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		testCID := "bafy123abc"
 		testDigest := "sha256:abcdef"
 		testName := "test-artifact"
-		testBundle := []byte("test-bundle-data")
+		testBundleSize := int64(len("test-bundle-data"))
 		artifactID := uuid.New()
 		runID := domaintypes.NewRunID()
 
 		st := &mockStore{
-			listArtifactBundlesByCIDResult: []store.ArtifactBundle{
+			listArtifactBundlesMetaByCIDResult: []store.ListArtifactBundlesMetaByCIDRow{
 				{
-					ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-					RunID:  runID,
-					Cid:    &testCID,
-					Digest: &testDigest,
-					Name:   &testName,
-					Bundle: testBundle,
+					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+					RunID:      runID,
+					Cid:        &testCID,
+					Digest:     &testDigest,
+					Name:       &testName,
+					BundleSize: testBundleSize,
 				},
 			},
 		}
@@ -85,14 +85,14 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		if art.Digest != testDigest {
 			t.Errorf("expected digest %s, got %s", testDigest, art.Digest)
 		}
-		if art.Size != int64(len(testBundle)) {
-			t.Errorf("expected size %d, got %d", len(testBundle), art.Size)
+		if art.Size != testBundleSize {
+			t.Errorf("expected size %d, got %d", testBundleSize, art.Size)
 		}
 	})
 
 	t.Run("SuccessWithNoResults", func(t *testing.T) {
 		st := &mockStore{
-			listArtifactBundlesByCIDResult: []store.ArtifactBundle{},
+			listArtifactBundlesMetaByCIDResult: []store.ListArtifactBundlesMetaByCIDRow{},
 		}
 		testCID := "bafy-not-found"
 

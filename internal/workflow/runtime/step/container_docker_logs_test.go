@@ -80,7 +80,7 @@ func TestDockerContainerRuntimeLogs(t *testing.T) {
 // Engine v29 Log Streaming Validation Tests
 // =============================================================================
 // These tests confirm log streaming and demuxing works with the moby client
-// as specified in ROADMAP.md line 49. They validate:
+// and validate:
 //   - Multiplexed log streams from ContainerLogs are correctly demuxed using
 //     stdcopy.StdCopy from github.com/moby/moby/api/pkg/stdcopy (the supported
 //     import path for Engine v29; the old github.com/docker/docker/pkg/stdcopy

@@ -14,7 +14,7 @@ import (
 // Engine v29 Container Lifecycle Validation Tests
 // =============================================================================
 // These tests re-validate container lifecycle semantics under Docker Engine v29
-// (moby SDK) as specified in ROADMAP.md line 43. They verify that:
+// (moby SDK). They verify that:
 //   - Create: HostConfig options (AutoRemove=false, Mounts, resource limits,
 //             network mode, storage options) are correctly passed to the daemon.
 //   - Start:  Container start succeeds and returns immediately (async).

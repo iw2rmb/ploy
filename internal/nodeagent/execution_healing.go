@@ -371,7 +371,7 @@ func (r *runController) runGateWithHealing(
 //
 // ## Execution Flow (Phase G: Pre-run Gate Only)
 //
-// Per ROADMAP.md Phase G, executeWithHealing disables per-step pre-gate in Runner.Run calls:
+// executeWithHealing disables per-step pre-gate in Runner.Run calls:
 //
 //  1. Run pre-mod gate via runGateWithHealing (handles healing if gate fails)
 //  2. Clone manifest into manifestForMainMod with Gate disabled and Hydration cleared
@@ -453,8 +453,8 @@ func (r *runController) executeWithHealing(
 	}
 
 	// Pre-mod gate passed. Clone manifest for main mod execution with gate disabled.
-	// Per ROADMAP.md Phase G: Set Gate.Enabled=false and clear Inputs[i].Hydration entries
-	// so Runner.Run performs container execution only.
+	// Set Gate.Enabled=false and clear Inputs[i].Hydration entries so Runner.Run performs
+	// container execution only.
 	manifestForMainMod := manifest
 	manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
 

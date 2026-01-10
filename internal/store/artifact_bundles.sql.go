@@ -203,19 +203,20 @@ func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListAr
 }
 
 const listArtifactBundlesMetaByCID = `-- name: ListArtifactBundlesMetaByCID :many
-SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
+SELECT id, run_id, job_id, name, cid, digest, created_at, octet_length(bundle)::BIGINT AS bundle_size FROM artifact_bundles
 WHERE cid = $1
 ORDER BY created_at DESC, id DESC
 `
 
 type ListArtifactBundlesMetaByCIDRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Name      *string            `json:"name"`
-	Cid       *string            `json:"cid"`
-	Digest    *string            `json:"digest"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         pgtype.UUID        `json:"id"`
+	RunID      types.RunID        `json:"run_id"`
+	JobID      *types.JobID       `json:"job_id"`
+	Name       *string            `json:"name"`
+	Cid        *string            `json:"cid"`
+	Digest     *string            `json:"digest"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	BundleSize int64              `json:"bundle_size"`
 }
 
 // Returns artifact bundle metadata (without the bundle blob) for a given cid.
@@ -237,6 +238,7 @@ func (q *Queries) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string)
 			&i.Cid,
 			&i.Digest,
 			&i.CreatedAt,
+			&i.BundleSize,
 		); err != nil {
 			return nil, err
 		}
@@ -249,19 +251,20 @@ func (q *Queries) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string)
 }
 
 const listArtifactBundlesMetaByRun = `-- name: ListArtifactBundlesMetaByRun :many
-SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
+SELECT id, run_id, job_id, name, cid, digest, created_at, octet_length(bundle)::BIGINT AS bundle_size FROM artifact_bundles
 WHERE run_id = $1
 ORDER BY created_at DESC, id DESC
 `
 
 type ListArtifactBundlesMetaByRunRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Name      *string            `json:"name"`
-	Cid       *string            `json:"cid"`
-	Digest    *string            `json:"digest"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         pgtype.UUID        `json:"id"`
+	RunID      types.RunID        `json:"run_id"`
+	JobID      *types.JobID       `json:"job_id"`
+	Name       *string            `json:"name"`
+	Cid        *string            `json:"cid"`
+	Digest     *string            `json:"digest"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	BundleSize int64              `json:"bundle_size"`
 }
 
 // Returns artifact bundle metadata (without the bundle blob) for a run.
@@ -283,6 +286,7 @@ func (q *Queries) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.
 			&i.Cid,
 			&i.Digest,
 			&i.CreatedAt,
+			&i.BundleSize,
 		); err != nil {
 			return nil, err
 		}
@@ -295,7 +299,7 @@ func (q *Queries) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.
 }
 
 const listArtifactBundlesMetaByRunAndJob = `-- name: ListArtifactBundlesMetaByRunAndJob :many
-SELECT id, run_id, job_id, name, cid, digest, created_at FROM artifact_bundles
+SELECT id, run_id, job_id, name, cid, digest, created_at, octet_length(bundle)::BIGINT AS bundle_size FROM artifact_bundles
 WHERE run_id = $1 AND job_id = $2
 ORDER BY created_at DESC, id DESC
 `
@@ -306,13 +310,14 @@ type ListArtifactBundlesMetaByRunAndJobParams struct {
 }
 
 type ListArtifactBundlesMetaByRunAndJobRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Name      *string            `json:"name"`
-	Cid       *string            `json:"cid"`
-	Digest    *string            `json:"digest"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         pgtype.UUID        `json:"id"`
+	RunID      types.RunID        `json:"run_id"`
+	JobID      *types.JobID       `json:"job_id"`
+	Name       *string            `json:"name"`
+	Cid        *string            `json:"cid"`
+	Digest     *string            `json:"digest"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	BundleSize int64              `json:"bundle_size"`
 }
 
 // Returns artifact bundle metadata (without the bundle blob) for a run and job.
@@ -334,6 +339,7 @@ func (q *Queries) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg Li
 			&i.Cid,
 			&i.Digest,
 			&i.CreatedAt,
+			&i.BundleSize,
 		); err != nil {
 			return nil, err
 		}

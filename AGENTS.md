@@ -80,7 +80,7 @@ The validation script checks:
 4. **REFACTOR validation**: Binary size remains under threshold (detects dependency bloat).
 5. **Code quality**: `go vet` and `staticcheck` pass.
 
-Reference: `GOLANG.md` (line 135-141), `ROADMAP.md` (line 133-136).
+Reference: `GOLANG.md` (line 135-141).
 
 ### CLI Build & Smoke Checks
 

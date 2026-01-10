@@ -149,7 +149,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			// Use conversion helper to map store.JobStatus -> modsapi.StageState
 			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
-			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
+			bundles, err := st.ListArtifactBundlesMetaByRunAndJob(r.Context(), store.ListArtifactBundlesMetaByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
 				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", jobIDStr, "err", err)

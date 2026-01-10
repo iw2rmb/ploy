@@ -10,9 +10,7 @@ import (
 )
 
 // TestConfigEnv_CRUD verifies the CRUD operations for the config_env table.
-// Per ROADMAP.md line 44: "Add store-level unit tests to verify CRUD semantics
-// against a test database or pgxpool mock — expect round-trip of GlobalEnv
-// entries and primary-key enforcement on key."
+// See docs/envs/README.md#Global Env Configuration for user-facing semantics.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestConfigEnv_CRUD(t *testing.T) {

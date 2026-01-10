@@ -175,7 +175,7 @@ if [[ $EXIT_CODE -eq 0 ]]; then
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Validate Codex healing pipeline artifacts (if healing occurred)
-  # Per ROADMAP.md Phase D: RED→GREEN→REFACTOR discipline for Codex healing.
+  # RED→GREEN→REFACTOR discipline for Codex healing.
   # ─────────────────────────────────────────────────────────────────────────────
   if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     echo "Extracting Codex mod-out artifact bundles (if present)..."

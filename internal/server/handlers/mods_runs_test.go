@@ -274,7 +274,6 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 
 // TestModRuns_Create_FirstJobClaimable verifies that the first job is Queued
 // and immediately claimable (v1 job queueing rules).
-// Scope: ROADMAP.md:342 — "first job is claimable".
 func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
 	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{

@@ -5,17 +5,14 @@ Scope: Implement the full refactor described in `roadmap/refactor/scope.md` and 
 Documentation:
 - `roadmap/refactor/scope.md`
 - `roadmap/refactor/contracts.md`
-- `roadmap/refactor/store.md`
 - `roadmap/refactor/server.md`
 - `roadmap/refactor/stream.md`
 - `roadmap/refactor/workflow.md`
 - `roadmap/refactor/mods-api.md`
 - `roadmap/refactor/worker.md`
 - `roadmap/refactor/cli-stream.md`
-- `roadmap/refactor/cli-logs.md`
 - `roadmap/refactor/cli-runs.md`
 - `roadmap/refactor/cli-mods.md`
-- `roadmap/refactor/cli-trasnfer.md`
 
 Legend: [ ] todo, [x] done.
 
@@ -45,7 +42,7 @@ Legend: [ ] todo, [x] done.
 - [x] Implement the canonical SSE/log payload contract end-to-end — eliminate duplicated structs and StepIndex truncation
   - Repository: ploy
   - Component: `internal/stream` + `internal/server` + `internal/cli/*`
-  - Scope: Make `internal/stream.LogRecord` the single canonical “log” payload type and ensure it uses domain types (`types.NodeID`, `types.JobID`, `types.ModType`, `types.StepIndex`); switch all publishers/decoders to it; remove duplicate log payload structs (e.g. `internal/cli/logs.LogRecord`) and remove all lossy `float64 -> int` casts in publish paths (`internal/server/events/service.go`) (`roadmap/refactor/scope.md`, `roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`, `roadmap/refactor/stream.md`, `roadmap/refactor/cli-logs.md`).
+  - Scope: Make `internal/stream.LogRecord` the single canonical “log” payload type and ensure it uses domain types (`types.NodeID`, `types.JobID`, `types.ModType`, `types.StepIndex`); switch all publishers/decoders to it; remove duplicate log payload structs (e.g. `internal/cli/logs.LogRecord`) and remove all lossy `float64 -> int` casts in publish paths (`internal/server/events/service.go`) (`roadmap/refactor/scope.md`, `roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`, `roadmap/refactor/stream.md`).
   - Snippets:
     - ```go
       type LogRecord struct {
@@ -88,17 +85,6 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/cli/mods -run TestResolveModByNameNoHeuristic` — CLI does not special-case “UUID-like” inputs
 
-- [x] Add strict transfer typing (`SlotID`, `TransferKind`, `TransferStage`, `Digest`) — fail fast on invalid transfer requests
-  - Repository: ploy
-  - Component: `internal/domain/types` + `internal/cli/transfer`
-  - Scope: Add newtypes/enums with `Validate()` (including digest format like `sha256:<hex>`), and use them in `internal/cli/transfer/client.go` request/response structs (see `roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      type Digest string
-      func (v Digest) Validate() error { /* sha256:<hex> */ }
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestDigestValidate` — invalid digests reject before HTTP
-
 - [x] Consolidate StepIndex invariant checks at boundaries — remove lossy `float64 -> int` casts
   - Repository: ploy
   - Component: `internal/domain/types` + server + mods api + stream
@@ -113,7 +99,7 @@ Legend: [ ] todo, [x] done.
 - [x] Set Postgres `search_path` in the pool config — stop correctness depending on DSN formatting
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Set `RuntimeParams["search_path"] = "ploy,public"` when building the pgx pool (`internal/store/store.go`) (see `roadmap/refactor/store.md`).
+  - Scope: Set `RuntimeParams["search_path"] = "ploy,public"` when building the pgx pool (`internal/store/store.go`).
   - Snippets:
     - ```go
       cfg.ConnConfig.RuntimeParams["search_path"] = "ploy,public"
@@ -123,7 +109,7 @@ Legend: [ ] todo, [x] done.
 - [x] Implement tracked migrations (Option A only) — make schema application deterministic
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Add `ploy.schema_version` to `internal/store/schema.sql`; update `RunMigrations` to use `execMigrationSQL` and record versions; keep/update `internal/store/versioning.go` (`roadmap/refactor/store.md`).
+  - Scope: Add `ploy.schema_version` to `internal/store/schema.sql`; update `RunMigrations` to use `execMigrationSQL` and record versions; keep/update `internal/store/versioning.go`.
   - Snippets:
     - ```sql
       CREATE TABLE IF NOT EXISTS ploy.schema_version (version BIGINT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL);
@@ -133,7 +119,7 @@ Legend: [ ] todo, [x] done.
 - [x] Add sqlc overrides for domain IDs and StepIndex — stop `string`/`float64` leakage from the store layer
   - Repository: ploy
   - Component: `internal/store` + `sqlc.yaml`
-  - Scope: Add sqlc overrides mapping id columns and args/returns to `internal/domain/types` newtypes; map `jobs.step_index` to `types.StepIndex` (`roadmap/refactor/store.md`, `roadmap/refactor/contracts.md`).
+  - Scope: Add sqlc overrides mapping id columns and args/returns to `internal/domain/types` newtypes; map `jobs.step_index` to `types.StepIndex` (`roadmap/refactor/contracts.md`).
   - Snippets:
     - ```yaml
       overrides:
@@ -145,7 +131,7 @@ Legend: [ ] todo, [x] done.
 - [x] Require non-null node id for job claiming — prevent `jobs.node_id = NULL` “Running” rows
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Replace `ClaimJob(ctx, nodeID *string)` with a typed non-null signature (e.g. `ClaimJob(ctx, nodeID types.NodeID)`); enforce non-null in SQL (`internal/store/querier.go`, `internal/store/queries/jobs.sql`) (`roadmap/refactor/store.md`).
+  - Scope: Replace `ClaimJob(ctx, nodeID *string)` with a typed non-null signature (e.g. `ClaimJob(ctx, nodeID types.NodeID)`); enforce non-null in SQL (`internal/store/querier.go`, `internal/store/queries/jobs.sql`).
   - Snippets:
     - ```go
       func (q *Queries) ClaimJob(ctx context.Context, nodeID domaintypes.NodeID) (...)
@@ -155,7 +141,7 @@ Legend: [ ] todo, [x] done.
 - [x] Make job claiming ordering deterministic and scoped — stop global step_index-only ordering
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Update `ClaimJob` SQL ordering to include a tie-breaker (`ORDER BY step_index ASC, id ASC`) and confirm ordering scope is correct (per run/per repo) (`internal/store/queries/jobs.sql`) (`roadmap/refactor/store.md`, `roadmap/refactor/contracts.md`).
+  - Scope: Update `ClaimJob` SQL ordering to include a tie-breaker (`ORDER BY step_index ASC, id ASC`) and confirm ordering scope is correct (per run/per repo) (`internal/store/queries/jobs.sql`) (`roadmap/refactor/contracts.md`).
   - Snippets:
     - ```sql
       ORDER BY j.step_index ASC, j.id ASC
@@ -165,7 +151,7 @@ Legend: [ ] todo, [x] done.
 - [x] Make scheduling atomic (select + update) — stop scheduler races
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Convert `ScheduleNextJob` to select with `FOR UPDATE SKIP LOCKED` and update with a status predicate; do not update rows that changed state concurrently (`internal/store/queries/jobs.sql`) (`roadmap/refactor/store.md`).
+  - Scope: Convert `ScheduleNextJob` to select with `FOR UPDATE SKIP LOCKED` and update with a status predicate; do not update rows that changed state concurrently (`internal/store/queries/jobs.sql`).
   - Snippets:
     - ```sql
       ... FOR UPDATE SKIP LOCKED
@@ -175,7 +161,7 @@ Legend: [ ] todo, [x] done.
 - [x] Fix `duration_ms` NULL writes — align transitions with `NOT NULL` schema
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Update `CompleteJob`/duration computations to handle missing `started_at`; set `started_at` on transition to Running and compute duration defensively (`internal/store/queries/jobs.sql`, `internal/store/schema.sql`) (`roadmap/refactor/store.md`).
+  - Scope: Update `CompleteJob`/duration computations to handle missing `started_at`; set `started_at` on transition to Running and compute duration defensively (`internal/store/queries/jobs.sql`, `internal/store/schema.sql`).
   - Snippets:
     - ```sql
       COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
@@ -185,7 +171,7 @@ Legend: [ ] todo, [x] done.
 - [x] Reject unknown enum values at scan-time — fail fast on schema/code drift
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Add allow-lists in `JobStatus.Scan` / `RunStatus.Scan` and return an error on unknown string values (`internal/store/models.go`) (`roadmap/refactor/store.md`).
+  - Scope: Add allow-lists in `JobStatus.Scan` / `RunStatus.Scan` and return an error on unknown string values (`internal/store/models.go`).
   - Snippets:
     - ```go
       default: return fmt.Errorf("unknown JobStatus %q", s)
@@ -195,7 +181,7 @@ Legend: [ ] todo, [x] done.
 - [x] Ensure `ClaimJob` locks only the intended rows — avoid unnecessary `runs` row locking
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Update `ClaimJob` query to avoid locking unrelated rows when using `FOR UPDATE SKIP LOCKED` (e.g., `FOR UPDATE OF jobs`); verify the lock scope matches the intended concurrency model (`internal/store/queries/jobs.sql`) (`roadmap/refactor/store.md`).
+  - Scope: Update `ClaimJob` query to avoid locking unrelated rows when using `FOR UPDATE SKIP LOCKED` (e.g., `FOR UPDATE OF jobs`); verify the lock scope matches the intended concurrency model (`internal/store/queries/jobs.sql`).
   - Snippets:
     - ```sql
       ... FOR UPDATE OF j SKIP LOCKED
@@ -205,7 +191,7 @@ Legend: [ ] todo, [x] done.
 - [x] Validate JSON before writing JSONB columns — prevent storing invalid `[]byte` blobs
   - Repository: ploy
   - Component: `internal/server` + `internal/workflow` + `internal/store`
-  - Scope: Before insert/update of JSONB columns (`jobs.meta`, `runs.stats`, `specs.spec`, `diffs.summary`), validate `json.Valid`; use `json.RawMessage` in boundary structs where possible (`roadmap/refactor/store.md`, `roadmap/refactor/contracts.md`).
+  - Scope: Before insert/update of JSONB columns (`jobs.meta`, `runs.stats`, `specs.spec`, `diffs.summary`), validate `json.Valid`; use `json.RawMessage` in boundary structs where possible (`roadmap/refactor/contracts.md`).
   - Snippets:
     - ```go
       if len(raw) > 0 && !json.Valid(raw) { return fmt.Errorf("invalid JSON") }
@@ -215,7 +201,7 @@ Legend: [ ] todo, [x] done.
 - [x] Apply deterministic tie-breakers to list queries — stop nondeterministic ordering on ties
   - Repository: ploy
   - Component: `internal/store`
-  - Scope: Add stable secondary ordering (`id`, `created_at`, etc.) to all list queries ordering by non-unique columns (including any ordered by `step_index`) (`internal/store/queries/*.sql`) (`roadmap/refactor/store.md`, `roadmap/refactor/contracts.md`).
+  - Scope: Add stable secondary ordering (`id`, `created_at`, etc.) to all list queries ordering by non-unique columns (including any ordered by `step_index`) (`internal/store/queries/*.sql`) (`roadmap/refactor/contracts.md`).
   - Snippets:
     - ```sql
       ORDER BY created_at DESC, id DESC
@@ -225,7 +211,7 @@ Legend: [ ] todo, [x] done.
 - [x] Add `List*Meta` store queries for blob-heavy endpoints — avoid `SELECT *` on lists
   - Repository: ploy
   - Component: `internal/store` + server handlers
-  - Scope: Add “meta list” queries that return ids + timestamps + small fields; keep existing `Get*` for blob fetch (`internal/store/queries/logs.sql`, `internal/store/queries/diffs.sql`, `internal/store/queries/artifact_bundles.sql`, `internal/store/queries/events.sql`) (`roadmap/refactor/store.md`).
+  - Scope: Add “meta list” queries that return ids + timestamps + small fields; keep existing `Get*` for blob fetch (`internal/store/queries/logs.sql`, `internal/store/queries/diffs.sql`, `internal/store/queries/artifact_bundles.sql`, `internal/store/queries/events.sql`).
   - Snippets:
     - ```sql
       SELECT id, created_at FROM ploy.logs WHERE ... ORDER BY created_at DESC, id DESC
@@ -742,16 +728,6 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/cli/mods` — package compiles and unit tests pass
 
-- [ ] Migrate Transfer CLI to the shared HTTP helper — delete per-command boilerplate
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Replace direct `http.NewRequest` + ad-hoc response decoding in transfer commands/clients with the shared helper; delete duplicated error decoding and normalize URL building rules (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      return httpx.DoJSON(ctx, client, req, &out)
-      ```
-  - Tests: `go test ./internal/cli/transfer` — package compiles and unit tests pass
-
 - [ ] Add shared streaming gunzip helper for diff downloads — stop buffering entire gz payloads
   - Repository: ploy
   - Component: `internal/cli/*`
@@ -806,20 +782,20 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/cli/stream` — package builds and tests pass after deletion
 
 ## CLI logs (`internal/cli/logs`) (canonical payloads + concurrency correctness)
-- [ ] Switch logs to canonical `internal/stream.LogRecord` — stop duplicate payload structs
+- [x] Switch logs to canonical `internal/stream.LogRecord` — stop duplicate payload structs
   - Repository: ploy
   - Component: `internal/cli/logs` + `internal/stream`
-  - Scope: Remove `internal/cli/logs.LogRecord`; decode into `internal/stream.LogRecord` (typed `mod_type`/`step_index` per contracts) (`roadmap/refactor/cli-logs.md`, `roadmap/refactor/contracts.md`).
+  - Scope: Remove `internal/cli/logs.LogRecord`; decode into `internal/stream.LogRecord` (typed `mod_type`/`step_index` per contracts) (`roadmap/refactor/contracts.md`).
   - Snippets:
     - ```go
       var rec logstream.LogRecord
       ```
   - Tests: `go test ./internal/cli/logs -run TestLogRecordDecodeUsesCanonicalType` — decode compiles and uses canonical struct
 
-- [ ] Make Printer concurrency story explicit — add locking or remove “thread-safe” claim
+- [x] Make Printer concurrency story explicit — add locking or remove “thread-safe” claim
   - Repository: ploy
   - Component: `internal/cli/logs`
-  - Scope: Either add a mutex around `retention` + output writes, or remove the thread-safe claim and enforce single-goroutine usage (`internal/cli/logs/printer.go`) (`roadmap/refactor/cli-logs.md`).
+  - Scope: Either add a mutex around `retention` + output writes, or remove the thread-safe claim and enforce single-goroutine usage (`internal/cli/logs/printer.go`).
   - Snippets:
     - ```go
       p.mu.Lock(); defer p.mu.Unlock()
@@ -829,7 +805,7 @@ Legend: [ ] todo, [x] done.
 - [ ] Treat “unset step_index” explicitly — stop printing logic relying on `> 0` sentinel behavior
   - Repository: ploy
   - Component: `internal/cli/logs`
-  - Scope: Once `step_index` is `types.StepIndex`, represent “unset” explicitly (e.g., pointer field) and adjust print logic; remove `> 0` heuristics (`internal/cli/logs/printer.go`) (`roadmap/refactor/cli-logs.md`).
+  - Scope: Once `step_index` is `types.StepIndex`, represent “unset” explicitly (e.g., pointer field) and adjust print logic; remove `> 0` heuristics (`internal/cli/logs/printer.go`).
   - Snippets:
     - ```go
       StepIndex *types.StepIndex `json:"step_index,omitempty"`
@@ -839,7 +815,7 @@ Legend: [ ] todo, [x] done.
 - [ ] Centralize SSE event decoding used by `mods`, `runs`, and `logs` — stop per-command drift
   - Repository: ploy
   - Component: `internal/cli/*`
-  - Scope: Implement one SSE event decode path (event type allow-list + canonical payload structs) and reuse in `internal/cli/mods/events.go`, `internal/cli/runs/follow.go`, and `internal/cli/logs/*` (`roadmap/refactor/scope.md`, `roadmap/refactor/cli-logs.md`).
+  - Scope: Implement one SSE event decode path (event type allow-list + canonical payload structs) and reuse in `internal/cli/mods/events.go`, `internal/cli/runs/follow.go`, and `internal/cli/logs/*` (`roadmap/refactor/scope.md`).
   - Snippets:
     - ```go
       func DecodeEvent(evt sse.Event) (types.SSEEventType, []byte, error)
@@ -937,67 +913,6 @@ Legend: [ ] todo, [x] done.
       for jobID, stage := range summary.Stages { _ = jobID /* typed */ }
       ```
   - Tests: `go test ./internal/cli/mods -run TestArtifactsUsesTypedStageKeys` — compiles and handles typed keys
-
-## CLI transfer (`internal/cli/transfer`) (typed requests + safe URL handling + timeouts)
-- [ ] Replace stringly-typed kind/stage/slot/digest — validate before requests
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Switch request structs to `types.TransferKind`/`types.TransferStage`/`types.SlotID`/`types.Digest` and validate before sending (`internal/cli/transfer/client.go`) (`roadmap/refactor/cli-trasnfer.md`, `roadmap/refactor/contracts.md`).
-  - Snippets:
-    - ```go
-      if err := req.Kind.Validate(); err != nil { return err }
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestTransferValidateBeforeHTTP` — invalid kind/stage/digest rejected locally
-
-- [ ] Remove `requestSlot(any)` runtime type switching — keep compile-time typed helpers
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Replace `requestSlot(payload any)` with two typed methods (or route both through a typed `doReq`); remove `any` + switch (`internal/cli/transfer/client.go`) (`roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      func (c *Client) requestUpload(ctx context.Context, req UploadSlotRequest) (Slot, error)
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestRequestSlotTypedHelpers` — upload/download slot requests are compile-time typed
-
-- [ ] Consolidate commit/abort request building — ensure consistent validation and error shaping
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Centralize slot action endpoint construction + request execution used by `Commit` and `Abort` (`internal/cli/transfer/client.go`) (`roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      func (c *Client) slotAction(ctx context.Context, slotID SlotID, action string, payload any) error
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestCommitAbortShareValidation` — both actions validate identically
-
-- [ ] Fix URL path handling for slot actions — no `path.Join` normalization for untrusted segments
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Validate `slot_id` is URL-safe; use `url.PathEscape` when interpolating; avoid normalizing `..` via `path.Join` (`internal/cli/transfer/client.go`) (`roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      endpoint, _ := url.JoinPath(base.String(), "v1", "slots", url.PathEscape(slotID.String()), "commit")
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestSlotIDCannotContainSlash` — slot IDs with `/` are rejected
-
-- [ ] Require HTTP timeouts for transfer client — stop hanging uploads/downloads
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Refuse `http.DefaultClient` without a timeout; enforce a non-zero `http.Client.Timeout` in constructors (`internal/cli/transfer/client.go`) (`roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      if c.HTTPClient == nil || c.HTTPClient.Timeout == 0 { return errors.New("http timeout required") }
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestTransferClientRequiresTimeout` — zero-timeout clients reject
-
-- [ ] Cap and parse error bodies consistently — stop reading entire bodies on non-2xx responses
-  - Repository: ploy
-  - Component: `internal/cli/transfer`
-  - Scope: Use the shared CLI HTTP error shaping rules (cap reads; parse `{ "error": "..." }` when present; fallback to trimmed text/status) (`internal/cli/transfer/client.go`) (`roadmap/refactor/contracts.md`, `roadmap/refactor/cli-trasnfer.md`).
-  - Snippets:
-    - ```go
-      return httpx.DecodeError(resp, "transfer")
-      ```
-  - Tests: `go test ./internal/cli/transfer -run TestErrorBodiesCapped` — large error bodies do not allocate unbounded memory
 
 ## Validation (repo-wide)
 - [ ] Run repo-wide tests + TDD discipline validation after each slice — keep coverage and guardrails intact

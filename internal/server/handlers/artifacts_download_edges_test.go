@@ -16,7 +16,7 @@ import (
 // Additional edge tests for error paths on download surfaces.
 
 func TestListArtifactsByCIDHandler_DBError(t *testing.T) {
-	st := &mockStore{listArtifactBundlesByCIDErr: errors.New("boom")}
+	st := &mockStore{listArtifactBundlesMetaByCIDErr: errors.New("boom")}
 	h := listArtifactsByCIDHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?cid=bafyerr", nil)
 	w := httptest.NewRecorder()

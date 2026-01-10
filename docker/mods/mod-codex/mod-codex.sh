@@ -50,7 +50,7 @@ fi
 
 # Auth via env content.
 # Note: CODEX_AUTH_JSON may be injected via `ploy config env set --key CODEX_AUTH_JSON ...`
-# and propagated through the global config mechanism. See ROADMAP.md for details.
+# and propagated through the global config mechanism. See docs/envs/README.md#Global Env Configuration.
 if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
   umask 077
   printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json

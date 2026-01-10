@@ -8,9 +8,7 @@ import (
 // TestListQueriesDeterministicOrder ensures all list queries ordering by non-unique columns
 // have deterministic tie-breakers (id, created_at+id, etc.) to prevent nondeterministic
 // ordering on ties.
-//
-// This addresses roadmap/refactor/store.md: "Make query ordering deterministic where ties
-// can happen" and roadmap/refactor/contracts.md § "StepIndex (Ordering Invariant)".
+// For step_index orderings, the tie-breaker must include a stable secondary key (id).
 func TestListQueriesDeterministicOrder(t *testing.T) {
 	t.Parallel()
 

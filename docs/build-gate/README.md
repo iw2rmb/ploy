@@ -173,5 +173,4 @@ mode with dedicated `buildgate_jobs` table and worker designation via
 `PLOY_BUILDGATE_WORKER_ENABLED`. This mode has been removed. All gate execution
 now runs locally on the node claiming the gate job from the unified queue.
 
-See `ROADMAP.md` for migration history and the rationale for collapsing gate
-execution into the jobs pipeline.
+See git history for the migration rationale for collapsing gate execution into the jobs pipeline.

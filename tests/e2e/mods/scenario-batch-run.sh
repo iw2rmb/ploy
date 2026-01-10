@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =========================================================================
-# E2E: Batch run workflow scenario (ROADMAP.md line 267)
+# E2E: Batch run workflow scenario
 #
 # This test validates the batch run workflow end-to-end:
 # 1. Create a batch run with a spec

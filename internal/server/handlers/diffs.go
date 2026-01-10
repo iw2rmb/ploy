@@ -125,8 +125,8 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Query diffs filtered by run_id and repo_id via jobs.repo_id join.
-		diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
+		// Query diff metadata only (exclude patch bytes) filtered by repo attribution.
+		diffs, err := st.ListDiffsMetaByRunRepo(r.Context(), store.ListDiffsMetaByRunRepoParams{
 			RunID:  runID,
 			RepoID: repoID,
 		})
@@ -151,7 +151,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 				ID:        uuid.UUID(d.ID.Bytes).String(), // diffs.id is still UUID
 				JobID:     jobID,                          // KSUID-backed domain type
 				CreatedAt: d.CreatedAt.Time,
-				Size:      len(d.Patch),
+				Size:      int(d.PatchSize),
 				Summary:   summary,
 			})
 		}

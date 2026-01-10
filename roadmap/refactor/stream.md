@@ -1,12 +1,6 @@
 # Stream Refactor Notes (`internal/stream`)
 
-- Cross-cutting contract decisions live in `roadmap/refactor/contracts.md` (IDs, JSON boundaries, StepIndex).
-- Merged work item: SSE + log payload contract (cursor/event types/payload structs) is implemented as one slice (see `roadmap/refactor/scope.md`); this file focuses on hub safety and stream-specific algorithms.
-
-## Type Hardening
-
-- Apply typed stream IDs/cursor/event types/payload structs (merged slice).
-  - Implement stream/event typing per `roadmap/refactor/contracts.md` and apply it consistently in hub + HTTP + server integration.
+This file tracks remaining hub/stream-specific correctness and performance work.
 
 ## Streamlining / Simplification
 

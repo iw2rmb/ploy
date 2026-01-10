@@ -15,7 +15,7 @@ This document codifies Go engineering rules for this repository. It complements 
 
 Worker nodes (`ployd-node`) require Docker Engine v29.0+ for container execution.
 The SDK migration from `github.com/docker/docker` to moby Engine v29 modules is
-complete—see `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration".
+complete.
 
 ### Supported Daemon Versions
 - **Minimum**: Docker Engine **v29.0** (API v1.44+)
@@ -77,7 +77,8 @@ go test ./internal/worker/lifecycle -run 'DockerChecker' -v
 
 ### Cross-References
 
-- Migration roadmap: `ROADMAP.md` § "Docker Engine v29 / moby Go SDK migration"
+- Cluster deployment: `docs/how-to/deploy-a-cluster.md`
+- Environment variables: `docs/envs/README.md`
 - Container runtime: `internal/workflow/runtime/step/container_docker.go`
 - Health checker: `internal/worker/lifecycle/health.go`
 - Gate executor: `internal/workflow/runtime/step/gate_docker.go`

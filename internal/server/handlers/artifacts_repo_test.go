@@ -56,36 +56,36 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(1000)},
 			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(2000)},
 		},
-		listArtifactBundlesByRunResult: []store.ArtifactBundle{
+		listArtifactBundlesMetaByRunResult: []store.ListArtifactBundlesMetaByRunRow{
 			{
-				ID:        pgtype.UUID{Bytes: id2, Valid: true},
-				RunID:     runIDTyped,
-				JobID:     &job1Typed,
-				Name:      &name2,
-				Bundle:    []byte("bb"),
-				Cid:       &cid2,
-				Digest:    &digest2,
-				CreatedAt: pgtype.Timestamptz{Time: t2, Valid: true},
+				ID:         pgtype.UUID{Bytes: id2, Valid: true},
+				RunID:      runIDTyped,
+				JobID:      &job1Typed,
+				Name:       &name2,
+				Cid:        &cid2,
+				Digest:     &digest2,
+				CreatedAt:  pgtype.Timestamptz{Time: t2, Valid: true},
+				BundleSize: 2,
 			},
 			{
-				ID:        pgtype.UUID{Bytes: id1, Valid: true},
-				RunID:     runIDTyped,
-				JobID:     &job1Typed,
-				Name:      &name1,
-				Bundle:    []byte("a"),
-				Cid:       &cid1,
-				Digest:    &digest1,
-				CreatedAt: pgtype.Timestamptz{Time: t1, Valid: true},
+				ID:         pgtype.UUID{Bytes: id1, Valid: true},
+				RunID:      runIDTyped,
+				JobID:      &job1Typed,
+				Name:       &name1,
+				Cid:        &cid1,
+				Digest:     &digest1,
+				CreatedAt:  pgtype.Timestamptz{Time: t1, Valid: true},
+				BundleSize: 1,
 			},
 			{
-				ID:        pgtype.UUID{Bytes: idOther, Valid: true},
-				RunID:     runIDTyped,
-				JobID:     &otherJobTyped,
-				Name:      nil,
-				Bundle:    []byte("zzz"),
-				Cid:       &cidOther,
-				Digest:    &digestOther,
-				CreatedAt: pgtype.Timestamptz{Time: t1, Valid: true},
+				ID:         pgtype.UUID{Bytes: idOther, Valid: true},
+				RunID:      runIDTyped,
+				JobID:      &otherJobTyped,
+				Name:       nil,
+				Cid:        &cidOther,
+				Digest:     &digestOther,
+				CreatedAt:  pgtype.Timestamptz{Time: t1, Valid: true},
+				BundleSize: 3,
 			},
 		},
 	}
@@ -106,8 +106,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	if !st.listJobsByRunRepoAttemptCalled {
 		t.Fatalf("expected ListJobsByRunRepoAttempt to be called")
 	}
-	if !st.listArtifactBundlesByRunCalled {
-		t.Fatalf("expected ListArtifactBundlesByRun to be called")
+	if !st.listArtifactBundlesMetaByRunCalled {
+		t.Fatalf("expected ListArtifactBundlesMetaByRun to be called")
 	}
 
 	var resp struct {

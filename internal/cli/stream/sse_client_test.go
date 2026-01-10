@@ -565,7 +565,7 @@ func TestSSEClientWaitForBackoffHonorsContext(t *testing.T) {
 // These tests validate that SSE streaming with enriched log payloads
 // (node_id, job_id, mod_type, step_index) maintains stable backoff,
 // idle timeout, and reconnection semantics.
-// Reference: ROADMAP.md - "Validate performance and resilience with enriched logs"
+// Stress test: validate performance and resilience with enriched logs.
 
 // TestSSEClientHighVolumeEnrichedLogs verifies that the SSE client correctly
 // handles a high volume of enriched log events without blocking or dropping.

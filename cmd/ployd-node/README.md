@@ -96,4 +96,4 @@ go test -race -cover ./internal/nodeagent/...
 
 ## Next Steps
 
-See `ROADMAP.md` for current and upcoming work.
+See `docs/how-to/deploy-a-cluster.md` and `docs/how-to/update-a-cluster.md`.

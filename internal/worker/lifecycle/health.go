@@ -9,7 +9,6 @@ import (
 
 	// Docker Engine v29 SDK module (moby). This replaces the deprecated
 	// github.com/docker/docker imports with supported Engine v29 equivalents.
-	// See ROADMAP.md "Migrate worker lifecycle packages to moby client and types".
 	// The client package provides PingResult, PingOptions, SystemInfoResult,
 	// and InfoOptions used by DockerChecker for health checks.
 	"github.com/moby/moby/client"

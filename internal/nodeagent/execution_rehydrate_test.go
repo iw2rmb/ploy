@@ -526,10 +526,6 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 
 // TestIncrementalDiffsAreRehydrationSafe verifies that per-step diffs are incremental
 // and can be replayed in order to reconstruct workspace state.
-//
-// This test implements the core requirement from ROADMAP.md line 75:
-// "Ensure per-step diffs are incremental and rehydration-safe —
-// Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]"
 func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 	t.Parallel()
 

@@ -129,7 +129,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 
 	// Load global environment variables from the store for ConfigHolder initialization.
 	// These are global env entries (CA bundles, Codex auth, API keys) persisted in
-	// the config_env table (ROADMAP.md line 10-44).
+	// the config_env table (see docs/envs/README.md#Global Env Configuration).
 	var globalEnvEntries []store.ConfigEnv
 	if st != nil {
 		globalEnvEntries, err = st.ListGlobalEnv(ctx)

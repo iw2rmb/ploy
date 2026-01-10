@@ -232,9 +232,8 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 // TestLogStreamer_JobIDInPayload verifies that the log streamer includes job_id
 // in the payload when a job ID is provided.
 //
-// This test validates the fix for "Attach log chunks to jobs — log streamer
-// currently omits job_id" (ROADMAP.md line 31). The server needs job_id to
-// associate log chunks with specific jobs, enabling per-job log retrieval.
+// The server uses job_id to associate log chunks with specific jobs, enabling
+// per-job log retrieval and enrichment.
 func TestLogStreamer_JobIDInPayload(t *testing.T) {
 	t.Parallel()
 

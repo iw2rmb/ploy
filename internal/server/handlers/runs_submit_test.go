@@ -104,7 +104,6 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 
 // TestRunsCreateSingleRepo_FirstJobClaimable verifies that the first job is Queued
 // and immediately claimable (v1 job queueing rules).
-// Scope: ROADMAP.md:341 — "first job is claimable".
 func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()

@@ -72,7 +72,7 @@ get:
     | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
     | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
     | `mod_type`   | string | Job phase: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`     |
-    | `step_index` | int    | Float index of the job (e.g., 1000, 2000, 3000)                  |
+    | `step_index` | number | Float index of the job (e.g., 1000, 2000, 3000; may be fractional) |
 
     **Example:**
     ```

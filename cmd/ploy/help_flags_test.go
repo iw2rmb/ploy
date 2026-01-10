@@ -9,12 +9,6 @@ import (
 // TestHelpFlagsAtAllLevels verifies that --help and -h flags work correctly
 // at every command level, printing the correct usage and subcommand lists
 // instead of falling back to Cobra's default or surfacing "unknown subcommand" errors.
-//
-// This test covers the ROADMAP.md requirement:
-// "Ensure `--help` (and `-h`) works at every command level — Guarantee that
-// `ploy --help`, `ploy <command> --help`, and deeper forms like
-// `ploy cluster rollout --help` print the correct usage and subcommand lists
-// instead of falling back to Cobra's default or surfacing "unknown subcommand" errors."
 func TestHelpFlagsAtAllLevels(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -21,7 +21,6 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 	// The command names should match the "Use" field from each builder function.
 	// NOTE: "token" has been removed from the top-level commands.
 	// Token operations are now accessible only via `ploy cluster token`.
-	// See ROADMAP.md line 387 for migration rationale.
 	expectedCommands := []string{
 		"version",  // Built-in version command
 		"mod",      // newModCmd
@@ -172,7 +171,7 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 			name: "root help shows all commands",
 			args: []string{"--help"},
 			// Our custom printUsage format uses "Core Commands:" not "Available Commands:"
-			// This is the expected behavior per ROADMAP.md — we preserve custom help output.
+			// This preserves existing custom help output behavior.
 			expectedInHelp: []string{
 				"Ploy CLI v2",
 				"Core Commands:",
