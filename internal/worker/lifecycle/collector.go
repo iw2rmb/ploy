@@ -137,13 +137,13 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 
 	// Build typed NodeCapacity.
 	capacity := NodeCapacity{
-		CPUFreeMilli:  resources.CPUFreeMilli,
-		MemFreeMB:     resources.MemoryFreeMB,
-		DiskFreeMB:    resources.DiskFreeMB,
-		CPUTotalMilli: resources.CPUTotalMilli,
-		MemTotalMB:    resources.MemoryTotalMB,
-		DiskTotalMB:   resources.DiskTotalMB,
-		Heartbeat:     now,
+		CPUFreeMillis:  resources.CPUFreeMillis,
+		CPUTotalMillis: resources.CPUTotalMillis,
+		MemFreeBytes:   resources.MemoryFreeBytes,
+		MemTotalBytes:  resources.MemoryTotalBytes,
+		DiskFreeBytes:  resources.DiskFreeBytes,
+		DiskTotalBytes: resources.DiskTotalBytes,
+		Heartbeat:      now,
 	}
 
 	return Snapshot{Status: status, Capacity: capacity}, nil

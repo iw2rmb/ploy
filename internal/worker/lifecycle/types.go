@@ -25,13 +25,13 @@ type NodeStatus struct {
 // NodeCapacity represents available node resources for scheduling.
 // This type is used for heartbeat payloads and capacity tracking.
 type NodeCapacity struct {
-	CPUFreeMilli  float64
-	MemFreeMB     float64
-	DiskFreeMB    float64
-	CPUTotalMilli float64
-	MemTotalMB    float64
-	DiskTotalMB   float64
-	Heartbeat     time.Time
+	CPUFreeMillis  int32
+	CPUTotalMillis int32
+	MemFreeBytes   int64
+	MemTotalBytes  int64
+	DiskFreeBytes  int64
+	DiskTotalBytes int64
+	Heartbeat      time.Time
 }
 
 // NodeResources aggregates CPU, memory, disk, and network resource snapshots.
@@ -118,13 +118,13 @@ func (s NodeStatus) ToMap() map[string]any {
 // ToMap converts NodeCapacity to map[string]any for JSON serialization.
 func (c NodeCapacity) ToMap() map[string]any {
 	return map[string]any{
-		"cpu_free":   c.CPUFreeMilli,
-		"mem_free":   c.MemFreeMB,
-		"disk_free":  c.DiskFreeMB,
-		"cpu_total":  c.CPUTotalMilli,
-		"mem_total":  c.MemTotalMB,
-		"disk_total": c.DiskTotalMB,
-		"heartbeat":  c.Heartbeat.Format(time.RFC3339Nano),
+		"cpu_free_millis":  c.CPUFreeMillis,
+		"cpu_total_millis": c.CPUTotalMillis,
+		"mem_free_bytes":   c.MemFreeBytes,
+		"mem_total_bytes":  c.MemTotalBytes,
+		"disk_free_bytes":  c.DiskFreeBytes,
+		"disk_total_bytes": c.DiskTotalBytes,
+		"heartbeat":        c.Heartbeat.Format(time.RFC3339Nano),
 	}
 }
 
