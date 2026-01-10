@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -28,8 +29,11 @@ func TestStopCommand_Run(t *testing.T) {
 			name:  "successful stop",
 			runID: domaintypes.RunID("run-456"),
 			serverResp: Summary{
-				ID:     domaintypes.RunID("run-456"),
-				Status: "Cancelled",
+				ID:        domaintypes.RunID("run-456"),
+				Status:    "Cancelled",
+				ModID:     domaintypes.ModID("mod-123"),
+				SpecID:    domaintypes.SpecID("spec-123"),
+				CreatedAt: time.Unix(1, 0).UTC(),
 			},
 			statusCode: http.StatusOK,
 		},
