@@ -59,7 +59,8 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			jobStepIndex[job.ID.String()] = job.StepIndex
 		}
 
-		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runID)
+		// Fetch artifact bundle metadata only (exclude bundle bytes).
+		bundles, err := st.ListArtifactBundlesMetaByRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
 			slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
@@ -96,7 +97,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 
 			summary := artifactSummary{
 				ID:   id,
-				Size: int64(len(bundle.Bundle)),
+				Size: bundle.BundleSize,
 			}
 			if bundle.Cid != nil {
 				summary.CID = *bundle.Cid

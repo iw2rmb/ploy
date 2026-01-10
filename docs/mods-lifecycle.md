@@ -771,7 +771,7 @@ value is a `StageStatus` object describing that job's execution state.
 | `current_job_id`| string (optional)   | Execution job ID (may differ in retry scenarios).   |
 | `artifacts`     | map[string]string   | Artifact logical names → bundle CIDs.               |
 | `last_error`    | string (optional)   | Error message from the most recent failed attempt.  |
-| `step_index`    | int                 | Float index from `jobs.step_index` for ordering.    |
+| `step_index`    | number              | Float index from `jobs.step_index` for ordering (may be fractional). |
 
 **step_index values:**
 
@@ -1107,7 +1107,7 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
 | `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
-| `step_index` | int    | Float index of the job within the pipeline (e.g., 1000, 2000)          |
+| `step_index` | number | Float index of the job within the pipeline (e.g., 1000, 2000; may be fractional) |
 
 **Example SSE frame:**
 

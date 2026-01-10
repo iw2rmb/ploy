@@ -31,7 +31,7 @@ type completeJobRequest struct {
 // This replaces untyped map[string]any decoding at the API boundary, providing
 // schema control over incoming stats payloads.
 //
-// Wire format example (per ROADMAP.md):
+// Wire format example:
 //
 //	{
 //	  "job_meta": { "kind": "gate", "gate": { ... } },

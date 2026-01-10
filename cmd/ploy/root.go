@@ -75,7 +75,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	// Node operations are now accessible only via `ploy cluster node`.
 	// Rollout operations are now accessible only via `ploy cluster rollout`.
 	// Token operations are now accessible only via `ploy cluster token`.
-	// See ROADMAP.md lines 186, 261, 309, and 387 for migration rationale.
+	// This keeps deployment and node-management under `ploy cluster ...` and reduces top-level command surface.
 
 	// Override help function so that `ploy --help` and `ploy -h` print our
 	// custom usage output instead of Cobra's default help format.

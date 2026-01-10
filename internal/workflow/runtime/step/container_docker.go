@@ -11,7 +11,6 @@ import (
 
 	// Docker Engine v29 SDK modules (moby). These replace the deprecated
 	// github.com/docker/docker imports with supported Engine v29 equivalents.
-	// See ROADMAP.md "Migrate workflow runtime packages to moby client and types".
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"

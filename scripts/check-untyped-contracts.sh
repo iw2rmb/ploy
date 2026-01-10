@@ -8,7 +8,7 @@
 #
 # ## Rationale
 #
-# Type hardening (per ROADMAP.md) replaced untyped map[string]any with typed structs
+# Type hardening replaced untyped map[string]any with typed structs
 # at critical API boundaries. This script prevents regression by flagging new untyped
 # usage outside approved parsing modules.
 #
@@ -213,7 +213,7 @@ main() {
                 echo -e "${YELLOW}Resolution:${NC}"
                 echo "  1. Use typed structs instead of map[string]any at API boundaries."
                 echo "  2. If this is approved usage, add the file to APPROVED_FILES in this script."
-                echo "  3. See ROADMAP.md 'Type System Hardening' for architectural guidance."
+                echo "  3. See docs/api/ and docs/mods-lifecycle.md for contract guidance."
                 exit 1
             else
                 echo -e "${GREEN}OK: No untyped contracts found at API boundaries${NC}"

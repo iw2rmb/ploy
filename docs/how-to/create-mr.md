@@ -274,4 +274,3 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
 
 - [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options
 - [docs/how-to/publish-mods.md](publish-mods.md) — Publishing custom Mods images
-- ROADMAP.md Phase G — Implementation details for GitLab MR support

@@ -172,7 +172,7 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 }
 
 const listDiffsMetaByRun = `-- name: ListDiffsMetaByRun :many
-SELECT id, run_id, job_id, summary, created_at FROM diffs
+SELECT id, run_id, job_id, summary, created_at, octet_length(patch)::BIGINT AS patch_size FROM diffs
 WHERE run_id = $1
 ORDER BY created_at ASC, id ASC
 `
@@ -183,6 +183,7 @@ type ListDiffsMetaByRunRow struct {
 	JobID     *types.JobID       `json:"job_id"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	PatchSize int64              `json:"patch_size"`
 }
 
 // Returns diff metadata (without the patch blob) for a run.
@@ -202,6 +203,7 @@ func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]
 			&i.JobID,
 			&i.Summary,
 			&i.CreatedAt,
+			&i.PatchSize,
 		); err != nil {
 			return nil, err
 		}
@@ -214,7 +216,7 @@ func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]
 }
 
 const listDiffsMetaByRunRepo = `-- name: ListDiffsMetaByRunRepo :many
-SELECT d.id, d.run_id, d.job_id, d.summary, d.created_at FROM diffs d
+SELECT d.id, d.run_id, d.job_id, d.summary, d.created_at, octet_length(patch)::BIGINT AS patch_size FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
@@ -231,6 +233,7 @@ type ListDiffsMetaByRunRepoRow struct {
 	JobID     *types.JobID       `json:"job_id"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	PatchSize int64              `json:"patch_size"`
 }
 
 // Returns diff metadata (without the patch blob) for a specific repo within a run.
@@ -250,6 +253,7 @@ func (q *Queries) ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaB
 			&i.JobID,
 			&i.Summary,
 			&i.CreatedAt,
+			&i.PatchSize,
 		); err != nil {
 			return nil, err
 		}

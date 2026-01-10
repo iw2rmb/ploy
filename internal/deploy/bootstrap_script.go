@@ -58,7 +58,7 @@ func PrefixedScript(env map[string]string) string {
 
 	// PKI writes are handled in primary/non-primary branches below to ensure
 	// we do not clobber existing PKI on the primary host when reusing.
-	// (See ROADMAP.md Phase 1: "Bootstrap must not clobber existing PKI on primary").
+	// Bootstrap is idempotent: if PKI exists on the primary, it is reused (not overwritten).
 
 	// Leaf certificate and key are written later in primary/non-primary branches
 	// to match correct file names (server.* vs node.*).

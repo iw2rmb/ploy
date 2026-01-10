@@ -16,10 +16,6 @@ import (
 // for the same repo attempt simultaneously, only one should succeed in
 // promoting a given job from Created to Queued.
 //
-// This test addresses roadmap/refactor/store.md:
-//
-//	"Make scheduling atomic (select + update) — stop scheduler races"
-//
 // The fix uses FOR UPDATE SKIP LOCKED in the subquery and a status predicate
 // in the update to ensure concurrent schedulers cannot race.
 //

@@ -11,10 +11,9 @@ import (
 // TestClaimJobOrderingDeterministic verifies that ClaimJob ordering is deterministic
 // when multiple jobs have the same step_index. Ties should resolve by job id (ASC).
 //
-// This test addresses roadmap/refactor/store.md: "Job claiming and scheduling are
-// under-specified" — the fix scopes ordering to the correct domain and adds a
-// stable tie-breaker (… ORDER BY run_id, repo_id, attempt, step_index, id) so
-// claim behavior cannot vary when step_index ties.
+// The implementation scopes ordering to the correct domain and adds a stable
+// tie-breaker (… ORDER BY run_id, repo_id, attempt, step_index, id) so claim
+// behavior cannot vary when step_index ties.
 //
 // Requires PLOY_TEST_PG_DSN to be set with a test database.
 func TestClaimJobOrderingDeterministic(t *testing.T) {

@@ -22,7 +22,6 @@
 #
 # References:
 #   GOLANG.md: TDD + coverage requirements (line 135-141)
-#   ROADMAP.md: RED→GREEN→REFACTOR discipline (line 133-136)
 
 set -euo pipefail
 
@@ -240,7 +239,7 @@ check_code_quality() {
 # Phase 4: Codex healing pipeline discipline (session + workspace diff handshake)
 # Validates that the Codex healing pipeline tests cover the handshake protocol where
 # Codex edits the workspace, exits, and the node agent re-gates only when diffs exist.
-# Per ROADMAP.md Phase D: RED→GREEN→REFACTOR for the Codex healing pipeline.
+# RED→GREEN→REFACTOR for the Codex healing pipeline.
 check_codex_healing_discipline() {
     log_info "Validating Codex healing pipeline TDD discipline..."
 
@@ -338,7 +337,7 @@ check_codex_healing_discipline() {
         return 0
     else
         log_warn "Some Codex healing pipeline TDD checks are missing"
-        log_warn "Reference: ROADMAP.md Phase D, tests/e2e/mods/README.md"
+        log_warn "Reference: tests/e2e/mods/README.md"
         return 0  # Warn but don't fail the overall check.
     fi
 }
@@ -404,7 +403,7 @@ main() {
         echo -e "${RED}✗ TDD discipline validation failed${NC}"
         echo ""
         log_error "Fix failing checks before proceeding"
-        log_error "Reference: GOLANG.md (line 135-141), ROADMAP.md (line 133-136)"
+        log_error "Reference: GOLANG.md (line 135-141)"
         echo ""
         return 1
     fi

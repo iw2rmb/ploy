@@ -90,7 +90,7 @@ The recommended approach for Codex-based healing is the workspace diff handshake
 
 **Codex Healing Handshake Checklist (TDD Validation):**
 
-Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifacts should be validated after Codex-based healing runs:
+Per RED→GREEN→REFACTOR discipline, the following artifacts should be validated after Codex-based healing runs:
 
 | Artifact | Location | Description | Required |
 |----------|----------|-------------|----------|
@@ -116,7 +116,7 @@ Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifa
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
 See `tests/unit/mod_codex_sh_test.sh` for unit tests covering these behaviors.
-Cross-reference: `ROADMAP.md` Phase D, `GOLANG.md` Codex Healing Pipeline section.
+Cross-reference: `GOLANG.md` Codex Healing Pipeline section.
 
 **Cross-phase inputs available to healing mods:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)

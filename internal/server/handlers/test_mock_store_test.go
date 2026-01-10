@@ -188,11 +188,23 @@ type mockStore struct {
 	listArtifactBundlesByCIDResult []store.ArtifactBundle
 	listArtifactBundlesByCIDErr    error
 
+	// ListArtifactBundlesMetaByCID tracking
+	listArtifactBundlesMetaByCIDCalled bool
+	listArtifactBundlesMetaByCIDParams *string
+	listArtifactBundlesMetaByCIDResult []store.ListArtifactBundlesMetaByCIDRow
+	listArtifactBundlesMetaByCIDErr    error
+
 	// ListArtifactBundlesByRun tracking
 	listArtifactBundlesByRunCalled bool
 	listArtifactBundlesByRunParam  string
 	listArtifactBundlesByRunResult []store.ArtifactBundle
 	listArtifactBundlesByRunErr    error
+
+	// ListArtifactBundlesMetaByRun tracking
+	listArtifactBundlesMetaByRunCalled bool
+	listArtifactBundlesMetaByRunParam  string
+	listArtifactBundlesMetaByRunResult []store.ListArtifactBundlesMetaByRunRow
+	listArtifactBundlesMetaByRunErr    error
 
 	// GetArtifactBundle tracking
 	getArtifactBundleCalled bool
@@ -205,6 +217,12 @@ type mockStore struct {
 	listArtifactBundlesByRunAndJobParams store.ListArtifactBundlesByRunAndJobParams
 	listArtifactBundlesByRunAndJobResult []store.ArtifactBundle
 	listArtifactBundlesByRunAndJobErr    error
+
+	// ListArtifactBundlesMetaByRunAndJob tracking
+	listArtifactBundlesMetaByRunAndJobCalled bool
+	listArtifactBundlesMetaByRunAndJobParams store.ListArtifactBundlesMetaByRunAndJobParams
+	listArtifactBundlesMetaByRunAndJobResult []store.ListArtifactBundlesMetaByRunAndJobRow
+	listArtifactBundlesMetaByRunAndJobErr    error
 
 	// CreateJob tracking
 	createJobCalled    bool
@@ -270,6 +288,12 @@ type mockStore struct {
 	listDiffsByRunRepoParams store.ListDiffsByRunRepoParams
 	listDiffsByRunRepoResult []store.Diff
 	listDiffsByRunRepoErr    error
+
+	// ListDiffsMetaByRunRepo tracking (v1 repo-scoped diffs listing; metadata-only)
+	listDiffsMetaByRunRepoCalled bool
+	listDiffsMetaByRunRepoParams store.ListDiffsMetaByRunRepoParams
+	listDiffsMetaByRunRepoResult []store.ListDiffsMetaByRunRepoRow
+	listDiffsMetaByRunRepoErr    error
 
 	// GetDiff tracking
 	getDiffCalled bool
@@ -439,7 +463,7 @@ type mockStore struct {
 	listRunsForRepoResult []store.ListRunsForRepoRow
 	listRunsForRepoErr    error
 
-	// Global Env tracking (config_env table — ROADMAP.md line 47)
+	// Global Env tracking (config_env table; see docs/envs/README.md#Global Env Configuration)
 	listGlobalEnvCalled bool
 	listGlobalEnvResult []store.ConfigEnv
 	listGlobalEnvErr    error
@@ -782,10 +806,22 @@ func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) (
 	return m.listArtifactBundlesByCIDResult, m.listArtifactBundlesByCIDErr
 }
 
+func (m *mockStore) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]store.ListArtifactBundlesMetaByCIDRow, error) {
+	m.listArtifactBundlesMetaByCIDCalled = true
+	m.listArtifactBundlesMetaByCIDParams = cid
+	return m.listArtifactBundlesMetaByCIDResult, m.listArtifactBundlesMetaByCIDErr
+}
+
 func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
 	m.listArtifactBundlesByRunCalled = true
 	m.listArtifactBundlesByRunParam = runID.String()
 	return m.listArtifactBundlesByRunResult, m.listArtifactBundlesByRunErr
+}
+
+func (m *mockStore) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]store.ListArtifactBundlesMetaByRunRow, error) {
+	m.listArtifactBundlesMetaByRunCalled = true
+	m.listArtifactBundlesMetaByRunParam = runID.String()
+	return m.listArtifactBundlesMetaByRunResult, m.listArtifactBundlesMetaByRunErr
 }
 
 func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (store.ArtifactBundle, error) {
@@ -798,6 +834,12 @@ func (m *mockStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg stor
 	m.listArtifactBundlesByRunAndJobCalled = true
 	m.listArtifactBundlesByRunAndJobParams = arg
 	return m.listArtifactBundlesByRunAndJobResult, m.listArtifactBundlesByRunAndJobErr
+}
+
+func (m *mockStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ListArtifactBundlesMetaByRunAndJobRow, error) {
+	m.listArtifactBundlesMetaByRunAndJobCalled = true
+	m.listArtifactBundlesMetaByRunAndJobParams = arg
+	return m.listArtifactBundlesMetaByRunAndJobResult, m.listArtifactBundlesMetaByRunAndJobErr
 }
 
 func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
@@ -926,6 +968,13 @@ func (m *mockStore) ListDiffsByRunRepo(ctx context.Context, arg store.ListDiffsB
 	m.listDiffsByRunRepoCalled = true
 	m.listDiffsByRunRepoParams = arg
 	return m.listDiffsByRunRepoResult, m.listDiffsByRunRepoErr
+}
+
+// ListDiffsMetaByRunRepo implements the v1 repo-scoped diffs metadata query.
+func (m *mockStore) ListDiffsMetaByRunRepo(ctx context.Context, arg store.ListDiffsMetaByRunRepoParams) ([]store.ListDiffsMetaByRunRepoRow, error) {
+	m.listDiffsMetaByRunRepoCalled = true
+	m.listDiffsMetaByRunRepoParams = arg
+	return m.listDiffsMetaByRunRepoResult, m.listDiffsMetaByRunRepoErr
 }
 
 func (m *mockStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, error) {

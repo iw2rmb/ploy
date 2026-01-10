@@ -2,7 +2,7 @@
 # check-critical-coverage.sh - Enforce coverage thresholds for critical paths
 # Usage: ./scripts/check-critical-coverage.sh [coverage.out]
 #
-# Enforces coverage thresholds per GOLANG.md (line 140) and ROADMAP.md (line 89):
+# Enforces coverage thresholds per GOLANG.md (line 140) and AGENTS.md:
 #   - ≥60% overall coverage
 #   - ≥90% on critical workflow runner packages (scheduler, worker/jobs)
 #   - ≥60% on protected workflow/worker paths (runtime/step, lifecycle)
@@ -26,8 +26,7 @@ CRITICAL_PATHS=(
 
 # Protected workflow/worker paths - require ≥60% coverage.
 # These are key execution paths that should not regress below the overall threshold.
-# Note: worker/lifecycle is excluded as ROADMAP.md line 82 accepts 23% coverage
-# (Docker health paths well-covered; low overall due to limited test scope).
+# Note: worker/lifecycle is excluded due to limited test scope (Docker health paths are covered).
 PROTECTED_PATHS=(
     "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )

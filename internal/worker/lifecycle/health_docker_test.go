@@ -8,7 +8,6 @@ import (
 
 	// Docker Engine v29 SDK modules (moby). These replace the deprecated
 	// github.com/docker/docker imports with supported Engine v29 equivalents.
-	// See ROADMAP.md "Migrate worker lifecycle packages to moby client and types".
 	"github.com/moby/moby/api/types/system"
 	"github.com/moby/moby/client"
 )
@@ -395,9 +394,6 @@ func TestDockerChecker_StableDetailsKeys(t *testing.T) {
 //   - State (OK, Degraded, Error) is meaningful for both daemon versions.
 //   - Version field correctly reflects the ServerVersion from Info.
 //   - Details keys remain stable and correctly typed across versions.
-//
-// See ROADMAP.md line 69: "Validate Docker health reporting across mixed daemon
-// versions — ensure Engine v28 and v29 both produce sane status."
 func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 	// Define test cases covering representative Engine v28 and v29 responses.
 	// Each case validates State, Version, and Details correctness.

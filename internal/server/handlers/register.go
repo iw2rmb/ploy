@@ -16,7 +16,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/config/gitlab", getGitLabConfigHandler(configHolder), auth.RoleCLIAdmin)
 	s.HandleFunc("PUT /v1/config/gitlab", putGitLabConfigHandler(configHolder), auth.RoleCLIAdmin)
 
-	// Config — Global Env (ROADMAP.md line 47: /v1/config/env endpoints)
+	// Config — Global Env (see docs/api/paths/config_env.yaml and docs/api/paths/config_env_key.yaml)
 	s.HandleFunc("GET /v1/config/env", listGlobalEnvHandler(configHolder), auth.RoleCLIAdmin)
 	s.HandleFunc("GET /v1/config/env/{key}", getGlobalEnvHandler(configHolder), auth.RoleCLIAdmin)
 	s.HandleFunc("PUT /v1/config/env/{key}", putGlobalEnvHandler(configHolder, st), auth.RoleCLIAdmin)
@@ -117,5 +117,5 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},
 	// POST /v1/nodes/{id}/buildgate/*, etc.) have been removed. Gate execution now runs
-	// as part of the unified jobs queue. See ROADMAP.md for details.
+	// as part of the unified jobs queue. See docs/build-gate/README.md.
 }

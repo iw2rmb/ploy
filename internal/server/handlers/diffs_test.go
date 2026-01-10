@@ -86,7 +86,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	_ = repoAID   // repo A owns the diff
 
 	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.listDiffsByRunRepoResult = []store.Diff{} // Empty: repo A's diff excluded
+	st.listDiffsMetaByRunRepoResult = []store.ListDiffsMetaByRunRepoRow{} // Empty: repo A's diff excluded
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoBID+"/diffs", nil)
@@ -99,14 +99,14 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	}
 
 	// Verify the query was called with correct parameters
-	if !st.listDiffsByRunRepoCalled {
-		t.Fatal("expected ListDiffsByRunRepo to be called")
+	if !st.listDiffsMetaByRunRepoCalled {
+		t.Fatal("expected ListDiffsMetaByRunRepo to be called")
 	}
-	if st.listDiffsByRunRepoParams.RunID != runID {
-		t.Errorf("run_id=%q, want %q", st.listDiffsByRunRepoParams.RunID, runID)
+	if st.listDiffsMetaByRunRepoParams.RunID != runID {
+		t.Errorf("run_id=%q, want %q", st.listDiffsMetaByRunRepoParams.RunID, runID)
 	}
-	if st.listDiffsByRunRepoParams.RepoID != repoBIDTyped {
-		t.Errorf("repo_id=%q, want %q", st.listDiffsByRunRepoParams.RepoID, repoBIDTyped)
+	if st.listDiffsMetaByRunRepoParams.RepoID != repoBIDTyped {
+		t.Errorf("repo_id=%q, want %q", st.listDiffsMetaByRunRepoParams.RepoID, repoBIDTyped)
 	}
 
 	var resp diffListResponse
@@ -131,13 +131,13 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
 	// Store returns the diff that belongs to this repo
-	st.listDiffsByRunRepoResult = []store.Diff{{
+	st.listDiffsMetaByRunRepoResult = []store.ListDiffsMetaByRunRepoRow{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
-		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0,"mod_type":"mod"}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
+		PatchSize: 3,
 	}}
 
 	rr := httptest.NewRecorder()

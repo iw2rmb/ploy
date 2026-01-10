@@ -25,8 +25,8 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Query artifacts by CID.
-		bundles, err := st.ListArtifactBundlesByCID(r.Context(), &cid)
+		// Query artifacts by CID (metadata only; excludes bundle bytes).
+		bundles, err := st.ListArtifactBundlesMetaByCID(r.Context(), &cid)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to query artifacts: %v", err), http.StatusInternalServerError)
 			return
@@ -44,7 +44,7 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 		for _, bundle := range bundles {
 			summary := artifactSummary{
 				ID:   uuid.UUID(bundle.ID.Bytes).String(),
-				Size: int64(len(bundle.Bundle)),
+				Size: bundle.BundleSize,
 			}
 			if bundle.Cid != nil {
 				summary.CID = *bundle.Cid

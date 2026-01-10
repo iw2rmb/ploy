@@ -60,7 +60,7 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Validate Codex healing pipeline artifacts (session + workspace diff handshake)
-# Per ROADMAP.md Phase D: RED→GREEN→REFACTOR discipline for Codex healing.
+# RED→GREEN→REFACTOR discipline for Codex healing.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "Validating Codex healing pipeline artifacts..."

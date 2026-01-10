@@ -554,7 +554,7 @@ func TestPublishRunTypedPayload(t *testing.T) {
 // These tests validate that enriched log payloads (with node_id, job_id,
 // mod_type, step_index) do not regress performance or resilience for
 // long-running or chatty Mods runs.
-// Reference: ROADMAP.md - "Validate performance and resilience with enriched logs"
+// Stress test: validate performance and resilience with enriched logs.
 
 // BenchmarkHubPublishEnrichedLog measures the throughput of publishing enriched
 // log records through the hub. This ensures the additional enrichment fields

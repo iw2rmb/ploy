@@ -164,7 +164,7 @@ type Querier interface {
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
 	ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
-	// Per ROADMAP.md line 10-44: provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
+	// See docs/envs/README.md#Global Env Configuration for scope/precedence rules.
 	// Returns all global environment entries, ordered by key for consistent iteration.
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)

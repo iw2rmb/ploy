@@ -213,7 +213,7 @@ CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
--- events.id remains BIGSERIAL per ROADMAP.md (unchanged).
+-- events.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
 CREATE TABLE IF NOT EXISTS events (
   id        BIGSERIAL PRIMARY KEY,
   run_id    TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -247,7 +247,7 @@ CREATE INDEX IF NOT EXISTS diffs_job_idx ON diffs(job_id);
 -- Logs are now grouped at the job level only; build_id column removed as part of
 -- the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
--- logs.id remains BIGSERIAL per ROADMAP.md (unchanged).
+-- logs.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
 CREATE TABLE IF NOT EXISTS logs (
   id         BIGSERIAL PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -265,7 +265,7 @@ CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 -- Artifact bundles are now grouped at the job level only; build_id column removed as
 -- part of the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
--- artifact_bundles.id remains UUID per ROADMAP.md (unchanged).
+-- artifact_bundles.id is UUID to allow client-side generation and offline staging.
 CREATE TABLE IF NOT EXISTS artifact_bundles (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -330,7 +330,7 @@ CREATE INDEX IF NOT EXISTS bootstrap_tokens_token_id_idx ON bootstrap_tokens(tok
 
 -- Global Environment Variables (config_env)
 -- Stores global environment entries (including secrets) for injection into jobs.
--- Per ROADMAP.md: scope controls which job types receive the env var (mods, heal, gate, all).
+-- scope controls which job types receive the env var (mods, heal, gate, all).
 -- The secret flag indicates whether the value should be redacted at the CLI/HTTP layer.
 -- Primary key on 'key' ensures uniqueness; upsert semantics for updates.
 CREATE TABLE IF NOT EXISTS config_env (

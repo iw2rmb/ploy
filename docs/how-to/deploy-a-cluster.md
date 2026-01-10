@@ -530,7 +530,6 @@ mods:
 
 For detailed implementation reference, see:
 - `docs/mods-lifecycle.md` — Multi-Node Mods architecture, run model and rehydration flow
-- `ROADMAP.md` — Comprehensive delivery plan for multi-node features
 - Implementation files:
   - `internal/nodeagent/execution_orchestrator.go` — Step loop orchestration
   - `internal/nodeagent/execution.go` — Rehydration helper

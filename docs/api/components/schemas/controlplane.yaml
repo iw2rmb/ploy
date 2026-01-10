@@ -571,10 +571,10 @@ StageStatus:
       nullable: true
       description: Human-readable error message from the most recent failed attempt.
     step_index:
-      type: integer
-      format: int32
+      type: number
+      format: double
       description: |
-        Float index from `jobs.step_index`, exposed as integer for API consumers.
+        Float index from `jobs.step_index` (JSON number; may be fractional).
         Used to order jobs in multi-step runs:
         - Pre-gate: 1000
         - First mod: 2000

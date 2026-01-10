@@ -506,7 +506,7 @@ func TestIsValidArtifactPath(t *testing.T) {
 
 // TestRunController_uploadConfiguredArtifacts_PathTraversal verifies that
 // path traversal attempts in artifact_paths are rejected and do not trigger uploads.
-// This is a critical security test per ROADMAP.md security hardening requirements.
+// Security: prevents uploads of files outside the workspace via traversal/absolute paths.
 func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 	t.Parallel()
 

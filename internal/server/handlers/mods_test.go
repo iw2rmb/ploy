@@ -1108,7 +1108,6 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 }
 
 // TestMods_SetSpec_RepeatedCalls verifies that repeated set spec calls create new spec rows and update mods.spec_id.
-// Scope: ROADMAP.md:313 — "repeated set spec creates new spec rows and changes mods.spec_id".
 func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mod{

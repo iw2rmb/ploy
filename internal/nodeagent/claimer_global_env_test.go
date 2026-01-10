@@ -14,7 +14,7 @@
 //
 // These tests complement the server-side spec_utils_global_env_test.go which
 // verifies mergeGlobalEnvIntoSpec semantics. Together they form an end-to-end
-// contract for the global config env feature (ROADMAP.md "ploy config env").
+// contract for the global env feature (see docs/envs/README.md#Global Env Configuration).
 package nodeagent
 
 import (

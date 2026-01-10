@@ -7,11 +7,6 @@ import (
 
 // TestListMetaQueriesDoNotReturnBlobs verifies that List*Meta queries
 // exclude large blob columns (data, patch, bundle, meta) to reduce I/O.
-//
-// This addresses roadmap/refactor/store.md § "Streamlining / Simplification":
-// "Avoid `SELECT *` for blob-heavy list endpoints... add `List*Meta` queries
-// returning only ids + timestamps + small fields; keep existing `Get*`
-// queries for blob fetches."
 func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	t.Parallel()
 
