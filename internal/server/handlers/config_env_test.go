@@ -422,14 +422,3 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 func emptyGitLabConfig() config.GitLabConfig {
 	return config.GitLabConfig{}
 }
-
-// Sentinel error for mock store failures.
-var errMockDatabase = &mockError{msg: "mock database error"}
-
-type mockError struct {
-	msg string
-}
-
-func (e *mockError) Error() string {
-	return e.msg
-}

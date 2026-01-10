@@ -16,11 +16,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// strPtr is a helper function that returns a pointer to a string.
-func strPtr(s string) *string {
-	return &s
-}
-
 // TestDrainNodeHandlerSuccess verifies successful node draining.
 func TestDrainNodeHandlerSuccess(t *testing.T) {
 	nodeIDStr := domaintypes.NewNodeKey()

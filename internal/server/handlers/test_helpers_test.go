@@ -4,8 +4,12 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"testing"
 
+	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
+	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -34,3 +38,30 @@ func createTestEventsServiceWithStore(st store.Store) (*events.Service, error) {
 type flushRecorder struct{ *httptest.ResponseRecorder }
 
 func (f *flushRecorder) Flush() {}
+
+// strPtr returns a pointer to s.
+func strPtr(s string) *string { return &s }
+
+// mockError is a simple error type for testing store error paths.
+type mockError struct{ msg string }
+
+func (e *mockError) Error() string { return e.msg }
+
+var errMockDatabase = &mockError{msg: "mock database error"}
+
+// newTestServerWithRole creates an HTTP server with routes registered and
+// the given auth role as the default for all requests.
+func newTestServerWithRole(t *testing.T, role auth.Role) *httpapi.Server {
+	t.Helper()
+	authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: role})
+	srv, err := httpapi.New(httpapi.Options{Authorizer: authz})
+	if err != nil {
+		t.Fatalf("http server: %v", err)
+	}
+	ev, err := events.New(events.Options{})
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	RegisterRoutes(srv, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
+	return srv
+}

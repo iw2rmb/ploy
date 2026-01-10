@@ -7,30 +7,11 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/server/auth"
-	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
-	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 )
 
 // TestConfigEnv_AdminOnly verifies that /v1/config/env endpoints require cli-admin role
 // and are rejected for control-plane and worker callers.
 func TestConfigEnv_AdminOnly(t *testing.T) {
-	// Helper to create a server with a given default role.
-	newServer := func(role auth.Role) *httpapi.Server {
-		authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: role})
-		srv, err := httpapi.New(httpapi.Options{Authorizer: authz})
-		if err != nil {
-			t.Fatalf("http server: %v", err)
-		}
-		ev, err := events.New(events.Options{})
-		if err != nil {
-			t.Fatalf("events: %v", err)
-		}
-		st := &mockStore{}
-		RegisterRoutes(srv, st, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
-		return srv
-	}
-
 	// Test cases for each endpoint.
 	tests := []struct {
 		name   string
@@ -65,7 +46,7 @@ func TestConfigEnv_AdminOnly(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Control-plane callers should be forbidden.
 			t.Run("control-plane forbidden", func(t *testing.T) {
-				srv := newServer(auth.RoleControlPlane)
+				srv := newTestServerWithRole(t, auth.RoleControlPlane)
 				var body *bytes.Buffer
 				if tt.body != "" {
 					body = bytes.NewBufferString(tt.body)
@@ -87,7 +68,7 @@ func TestConfigEnv_AdminOnly(t *testing.T) {
 
 			// Worker callers should be forbidden.
 			t.Run("worker forbidden", func(t *testing.T) {
-				srv := newServer(auth.RoleWorker)
+				srv := newTestServerWithRole(t, auth.RoleWorker)
 				var body *bytes.Buffer
 				if tt.body != "" {
 					body = bytes.NewBufferString(tt.body)
@@ -109,7 +90,7 @@ func TestConfigEnv_AdminOnly(t *testing.T) {
 
 			// CLI admin callers should be allowed (not forbidden).
 			t.Run("cli-admin allowed", func(t *testing.T) {
-				srv := newServer(auth.RoleCLIAdmin)
+				srv := newTestServerWithRole(t, auth.RoleCLIAdmin)
 				var body *bytes.Buffer
 				if tt.body != "" {
 					body = bytes.NewBufferString(tt.body)
