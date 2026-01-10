@@ -11,8 +11,6 @@ import (
 	"path"
 	"testing"
 	"time"
-
-	"github.com/iw2rmb/ploy/internal/pki"
 )
 
 // TestBuildURLBasic verifies basic URL construction from server base and path.
@@ -261,56 +259,6 @@ func TestNewHTTPClientConfiguresMTLS(t *testing.T) {
 	}
 
 	// In bearer/HTTP mode, transport may be default; no TLS assertions here.
-}
-
-// writeTempFile creates a temporary file with content for testing.
-func writeTempFile(t *testing.T, content []byte) string {
-	t.Helper()
-	f, err := os.CreateTemp("", "test-cert-*")
-	if err != nil {
-		t.Fatalf("create temp file: %v", err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if _, err := f.Write(content); err != nil {
-		t.Fatalf("write temp file: %v", err)
-	}
-
-	t.Cleanup(func() {
-		_ = os.Remove(f.Name())
-	})
-
-	return f.Name()
-}
-
-// generateTestCerts creates test CA, node certificate, and key for mTLS testing.
-func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
-	t.Helper()
-
-	now := time.Now().UTC()
-
-	ca, err := pki.GenerateCA("test-cluster", now)
-	if err != nil {
-		t.Fatalf("generate CA: %v", err)
-	}
-
-	nodeKey, nodeCSR, err := pki.GenerateNodeCSR("test-node", "test-cluster", "127.0.0.1")
-	if err != nil {
-		t.Fatalf("generate node CSR: %v", err)
-	}
-
-	nodeCert, err := pki.SignNodeCSR(ca, nodeCSR, now)
-	if err != nil {
-		t.Fatalf("sign node CSR: %v", err)
-	}
-
-	certPEM = []byte(nodeCert.CertPEM)
-	keyPEM = []byte(nodeKey.KeyPEM)
-	caPEM = []byte(ca.CertPEM)
-
-	return certPEM, keyPEM, caPEM
 }
 
 // TestNewHeartbeatManagerParsesNetIgnoreEnv verifies that PLOY_LIFECYCLE_NET_IGNORE
