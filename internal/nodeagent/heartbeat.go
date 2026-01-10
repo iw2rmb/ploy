@@ -16,22 +16,19 @@ import (
 	"strings"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // HeartbeatPayload contains resource snapshot data sent to the server.
-// Uses domain type (NodeID) for type-safe identification.
 type HeartbeatPayload struct {
-	NodeID        domaintypes.NodeID `json:"node_id"` // Node ID (NanoID-backed)
-	Timestamp     time.Time          `json:"timestamp"`
-	CPUFreeMilli  float64            `json:"cpu_free_millis"`
-	MemFreeMB     float64            `json:"mem_free_mb"`
-	DiskFreeMB    float64            `json:"disk_free_mb"`
-	CPUTotalMilli float64            `json:"cpu_total_millis"`
-	MemTotalMB    float64            `json:"mem_total_mb"`
-	DiskTotalMB   float64            `json:"disk_total_mb"`
+	CPUFreeMillis  int32  `json:"cpu_free_millis"`
+	CPUTotalMillis int32  `json:"cpu_total_millis"`
+	MemFreeBytes   int64  `json:"mem_free_bytes"`
+	MemTotalBytes  int64  `json:"mem_total_bytes"`
+	DiskFreeBytes  int64  `json:"disk_free_bytes"`
+	DiskTotalBytes int64  `json:"disk_total_bytes"`
+	Version        string `json:"version,omitempty"`
 }
 
 // HeartbeatManager periodically sends resource snapshots to the server.
@@ -150,14 +147,12 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	capacity := snap.Capacity
 
 	payload := HeartbeatPayload{
-		NodeID:        h.cfg.NodeID,
-		Timestamp:     time.Now().UTC(),
-		CPUFreeMilli:  capacity.CPUFreeMilli,
-		CPUTotalMilli: capacity.CPUTotalMilli,
-		MemFreeMB:     capacity.MemFreeMB,
-		MemTotalMB:    capacity.MemTotalMB,
-		DiskFreeMB:    capacity.DiskFreeMB,
-		DiskTotalMB:   capacity.DiskTotalMB,
+		CPUFreeMillis:  capacity.CPUFreeMillis,
+		CPUTotalMillis: capacity.CPUTotalMillis,
+		MemFreeBytes:   capacity.MemFreeBytes,
+		MemTotalBytes:  capacity.MemTotalBytes,
+		DiskFreeBytes:  capacity.DiskFreeBytes,
+		DiskTotalBytes: capacity.DiskTotalBytes,
 	}
 
 	body, err := json.Marshal(payload)

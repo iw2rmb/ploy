@@ -91,6 +91,7 @@ func TestNewHTTPClientTLSDisabled(t *testing.T) {
 // TestSendHeartbeatSuccess verifies successful heartbeat POST request and payload.
 func TestSendHeartbeatSuccess(t *testing.T) {
 	var receivedPayload HeartbeatPayload
+	var receivedMap map[string]any
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -111,6 +112,9 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 			t.Fatalf("read body error: %v", err)
 		}
 
+		if err := json.Unmarshal(body, &receivedMap); err != nil {
+			t.Fatalf("unmarshal payload map error: %v", err)
+		}
 		if err := json.Unmarshal(body, &receivedPayload); err != nil {
 			t.Fatalf("unmarshal payload error: %v", err)
 		}
@@ -143,24 +147,23 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 		t.Fatalf("sendHeartbeat error: %v", err)
 	}
 
-	if receivedPayload.NodeID != "test-node-123" {
-		t.Errorf("node_id = %s, want test-node-123", receivedPayload.NodeID)
+	if _, ok := receivedMap["node_id"]; ok {
+		t.Errorf("payload includes node_id, want absent (identity is in URL path)")
+	}
+	if _, ok := receivedMap["timestamp"]; ok {
+		t.Errorf("payload includes timestamp, want absent")
 	}
 
-	if receivedPayload.Timestamp.IsZero() {
-		t.Error("timestamp is zero")
-	}
-
-	if receivedPayload.CPUTotalMilli <= 0 {
+	if receivedPayload.CPUTotalMillis <= 0 {
 		t.Error("cpu_total_millis should be > 0")
 	}
 
-	if receivedPayload.MemTotalMB <= 0 {
-		t.Error("mem_total_mb should be > 0")
+	if receivedPayload.MemTotalBytes <= 0 {
+		t.Error("mem_total_bytes should be > 0")
 	}
 
-	if receivedPayload.DiskTotalMB <= 0 {
-		t.Error("disk_total_mb should be > 0")
+	if receivedPayload.DiskTotalBytes <= 0 {
+		t.Error("disk_total_bytes should be > 0")
 	}
 }
 

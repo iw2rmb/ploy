@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"math"
 	"runtime"
 	"strings"
 
@@ -38,13 +39,13 @@ type networkMetrics struct {
 }
 
 type resourceSnapshot struct {
-	CPUTotalMilli        float64
-	CPUFreeMilli         float64
+	CPUTotalMillis       int32
+	CPUFreeMillis        int32
 	CPULoad1             float64
-	MemoryTotalMB        float64
-	MemoryFreeMB         float64
-	DiskTotalMB          float64
-	DiskFreeMB           float64
+	MemoryTotalBytes     int64
+	MemoryFreeBytes      int64
+	DiskTotalBytes       int64
+	DiskFreeBytes        int64
 	DiskReadMBps         float64
 	DiskWriteMBps        float64
 	DiskReadIOPS         float64
@@ -69,17 +70,17 @@ func (r resourceSnapshot) toNodeResources() NodeResources {
 
 	return NodeResources{
 		CPU: CPUResources{
-			TotalMCores: r.CPUTotalMilli,
-			FreeMCores:  r.CPUFreeMilli,
+			TotalMCores: float64(r.CPUTotalMillis),
+			FreeMCores:  float64(r.CPUFreeMillis),
 			Load1:       r.CPULoad1,
 		},
 		Memory: MemoryResources{
-			TotalMB: r.MemoryTotalMB,
-			FreeMB:  r.MemoryFreeMB,
+			TotalMB: bytesToMBInt64(r.MemoryTotalBytes),
+			FreeMB:  bytesToMBInt64(r.MemoryFreeBytes),
 		},
 		Disk: DiskResources{
-			TotalMB: r.DiskTotalMB,
-			FreeMB:  r.DiskFreeMB,
+			TotalMB: bytesToMBInt64(r.DiskTotalBytes),
+			FreeMB:  bytesToMBInt64(r.DiskFreeBytes),
 			IO: DiskIO{
 				ReadMBPerSec:  r.DiskReadMBps,
 				WriteMBPerSec: r.DiskWriteMBps,
@@ -107,62 +108,75 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 	var errs []string
 
 	totalCores := runtime.NumCPU()
-	snapshot.CPUTotalMilli = float64(totalCores) * 1000
+	totalMillis64 := int64(totalCores) * 1000
+	if totalMillis64 > math.MaxInt32 {
+		snapshot.CPUTotalMillis = math.MaxInt32
+		errs = append(errs, "cpu:total out of range")
+	} else {
+		snapshot.CPUTotalMillis = int32(totalMillis64)
+	}
+	totalMillis64 = int64(snapshot.CPUTotalMillis)
 
 	if c.loadFunc != nil {
 		if avg, err := c.loadFunc(ctx); err == nil {
 			snapshot.CPULoad1 = avg.Load1
-			used := avg.Load1 * 1000
-			free := snapshot.CPUTotalMilli - used
-			if free < 0 {
-				free = 0
+			usedMillis := int64(math.Round(avg.Load1 * 1000))
+			freeMillis := totalMillis64 - usedMillis
+			if freeMillis < 0 {
+				freeMillis = 0
 			}
-			snapshot.CPUFreeMilli = free
+			if freeMillis > totalMillis64 {
+				freeMillis = totalMillis64
+			}
+			snapshot.CPUFreeMillis = int32(freeMillis)
 		} else if !errors.Is(err, context.Canceled) {
-			snapshot.CPUFreeMilli = snapshot.CPUTotalMilli
+			snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 			errs = append(errs, "load:"+err.Error())
 		} else {
-			snapshot.CPUFreeMilli = snapshot.CPUTotalMilli
+			snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 		}
 	} else if avg, err := load.AvgWithContext(ctx); err == nil {
 		snapshot.CPULoad1 = avg.Load1
-		used := avg.Load1 * 1000
-		free := snapshot.CPUTotalMilli - used
-		if free < 0 {
-			free = 0
+		usedMillis := int64(math.Round(avg.Load1 * 1000))
+		freeMillis := totalMillis64 - usedMillis
+		if freeMillis < 0 {
+			freeMillis = 0
 		}
-		snapshot.CPUFreeMilli = free
+		if freeMillis > totalMillis64 {
+			freeMillis = totalMillis64
+		}
+		snapshot.CPUFreeMillis = int32(freeMillis)
 	} else if !errors.Is(err, context.Canceled) {
-		snapshot.CPUFreeMilli = snapshot.CPUTotalMilli
+		snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 		errs = append(errs, "load:"+err.Error())
 	} else {
-		snapshot.CPUFreeMilli = snapshot.CPUTotalMilli
+		snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 	}
 
 	if c.memFunc != nil {
 		if vm, err := c.memFunc(ctx); err == nil {
-			snapshot.MemoryTotalMB = bytesToMB(vm.Total)
-			snapshot.MemoryFreeMB = bytesToMB(vm.Available)
+			snapshot.MemoryTotalBytes = uint64ToInt64(vm.Total)
+			snapshot.MemoryFreeBytes = uint64ToInt64(vm.Available)
 		} else if !errors.Is(err, context.Canceled) {
 			errs = append(errs, "memory:"+err.Error())
 		}
 	} else if vm, err := mem.VirtualMemoryWithContext(ctx); err == nil {
-		snapshot.MemoryTotalMB = bytesToMB(vm.Total)
-		snapshot.MemoryFreeMB = bytesToMB(vm.Available)
+		snapshot.MemoryTotalBytes = uint64ToInt64(vm.Total)
+		snapshot.MemoryFreeBytes = uint64ToInt64(vm.Available)
 	} else {
 		errs = append(errs, "memory:"+err.Error())
 	}
 
 	if c.diskUsageFunc != nil {
 		if du, err := c.diskUsageFunc(ctx, "/"); err == nil {
-			snapshot.DiskTotalMB = bytesToMB(du.Total)
-			snapshot.DiskFreeMB = bytesToMB(du.Free)
+			snapshot.DiskTotalBytes = uint64ToInt64(du.Total)
+			snapshot.DiskFreeBytes = uint64ToInt64(du.Free)
 		} else if !errors.Is(err, context.Canceled) {
 			errs = append(errs, "disk:"+err.Error())
 		}
 	} else if du, err := disk.UsageWithContext(ctx, "/"); err == nil {
-		snapshot.DiskTotalMB = bytesToMB(du.Total)
-		snapshot.DiskFreeMB = bytesToMB(du.Free)
+		snapshot.DiskTotalBytes = uint64ToInt64(du.Total)
+		snapshot.DiskFreeBytes = uint64ToInt64(du.Free)
 	} else if !errors.Is(err, context.Canceled) {
 		errs = append(errs, "disk:"+err.Error())
 	}
@@ -230,4 +244,18 @@ func (c *Collector) collectIOMetrics(ctx context.Context) (diskIOMetrics, networ
 func bytesToMB(value uint64) float64 {
 	const mb = 1024 * 1024
 	return float64(value) / mb
+}
+
+func bytesToMBInt64(value int64) float64 {
+	if value <= 0 {
+		return 0
+	}
+	return bytesToMB(uint64(value))
+}
+
+func uint64ToInt64(value uint64) int64 {
+	if value > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(value)
 }
