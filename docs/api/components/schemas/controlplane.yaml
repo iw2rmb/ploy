@@ -233,7 +233,10 @@ CreateRunRequest:
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
     target_ref: { type: string }
-    spec: {}
+    spec:
+      type: object
+      additionalProperties: true
+      description: Mods spec JSON object.
   required: [repo_url, base_ref, target_ref]
 
 CreateRunResponse:
@@ -252,7 +255,10 @@ RunSubmitRequest:
       description: "Repository URL. Allowed schemes: https://, ssh://, file://."
     base_ref: { type: string }
     target_ref: { type: string }
-    spec: {}
+    spec:
+      type: object
+      additionalProperties: true
+      description: Mods spec JSON object (must be a JSON object).
     created_by: { type: string, nullable: true }
   required: [repo_url, base_ref, target_ref, spec]
 
@@ -268,7 +274,10 @@ CreateModRequest:
   type: object
   properties:
     name: { type: string, description: "Unique mod name." }
-    spec: { description: "Optional initial spec JSON." }
+    spec:
+      type: object
+      additionalProperties: true
+      description: Optional initial mods spec JSON object.
     created_by: { type: string, nullable: true }
   required: [name]
 
@@ -635,6 +644,7 @@ NodeClaimResponse:
         Opaque run specification JSON merged by the server at claim time.
         Includes `job_id` and any server defaults (e.g., `gitlab_pat`, `gitlab_domain`,
         `mr_on_success`, `mr_on_fail`).
+        If the persisted spec in the DB is invalid or non-object, the server returns 500.
       type: object
       additionalProperties: true
   required:

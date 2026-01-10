@@ -35,5 +35,5 @@ This file tracks remaining `internal/cli/stream` runtime correctness and cleanup
 ## Suggested Minimal Slices
 
 - Slice 1: Fix idle-timeout cancellation correctness (closure capture, per-iteration cancels, and correct error classification).
-- Slice 2: Apply the unified SSE/log payload contract types (merged slice; `roadmap/refactor/contracts.md`).
+- Slice 2: Apply the unified SSE/log payload contract types (merged slice).
 - Slice 3: Delete the unused/duplicate SSE client implementation.

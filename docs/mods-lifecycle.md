@@ -1023,6 +1023,8 @@ Mods container images are standard OCI images with the following expectations:
     - `mods` → `mod` and `post_gate` jobs
     - `heal` → `heal` and `re_gate` jobs
     - `gate` → `pre_gate`, `re_gate`, and `post_gate` jobs
+    The job spec must be a JSON object; invalid/non-object specs are rejected at submission
+    time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
   - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
     keys are never overwritten.
   - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `OPENAI_API_KEY`.
