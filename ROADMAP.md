@@ -254,7 +254,7 @@ Legend: [ ] todo, [x] done.
       ```
   - Tests: `go test ./internal/server/handlers -run TestPathParamsUseDomainTypes` — invalid/blank IDs return 400 before store calls
 
-- [ ] Make “merge spec JSON” reject invalid/non-object inputs — stop silent `{}` substitution
+- [x] Make “merge spec JSON” reject invalid/non-object inputs — stop silent `{}` substitution
   - Repository: ploy
   - Component: `internal/server`
   - Scope: Update merge helpers to treat spec blobs as `json.RawMessage`; require `json.Valid` and object-only when merging; return 400 on invalid/non-object (`internal/server/handlers/spec_utils.go`, `internal/server/handlers/nodes_claim.go`) (`roadmap/refactor/contracts.md`, `roadmap/refactor/server.md`).
