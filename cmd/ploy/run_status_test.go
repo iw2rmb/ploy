@@ -18,44 +18,39 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 			now := time.Now()
 			resp := struct {
 				ID        string    `json:"id"`
-				Name      *string   `json:"name,omitempty"`
 				Status    string    `json:"status"`
-				RepoURL   string    `json:"repo_url"`
-				BaseRef   string    `json:"base_ref"`
-				TargetRef string    `json:"target_ref"`
+				ModID     string    `json:"mod_id"`
+				SpecID    string    `json:"spec_id"`
 				CreatedAt time.Time `json:"created_at"`
 				Counts    *struct {
 					Total         int32  `json:"total"`
-					Pending       int32  `json:"pending"`
+					Queued        int32  `json:"queued"`
 					Running       int32  `json:"running"`
-					Succeeded     int32  `json:"succeeded"`
-					Failed        int32  `json:"failed"`
-					Skipped       int32  `json:"skipped"`
+					Success       int32  `json:"success"`
+					Fail          int32  `json:"fail"`
 					Cancelled     int32  `json:"cancelled"`
 					DerivedStatus string `json:"derived_status"`
 				} `json:"repo_counts,omitempty"`
 			}{
-				ID:      "batch-123",
-				Status:  "running",
-				RepoURL: "https://github.com/org/repo.git",
-				BaseRef: "main", TargetRef: "feature",
+				ID:        "batch-123",
+				Status:    "running",
+				ModID:     "mod-123",
+				SpecID:    "spec-123",
 				CreatedAt: now,
 				Counts: &struct {
 					Total         int32  `json:"total"`
-					Pending       int32  `json:"pending"`
+					Queued        int32  `json:"queued"`
 					Running       int32  `json:"running"`
-					Succeeded     int32  `json:"succeeded"`
-					Failed        int32  `json:"failed"`
-					Skipped       int32  `json:"skipped"`
+					Success       int32  `json:"success"`
+					Fail          int32  `json:"fail"`
 					Cancelled     int32  `json:"cancelled"`
 					DerivedStatus string `json:"derived_status"`
 				}{
 					Total:         5,
-					Pending:       1,
+					Queued:        1,
 					Running:       2,
-					Succeeded:     2,
-					Failed:        0,
-					Skipped:       0,
+					Success:       2,
+					Fail:          0,
 					Cancelled:     0,
 					DerivedStatus: "running",
 				},

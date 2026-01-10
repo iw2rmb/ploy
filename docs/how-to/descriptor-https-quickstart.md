@@ -6,6 +6,7 @@ Goal
 Inputs
 - Cluster CA bundle: `ca.pem`
 - API endpoints (IPs or hostnames with port): `https://203.0.113.10:8443`, `https://203.0.113.11:8443`
+  - Endpoints may include a path prefix when the control plane is behind a reverse proxy (example: `https://api.alpha.ploy/ploy`).
 - SNI/server name to verify: `api.<cluster-id>.ploy`
  
 
