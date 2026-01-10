@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -122,7 +121,7 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 			runID:        "run-123",
 			repoID:       "repo-abc",
 			diffID:       "diff-123",
-			patchContent: gzipBytesHelper(t, []byte("test patch content")),
+			patchContent: gzipBytes(t, []byte("test patch content")),
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 		},
@@ -131,7 +130,7 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 			runID:        "run-123",
 			repoID:       "repo-abc",
 			diffID:       "diff-empty",
-			patchContent: gzipBytesHelper(t, []byte("")),
+			patchContent: gzipBytes(t, []byte("")),
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 		},
@@ -222,9 +221,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
-				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
-				"diff-1": gzipBytesHelper(t, []byte("patch 1")),
-				"diff-2": gzipBytesHelper(t, []byte("patch 2")),
+				"diff-0": gzipBytes(t, []byte("patch 0")),
+				"diff-1": gzipBytes(t, []byte("patch 1")),
+				"diff-2": gzipBytes(t, []byte("patch 2")),
 			},
 			wantCount: 2,
 			wantErr:   false,
@@ -240,9 +239,9 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 				{ID: "diff-2", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
-				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
-				"diff-1": gzipBytesHelper(t, []byte("patch 1")),
-				"diff-2": gzipBytesHelper(t, []byte("patch 2")),
+				"diff-0": gzipBytes(t, []byte("patch 0")),
+				"diff-1": gzipBytes(t, []byte("patch 1")),
+				"diff-2": gzipBytes(t, []byte("patch 2")),
 			},
 			wantCount: 3,
 			wantErr:   false,
@@ -261,12 +260,12 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 				{ID: "diff-2-mod", JobID: "job-2", Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(2)).ModType(DiffModTypeMod.String()).MustBuild()},
 			},
 			patches: map[string][]byte{
-				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
-				"diff-0-heal":  gzipBytesHelper(t, []byte("patch 0 heal")),
-				"diff-1-mod":   gzipBytesHelper(t, []byte("patch 1 mod")),
-				"diff-1-heal1": gzipBytesHelper(t, []byte("patch 1 heal 1")),
-				"diff-1-heal2": gzipBytesHelper(t, []byte("patch 1 heal 2")),
-				"diff-2-mod":   gzipBytesHelper(t, []byte("patch 2 mod")),
+				"diff-0-mod":   gzipBytes(t, []byte("patch 0 mod")),
+				"diff-0-heal":  gzipBytes(t, []byte("patch 0 heal")),
+				"diff-1-mod":   gzipBytes(t, []byte("patch 1 mod")),
+				"diff-1-heal1": gzipBytes(t, []byte("patch 1 heal 1")),
+				"diff-1-heal2": gzipBytes(t, []byte("patch 1 heal 2")),
+				"diff-2-mod":   gzipBytes(t, []byte("patch 2 mod")),
 			},
 			wantCount: 2,
 			wantErr:   false,
@@ -406,7 +405,7 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			// Build patch content map.
 			patches := make(map[string][]byte)
 			for _, d := range tt.diffs {
-				patches[d.ID] = gzipBytesHelper(t, []byte("patch-"+d.ID))
+				patches[d.ID] = gzipBytes(t, []byte("patch-"+d.ID))
 			}
 
 			// Expected path for this test.
@@ -470,18 +469,4 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 // stepIndex returns a StepIndex value.
 func stepIndex(v int32) types.StepIndex {
 	return types.StepIndex(v)
-}
-
-// gzipBytesHelper compresses input bytes using gzip (test helper).
-func gzipBytesHelper(t *testing.T, input []byte) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	w := gzip.NewWriter(&buf)
-	if _, err := w.Write(input); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-	return buf.Bytes()
 }

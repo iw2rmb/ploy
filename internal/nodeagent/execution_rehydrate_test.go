@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"os"
 	"os/exec"
@@ -349,20 +348,6 @@ func TestCopyGitClone(t *testing.T) {
 }
 
 // --- Test Helpers ---
-
-// gzipBytes compresses input bytes using gzip.
-func gzipBytes(t *testing.T, input []byte) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	w := gzip.NewWriter(&buf)
-	if _, err := w.Write(input); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("gzip close failed: %v", err)
-	}
-	return buf.Bytes()
-}
 
 // initGitRepo initializes a git repository in the specified directory.
 func initGitRepo(t *testing.T, dir string) {

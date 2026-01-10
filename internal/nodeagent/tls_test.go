@@ -417,44 +417,6 @@ func TestTLSDisabled(t *testing.T) {
 	}
 }
 
-// mockController is a minimal RunController implementation for testing.
-type mockController struct{}
-
-func (m *mockController) StartRun(ctx context.Context, req StartRunRequest) error {
-	return nil
-}
-
-func (m *mockController) StopRun(ctx context.Context, req StopRunRequest) error {
-	return nil
-}
-
-func (m *mockController) AcquireSlot(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockController) ReleaseSlot() {}
-
-// containsError checks if an error message contains a substring.
-func containsError(err error, substr string) bool {
-	if err == nil {
-		return false
-	}
-	return contains(err.Error(), substr)
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i+len(substr) <= len(s); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
 // TestBootstrapTLS_PinnedCA verifies that requestCertificate uses the configured
 // BootstrapCAPath to verify the server during bootstrap.
 func TestBootstrapTLS_PinnedCA(t *testing.T) {
