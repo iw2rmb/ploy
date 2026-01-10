@@ -17,8 +17,8 @@ func FuzzMergeGitLabConfigIntoSpec_NoPanic(f *testing.F) {
 	f.Fuzz(func(t *testing.T, specBytes []byte, domain, token string) {
 		spec := json.RawMessage(specBytes)
 		cfg := config.GitLabConfig{Domain: domain, Token: token}
-		out := mergeGitLabConfigIntoSpec(spec, cfg)
-		if !json.Valid(out) {
+		out, err := mergeGitLabConfigIntoSpec(spec, cfg)
+		if err == nil && !json.Valid(out) {
 			t.Fatalf("merge produced invalid JSON: %q", string(out))
 		}
 	})

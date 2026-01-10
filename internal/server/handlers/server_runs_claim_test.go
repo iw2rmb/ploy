@@ -120,6 +120,67 @@ func TestClaimJob_Success(t *testing.T) {
 	}
 }
 
+func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "mod-0",
+			Status:      store.JobStatusRunning,
+			ModType:     domaintypes.ModTypeMod.String(),
+			StepIndex:   domaintypes.StepIndex(2000),
+			Meta:        []byte(`{}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.ModRepo{
+			ID:      repoID,
+			RepoUrl: "https://github.com/user/repo.git",
+		},
+		// Spec is sourced from the DB at claim time; it must be a JSON object.
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`[]`)},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	t.Parallel()
 
