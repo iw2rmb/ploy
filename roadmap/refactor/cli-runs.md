@@ -1,7 +1,5 @@
 # CLI Runs Refactor Notes (`internal/cli/runs`)
 
-- Cross-cutting contracts live in `roadmap/refactor/contracts.md` (IDs/newtypes, JSON decoding rules, SSE cursor/event types).
-
 ## Type Hardening
 
 - Use domain ID newtypes for all identifiers in run CLI commands.
@@ -13,18 +11,18 @@
   - Solution: decode `created_at` as `time.Time` and sort locally when selecting “newest” (or make the API contract explicit and test it).
 - Standardize JSON decoding strictness for CLI control-plane responses.
   - CLI decodes JSON via `json.NewDecoder(...).Decode(...)` without `DisallowUnknownFields` (`internal/cli/runs/start.go:65`, `internal/cli/runs/status.go:65`).
-  - Merged slice: implement once per `roadmap/refactor/contracts.md` § "HTTP Boundary Decoding (CLI)" and reuse across CLI commands.
+  - Merged slice: implement once in a shared helper and reuse across CLI commands.
 
 ## Streamlining / Simplification
 
 - Centralize request/response boilerplate.
   - `StartCommand` and `GetStatusCommand` repeat: input validation, endpoint building, status check, error body read, JSON decode.
-  - Implement a shared helper per `roadmap/refactor/contracts.md` § "HTTP Boundary Decoding (CLI)" and reuse across CLI commands.
+  - Implement a shared helper and reuse across CLI commands.
 
 ## Likely Bugs / Risks
 
 - Unbounded error-body reads (merged slice).
-  - Fix once per `roadmap/refactor/contracts.md` § "HTTP Boundary Decoding (CLI)".
+  - Fix once in the shared CLI HTTP helper (cap bytes).
 - Ambiguous stop vs cancel semantics.
   - `StopCommand` posts to `/cancel` and returns a run summary, while `CancelCommand` also posts to `/cancel` but returns only “Cancellation requested” (`internal/cli/runs/stop.go:21`, `internal/cli/runs/cancel.go:20`).
   - Solution: keep **cancel** semantics only:

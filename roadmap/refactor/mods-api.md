@@ -1,6 +1,6 @@
 # Mods API Refactor Notes (`internal/mods/api`)
 
-- Cross-cutting contract decisions live in `roadmap/refactor/contracts.md` (IDs/newtypes, JSON boundaries).
+- Cross-cutting contract decisions live in `docs/api/OpenAPI.yaml` and `internal/domain/types`.
 
 ## Type Hardening
 
@@ -33,4 +33,4 @@
   - Solution: derive API `RunState` from outcomes (e.g., inspect per-job/per-repo results or stats), or introduce an explicit run outcome field separate from lifecycle state.
 - Weak spec validation boundary.
   - `RunSubmitRequest.Spec` is `json.RawMessage` (`internal/mods/api/types.go:50`) but the type does not require `json.Valid` or “must be object”.
-  - Solution: validate spec shape at the server boundary (object-only if it will be merged/inspected) and cap request size per `roadmap/refactor/contracts.md` § "JSON Boundary Decoding (Server)".
+  - Solution: validate spec shape at the server boundary (object-only if it will be merged/inspected) and cap request size at the handler boundary (see `internal/server/handlers/DecodeJSON`).

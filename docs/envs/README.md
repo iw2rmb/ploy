@@ -433,6 +433,8 @@ The `scope` parameter controls which job types receive each variable:
    control-plane's `ConfigHolder` at startup.
 2. **Claim-time merge**: When a node claims a job via `/v1/nodes/{id}/claim`, the server
    calls `mergeGlobalEnvIntoSpec()` to inject matching global env vars into the job's spec.
+   The job spec must be a JSON object; invalid/non-object specs are rejected at submission
+   time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
 3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
    in the spec are never overwritten by global env.
 4. **Container injection**: The node agent propagates the merged `env` map to the

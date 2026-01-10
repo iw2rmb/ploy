@@ -1,6 +1,5 @@
 # CLI Mods Refactor Notes (`internal/cli/mods`)
 
-- Cross-cutting contracts live in `roadmap/refactor/contracts.md` (IDs/newtypes, JSON decoding rules, SSE cursor/event types, canonical log payload).
 - Mods API type hardening is tracked in `roadmap/refactor/mods-api.md`.
 
 ## Type Hardening
@@ -30,7 +29,7 @@
 ## Streamlining / Simplification
 
 - Merged slice: CLI HTTP boundary behavior.
-  - Implement once per `roadmap/refactor/contracts.md` § "HTTP Boundary Decoding (CLI)" and reuse across all Mods CLI commands.
+  - Implement once in a shared helper and reuse across all Mods CLI commands.
 - Merged slice: gzip diff download streaming.
   - Implement one streaming gunzip helper (no “read all gz then gunzip all”) and reuse in Mods + Runs CLI.
 
@@ -44,7 +43,7 @@
   - Solution: validate newtyped identifiers to be URL-safe and consistently escape dynamic segments.
 - Partial error-body handling.
   - Some paths cap error bodies (`decodeHTTPError`), while others attempt to decode `{error: ...}` without strictness and without a cap (`internal/cli/mods/submit.go:90`).
-  - Merged slice: unify error decoding + caps once per `roadmap/refactor/contracts.md` § "HTTP Boundary Decoding (CLI)".
+  - Merged slice: unify error decoding + caps once in a shared CLI HTTP helper.
 
 ## Suggested Minimal Slices
 

@@ -1,6 +1,6 @@
 # Workflow Refactor Notes (internal/workflow)
 
-Cross-cutting contract decisions live in `roadmap/refactor/contracts.md` (IDs, StepIndex).
+Cross-cutting contract decisions live in code (IDs: `internal/domain/types`, ordering: `internal/workflow/graph`).
 
 ## Type Hardening
 
@@ -20,7 +20,7 @@ Cross-cutting contract decisions live in `roadmap/refactor/contracts.md` (IDs, S
   - `internal/workflow/contracts/job_meta.go:75` (`BuildMeta.Metrics map[string]interface{}`).
   - `internal/workflow/contracts/contracts.go:31` (`SubjectsForRun(runID string)` should take `types.RunID` from `internal/domain/types/ids.go`).
   - Server-injected spec fields like `job_id` should be `types.JobID` (not `string`) and validated on parse (`internal/workflow/contracts/mods_spec.go:372`).
-  - Solution: follow `roadmap/refactor/contracts.md` § "IDs and Newtypes (`internal/domain/types`)".
+  - Solution: use domain newtypes from `internal/domain/types` and validate at decode time.
 
 ## Algorithms / Simplifications
 
@@ -30,7 +30,7 @@ Cross-cutting contract decisions live in `roadmap/refactor/contracts.md` (IDs, S
 - Make graph ordering deterministic and defensive.
   - `internal/workflow/graph/types.go:206`: sort key is only `StepIndex`; equal indices become nondeterministic (map iteration). Add a tie-breaker (e.g., job ID) and/or detect duplicate step indices.
   - `internal/workflow/graph/types.go:143`: `AddNode` overwrites on duplicate node ID without error.
-  - Solution: follow `roadmap/refactor/contracts.md` § "StepIndex (Ordering Invariant)" (deterministic tie-breakers; no silent overwrite).
+  - Solution: add deterministic tie-breakers and avoid silent overwrite (no duplicate StepIndex without explicit policy).
 - Align container mount behavior to manifest semantics.
   - `internal/workflow/runtime/step/container_spec.go:55`: always mounts `Inputs[0]` RW and ignores `StepInput.Mode`; additional inputs are ignored.
   - Solution: implement `StepInput.Mode` for each input (mount all inputs with correct RO/RW), and add a unit test that asserts mount flags for multiple inputs.
