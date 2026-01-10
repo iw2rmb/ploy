@@ -17,6 +17,8 @@ import (
 func TestListBatchesCommand_Run(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	tests := []struct {
 		name        string
 		limit       int32
@@ -83,8 +85,8 @@ func TestListBatchesCommand_Run(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				if !strings.HasPrefix(r.URL.Path, "/v1/runs") {
-					t.Errorf("expected path /v1/runs, got %s", r.URL.Path)
+				if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs") {
+					t.Errorf("expected path %s/v1/runs, got %s", basePathPrefix, r.URL.Path)
 				}
 
 				// Verify pagination query params if provided.
@@ -104,7 +106,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 
-			baseURL, err := url.Parse(srv.URL)
+			baseURL, err := url.Parse(srv.URL + basePathPrefix)
 			if err != nil {
 				t.Fatalf("parse server URL: %v", err)
 			}
@@ -211,6 +213,8 @@ func TestStartBatchCommand_Run(t *testing.T) {
 func TestCreateBatchCommand_Run(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	tests := []struct {
 		name        string
 		repoURL     string
@@ -256,7 +260,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
-				case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+				case r.Method == http.MethodPost && r.URL.Path == basePathPrefix+"/v1/runs":
 					// Decode and verify request body.
 					var req struct {
 						RepoURL   string `json:"repo_url"`
@@ -284,7 +288,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 					w.WriteHeader(tc.statusCode)
 					_ = json.NewEncoder(w).Encode(resp)
 					return
-				case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/batch-new-001":
+				case r.Method == http.MethodGet && r.URL.Path == basePathPrefix+"/v1/runs/batch-new-001":
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(tc.runSummary)
@@ -295,7 +299,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 
-			baseURL, err := url.Parse(srv.URL)
+			baseURL, err := url.Parse(srv.URL + basePathPrefix)
 			if err != nil {
 				t.Fatalf("parse server URL: %v", err)
 			}
@@ -341,12 +345,14 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 func TestCreateBatchCommand_InvalidRepoURLScheme(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
 	}))
 	t.Cleanup(srv.Close)
 
-	baseURL, err := url.Parse(srv.URL)
+	baseURL, err := url.Parse(srv.URL + basePathPrefix)
 	if err != nil {
 		t.Fatalf("parse server URL: %v", err)
 	}
@@ -410,13 +416,16 @@ func TestBatchCommand_Errors(t *testing.T) {
 func TestHTTPError(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("internal server error"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"internal server error"}`))
 	}))
 	t.Cleanup(srv.Close)
 
-	baseURL, _ := url.Parse(srv.URL)
+	baseURL, _ := url.Parse(srv.URL + basePathPrefix)
 
 	cmd := ListBatchesCommand{
 		Client:  srv.Client(),
@@ -429,6 +438,9 @@ func TestHTTPError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "internal server error") {
 		t.Errorf("error should contain server message: %v", err)
+	}
+	if strings.Contains(err.Error(), "{\"error\"") {
+		t.Errorf("error should prefer decoded error message, got: %v", err)
 	}
 }
 

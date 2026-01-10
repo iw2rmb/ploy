@@ -61,6 +61,10 @@ func TestStopCommand_Run(t *testing.T) {
 				if r.Method != http.MethodPost {
 					t.Errorf("expected POST, got %s", r.Method)
 				}
+				// Verify BaseURL.Path preservation.
+				if !strings.HasPrefix(r.URL.Path, "/api/v1/runs/") {
+					t.Errorf("expected path to start with /api/v1/runs/, got %s", r.URL.Path)
+				}
 				if !strings.HasSuffix(r.URL.Path, "/cancel") {
 					t.Errorf("expected path to end with /cancel, got %s", r.URL.Path)
 				}
@@ -75,7 +79,7 @@ func TestStopCommand_Run(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 
-			baseURL, err := url.Parse(srv.URL)
+			baseURL, err := url.Parse(srv.URL + "/api")
 			if err != nil {
 				t.Fatalf("parse server URL: %v", err)
 			}

@@ -2,13 +2,11 @@ package runs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -32,7 +30,7 @@ func (c GetStatusCommand) Run(ctx context.Context) (Summary, error) {
 		return Summary{}, fmt.Errorf("run status: run id required")
 	}
 
-	endpoint := c.BaseURL.JoinPath("/v1/runs", c.RunID.String())
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return Summary{}, fmt.Errorf("run status: build request: %w", err)
@@ -45,16 +43,11 @@ func (c GetStatusCommand) Run(ctx context.Context) (Summary, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return Summary{}, fmt.Errorf("run status: %s", msg)
+		return Summary{}, httpx.WrapError("run status", resp.Status, resp.Body)
 	}
 
 	var summary Summary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return Summary{}, fmt.Errorf("run status: decode response: %w", err)
 	}
 

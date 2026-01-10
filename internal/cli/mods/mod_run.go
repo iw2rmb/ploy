@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 )
 
 // CreateModRunCommand creates a batch run from a mod project with repo selection.
@@ -90,7 +92,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	}
 
 	// POST /v1/mods/{mod_id}/runs
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "runs")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return CreateModRunResult{}, fmt.Errorf("mod run: build request: %w", err)
@@ -106,7 +108,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result CreateModRunResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return CreateModRunResult{}, fmt.Errorf("mod run: decode response: %w", err)
 		}
 		return result, nil

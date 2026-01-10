@@ -12,11 +12,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -91,7 +91,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 	}
 
 	// POST /v1/runs to create the run.
-	endpoint := c.BaseURL.JoinPath("/v1/runs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return BatchSummary{}, fmt.Errorf("batch create: build request: %w", err)
@@ -109,7 +109,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 		var srvResp struct {
 			RunID domaintypes.RunID `json:"run_id"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &srvResp, httpx.MaxJSONBodyBytes); err != nil {
 			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 
@@ -147,7 +147,7 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 	}
 
 	// Build endpoint with query params.
-	endpoint := c.BaseURL.JoinPath("/v1/runs")
+	endpoint := c.BaseURL.JoinPath("v1", "runs")
 	q := endpoint.Query()
 	if c.Limit > 0 {
 		q.Set("limit", fmt.Sprintf("%d", c.Limit))
@@ -176,7 +176,7 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 	var result struct {
 		Runs []BatchSummary `json:"runs"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("batch list: decode response: %w", err)
 	}
 
@@ -187,10 +187,5 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 // It attempts to extract an error message from the response body; otherwise,
 // falls back to the HTTP status text.
 func decodeHTTPError(resp *http.Response, prefix string) error {
-	data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-	msg := strings.TrimSpace(string(data))
-	if msg == "" {
-		msg = resp.Status
-	}
-	return fmt.Errorf("%s: %s", prefix, msg)
+	return httpx.WrapError(prefix, resp.Status, resp.Body)
 }

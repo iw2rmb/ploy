@@ -18,13 +18,15 @@ import (
 func TestRunPullCommand_Success(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	// Create a mock server that returns a valid response.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request method and path.
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST method, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/pull") {
+		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/runs/") || !strings.HasSuffix(r.URL.Path, "/pull") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -56,7 +58,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	baseURL, _ := url.Parse(server.URL)
+	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
 	cmd := RunPullCommand{
 		Client:  server.Client(),
@@ -85,12 +87,14 @@ func TestRunPullCommand_Success(t *testing.T) {
 func TestRunPullCommand_NotFound(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "run not found", http.StatusNotFound)
 	}))
 	defer server.Close()
 
-	baseURL, _ := url.Parse(server.URL)
+	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
 	cmd := RunPullCommand{
 		Client:  server.Client(),
@@ -174,12 +178,14 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 func TestModPullCommand_Success(t *testing.T) {
 	t.Parallel()
 
+	const basePathPrefix = "/api"
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request method and path.
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST method, got %s", r.Method)
 		}
-		if !strings.HasPrefix(r.URL.Path, "/v1/mods/") || !strings.HasSuffix(r.URL.Path, "/pull") {
+		if !strings.HasPrefix(r.URL.Path, basePathPrefix+"/v1/mods/") || !strings.HasSuffix(r.URL.Path, "/pull") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -207,7 +213,7 @@ func TestModPullCommand_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	baseURL, _ := url.Parse(server.URL)
+	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
 	cmd := ModPullCommand{
 		Client:  server.Client(),
@@ -233,6 +239,8 @@ func TestModPullCommand_Success(t *testing.T) {
 // TestModPullCommand_WithLastFailed verifies that last-failed mode is sent correctly.
 func TestModPullCommand_WithLastFailed(t *testing.T) {
 	t.Parallel()
+
+	const basePathPrefix = "/api"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Parse request body.
@@ -261,7 +269,7 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	baseURL, _ := url.Parse(server.URL)
+	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
 	cmd := ModPullCommand{
 		Client:  server.Client(),

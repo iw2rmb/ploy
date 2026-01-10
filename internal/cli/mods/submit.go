@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
@@ -51,7 +52,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	}
 
 	// Control-plane submission endpoint: POST /v1/runs
-	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/runs"})
+	endpoint := c.BaseURL.JoinPath("v1", "runs")
 
 	// Marshal the canonical submit request.
 	payload, err := json.Marshal(reqBody)
@@ -73,9 +74,11 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	// Server returns 201 Created with {run_id, mod_id, spec_id}.
 	if resp.StatusCode == http.StatusCreated {
 		var created struct {
-			RunID string `json:"run_id"`
+			RunID  string `json:"run_id"`
+			ModID  string `json:"mod_id"`
+			SpecID string `json:"spec_id"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &created, httpx.MaxJSONBodyBytes); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 		}
 		runID := domaintypes.RunID(strings.TrimSpace(created.RunID))
@@ -85,20 +88,11 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		return fetchRunSummary(ctx, c.BaseURL, c.Client, runID)
 	}
 
-	// Handle error responses.
-	var apiErr struct {
-		Error string `json:"error"`
-	}
-	_ = json.NewDecoder(resp.Body).Decode(&apiErr)
-	message := strings.TrimSpace(apiErr.Error)
-	if message == "" {
-		message = resp.Status
-	}
-	return modsapi.RunSummary{}, fmt.Errorf("mods submit: %s", message)
+	return modsapi.RunSummary{}, decodeHTTPError(resp, "mods submit")
 }
 
 func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Client, runID domaintypes.RunID) (modsapi.RunSummary, error) {
-	endpoint := baseURL.ResolveReference(&url.URL{Path: "/v1/runs/" + url.PathEscape(runID.String()) + "/status"})
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "status")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: build status request: %w", err)
@@ -109,18 +103,10 @@ func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Cli
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		var apiErr struct {
-			Error string `json:"error"`
-		}
-		_ = json.NewDecoder(resp.Body).Decode(&apiErr)
-		message := strings.TrimSpace(apiErr.Error)
-		if message == "" {
-			message = resp.Status
-		}
-		return modsapi.RunSummary{}, fmt.Errorf("mods submit: %s", message)
+		return modsapi.RunSummary{}, decodeHTTPError(resp, "mods submit")
 	}
 	var summary modsapi.RunSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: decode status response: %w", err)
 	}
 	summary.RunID = runID

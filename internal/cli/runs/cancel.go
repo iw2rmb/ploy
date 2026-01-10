@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -61,12 +61,7 @@ func (c CancelCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp.Body)
-		msg := strings.TrimSpace(string(data))
-		if msg == "" {
-			msg = resp.Status
-		}
-		return fmt.Errorf("runs cancel: %s", msg)
+		return httpx.WrapError("runs cancel", resp.Status, resp.Body)
 	}
 	if c.Output != nil {
 		_, _ = io.WriteString(c.Output, "Cancellation requested\n")

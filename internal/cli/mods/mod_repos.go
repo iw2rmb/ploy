@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 )
 
 // ModRepoSummary represents a repo in a mod's repo set.
@@ -81,7 +83,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	}
 
 	// POST /v1/mods/{mod_id}/repos
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: build request: %w", err)
@@ -97,7 +99,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result ModRepoSummary
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return ModRepoSummary{}, fmt.Errorf("mod repo add: decode response: %w", err)
 		}
 		return result, nil
@@ -128,7 +130,7 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 	}
 
 	// GET /v1/mods/{mod_id}/repos
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("mod repo list: build request: %w", err)
@@ -148,7 +150,7 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 	var result struct {
 		Repos []ModRepoSummary `json:"repos"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mod repo list: decode response: %w", err)
 	}
 
@@ -182,7 +184,8 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 
 	// DELETE /v1/mods/{mod_id}/repos/{repo_id}
 	endpoint := c.BaseURL.JoinPath(
-		"/v1/mods",
+		"v1",
+		"mods",
 		url.PathEscape(strings.TrimSpace(c.ModID)),
 		"repos",
 		url.PathEscape(strings.TrimSpace(c.RepoID)),
@@ -246,7 +249,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	}
 
 	// POST /v1/mods/{mod_id}/repos/bulk with Content-Type: text/csv
-	endpoint := c.BaseURL.JoinPath("/v1/mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos", "bulk")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos", "bulk")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(c.CSVData))
 	if err != nil {
 		return ImportModReposResult{}, fmt.Errorf("mod repo import: build request: %w", err)
@@ -262,7 +265,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	// Handle 200 OK response (bulk import always returns 200 with counts).
 	if resp.StatusCode == http.StatusOK {
 		var result ImportModReposResult
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return ImportModReposResult{}, fmt.Errorf("mod repo import: decode response: %w", err)
 		}
 		return result, nil

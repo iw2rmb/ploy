@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 )
 
 // =============================================================================
@@ -69,7 +71,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	// Build endpoint: POST /v1/runs/{run_id}/pull
-	endpoint := c.BaseURL.JoinPath("/v1/runs", runID, "pull")
+	endpoint := c.BaseURL.JoinPath("v1", "runs", runID, "pull")
 
 	// Build request body: {"repo_url": "..."}
 	reqBody := struct {
@@ -99,7 +101,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	var result PullResolution
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run pull: decode response: %w", err)
 	}
 
@@ -164,7 +166,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	// Build endpoint: POST /v1/mods/{mod_id}/pull
-	endpoint := c.BaseURL.JoinPath("/v1/mods", modID, "pull")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", modID, "pull")
 
 	// Build request body: {"repo_url": "...", "mode": "..."}
 	reqBody := struct {
@@ -196,7 +198,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	var result PullResolution
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mod pull: decode response: %w", err)
 	}
 

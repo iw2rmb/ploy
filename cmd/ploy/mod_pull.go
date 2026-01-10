@@ -238,7 +238,7 @@ func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 		return "", errors.New("base url required")
 	}
 
-	endpoint := baseURL.JoinPath("/v1/mods")
+	endpoint := baseURL.JoinPath("v1", "mods")
 	q := endpoint.Query()
 	q.Set("repo_url", repoURL)
 	q.Set("archived", "false")

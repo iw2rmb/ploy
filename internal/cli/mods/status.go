@@ -9,13 +9,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -82,7 +82,7 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	var result struct {
 		Diffs []DiffEntry `json:"diffs"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("list run repo diffs: decode response: %w", err)
 	}
 
@@ -145,7 +145,7 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	}
 
 	// Read the gzipped response body.
-	gzData, err := io.ReadAll(resp.Body)
+	gzData, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxDownloadBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("download diff: read body: %w", err)
 	}
