@@ -682,11 +682,15 @@ workflows.
 
 Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see `internal/vcs/repourl.go`):
 - Normalization: trim whitespace, strip trailing `/` and `.git` suffix.
-- Matching: compare normalized strings; no URL parsing or scheme validation is performed.
+- Matching (server): compare normalized strings; no URL parsing is performed.
 The CLI derives `repo_url` from the git remote URL; the server performs normalized matching
 to select the correct `run_repos` entry.
 
-For CLI commands that accept a repo URL as an explicit input (submit, batch create, `mod repo add`, `mod run --repo`), the CLI validates `repo_url` using `internal/domain/types.RepoURL` (allowed schemes: `https://`, `ssh://`, `file://`).
+The CLI validates `repo_url` using `internal/domain/types.RepoURL` (allowed schemes: `https://`, `ssh://`, `file://`) when:
+- the user provides a repo URL explicitly (submit, batch create, `mod repo add`, `mod run --repo`), and
+- the CLI derives `repo_url` from a git remote for pull commands (`run pull`, `mod pull`).
+
+If your git remote uses SCP-like syntax (example: `git@github.com:org/repo.git`), change it to an allowed form (example: `ssh://git@github.com/org/repo.git`) or use an HTTPS remote.
 
 **Example usage:**
 
