@@ -38,7 +38,7 @@ type HealthChecker interface {
 // Options configure the lifecycle collector.
 type Options struct {
 	Role             string
-	NodeID           string
+	NodeID           domaintypes.NodeID
 	Hostname         func() (string, error)
 	Docker           HealthChecker
 	Gate             HealthChecker
@@ -73,7 +73,7 @@ type Collector struct {
 }
 
 // NewCollector constructs a lifecycle collector with the supplied options.
-func NewCollector(opts Options) *Collector {
+func NewCollector(opts Options) (*Collector, error) {
 	hostFn := opts.Hostname
 	if hostFn == nil {
 		hostFn = os.Hostname
@@ -82,9 +82,15 @@ func NewCollector(opts Options) *Collector {
 	if nowFn == nil {
 		nowFn = func() time.Time { return time.Now().UTC() }
 	}
+
+	nodeID := domaintypes.NodeID(domaintypes.Normalize(opts.NodeID.String()))
+	if nodeID.IsZero() {
+		return nil, domaintypes.ErrEmpty
+	}
+
 	return &Collector{
 		role:          strings.TrimSpace(opts.Role),
-		nodeID:        domaintypes.NodeID(strings.TrimSpace(opts.NodeID)), // Convert string to domain type
+		nodeID:        nodeID,
 		hostname:      hostFn,
 		docker:        opts.Docker,
 		gate:          opts.Gate,
@@ -98,7 +104,7 @@ func NewCollector(opts Options) *Collector {
 		netCountersFunc:  func(ctx context.Context) ([]net.IOCountersStat, error) { return net.IOCountersWithContext(ctx, true) },
 		ignoreInterfaces: normalizePatterns(opts.IgnoreInterfaces),
 		metrics:          newMetricsCache(),
-	}
+	}, nil
 }
 
 // Collect builds the latest status and capacity payloads.
@@ -137,12 +143,12 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 
 	// Build typed NodeCapacity.
 	capacity := NodeCapacity{
-		CPUFreeMillis:  resources.CPUFreeMillis,
-		CPUTotalMillis: resources.CPUTotalMillis,
-		MemFreeBytes:   resources.MemoryFreeBytes,
-		MemTotalBytes:  resources.MemoryTotalBytes,
-		DiskFreeBytes:  resources.DiskFreeBytes,
-		DiskTotalBytes: resources.DiskTotalBytes,
+		CPUFreeMillis:  domaintypes.CPUmilli(resources.CPUFreeMillis),
+		CPUTotalMillis: domaintypes.CPUmilli(resources.CPUTotalMillis),
+		MemFreeBytes:   domaintypes.Bytes(resources.MemoryFreeBytes),
+		MemTotalBytes:  domaintypes.Bytes(resources.MemoryTotalBytes),
+		DiskFreeBytes:  domaintypes.Bytes(resources.DiskFreeBytes),
+		DiskTotalBytes: domaintypes.Bytes(resources.DiskTotalBytes),
 		Heartbeat:      now,
 	}
 

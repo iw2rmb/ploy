@@ -54,11 +54,14 @@ func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
 		}
 	}
 
-	collector := lifecycle.NewCollector(lifecycle.Options{
+	collector, err := lifecycle.NewCollector(lifecycle.Options{
 		Role:             "node",
-		NodeID:           cfg.NodeID.String(), // Convert domain type to string for lifecycle collector
+		NodeID:           cfg.NodeID,
 		IgnoreInterfaces: ignore,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("new lifecycle collector: %w", err)
+	}
 
 	// Don't create HTTP client yet - defer until after bootstrap runs.
 	// Client will be lazily initialized on first heartbeat.
@@ -147,12 +150,12 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	capacity := snap.Capacity
 
 	payload := HeartbeatPayload{
-		CPUFreeMillis:  capacity.CPUFreeMillis,
-		CPUTotalMillis: capacity.CPUTotalMillis,
-		MemFreeBytes:   capacity.MemFreeBytes,
-		MemTotalBytes:  capacity.MemTotalBytes,
-		DiskFreeBytes:  capacity.DiskFreeBytes,
-		DiskTotalBytes: capacity.DiskTotalBytes,
+		CPUFreeMillis:  int32(capacity.CPUFreeMillis),
+		CPUTotalMillis: int32(capacity.CPUTotalMillis),
+		MemFreeBytes:   int64(capacity.MemFreeBytes),
+		MemTotalBytes:  int64(capacity.MemTotalBytes),
+		DiskFreeBytes:  int64(capacity.DiskFreeBytes),
+		DiskTotalBytes: int64(capacity.DiskTotalBytes),
 	}
 
 	body, err := json.Marshal(payload)

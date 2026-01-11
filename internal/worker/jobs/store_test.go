@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
@@ -13,22 +14,22 @@ func TestStore_StartListComplete_Bounds(t *testing.T) {
 
 	store := jobs.NewStore(jobs.Options{Capacity: 2})
 
-	store.Start("job-1")
+	store.Start(types.JobID("job-1"))
 	time.Sleep(1 * time.Millisecond)
-	store.Start("job-2")
+	store.Start(types.JobID("job-2"))
 	time.Sleep(1 * time.Millisecond)
-	store.Start("job-3")
+	store.Start(types.JobID("job-3"))
 
 	list := store.List()
 	if len(list) != 2 {
 		t.Fatalf("list len=%d want 2", len(list))
 	}
-	if list[0].ID != "job-3" || list[1].ID != "job-2" {
-		t.Fatalf("order=%v want [job-3 job-2]", []string{list[0].ID, list[1].ID})
+	if list[0].ID != types.JobID("job-3") || list[1].ID != types.JobID("job-2") {
+		t.Fatalf("order=%v want [job-3 job-2]", []types.JobID{list[0].ID, list[1].ID})
 	}
 
-	store.Complete("job-2", jobs.StateSucceeded, "")
-	got, ok := store.Get("job-2")
+	store.Complete(types.JobID("job-2"), jobs.StateSucceeded, "")
+	got, ok := store.Get(types.JobID("job-2"))
 	if !ok {
 		t.Fatalf("expected job-2 present")
 	}
@@ -41,7 +42,7 @@ func TestStore_StartListComplete_Bounds(t *testing.T) {
 func TestStore_Get_Unknown(t *testing.T) {
 	t.Parallel()
 	store := jobs.NewStore(jobs.Options{})
-	if _, ok := store.Get("missing"); ok {
+	if _, ok := store.Get(types.JobID("missing")); ok {
 		t.Fatalf("expected missing=false for unknown id")
 	}
 }

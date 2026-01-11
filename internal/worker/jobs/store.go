@@ -4,6 +4,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // State represents a job state.
@@ -20,12 +22,12 @@ const (
 
 // Record captures node-local job metadata.
 type Record struct {
-	ID          string    `json:"id"`
-	State       State     `json:"state"`
-	StartedAt   time.Time `json:"started_at"`
-	CompletedAt time.Time `json:"completed_at,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	LogStream   string    `json:"log_stream"`
+	ID          types.JobID `json:"id"`
+	State       State       `json:"state"`
+	StartedAt   time.Time   `json:"started_at"`
+	CompletedAt time.Time   `json:"completed_at,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	LogStream   string      `json:"log_stream"`
 }
 
 // Options configures the Store.
@@ -38,8 +40,8 @@ type Options struct {
 type Store struct {
 	mu    sync.RWMutex
 	cap   int
-	byID  map[string]*Record
-	order []string // newest-first IDs
+	byID  map[types.JobID]*Record
+	order []types.JobID // newest-first IDs
 }
 
 // NewStore constructs a tracker with a bounded capacity (default 128).
@@ -48,12 +50,12 @@ func NewStore(opts Options) *Store {
 	if cap <= 0 {
 		cap = 128
 	}
-	return &Store{cap: cap, byID: make(map[string]*Record), order: make([]string, 0, cap)}
+	return &Store{cap: cap, byID: make(map[types.JobID]*Record), order: make([]types.JobID, 0, cap)}
 }
 
 // Start records a job start timestamp and running state.
-func (s *Store) Start(id string) {
-	if s == nil || id == "" {
+func (s *Store) Start(id types.JobID) {
+	if s == nil || id.IsZero() {
 		return
 	}
 	s.mu.Lock()
@@ -64,9 +66,9 @@ func (s *Store) Start(id string) {
 		s.bumpToFrontLocked(id)
 		return
 	}
-	rec := &Record{ID: id, State: StateRunning, StartedAt: time.Now().UTC(), LogStream: id}
+	rec := &Record{ID: id, State: StateRunning, StartedAt: time.Now().UTC(), LogStream: id.String()}
 	s.byID[id] = rec
-	s.order = append([]string{id}, s.order...)
+	s.order = append([]types.JobID{id}, s.order...)
 	if len(s.order) > s.cap {
 		// Evict oldest and its record.
 		evict := s.order[len(s.order)-1]
@@ -76,17 +78,17 @@ func (s *Store) Start(id string) {
 }
 
 // Complete marks a job terminal state and stamps completion time.
-func (s *Store) Complete(id string, state State, errMsg string) {
-	if s == nil || id == "" {
+func (s *Store) Complete(id types.JobID, state State, errMsg string) {
+	if s == nil || id.IsZero() {
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rec, ok := s.byID[id]
 	if !ok {
-		rec = &Record{ID: id, StartedAt: time.Now().UTC(), LogStream: id}
+		rec = &Record{ID: id, StartedAt: time.Now().UTC(), LogStream: id.String()}
 		s.byID[id] = rec
-		s.order = append([]string{id}, s.order...)
+		s.order = append([]types.JobID{id}, s.order...)
 	}
 	if state != StateSucceeded && state != StateFailed {
 		state = StateFailed
@@ -98,7 +100,7 @@ func (s *Store) Complete(id string, state State, errMsg string) {
 }
 
 // Get returns a copy of the job record for the given id.
-func (s *Store) Get(id string) (Record, bool) {
+func (s *Store) Get(id types.JobID) (Record, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rec, ok := s.byID[id]
@@ -121,7 +123,7 @@ func (s *Store) List() []Record {
 	return out
 }
 
-func (s *Store) bumpToFrontLocked(id string) {
+func (s *Store) bumpToFrontLocked(id types.JobID) {
 	// Remove id from order and re-insert at front.
 	idx := -1
 	for i, v := range s.order {
@@ -131,12 +133,12 @@ func (s *Store) bumpToFrontLocked(id string) {
 		}
 	}
 	if idx >= 0 {
-		s.order = append(append([]string{}, s.order[:idx]...), s.order[idx+1:]...)
+		s.order = append(append([]types.JobID{}, s.order[:idx]...), s.order[idx+1:]...)
 	}
-	s.order = append([]string{id}, s.order...)
+	s.order = append([]types.JobID{id}, s.order...)
 	// Ensure uniqueness if duplicates slipped in.
-	uniq := make(map[string]struct{}, len(s.order))
-	dedup := make([]string, 0, len(s.order))
+	uniq := make(map[types.JobID]struct{}, len(s.order))
+	dedup := make([]types.JobID, 0, len(s.order))
 	for _, v := range s.order {
 		if _, seen := uniq[v]; seen {
 			continue
@@ -149,7 +151,7 @@ func (s *Store) bumpToFrontLocked(id string) {
 	s.order = dedup
 }
 
-func indexOf(list []string, id string) int {
+func indexOf(list []types.JobID, id types.JobID) int {
 	for i, v := range list {
 		if v == id {
 			return i
