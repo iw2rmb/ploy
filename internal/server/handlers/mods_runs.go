@@ -162,9 +162,9 @@ func createModRunHandler(st store.Store) http.HandlerFunc {
 
 		// Build response with run_id.
 		resp := struct {
-			RunID string `json:"run_id"`
+			RunID domaintypes.RunID `json:"run_id"`
 		}{
-			RunID: run.ID.String(),
+			RunID: run.ID,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

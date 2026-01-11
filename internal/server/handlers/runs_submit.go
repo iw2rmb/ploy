@@ -151,13 +151,13 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// Build response with run_id, mod_id, and spec_id.
 		resp := struct {
-			RunID  string `json:"run_id"`
-			ModID  string `json:"mod_id"`
-			SpecID string `json:"spec_id"`
+			RunID  domaintypes.RunID  `json:"run_id"`
+			ModID  domaintypes.ModID  `json:"mod_id"`
+			SpecID domaintypes.SpecID `json:"spec_id"`
 		}{
-			RunID:  run.ID.String(),
-			ModID:  modID.String(),
-			SpecID: createdSpec.ID.String(),
+			RunID:  run.ID,
+			ModID:  modID,
+			SpecID: createdSpec.ID,
 		}
 
 		// Publish queued event to SSE hub for the run

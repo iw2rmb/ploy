@@ -51,9 +51,9 @@ type modPullRequest struct {
 //   - repo_id: the mod_repos.id for the matched repo
 //   - repo_target_ref: the target ref snapshot from run_repos
 type pullResponse struct {
-	RunID         string `json:"run_id"`
-	RepoID        string `json:"repo_id"`
-	RepoTargetRef string `json:"repo_target_ref"`
+	RunID         domaintypes.RunID     `json:"run_id"`
+	RepoID        domaintypes.ModRepoID `json:"repo_id"`
+	RepoTargetRef string                `json:"repo_target_ref"`
 }
 
 // -------------------------------------------------------------------------
@@ -143,8 +143,8 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Single match found — return the pull response.
 		match := matches[0]
 		resp := pullResponse{
-			RunID:         match.RunID.String(),
-			RepoID:        match.RepoID.String(),
+			RunID:         match.RunID,
+			RepoID:        match.RepoID,
 			RepoTargetRef: match.RepoTargetRef,
 		}
 
@@ -277,8 +277,8 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Return the pull response.
 		resp := pullResponse{
-			RunID:         latestRunRepo.RunID.String(),
-			RepoID:        latestRunRepo.RepoID.String(),
+			RunID:         latestRunRepo.RunID,
+			RepoID:        latestRunRepo.RepoID,
 			RepoTargetRef: latestRunRepo.RepoTargetRef,
 		}
 

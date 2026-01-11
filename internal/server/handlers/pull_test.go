@@ -54,11 +54,11 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	if resp.RunID != runID.String() {
-		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID)
+	if resp.RunID != runID {
+		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID.String())
 	}
-	if resp.RepoID != repoID.String() {
-		t.Fatalf("expected repo_id %q, got %q", repoID.String(), resp.RepoID)
+	if resp.RepoID != repoID {
+		t.Fatalf("expected repo_id %q, got %q", repoID.String(), resp.RepoID.String())
 	}
 	if resp.RepoTargetRef != "feature-branch" {
 		t.Fatalf("expected repo_target_ref 'feature-branch', got %q", resp.RepoTargetRef)
@@ -335,11 +335,11 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	if resp.RunID != runID.String() {
-		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID)
+	if resp.RunID != runID {
+		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID.String())
 	}
-	if resp.RepoID != repoID.String() {
-		t.Fatalf("expected repo_id %q, got %q", repoID.String(), resp.RepoID)
+	if resp.RepoID != repoID {
+		t.Fatalf("expected repo_id %q, got %q", repoID.String(), resp.RepoID.String())
 	}
 	if resp.RepoTargetRef != "feature-branch" {
 		t.Fatalf("expected repo_target_ref 'feature-branch', got %q", resp.RepoTargetRef)
@@ -395,8 +395,8 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	if resp.RunID != runID.String() {
-		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID)
+	if resp.RunID != runID {
+		t.Fatalf("expected run_id %q, got %q", runID.String(), resp.RunID.String())
 	}
 
 	// Verify the store call used the correct status filter

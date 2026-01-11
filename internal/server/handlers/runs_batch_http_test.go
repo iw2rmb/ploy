@@ -233,7 +233,6 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	runIDStr := runID.String()
 	repoID := domaintypes.NewModRepoID()
-	repoIDStr := repoID.String()
 
 	st := &mockStore{
 		listRunReposByRunResult: []store.RunRepo{
@@ -258,7 +257,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoIDStr || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
+	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoID || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
 		t.Fatalf("unexpected repos response: %+v", resp.Repos)
 	}
 }

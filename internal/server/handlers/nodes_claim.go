@@ -178,7 +178,7 @@ func buildAndSendJobClaimResponse(
 	resp := struct {
 		RunID     domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
 		Name      *string               `json:"name,omitempty"`
-		RepoID    string                `json:"repo_id"`
+		RepoID    domaintypes.ModRepoID `json:"repo_id"`
 		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
@@ -196,7 +196,7 @@ func buildAndSendJobClaimResponse(
 	}{
 		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
 		Name:      nil,
-		RepoID:    job.RepoID.String(),
+		RepoID:    job.RepoID,
 		Attempt:   job.Attempt,
 		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
 		JobName:   job.Name,

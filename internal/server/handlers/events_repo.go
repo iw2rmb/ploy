@@ -83,7 +83,11 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 				if jobIDStr == "" {
 					return evt, false
 				}
-				_, ok := allowedJobs[domaintypes.JobID(jobIDStr)]
+				var jobID domaintypes.JobID
+				if err := jobID.UnmarshalText([]byte(jobIDStr)); err != nil {
+					return evt, false
+				}
+				_, ok := allowedJobs[jobID]
 				return evt, ok
 			case domaintypes.SSEEventRun:
 				// Filter stages map to this repo's jobs (payload schema stays RunSummary).

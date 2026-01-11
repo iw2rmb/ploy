@@ -55,13 +55,13 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	st := &mockStore{
 		listDistinctReposResult: []store.ListDistinctReposRow{
 			{
-				RepoID:     "repo_1",
+				RepoID:     "repo0001",
 				RepoUrl:    "https://github.com/org/repo1.git",
 				LastRunAt:  pgtype.Timestamptz{Time: now, Valid: true},
 				LastStatus: "Success",
 			},
 			{
-				RepoID:     "repo_2",
+				RepoID:     "repo0002",
 				RepoUrl:    "https://github.com/org/repo2.git",
 				LastRunAt:  pgtype.Timestamptz{Valid: false},
 				LastStatus: "",
@@ -88,7 +88,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 		t.Fatalf("expected 2 repos, got %d", len(resp.Repos))
 	}
 
-	if resp.Repos[0].RepoID != "repo_1" || resp.Repos[0].RepoURL != "https://github.com/org/repo1.git" {
+	if resp.Repos[0].RepoID.String() != "repo0001" || resp.Repos[0].RepoURL != "https://github.com/org/repo1.git" {
 		t.Fatalf("unexpected repo[0]: %+v", resp.Repos[0])
 	}
 	if resp.Repos[0].LastRunAt == nil {
@@ -98,7 +98,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 		t.Fatalf("expected last_status Success, got %v", resp.Repos[0].LastStatus)
 	}
 
-	if resp.Repos[1].RepoID != "repo_2" || resp.Repos[1].RepoURL != "https://github.com/org/repo2.git" {
+	if resp.Repos[1].RepoID.String() != "repo0002" || resp.Repos[1].RepoURL != "https://github.com/org/repo2.git" {
 		t.Fatalf("unexpected repo[1]: %+v", resp.Repos[1])
 	}
 	if resp.Repos[1].LastRunAt != nil {
@@ -193,8 +193,8 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if run.RunID.String() != runID.String() {
 		t.Fatalf("unexpected run_id: %s", run.RunID.String())
 	}
-	if run.ModID != modID.String() {
-		t.Fatalf("unexpected mod_id: %s", run.ModID)
+	if run.ModID != modID {
+		t.Fatalf("unexpected mod_id: %s", run.ModID.String())
 	}
 	if run.RunStatus != "Finished" {
 		t.Fatalf("unexpected run_status: %s", run.RunStatus)
