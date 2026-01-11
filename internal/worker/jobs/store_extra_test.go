@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
@@ -12,21 +13,21 @@ import (
 func TestStore_Start_ExistingAndEmptyCoversEdges(t *testing.T) {
 	var s *jobs.Store
 	// Nil receiver and empty id are safe no-ops.
-	s.Start("")
+	s.Start(types.JobID(""))
 
 	s = jobs.NewStore(jobs.Options{Capacity: 3})
-	s.Start("a")
+	s.Start(types.JobID("a"))
 	// Start same id should keep it at front (newest-first) and remain running.
 	time.Sleep(1 * time.Millisecond)
-	s.Start("b")
+	s.Start(types.JobID("b"))
 	time.Sleep(1 * time.Millisecond)
-	s.Start("a") // bump existing to front
+	s.Start(types.JobID("a")) // bump existing to front
 	list := s.List()
 	if len(list) != 2 {
 		t.Fatalf("List length=%d want 2", len(list))
 	}
-	if list[0].ID != "a" || list[1].ID != "b" {
-		t.Fatalf("order=%v want [a b]", []string{list[0].ID, list[1].ID})
+	if list[0].ID != types.JobID("a") || list[1].ID != types.JobID("b") {
+		t.Fatalf("order=%v want [a b]", []types.JobID{list[0].ID, list[1].ID})
 	}
 	if list[0].State != jobs.StateRunning {
 		t.Fatalf("state=%s want running", list[0].State)
@@ -38,8 +39,8 @@ func TestStore_Start_ExistingAndEmptyCoversEdges(t *testing.T) {
 func TestStore_Complete_UnknownAndInvalidState(t *testing.T) {
 	s := jobs.NewStore(jobs.Options{Capacity: 2})
 	// Complete unknown id with invalid state -> record created and failed.
-	s.Complete("z", "not-a-state", "boom")
-	got, ok := s.Get("z")
+	s.Complete(types.JobID("z"), "not-a-state", "boom")
+	got, ok := s.Get(types.JobID("z"))
 	if !ok {
 		t.Fatalf("expected record created for unknown id")
 	}
@@ -59,16 +60,16 @@ func TestStore_Complete_UnknownAndInvalidState(t *testing.T) {
 func TestStore_List_Dedup(t *testing.T) {
 	s := jobs.NewStore(jobs.Options{Capacity: 5})
 	for i := 0; i < 3; i++ {
-		s.Start("x")
+		s.Start(types.JobID("x"))
 	}
 	// Force some variety and another id.
-	s.Start("y")
+	s.Start(types.JobID("y"))
 	records := s.List()
 	seen := map[string]bool{}
 	for _, r := range records {
-		if seen[r.ID] {
+		if seen[r.ID.String()] {
 			t.Fatalf("duplicate id %q in list %v", r.ID, records)
 		}
-		seen[r.ID] = true
+		seen[r.ID.String()] = true
 	}
 }
