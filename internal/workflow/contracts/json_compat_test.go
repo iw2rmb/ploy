@@ -32,7 +32,7 @@ func jsonAsInterface(t *testing.T, data []byte) any {
 func TestJSONCompatibility_WorkflowRun_Golden(t *testing.T) {
 	run := WorkflowRun{
 		SchemaVersion: SchemaVersion,
-		RunID:         types.RunID("run-123"),
+		RunID:         types.RunID("123456789012345678901234567"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		Repo: RepoMaterialization{
 			URL:           types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),

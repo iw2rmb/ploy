@@ -16,7 +16,7 @@ import (
 func TestHubPublishAndResume(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-1")
+	runID := domaintypes.NewRunID()
 
 	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T12:00:00Z", Stream: "stdout", Line: "line one"}); err != nil {
 		t.Fatalf("publish log: %v", err)
@@ -73,7 +73,7 @@ func TestHubPublishAndResume(t *testing.T) {
 func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-1")
+	runID := domaintypes.NewRunID()
 
 	_, err := hub.Subscribe(ctx, runID, domaintypes.EventID(-1))
 	if err == nil {
@@ -88,8 +88,8 @@ func TestHubSubscribeRejectsNegativeEventID(t *testing.T) {
 func TestHubRejectsUnknownEventType(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 1})
 	ctx := context.Background()
-	validRunID := domaintypes.RunID("valid-stream")
-	invalidRunID := domaintypes.RunID("invalid-stream")
+	validRunID := domaintypes.NewRunID()
+	invalidRunID := domaintypes.NewRunID()
 
 	if err := hub.publish(ctx, validRunID, domaintypes.SSEEventLog, LogRecord{
 		Timestamp: "2025-10-22T12:00:00Z",
@@ -127,7 +127,7 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 4})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-2")
+	runID := domaintypes.NewRunID()
 
 	sub, err := hub.Subscribe(ctx, runID, 0)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestHubBackpressureDropsSlowSubscriber(t *testing.T) {
 func TestServeWritesSSEFrames(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-http")
+	runID := domaintypes.NewRunID()
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
@@ -181,7 +181,7 @@ func TestServeWritesSSEFrames(t *testing.T) {
 func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 8, HistorySize: 16})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-concurrent")
+	runID := domaintypes.NewRunID()
 
 	// Publish initial events before any subscribers join.
 	if err := hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T14:00:00Z", Stream: "stdout", Line: "event 1"}); err != nil {
@@ -359,7 +359,7 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 func TestSubscribeClosedStreamFutureSince(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
-	runID := domaintypes.RunID("job-closed")
+	runID := domaintypes.NewRunID()
 
 	// Publish a couple of events and close the stream.
 	_ = hub.PublishLog(ctx, runID, LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
@@ -397,6 +397,7 @@ func (f *flushRecorder) Flush() {
 func TestLogRecordEnrichedFields(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
+	jobID := domaintypes.NewJobID()
 
 	tests := []struct {
 		name   string
@@ -410,7 +411,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Stream:    "stdout",
 				Line:      "hello world",
 				NodeID:    "aB3xY9",
-				JobID:     "job-def456",
+				JobID:     jobID,
 				ModType:   "mod",
 				StepIndex: 2,
 			},
@@ -419,7 +420,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"stream":     "stdout",
 				"line":       "hello world",
 				"node_id":    "aB3xY9",
-				"job_id":     "job-def456",
+				"job_id":     jobID.String(),
 				"mod_type":   "mod",
 				"step_index": float64(2), // JSON numbers decode as float64
 			},
@@ -457,9 +458,9 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 		},
 	}
 
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runID := domaintypes.RunID("enriched-test-" + string(rune('0'+i)))
+			runID := domaintypes.NewRunID()
 
 			if err := hub.PublishLog(ctx, runID, tt.record); err != nil {
 				t.Fatalf("publish log: %v", err)
@@ -506,11 +507,11 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 func TestPublishRunTypedPayload(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
 	ctx := context.Background()
-	runID := domaintypes.RunID("run-1")
+	runID := domaintypes.NewRunID()
 
 	// Construct a typed RunSummary payload with RunID field.
 	run := api.RunSummary{
-		RunID:  "run-123",
+		RunID:  runID,
 		State:  api.RunStateRunning,
 		Stages: make(map[domaintypes.JobID]api.StageStatus),
 	}
@@ -562,7 +563,7 @@ func TestPublishRunTypedPayload(t *testing.T) {
 func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
-	runID := domaintypes.RunID("bench-stream")
+	runID := domaintypes.NewRunID()
 
 	// Create a fully enriched log record matching real-world usage.
 	record := LogRecord{
@@ -570,7 +571,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 		Stream:    "stdout",
 		Line:      "Build step completed: compiling module org.example.service",
 		NodeID:    "aB3xY9",
-		JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
+		JobID:     domaintypes.NewJobID(),
 		ModType:   "mod",
 		StepIndex: 2000,
 	}
@@ -588,7 +589,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 func BenchmarkHubPublishMinimalLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
-	runID := domaintypes.RunID("bench-stream")
+	runID := domaintypes.NewRunID()
 
 	// Create a minimal log record without enrichment fields.
 	record := LogRecord{
@@ -610,14 +611,16 @@ func BenchmarkHubPublishMinimalLog(b *testing.B) {
 func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
 	ctx := context.Background()
-	runID := domaintypes.RunID("bench-concurrent")
+	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	jobID := domaintypes.NewJobID()
 
 	record := LogRecord{
 		Timestamp: "2025-12-01T10:00:00.000000Z",
 		Stream:    "stdout",
 		Line:      "Concurrent build output from parallel job execution",
-		NodeID:    "node-concurrent-test",
-		JobID:     "job-concurrent-test",
+		NodeID:    nodeID,
+		JobID:     jobID,
 		ModType:   "hook",
 		StepIndex: 100,
 	}
@@ -649,7 +652,9 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 		HistorySize: 2 * numLogs,
 	})
 	ctx := context.Background()
-	runID := domaintypes.RunID("high-volume-stream")
+	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	jobID := domaintypes.NewJobID()
 
 	// Track events received by each subscriber using concurrent goroutines.
 	type result struct {
@@ -698,8 +703,8 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			Timestamp: time.Now().Format(time.RFC3339Nano),
 			Stream:    "stdout",
 			Line:      "Compiling module " + string(rune('A'+i%26)),
-			NodeID:    "aabbccdd-eeff-0011-2233-445566778899",
-			JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
+			NodeID:    nodeID,
+			JobID:     jobID,
 			ModType:   "mod",
 			StepIndex: domaintypes.StepIndex(i),
 		}
@@ -754,7 +759,9 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 
 	hub := NewHub(Options{BufferSize: 8, HistorySize: 16})
 	ctx := context.Background()
-	runID := domaintypes.RunID("large-payload-stream")
+	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	jobID := domaintypes.NewJobID()
 
 	// Create a log record with maximum reasonable field sizes.
 	// Real-world logs can have long lines from stack traces, build output, etc.
@@ -764,8 +771,8 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 		Timestamp: "2025-12-01T10:00:00.123456789Z",
 		Stream:    "stderr",
 		Line:      longLine,
-		NodeID:    "aabbccdd-eeff-0011-2233-445566778899",
-		JobID:     "11223344-5566-7788-99aa-bbccddeeff00",
+		NodeID:    nodeID,
+		JobID:     jobID,
 		ModType:   domaintypes.ModTypePreGate,
 		StepIndex: 999,
 	}
@@ -818,7 +825,9 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 	// Use minimal buffer size to trigger backpressure quickly.
 	hub := NewHub(Options{BufferSize: 1, HistorySize: 4})
 	ctx := context.Background()
-	runID := domaintypes.RunID("backpressure-stream")
+	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	jobID := domaintypes.NewJobID()
 
 	// Subscribe with a slow consumer (never drains the channel).
 	sub, err := hub.Subscribe(ctx, runID, 0)
@@ -833,8 +842,8 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			Timestamp: time.Now().Format(time.RFC3339Nano),
 			Stream:    "stdout",
 			Line:      "Log line " + string(rune('0'+i)),
-			NodeID:    "node-backpressure",
-			JobID:     "job-backpressure",
+			NodeID:    nodeID,
+			JobID:     jobID,
 			ModType:   "mod",
 			StepIndex: domaintypes.StepIndex(i),
 		}
@@ -975,7 +984,7 @@ func TestRunIDRejectedAtStreamBoundary(t *testing.T) {
 
 	// Verify that valid run IDs are accepted (contrast test).
 	t.Run("ValidRunIDsAccepted", func(t *testing.T) {
-		validRunID := domaintypes.RunID("valid-run-id-12345")
+		validRunID := domaintypes.NewRunID()
 
 		// Ensure should succeed.
 		if err := hub.Ensure(validRunID); err != nil {

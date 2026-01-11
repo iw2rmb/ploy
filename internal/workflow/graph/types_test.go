@@ -35,7 +35,7 @@ func TestNewWorkflowGraph(t *testing.T) {
 func TestAddNode(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 
 	// Add node with nil slices (should be initialized).
 	node := &GraphNode{
@@ -71,7 +71,7 @@ func TestAddNode(t *testing.T) {
 func TestComputeEdges_LinearChain(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 
 	// Create a standard 3-job pipeline: pre-gate → mod-0 → post-gate.
 	g.AddNode(&GraphNode{ID: "pre-gate", Name: "pre-gate", Type: NodeTypePreGate, StepIndex: 1000, Status: NodeStatusSuccess})
@@ -127,7 +127,7 @@ func TestComputeEdges_LinearChain(t *testing.T) {
 func TestComputeEdges_WithHealing(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 
 	// Simulate a healing scenario:
 	// pre-gate (1000) → heal-1 (1500) → re-gate (1750) → mod-0 (2000) → post-gate (3000)
@@ -164,7 +164,7 @@ func TestComputeEdges_WithHealing(t *testing.T) {
 func TestComputeEdges_EmptyGraph(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 	g.ComputeEdges()
 
 	if len(g.RootIDs) != 0 {
@@ -179,7 +179,7 @@ func TestComputeEdges_EmptyGraph(t *testing.T) {
 func TestComputeEdges_SingleNode(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 	g.AddNode(&GraphNode{ID: "only-job", Name: "only-job", Type: NodeTypeMod, StepIndex: 1000, Status: NodeStatusQueued})
 	g.ComputeEdges()
 
@@ -204,7 +204,7 @@ func TestComputeEdges_SingleNode(t *testing.T) {
 func TestOrderedNodes(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 
 	// Add nodes out of order.
 	g.AddNode(&GraphNode{ID: "c", StepIndex: 3000})
@@ -225,7 +225,7 @@ func TestOrderedNodes(t *testing.T) {
 func TestGetNode(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 	g.AddNode(&GraphNode{ID: "job-1", Name: "test-job"})
 
 	if n := g.GetNode("job-1"); n == nil || n.Name != "test-job" {
@@ -240,7 +240,7 @@ func TestGetNode(t *testing.T) {
 func TestIsTerminal(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 	g.AddNode(&GraphNode{ID: "a", StepIndex: 1000})
 	g.AddNode(&GraphNode{ID: "b", StepIndex: 2000})
 	g.ComputeEdges()
@@ -312,7 +312,8 @@ func TestGraphNode_IsHealingNode(t *testing.T) {
 func TestWorkflowGraph_JSONSerialization(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-123"))
+	runID := domaintypes.NewRunID()
+	g := NewWorkflowGraph(runID)
 	g.AddNode(&GraphNode{
 		ID:        "job-1",
 		Name:      "pre-gate",
@@ -343,8 +344,8 @@ func TestWorkflowGraph_JSONSerialization(t *testing.T) {
 		t.Fatalf("failed to unmarshal graph: %v", err)
 	}
 
-	if result["run_id"] != "run-123" {
-		t.Errorf("run_id should be 'run-123', got %v", result["run_id"])
+	if result["run_id"] != runID.String() {
+		t.Errorf("run_id should be %q, got %v", runID.String(), result["run_id"])
 	}
 	if result["linear"] != true {
 		t.Errorf("linear should be true, got %v", result["linear"])
@@ -364,7 +365,7 @@ func TestWorkflowGraph_JSONSerialization(t *testing.T) {
 func TestComputeEdges_RecalculatesEdges(t *testing.T) {
 	t.Parallel()
 
-	g := NewWorkflowGraph(domaintypes.RunID("run-1"))
+	g := NewWorkflowGraph(domaintypes.NewRunID())
 	g.AddNode(&GraphNode{ID: "a", StepIndex: 1000, ChildIDs: []string{"stale"}})
 	g.AddNode(&GraphNode{ID: "b", StepIndex: 2000, ParentIDs: []string{"stale"}})
 	g.ComputeEdges()
