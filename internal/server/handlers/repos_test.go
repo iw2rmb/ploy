@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -149,11 +150,13 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
+	runID := domaintypes.NewRunID()
+	modID := domaintypes.NewModID()
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
-				RunID:         "run_1",
-				ModID:         "mod_1",
+				RunID:         runID,
+				ModID:         modID,
 				RunStatus:     store.RunStatusFinished,
 				RepoStatus:    store.RunRepoStatusSuccess,
 				RepoBaseRef:   "main",
@@ -187,10 +190,10 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	}
 
 	run := resp.Runs[0]
-	if run.RunID.String() != "run_1" {
+	if run.RunID.String() != runID.String() {
 		t.Fatalf("unexpected run_id: %s", run.RunID.String())
 	}
-	if run.ModID != "mod_1" {
+	if run.ModID != modID.String() {
 		t.Fatalf("unexpected mod_id: %s", run.ModID)
 	}
 	if run.RunStatus != "Finished" {

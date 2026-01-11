@@ -14,6 +14,7 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
 	st.getNodeResult = store.Node{} // handler only checks err
 
 	h := heartbeatHandler(st)
+	nodeID := "aB3xY9"
 
 	reqBody := `{
   "cpu_free_millis": 1500,
@@ -25,8 +26,8 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
   "version": "ployd-node/test"
 }`
 
-	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/test-node/heartbeat", bytes.NewBufferString(reqBody))
-	r.SetPathValue("id", "test-node")
+	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/heartbeat", bytes.NewBufferString(reqBody))
+	r.SetPathValue("id", nodeID)
 	w := httptest.NewRecorder()
 
 	h(w, r)
@@ -42,8 +43,8 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
 		t.Fatalf("expected UpdateNodeHeartbeat to be called")
 	}
 
-	if got := st.updateNodeHeartbeatParams.ID.String(); got != "test-node" {
-		t.Fatalf("UpdateNodeHeartbeat ID = %q, want %q", got, "test-node")
+	if got := st.updateNodeHeartbeatParams.ID.String(); got != nodeID {
+		t.Fatalf("UpdateNodeHeartbeat ID = %q, want %q", got, nodeID)
 	}
 	if st.updateNodeHeartbeatParams.CpuFreeMillis != 1500 {
 		t.Fatalf("cpu_free_millis = %d, want %d", st.updateNodeHeartbeatParams.CpuFreeMillis, 1500)
@@ -71,20 +72,21 @@ func TestHeartbeatHandler_BytesContract(t *testing.T) {
 func TestHeartbeatHandler_RejectsRedundantIdentity(t *testing.T) {
 	st := &mockStore{}
 	h := heartbeatHandler(st)
+	nodeID := "aB3xY9"
 
 	// node_id is redundant; the node identity is provided by the {id} path param.
 	reqBody := `{
-  "node_id": "test-node",
-  "cpu_free_millis": 1,
-  "cpu_total_millis": 1,
-  "mem_free_bytes": 1,
-  "mem_total_bytes": 1,
-  "disk_free_bytes": 1,
-  "disk_total_bytes": 1
-}`
+	  "node_id": "aB3xY9",
+	  "cpu_free_millis": 1,
+	  "cpu_total_millis": 1,
+	  "mem_free_bytes": 1,
+	  "mem_total_bytes": 1,
+	  "disk_free_bytes": 1,
+	  "disk_total_bytes": 1
+	}`
 
-	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/test-node/heartbeat", bytes.NewBufferString(reqBody))
-	r.SetPathValue("id", "test-node")
+	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/heartbeat", bytes.NewBufferString(reqBody))
+	r.SetPathValue("id", nodeID)
 	w := httptest.NewRecorder()
 
 	h(w, r)
@@ -100,6 +102,7 @@ func TestHeartbeatHandler_RejectsRedundantIdentity(t *testing.T) {
 func TestHeartbeatHandler_RejectsLegacyMBFields(t *testing.T) {
 	st := &mockStore{}
 	h := heartbeatHandler(st)
+	nodeID := "aB3xY9"
 
 	reqBody := `{
   "cpu_free_millis": 1500,
@@ -110,8 +113,8 @@ func TestHeartbeatHandler_RejectsLegacyMBFields(t *testing.T) {
   "disk_total_mb": 51200.0
 }`
 
-	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/test-node/heartbeat", bytes.NewBufferString(reqBody))
-	r.SetPathValue("id", "test-node")
+	r := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/heartbeat", bytes.NewBufferString(reqBody))
+	r.SetPathValue("id", nodeID)
 	w := httptest.NewRecorder()
 
 	h(w, r)
