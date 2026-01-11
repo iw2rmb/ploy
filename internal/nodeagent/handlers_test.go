@@ -12,6 +12,8 @@ import (
 )
 
 func TestHandleRunStart(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
 	tests := []struct {
 		name          string
 		request       StartRunRequest
@@ -24,8 +26,8 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "valid request",
 			request: StartRunRequest{
-				RunID:   types.RunID("run-123"),
-				JobID:   types.JobID("job-123"),
+				RunID:   runID,
+				JobID:   jobID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
@@ -47,8 +49,8 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "missing repo_url",
 			request: StartRunRequest{
-				RunID: types.RunID("run-123"),
-				JobID: types.JobID("job-123"),
+				RunID: runID,
+				JobID: jobID,
 			},
 			wantStatus:  http.StatusBadRequest,
 			wantCalled:  false,
@@ -58,7 +60,7 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "missing job_id",
 			request: StartRunRequest{
-				RunID:   types.RunID("run-123"),
+				RunID:   runID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			wantStatus:  http.StatusBadRequest,
@@ -69,8 +71,8 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "controller error",
 			request: StartRunRequest{
-				RunID:   types.RunID("run-123"),
-				JobID:   types.JobID("job-123"),
+				RunID:   runID,
+				JobID:   jobID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			controllerErr: fmt.Errorf("execution failed"),
@@ -84,7 +86,7 @@ func TestHandleRunStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockRunController{startErr: tt.controllerErr}
-			cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
+			cfg := Config{NodeID: "aB3xY9", ServerURL: "http://127.0.0.1:8080"}
 			srv := &Server{cfg: cfg, controller: mock}
 
 			body, err := json.Marshal(tt.request)
@@ -121,6 +123,7 @@ func TestHandleRunStart(t *testing.T) {
 }
 
 func TestHandleRunStop(t *testing.T) {
+	runID := types.NewRunID()
 	tests := []struct {
 		name          string
 		request       StopRunRequest
@@ -131,7 +134,7 @@ func TestHandleRunStop(t *testing.T) {
 		{
 			name: "valid request",
 			request: StopRunRequest{
-				RunID:  "run-123",
+				RunID:  runID,
 				Reason: "user requested",
 			},
 			wantStatus: http.StatusOK,
@@ -148,7 +151,7 @@ func TestHandleRunStop(t *testing.T) {
 		{
 			name: "controller error",
 			request: StopRunRequest{
-				RunID: "run-123",
+				RunID: runID,
 			},
 			controllerErr: fmt.Errorf("stop failed"),
 			wantStatus:    http.StatusInternalServerError,
@@ -159,7 +162,7 @@ func TestHandleRunStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockRunController{stopErr: tt.controllerErr}
-			cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
+			cfg := Config{NodeID: "aB3xY9", ServerURL: "http://127.0.0.1:8080"}
 			srv := &Server{cfg: cfg, controller: mock}
 
 			// Use raw JSON for "missing run_id" test case to avoid MarshalJSON error on empty RunID.
@@ -196,7 +199,7 @@ func TestHandleRunStop(t *testing.T) {
 }
 
 func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
+	cfg := Config{NodeID: "aB3xY9", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -215,7 +218,7 @@ func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
+	cfg := Config{NodeID: "aB3xY9", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
