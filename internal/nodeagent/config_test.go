@@ -18,7 +18,7 @@ func TestLoadConfig(t *testing.T) {
 			name: "valid config with defaults",
 			yaml: `
 server_url: https://server.example.com:8443
-node_id: node-001
+node_id: aB3xY9
 http:
   listen: ":8444"
   tls:
@@ -29,8 +29,8 @@ http:
 				if cfg.ServerURL != "https://server.example.com:8443" {
 					t.Errorf("ServerURL = %q, want %q", cfg.ServerURL, "https://server.example.com:8443")
 				}
-				if cfg.NodeID != "node-001" {
-					t.Errorf("NodeID = %q, want %q", cfg.NodeID, "node-001")
+				if cfg.NodeID != "aB3xY9" {
+					t.Errorf("NodeID = %q, want %q", cfg.NodeID, "aB3xY9")
 				}
 				// Listen default comes from config file; no assertion on value.
 				if cfg.Concurrency != 1 {
@@ -45,7 +45,7 @@ http:
 			name: "custom values",
 			yaml: `
 server_url: https://custom.example.com:9443
-node_id: custom-node
+node_id: Z9yX3b
 concurrency: 4
 http:
   listen: ":9000"
@@ -75,7 +75,7 @@ heartbeat:
 		{
 			name: "missing server_url",
 			yaml: `
-node_id: node-001
+node_id: aB3xY9
 http:
   tls:
     enabled: false
@@ -96,7 +96,7 @@ http:
 			name: "tls enabled but missing cert_path",
 			yaml: `
 server_url: https://server.example.com:8443
-node_id: node-001
+node_id: aB3xY9
 http:
   tls:
     enabled: true
