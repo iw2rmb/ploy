@@ -454,15 +454,18 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 
 	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
 	commit := "abc123"
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := "aB3xY9"
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
-		RunID:     types.RunID("run-step-map"),
-		JobID:     types.JobID("job-123-step-map"),
+		RunID:     runID,
+		JobID:     jobID,
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi.git",
 		Status:    "Started",
-		NodeID:    types.NodeID("test-node"),
+		NodeID:    types.NodeID(nodeIDStr),
 		BaseRef:   "main",
 		TargetRef: "feature/multi-step",
 		CommitSha: &commit,
@@ -474,7 +477,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	// HTTP test server for unified claim queue with step-level claim.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + nodeIDStr + "/claim":
 			// Return step-level claim with step_index.
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
@@ -489,7 +492,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    types.NodeID(nodeIDStr),
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
 
@@ -537,7 +540,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	t.Parallel()
 
-	runID := types.RunID("run-multi-node-123")
+	runID := types.NewRunID()
 	commit := "deadbeef"
 
 	// Node1 claims job 0 (pre-gate).
@@ -546,7 +549,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
 		RunID:     runID,
-		JobID:     types.JobID("job-node1-pregate"),
+		JobID:     types.NewJobID(),
 		JobName:   "pre-gate",
 		RepoURL:   "https://github.com/acme/multi-node.git",
 		Status:    "Started",
@@ -565,7 +568,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
 		RunID:     runID,
-		JobID:     types.JobID("job-node2-mod0"),
+		JobID:     types.NewJobID(),
 		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi-node.git",
 		Status:    "Started",
