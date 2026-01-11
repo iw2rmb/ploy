@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // =============================================================================
@@ -48,9 +50,9 @@ func TestRunPullCommand_Success(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         "run123",
-			RepoID:        "repo456",
-			RepoTargetRef: "mods/run123/feature",
+			RunID:         domaintypes.RunID("run123"),
+			RepoID:        domaintypes.ModRepoID("repo456"),
+			RepoTargetRef: domaintypes.GitRef("mods/run123/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -63,7 +65,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 	cmd := RunPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		RunID:   "run123",
+		RunID:   domaintypes.RunID("run123"),
 		RepoURL: "https://github.com/example/repo.git",
 	}
 
@@ -72,14 +74,14 @@ func TestRunPullCommand_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.RunID != "run123" {
-		t.Errorf("expected RunID 'run123', got %q", result.RunID)
+	if result.RunID.String() != "run123" {
+		t.Errorf("expected RunID 'run123', got %q", result.RunID.String())
 	}
-	if result.RepoID != "repo456" {
-		t.Errorf("expected RepoID 'repo456', got %q", result.RepoID)
+	if result.RepoID.String() != "repo456" {
+		t.Errorf("expected RepoID 'repo456', got %q", result.RepoID.String())
 	}
-	if result.RepoTargetRef != "mods/run123/feature" {
-		t.Errorf("expected RepoTargetRef 'mods/run123/feature', got %q", result.RepoTargetRef)
+	if result.RepoTargetRef.String() != "mods/run123/feature" {
+		t.Errorf("expected RepoTargetRef 'mods/run123/feature', got %q", result.RepoTargetRef.String())
 	}
 }
 
@@ -99,7 +101,7 @@ func TestRunPullCommand_NotFound(t *testing.T) {
 	cmd := RunPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		RunID:   "nonexistent",
+		RunID:   domaintypes.RunID("nonexistent"),
 		RepoURL: "https://github.com/example/repo.git",
 	}
 
@@ -123,14 +125,14 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "nil client",
-			cmd:     RunPullCommand{RunID: "run123", RepoURL: "https://example.com"},
+			cmd:     RunPullCommand{RunID: domaintypes.RunID("run123"), RepoURL: "https://example.com"},
 			wantErr: "http client required",
 		},
 		{
 			name: "nil base url",
 			cmd: RunPullCommand{
 				Client:  http.DefaultClient,
-				RunID:   "run123",
+				RunID:   domaintypes.RunID("run123"),
 				RepoURL: "https://example.com",
 			},
 			wantErr: "base url required",
@@ -149,7 +151,7 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 			cmd: RunPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				RunID:   "run123",
+				RunID:   domaintypes.RunID("run123"),
 			},
 			wantErr: "repo url required",
 		},
@@ -203,9 +205,9 @@ func TestModPullCommand_Success(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         "run789",
-			RepoID:        "repo101",
-			RepoTargetRef: "mods/run789/feature",
+			RunID:         domaintypes.RunID("run789"),
+			RepoID:        domaintypes.ModRepoID("repo101"),
+			RepoTargetRef: domaintypes.GitRef("mods/run789/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -218,7 +220,7 @@ func TestModPullCommand_Success(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		ModID:   "my-mod",
+		ModRef:  domaintypes.ModRef("my-mod"),
 		RepoURL: "https://github.com/example/repo.git",
 		Mode:    PullModeLastSucceeded,
 	}
@@ -228,11 +230,11 @@ func TestModPullCommand_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.RunID != "run789" {
-		t.Errorf("expected RunID 'run789', got %q", result.RunID)
+	if result.RunID.String() != "run789" {
+		t.Errorf("expected RunID 'run789', got %q", result.RunID.String())
 	}
-	if result.RepoID != "repo101" {
-		t.Errorf("expected RepoID 'repo101', got %q", result.RepoID)
+	if result.RepoID.String() != "repo101" {
+		t.Errorf("expected RepoID 'repo101', got %q", result.RepoID.String())
 	}
 }
 
@@ -259,9 +261,9 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         "run-failed",
-			RepoID:        "repo-failed",
-			RepoTargetRef: "mods/run-failed/fix",
+			RunID:         domaintypes.RunID("run-failed"),
+			RepoID:        domaintypes.ModRepoID("repo-failed"),
+			RepoTargetRef: domaintypes.GitRef("mods/run-failed/fix"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -274,7 +276,7 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		ModID:   "my-mod",
+		ModRef:  domaintypes.ModRef("my-mod"),
 		RepoURL: "https://github.com/example/repo.git",
 		Mode:    PullModeLastFailed,
 	}
@@ -284,8 +286,8 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.RunID != "run-failed" {
-		t.Errorf("expected RunID 'run-failed', got %q", result.RunID)
+	if result.RunID.String() != "run-failed" {
+		t.Errorf("expected RunID 'run-failed', got %q", result.RunID.String())
 	}
 }
 
@@ -310,9 +312,9 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 
 		// Return a valid response.
 		resp := PullResolution{
-			RunID:         "run-default",
-			RepoID:        "repo-default",
-			RepoTargetRef: "mods/run-default/feature",
+			RunID:         domaintypes.RunID("run-default"),
+			RepoID:        domaintypes.ModRepoID("repo-default"),
+			RepoTargetRef: domaintypes.GitRef("mods/run-default/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -325,7 +327,7 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		ModID:   "my-mod",
+		ModRef:  domaintypes.ModRef("my-mod"),
 		RepoURL: "https://github.com/example/repo.git",
 		// Mode is intentionally not set to test default behavior.
 	}
@@ -347,14 +349,14 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "nil client",
-			cmd:     ModPullCommand{ModID: "my-mod", RepoURL: "https://example.com"},
+			cmd:     ModPullCommand{ModRef: domaintypes.ModRef("my-mod"), RepoURL: "https://example.com"},
 			wantErr: "http client required",
 		},
 		{
 			name: "nil base url",
 			cmd: ModPullCommand{
 				Client:  http.DefaultClient,
-				ModID:   "my-mod",
+				ModRef:  domaintypes.ModRef("my-mod"),
 				RepoURL: "https://example.com",
 			},
 			wantErr: "base url required",
@@ -373,7 +375,7 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 			cmd: ModPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				ModID:   "my-mod",
+				ModRef:  domaintypes.ModRef("my-mod"),
 			},
 			wantErr: "repo url required",
 		},
@@ -408,7 +410,7 @@ func TestModPullCommand_NotFound(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		ModID:   "nonexistent",
+		ModRef:  domaintypes.ModRef("nonexistent"),
 		RepoURL: "https://github.com/example/repo.git",
 	}
 

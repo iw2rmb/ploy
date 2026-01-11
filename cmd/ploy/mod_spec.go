@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -79,7 +80,7 @@ func handleModSpecSet(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Spec set: %s (created_at: %s)\n", result.ID, result.CreatedAt)
+	_, _ = fmt.Fprintf(stderr, "Spec set: %s (created_at: %s)\n", result.ID.String(), result.CreatedAt.Format(time.RFC3339))
 	return nil
 }
 

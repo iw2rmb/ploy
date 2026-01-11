@@ -22,9 +22,9 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 
 	diffs := []testDiff{
-		{ID: "diff-1", JobID: "job-1", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
-		{ID: "diff-2", JobID: "job-2", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
-		{ID: "diff-3", JobID: "job-3", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440000", JobID: "job-1", CreatedAt: "2026-01-10T00:00:00Z", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440001", JobID: "job-2", CreatedAt: "2026-01-10T00:00:01Z", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440002", JobID: "job-3", CreatedAt: "2026-01-10T00:00:02Z", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
 	}
 
 	mux := http.NewServeMux()
@@ -46,7 +46,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  "repo-abc",
+		RepoID:  domaintypes.ModRepoID("repo-abc"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -80,7 +80,7 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-empty"),
-		RepoID:  "repo-abc",
+		RepoID:  domaintypes.ModRepoID("repo-abc"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -107,8 +107,8 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 		if r.URL.Query().Get("download") != "true" {
 			t.Error("expected download=true query param")
 		}
-		if r.URL.Query().Get("diff_id") != "diff-abc" {
-			t.Errorf("expected diff_id=diff-abc, got %s", r.URL.Query().Get("diff_id"))
+		if r.URL.Query().Get("diff_id") != "550e8400-e29b-41d4-a716-4466554400aa" {
+			t.Errorf("expected diff_id=550e8400-e29b-41d4-a716-4466554400aa, got %s", r.URL.Query().Get("diff_id"))
 		}
 
 		// Write gzipped content.
@@ -124,8 +124,8 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  "repo-abc",
-		DiffID:  "diff-abc",
+		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		DiffID:  domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400aa"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -147,8 +147,8 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 		if r.URL.Query().Get("download") != "true" {
 			t.Error("expected download=true query param")
 		}
-		if r.URL.Query().Get("diff_id") != "diff-empty" {
-			t.Errorf("expected diff_id=diff-empty, got %s", r.URL.Query().Get("diff_id"))
+		if r.URL.Query().Get("diff_id") != "550e8400-e29b-41d4-a716-4466554400bb" {
+			t.Errorf("expected diff_id=550e8400-e29b-41d4-a716-4466554400bb, got %s", r.URL.Query().Get("diff_id"))
 		}
 		// Write empty gzipped content.
 		w.Header().Set("Content-Type", "application/gzip")
@@ -162,8 +162,8 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  "repo-abc",
-		DiffID:  "diff-empty",
+		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		DiffID:  domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400bb"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -174,69 +174,4 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	if len(result) != 0 {
 		t.Errorf("got %d bytes, want 0 for empty patch", len(result))
 	}
-}
-
-// TestDecompressGzipBytes_Success verifies gzip decompression.
-func TestDecompressGzipBytes_Success(t *testing.T) {
-	original := []byte("test content for compression")
-
-	// Compress the content.
-	var compressed []byte
-	func() {
-		var buf = new(bytesBuffer)
-		gw := gzip.NewWriter(buf)
-		_, _ = gw.Write(original)
-		_ = gw.Close()
-		compressed = buf.Bytes()
-	}()
-
-	result, err := decompressGzipBytes(compressed)
-	if err != nil {
-		t.Fatalf("decompressGzipBytes() error = %v", err)
-	}
-
-	if string(result) != string(original) {
-		t.Errorf("result = %q, want %q", string(result), string(original))
-	}
-}
-
-// TestDecompressGzipBytes_EmptyInput verifies empty input handling.
-func TestDecompressGzipBytes_EmptyInput(t *testing.T) {
-	result, err := decompressGzipBytes([]byte{})
-	if err != nil {
-		t.Fatalf("decompressGzipBytes() error = %v", err)
-	}
-
-	if len(result) != 0 {
-		t.Errorf("got %d bytes, want 0", len(result))
-	}
-}
-
-// bytesBuffer is a simple bytes.Buffer wrapper for testing.
-type bytesBuffer struct {
-	data []byte
-}
-
-func (b *bytesBuffer) Write(p []byte) (n int, err error) {
-	b.data = append(b.data, p...)
-	return len(p), nil
-}
-
-func (b *bytesBuffer) Bytes() []byte {
-	return b.data
-}
-
-// contains is a helper to check if s contains substr.
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

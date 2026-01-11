@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -31,10 +32,10 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       nil,
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        "mod-001",
+				ID:        types.ModID("mod-001"),
 				Name:      "test-mod",
 				SpecID:    nil,
-				CreatedAt: "2024-01-01T00:00:00Z",
+				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
@@ -43,10 +44,10 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        "mod-002",
+				ID:        types.ModID("mod-002"),
 				Name:      "test-mod-with-spec",
-				SpecID:    strPtr("spec-001"),
-				CreatedAt: "2024-01-01T00:00:00Z",
+				SpecID:    specIDPtr(types.SpecID("spec-001")),
+				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
@@ -138,8 +139,8 @@ func TestListModsCommand_Run(t *testing.T) {
 			limit:  50,
 			offset: 0,
 			serverResp: []ModSummary{
-				{ID: "mod-001", Name: "mod-one", Archived: false, CreatedAt: "2024-01-01T00:00:00Z"},
-				{ID: "mod-002", Name: "mod-two", Archived: true, CreatedAt: "2024-01-02T00:00:00Z"},
+				{ID: types.ModID("mod-001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: types.ModID("mod-002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 			wantCount: 2,
 		},
@@ -286,7 +287,7 @@ func TestArchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
 		}
 
-		resp := ArchiveModResult{ID: "mod-001", Name: "test-mod", Archived: true}
+		resp := ArchiveModResult{ID: types.ModID("mod-001"), Name: "test-mod", Archived: true}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -321,7 +322,7 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
 		}
 
-		resp := UnarchiveModResult{ID: "mod-001", Name: "test-mod", Archived: false}
+		resp := UnarchiveModResult{ID: types.ModID("mod-001"), Name: "test-mod", Archived: false}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -356,7 +357,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /specs, got %s", r.URL.Path)
 		}
 
-		resp := SetModSpecResult{ID: "spec-001", CreatedAt: "2024-01-01T00:00:00Z"}
+		resp := SetModSpecResult{ID: types.SpecID("spec-001"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(resp)
@@ -376,8 +377,8 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error: %v", err)
 	}
-	if result.ID != "spec-001" {
-		t.Errorf("got ID %q, want %q", result.ID, "spec-001")
+	if result.ID.String() != "spec-001" {
+		t.Errorf("got ID %q, want %q", result.ID.String(), "spec-001")
 	}
 }
 
@@ -451,4 +452,8 @@ func TestResolveModByNameNoHeuristic(t *testing.T) {
 func jsonRawPtr(data []byte) *json.RawMessage {
 	raw := json.RawMessage(data)
 	return &raw
+}
+
+func specIDPtr(v types.SpecID) *types.SpecID {
+	return &v
 }

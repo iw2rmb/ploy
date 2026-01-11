@@ -6,14 +6,12 @@
 package mods
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -21,9 +19,9 @@ import (
 
 // DiffEntry represents a single diff record from the list diffs response.
 type DiffEntry struct {
-	ID        string                  `json:"id"`
+	ID        domaintypes.DiffID      `json:"id"`
 	JobID     domaintypes.JobID       `json:"job_id"`
-	CreatedAt string                  `json:"created_at"`
+	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
 	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
 }
@@ -38,7 +36,7 @@ type ListRunRepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  string            // Repo ID (NanoID-backed string)
+	RepoID  domaintypes.ModRepoID
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
@@ -53,12 +51,12 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("list run repo diffs: run id required")
 	}
-	if strings.TrimSpace(c.RepoID) == "" {
+	if c.RepoID.IsZero() {
 		return nil, fmt.Errorf("list run repo diffs: repo id required")
 	}
 
 	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID), "diffs")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID.String()), "diffs")
 	if err != nil {
 		return nil, fmt.Errorf("list run repo diffs: build url: %w", err)
 	}
@@ -96,8 +94,8 @@ type DownloadDiffCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  string            // Repo ID (NanoID-backed string)
-	DiffID  string            // Diff ID (UUID string)
+	RepoID  domaintypes.ModRepoID
+	DiffID  domaintypes.DiffID
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
@@ -112,21 +110,21 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("download diff: run id required")
 	}
-	if strings.TrimSpace(c.RepoID) == "" {
+	if c.RepoID.IsZero() {
 		return nil, fmt.Errorf("download diff: repo id required")
 	}
-	if strings.TrimSpace(c.DiffID) == "" {
+	if c.DiffID.IsZero() {
 		return nil, fmt.Errorf("download diff: diff id required")
 	}
 
 	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID), "diffs")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID.String()), "diffs")
 	if err != nil {
 		return nil, fmt.Errorf("download diff: build url: %w", err)
 	}
 	q := url.Values{}
 	q.Set("download", "true")
-	q.Set("diff_id", strings.TrimSpace(c.DiffID))
+	q.Set("diff_id", c.DiffID.String())
 	endpoint += "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -144,37 +142,10 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 		return nil, decodeHTTPError(resp, "download diff")
 	}
 
-	// Read the gzipped response body.
-	gzData, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxDownloadBodyBytes))
+	patch, err := httpx.GunzipToBytes(io.LimitReader(resp.Body, httpx.MaxDownloadBodyBytes), httpx.MaxGunzipOutputBytes)
 	if err != nil {
-		return nil, fmt.Errorf("download diff: read body: %w", err)
-	}
-
-	// Decompress the gzipped patch.
-	patch, err := decompressGzipBytes(gzData)
-	if err != nil {
-		return nil, fmt.Errorf("download diff: decompress: %w", err)
+		return nil, fmt.Errorf("download diff: gunzip: %w", err)
 	}
 
 	return patch, nil
-}
-
-// decompressGzipBytes decompresses gzipped bytes and returns the plaintext content.
-func decompressGzipBytes(data []byte) ([]byte, error) {
-	if len(data) == 0 {
-		return []byte{}, nil
-	}
-
-	reader, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("gzip reader: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
-
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, reader); err != nil {
-		return nil, fmt.Errorf("gzip decompress: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }

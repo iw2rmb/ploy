@@ -18,19 +18,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ModRepoSummary represents a repo in a mod's repo set.
 // Matches the server response shape from internal/server/handlers/mods_repos.go.
 type ModRepoSummary struct {
-	ID        string `json:"id"`
-	ModID     string `json:"mod_id"`
-	RepoURL   string `json:"repo_url"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
-	CreatedAt string `json:"created_at"`
+	ID        domaintypes.ModRepoID `json:"id"`
+	ModID     domaintypes.ModID     `json:"mod_id"`
+	RepoURL   string                `json:"repo_url"`
+	BaseRef   domaintypes.GitRef    `json:"base_ref"`
+	TargetRef domaintypes.GitRef    `json:"target_ref"`
+	CreatedAt time.Time             `json:"created_at"`
 }
 
 // AddModRepoCommand adds a repo to a mod's repo set.
@@ -39,10 +41,10 @@ type ModRepoSummary struct {
 type AddModRepoCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	ModID     string // Required: mod ID or name.
-	RepoURL   string // Required: git repository URL.
-	BaseRef   string // Required: base git ref.
-	TargetRef string // Required: target git ref.
+	ModRef    domaintypes.ModRef // Required: mod ID or name.
+	RepoURL   string             // Required: git repository URL.
+	BaseRef   string             // Required: base git ref.
+	TargetRef string             // Required: target git ref.
 }
 
 // Run executes POST /v1/mods/{mod_id}/repos to add a repo.
@@ -53,28 +55,31 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	if c.BaseURL == nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: mod id is required")
 	}
-	if strings.TrimSpace(c.RepoURL) == "" {
+	repoURL := domaintypes.RepoURL(strings.TrimSpace(c.RepoURL))
+	if err := repoURL.Validate(); err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: repo url is required")
 	}
-	if strings.TrimSpace(c.BaseRef) == "" {
+	baseRef := domaintypes.GitRef(strings.TrimSpace(c.BaseRef))
+	if err := baseRef.Validate(); err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: base ref is required")
 	}
-	if strings.TrimSpace(c.TargetRef) == "" {
+	targetRef := domaintypes.GitRef(strings.TrimSpace(c.TargetRef))
+	if err := targetRef.Validate(); err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: target ref is required")
 	}
 
 	// Build request payload with repo_url, base_ref, and target_ref.
 	req := struct {
-		RepoURL   string `json:"repo_url"`
-		BaseRef   string `json:"base_ref"`
-		TargetRef string `json:"target_ref"`
+		RepoURL   domaintypes.RepoURL `json:"repo_url"`
+		BaseRef   domaintypes.GitRef  `json:"base_ref"`
+		TargetRef domaintypes.GitRef  `json:"target_ref"`
 	}{
-		RepoURL:   strings.TrimSpace(c.RepoURL),
-		BaseRef:   strings.TrimSpace(c.BaseRef),
-		TargetRef: strings.TrimSpace(c.TargetRef),
+		RepoURL:   repoURL,
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
 	}
 
 	payload, err := json.Marshal(req)
@@ -83,7 +88,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	}
 
 	// POST /v1/mods/{mod_id}/repos
-	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mod repo add: build request: %w", err)
@@ -114,7 +119,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 type ListModReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name.
+	ModRef  domaintypes.ModRef // Required: mod ID or name.
 }
 
 // Run executes GET /v1/mods/{mod_id}/repos to list repos.
@@ -125,12 +130,12 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("mod repo list: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return nil, fmt.Errorf("mod repo list: mod id is required")
 	}
 
 	// GET /v1/mods/{mod_id}/repos
-	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("mod repo list: build request: %w", err)
@@ -163,8 +168,8 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 type RemoveModRepoCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name.
-	RepoID  string // Required: repo ID to delete.
+	ModRef  domaintypes.ModRef // Required: mod ID or name.
+	RepoID  domaintypes.ModRepoID
 }
 
 // Run executes DELETE /v1/mods/{mod_id}/repos/{repo_id} to delete a repo.
@@ -175,10 +180,10 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return fmt.Errorf("mod repo remove: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return fmt.Errorf("mod repo remove: mod id is required")
 	}
-	if strings.TrimSpace(c.RepoID) == "" {
+	if c.RepoID.IsZero() {
 		return fmt.Errorf("mod repo remove: repo id is required")
 	}
 
@@ -186,9 +191,9 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 	endpoint := c.BaseURL.JoinPath(
 		"v1",
 		"mods",
-		url.PathEscape(strings.TrimSpace(c.ModID)),
+		c.ModRef.String(),
 		"repos",
-		url.PathEscape(strings.TrimSpace(c.RepoID)),
+		c.RepoID.String(),
 	)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
@@ -215,8 +220,8 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 type ImportModReposCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModID   string // Required: mod ID or name.
-	CSVData []byte // Required: CSV content with header: repo_url,base_ref,target_ref
+	ModRef  domaintypes.ModRef // Required: mod ID or name.
+	CSVData []byte             // Required: CSV content with header: repo_url,base_ref,target_ref
 }
 
 // ImportModReposResult contains the response from bulk importing repos.
@@ -241,7 +246,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	if c.BaseURL == nil {
 		return ImportModReposResult{}, fmt.Errorf("mod repo import: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return ImportModReposResult{}, fmt.Errorf("mod repo import: mod id is required")
 	}
 	if len(c.CSVData) == 0 {
@@ -249,7 +254,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	}
 
 	// POST /v1/mods/{mod_id}/repos/bulk with Content-Type: text/csv
-	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "repos", "bulk")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "repos", "bulk")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(c.CSVData))
 	if err != nil {
 		return ImportModReposResult{}, fmt.Errorf("mod repo import: build request: %w", err)

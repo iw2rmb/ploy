@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -27,12 +28,12 @@ import (
 // ModSummary represents a mod project returned by the server.
 // Matches the server response shape from internal/server/handlers/mods.go.
 type ModSummary struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	SpecID    *string `json:"spec_id,omitempty"`
-	CreatedBy *string `json:"created_by,omitempty"`
-	Archived  bool    `json:"archived"`
-	CreatedAt string  `json:"created_at"`
+	ID        types.ModID   `json:"id"`
+	Name      string        `json:"name"`
+	SpecID    *types.SpecID `json:"spec_id,omitempty"`
+	CreatedBy *string       `json:"created_by,omitempty"`
+	Archived  bool          `json:"archived"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 // AddModCommand creates a new mod project.
@@ -48,10 +49,10 @@ type AddModCommand struct {
 
 // AddModResult contains the response from creating a mod.
 type AddModResult struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	SpecID    *string `json:"spec_id,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID        types.ModID   `json:"id"`
+	Name      string        `json:"name"`
+	SpecID    *types.SpecID `json:"spec_id,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 // Run executes POST /v1/mods to create a mod project.
@@ -230,9 +231,9 @@ type ArchiveModCommand struct {
 
 // ArchiveModResult contains the response from archiving a mod.
 type ArchiveModResult struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Archived bool   `json:"archived"`
+	ID       types.ModID `json:"id"`
+	Name     string      `json:"name"`
+	Archived bool        `json:"archived"`
 }
 
 // Run executes PATCH /v1/mods/{mod_ref}/archive to archive a mod.
@@ -282,9 +283,9 @@ type UnarchiveModCommand struct {
 
 // UnarchiveModResult contains the response from unarchiving a mod.
 type UnarchiveModResult struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Archived bool   `json:"archived"`
+	ID       types.ModID `json:"id"`
+	Name     string      `json:"name"`
+	Archived bool        `json:"archived"`
 }
 
 // Run executes PATCH /v1/mods/{mod_ref}/unarchive to unarchive a mod.
@@ -337,8 +338,8 @@ type SetModSpecCommand struct {
 
 // SetModSpecResult contains the response from setting a mod spec.
 type SetModSpecResult struct {
-	ID        string `json:"id"` // spec_id
-	CreatedAt string `json:"created_at"`
+	ID        types.SpecID `json:"id"` // spec_id
+	CreatedAt time.Time    `json:"created_at"`
 }
 
 // Run executes POST /v1/mods/{mod_ref}/specs to set the mod's spec.
@@ -452,7 +453,7 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 		// No exact match; the reference might be an ID, pass it through.
 		return ref, nil
 	case 1:
-		return matches[0].ID, nil
+		return matches[0].ID.String(), nil
 	default:
 		// Multiple exact matches should not happen (name is unique), but handle gracefully.
 		return "", fmt.Errorf("resolve mod: multiple mods found with name %q", ref)
