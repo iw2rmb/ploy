@@ -12,6 +12,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/segmentio/ksuid"
 )
 
 // RunID identifies a run instance (workflow execution).
@@ -180,18 +182,72 @@ func (v *StepIndex) UnmarshalJSON(b []byte) error {
 // JSON helpers for each ID type. Using small helpers avoids duplication while
 // keeping explicit method sets for clarity and future extension.
 
+var (
+	ErrInvalidRunID     = errors.New("invalid run id")
+	ErrInvalidJobID     = errors.New("invalid job id")
+	ErrInvalidNodeID    = errors.New("invalid node id")
+	ErrInvalidModID     = errors.New("invalid mod id")
+	ErrInvalidSpecID    = errors.New("invalid spec id")
+	ErrInvalidModRepoID = errors.New("invalid mod repo id")
+)
+
+var nanoIDAlphabetTable = func() [256]bool {
+	var t [256]bool
+	for i := 0; i < len(alphabet); i++ {
+		t[alphabet[i]] = true
+	}
+	return t
+}()
+
+func validateKSUID(s string, errInvalid error) error {
+	if _, err := ksuid.Parse(s); err != nil {
+		return errInvalid
+	}
+	return nil
+}
+
+func validateNanoID(s string, length int, errInvalid error) error {
+	if len(s) != length {
+		return errInvalid
+	}
+	for i := 0; i < len(s); i++ {
+		if !nanoIDAlphabetTable[s[i]] {
+			return errInvalid
+		}
+	}
+	return nil
+}
+
 func marshalIDText[S ~string](v S) ([]byte, error) {
+	return marshalIDTextValidated(v, nil)
+}
+
+func marshalIDTextValidated[S ~string](v S, validate func(string) error) ([]byte, error) {
 	s := Normalize(string(v))
 	if IsEmpty(s) {
 		return nil, ErrEmpty
+	}
+	if validate != nil {
+		if err := validate(s); err != nil {
+			return nil, err
+		}
 	}
 	return []byte(s), nil
 }
 
 func unmarshalIDText[S ~string](dst *S, b []byte) error {
+	return unmarshalIDTextValidated(dst, b, nil)
+}
+
+func unmarshalIDTextValidated[S ~string](dst *S, b []byte, validate func(string) error) error {
 	s := Normalize(string(b))
 	if IsEmpty(s) {
 		return ErrEmpty
+	}
+	if validate != nil {
+		if err := validate(s); err != nil {
+			return err
+		}
 	}
 	*dst = S(s)
 	return nil
@@ -204,8 +260,10 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*RunID)(nil)
 
-func (v RunID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *RunID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateRunID(s string) error { return validateKSUID(s, ErrInvalidRunID) }
+
+func (v RunID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateRunID) }
+func (v *RunID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateRunID) }
 func (v RunID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *RunID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
@@ -224,8 +282,10 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*JobID)(nil)
 
-func (v JobID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *JobID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateJobID(s string) error { return validateKSUID(s, ErrInvalidJobID) }
+
+func (v JobID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateJobID) }
+func (v *JobID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateJobID) }
 func (v JobID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *JobID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
@@ -244,8 +304,10 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*NodeID)(nil)
 
-func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateNodeID(s string) error { return validateNanoID(s, 6, ErrInvalidNodeID) }
+
+func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateNodeID) }
+func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateNodeID) }
 func (v NodeID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *NodeID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
@@ -256,8 +318,10 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*ModID)(nil)
 
-func (v ModID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *ModID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateModID(s string) error { return validateNanoID(s, 6, ErrInvalidModID) }
+
+func (v ModID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateModID) }
+func (v *ModID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateModID) }
 func (v ModID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *ModID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
@@ -268,8 +332,10 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*SpecID)(nil)
 
-func (v SpecID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *SpecID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateSpecID(s string) error { return validateNanoID(s, 8, ErrInvalidSpecID) }
+
+func (v SpecID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateSpecID) }
+func (v *SpecID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateSpecID) }
 func (v SpecID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *SpecID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
@@ -280,8 +346,12 @@ var _ interface {
 	encoding.TextUnmarshaler
 } = (*ModRepoID)(nil)
 
-func (v ModRepoID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *ModRepoID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func validateModRepoID(s string) error { return validateNanoID(s, 8, ErrInvalidModRepoID) }
+
+func (v ModRepoID) MarshalText() ([]byte, error) { return marshalIDTextValidated(v, validateModRepoID) }
+func (v *ModRepoID) UnmarshalText(b []byte) error {
+	return unmarshalIDTextValidated(v, b, validateModRepoID)
+}
 func (v ModRepoID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *ModRepoID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 

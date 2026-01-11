@@ -45,8 +45,9 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		}
 
 		// Validate node_id.
-		if req.NodeID == "" {
-			http.Error(w, "node_id is required", http.StatusBadRequest)
+		var nodeID domaintypes.NodeID
+		if err := nodeID.UnmarshalText([]byte(req.NodeID)); err != nil {
+			http.Error(w, "invalid node_id", http.StatusBadRequest)
 			return
 		}
 
@@ -66,7 +67,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Generate bootstrap token.
 		now := time.Now()
 		expiresAt := now.Add(time.Duration(req.ExpiresInMinutes) * time.Minute)
-		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, req.NodeID, expiresAt)
+		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, nodeID, expiresAt)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate token: %v", err), http.StatusInternalServerError)
 			slog.Error("create bootstrap token: generation failed", "err", err)
@@ -89,13 +90,6 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		var issuedBy *string
 		if identity, ok := auth.IdentityFromContext(r.Context()); ok {
 			issuedBy = &identity.CommonName
-		}
-
-		// Validate node_id is non-empty.
-		nodeID := domaintypes.NodeID(strings.TrimSpace(req.NodeID))
-		if nodeID.IsZero() {
-			http.Error(w, "invalid node_id: must be a non-empty string", http.StatusBadRequest)
-			return
 		}
 
 		// Store token in database.
@@ -121,7 +115,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			ExpiresAt time.Time `json:"expires_at"`
 		}{
 			Token:     token,
-			NodeID:    req.NodeID,
+			NodeID:    nodeID.String(),
 			ExpiresAt: expiresAt,
 		}
 
@@ -133,7 +127,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 
 		slog.Info("bootstrap token created",
 			"token_id", claims.ID,
-			"node_id", req.NodeID,
+			"node_id", nodeID.String(),
 			"expires_at", expiresAt,
 			"issued_by", issuedBy,
 		)
@@ -235,7 +229,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		}
 
 		// Verify CSR CN matches token's node_id.
-		expectedCN := "node:" + claims.NodeID
+		expectedCN := "node:" + claims.NodeID.String()
 		if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
 			http.Error(w, "CSR subject common name must match node_id from token", http.StatusBadRequest)
 			slog.Warn("bootstrap certificate: CN mismatch",
@@ -267,10 +261,10 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		// Register node in database if it doesn't exist yet.
 		// Use the node_id from the bootstrap token and default values for other fields.
-		nodeID := domaintypes.NodeID(strings.TrimSpace(claims.NodeID))
+		nodeID := claims.NodeID
 		if nodeID.IsZero() {
 			http.Error(w, "invalid node_id in token", http.StatusInternalServerError)
-			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID)
+			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID.String())
 			return
 		}
 
@@ -289,10 +283,10 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to register node: %v", err), http.StatusInternalServerError)
-				slog.Error("bootstrap certificate: failed to register node", "node_id", claims.NodeID, "err", err)
+				slog.Error("bootstrap certificate: failed to register node", "node_id", claims.NodeID.String(), "err", err)
 				return
 			}
-			slog.Info("node registered", "node_id", claims.NodeID)
+			slog.Info("node registered", "node_id", claims.NodeID.String())
 		}
 
 		// Mark bootstrap token as used.
@@ -361,7 +355,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		slog.Info("bootstrap certificate issued",
 			"token_id", claims.ID,
-			"node_id", claims.NodeID,
+			"node_id", claims.NodeID.String(),
 			"serial", cert.Serial,
 			"fingerprint", cert.Fingerprint,
 			"not_before", cert.NotBefore.Format(time.RFC3339),
