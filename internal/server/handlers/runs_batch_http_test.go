@@ -20,12 +20,14 @@ func TestListRunsHandler_Success(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	runIDStr := runID.String()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
 	st := &mockStore{
 		listRunsResult: []store.Run{
 			{
 				ID:        runID,
-				ModID:     "mod_1",
-				SpecID:    "spec_1",
+				ModID:     modID,
+				SpecID:    specID,
 				Status:    store.RunStatusStarted,
 				CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},
@@ -60,11 +62,13 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	runIDStr := runID.String()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     "mod_1",
-			SpecID:    "spec_1",
+			ModID:     modID,
+			SpecID:    specID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
@@ -103,21 +107,24 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	runIDStr := runID.String()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
 	queuedRepoID := domaintypes.NewModRepoID()
 	runningRepoID := domaintypes.NewModRepoID()
+	doneRepoID := domaintypes.NewModRepoID()
 
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     "mod_1",
-			SpecID:    "spec_1",
+			ModID:     modID,
+			SpecID:    specID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		listRunReposByRunResult: []store.RunRepo{
 			{RunID: runID, RepoID: queuedRepoID, Status: store.RunRepoStatusQueued},
 			{RunID: runID, RepoID: runningRepoID, Status: store.RunRepoStatusRunning},
-			{RunID: runID, RepoID: "repo_done", Status: store.RunRepoStatusSuccess},
+			{RunID: runID, RepoID: doneRepoID, Status: store.RunRepoStatusSuccess},
 		},
 		listJobsByRunResult: []store.Job{
 			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusCreated},
@@ -259,13 +266,15 @@ func TestListRunReposHandler_Success(t *testing.T) {
 func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
 	st := &mockStore{
 		getRunRepoErr: pgx.ErrNoRows,
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_1/repos/repo_1/cancel", nil)
-	req.SetPathValue("run_id", "run_1")
-	req.SetPathValue("repo_id", "repo_1")
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/cancel", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
 	rr := httptest.NewRecorder()
 
 	cancelRunRepoHandlerV1(st).ServeHTTP(rr, req)

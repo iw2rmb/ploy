@@ -395,6 +395,7 @@ func TestModRuns_Create_ModNotFound(t *testing.T) {
 	}
 	handler := createModRunHandler(st)
 
+	modID := domaintypes.NewModID().String()
 	reqBody := map[string]any{
 		"repo_selector": map[string]any{
 			"mode": "all",
@@ -402,8 +403,8 @@ func TestModRuns_Create_ModNotFound(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/nonexistent/runs", bytes.NewReader(body))
-	req.SetPathValue("mod_id", "nonexistent")
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID+"/runs", bytes.NewReader(body))
+	req.SetPathValue("mod_id", modID)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 

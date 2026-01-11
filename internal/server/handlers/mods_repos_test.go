@@ -27,34 +27,34 @@ func TestAddModRepoHandler(t *testing.T) {
 	}{
 		{
 			name:  "success - adds repo to mod",
-			modID: "mod-abc123",
+			modID: "mod123",
 			body: map[string]interface{}{
 				"repo_url":   "https://github.com/org/repo",
 				"base_ref":   "main",
 				"target_ref": "feature-branch",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name:  "success - normalizes repo URL",
-			modID: "mod-abc123",
+			modID: "mod123",
 			body: map[string]interface{}{
 				"repo_url":   "https://github.com/org/repo.git/",
 				"base_ref":   "main",
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantRepoURL: "https://github.com/org/repo",
 			wantStatus:  http.StatusCreated,
 		},
 		{
 			name:  "error - mod not found",
-			modID: "mod-notfound",
+			modID: "mod404",
 			body: map[string]interface{}{
 				"repo_url":   "https://github.com/org/repo",
 				"base_ref":   "main",
@@ -68,7 +68,7 @@ func TestAddModRepoHandler(t *testing.T) {
 		},
 		{
 			name:  "error - archived mod",
-			modID: "mod-archived",
+			modID: "modarc",
 			body: map[string]interface{}{
 				"repo_url":   "https://github.com/org/repo",
 				"base_ref":   "main",
@@ -76,7 +76,7 @@ func TestAddModRepoHandler(t *testing.T) {
 			},
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mod{
-					ID:         "mod-archived",
+					ID:         "modarc",
 					Name:       "archived-mod",
 					ArchivedAt: pgtype.Timestamptz{Valid: true},
 				}
@@ -86,40 +86,40 @@ func TestAddModRepoHandler(t *testing.T) {
 		},
 		{
 			name:  "error - missing repo_url",
-			modID: "mod-abc123",
+			modID: "mod123",
 			body: map[string]interface{}{
 				"base_ref":   "main",
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "repo_url is required",
 		},
 		{
 			name:  "error - missing base_ref",
-			modID: "mod-abc123",
+			modID: "mod123",
 			body: map[string]interface{}{
 				"repo_url":   "https://github.com/org/repo",
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "base_ref is required",
 		},
 		{
 			name:  "error - invalid repo_url scheme",
-			modID: "mod-abc123",
+			modID: "mod123",
 			body: map[string]interface{}{
 				"repo_url":   "ftp://invalid.com/repo",
 				"base_ref":   "main",
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "repo_url",
@@ -172,12 +172,12 @@ func TestListModReposHandler(t *testing.T) {
 	}{
 		{
 			name:  "success - lists repos",
-			modID: "mod-abc123",
+			modID: "mod123",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.listModReposByModResult = []store.ModRepo{
-					{ID: "repo-1", ModID: "mod-abc123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo-2", ModID: "mod-abc123", RepoUrl: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
+					{ID: "repo0001", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo0002", ModID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -185,9 +185,9 @@ func TestListModReposHandler(t *testing.T) {
 		},
 		{
 			name:  "success - empty list",
-			modID: "mod-abc123",
+			modID: "mod123",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.listModReposByModResult = []store.ModRepo{}
 			},
 			wantStatus: http.StatusOK,
@@ -195,7 +195,7 @@ func TestListModReposHandler(t *testing.T) {
 		},
 		{
 			name:  "error - mod not found",
-			modID: "mod-notfound",
+			modID: "mod404",
 			setupMock: func(m *mockStore) {
 				m.getModErr = pgx.ErrNoRows
 			},
@@ -253,19 +253,19 @@ func TestDeleteModRepoHandler(t *testing.T) {
 	}{
 		{
 			name:   "success - deletes repo",
-			modID:  "mod-abc123",
-			repoID: "repo-xyz789",
+			modID:  "mod123",
+			repoID: "repoX789",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repo-xyz789", ModID: "mod-abc123"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.ModRepo{ID: "repoX789", ModID: "mod123"}
 				m.hasModRepoHistoryResult = false
 			},
 			wantStatus: http.StatusNoContent,
 		},
 		{
 			name:   "error - mod not found",
-			modID:  "mod-notfound",
-			repoID: "repo-xyz789",
+			modID:  "mod404",
+			repoID: "repoX789",
 			setupMock: func(m *mockStore) {
 				m.getModErr = pgx.ErrNoRows
 			},
@@ -274,10 +274,10 @@ func TestDeleteModRepoHandler(t *testing.T) {
 		},
 		{
 			name:   "error - repo not found",
-			modID:  "mod-abc123",
-			repoID: "repo-notfound",
+			modID:  "mod123",
+			repoID: "repo4040",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.getModRepoErr = pgx.ErrNoRows
 			},
 			wantStatus:     http.StatusNotFound,
@@ -285,22 +285,22 @@ func TestDeleteModRepoHandler(t *testing.T) {
 		},
 		{
 			name:   "error - repo belongs to different mod",
-			modID:  "mod-abc123",
-			repoID: "repo-other",
+			modID:  "mod123",
+			repoID: "repo0003",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repo-other", ModID: "mod-different"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.ModRepo{ID: "repo0003", ModID: "moddif"}
 			},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo does not belong to this mod",
 		},
 		{
 			name:   "error - repo has historical executions",
-			modID:  "mod-abc123",
-			repoID: "repo-with-history",
+			modID:  "mod123",
+			repoID: "repohist",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repo-with-history", ModID: "mod-abc123"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.ModRepo{ID: "repohist", ModID: "mod123"}
 				m.hasModRepoHistoryResult = true
 			},
 			wantStatus:     http.StatusConflict,
@@ -350,13 +350,13 @@ func TestBulkUpsertModReposHandler(t *testing.T) {
 	}{
 		{
 			name:        "success - creates new repos",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo1,main,feature1
 https://github.com/org/repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				// GetModRepoByURL returns not found (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
@@ -367,16 +367,16 @@ https://github.com/org/repo2,develop,feature2`,
 		},
 		{
 			name:        "success - updates existing repos",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/existing,main,new-feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				// GetModRepoByURL returns existing repo (update case).
 				m.getModRepoByURLResult = store.ModRepo{
-					ID:    "repo-existing",
-					ModID: "mod-abc123",
+					ID:    "repoexst",
+					ModID: "mod123",
 				}
 			},
 			wantStatus:  http.StatusOK,
@@ -386,13 +386,13 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:        "success - processes multiple repos (all new)",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/new-repo1,main,feature1
 https://github.com/org/new-repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				// GetModRepoByURL returns not found for all (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
@@ -403,12 +403,12 @@ https://github.com/org/new-repo2,develop,feature2`,
 		},
 		{
 			name:        "success - parses quoted fields and unicode",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: "repo_url,base_ref,target_ref\n" +
 				"\"https://github.com/org/привет\",\"main\",\"feature\"\"one\"",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -418,12 +418,12 @@ https://github.com/org/new-repo2,develop,feature2`,
 		},
 		{
 			name:        "success - normalizes repo URL before upsert",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo.git/,main,feature",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			verify: func(t *testing.T, m *mockStore) {
@@ -448,18 +448,18 @@ https://github.com/org/new-repo2,develop,feature2`,
 		},
 		{
 			name:        "error - wrong content type",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "application/json",
 			body:        `{}`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "Content-Type must be text/csv",
 		},
 		{
 			name:        "error - mod not found",
-			modID:       "mod-notfound",
+			modID:       "mod404",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo,main,feature`,
@@ -471,13 +471,13 @@ https://github.com/org/repo,main,feature`,
 		},
 		{
 			name:        "error - archived mod",
-			modID:       "mod-archived",
+			modID:       "modarc",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo,main,feature`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mod{
-					ID:         "mod-archived",
+					ID:         "modarc",
 					Name:       "archived-mod",
 					ArchivedAt: pgtype.Timestamptz{Valid: true},
 				}
@@ -487,25 +487,25 @@ https://github.com/org/repo,main,feature`,
 		},
 		{
 			name:        "error - invalid header",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `wrong,headers,here
 https://github.com/org/repo,main,feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "CSV header must be",
 		},
 		{
 			name:        "partial success - invalid repo_url on one line",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/good-repo,main,feature1
 ftp://invalid.com/bad-repo,main,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -515,12 +515,12 @@ ftp://invalid.com/bad-repo,main,feature2`,
 		},
 		{
 			name:        "partial success - missing fields",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo,,feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusOK,
 			wantCreated:    0,
@@ -530,12 +530,12 @@ https://github.com/org/repo,,feature`,
 		},
 		{
 			name:        "partial success - strict CSV parse error",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo,main,\"unterminated",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 0,
@@ -544,12 +544,12 @@ https://github.com/org/repo,,feature`,
 		},
 		{
 			name:        "partial success - store lookup error is a per-line failure",
-			modID:       "mod-abc123",
+			modID:       "mod123",
 			contentType: "text/csv",
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo,main,feature",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod-abc123", Name: "test-mod"}
+				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = errors.New("db down")
 			},
 			verify: func(t *testing.T, m *mockStore) {
