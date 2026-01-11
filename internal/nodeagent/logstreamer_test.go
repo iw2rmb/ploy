@@ -50,7 +50,9 @@ func TestLogStreamer_Write(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: "http://localhost:8443",
 			}
-			ls := NewLogStreamer(cfg, "run-123", "job-456")
+			runID := domaintypes.NewRunID().String()
+			jobID := domaintypes.NewJobID().String()
+			ls := NewLogStreamer(cfg, runID, jobID)
 			defer func() { _ = ls.Close() }()
 
 			n, err := ls.Write([]byte(tt.input))
@@ -75,7 +77,8 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	ls := NewLogStreamer(cfg, "run-123", "")
+	runID := domaintypes.NewRunID().String()
+	ls := NewLogStreamer(cfg, runID, "")
 	defer func() { _ = ls.Close() }()
 
 	// Generate data that will compress to over 1 MiB.
@@ -141,7 +144,8 @@ func TestLogStreamer_Close(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	ls := NewLogStreamer(cfg, "run-123", "")
+	runID := domaintypes.NewRunID().String()
+	ls := NewLogStreamer(cfg, runID, "")
 
 	// Write some data.
 	_, err := ls.Write([]byte("test log\n"))
@@ -171,7 +175,8 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	ls := NewLogStreamer(cfg, "run-123", "")
+	runID := domaintypes.NewRunID().String()
+	ls := NewLogStreamer(cfg, runID, "")
 	defer func() { _ = ls.Close() }()
 
 	// Write a small amount of data.
@@ -204,7 +209,8 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	ls := NewLogStreamer(cfg, "run-123", "")
+	runID := domaintypes.NewRunID().String()
+	ls := NewLogStreamer(cfg, runID, "")
 	defer func() { _ = ls.Close() }()
 
 	// Verify initial chunk number is 0.
@@ -245,6 +251,9 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 		Data    []byte            `json:"data"`
 	}
 
+	runID := domaintypes.NewRunID().String()
+	jobID := domaintypes.NewJobID().String()
+
 	tests := []struct {
 		name       string
 		jobID      string
@@ -253,9 +262,9 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 	}{
 		{
 			name:       "with job_id",
-			jobID:      "job-abc123",
+			jobID:      jobID,
 			wantJobID:  true,
-			wantJobIDV: "job-abc123",
+			wantJobIDV: jobID,
 		},
 		{
 			name:       "without job_id (empty string)",
@@ -316,7 +325,7 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: server.URL,
 			}
-			ls := NewLogStreamer(cfg, "run-xyz789", tt.jobID)
+			ls := NewLogStreamer(cfg, runID, tt.jobID)
 
 			// Write some data to the log streamer.
 			_, err := ls.Write([]byte("test log line for job_id verification\n"))
@@ -354,8 +363,8 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 			}
 
 			// Verify run_id is always present.
-			if string(payload.RunID) != "run-xyz789" {
-				t.Errorf("run_id = %q, want %q", payload.RunID, "run-xyz789")
+			if string(payload.RunID) != runID {
+				t.Errorf("run_id = %q, want %q", payload.RunID, runID)
 			}
 		})
 	}
