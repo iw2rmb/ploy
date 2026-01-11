@@ -95,14 +95,14 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect POST /v1/runs/{id}/repos
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos" {
 			called = true
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				RunID:     "2NxO0FEXAMPLE4Rn",
+				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   receivedBody["repo_url"],
 				BaseRef:   receivedBody["base_ref"],
@@ -127,7 +127,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
 		"--target-ref", "feature-branch",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo add error: %v", err)
@@ -166,7 +166,7 @@ func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 		"--repo-url", "http://github.com/org/repo.git",
 		"--base-ref", "main",
 		"--target-ref", "feature-branch",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -186,13 +186,13 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect POST /v1/runs/{id}/repos/{repo_id}/cancel
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/cancel" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/cancel" {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				RunID:     "2NxO0FEXAMPLE4Rn",
+				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
@@ -215,7 +215,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	err := executeCmd([]string{
 		"mod", "run", "repo", "remove",
 		"--repo-id", "a1b2c3d4",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo remove error: %v", err)
@@ -233,14 +233,14 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect POST /v1/runs/{id}/repos/{repo_id}/restart
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/restart" {
 			called = true
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				RunID:     "2NxO0FEXAMPLE4Rn",
+				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
@@ -264,7 +264,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"--target-ref", "feature-branch-v2",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)
@@ -285,14 +285,14 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Expect GET /v1/runs/{id}/repos
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos" {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			repos := []runRepoResponse{
 				{
-					RunID:     "2NxO0FEXAMPLE4Rn",
+					RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 					RepoID:    "e5f6g7h8", // mod_repos.id (NanoID, 8 chars)
 					RepoURL:   "https://github.com/org/repo1.git",
 					BaseRef:   "main",
@@ -302,7 +302,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 					CreatedAt: time.Now(),
 				},
 				{
-					RunID:     "2NxO0FEXAMPLE4Rn",
+					RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 					RepoID:    "i9j0k1l2", // mod_repos.id (NanoID, 8 chars)
 					RepoURL:   "https://github.com/org/repo2.git",
 					BaseRef:   "main",
@@ -325,7 +325,7 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mod", "run", "repo", "status", "2NxO0FEXAMPLE4Rn"}, buf)
+	err := executeCmd([]string{"mod", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo status error: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestModRunRepoStatusEmptyBatch(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoAddServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos" {
 			http.Error(w, "run not found", http.StatusNotFound)
 			return
 		}
@@ -385,7 +385,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 		"--repo-url", "https://github.com/org/repo.git",
 		"--base-ref", "main",
 		"--target-ref", "feature-branch",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
@@ -404,7 +404,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRemoveServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/cancel" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/cancel" {
 			http.Error(w, "repo not found", http.StatusNotFound)
 			return
 		}
@@ -418,7 +418,7 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 	err := executeCmd([]string{
 		"mod", "run", "repo", "remove",
 		"--repo-id", "a1b2c3d4",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
@@ -432,7 +432,7 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRestartServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/restart" {
 			// Conflict: cannot restart a non-terminal repo.
 			http.Error(w, "can only restart repos in terminal state", http.StatusConflict)
 			return
@@ -447,7 +447,7 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	err := executeCmd([]string{
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err == nil {
 		t.Fatal("expected error for 409 response")
@@ -487,13 +487,13 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/restart" {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				RunID:     "2NxO0FEXAMPLE4Rn",
+				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
@@ -516,7 +516,7 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 		"mod", "run", "repo", "restart",
 		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)
@@ -534,13 +534,13 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2NxO0FEXAMPLE4Rn/repos/a1b2c3d4/restart" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/restart" {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
-				RunID:     "2NxO0FEXAMPLE4Rn",
+				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
@@ -564,7 +564,7 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 		"--repo-id", "a1b2c3d4",
 		"--base-ref", "main-v2",
 		"--target-ref", "feature-v2",
-		"2NxO0FEXAMPLE4Rn",
+		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
 		t.Fatalf("mod run repo restart error: %v", err)

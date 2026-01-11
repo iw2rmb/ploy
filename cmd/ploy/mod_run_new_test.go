@@ -17,6 +17,9 @@ import (
 
 func TestExecuteModRunSubmitsRun(t *testing.T) {
 	var received modsapi.RunSubmitRequest
+	runID := domaintypes.NewRunID().String()
+	modID := domaintypes.NewModID().String()
+	specID := domaintypes.NewSpecID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
@@ -29,13 +32,13 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: "mods-server-123", ModID: "m1", SpecID: "s1"}); err != nil {
+			}{RunID: runID, ModID: modID, SpecID: specID}); err != nil {
 				t.Fatalf("encode response: %v", err)
 			}
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/mods-server-123/status":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-				RunID: domaintypes.RunID("mods-server-123"),
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStatePending,
 			})
 		default:
@@ -75,13 +78,14 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 		t.Fatalf("expected non-empty spec payload")
 	}
 	output := buf.String()
-	if !strings.Contains(output, "Mods run mods-server-123 submitted") {
+	if !strings.Contains(output, "Mods run "+runID+" submitted") {
 		t.Fatalf("unexpected output: %s", output)
 	}
 }
 
 func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 	var received modsapi.RunSubmitRequest
+	runID := domaintypes.NewRunID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
@@ -91,11 +95,11 @@ func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: "mods-abc123", ModID: "m2", SpecID: "s2"})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/mods-abc123/status":
+			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-				RunID: domaintypes.RunID("mods-abc123"),
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStatePending,
 			})
 		default:
@@ -117,6 +121,7 @@ func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 
 func TestExecuteModRunGitLabFlags(t *testing.T) {
 	var received modsapi.RunSubmitRequest
+	runID := domaintypes.NewRunID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
@@ -128,11 +133,11 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: "mods-gitlab-test", ModID: "m3", SpecID: "s3"})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/mods-gitlab-test/status":
+			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-				RunID: domaintypes.RunID("mods-gitlab-test"),
+				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStatePending,
 			})
 		default:

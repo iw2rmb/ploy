@@ -20,8 +20,11 @@ import (
 func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	t.Helper()
 
-	runID := "mods-follow-test"
+	runID := domaintypes.NewRunID().String()
 	artifactCID := "bafy-artifact-test"
+	stageID := domaintypes.NewJobID()
+	artifactID := "11111111-1111-1111-1111-111111111111"
+	artifactDigest := "sha256:deadbeef" + strings.Repeat("0", 56)
 
 	// Minimal control-plane emulator.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +38,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: "m1", SpecID: "s1"})
+			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream: run running -> run succeeded
@@ -73,7 +76,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
 				Stages: map[domaintypes.JobID]modsapi.StageStatus{
-					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
+					stageID: {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
 				},
 			})
 
@@ -82,9 +85,9 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				t.Fatalf("unexpected artifact lookup cid: %q", q)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"artifacts":[{"id":"artifact-1","cid":"` + artifactCID + `","digest":"sha256:deadbeef","name":"plan-diff.tar.gz","size":10}]}`))
+			_, _ = w.Write([]byte(`{"artifacts":[{"id":"` + artifactID + `","cid":"` + artifactCID + `","digest":"` + artifactDigest + `","name":"plan-diff.tar.gz","size":10}]}`))
 
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/artifacts/artifact-1"):
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/artifacts/"+artifactID):
 			// Download bytes
 			_, _ = w.Write([]byte("artifact-bytes"))
 
@@ -153,7 +156,9 @@ func list(dir string) []string {
 // enriched log events using the shared log printer alongside run/stage updates.
 // This test covers the unified log streaming wired in via ROADMAP line 32.
 func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
-	runID := "mods-unified-logs-test"
+	runID := domaintypes.NewRunID().String()
+	nodeID := domaintypes.NewNodeKey()
+	jobID := domaintypes.NewJobID().String()
 
 	// Control-plane emulator that sends run, stage, and log events.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +170,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: "m2", SpecID: "s2"})
+			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
 			// Minimal RunSummary status response used by the submit command.
@@ -196,7 +201,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 
 			// Enriched log event with node_id, mod_type, step_index, job_id.
 			_, _ = w.Write([]byte("event: log\n"))
-			logData := `{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"node-abc123","job_id":"job-def456","mod_type":"mod","step_index":2000}`
+			logData := fmt.Sprintf(`{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"%s","job_id":"%s","mod_type":"mod","step_index":2000}`, nodeID, jobID)
 			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
 			fl.Flush()
 
@@ -249,8 +254,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	}
 
 	// Verify enriched log line is rendered with context fields (structured format).
-	// Expected format: "2025-10-22T10:00:00Z stdout node=node-abc123 mod=mod step=2000 job=job-def456 Step started"
-	if !strings.Contains(out, "node=node-abc123") {
+	if !strings.Contains(out, "node="+nodeID) {
 		t.Errorf("expected enriched log with node_id, got: %s", out)
 	}
 	if !strings.Contains(out, "mod=mod") {
@@ -259,7 +263,7 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 	if !strings.Contains(out, "step=2000") {
 		t.Errorf("expected enriched log with step_index, got: %s", out)
 	}
-	if !strings.Contains(out, "job=job-def456") {
+	if !strings.Contains(out, "job="+jobID) {
 		t.Errorf("expected enriched log with job_id, got: %s", out)
 	}
 	if !strings.Contains(out, "Step started") {
@@ -275,7 +279,9 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 // TestModRunFollowRawLogFormat verifies that --log-format raw renders logs
 // as message-only (no timestamps or context fields).
 func TestModRunFollowRawLogFormat(t *testing.T) {
-	runID := "mods-raw-format-test"
+	runID := domaintypes.NewRunID().String()
+	nodeID := domaintypes.NewNodeKey()
+	jobID := domaintypes.NewJobID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -286,7 +292,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 				RunID  string `json:"run_id"`
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: "m3", SpecID: "s3"})
+			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
 			// Minimal RunSummary status response used by the submit command.
@@ -316,7 +322,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 
 			// Log event with enriched fields.
 			_, _ = w.Write([]byte("event: log\n"))
-			logData := `{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Raw log line","node_id":"node-xyz","job_id":"job-999","mod_type":"gate","step_index":100}`
+			logData := fmt.Sprintf(`{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Raw log line","node_id":"%s","job_id":"%s","mod_type":"gate","step_index":100}`, nodeID, jobID)
 			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
 			fl.Flush()
 

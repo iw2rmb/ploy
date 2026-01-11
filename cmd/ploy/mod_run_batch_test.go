@@ -8,12 +8,21 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestRunListCallsControlPlane validates list command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunListCallsControlPlane(t *testing.T) {
 	var called bool
+
+	runID1 := domaintypes.NewRunID().String()
+	runID2 := domaintypes.NewRunID().String()
+	modID1 := domaintypes.NewModID().String()
+	modID2 := domaintypes.NewModID().String()
+	specID1 := domaintypes.NewSpecID().String()
+	specID2 := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/runs") {
@@ -57,10 +66,10 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					} `json:"repo_counts,omitempty"`
 				}{
 					{
-						ID:        "batch-001",
+						ID:        runID1,
 						Status:    "Started",
-						ModID:     "mod-001",
-						SpecID:    "spec-001",
+						ModID:     modID1,
+						SpecID:    specID1,
 						CreatedAt: now,
 						Counts: &struct {
 							Total         int32  `json:"total"`
@@ -69,10 +78,10 @@ func TestRunListCallsControlPlane(t *testing.T) {
 						}{Total: 5, Success: 2, DerivedStatus: "running"},
 					},
 					{
-						ID:        "batch-002",
+						ID:        runID2,
 						Status:    "Finished",
-						ModID:     "mod-002",
-						SpecID:    "spec-002",
+						ModID:     modID2,
+						SpecID:    specID2,
 						CreatedAt: now,
 					},
 				},
@@ -98,8 +107,8 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "batch-001") {
-		t.Errorf("output should contain batch-001: %s", output)
+	if !strings.Contains(output, runID1) {
+		t.Errorf("output should contain %s: %s", runID1, output)
 	}
 	if !strings.Contains(output, "Started") {
 		t.Errorf("output should contain Started: %s", output)
@@ -190,8 +199,9 @@ func TestRunListInvalidLimit(t *testing.T) {
 // TestModRunBatchStatusNotFound validates run status command handles 404.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunBatchStatusNotFound(t *testing.T) {
+	runID := domaintypes.NewRunID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/nonexistent" {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID {
 			http.Error(w, "run not found", http.StatusNotFound)
 			return
 		}
@@ -202,7 +212,7 @@ func TestModRunBatchStatusNotFound(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "status", "nonexistent"}, &buf)
+	err := executeCmd([]string{"run", "status", runID}, &buf)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
