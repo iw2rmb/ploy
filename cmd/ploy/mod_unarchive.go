@@ -47,7 +47,7 @@ func handleModUnarchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Mod unarchived: %s (name: %s)\n", result.ID, result.Name)
+	_, _ = fmt.Fprintf(stderr, "Mod unarchived: %s (name: %s)\n", result.ID.String(), result.Name)
 	return nil
 }
 

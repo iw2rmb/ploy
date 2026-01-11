@@ -14,7 +14,7 @@ func TestJSONRoundTrip(t *testing.T) {
 	in := RunSummary{
 		RunID: domaintypes.RunID("t-123"),
 		State: RunStateRunning,
-		Stages: map[string]StageStatus{
+		Stages: map[domaintypes.JobID]StageStatus{
 			"s1": {State: StageStateQueued, CurrentJobID: domaintypes.JobID("job-1")},
 		},
 	}
@@ -39,7 +39,8 @@ func TestJSONRoundTrip(t *testing.T) {
 	if out.RunID != in.RunID {
 		t.Fatalf("run id roundtrip mismatch: %v vs %v", out.RunID, in.RunID)
 	}
-	if out.Stages["s1"].CurrentJobID != in.Stages["s1"].CurrentJobID {
-		t.Fatalf("job id roundtrip mismatch: %v vs %v", out.Stages["s1"].CurrentJobID, in.Stages["s1"].CurrentJobID)
+	stageKey := domaintypes.JobID("s1")
+	if out.Stages[stageKey].CurrentJobID != in.Stages[stageKey].CurrentJobID {
+		t.Fatalf("job id roundtrip mismatch: %v vs %v", out.Stages[stageKey].CurrentJobID, in.Stages[stageKey].CurrentJobID)
 	}
 }

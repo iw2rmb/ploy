@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"text/tabwriter"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/domain/types"
@@ -109,7 +110,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	cmd := mods.AddModRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
-		ModID:     modID,
+		ModRef:    types.ModRef(modID),
 		RepoURL:   *repoURL,
 		BaseRef:   *baseRef,
 		TargetRef: *targetRef,
@@ -120,7 +121,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Repo added: %s (url: %s)\n", result.ID, result.RepoURL)
+	_, _ = fmt.Fprintf(stderr, "Repo added: %s (url: %s)\n", result.ID.String(), result.RepoURL)
 	return nil
 }
 
@@ -161,7 +162,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	cmd := mods.ListModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModID:   modID,
+		ModRef:  types.ModRef(modID),
 	}
 
 	results, err := cmd.Run(ctx)
@@ -178,7 +179,13 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	w := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "ID\tREPO_URL\tBASE_REF\tTARGET_REF\tADDED_AT")
 	for _, repo := range results {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", repo.ID, repo.RepoURL, repo.BaseRef, repo.TargetRef, repo.CreatedAt)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			repo.ID.String(),
+			repo.RepoURL,
+			repo.BaseRef.String(),
+			repo.TargetRef.String(),
+			repo.CreatedAt.Format(time.RFC3339),
+		)
 	}
 	_ = w.Flush()
 
@@ -239,8 +246,8 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	cmd := mods.RemoveModRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModID:   modID,
-		RepoID:  *repoID,
+		ModRef:  types.ModRef(modID),
+		RepoID:  types.ModRepoID(*repoID),
 	}
 
 	if err := cmd.Run(ctx); err != nil {
@@ -311,7 +318,7 @@ func handleModRepoImport(args []string, stderr io.Writer) error {
 	cmd := mods.ImportModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModID:   modID,
+		ModRef:  types.ModRef(modID),
 		CSVData: csvData,
 	}
 

@@ -1,8 +1,6 @@
 package runs
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -66,10 +64,10 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 	var listing struct {
 		Diffs []struct {
-			ID        string            `json:"id"`
-			JobID     domaintypes.JobID `json:"job_id"`
-			CreatedAt string            `json:"created_at"`
-			Size      int               `json:"gzipped_size"`
+			ID        domaintypes.DiffID `json:"id"`
+			JobID     domaintypes.JobID  `json:"job_id"`
+			CreatedAt string             `json:"created_at"`
+			Size      int                `json:"gzipped_size"`
 		} `json:"diffs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
@@ -82,7 +80,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 			if job == "" {
 				job = "-"
 			}
-			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", strings.TrimSpace(d.ID), job, d.Size, strings.TrimSpace(d.CreatedAt))
+			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", d.ID.String(), job, d.Size, strings.TrimSpace(d.CreatedAt))
 		}
 		return nil
 	}
@@ -153,10 +151,10 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	var listing struct {
 		Diffs []struct {
-			ID        string            `json:"id"`
-			JobID     domaintypes.JobID `json:"job_id"`
-			CreatedAt string            `json:"created_at"`
-			Size      int               `json:"gzipped_size"`
+			ID        domaintypes.DiffID `json:"id"`
+			JobID     domaintypes.JobID  `json:"job_id"`
+			CreatedAt string             `json:"created_at"`
+			Size      int                `json:"gzipped_size"`
 		} `json:"diffs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
@@ -169,7 +167,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 			if job == "" {
 				job = "-"
 			}
-			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", strings.TrimSpace(d.ID), job, d.Size, strings.TrimSpace(d.CreatedAt))
+			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", d.ID.String(), job, d.Size, strings.TrimSpace(d.CreatedAt))
 		}
 		return nil
 	}
@@ -178,7 +176,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 		return errors.New("run repo diffs: no diffs available for this repo execution")
 	}
 	// Newest first by API; take first.
-	diffID := strings.TrimSpace(listing.Diffs[0].ID)
+	diffID := listing.Diffs[0].ID
 
 	// Download gzipped patch via repo-scoped endpoint (download mode).
 	dlURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "repos", url.PathEscape(repoID), "diffs")
@@ -187,7 +185,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 	q := url.Values{}
 	q.Set("download", "true")
-	q.Set("diff_id", diffID)
+	q.Set("diff_id", diffID.String())
 	dlURL = dlURL + "?" + q.Encode()
 	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, nil)
 	if err != nil {
@@ -201,12 +199,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if resp2.StatusCode != http.StatusOK {
 		return httpx.WrapError("run repo diffs", resp2.Status, resp2.Body)
 	}
-	gzData, err := io.ReadAll(io.LimitReader(resp2.Body, httpx.MaxDownloadBodyBytes))
-	if err != nil {
-		return err
-	}
-	// gunzip
-	patch, err := gunzipBytes(gzData)
+	patch, err := httpx.GunzipToBytes(io.LimitReader(resp2.Body, httpx.MaxDownloadBodyBytes), httpx.MaxGunzipOutputBytes)
 	if err != nil {
 		return fmt.Errorf("gunzip patch: %w", err)
 	}
@@ -227,13 +220,4 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 		_, _ = out.Write([]byte("\n"))
 	}
 	return nil
-}
-
-func gunzipBytes(data []byte) ([]byte, error) {
-	r, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = r.Close() }()
-	return io.ReadAll(r)
 }

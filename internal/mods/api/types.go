@@ -68,7 +68,7 @@ type RunSummary struct {
 	// Stages is keyed by job ID (KSUID string from jobs.id). Each entry represents
 	// a row from the `jobs` table. Use StageStatus.StepIndex (mirrors jobs.step_index)
 	// for ordered step sequencing.
-	Stages map[string]StageStatus `json:"stages"`
+	Stages map[domaintypes.JobID]StageStatus `json:"stages"`
 }
 
 // StageStatus summarises the execution state for a job.

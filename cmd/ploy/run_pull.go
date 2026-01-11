@@ -123,7 +123,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	pullCmd := mods.RunPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		RunID:   runID,
+		RunID:   domaintypes.RunID(runID),
 		RepoURL: rawOriginURL,
 	}
 	resolution, err := pullCmd.Run(ctx)
@@ -132,13 +132,13 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	_, _ = fmt.Fprintf(stderr, "run pull: resolved run %s\n", runID)
-	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID)
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef)
+	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
+	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef.String())
 
 	// Step 5: Fetch repo details to get base_ref.
 	// The pull resolution returns repo_target_ref, but we need base_ref for checkout.
 	// Query the run repos endpoint to get the full repo details.
-	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, runID, resolution.RepoID)
+	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, domaintypes.RunID(runID), resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("run pull: fetch repo details: %w", err)
 	}
@@ -149,7 +149,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
-	targetRef := strings.TrimSpace(resolution.RepoTargetRef)
+	targetRef := strings.TrimSpace(resolution.RepoTargetRef.String())
 	if targetRef == "" {
 		return errors.New("run pull: target_ref is not available for this run")
 	}
@@ -225,12 +225,12 @@ type runRepoDetails struct {
 
 // fetchRunRepoDetails fetches the repo details for a run/repo pair.
 // Queries GET /v1/runs/{run_id}/repos and filters by repo_id.
-func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID string, repoID string) (*runRepoDetails, error) {
+func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.ModRepoID) (*runRepoDetails, error) {
 	if baseURL == nil {
 		return nil, errors.New("base url required")
 	}
 
-	endpoint := baseURL.JoinPath("v1", "runs", runID, "repos")
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -257,12 +257,12 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 	}
 
 	for _, repo := range result.Repos {
-		if repo.RepoID == repoID {
+		if repo.RepoID == repoID.String() {
 			return &repo, nil
 		}
 	}
 
-	return nil, fmt.Errorf("repo %s not found in run %s", repoID, runID)
+	return nil, fmt.Errorf("repo %s not found in run %s", repoID.String(), runID.String())
 }
 
 // printRunPullUsage renders the usage help for `ploy run pull`.

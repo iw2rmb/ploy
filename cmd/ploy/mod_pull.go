@@ -139,7 +139,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	pullCmd := mods.ModPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModID:   modID,
+		ModRef:  domaintypes.ModRef(modID),
 		RepoURL: rawOriginURL,
 		Mode:    pullMode,
 	}
@@ -148,9 +148,9 @@ func handleModPull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("mod pull: resolve repo: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "mod pull: resolved run %s (mode: %s)\n", resolution.RunID, pullMode)
-	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID)
-	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef)
+	_, _ = fmt.Fprintf(stderr, "mod pull: resolved run %s (mode: %s)\n", resolution.RunID.String(), pullMode)
+	_, _ = fmt.Fprintf(stderr, "  repo ID: %s\n", resolution.RepoID.String())
+	_, _ = fmt.Fprintf(stderr, "  target ref: %s\n", resolution.RepoTargetRef.String())
 
 	// Step 7: Fetch repo details to get base_ref.
 	repoDetails, err := fetchRunRepoDetails(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
@@ -164,7 +164,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "  base ref: %s\n", baseRef)
 
-	targetRef := strings.TrimSpace(resolution.RepoTargetRef)
+	targetRef := strings.TrimSpace(resolution.RepoTargetRef.String())
 	if targetRef == "" {
 		return errors.New("mod pull: target_ref is not available for this run")
 	}
@@ -190,7 +190,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 10: Fetch diffs for this repo execution.
-	diffs, err := listRunRepoDiffs(ctx, httpClient, base, domaintypes.RunID(resolution.RunID), resolution.RepoID)
+	diffs, err := listRunRepoDiffs(ctx, httpClient, base, resolution.RunID, resolution.RepoID)
 	if err != nil {
 		return fmt.Errorf("mod pull: list diffs: %w", err)
 	}
@@ -213,7 +213,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 13: Download and apply all diffs.
-	appliedCount, err := downloadAndApplyDiffs(ctx, domaintypes.RunID(resolution.RunID), resolution.RepoID, diffs, stderr)
+	appliedCount, err := downloadAndApplyDiffs(ctx, resolution.RunID, resolution.RepoID, diffs, stderr)
 	if err != nil {
 		return fmt.Errorf("mod pull: %w", err)
 	}

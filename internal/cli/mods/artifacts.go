@@ -60,14 +60,14 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		return nil
 	}
 	// Stable iteration order by stage id (map key = job ID, KSUID string).
-	var stageIDs []string
+	var stageIDs []domaintypes.JobID
 	for id := range summary.Stages {
 		stageIDs = append(stageIDs, id)
 	}
-	sort.Strings(stageIDs)
+	sort.Slice(stageIDs, func(i, j int) bool { return stageIDs[i].String() < stageIDs[j].String() })
 	for _, id := range stageIDs {
 		st := summary.Stages[id]
-		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(id))
+		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(id.String()))
 		if len(st.Artifacts) == 0 {
 			continue
 		}

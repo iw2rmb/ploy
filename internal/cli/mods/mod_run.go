@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // CreateModRunCommand creates a batch run from a mod project with repo selection.
@@ -23,15 +24,15 @@ import (
 type CreateModRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	ModID     string   // Required: mod ID or name.
-	RepoURLs  []string // Optional: explicit repo URLs for "explicit" mode.
-	Failed    bool     // If true, use "failed" mode; otherwise "all" or "explicit".
-	CreatedBy *string  // Optional: creator identifier.
+	ModRef    domaintypes.ModRef // Required: mod ID or name.
+	RepoURLs  []string           // Optional: explicit repo URLs for "explicit" mode.
+	Failed    bool               // If true, use "failed" mode; otherwise "all" or "explicit".
+	CreatedBy *string            // Optional: creator identifier.
 }
 
 // CreateModRunResult contains the response from creating a mod run.
 type CreateModRunResult struct {
-	RunID string `json:"run_id"`
+	RunID domaintypes.RunID `json:"run_id"`
 }
 
 // Run executes POST /v1/mods/{mod_id}/runs to create a run with repo selection.
@@ -46,7 +47,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	if c.BaseURL == nil {
 		return CreateModRunResult{}, fmt.Errorf("mod run: base url required")
 	}
-	if strings.TrimSpace(c.ModID) == "" {
+	if err := c.ModRef.Validate(); err != nil {
 		return CreateModRunResult{}, fmt.Errorf("mod run: mod id is required")
 	}
 
@@ -57,7 +58,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 
 	// Determine repo_selector mode based on flags.
 	var mode string
-	var repoURLs []string
+	var repoURLs []domaintypes.RepoURL
 	switch {
 	case c.Failed:
 		// --failed → repos whose last terminal state is Fail.
@@ -65,7 +66,13 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	case len(c.RepoURLs) > 0:
 		// --repo ... → explicit repos by URL.
 		mode = "explicit"
-		repoURLs = c.RepoURLs
+		for _, raw := range c.RepoURLs {
+			u := domaintypes.RepoURL(strings.TrimSpace(raw))
+			if err := u.Validate(); err != nil {
+				return CreateModRunResult{}, fmt.Errorf("mod run: --repo must be a valid repo url")
+			}
+			repoURLs = append(repoURLs, u)
+		}
 	default:
 		// No flags → all repos in the mod repo set.
 		mode = "all"
@@ -74,8 +81,8 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	// Build request payload with repo_selector mode and optional repos list.
 	req := struct {
 		RepoSelector struct {
-			Mode  string   `json:"mode"`
-			Repos []string `json:"repos,omitempty"`
+			Mode  string                `json:"mode"`
+			Repos []domaintypes.RepoURL `json:"repos,omitempty"`
 		} `json:"repo_selector"`
 		CreatedBy *string `json:"created_by,omitempty"`
 	}{
@@ -92,7 +99,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 	}
 
 	// POST /v1/mods/{mod_id}/runs
-	endpoint := c.BaseURL.JoinPath("v1", "mods", url.PathEscape(strings.TrimSpace(c.ModID)), "runs")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return CreateModRunResult{}, fmt.Errorf("mod run: build request: %w", err)

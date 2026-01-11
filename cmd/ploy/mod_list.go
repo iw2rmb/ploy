@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"text/tabwriter"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 )
@@ -54,7 +55,7 @@ func handleModList(args []string, stderr io.Writer) error {
 		if mod.Archived {
 			archived = "yes"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", mod.ID, mod.Name, mod.CreatedAt, archived)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", mod.ID.String(), mod.Name, mod.CreatedAt.Format(time.RFC3339), archived)
 	}
 	_ = w.Flush()
 

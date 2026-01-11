@@ -8,6 +8,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestAddModRepoCommand_Run validates AddModRepoCommand responses.
@@ -62,12 +65,12 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 				}
 
 				resp := ModRepoSummary{
-					ID:        "repo-001",
-					ModID:     tc.modID,
+					ID:        domaintypes.ModRepoID("repo-001"),
+					ModID:     domaintypes.ModID(tc.modID),
 					RepoURL:   tc.repoURL,
-					BaseRef:   tc.baseRef,
-					TargetRef: tc.targetRef,
-					CreatedAt: "2024-01-01T00:00:00Z",
+					BaseRef:   domaintypes.GitRef(tc.baseRef),
+					TargetRef: domaintypes.GitRef(tc.targetRef),
+					CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 				}
 
 				w.Header().Set("Content-Type", "application/json")
@@ -81,7 +84,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 			cmd := AddModRepoCommand{
 				Client:    srv.Client(),
 				BaseURL:   baseURL,
-				ModID:     tc.modID,
+				ModRef:    domaintypes.ModRef(tc.modID),
 				RepoURL:   tc.repoURL,
 				BaseRef:   tc.baseRef,
 				TargetRef: tc.targetRef,
@@ -100,8 +103,8 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run() error: %v", err)
 			}
-			if result.ID != "repo-001" {
-				t.Errorf("got ID %q, want %q", result.ID, "repo-001")
+			if result.ID.String() != "repo-001" {
+				t.Errorf("got ID %q, want %q", result.ID.String(), "repo-001")
 			}
 		})
 	}
@@ -120,8 +123,8 @@ func TestListModReposCommand_Run(t *testing.T) {
 			Repos []ModRepoSummary `json:"repos"`
 		}{
 			Repos: []ModRepoSummary{
-				{ID: "repo-001", ModID: "mod-001", RepoURL: "https://github.com/a/b.git", BaseRef: "main", TargetRef: "feat", CreatedAt: "2024-01-01T00:00:00Z"},
-				{ID: "repo-002", ModID: "mod-001", RepoURL: "https://github.com/c/d.git", BaseRef: "main", TargetRef: "fix", CreatedAt: "2024-01-02T00:00:00Z"},
+				{ID: domaintypes.ModRepoID("repo-001"), ModID: domaintypes.ModID("mod-001"), RepoURL: "https://github.com/a/b.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("feat"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.ModRepoID("repo-002"), ModID: domaintypes.ModID("mod-001"), RepoURL: "https://github.com/c/d.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("fix"), CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 		}
 
@@ -135,7 +138,7 @@ func TestListModReposCommand_Run(t *testing.T) {
 	cmd := ListModReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
+		ModRef:  domaintypes.ModRef("mod-001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -164,8 +167,8 @@ func TestRemoveModRepoCommand_Run(t *testing.T) {
 	cmd := RemoveModRepoCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
-		RepoID:  "repo-001",
+		ModRef:  domaintypes.ModRef("mod-001"),
+		RepoID:  domaintypes.ModRepoID("repo-001"),
 	}
 
 	err := cmd.Run(context.Background())
@@ -208,7 +211,7 @@ func TestImportModReposCommand_Run(t *testing.T) {
 	cmd := ImportModReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModID:   "mod-001",
+		ModRef:  domaintypes.ModRef("mod-001"),
 		CSVData: csvData,
 	}
 

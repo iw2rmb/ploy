@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestCreateModRunCommand_Run validates CreateModRunCommand responses.
@@ -94,7 +96,7 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 					t.Errorf("expected mode all, got %s", req.RepoSelector.Mode)
 				}
 
-				resp := CreateModRunResult{RunID: "run-001"}
+				resp := CreateModRunResult{RunID: domaintypes.RunID("run-001")}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
@@ -107,7 +109,7 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 			cmd := CreateModRunCommand{
 				Client:   srv.Client(),
 				BaseURL:  baseURL,
-				ModID:    tc.modID,
+				ModRef:   domaintypes.ModRef(tc.modID),
 				RepoURLs: tc.repoURLs,
 				Failed:   tc.failed,
 			}
@@ -125,8 +127,8 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run() error: %v", err)
 			}
-			if result.RunID != "run-001" {
-				t.Errorf("got RunID %q, want %q", result.RunID, "run-001")
+			if result.RunID.String() != "run-001" {
+				t.Errorf("got RunID %q, want %q", result.RunID.String(), "run-001")
 			}
 		})
 	}
@@ -146,7 +148,7 @@ func TestCreateModRunCommand_SelectorMutualExclusion(t *testing.T) {
 	cmd := CreateModRunCommand{
 		Client:   srv.Client(),
 		BaseURL:  baseURL,
-		ModID:    "mod-001",
+		ModRef:   domaintypes.ModRef("mod-001"),
 		RepoURLs: []string{"https://github.com/org/repo.git"},
 		Failed:   true,
 	}

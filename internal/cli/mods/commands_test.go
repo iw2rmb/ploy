@@ -29,7 +29,7 @@ func TestArtifactsCommand(t *testing.T) {
 	run := modsapi.RunSummary{
 		RunID: domaintypes.RunID("t1"),
 		State: modsapi.RunStateSucceeded,
-		Stages: map[string]modsapi.StageStatus{
+		Stages: map[domaintypes.JobID]modsapi.StageStatus{
 			"build": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
 			"test":  {State: modsapi.StageStateSucceeded},
 		},
@@ -80,7 +80,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 				"repo_base_ref":   "main",
 				"repo_target_ref": "feature",
 			},
-			Stages: make(map[string]modsapi.StageStatus),
+			Stages: make(map[domaintypes.JobID]modsapi.StageStatus),
 		})
 	})
 	mux.HandleFunc("/v1/runs/t2/cancel", func(w http.ResponseWriter, r *http.Request) {

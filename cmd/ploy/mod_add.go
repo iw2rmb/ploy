@@ -76,9 +76,9 @@ func handleModAdd(args []string, stderr io.Writer) error {
 
 	// Print result.
 	if result.SpecID != nil {
-		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s, spec_id: %s)\n", result.ID, result.Name, *result.SpecID)
+		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s, spec_id: %s)\n", result.ID.String(), result.Name, result.SpecID.String())
 	} else {
-		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s)\n", result.ID, result.Name)
+		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s)\n", result.ID.String(), result.Name)
 	}
 
 	return nil

@@ -86,7 +86,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	cmd := climods.CreateModRunCommand{
 		Client:   httpClient,
 		BaseURL:  base,
-		ModID:    modID,
+		ModRef:   types.ModRef(modID),
 		RepoURLs: repoURLs,
 		Failed:   *failed,
 	}
