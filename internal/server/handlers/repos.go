@@ -28,17 +28,17 @@ import (
 // RepoSummary represents a repository with its last run metadata.
 // Used in the GET /v1/repos response to show known repositories.
 type RepoSummary struct {
-	RepoID     string     `json:"repo_id"`
-	RepoURL    string     `json:"repo_url"`
-	LastRunAt  *time.Time `json:"last_run_at,omitempty"`
-	LastStatus *string    `json:"last_status,omitempty"`
+	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoURL    string                `json:"repo_url"`
+	LastRunAt  *time.Time            `json:"last_run_at,omitempty"`
+	LastStatus *string               `json:"last_status,omitempty"`
 }
 
 // RepoRunSummary represents a run for a specific repository.
 // Used in the GET /v1/repos/{repo_id}/runs response.
 type RepoRunSummary struct {
 	RunID      domaintypes.RunID `json:"run_id"`
-	ModID      string            `json:"mod_id"`
+	ModID      domaintypes.ModID `json:"mod_id"`
 	RunStatus  string            `json:"run_status"`
 	RepoStatus string            `json:"repo_status"`
 	BaseRef    string            `json:"base_ref"`
@@ -74,7 +74,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 		summaries := make([]RepoSummary, 0, len(repos))
 		for _, repo := range repos {
 			summary := RepoSummary{
-				RepoID:  repo.RepoID.String(),
+				RepoID:  repo.RepoID,
 				RepoURL: repo.RepoUrl,
 			}
 			// Include last run timing if available.
@@ -172,7 +172,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		for _, run := range runs {
 			summary := RepoRunSummary{
 				RunID:      run.RunID,
-				ModID:      run.ModID.String(),
+				ModID:      run.ModID,
 				RunStatus:  string(run.RunStatus),
 				RepoStatus: string(run.RepoStatus),
 				BaseRef:    run.RepoBaseRef,

@@ -107,15 +107,15 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Build response with repo details.
 		resp := struct {
-			ID        string `json:"id"`
-			ModID     string `json:"mod_id"`
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
-			CreatedAt string `json:"created_at"`
+			ID        domaintypes.ModRepoID `json:"id"`
+			ModID     domaintypes.ModID     `json:"mod_id"`
+			RepoURL   string                `json:"repo_url"`
+			BaseRef   string                `json:"base_ref"`
+			TargetRef string                `json:"target_ref"`
+			CreatedAt string                `json:"created_at"`
 		}{
-			ID:        repo.ID.String(),
-			ModID:     repo.ModID.String(),
+			ID:        repo.ID,
+			ModID:     repo.ModID,
 			RepoURL:   repo.RepoUrl,
 			BaseRef:   repo.BaseRef,
 			TargetRef: repo.TargetRef,
@@ -167,19 +167,19 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		type repoItem struct {
-			ID        string `json:"id"`
-			ModID     string `json:"mod_id"`
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
-			CreatedAt string `json:"created_at"`
+			ID        domaintypes.ModRepoID `json:"id"`
+			ModID     domaintypes.ModID     `json:"mod_id"`
+			RepoURL   string                `json:"repo_url"`
+			BaseRef   string                `json:"base_ref"`
+			TargetRef string                `json:"target_ref"`
+			CreatedAt string                `json:"created_at"`
 		}
 
 		items := make([]repoItem, 0, len(repos))
 		for _, repo := range repos {
 			items = append(items, repoItem{
-				ID:        repo.ID.String(),
-				ModID:     repo.ModID.String(),
+				ID:        repo.ID,
+				ModID:     repo.ModID,
 				RepoURL:   repo.RepoUrl,
 				BaseRef:   repo.BaseRef,
 				TargetRef: repo.TargetRef,

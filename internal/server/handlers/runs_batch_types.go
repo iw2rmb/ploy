@@ -153,25 +153,25 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 // v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
 // to mod_repos.id (NanoID(8)).
 type RunRepoResponse struct {
-	RunID      domaintypes.RunID   `json:"run_id"`
-	RepoID     string              `json:"repo_id"`
-	RepoURL    string              `json:"repo_url"`
-	BaseRef    string              `json:"base_ref"`
-	TargetRef  string              `json:"target_ref"`
-	Status     store.RunRepoStatus `json:"status"`
-	Attempt    int32               `json:"attempt"`
-	LastError  *string             `json:"last_error,omitempty"`
-	CreatedAt  time.Time           `json:"created_at"`
-	StartedAt  *time.Time          `json:"started_at,omitempty"`
-	FinishedAt *time.Time          `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoURL    string                `json:"repo_url"`
+	BaseRef    string                `json:"base_ref"`
+	TargetRef  string                `json:"target_ref"`
+	Status     store.RunRepoStatus   `json:"status"`
+	Attempt    int32                 `json:"attempt"`
+	LastError  *string               `json:"last_error,omitempty"`
+	CreatedAt  time.Time             `json:"created_at"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.
 // Wraps raw store strings in domain types for type-safe API output.
 func runRepoToResponse(rr store.RunRepo, repoURL string) RunRepoResponse {
 	resp := RunRepoResponse{
-		RunID:     domaintypes.RunID(rr.RunID),
-		RepoID:    rr.RepoID.String(),
+		RunID:     rr.RunID,
+		RepoID:    rr.RepoID,
 		RepoURL:   repoURL,
 		BaseRef:   rr.RepoBaseRef,
 		TargetRef: rr.RepoTargetRef,
