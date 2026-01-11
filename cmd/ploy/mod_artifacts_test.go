@@ -13,7 +13,9 @@ import (
 
 func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	t.Helper()
-	runID := "run-artifacts"
+	runID := domaintypes.NewRunID().String()
+	stageA := domaintypes.NewJobID()
+	stageB := domaintypes.NewJobID()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status" {
 			// Return RunSummary directly — the canonical response shape.
@@ -21,8 +23,8 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
 				Stages: map[domaintypes.JobID]modsapi.StageStatus{
-					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
-					"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
+					stageA: {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
+					stageB: {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
 				},
 			})
 			return
@@ -38,7 +40,10 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 		t.Fatalf("mod artifacts error: %v", err)
 	}
 	out := buf.String()
-	if !bytes.Contains([]byte(out), []byte("plan")) || !bytes.Contains([]byte(out), []byte("exec")) {
-		t.Fatalf("expected stage names in output; got %q", out)
+	if !bytes.Contains([]byte(out), []byte(stageA.String())) || !bytes.Contains([]byte(out), []byte(stageB.String())) {
+		t.Fatalf("expected stage IDs in output; got %q", out)
+	}
+	if !bytes.Contains([]byte(out), []byte("diff: bafy-diff")) || !bytes.Contains([]byte(out), []byte("logs: bafy-logs")) {
+		t.Fatalf("expected artifact entries in output; got %q", out)
 	}
 }
