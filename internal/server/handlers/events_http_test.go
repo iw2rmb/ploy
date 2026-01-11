@@ -204,12 +204,13 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	time.Sleep(25 * time.Millisecond)
 
 	ctx := context.Background()
+	jobID := domaintypes.NewJobID()
 	enriched := logstream.LogRecord{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Stream:    "stdout",
 		Line:      "enriched line",
 		NodeID:    "aB3xY9",
-		JobID:     "job-def456",
+		JobID:     jobID,
 		ModType:   "mod",
 		StepIndex: 2000,
 	}
@@ -253,8 +254,8 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	if got := payload["node_id"]; got != "aB3xY9" {
 		t.Errorf("node_id = %v, want %q", got, "aB3xY9")
 	}
-	if got := payload["job_id"]; got != "job-def456" {
-		t.Errorf("job_id = %v, want %q", got, "job-def456")
+	if got := payload["job_id"]; got != jobID.String() {
+		t.Errorf("job_id = %v, want %q", got, jobID.String())
 	}
 	if got := payload["mod_type"]; got != "mod" {
 		t.Errorf("mod_type = %v, want %q", got, "mod")
