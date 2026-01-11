@@ -631,7 +631,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	if len(resp.Stages) != 1 {
 		t.Fatalf("expected 1 stage, got %d", len(resp.Stages))
 	}
-	if got := resp.Stages[jobIDStr].State; got != modsapi.StageStatePending {
+	if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != modsapi.StageStatePending {
 		t.Fatalf("expected stage to be pending, got %s", got)
 	}
 

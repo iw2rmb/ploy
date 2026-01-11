@@ -20,7 +20,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 				RunID: domaintypes.RunID(runID),
 				State: modsapi.RunStateSucceeded,
-				Stages: map[string]modsapi.StageStatus{
+				Stages: map[domaintypes.JobID]modsapi.StageStatus{
 					"plan": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
 					"exec": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
 				},

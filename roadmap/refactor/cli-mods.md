@@ -1,52 +1,81 @@
-# CLI Mods Refactor Notes (`internal/cli/mods`)
+# CLI Mods Refactor Slices (`internal/cli/mods`)
 
-- Mods API type hardening is tracked in `roadmap/refactor/mods-api.md`.
+This file is a *roadmap slice plan* for refactoring Mods CLI clients under `internal/cli/mods/*`.
 
-## Type Hardening
+Prerequisite work that changes the shared wire types lives in `roadmap/refactor/mods-api.md`.
 
-- Use domain newtypes for IDs in all Mods CLI commands.
-  - Many commands use raw `string` identifiers:
-    - `PullResolution.RunID`/`RepoID` (`internal/cli/mods/pull.go:30`).
-    - `RunPullCommand.RunID` (`internal/cli/mods/pull.go:51`).
-    - `ListRunRepoDiffsCommand.RepoID`, `DownloadDiffCommand.RepoID`, `DownloadDiffCommand.DiffID` (`internal/cli/mods/status.go:40`, `internal/cli/mods/status.go:98`).
-    - Mod management + repos use `ModID string` and `RepoID string` (`internal/cli/mods/mod_management.go:184`, `internal/cli/mods/mod_repos.go:165`).
-  - Solution:
-    - Use `types.RunID` and `types.ModRepoID` for `run_id` / `repo_id` everywhere.
-    - Use `types.ModID` for mod project IDs in responses.
-    - If the path param accepts “id OR name”, introduce a distinct newtype (e.g. `types.ModRef`) to avoid accidentally treating names as IDs.
-    - For UUID-backed resources (diff id), introduce a validated UUID newtype (e.g. `types.DiffID`) instead of raw strings.
-- Use domain newtypes for VCS inputs.
-  - `AddModRepoCommand` and `CreateModRunCommand` only check “non-empty” for `repo_url`/`base_ref`/`target_ref` (`internal/cli/mods/mod_repos.go:58`, `internal/cli/mods/mod_run.go:80`).
-  - `SubmitCommand` and `CreateBatchCommand` validate via domain types, but only after trimming strings (`internal/cli/mods/submit.go:38`, `internal/cli/mods/batch.go:49`).
-  - Solution: make request structs use `types.RepoURL` + `types.GitRef` directly (so validation happens at decode time) and validate *lists* (`RepoURLs`) item-by-item.
-- Stop duplicating canonical payload structs (SSE + status).
-  - `ArtifactsCommand` iterates `summary.Stages map[string]...` and treats keys as stage IDs (`internal/cli/mods/artifacts.go:70`).
-  - Solution: once `modsapi.RunSummary.Stages` becomes `map[types.JobID]StageStatus` (see `roadmap/refactor/mods-api.md`), update CLI code to treat keys as `types.JobID`, not `string`.
-- Decode timestamps as `time.Time`, not `string`, for correctness checks.
-  - Mod and mod-repo summaries use `CreatedAt string` (`internal/cli/mods/mod_management.go:27`, `internal/cli/mods/mod_repos.go:25`).
-  - Solution: use `time.Time` so JSON decoding enforces RFC3339 and call sites can compare/sort without string assumptions.
+## Current State (Anchor at HEAD)
 
-## Streamlining / Simplification
-
-- Merged slice: CLI HTTP boundary behavior.
-  - Implement once in a shared helper and reuse across all Mods CLI commands.
-- Merged slice: gzip diff download streaming.
-  - Implement one streaming gunzip helper (no “read all gz then gunzip all”) and reuse in Mods + Runs CLI.
-
-## Likely Bugs / Risks
-
-- Incorrect “is this an ID?” heuristic for mods.
-  - `ResolveModByNameCommand` treats “UUID-like” strings as IDs (`internal/cli/mods/mod_management.go:430`), but `types.ModID` is NanoID-based (`internal/domain/types/ids.go:30`).
-  - Solution: remove this heuristic and rely on an explicit server-side resolution contract (or always treat input as a `types.ModRef` and let the server resolve deterministically).
-- URL path params not consistently escaped/validated.
-  - Some commands escape ids (`url.PathEscape`), others pass raw (`internal/cli/mods/pull.go:72`, `internal/cli/mods/pull.go:167`).
-  - Solution: validate newtyped identifiers to be URL-safe and consistently escape dynamic segments.
-- Partial error-body handling.
-  - Some paths cap error bodies (`decodeHTTPError`), while others attempt to decode `{error: ...}` without strictness and without a cap (`internal/cli/mods/submit.go:90`).
-  - Merged slice: unify error decoding + caps once in a shared CLI HTTP helper.
+- `types.ModRef` already exists (`internal/domain/types/ids.go`) and is used by mod management commands (`internal/cli/mods/mod_management.go`).
+- `ResolveModByNameCommand` does not use “UUID-like” heuristics; it always queries the server (`internal/cli/mods/mod_management.go`).
+- Error-body caps are already centralized via `decodeHTTPError → httpx.WrapError` (`internal/cli/mods/batch.go`, `internal/cli/httpx/httpx.go`).
+- Remaining issues at HEAD:
+  - Several commands still use raw `string` identifiers (not domain newtypes) (`internal/cli/mods/pull.go`, `internal/cli/mods/status.go`, `internal/cli/mods/mod_repos.go`, `internal/cli/mods/mod_run.go`).
+  - Diff downloads still “read all gz then gunzip all” (`internal/cli/mods/status.go`, `internal/cli/runs/diffs.go`).
+  - URL construction/escaping is inconsistent; some code pre-escapes segments before `BaseURL.JoinPath(...)` (risk: double-escaping) (`internal/cli/mods/mod_repos.go`, `internal/cli/mods/mod_run.go`).
+  - Several `created_at` fields are decoded as `string` instead of `time.Time` (`internal/cli/mods/mod_management.go`, `internal/cli/mods/mod_repos.go`, `internal/cli/mods/status.go`).
 
 ## Suggested Minimal Slices
 
-- Slice 1: Apply the shared CLI HTTP boundary helper (merged slice).
-- Slice 2: Switch `run_id`/`repo_id`/`repo_url`/refs to domain newtypes across Mods CLI commands.
-- Slice 3: Apply the shared streaming gunzip helper (merged slice).
+### Slice 1: Streaming gunzip helper (Mods + Runs)
+
+- What changes:
+  - Replace “read all gzipped bytes into memory, then gunzip” with a streaming gunzip path.
+- Where:
+  - Introduce a shared helper under `internal/cli/httpx` (e.g. `GunzipToBytes(r io.Reader, limit int64) ([]byte, error)`).
+  - Update `internal/cli/mods/status.go` and `internal/cli/runs/diffs.go` to stream-decompress directly from `resp.Body` with a size cap.
+- Compatibility impact: none (internal refactor; wire format unchanged).
+- Unchanged behavior:
+  - Same endpoints and query params.
+  - Same patch bytes returned to callers.
+
+### Slice 2: Add a validated diff-id newtype
+
+- What changes:
+  - Introduce a UUID-backed identifier type (e.g. `types.DiffID`) instead of raw `string` diff IDs.
+  - Use it in diff listing/download structs and CLI command parameters.
+- Where:
+  - Add new type in `internal/domain/types` (new file is fine; keep UUID validation local to this type).
+  - Update `internal/cli/mods/status.go` and `internal/cli/runs/diffs.go` to use `types.DiffID` for:
+    - list response IDs,
+    - download request `diff_id` query param.
+  - Update call sites (notably `cmd/ploy/pull_helpers.go`) to thread `types.DiffID` through.
+- Compatibility impact: none (diff IDs are still transported as JSON strings and query params).
+- Unchanged behavior:
+  - Same server-generated diff ID strings; client now validates they are UUIDs.
+
+### Slice 3: Mods CLI type hardening + URL construction cleanup
+
+- What changes:
+  - Convert Mods CLI command structs and response structs to domain newtypes:
+    - `run_id` as `types.RunID`,
+    - `repo_id` as `types.ModRepoID`,
+    - mod project IDs as `types.ModID`,
+    - “id-or-name” params stay as `types.ModRef` (already present).
+  - Validate VCS inputs using domain types:
+    - `repo_url` as `types.RepoURL`,
+    - `base_ref`/`target_ref` as `types.GitRef`,
+    - validate `RepoURLs` lists item-by-item.
+  - Normalize URL construction:
+    - stop pre-escaping segments passed to `BaseURL.JoinPath(...)`,
+    - pick one consistent pattern across Mods CLI (either `url.JoinPath(base.String(), ..., url.PathEscape(seg))` or `base.JoinPath(...raw...)` with explicit validation that segments are URL-safe).
+  - Decode `created_at` timestamps into `time.Time` where the server returns RFC3339.
+- Where:
+  - Primary files: `internal/cli/mods/pull.go`, `internal/cli/mods/status.go`, `internal/cli/mods/mod_repos.go`, `internal/cli/mods/mod_run.go`, `internal/cli/mods/mod_management.go`.
+  - CLI entrypoints: `cmd/ploy/*` that construct these commands.
+- Compatibility impact: none (wire format unchanged; internal types become strict).
+- Unchanged behavior:
+  - CLI flags/args remain strings; parsing converts to typed values and errors early on invalid inputs.
+
+### Slice 4: Mods API prerequisite (then fix CLI artifacts staging types)
+
+- What changes:
+  - Apply the Mods API type changes that unblock CLI correctness:
+    - `modsapi.RunSummary.Stages` becomes `map[types.JobID]StageStatus`.
+    - (Optionally in the same slice) `modsapi.RunSubmitRequest` uses `types.RepoURL` and `types.GitRef`.
+- Where:
+  - Implemented per `roadmap/refactor/mods-api.md` in `internal/mods/api/types.go`.
+  - Then update `internal/cli/mods/artifacts.go` to iterate typed keys (`types.JobID`) instead of `string`.
+- Compatibility impact: none on the wire (JSON map keys remain strings); internal compiler-checked safety improves.
+- Unchanged behavior:
+  - `GET /v1/runs/{id}/status` payload shape remains the same JSON.

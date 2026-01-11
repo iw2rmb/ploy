@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -71,11 +72,11 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 	var downloaded int
 
 	// Deterministic iteration: sort stages and artifact names for stable manifests.
-	stageIDs := make([]string, 0, len(summary.Stages))
+	stageIDs := make([]domaintypes.JobID, 0, len(summary.Stages))
 	for id := range summary.Stages {
 		stageIDs = append(stageIDs, id)
 	}
-	sort.Strings(stageIDs)
+	sort.Slice(stageIDs, func(i, j int) bool { return stageIDs[i].String() < stageIDs[j].String() })
 	for _, stageID := range stageIDs {
 		st := summary.Stages[stageID]
 		names := make([]string, 0, len(st.Artifacts))
@@ -148,7 +149,7 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 				_ = dresp.Body.Close()
 				return controlPlaneHTTPError(dresp)
 			}
-			filename := buildArtifactFilename(stageID, name, cid, art.Digest)
+			filename := buildArtifactFilename(stageID.String(), name, cid, art.Digest)
 			path := filepath.Join(dir, filename)
 
 			// Stream download to disk to avoid buffering large artifacts in memory.
@@ -166,7 +167,7 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 			if closeErr != nil {
 				return fmt.Errorf("close artifact %s: %w", filename, closeErr)
 			}
-			items = append(items, manifestItem{Stage: stageID, Name: name, CID: cid, Digest: art.Digest, Size: n, Path: path})
+			items = append(items, manifestItem{Stage: stageID.String(), Name: name, CID: cid, Digest: art.Digest, Size: n, Path: path})
 			downloaded++
 		}
 	}

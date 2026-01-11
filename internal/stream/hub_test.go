@@ -512,7 +512,7 @@ func TestPublishRunTypedPayload(t *testing.T) {
 	run := api.RunSummary{
 		RunID:  "run-123",
 		State:  api.RunStateRunning,
-		Stages: make(map[string]api.StageStatus),
+		Stages: make(map[domaintypes.JobID]api.StageStatus),
 	}
 
 	// Publish the run event using renamed PublishRun method.

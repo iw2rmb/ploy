@@ -98,7 +98,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			Metadata:   map[string]string{"repo_base_ref": repoBase, "repo_target_ref": repoTarget},
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
-			Stages:     make(map[string]modsapi.StageStatus),
+			Stages:     make(map[domaintypes.JobID]modsapi.StageStatus),
 		}
 
 		// Surface MR URL, gate summary, and resume metadata from runs.stats if present.
@@ -176,7 +176,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.
-			summary.Stages[jobIDStr] = modsapi.StageStatus{
+			summary.Stages[job.ID] = modsapi.StageStatus{
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
