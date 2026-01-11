@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestAgentCreation verifies that New() constructs all required components.
@@ -20,7 +22,7 @@ func TestAgentCreation(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   "https://server.example.com",
-		NodeID:      "test-node-1",
+		NodeID:      "aB3xY9",
 		Concurrency: 2,
 		HTTP: HTTPConfig{
 			Listen: ":0", // random port
@@ -58,16 +60,17 @@ func TestAgentCreation(t *testing.T) {
 func TestAgentLifecycle(t *testing.T) {
 	t.Parallel()
 
+	nodeID := "aB3xY9"
 	// Create a mock control-plane server to handle heartbeats and claims.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Handle heartbeat endpoint.
-		if r.URL.Path == "/v1/nodes/test-node/heartbeat" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/heartbeat" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
 		// Handle claim endpoint (unified jobs queue).
-		if r.URL.Path == "/v1/nodes/test-node/claim" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/claim" {
 			// Return no work available.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -81,7 +84,7 @@ func TestAgentLifecycle(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   mockServer.URL,
-		NodeID:      "test-node",
+		NodeID:      domaintypes.NodeID(nodeID),
 		Concurrency: 1,
 		HTTP: HTTPConfig{
 			Listen: ":0", // random port
@@ -143,16 +146,17 @@ func TestAgentLifecycle(t *testing.T) {
 func TestAgentGracefulShutdown(t *testing.T) {
 	t.Parallel()
 
+	nodeID := "shutd0"
 	// Create a mock control-plane server.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Handle heartbeat endpoint.
-		if r.URL.Path == "/v1/nodes/shutdown-test/heartbeat" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/heartbeat" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
 		// Handle claim endpoint (unified jobs queue).
-		if r.URL.Path == "/v1/nodes/shutdown-test/claim" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
@@ -165,7 +169,7 @@ func TestAgentGracefulShutdown(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   mockServer.URL,
-		NodeID:      "shutdown-test",
+		NodeID:      domaintypes.NodeID(nodeID),
 		Concurrency: 1,
 		HTTP: HTTPConfig{
 			Listen: ":0",
@@ -220,13 +224,14 @@ func TestAgentGracefulShutdown(t *testing.T) {
 func TestAgentComponentIntegration(t *testing.T) {
 	t.Parallel()
 
+	nodeID := "intg01"
 	// Create a mock control-plane server.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/nodes/integration-test/heartbeat" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/heartbeat" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if r.URL.Path == "/v1/nodes/integration-test/claim" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
@@ -238,7 +243,7 @@ func TestAgentComponentIntegration(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   mockServer.URL,
-		NodeID:      "integration-test",
+		NodeID:      domaintypes.NodeID(nodeID),
 		Concurrency: 1,
 		HTTP: HTTPConfig{
 			Listen: ":0",
@@ -269,9 +274,11 @@ func TestAgentComponentIntegration(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Send a run start request to the agent's HTTP server.
+	runID := domaintypes.NewRunID().String()
+	jobID := domaintypes.NewJobID().String()
 	startReq := map[string]string{
-		"run_id":   "test-run-123",
-		"job_id":   "test-job-123",
+		"run_id":   runID,
+		"job_id":   jobID,
 		"repo_url": "https://github.com/example/repo.git",
 		"base_ref": "main",
 	}
@@ -317,12 +324,13 @@ func TestAgentWithTLS(t *testing.T) {
 	caPath := writeTempFile(t, caPEM)
 
 	// Create a mock control-plane server with TLS.
+	nodeID := "tlsTst"
 	mockServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/nodes/tls-test/heartbeat" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/heartbeat" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if r.URL.Path == "/v1/nodes/tls-test/claim" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
@@ -334,7 +342,7 @@ func TestAgentWithTLS(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   mockServer.URL,
-		NodeID:      "tls-test",
+		NodeID:      domaintypes.NodeID(nodeID),
 		Concurrency: 1,
 		HTTP: HTTPConfig{
 			Listen: ":0",
@@ -394,15 +402,16 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 	t.Parallel()
 
 	var heartbeatAttempts int
+	nodeID := "hbFail"
 
 	// Create a mock server that always fails heartbeats.
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/nodes/heartbeat-fail/heartbeat" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/heartbeat" {
 			heartbeatAttempts++
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if r.URL.Path == "/v1/nodes/heartbeat-fail/claim" {
+		if r.URL.Path == "/v1/nodes/"+nodeID+"/claim" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
@@ -414,7 +423,7 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   mockServer.URL,
-		NodeID:      "heartbeat-fail",
+		NodeID:      domaintypes.NodeID(nodeID),
 		Concurrency: 1,
 		HTTP: HTTPConfig{
 			Listen: ":0",

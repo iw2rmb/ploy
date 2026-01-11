@@ -377,14 +377,17 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	t.Parallel()
 
 	commit := "deadbeef"
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	nodeIDStr := "aB3xY9"
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
-		RunID:     types.RunID("run-map-1"),
-		JobID:     types.JobID("job-map-1"),
+		RunID:     runID,
+		JobID:     jobID,
 		RepoURL:   "https://github.com/acme/thing.git",
 		Status:    "Started",
-		NodeID:    types.NodeID("test-node"),
+		NodeID:    types.NodeID(nodeIDStr),
 		BaseRef:   "main",
 		TargetRef: "feature/x",
 		CommitSha: &commit,
@@ -395,7 +398,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	// HTTP test server for unified claim queue.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + nodeIDStr + "/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
 		default:
@@ -409,7 +412,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    types.NodeID(nodeIDStr),
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
 
