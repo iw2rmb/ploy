@@ -19,8 +19,8 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 	}
 	// Seed a few interesting values. The second parameter is the RunID field value.
 	f.Add(" ", "", uint8(0))
-	f.Add("run-123", "run-xyz", uint8(1))
-	f.Add("run-123", "run-xyz", uint8(255))
+	f.Add(domaintypes.NewRunID().String(), domaintypes.NewRunID().String(), uint8(1))
+	f.Add(domaintypes.NewRunID().String(), domaintypes.NewRunID().String(), uint8(255))
 
 	f.Fuzz(func(t *testing.T, streamRunID, payloadRunID string, stateByte uint8) {
 		// Map byte to a valid run state.
@@ -34,13 +34,21 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 		state := states[int(stateByte)%len(states)]
 
 		// Build payload using renamed RunID field.
-		payload := modsapi.RunSummary{RunID: domaintypes.RunID(payloadRunID), State: state}
+		payloadID := domaintypes.RunID(payloadRunID)
+		payload := modsapi.RunSummary{RunID: payloadID, State: state}
 		ctx := context.Background()
 
 		err := svc.PublishRun(ctx, domaintypes.RunID(streamRunID), payload)
 		if strings.TrimSpace(streamRunID) == "" {
 			if err == nil {
 				t.Fatalf("expected error for empty runID")
+			}
+			return
+		}
+		if _, idErr := payloadID.MarshalText(); idErr != nil {
+			// Payload contains an invalid RunID, so JSON marshaling should fail.
+			if err == nil {
+				t.Fatalf("expected error for invalid payload runID")
 			}
 			return
 		}

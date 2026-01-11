@@ -151,8 +151,10 @@ func TestStream_PublishRun(t *testing.T) {
 			ctx := context.Background()
 			now := time.Now()
 
+			payloadRunID := domaintypes.NewRunID()
+			stageJobID := domaintypes.NewJobID()
 			payload := modsapi.RunSummary{
-				RunID:      domaintypes.RunID("test-run-123"),
+				RunID:      payloadRunID,
 				State:      tt.state,
 				Submitter:  "test-user",
 				Repository: "test-repo",
@@ -162,7 +164,7 @@ func TestStream_PublishRun(t *testing.T) {
 				CreatedAt: now,
 				UpdatedAt: now,
 				Stages: map[domaintypes.JobID]modsapi.StageStatus{
-					"stage-1": {
+					stageJobID: {
 						State:       modsapi.StageStateQueued,
 						Attempts:    0,
 						MaxAttempts: 3,

@@ -504,9 +504,9 @@ func gzipData(t *testing.T, data string) []byte {
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.RunID("run-log-enrich-123")
-	jobID := domaintypes.JobID("job-log-enrich-123")
-	nodeID := domaintypes.NodeID("node-log-enrich-123")
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
 	// Create log data (gzipped, since that's how logs come from nodes).
 	logLine := "Build step completed successfully\n"
@@ -600,9 +600,9 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.RunID("run-logrecord-123")
-	jobID := domaintypes.JobID("job-logrecord-123")
-	nodeID := domaintypes.NodeID("node-logrecord-123")
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
 	logLine := "hello\n"
 	gzippedLog := gzipData(t, logLine)
@@ -677,7 +677,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.RunID("run-log-no-job")
+	runID := domaintypes.NewRunID()
 
 	logLine := "System log without job context\n"
 	gzippedLog := gzipData(t, logLine)
