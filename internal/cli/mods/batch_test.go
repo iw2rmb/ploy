@@ -18,6 +18,15 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
+	runID1 := domaintypes.NewRunID()
+	runID2 := domaintypes.NewRunID()
+	runIDPage := domaintypes.NewRunID()
+	modID1 := domaintypes.NewModID()
+	modID2 := domaintypes.NewModID()
+	modIDPage := domaintypes.NewModID()
+	specID1 := domaintypes.NewSpecID()
+	specID2 := domaintypes.NewSpecID()
+	specIDPage := domaintypes.NewSpecID()
 
 	tests := []struct {
 		name        string
@@ -34,10 +43,10 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			offset: 0,
 			serverResp: []BatchSummary{
 				{
-					ID:        domaintypes.RunID("batch-001"), // Convert to domain type
+					ID:        runID1,
 					Status:    "Started",
-					ModID:     "mod-001",
-					SpecID:    "spec-001",
+					ModID:     modID1,
+					SpecID:    specID1,
 					CreatedAt: time.Now(),
 					Counts: &RunRepoCounts{
 						Total:         5,
@@ -48,10 +57,10 @@ func TestListBatchesCommand_Run(t *testing.T) {
 					},
 				},
 				{
-					ID:        domaintypes.RunID("batch-002"), // Convert to domain type
+					ID:        runID2,
 					Status:    "Finished",
-					ModID:     "mod-002",
-					SpecID:    "spec-002",
+					ModID:     modID2,
+					SpecID:    specID2,
 					CreatedAt: time.Now(),
 				},
 			},
@@ -69,7 +78,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			limit:  10,
 			offset: 5,
 			serverResp: []BatchSummary{
-				{ID: domaintypes.RunID("batch-page"), Status: "Started", ModID: "mod-page", SpecID: "spec-page"}, // Convert to domain type
+				{ID: runIDPage, Status: "Started", ModID: modIDPage, SpecID: specIDPage},
 			},
 			wantCount: 1,
 		},
@@ -214,6 +223,11 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
+	runID := domaintypes.NewRunID()
+	modID1 := domaintypes.NewModID()
+	modID2 := domaintypes.NewModID()
+	specID1 := domaintypes.NewSpecID()
+	specID2 := domaintypes.NewSpecID()
 
 	tests := []struct {
 		name        string
@@ -232,7 +246,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "feature-branch",
 			batchName:  strPtr("test-batch"),
-			runSummary: BatchSummary{ID: domaintypes.RunID("batch-new-001"), Status: "Started", ModID: "mod-001", SpecID: "spec-001", CreatedAt: time.Now()},
+			runSummary: BatchSummary{ID: runID, Status: "Started", ModID: modID1, SpecID: specID1, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -241,7 +255,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "hotfix",
 			batchName:  nil,
-			runSummary: BatchSummary{ID: domaintypes.RunID("batch-new-001"), Status: "Started", ModID: "mod-002", SpecID: "spec-002", CreatedAt: time.Now()},
+			runSummary: BatchSummary{ID: runID, Status: "Started", ModID: modID2, SpecID: specID2, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -281,14 +295,14 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 					resp := struct {
 						RunID domaintypes.RunID `json:"run_id"`
 					}{
-						RunID: domaintypes.RunID("batch-new-001"),
+						RunID: runID,
 					}
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(tc.statusCode)
 					_ = json.NewEncoder(w).Encode(resp)
 					return
-				case r.Method == http.MethodGet && r.URL.Path == basePathPrefix+"/v1/runs/batch-new-001":
+				case r.Method == http.MethodGet && r.URL.Path == basePathPrefix+"/v1/runs/"+runID.String():
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(tc.runSummary)

@@ -22,7 +22,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			ID:         RunID("2NQPoBfVkc8dFmGAQqJnUwMu9jR"),
 			Status:     "Started",
 			ModID:      ModID("mod-x1"),
-			SpecID:     SpecID("spec-y2"),
+			SpecID:     SpecID("spec-y2Z"),
 			CreatedBy:  ptr("test-user"),
 			CreatedAt:  now,
 			StartedAt:  &started,
@@ -70,7 +70,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
 			"status": "Started",
 			"mod_id": "",
-			"spec_id": "spec-y2",
+			"spec_id": "spec-y2Z",
 			"created_at": "2024-01-01T00:00:00Z"
 		}`
 
@@ -108,7 +108,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
 			"status": "Started",
 			"mod_id": "   ",
-			"spec_id": "spec-y2",
+			"spec_id": "spec-y2Z",
 			"created_at": "2024-01-01T00:00:00Z"
 		}`
 

@@ -11,11 +11,15 @@ import (
 // TestJSONRoundTrip ensures typed IDs in the Mods API marshal/unmarshal as JSON strings.
 // Verifies that RunSummary.RunID marshals as "run_id" in JSON for wire compatibility.
 func TestJSONRoundTrip(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	stageKey := domaintypes.NewJobID()
+	jobID := domaintypes.NewJobID()
+
 	in := RunSummary{
-		RunID: domaintypes.RunID("t-123"),
+		RunID: runID,
 		State: RunStateRunning,
 		Stages: map[domaintypes.JobID]StageStatus{
-			"s1": {State: StageStateQueued, CurrentJobID: domaintypes.JobID("job-1")},
+			stageKey: {State: StageStateQueued, CurrentJobID: jobID},
 		},
 	}
 
@@ -26,7 +30,10 @@ func TestJSONRoundTrip(t *testing.T) {
 	// Expect JSON to contain plain strings for ids.
 	// RunID marshals as "run_id" to maintain wire format compatibility.
 	js := string(b)
-	for _, want := range []string{"\"run_id\":\"t-123\"", "\"current_job_id\":\"job-1\""} {
+	for _, want := range []string{
+		"\"run_id\":\"" + runID.String() + "\"",
+		"\"current_job_id\":\"" + jobID.String() + "\"",
+	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("expected json to contain %s; got %s", want, js)
 		}
@@ -39,7 +46,6 @@ func TestJSONRoundTrip(t *testing.T) {
 	if out.RunID != in.RunID {
 		t.Fatalf("run id roundtrip mismatch: %v vs %v", out.RunID, in.RunID)
 	}
-	stageKey := domaintypes.JobID("s1")
 	if out.Stages[stageKey].CurrentJobID != in.Stages[stageKey].CurrentJobID {
 		t.Fatalf("job id roundtrip mismatch: %v vs %v", out.Stages[stageKey].CurrentJobID, in.Stages[stageKey].CurrentJobID)
 	}

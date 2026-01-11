@@ -16,6 +16,8 @@ import (
 func TestCreateModRunCommand_Run(t *testing.T) {
 	t.Parallel()
 
+	modID := domaintypes.NewModID().String()
+
 	tests := []struct {
 		name        string
 		modID       string
@@ -27,28 +29,28 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 	}{
 		{
 			name:       "run all repos",
-			modID:      "mod-001",
+			modID:      modID,
 			repoURLs:   nil,
 			failed:     false,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:       "run failed repos",
-			modID:      "mod-001",
+			modID:      modID,
 			repoURLs:   nil,
 			failed:     true,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:       "run explicit repos",
-			modID:      "mod-001",
+			modID:      modID,
 			repoURLs:   []string{"https://github.com/a/b.git", "https://github.com/c/d.git"},
 			failed:     false,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:        "mutually exclusive flags",
-			modID:       "mod-001",
+			modID:       modID,
 			repoURLs:    []string{"https://github.com/a/b.git"},
 			failed:      true,
 			wantErr:     true,
@@ -65,6 +67,8 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
+			runID := domaintypes.NewRunID()
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
@@ -96,7 +100,7 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 					t.Errorf("expected mode all, got %s", req.RepoSelector.Mode)
 				}
 
-				resp := CreateModRunResult{RunID: domaintypes.RunID("run-001")}
+				resp := CreateModRunResult{RunID: runID}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
@@ -127,8 +131,8 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run() error: %v", err)
 			}
-			if result.RunID.String() != "run-001" {
-				t.Errorf("got RunID %q, want %q", result.RunID.String(), "run-001")
+			if result.RunID != runID {
+				t.Errorf("got RunID %q, want %q", result.RunID.String(), runID.String())
 			}
 		})
 	}
@@ -137,6 +141,8 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 // TestCreateModRunCommand_SelectorMutualExclusion validates --repo and --failed are mutually exclusive.
 func TestCreateModRunCommand_SelectorMutualExclusion(t *testing.T) {
 	t.Parallel()
+
+	modID := domaintypes.NewModID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
@@ -148,7 +154,7 @@ func TestCreateModRunCommand_SelectorMutualExclusion(t *testing.T) {
 	cmd := CreateModRunCommand{
 		Client:   srv.Client(),
 		BaseURL:  baseURL,
-		ModRef:   domaintypes.ModRef("mod-001"),
+		ModRef:   domaintypes.ModRef(modID.String()),
 		RepoURLs: []string{"https://github.com/org/repo.git"},
 		Failed:   true,
 	}

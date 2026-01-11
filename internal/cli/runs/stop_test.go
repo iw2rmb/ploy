@@ -17,6 +17,11 @@ import (
 func TestStopCommand_Run(t *testing.T) {
 	t.Parallel()
 
+	okRunID := domaintypes.NewRunID()
+	missingRunID := domaintypes.NewRunID()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+
 	tests := []struct {
 		name        string
 		runID       domaintypes.RunID
@@ -27,19 +32,19 @@ func TestStopCommand_Run(t *testing.T) {
 	}{
 		{
 			name:  "successful stop",
-			runID: domaintypes.RunID("run-456"),
+			runID: okRunID,
 			serverResp: Summary{
-				ID:        domaintypes.RunID("run-456"),
+				ID:        okRunID,
 				Status:    "Cancelled",
-				ModID:     domaintypes.ModID("mod-123"),
-				SpecID:    domaintypes.SpecID("spec-123"),
+				ModID:     modID,
+				SpecID:    specID,
 				CreatedAt: time.Unix(1, 0).UTC(),
 			},
 			statusCode: http.StatusOK,
 		},
 		{
 			name:        "run not found",
-			runID:       domaintypes.RunID("nonexistent"),
+			runID:       missingRunID,
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run stop",
