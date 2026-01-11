@@ -78,17 +78,18 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 	)
 
 	// Test RunID text/JSON round-trip (covers run identifier serialization).
-	if err := rid.UnmarshalText([]byte("  R-42  ")); err != nil {
+	runIDStr := NewRunID().String()
+	if err := rid.UnmarshalText([]byte("  " + runIDStr + "  ")); err != nil {
 		t.Fatalf("run UnmarshalText: %v", err)
 	}
-	if rid.String() != "R-42" {
+	if rid.String() != runIDStr {
 		t.Fatalf("run normalize: %q", rid.String())
 	}
 	b, err := json.Marshal(rid)
 	if err != nil {
 		t.Fatalf("run marshal: %v", err)
 	}
-	if string(b) != "\"R-42\"" {
+	if string(b) != "\""+runIDStr+"\"" {
 		t.Fatalf("run json string expected, got %s", string(b))
 	}
 	var rid2 RunID
@@ -107,13 +108,16 @@ func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
 		t.Fatalf("cluster UnmarshalText: %v", err)
 	}
 	// Test v1 ID types text round-trip.
-	if err := mid.UnmarshalText([]byte(" mod-1 ")); err != nil {
+	modIDStr := NewModID().String()
+	if err := mid.UnmarshalText([]byte(" " + modIDStr + " ")); err != nil {
 		t.Fatalf("mod UnmarshalText: %v", err)
 	}
-	if err := sid.UnmarshalText([]byte(" spec-1 ")); err != nil {
+	specIDStr := NewSpecID().String()
+	if err := sid.UnmarshalText([]byte(" " + specIDStr + " ")); err != nil {
 		t.Fatalf("spec UnmarshalText: %v", err)
 	}
-	if err := mrid.UnmarshalText([]byte(" modrepo-1 ")); err != nil {
+	modRepoIDStr := NewModRepoID().String()
+	if err := mrid.UnmarshalText([]byte(" " + modRepoIDStr + " ")); err != nil {
 		t.Fatalf("modrepo UnmarshalText: %v", err)
 	}
 
@@ -155,6 +159,61 @@ func TestIDs_RejectEmpty(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIDs_RejectInvalidFormats(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunID", func(t *testing.T) {
+		t.Parallel()
+		var v RunID
+		if err := v.UnmarshalText([]byte("abc123")); err == nil {
+			t.Fatalf("expected error for invalid RunID, got nil")
+		}
+	})
+
+	t.Run("JobID", func(t *testing.T) {
+		t.Parallel()
+		var v JobID
+		if err := v.UnmarshalText([]byte("job123")); err == nil {
+			t.Fatalf("expected error for invalid JobID, got nil")
+		}
+	})
+
+	t.Run("NodeID", func(t *testing.T) {
+		t.Parallel()
+		var v NodeID
+		if err := v.UnmarshalText([]byte("too-long")); err == nil {
+			t.Fatalf("expected error for invalid NodeID, got nil")
+		}
+		if err := v.UnmarshalText([]byte("ab cd1")); err == nil {
+			t.Fatalf("expected error for invalid NodeID chars, got nil")
+		}
+	})
+
+	t.Run("ModID", func(t *testing.T) {
+		t.Parallel()
+		var v ModID
+		if err := v.UnmarshalText([]byte("abcdefg")); err == nil {
+			t.Fatalf("expected error for invalid ModID length, got nil")
+		}
+	})
+
+	t.Run("SpecID", func(t *testing.T) {
+		t.Parallel()
+		var v SpecID
+		if err := v.UnmarshalText([]byte("short")); err == nil {
+			t.Fatalf("expected error for invalid SpecID length, got nil")
+		}
+	})
+
+	t.Run("ModRepoID", func(t *testing.T) {
+		t.Parallel()
+		var v ModRepoID
+		if err := v.UnmarshalText([]byte("short")); err == nil {
+			t.Fatalf("expected error for invalid ModRepoID length, got nil")
+		}
+	})
 }
 
 // TestIDGenerators verifies the KSUID and NanoID-based ID generation helpers.

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const testSecret = "test-secret-key-for-jwt-signing-at-least-32-chars-long"
@@ -77,8 +78,8 @@ func TestGenerateAPIToken_ContainsCorrectClaims(t *testing.T) {
 	}
 
 	// Verify NodeID is not set for API tokens
-	if claims.NodeID != "" {
-		t.Errorf("expected NodeID to be empty for API token, got %s", claims.NodeID)
+	if !claims.NodeID.IsZero() {
+		t.Errorf("expected NodeID to be empty for API token, got %s", claims.NodeID.String())
 	}
 
 	// Verify expiration is approximately correct (within 1 minute tolerance)
@@ -115,7 +116,7 @@ func TestGenerateAPIToken_UniqueTokenIDs(t *testing.T) {
 
 func TestGenerateBootstrapToken_Success(t *testing.T) {
 	clusterID := "test-cluster"
-	nodeID := "node-123"
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	expiresAt := time.Now().Add(15 * time.Minute)
 
 	tokenString, err := GenerateBootstrapToken(testSecret, clusterID, nodeID, expiresAt)
@@ -143,7 +144,7 @@ func TestGenerateBootstrapToken_Success(t *testing.T) {
 
 func TestGenerateBootstrapToken_IncludesNodeID(t *testing.T) {
 	clusterID := "test-cluster"
-	nodeID := "550e8400-e29b-41d4-a716-446655440000"
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	expiresAt := time.Now().Add(15 * time.Minute)
 
 	tokenString, err := GenerateBootstrapToken(testSecret, clusterID, nodeID, expiresAt)
@@ -168,7 +169,7 @@ func TestGenerateBootstrapToken_IncludesNodeID(t *testing.T) {
 
 func TestGenerateBootstrapToken_ShortLived(t *testing.T) {
 	clusterID := "test-cluster"
-	nodeID := "node-123"
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	expiresAt := time.Now().Add(15 * time.Minute)
 
 	tokenString, err := GenerateBootstrapToken(testSecret, clusterID, nodeID, expiresAt)

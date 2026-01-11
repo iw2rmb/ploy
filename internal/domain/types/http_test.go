@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,8 @@ import (
 func TestParseRunIDParam(t *testing.T) {
 	t.Parallel()
 
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
 	tests := []struct {
 		name      string
 		pathKey   string
@@ -16,19 +19,20 @@ func TestParseRunIDParam(t *testing.T) {
 		wantID    RunID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
 			pathKey:   "id",
-			pathValue: "abc123",
-			wantID:    RunID("abc123"),
+			pathValue: validRunID,
+			wantID:    RunID(validRunID),
 			wantErr:   false,
 		},
 		{
 			name:      "value with leading/trailing whitespace is trimmed",
 			pathKey:   "id",
-			pathValue: "  abc123  ",
-			wantID:    RunID("abc123"),
+			pathValue: "  " + validRunID + "  ",
+			wantID:    RunID(validRunID),
 			wantErr:   false,
 		},
 		{
@@ -53,11 +57,11 @@ func TestParseRunIDParam(t *testing.T) {
 			errMsg:    "run_id path parameter is required",
 		},
 		{
-			name:      "KSUID-like value",
+			name:      "invalid format returns error",
 			pathKey:   "id",
-			pathValue: "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-			wantID:    RunID("2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"),
-			wantErr:   false,
+			pathValue: "abc123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidRunID,
 		},
 	}
 
@@ -75,7 +79,14 @@ func TestParseRunIDParam(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -95,6 +106,8 @@ func TestParseRunIDParam(t *testing.T) {
 func TestParseJobIDParam(t *testing.T) {
 	t.Parallel()
 
+	validJobID := NewJobID().String()
+
 	tests := []struct {
 		name      string
 		pathKey   string
@@ -102,12 +115,13 @@ func TestParseJobIDParam(t *testing.T) {
 		wantID    JobID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
 			pathKey:   "job_id",
-			pathValue: "job123",
-			wantID:    JobID("job123"),
+			pathValue: validJobID,
+			wantID:    JobID(validJobID),
 			wantErr:   false,
 		},
 		{
@@ -123,6 +137,13 @@ func TestParseJobIDParam(t *testing.T) {
 			pathValue: "   ",
 			wantErr:   true,
 			errMsg:    "job_id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "job_id",
+			pathValue: "job123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidJobID,
 		},
 	}
 
@@ -140,7 +161,14 @@ func TestParseJobIDParam(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -160,6 +188,8 @@ func TestParseJobIDParam(t *testing.T) {
 func TestParseNodeIDParam(t *testing.T) {
 	t.Parallel()
 
+	validNodeID := NewNodeKey()
+
 	tests := []struct {
 		name      string
 		pathKey   string
@@ -167,12 +197,13 @@ func TestParseNodeIDParam(t *testing.T) {
 		wantID    NodeID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
 			pathKey:   "id",
-			pathValue: "node123",
-			wantID:    NodeID("node123"),
+			pathValue: validNodeID,
+			wantID:    NodeID(validNodeID),
 			wantErr:   false,
 		},
 		{
@@ -188,6 +219,13 @@ func TestParseNodeIDParam(t *testing.T) {
 			pathValue: "   ",
 			wantErr:   true,
 			errMsg:    "id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "id",
+			pathValue: "node123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidNodeID,
 		},
 	}
 
@@ -205,7 +243,14 @@ func TestParseNodeIDParam(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -232,6 +277,7 @@ func TestParseModIDParam(t *testing.T) {
 		wantID    ModID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
@@ -254,6 +300,13 @@ func TestParseModIDParam(t *testing.T) {
 			wantErr:   true,
 			errMsg:    "mod_id path parameter is required",
 		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "mod_id",
+			pathValue: "mod12",
+			wantErr:   true,
+			wantErrIs: ErrInvalidModID,
+		},
 	}
 
 	for _, tt := range tests {
@@ -270,7 +323,14 @@ func TestParseModIDParam(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -376,6 +436,8 @@ func TestParseModRefParam(t *testing.T) {
 func TestParseModRepoIDParam(t *testing.T) {
 	t.Parallel()
 
+	validRepoID := NewModRepoID().String()
+
 	tests := []struct {
 		name      string
 		pathKey   string
@@ -383,12 +445,13 @@ func TestParseModRepoIDParam(t *testing.T) {
 		wantID    ModRepoID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
 			pathKey:   "repo_id",
-			pathValue: "repo123",
-			wantID:    ModRepoID("repo123"),
+			pathValue: validRepoID,
+			wantID:    ModRepoID(validRepoID),
 			wantErr:   false,
 		},
 		{
@@ -404,6 +467,13 @@ func TestParseModRepoIDParam(t *testing.T) {
 			pathValue: "   ",
 			wantErr:   true,
 			errMsg:    "repo_id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "repo_id",
+			pathValue: "repo123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidModRepoID,
 		},
 	}
 
@@ -421,7 +491,14 @@ func TestParseModRepoIDParam(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -441,38 +518,53 @@ func TestParseModRepoIDParam(t *testing.T) {
 func TestOptionalRunIDParam(t *testing.T) {
 	t.Parallel()
 
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
 	tests := []struct {
 		name      string
 		pathKey   string
 		pathValue string
+		wantErr   bool
+		wantErrIs error
 		wantNil   bool
 		wantID    RunID
 	}{
 		{
 			name:      "valid value returns pointer",
 			pathKey:   "id",
-			pathValue: "abc123",
+			pathValue: validRunID,
+			wantErr:   false,
 			wantNil:   false,
-			wantID:    RunID("abc123"),
+			wantID:    RunID(validRunID),
 		},
 		{
 			name:      "value with whitespace is trimmed",
 			pathKey:   "id",
-			pathValue: "  abc123  ",
+			pathValue: "  " + validRunID + "  ",
+			wantErr:   false,
 			wantNil:   false,
-			wantID:    RunID("abc123"),
+			wantID:    RunID(validRunID),
 		},
 		{
 			name:      "empty value returns nil",
 			pathKey:   "id",
 			pathValue: "",
+			wantErr:   false,
 			wantNil:   true,
 		},
 		{
 			name:      "whitespace-only value returns nil",
 			pathKey:   "id",
 			pathValue: "   ",
+			wantErr:   false,
 			wantNil:   true,
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "id",
+			pathValue: "abc123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidRunID,
 		},
 	}
 
@@ -483,7 +575,19 @@ func TestOptionalRunIDParam(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			req.SetPathValue(tt.pathKey, tt.pathValue)
 
-			result := OptionalRunIDParam(req, tt.pathKey)
+			result, err := OptionalRunIDParam(req, tt.pathKey)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Fatalf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			if tt.wantNil {
 				if result != nil {
@@ -506,26 +610,29 @@ func TestOptionalRunIDParam(t *testing.T) {
 func TestParseRunIDQuery(t *testing.T) {
 	t.Parallel()
 
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
 	tests := []struct {
-		name     string
-		queryKey string
-		query    string
-		wantID   RunID
-		wantErr  bool
-		errMsg   string
+		name      string
+		queryKey  string
+		query     string
+		wantID    RunID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:     "valid value",
 			queryKey: "id",
-			query:    "id=abc123",
-			wantID:   RunID("abc123"),
+			query:    "id=" + validRunID,
+			wantID:   RunID(validRunID),
 			wantErr:  false,
 		},
 		{
 			name:     "value with whitespace is trimmed",
 			queryKey: "id",
-			query:    "id=%20abc123%20",
-			wantID:   RunID("abc123"),
+			query:    "id=%20" + validRunID + "%20",
+			wantID:   RunID(validRunID),
 			wantErr:  false,
 		},
 		{
@@ -541,6 +648,13 @@ func TestParseRunIDQuery(t *testing.T) {
 			query:    "id=",
 			wantErr:  true,
 			errMsg:   "id query parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			queryKey:  "id",
+			query:     "id=abc123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidRunID,
 		},
 	}
 
@@ -561,7 +675,14 @@ func TestParseRunIDQuery(t *testing.T) {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -581,31 +702,45 @@ func TestParseRunIDQuery(t *testing.T) {
 func TestOptionalRunIDQuery(t *testing.T) {
 	t.Parallel()
 
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
 	tests := []struct {
-		name     string
-		queryKey string
-		query    string
-		wantNil  bool
-		wantID   RunID
+		name      string
+		queryKey  string
+		query     string
+		wantErr   bool
+		wantErrIs error
+		wantNil   bool
+		wantID    RunID
 	}{
 		{
 			name:     "valid value returns pointer",
 			queryKey: "id",
-			query:    "id=abc123",
+			query:    "id=" + validRunID,
+			wantErr:  false,
 			wantNil:  false,
-			wantID:   RunID("abc123"),
+			wantID:   RunID(validRunID),
 		},
 		{
 			name:     "missing query param returns nil",
 			queryKey: "id",
 			query:    "",
+			wantErr:  false,
 			wantNil:  true,
 		},
 		{
 			name:     "empty query value returns nil",
 			queryKey: "id",
 			query:    "id=",
+			wantErr:  false,
 			wantNil:  true,
+		},
+		{
+			name:      "invalid format returns error",
+			queryKey:  "id",
+			query:     "id=abc123",
+			wantErr:   true,
+			wantErrIs: ErrInvalidRunID,
 		},
 	}
 
@@ -619,7 +754,19 @@ func TestOptionalRunIDQuery(t *testing.T) {
 			}
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 
-			result := OptionalRunIDQuery(req, tt.queryKey)
+			result, err := OptionalRunIDQuery(req, tt.queryKey)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Fatalf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			if tt.wantNil {
 				if result != nil {
