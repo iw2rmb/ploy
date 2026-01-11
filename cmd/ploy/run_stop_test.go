@@ -8,15 +8,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestRunStopCallsControlPlane validates `ploy run stop <run-id>` calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunStopCallsControlPlane(t *testing.T) {
 	var called bool
+	runID := domaintypes.NewRunID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-456/cancel" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID.String()+"/cancel" {
 			called = true
 
 			now := time.Now()
@@ -29,7 +32,7 @@ func TestRunStopCallsControlPlane(t *testing.T) {
 					Cancelled int32 `json:"cancelled"`
 				} `json:"repo_counts,omitempty"`
 			}{
-				ID:        "run-456",
+				ID:        runID.String(),
 				Status:    "Cancelled",
 				CreatedAt: now,
 				Counts: &struct {
@@ -49,17 +52,17 @@ func TestRunStopCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "stop", "run-456"}, &buf)
+	err := executeCmd([]string{"run", "stop", runID.String()}, &buf)
 	if err != nil {
 		t.Fatalf("run stop error: %v", err)
 	}
 	if !called {
-		t.Fatal("expected POST /v1/runs/run-456/cancel to be called")
+		t.Fatalf("expected POST /v1/runs/%s/cancel to be called", runID.String())
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "run-456") {
-		t.Errorf("output should contain run-456: %s", output)
+	if !strings.Contains(output, runID.String()) {
+		t.Errorf("output should contain %s: %s", runID.String(), output)
 	}
 	if !strings.Contains(output, "stopped") {
 		t.Errorf("output should contain stopped: %s", output)

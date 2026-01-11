@@ -234,6 +234,7 @@ func TestRunNodeAddGeneratesNanoIDNodeID(t *testing.T) {
 
 func TestSignNodeCSR_Success(t *testing.T) {
 	t.Parallel()
+	nodeID := domaintypes.NewNodeKey()
 	// Arrange a fake PKI sign endpoint
 	var gotPath, gotContentType string
 	var gotBody pkiSignRequest
@@ -256,7 +257,7 @@ func TestSignNodeCSR_Success(t *testing.T) {
 	defer srv.Close()
 
 	// Act
-	cert, ca, err := signNodeCSR(context.Background(), srv.URL, "node-abc", []byte("CSR-PEM"))
+	cert, ca, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
 	if err != nil {
 		t.Fatalf("signNodeCSR error: %v", err)
 	}
@@ -268,7 +269,7 @@ func TestSignNodeCSR_Success(t *testing.T) {
 	if gotContentType != "application/json" {
 		t.Fatalf("expected application/json, got: %s", gotContentType)
 	}
-	if gotBody.NodeID != "node-abc" || gotBody.CSR != "CSR-PEM" {
+	if gotBody.NodeID.String() != nodeID || gotBody.CSR != "CSR-PEM" {
 		t.Fatalf("unexpected body: %+v", gotBody)
 	}
 	if cert != "CERT-PEM" || ca != "CA-PEM" {
@@ -278,12 +279,13 @@ func TestSignNodeCSR_Success(t *testing.T) {
 
 func TestSignNodeCSR_Non200(t *testing.T) {
 	t.Parallel()
+	nodeID := domaintypes.NewNodeKey()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad csr", http.StatusBadRequest)
 	}))
 	defer srv.Close()
 
-	_, _, err := signNodeCSR(context.Background(), srv.URL, "node-abc", []byte("CSR-PEM"))
+	_, _, err := signNodeCSR(context.Background(), srv.URL, nodeID, []byte("CSR-PEM"))
 	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad csr") {
 		t.Fatalf("expected status error, got: %v", err)
 	}

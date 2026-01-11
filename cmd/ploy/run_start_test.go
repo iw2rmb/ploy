@@ -15,9 +15,10 @@ import (
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunStartCallsControlPlane(t *testing.T) {
 	var called bool
+	runID := domaintypes.NewRunID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/run-789/start" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/"+runID.String()+"/start" {
 			called = true
 
 			resp := struct {
@@ -26,7 +27,7 @@ func TestRunStartCallsControlPlane(t *testing.T) {
 				AlreadyDone int               `json:"already_done"`
 				Pending     int               `json:"pending"`
 			}{
-				RunID:       domaintypes.RunID("run-789"),
+				RunID:       runID,
 				Started:     3,
 				AlreadyDone: 1,
 				Pending:     0,
@@ -43,17 +44,17 @@ func TestRunStartCallsControlPlane(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "start", "run-789"}, &buf)
+	err := executeCmd([]string{"run", "start", runID.String()}, &buf)
 	if err != nil {
 		t.Fatalf("run start error: %v", err)
 	}
 	if !called {
-		t.Fatal("expected POST /v1/runs/run-789/start to be called")
+		t.Fatalf("expected POST /v1/runs/%s/start to be called", runID.String())
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "run-789") {
-		t.Errorf("output should contain run-789: %s", output)
+	if !strings.Contains(output, runID.String()) {
+		t.Errorf("output should contain %s: %s", runID.String(), output)
 	}
 	if !strings.Contains(output, "started 3") {
 		t.Errorf("output should contain started 3: %s", output)

@@ -8,13 +8,19 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestRunStatusPrintsSummary(t *testing.T) {
 	t.Helper()
 
+	runID := domaintypes.NewRunID()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/batch-123" {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String() {
 			now := time.Now()
 			resp := struct {
 				ID        string    `json:"id"`
@@ -32,10 +38,10 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 					DerivedStatus string `json:"derived_status"`
 				} `json:"repo_counts,omitempty"`
 			}{
-				ID:        "batch-123",
+				ID:        runID.String(),
 				Status:    "running",
-				ModID:     "mod-123",
-				SpecID:    "spec-123",
+				ModID:     modID.String(),
+				SpecID:    specID.String(),
 				CreatedAt: now,
 				Counts: &struct {
 					Total         int32  `json:"total"`
@@ -66,12 +72,12 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 	useServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "status", "batch-123"}, &buf)
+	err := executeCmd([]string{"run", "status", runID.String()}, &buf)
 	if err != nil {
 		t.Fatalf("run status error: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Run: batch-123") {
+	if !strings.Contains(out, "Run: "+runID.String()) {
 		t.Fatalf("expected output to contain run id; got %q", out)
 	}
 	if !strings.Contains(out, "Repo Counts") {
