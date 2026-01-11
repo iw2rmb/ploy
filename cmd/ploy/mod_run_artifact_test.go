@@ -20,6 +20,8 @@ import (
 // and a manifest.json file is created with correct metadata.
 func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 	t.Parallel()
+	runID := domaintypes.NewRunID()
+	stageID := domaintypes.NewJobID()
 	// Create a mock server that handles run status and artifact downloads.
 	artifactContent := []byte("test artifact content")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,10 +30,10 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 			// Run status endpoint — return RunSummary directly (canonical response shape).
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-				RunID: domaintypes.RunID("test-123"),
+				RunID: runID,
 				State: modsapi.RunStateSucceeded,
 				Stages: map[domaintypes.JobID]modsapi.StageStatus{
-					"stage1": {
+					stageID: {
 						State: modsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"artifact1": "cid-abc123",
@@ -72,7 +74,7 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	ctx := context.Background()
-	err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test-123", tmpDir, out)
+	err := downloadRunArtifacts(ctx, baseURL, server.Client(), runID.String(), tmpDir, out)
 	if err != nil {
 		t.Fatalf("downloadRunArtifacts failed: %v", err)
 	}
@@ -105,8 +107,8 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 		t.Fatalf("expected 1 artifact in manifest, got %d", len(manifest.Artifacts))
 	}
 	item := manifest.Artifacts[0]
-	if item.Stage != "stage1" {
-		t.Errorf("expected stage1, got %s", item.Stage)
+	if item.Stage != stageID.String() {
+		t.Errorf("expected %s, got %s", stageID.String(), item.Stage)
 	}
 	if item.Name != "artifact1" {
 		t.Errorf("expected artifact1, got %s", item.Name)
@@ -134,22 +136,26 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 // stages are all downloaded correctly.
 func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 	t.Parallel()
+	runID := domaintypes.NewRunID()
+	planStageID := domaintypes.NewJobID()
+	execStageID := domaintypes.NewJobID()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status"):
 			// Run status with multiple stages — return RunSummary directly.
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-				RunID: domaintypes.RunID("test-multi"),
+				RunID: runID,
 				State: modsapi.RunStateSucceeded,
 				Stages: map[domaintypes.JobID]modsapi.StageStatus{
-					"plan": {
+					planStageID: {
 						State: modsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"plan.json": "cid-plan",
 						},
 					},
-					"exec": {
+					execStageID: {
 						State: modsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"output.log": "cid-exec",
@@ -208,7 +214,7 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	ctx := context.Background()
-	err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test-multi", tmpDir, out)
+	err := downloadRunArtifacts(ctx, baseURL, server.Client(), runID.String(), tmpDir, out)
 	if err != nil {
 		t.Fatalf("downloadRunArtifacts failed: %v", err)
 	}
@@ -237,6 +243,9 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 // failure scenarios (status fetch failure, artifact not found, etc.).
 func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 	t.Parallel()
+	runID := domaintypes.NewRunID()
+	stageID := domaintypes.NewJobID()
+
 	tests := []struct {
 		name        string
 		handler     http.HandlerFunc
@@ -259,9 +268,9 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 					// Return RunSummary directly.
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-						RunID: domaintypes.RunID("test"),
+						RunID: runID,
 						Stages: map[domaintypes.JobID]modsapi.StageStatus{
-							"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
+							stageID: {Artifacts: map[string]string{"art": "missing-cid"}},
 						},
 					})
 				} else if strings.Contains(r.URL.Path, "/v1/artifacts") {
@@ -284,7 +293,7 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 			out := &bytes.Buffer{}
 
 			ctx := context.Background()
-			err := downloadRunArtifacts(ctx, baseURL, server.Client(), "test", tmpDir, out)
+			err := downloadRunArtifacts(ctx, baseURL, server.Client(), runID.String(), tmpDir, out)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -359,6 +368,8 @@ func TestBuildArtifactFilename(t *testing.T) {
 // TestFetchMRURL verifies MR URL extraction from run metadata.
 func TestFetchMRURL(t *testing.T) {
 	t.Parallel()
+	runID := domaintypes.NewRunID()
+
 	tests := []struct {
 		name       string
 		metadata   map[string]string
@@ -399,7 +410,7 @@ func TestFetchMRURL(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-					RunID:    domaintypes.RunID("test"),
+					RunID:    runID,
 					Metadata: tt.metadata,
 				})
 			}))
@@ -407,7 +418,7 @@ func TestFetchMRURL(t *testing.T) {
 
 			baseURL, _ := url.Parse(server.URL)
 			ctx := context.Background()
-			gotURL, err := fetchMRURL(ctx, baseURL, server.Client(), "test")
+			gotURL, err := fetchMRURL(ctx, baseURL, server.Client(), runID.String())
 			if (err == nil) != tt.wantErrNil {
 				t.Errorf("fetchMRURL error = %v, wantErrNil %v", err, tt.wantErrNil)
 			}
@@ -429,7 +440,7 @@ func TestFetchMRURLErrorHandling(t *testing.T) {
 
 	baseURL, _ := url.Parse(server.URL)
 	ctx := context.Background()
-	_, err := fetchMRURL(ctx, baseURL, server.Client(), "test")
+	_, err := fetchMRURL(ctx, baseURL, server.Client(), domaintypes.NewRunID().String())
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -441,13 +452,15 @@ func TestFetchMRURLErrorHandling(t *testing.T) {
 // TestDownloadRunArtifactsZeroArtifacts writes an empty manifest when no artifacts exist.
 func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 	t.Parallel()
+	stageID := domaintypes.NewJobID()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
 			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{Stages: map[domaintypes.JobID]modsapi.StageStatus{
-				"stage0": {Artifacts: map[string]string{}},
+				stageID: {Artifacts: map[string]string{}},
 			}})
 			return
 		}
@@ -459,7 +472,7 @@ func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 	baseURL, _ := url.Parse(server.URL)
 	out := &bytes.Buffer{}
 	ctx := context.Background()
-	if err := downloadRunArtifacts(ctx, baseURL, server.Client(), "t0", tmpDir, out); err != nil {
+	if err := downloadRunArtifacts(ctx, baseURL, server.Client(), domaintypes.NewRunID().String(), tmpDir, out); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(tmpDir, "manifest.json"))
