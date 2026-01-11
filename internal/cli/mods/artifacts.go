@@ -35,11 +35,8 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		return errors.New("mods artifacts: run id required")
 	}
 	runID := c.RunID.String()
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "status")
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	endpoint := c.BaseURL.JoinPath("v1", "runs", runID, "status")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return err
 	}

@@ -96,10 +96,23 @@ func buildRunRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 	}
 	targetRef := strings.TrimSpace(*flags.RepoTargetRef)
 
+	typedRepoURL := domaintypes.RepoURL(repoURL)
+	if err := typedRepoURL.Validate(); err != nil {
+		return modsapi.RunSubmitRequest{}, fmt.Errorf("repo_url: %w", err)
+	}
+	typedBaseRef := domaintypes.GitRef(baseRef)
+	if err := typedBaseRef.Validate(); err != nil {
+		return modsapi.RunSubmitRequest{}, fmt.Errorf("base_ref: %w", err)
+	}
+	typedTargetRef := domaintypes.GitRef(targetRef)
+	if err := typedTargetRef.Validate(); err != nil {
+		return modsapi.RunSubmitRequest{}, fmt.Errorf("target_ref: %w", err)
+	}
+
 	request := modsapi.RunSubmitRequest{
-		RepoURL:   repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
+		RepoURL:   typedRepoURL,
+		BaseRef:   typedBaseRef,
+		TargetRef: typedTargetRef,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
 

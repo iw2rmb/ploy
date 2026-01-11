@@ -35,16 +35,16 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	}
 
 	reqBody := c.Request
-	reqBody.RepoURL = strings.TrimSpace(reqBody.RepoURL)
-	if err := domaintypes.RepoURL(reqBody.RepoURL).Validate(); err != nil {
+	reqBody.RepoURL = domaintypes.RepoURL(strings.TrimSpace(reqBody.RepoURL.String()))
+	if err := reqBody.RepoURL.Validate(); err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: repo_url: %w", err)
 	}
-	reqBody.BaseRef = strings.TrimSpace(reqBody.BaseRef)
-	if err := domaintypes.GitRef(reqBody.BaseRef).Validate(); err != nil {
+	reqBody.BaseRef = domaintypes.GitRef(strings.TrimSpace(reqBody.BaseRef.String()))
+	if err := reqBody.BaseRef.Validate(); err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: base_ref: %w", err)
 	}
-	reqBody.TargetRef = strings.TrimSpace(reqBody.TargetRef)
-	if err := domaintypes.GitRef(reqBody.TargetRef).Validate(); err != nil {
+	reqBody.TargetRef = domaintypes.GitRef(strings.TrimSpace(reqBody.TargetRef.String()))
+	if err := reqBody.TargetRef.Validate(); err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("mods submit: target_ref: %w", err)
 	}
 	if len(reqBody.Spec) == 0 {
