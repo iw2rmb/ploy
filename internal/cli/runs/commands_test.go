@@ -15,12 +15,16 @@ import (
 func TestGetStatusCommandDelegates(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.NewRunID()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/v1/runs/run-123" {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/runs/"+runID.String() {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"run-123","status":"running","mod_id":"mod-123","spec_id":"spec-123","created_at":"2024-01-01T00:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"id":"` + runID.String() + `","status":"running","mod_id":"` + modID.String() + `","spec_id":"` + specID.String() + `","created_at":"2024-01-01T00:00:00Z"}`))
 	}))
 	t.Cleanup(srv.Close)
 
@@ -32,14 +36,14 @@ func TestGetStatusCommandDelegates(t *testing.T) {
 	cmd := GetStatusCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   domaintypes.RunID("run-123"),
+		RunID:   runID,
 	}
 
 	summary, err := cmd.Run(context.Background())
 	if err != nil {
 		t.Fatalf("GetStatusCommand.Run error: %v", err)
 	}
-	if summary.ID != domaintypes.RunID("run-123") {
+	if summary.ID != runID {
 		t.Fatalf("unexpected run id: %s", summary.ID)
 	}
 }

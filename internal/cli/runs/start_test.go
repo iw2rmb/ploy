@@ -15,6 +15,11 @@ import (
 func TestStartCommand_Run(t *testing.T) {
 	t.Parallel()
 
+	runIDPartial := domaintypes.NewRunID()
+	runIDDrift := domaintypes.NewRunID()
+	runIDNotFound := domaintypes.NewRunID()
+	runIDNotFoundJSON := domaintypes.NewRunID()
+
 	tests := []struct {
 		name        string
 		runID       domaintypes.RunID
@@ -28,9 +33,9 @@ func TestStartCommand_Run(t *testing.T) {
 	}{
 		{
 			name:  "start with pending repos",
-			runID: domaintypes.RunID("run-partial"),
+			runID: runIDPartial,
 			serverResp: StartResult{
-				RunID:       domaintypes.RunID("run-partial"),
+				RunID:       runIDPartial,
 				Started:     2,
 				AlreadyDone: 0,
 				Pending:     3,
@@ -39,10 +44,10 @@ func TestStartCommand_Run(t *testing.T) {
 		},
 		{
 			name:       "contract drift: unknown field",
-			runID:      domaintypes.RunID("run-drift"),
+			runID:      runIDDrift,
 			statusCode: http.StatusOK,
 			serverBody: map[string]any{
-				"run_id":        "run-drift",
+				"run_id":        runIDDrift.String(),
 				"started":       1,
 				"already_done":  0,
 				"pending":       0,
@@ -54,14 +59,14 @@ func TestStartCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "run not found",
-			runID:       domaintypes.RunID("nonexistent"),
+			runID:       runIDNotFound,
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "run start",
 		},
 		{
 			name:        "run not found with json error",
-			runID:       domaintypes.RunID("nonexistent-json"),
+			runID:       runIDNotFoundJSON,
 			statusCode:  http.StatusNotFound,
 			jsonError:   "run not found (json)",
 			wantErr:     true,

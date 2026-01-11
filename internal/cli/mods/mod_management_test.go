@@ -32,7 +32,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       nil,
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        types.ModID("mod-001"),
+				ID:        types.ModID("mod001"),
 				Name:      "test-mod",
 				SpecID:    nil,
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -44,7 +44,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        types.ModID("mod-002"),
+				ID:        types.ModID("mod002"),
 				Name:      "test-mod-with-spec",
 				SpecID:    specIDPtr(types.SpecID("spec-001")),
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -139,8 +139,8 @@ func TestListModsCommand_Run(t *testing.T) {
 			limit:  50,
 			offset: 0,
 			serverResp: []ModSummary{
-				{ID: types.ModID("mod-001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: types.ModID("mod-002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+				{ID: types.ModID("mod001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: types.ModID("mod002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 			wantCount: 2,
 		},
@@ -207,7 +207,7 @@ func TestRemoveModCommand_Run(t *testing.T) {
 	}{
 		{
 			name:       "successful delete",
-			modID:      "mod-001",
+			modID:      "mod001",
 			statusCode: http.StatusNoContent,
 		},
 		{
@@ -287,7 +287,7 @@ func TestArchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
 		}
 
-		resp := ArchiveModResult{ID: types.ModID("mod-001"), Name: "test-mod", Archived: true}
+		resp := ArchiveModResult{ID: types.ModID("mod001"), Name: "test-mod", Archived: true}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -298,7 +298,7 @@ func TestArchiveModCommand_Run(t *testing.T) {
 	cmd := ArchiveModCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod-001"),
+		ModRef:  types.ModRef("mod001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -322,7 +322,7 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
 		}
 
-		resp := UnarchiveModResult{ID: types.ModID("mod-001"), Name: "test-mod", Archived: false}
+		resp := UnarchiveModResult{ID: types.ModID("mod001"), Name: "test-mod", Archived: false}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -333,7 +333,7 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 	cmd := UnarchiveModCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod-001"),
+		ModRef:  types.ModRef("mod001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -369,7 +369,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	cmd := SetModSpecCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod-001"),
+		ModRef:  types.ModRef("mod001"),
 		Spec:    json.RawMessage(`{"version":"v1"}`),
 	}
 

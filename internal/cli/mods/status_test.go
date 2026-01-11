@@ -13,6 +13,12 @@ import (
 )
 
 func TestListRunRepoDiffsCommand_Success(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	jobID1 := domaintypes.NewJobID()
+	jobID2 := domaintypes.NewJobID()
+	jobID3 := domaintypes.NewJobID()
+
 	type testDiff struct {
 		ID        string                 `json:"id"`
 		JobID     string                 `json:"job_id"`
@@ -22,13 +28,13 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 
 	diffs := []testDiff{
-		{ID: "550e8400-e29b-41d4-a716-446655440000", JobID: "job-1", CreatedAt: "2026-01-10T00:00:00Z", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
-		{ID: "550e8400-e29b-41d4-a716-446655440001", JobID: "job-2", CreatedAt: "2026-01-10T00:00:01Z", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
-		{ID: "550e8400-e29b-41d4-a716-446655440002", JobID: "job-3", CreatedAt: "2026-01-10T00:00:02Z", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440000", JobID: jobID1.String(), CreatedAt: "2026-01-10T00:00:00Z", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440001", JobID: jobID2.String(), CreatedAt: "2026-01-10T00:00:01Z", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440002", JobID: jobID3.String(), CreatedAt: "2026-01-10T00:00:02Z", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/runs/run-123/repos/repo-abc/diffs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
@@ -45,8 +51,8 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	cmd := ListRunRepoDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		RunID:   runID,
+		RepoID:  repoID,
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -67,6 +73,9 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 }
 
 func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(struct {
@@ -79,8 +88,8 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 	cmd := ListRunRepoDiffsCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   domaintypes.RunID("run-empty"),
-		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		RunID:   runID,
+		RepoID:  repoID,
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -95,14 +104,18 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 
 // TestDownloadDiffCommand_Success verifies successful download and decompression.
 func TestDownloadDiffCommand_Success(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+
 	patchContent := "diff --git a/test.txt b/test.txt\n+added line\n"
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/runs/run-123/repos/repo-abc/diffs" {
-			t.Errorf("expected path /v1/runs/run-123/repos/repo-abc/diffs, got %s", r.URL.Path)
+		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		if r.URL.Path != wantPath {
+			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
 		}
 		if r.URL.Query().Get("download") != "true" {
 			t.Error("expected download=true query param")
@@ -123,8 +136,8 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 	cmd := DownloadDiffCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		RunID:   runID,
+		RepoID:  repoID,
 		DiffID:  domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400aa"),
 	}
 
@@ -140,9 +153,13 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 
 // TestDownloadDiffCommand_EmptyPatch verifies handling of empty patches.
 func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/runs/run-123/repos/repo-abc/diffs" {
-			t.Errorf("expected path /v1/runs/run-123/repos/repo-abc/diffs, got %s", r.URL.Path)
+		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		if r.URL.Path != wantPath {
+			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
 		}
 		if r.URL.Query().Get("download") != "true" {
 			t.Error("expected download=true query param")
@@ -161,8 +178,8 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	cmd := DownloadDiffCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		RunID:   domaintypes.RunID("run-123"),
-		RepoID:  domaintypes.ModRepoID("repo-abc"),
+		RunID:   runID,
+		RepoID:  repoID,
 		DiffID:  domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400bb"),
 	}
 

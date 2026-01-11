@@ -26,12 +26,16 @@ func newTestLogPrinter(w io.Writer) *logs.Printer {
 }
 
 func TestArtifactsCommand(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	buildJobID := domaintypes.NewJobID()
+	testJobID := domaintypes.NewJobID()
+
 	run := modsapi.RunSummary{
-		RunID: domaintypes.RunID("t1"),
+		RunID: runID,
 		State: modsapi.RunStateSucceeded,
 		Stages: map[domaintypes.JobID]modsapi.StageStatus{
-			"build": {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
-			"test":  {State: modsapi.StageStateSucceeded},
+			buildJobID: {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
+			testJobID:  {State: modsapi.StageStateSucceeded},
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +46,7 @@ func TestArtifactsCommand(t *testing.T) {
 	base, _ := url.Parse(srv.URL)
 
 	var out bytes.Buffer
-	if err := (ArtifactsCommand{Client: srv.Client(), BaseURL: base, RunID: "t1", Output: &out}).Run(context.Background()); err != nil {
+	if err := (ArtifactsCommand{Client: srv.Client(), BaseURL: base, RunID: runID, Output: &out}).Run(context.Background()); err != nil {
 		t.Fatalf("artifacts run: %v", err)
 	}
 	if out.Len() == 0 {
@@ -51,6 +55,14 @@ func TestArtifactsCommand(t *testing.T) {
 }
 
 func TestCancelResumeSubmitCommands(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	modID := domaintypes.NewModID()
+	specID := domaintypes.NewSpecID()
+
+	runIDStr := runID.String()
+	modIDStr := modID.String()
+	specIDStr := specID.String()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -64,16 +76,16 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			ModID  string `json:"mod_id"`
 			SpecID string `json:"spec_id"`
 		}{
-			RunID:  "t2",
-			ModID:  "m2",
-			SpecID: "s2",
+			RunID:  runIDStr,
+			ModID:  modIDStr,
+			SpecID: specIDStr,
 		})
 	})
-	mux.HandleFunc("/v1/runs/t2/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs/"+runIDStr+"/status", func(w http.ResponseWriter, r *http.Request) {
 		// Canonical RunSummary response shape for status.
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
-			RunID:      domaintypes.RunID("t2"),
+			RunID:      runID,
 			State:      modsapi.RunStatePending,
 			Repository: "https://example.com/repo.git",
 			Metadata: map[string]string{
@@ -83,7 +95,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			Stages: make(map[domaintypes.JobID]modsapi.StageStatus),
 		})
 	})
-	mux.HandleFunc("/v1/runs/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/runs/"+runIDStr+"/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	})
 	srv := httptest.NewServer(mux)
@@ -101,11 +113,11 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			Spec:      []byte("{}"),
 		},
 	}).Run(context.Background())
-	if err != nil || string(sum.RunID) != "t2" {
+	if err != nil || sum.RunID != runID {
 		t.Fatalf("submit err=%v run=%+v", err, sum)
 	}
 	// Cancel
-	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t2"}).Run(context.Background()); err != nil {
+	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: runID}).Run(context.Background()); err != nil {
 		t.Fatalf("cancel err=%v", err)
 	}
 }
@@ -148,13 +160,15 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			runID := domaintypes.NewRunID()
+
 			// SSE server emits a terminal run event (RunSummary directly, no wrapper).
 			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
-				runSummary := modsapi.RunSummary{RunID: domaintypes.RunID("t3"), State: tt.terminalState}
+				runSummary := modsapi.RunSummary{RunID: runID, State: tt.terminalState}
 				b, _ := json.Marshal(runSummary)
 				_, _ = w.Write([]byte("event: run\n"))
 				_, _ = w.Write([]byte("data: "))
@@ -169,7 +183,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 			base, _ := url.Parse(sse.URL)
 
 			cli := stream.Client{HTTPClient: sse.Client(), MaxRetries: 0}
-			state, err := (EventsCommand{Client: cli, BaseURL: base, RunID: "t3"}).Run(context.Background())
+			state, err := (EventsCommand{Client: cli, BaseURL: base, RunID: runID}).Run(context.Background())
 			if err != nil {
 				t.Fatalf("events run err=%v", err)
 			}
@@ -181,13 +195,16 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 }
 
 func TestModsCommandsErrorPaths(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"bad req"}`))
 	})
-	mux.HandleFunc("/v1/runs/t/status", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
-	mux.HandleFunc("/v1/runs/t/cancel", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
+	mux.HandleFunc("/v1/runs/"+runIDStr+"/status", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+	mux.HandleFunc("/v1/runs/"+runIDStr+"/cancel", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
 	mux.HandleFunc("/v1/mods/t", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -206,16 +223,19 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 		t.Fatal("expected submit error")
 	}
 	// Cancel
-	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: "t"}).Run(context.Background()); err == nil {
+	if err := (runs.CancelCommand{Client: srv.Client(), BaseURL: base, RunID: runID}).Run(context.Background()); err == nil {
 		t.Fatal("expected cancel error")
 	}
 }
 
 func TestSimplePrinterFormats(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
-	p.Run(modsapi.RunSummary{RunID: domaintypes.RunID("t1"), State: modsapi.RunStateRunning})
-	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
+	p.Run(modsapi.RunSummary{RunID: runID, State: modsapi.RunStateRunning})
+	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: jobID, LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
 	}
@@ -227,18 +247,20 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		events     []string // SSE event lines to send
-		wantLog    string   // expected substring in log output
-		wantFinal  modsapi.RunState
-		wantNodeID bool // whether node= context should appear
+		name        string
+		buildEvents func(runID, nodeID, jobID string) []string
+		wantLog     string // expected substring in log output
+		wantFinal   modsapi.RunState
+		wantNodeID  bool // whether node= context should appear
 	}{
 		{
 			name: "log event with enriched fields",
-			events: []string{
-				"event: run\ndata: {\"run_id\":\"t-log\",\"state\":\"running\"}\n\n",
-				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"node-1\",\"job_id\":\"job-1\",\"mod_type\":\"mod\",\"step_index\":100}\n\n",
-				"event: run\ndata: {\"run_id\":\"t-log\",\"state\":\"succeeded\"}\n\n",
+			buildEvents: func(runID, nodeID, jobID string) []string {
+				return []string{
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
+					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"" + nodeID + "\",\"job_id\":\"" + jobID + "\",\"mod_type\":\"mod\",\"step_index\":100}\n\n",
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
+				}
 			},
 			wantLog:    "Build started",
 			wantFinal:  modsapi.RunStateSucceeded,
@@ -246,10 +268,12 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		},
 		{
 			name: "log event without enriched fields",
-			events: []string{
-				"event: run\ndata: {\"run_id\":\"t-log2\",\"state\":\"running\"}\n\n",
-				"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:01Z\",\"stream\":\"stderr\",\"line\":\"Warning\"}\n\n",
-				"event: run\ndata: {\"run_id\":\"t-log2\",\"state\":\"succeeded\"}\n\n",
+			buildEvents: func(runID, _ string, _ string) []string {
+				return []string{
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
+					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:01Z\",\"stream\":\"stderr\",\"line\":\"Warning\"}\n\n",
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
+				}
 			},
 			wantLog:    "Warning",
 			wantFinal:  modsapi.RunStateSucceeded,
@@ -257,10 +281,12 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		},
 		{
 			name: "retention event recorded",
-			events: []string{
-				"event: run\ndata: {\"run_id\":\"t-ret\",\"state\":\"running\"}\n\n",
-				"event: retention\ndata: {\"retained\":true,\"ttl\":\"24h\",\"expires_at\":\"2025-10-23T10:00:00Z\",\"bundle_cid\":\"bafy-bundle\"}\n\n",
-				"event: run\ndata: {\"run_id\":\"t-ret\",\"state\":\"succeeded\"}\n\n",
+			buildEvents: func(runID, _ string, _ string) []string {
+				return []string{
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
+					"event: retention\ndata: {\"retained\":true,\"ttl\":\"24h\",\"expires_at\":\"2025-10-23T10:00:00Z\",\"bundle_cid\":\"bafy-bundle\"}\n\n",
+					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
+				}
 			},
 			wantLog:    "retained", // retention summary is printed
 			wantFinal:  modsapi.RunStateSucceeded,
@@ -272,6 +298,10 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			runID := domaintypes.NewRunID()
+			nodeID := domaintypes.NewNodeKey()
+			jobID := domaintypes.NewJobID()
+
 			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
 				fl, ok := w.(http.Flusher)
@@ -280,7 +310,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 				}
 				fl.Flush()
 
-				for _, evt := range tt.events {
+				for _, evt := range tt.buildEvents(runID.String(), nodeID, jobID.String()) {
 					_, _ = w.Write([]byte(evt))
 					fl.Flush()
 					time.Sleep(2 * time.Millisecond)
@@ -297,7 +327,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 			cmd := EventsCommand{
 				Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
 				BaseURL:    base,
-				RunID:      "t-test",
+				RunID:      runID,
 				Output:     &buf,
 				LogPrinter: logPrinter,
 			}
@@ -326,6 +356,8 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.NewRunID()
+
 	sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		fl, ok := w.(http.Flusher)
@@ -336,9 +368,9 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 
 		// Send run, log, and run events.
 		events := []string{
-			"event: run\ndata: {\"run_id\":\"t-nolog\",\"state\":\"running\"}\n\n",
+			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"running\"}\n\n",
 			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be printed\"}\n\n",
-			"event: run\ndata: {\"run_id\":\"t-nolog\",\"state\":\"succeeded\"}\n\n",
+			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"succeeded\"}\n\n",
 		}
 		for _, evt := range events {
 			_, _ = w.Write([]byte(evt))
@@ -354,7 +386,7 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	cmd := EventsCommand{
 		Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
 		BaseURL:    base,
-		RunID:      "t-nolog",
+		RunID:      runID,
 		Output:     &buf,
 		LogPrinter: nil, // No LogPrinter configured.
 	}
@@ -373,7 +405,7 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 		t.Errorf("log message should appear when LogPrinter is nil, got: %s", out)
 	}
 	// Ticket state should still appear via SimplePrinter.
-	if !bytes.Contains([]byte(out), []byte("t-nolog")) {
+	if !bytes.Contains([]byte(out), []byte(runID.String())) {
 		t.Errorf("run ID should appear in output, got: %s", out)
 	}
 }
