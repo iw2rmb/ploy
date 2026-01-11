@@ -69,6 +69,9 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if repoURL == "" {
 		return nil, fmt.Errorf("run pull: repo url required")
 	}
+	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
+		return nil, fmt.Errorf("run pull: repo url must be a valid repo url")
+	}
 
 	// Build endpoint: POST /v1/runs/{run_id}/pull
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "pull")
@@ -156,6 +159,9 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	repoURL := strings.TrimSpace(c.RepoURL)
 	if repoURL == "" {
 		return nil, fmt.Errorf("mod pull: repo url required")
+	}
+	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
+		return nil, fmt.Errorf("mod pull: repo url must be a valid repo url")
 	}
 
 	// Default mode is "last-succeeded".

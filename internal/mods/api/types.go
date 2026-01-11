@@ -44,11 +44,11 @@ const (
 //   - spec: arbitrary JSON spec (YAML/JSON from CLI after normalisation)
 //   - created_by: optional submitter identifier (email, CI job, etc.)
 type RunSubmitRequest struct {
-	RepoURL   string          `json:"repo_url"`
-	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref"`
-	Spec      json.RawMessage `json:"spec"`
-	CreatedBy string          `json:"created_by,omitempty"`
+	RepoURL   domaintypes.RepoURL `json:"repo_url"`
+	BaseRef   domaintypes.GitRef  `json:"base_ref"`
+	TargetRef domaintypes.GitRef  `json:"target_ref"`
+	Spec      json.RawMessage     `json:"spec"`
+	CreatedBy string              `json:"created_by,omitempty"`
 }
 
 // RunSummary is the canonical response type for GET /v1/runs/{id}/status (status)

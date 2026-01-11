@@ -95,9 +95,9 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: modsapi.RunSubmitRequest{
-			RepoURL:   "https://example.com/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature",
+			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
+			BaseRef:   domaintypes.GitRef("main"),
+			TargetRef: domaintypes.GitRef("feature"),
 			Spec:      []byte("{}"),
 		},
 	}).Run(context.Background())
@@ -123,9 +123,9 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: modsapi.RunSubmitRequest{
-			RepoURL:   "http://example.com/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature",
+			RepoURL:   domaintypes.RepoURL("http://example.com/repo.git"),
+			BaseRef:   domaintypes.GitRef("main"),
+			TargetRef: domaintypes.GitRef("feature"),
 		},
 	}).Run(context.Background())
 	if err == nil {
@@ -197,9 +197,9 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 		Client:  srv.Client(),
 		BaseURL: base,
 		Request: modsapi.RunSubmitRequest{
-			RepoURL:   "https://example.com/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature",
+			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
+			BaseRef:   domaintypes.GitRef("main"),
+			TargetRef: domaintypes.GitRef("feature"),
 			Spec:      []byte("{}"),
 		},
 	}).Run(context.Background()); err == nil {

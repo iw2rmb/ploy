@@ -56,12 +56,9 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	}
 
 	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID.String()), "diffs")
-	if err != nil {
-		return nil, fmt.Errorf("list run repo diffs: build url: %w", err)
-	}
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("list run repo diffs: build request: %w", err)
 	}
@@ -118,16 +115,13 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	}
 
 	// Build endpoint: /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.RunID.String()), "repos", url.PathEscape(c.RepoID.String()), "diffs")
-	if err != nil {
-		return nil, fmt.Errorf("download diff: build url: %w", err)
-	}
-	q := url.Values{}
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", c.DiffID.String())
-	endpoint += "?" + q.Encode()
+	endpoint.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("download diff: build request: %w", err)
 	}

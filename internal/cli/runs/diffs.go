@@ -46,11 +46,8 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	}
 
 	// List diffs
-	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "diffs")
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "diffs")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -133,11 +130,8 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	}
 
 	// List diffs via repo-scoped endpoint
-	listURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "repos", url.PathEscape(repoID), "diffs")
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -179,15 +173,12 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	diffID := listing.Diffs[0].ID
 
 	// Download gzipped patch via repo-scoped endpoint (download mode).
-	dlURL, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "repos", url.PathEscape(repoID), "diffs")
-	if err != nil {
-		return err
-	}
-	q := url.Values{}
+	dlURL := c.BaseURL.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	q := dlURL.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID.String())
-	dlURL = dlURL + "?" + q.Encode()
-	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, nil)
+	dlURL.RawQuery = q.Encode()
+	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL.String(), nil)
 	if err != nil {
 		return err
 	}

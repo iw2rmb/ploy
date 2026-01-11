@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
@@ -111,9 +112,9 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 
 	// Build run request from parsed flags.
 	request := modsapi.RunSubmitRequest{
-		RepoURL:   strings.TrimSpace(*flags.RepoURL),
-		BaseRef:   strings.TrimSpace(*flags.BaseRef),
-		TargetRef: strings.TrimSpace(*flags.TargetRef),
+		RepoURL:   domaintypes.RepoURL(strings.TrimSpace(*flags.RepoURL)),
+		BaseRef:   domaintypes.GitRef(strings.TrimSpace(*flags.BaseRef)),
+		TargetRef: domaintypes.GitRef(strings.TrimSpace(*flags.TargetRef)),
 		Spec:      specPayload,
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}

@@ -62,14 +62,14 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
-	if received.RepoURL != "https://example.com/repo.git" {
-		t.Fatalf("unexpected repo_url: %s", received.RepoURL)
+	if received.RepoURL.String() != "https://example.com/repo.git" {
+		t.Fatalf("unexpected repo_url: %s", received.RepoURL.String())
 	}
-	if received.BaseRef != "main" {
-		t.Fatalf("expected base_ref main, got %s", received.BaseRef)
+	if received.BaseRef.String() != "main" {
+		t.Fatalf("expected base_ref main, got %s", received.BaseRef.String())
 	}
-	if received.TargetRef != "feature" {
-		t.Fatalf("expected target_ref feature, got %s", received.TargetRef)
+	if received.TargetRef.String() != "feature" {
+		t.Fatalf("expected target_ref feature, got %s", received.TargetRef.String())
 	}
 	if len(received.Spec) == 0 {
 		t.Fatalf("expected non-empty spec payload")
@@ -165,14 +165,14 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 	}
 
 	// Verify repository fields are set correctly.
-	if received.RepoURL != "https://example.com/repo.git" {
-		t.Fatalf("expected repo_url https://example.com/repo.git, got %s", received.RepoURL)
+	if received.RepoURL.String() != "https://example.com/repo.git" {
+		t.Fatalf("expected repo_url https://example.com/repo.git, got %s", received.RepoURL.String())
 	}
-	if received.BaseRef != "main" {
-		t.Fatalf("expected base_ref main, got %s", received.BaseRef)
+	if received.BaseRef.String() != "main" {
+		t.Fatalf("expected base_ref main, got %s", received.BaseRef.String())
 	}
-	if received.TargetRef != "feature" {
-		t.Fatalf("expected target_ref feature, got %s", received.TargetRef)
+	if received.TargetRef.String() != "feature" {
+		t.Fatalf("expected target_ref feature, got %s", received.TargetRef.String())
 	}
 
 	// Verify PAT is not printed in output.
