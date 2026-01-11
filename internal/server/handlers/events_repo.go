@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -55,9 +56,9 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		allowedJobs := make(map[string]struct{}, len(jobs))
+		allowedJobs := make(map[domaintypes.JobID]struct{}, len(jobs))
 		for _, job := range jobs {
-			allowedJobs[job.ID.String()] = struct{}{}
+			allowedJobs[job.ID] = struct{}{}
 		}
 
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
@@ -78,10 +79,11 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 				if err := json.Unmarshal(evt.Data, &payload); err != nil {
 					return evt, true
 				}
-				if payload.JobID == "" {
+				jobIDStr := strings.TrimSpace(payload.JobID)
+				if jobIDStr == "" {
 					return evt, false
 				}
-				_, ok := allowedJobs[payload.JobID]
+				_, ok := allowedJobs[domaintypes.JobID(jobIDStr)]
 				return evt, ok
 			case domaintypes.SSEEventRun:
 				// Filter stages map to this repo's jobs (payload schema stays RunSummary).

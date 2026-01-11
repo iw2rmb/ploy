@@ -30,7 +30,7 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 				RunID: domaintypes.RunID("test-123"),
 				State: modsapi.RunStateSucceeded,
-				Stages: map[string]modsapi.StageStatus{
+				Stages: map[domaintypes.JobID]modsapi.StageStatus{
 					"stage1": {
 						State: modsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
@@ -142,7 +142,7 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 				RunID: domaintypes.RunID("test-multi"),
 				State: modsapi.RunStateSucceeded,
-				Stages: map[string]modsapi.StageStatus{
+				Stages: map[domaintypes.JobID]modsapi.StageStatus{
 					"plan": {
 						State: modsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
@@ -260,7 +260,7 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
 						RunID: domaintypes.RunID("test"),
-						Stages: map[string]modsapi.StageStatus{
+						Stages: map[domaintypes.JobID]modsapi.StageStatus{
 							"stage1": {Artifacts: map[string]string{"art": "missing-cid"}},
 						},
 					})
@@ -446,7 +446,7 @@ func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{Stages: map[string]modsapi.StageStatus{
+			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{Stages: map[domaintypes.JobID]modsapi.StageStatus{
 				"stage0": {Artifacts: map[string]string{}},
 			}})
 			return

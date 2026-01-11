@@ -175,7 +175,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
-				Stages:    make(map[string]modsapi.StageStatus),
+				Stages:    make(map[domaintypes.JobID]modsapi.StageStatus),
 			}
 			if err := eventsService.PublishRun(r.Context(), run.ID, summary); err != nil {
 				slog.Error("create single-repo run: publish run event failed", "run_id", run.ID, "err", err)

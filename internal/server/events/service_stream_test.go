@@ -161,7 +161,7 @@ func TestStream_PublishRun(t *testing.T) {
 				},
 				CreatedAt: now,
 				UpdatedAt: now,
-				Stages: map[string]modsapi.StageStatus{
+				Stages: map[domaintypes.JobID]modsapi.StageStatus{
 					"stage-1": {
 						State:       modsapi.StageStateQueued,
 						Attempts:    0,
@@ -232,7 +232,7 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 		State:     modsapi.RunStateRunning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Stages:    map[string]modsapi.StageStatus{},
+		Stages:    map[domaintypes.JobID]modsapi.StageStatus{},
 	}
 
 	// Test with cancelled context.

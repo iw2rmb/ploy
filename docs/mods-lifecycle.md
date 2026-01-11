@@ -638,8 +638,8 @@ workflows.
 │  4. Apply diffs                                                              │
 │     ├─ Call GET /v1/runs/{run_id}/repos/{repo_id}/diffs to list diffs        │
 │     ├─ For each diff (ordered by step_index):                               │
-│     │   ├─ Download via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id> │
-│     │   ├─ Decompress gzipped patch                                         │
+│     │   ├─ Download via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid> │
+│     │   ├─ Stream-decompress gzipped patch                                  │
 │     │   └─ git apply (skip empty patches)                                   │
 │     └─ Print success summary                                                │
 │                                                                             │
@@ -662,6 +662,7 @@ workflows.
 | `repo_target_ref`          | API / `POST /v1/*/pull`         | Target branch name snapshot               |
 | `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Base ref snapshot for branch base     |
 | `diffs.summary.step_index` | diffs summary JSON              | Optional step index metadata for display  |
+| `diffs.id`                 | API / `GET /v1/runs/.../diffs`   | UUID used as `diff_id` for download       |
 
 **API endpoints consumed:**
 
@@ -669,7 +670,13 @@ workflows.
 - `POST /v1/mods/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
 - `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
-- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — Download gzipped patch content.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — Download gzipped patch content.
+
+**Download size limits (CLI):**
+
+- The CLI streams and gunzips diff downloads (no “read-all then gunzip-all”) using `internal/cli/httpx.GunzipToBytes`.
+- The decompressed patch is capped at 256 MiB (`httpx.MaxGunzipOutputBytes`) to mitigate gzip “zip bombs”.
+- Diff IDs are validated as UUIDs (`internal/domain/types.DiffID`) when decoded from API responses and when constructing download requests.
 
 **Repo URL rules:**
 
@@ -678,6 +685,8 @@ Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see `internal/v
 - Matching: compare normalized strings; no URL parsing or scheme validation is performed.
 The CLI derives `repo_url` from the git remote URL; the server performs normalized matching
 to select the correct `run_repos` entry.
+
+For CLI commands that accept a repo URL as an explicit input (submit, batch create, `mod repo add`, `mod run --repo`), the CLI validates `repo_url` using `internal/domain/types.RepoURL` (allowed schemes: `https://`, `ssh://`, `file://`).
 
 **Example usage:**
 
@@ -738,7 +747,7 @@ for the formal schema definition.
 | `metadata`   | map[string]string           | Additional diagnostics (see below).               |
 | `created_at` | string (RFC 3339)           | Run creation timestamp.                           |
 | `updated_at` | string (RFC 3339)           | Timestamp of the latest status update.            |
-| `stages`     | map[string]StageStatus      | Job execution states keyed by job ID.             |
+| `stages`     | map[JobID]StageStatus       | Job execution states keyed by job ID (JSON keys are job ID strings). |
 
 **Metadata keys:**
 
@@ -849,7 +858,7 @@ value is a `StageStatus` object describing that job's execution state.
     - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (`internal/server/handlers/diffs.go`)
       — returns a list of diffs with `job_id` and summary metadata, ordered by
       the producing job's `step_index` (ascending), then `created_at` (ascending).
-    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — returns the gzipped unified diff.
+    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — returns the gzipped unified diff.
   - Diffs are ordered by job `step_index` for rehydration.
 
 ### 2.3 Artifacts
@@ -902,7 +911,7 @@ value is a `StageStatus` object describing that job's execution state.
     - Updates repos in `Queued|Running` to `Cancelled`.
     - Updates jobs in `Created|Queued|Running` to `Cancelled`.
 
-- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<id>` — diff list and download.
+- `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` and `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — diff list and download.
   - Handler: `listRunRepoDiffsHandler` (download mode is query-driven).
   - Enable node and CLI callers to enumerate and fetch per-step diffs for a repo execution.
 

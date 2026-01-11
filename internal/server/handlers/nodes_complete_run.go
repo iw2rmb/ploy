@@ -183,7 +183,7 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 			Repository: repoURL,
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
-			Stages:     make(map[string]modsapi.StageStatus),
+			Stages:     make(map[domaintypes.JobID]modsapi.StageStatus),
 		}
 		if err := eventsService.PublishRun(ctx, runID, summary); err != nil {
 			slog.Error("complete run: publish run event failed", "run_id", runID, "err", err)
