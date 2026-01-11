@@ -115,8 +115,8 @@ func TestClaimJob_Success(t *testing.T) {
 	if spec["job_id"] != jobID.String() {
 		t.Fatalf("expected spec.job_id %s, got %v", jobID.String(), spec["job_id"])
 	}
-	if mi, ok := spec["mod_index"].(float64); !ok || mi != 0 {
-		t.Fatalf("expected spec.mod_index 0, got %v", spec["mod_index"])
+	if _, ok := spec["mod_index"]; ok {
+		t.Fatalf("expected spec.mod_index to be absent, got %v", spec["mod_index"])
 	}
 }
 

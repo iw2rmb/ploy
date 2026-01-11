@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -159,18 +157,6 @@ func buildAndSendJobClaimResponse(
 		return fmt.Errorf("merge job_id into spec: %w", err)
 	}
 
-	// For mod jobs (names following "mod-N" pattern), inject a numeric
-	// mod_index derived from job name so the node agent can map this job
-	// to mods[N] in multi-step specs.
-	if strings.HasPrefix(job.Name, "mod-") {
-		if idx, err := parseModIndex(job.Name); err == nil {
-			mergedSpec, err = mergeModIndexIntoSpec(mergedSpec, idx)
-			if err != nil {
-				return fmt.Errorf("merge mod_index into spec: %w", err)
-			}
-		}
-	}
-
 	// Merge server default GitLab config (token/domain) into spec if configured.
 	// Per-run overrides (already in spec) take precedence over server defaults.
 	gitlabCfg := configHolder.GetGitLab()
@@ -247,38 +233,6 @@ func mergeJobIDIntoSpec(spec []byte, jobID domaintypes.JobID) (json.RawMessage, 
 		return nil, fmt.Errorf("marshal merged spec: %w", err)
 	}
 	return merged, nil
-}
-
-// mergeModIndexIntoSpec injects mod_index into the spec JSONB for downstream execution.
-// mod_index maps a mod job (mod-N) to mods[N] in multi-step specs.
-func mergeModIndexIntoSpec(spec json.RawMessage, modIndex int) (json.RawMessage, error) {
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-	m["mod_index"] = modIndex
-	merged, err := json.Marshal(m)
-	if err != nil {
-		return nil, fmt.Errorf("marshal merged spec: %w", err)
-	}
-	return merged, nil
-}
-
-// parseModIndex extracts the numeric index from a mod job name ("mod-N").
-func parseModIndex(name string) (int, error) {
-	const prefix = "mod-"
-	if !strings.HasPrefix(name, prefix) {
-		return 0, fmt.Errorf("job name %q does not use mod-N pattern", name)
-	}
-	suffix := strings.TrimPrefix(name, prefix)
-	if strings.TrimSpace(suffix) == "" {
-		return 0, fmt.Errorf("empty mod index in job name %q", name)
-	}
-	idx, err := strconv.Atoi(suffix)
-	if err != nil {
-		return 0, fmt.Errorf("parse mod index from %q: %w", name, err)
-	}
-	return idx, nil
 }
 
 func nodeIDPtrOrZero(id *domaintypes.NodeID) domaintypes.NodeID {

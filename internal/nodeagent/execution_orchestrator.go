@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,18 +100,23 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	stack := r.loadPersistedStack(req.RunID)
 
 	// Build manifest with stack-aware image resolution using typed options.
-	// stepIndex is derived from server-injected mod_index for multi-step runs;
-	// when absent, defaults to 0 (single-step or legacy behavior).
 	typedOpts := req.TypedOptions
 	stepIdx := 0
-	if len(typedOpts.Steps) > 0 && typedOpts.ModIndexSet {
-		// Use typed ModIndex from RunOptions (passed in from claimer_loop).
-		if typedOpts.ModIndex >= 0 && typedOpts.ModIndex < len(typedOpts.Steps) {
-			stepIdx = typedOpts.ModIndex
-		} else {
-			slog.Warn("mod_index out of range for steps",
-				"run_id", req.RunID, "mod_index", typedOpts.ModIndex, "steps_len", len(typedOpts.Steps))
+	if len(typedOpts.Steps) > 0 {
+		idx, err := modStepIndexFromJobStepIndex(req.StepIndex)
+		if err != nil {
+			err = fmt.Errorf("derive mod step index from step_index: %w", err)
+			slog.Error("failed to derive mod step index", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
 		}
+		if idx < 0 || idx >= len(typedOpts.Steps) {
+			err := fmt.Errorf("derived mod step index out of range: step_index=%v derived=%d steps_len=%d", req.StepIndex, idx, len(typedOpts.Steps))
+			slog.Error("derived mod step index out of range", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex, "derived_index", idx, "steps_len", len(typedOpts.Steps))
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+		stepIdx = idx
 	}
 	manifest, err := buildManifestFromRequest(req, typedOpts, stepIdx, stack)
 	if err != nil {
@@ -235,6 +241,29 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		slog.Error("failed to create /out directory", "run_id", req.RunID, "error", outDirErr)
 		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
 	}
+}
+
+func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
+	f := stepIndex.Float64()
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("invalid step_index %v", f)
+	}
+	if f != math.Trunc(f) {
+		return 0, fmt.Errorf("step_index %v is not an integer", f)
+	}
+	if f < 2000 {
+		return 0, fmt.Errorf("step_index %v is too small for a mod step", f)
+	}
+
+	// Server job layout (internal contract):
+	// - pre-gate=1000
+	// - mod-N=2000+N*1000
+	// - post-gate=2000+(len(steps))*1000
+	thousands := int64(f) / 1000
+	if int64(f) != thousands*1000 {
+		return 0, fmt.Errorf("step_index %v is not a multiple of 1000", f)
+	}
+	return int(thousands) - 2, nil
 }
 
 // executeHealingJob runs a healing container job.

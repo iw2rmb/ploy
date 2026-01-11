@@ -11,7 +11,7 @@
 // The primary entry point for typed options is modsSpecToRunOptions(), which
 // converts directly from contracts.ModsSpec to RunOptions. This eliminates the
 // intermediate map[string]any bridge and its associated type conversion hazards:
-//   - No float64→int conversion for numeric fields (mod_index, retries)
+//   - No float64→int conversion for numeric fields (retries)
 //   - No []any→[]string conversion for slices (artifact_paths, command exec arrays)
 //   - No map[string]any type assertions at access points
 //
@@ -67,15 +67,6 @@ type RunOptions struct {
 
 	// ServerMetadata holds server-injected metadata for uploads and tracking.
 	ServerMetadata ServerMetadataOptions
-
-	// ModIndex is the server-injected index for multi-step runs. It selects
-	// which entry in Steps[] to use for manifest building. Defaults to 0.
-	// For single-step runs, this field is ignored.
-	ModIndex int
-
-	// ModIndexSet is true when mod_index was explicitly provided in the spec.
-	// This distinguishes between "not set" (use 0) and "set to 0".
-	ModIndexSet bool
 
 	// Steps holds the list of mod steps for multi-step runs (steps[] array).
 	// For single-step runs, this slice is empty and Execution options are used.
@@ -374,13 +365,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	// Direct assignment from typed spec fields.
 	if trimmed := strings.TrimSpace(spec.JobID); trimmed != "" {
 		runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
-	}
-
-	// --- Mod Index ---
-	// Direct int assignment without float64→int conversion.
-	if spec.ModIndex != nil {
-		runOpts.ModIndex = *spec.ModIndex
-		runOpts.ModIndexSet = true
 	}
 
 	return runOpts

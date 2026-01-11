@@ -110,7 +110,7 @@ func TestParseSpec_EnvMergingSemantics(t *testing.T) {
 	})
 }
 
-func TestParseSpec_ModIndexPropagatesToTypedOptions(t *testing.T) {
+func TestParseSpec_ModIndexRejected(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
@@ -124,11 +124,11 @@ func TestParseSpec_ModIndexPropagatesToTypedOptions(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	_, typedOpts := parseSpec(raw)
 
-	if !typedOpts.ModIndexSet {
-		t.Errorf("expected ModIndexSet=true, got false")
+	if len(typedOpts.Steps) != 0 {
+		t.Fatalf("expected mod_index to be rejected (zero typed options), got steps_len=%d", len(typedOpts.Steps))
 	}
-	if typedOpts.ModIndex != 1 {
-		t.Errorf("expected ModIndex=1, got %d", typedOpts.ModIndex)
+	if !typedOpts.Execution.Image.IsEmpty() {
+		t.Fatalf("expected mod_index to be rejected (zero typed options), got execution.image=%v", typedOpts.Execution.Image)
 	}
 }
 
@@ -254,13 +254,11 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Run("single_step_with_all_options", func(t *testing.T) {
 		t.Parallel()
 
-		modIndex := 0
 		mrOnSuccess := true
 		mrOnFail := false
 
 		spec := &contracts.ModsSpec{
-			JobID:    "job-direct-test-123",
-			ModIndex: &modIndex,
+			JobID: "job-direct-test-123",
 			Steps: []contracts.ModStep{
 				{
 					Image:           contracts.ModImage{Universal: "docker.io/test/mod:v1"},
@@ -294,12 +292,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 
 		if runOpts.ServerMetadata.JobID.String() != "job-direct-test-123" {
 			t.Errorf("JobID: got %q, want %q", runOpts.ServerMetadata.JobID.String(), "job-direct-test-123")
-		}
-		if !runOpts.ModIndexSet {
-			t.Error("expected ModIndexSet=true")
-		}
-		if runOpts.ModIndex != 0 {
-			t.Errorf("ModIndex: got %d, want 0", runOpts.ModIndex)
 		}
 
 		execImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
@@ -433,9 +425,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		t.Parallel()
 
 		runOpts := modsSpecToRunOptions(nil)
-		if runOpts.ModIndexSet {
-			t.Error("expected ModIndexSet=false for nil spec")
-		}
 		if !runOpts.Execution.Image.IsEmpty() {
 			t.Error("expected empty Execution.Image for nil spec")
 		}

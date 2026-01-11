@@ -66,10 +66,6 @@ type ModsSpec struct {
 	// JobID is the claimed job ID injected into the spec at claim time.
 	JobID string `json:"job_id,omitempty" yaml:"job_id,omitempty"`
 
-	// ModIndex maps a claimed mod job ("mod-N") to steps[N] in multi-step specs.
-	// Only present for mod jobs in multi-step runs.
-	ModIndex *int `json:"mod_index,omitempty" yaml:"mod_index,omitempty"`
-
 	// APIVersion is an optional schema version identifier (e.g., "ploy.mod/v1alpha1").
 	// Informational only; the control plane forwards specs as opaque JSON.
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
@@ -315,11 +311,6 @@ func (s ModsSpec) IsSingleStep() bool {
 //   - HealingSpec.Mod must have a non-empty image when present.
 //   - Retries must be non-negative.
 func (s ModsSpec) Validate() error {
-	// Validate server metadata.
-	if s.ModIndex != nil && *s.ModIndex < 0 {
-		return fmt.Errorf("mod_index: must be non-negative, got %d", *s.ModIndex)
-	}
-
 	// Validate steps.
 	if len(s.Steps) == 0 {
 		return fmt.Errorf("steps: required")
@@ -378,16 +369,8 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 		}
 		spec.JobID = strings.TrimSpace(s)
 	}
-	if v, ok := raw["mod_index"]; ok && v != nil {
-		switch n := v.(type) {
-		case int:
-			spec.ModIndex = &n
-		case float64:
-			ni := int(n)
-			spec.ModIndex = &ni
-		default:
-			return nil, fmt.Errorf("mod_index: expected number, got %T", v)
-		}
+	if _, ok := raw["mod_index"]; ok {
+		return nil, fmt.Errorf("mod_index: forbidden (derived internally from step_index; must not be provided)")
 	}
 
 	// Parse optional metadata fields.
@@ -742,9 +725,6 @@ func (s ModsSpec) ToMap() map[string]any {
 	// Server-injected metadata.
 	if strings.TrimSpace(s.JobID) != "" {
 		result["job_id"] = strings.TrimSpace(s.JobID)
-	}
-	if s.ModIndex != nil {
-		result["mod_index"] = *s.ModIndex
 	}
 
 	// Metadata.

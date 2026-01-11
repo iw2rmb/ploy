@@ -223,7 +223,7 @@ func (r *runController) runGateWithHealing(
 
 		// Build healing manifest from the single configured HealingMod.
 		mod := healingConfig.Mod
-		const modIndex = 0
+		const healingIndex = 0
 
 		// Pass healingSession through so agent-specific session env (for example,
 		// CODEX_RESUME=1 for Codex-based healers) can be injected by
@@ -231,13 +231,13 @@ func (r *runController) runGateWithHealing(
 		// Stack is unknown during inline healing loops since the gate result
 		// that detected the stack is the one that just failed. Use explicit
 		// ModStackUnknown to indicate this is intentional, not a fallback.
-		healManifest, buildErr := buildHealingManifest(req, mod, modIndex, healingSession, contracts.ModStackUnknown)
+		healManifest, buildErr := buildHealingManifest(req, mod, healingIndex, healingSession, contracts.ModStackUnknown)
 		if buildErr != nil {
-			slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", modIndex, "error", buildErr)
-			return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", modIndex, buildErr)
+			slog.Error("failed to build healing manifest", "run_id", req.RunID, "healing_index", healingIndex, "error", buildErr)
+			return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", healingIndex, buildErr)
 		}
 
-		slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", modIndex, "image", healManifest.Image, "phase", gatePhase)
+		slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "healing_index", healingIndex, "image", healManifest.Image, "phase", gatePhase)
 
 		// Inject healing-specific environment variables and TLS certificate mounts.
 		// Uses shared helpers (injectHealingEnvVars, mountHealingTLSCerts) to ensure
@@ -257,25 +257,25 @@ func (r *runController) runGateWithHealing(
 		})
 
 		if healErr != nil {
-			slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", modIndex, "error", healErr)
-			return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", modIndex, healErr)
+			slog.Error("healing mod execution failed", "run_id", req.RunID, "healing_index", healingIndex, "error", healErr)
+			return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", healingIndex, healErr)
 		}
 
 		if healResult.ExitCode != 0 {
-			slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", modIndex, "exit_code", healResult.ExitCode)
+			slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "healing_index", healingIndex, "exit_code", healResult.ExitCode)
 			// Continue; re-gate will still run so callers see gate status.
 		}
 
 		// Upload /out artifacts for this healing mod if present.
 		if uploadErr := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); uploadErr != nil {
-			slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "mod_index", modIndex, "error", uploadErr)
+			slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "healing_index", healingIndex, "error", uploadErr)
 		}
 
 		// Read session artifacts from /out for propagation across retries.
 		if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
 			if session := strings.TrimSpace(string(sessionBytes)); session != "" {
 				healingSession = session
-				slog.Info("healing: captured session from /out", "run_id", req.RunID, "mod_index", modIndex, "session_id", healingSession)
+				slog.Info("healing: captured session from /out", "run_id", req.RunID, "healing_index", healingIndex, "session_id", healingSession)
 			}
 		}
 
