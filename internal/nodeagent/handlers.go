@@ -25,7 +25,6 @@ import (
 //   - Artifacts: artifact name and workspace-relative paths to upload.
 //   - ServerMetadata: server-injected job ID for upload correlation.
 //   - Steps: multi-step mods array for sequential execution.
-//   - ModIndex/ModIndexSet: server-injected step index for multi-step runs.
 //
 // StepIndex field:
 //   - Identifies the job's step index for job-level execution tracking.

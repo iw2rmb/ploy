@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -261,6 +262,17 @@ func TestParseModsSpecJSON_Empty(t *testing.T) {
 	}
 	if want := "steps: required"; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
+	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mod:latest"}]}`
+	_, err := ParseModsSpecJSON([]byte(input))
+	if err == nil {
+		t.Fatal("expected error for mod_index")
+	}
+	if !strings.Contains(err.Error(), "mod_index: forbidden") {
+		t.Fatalf("expected mod_index forbidden error, got %q", err.Error())
 	}
 }
 
