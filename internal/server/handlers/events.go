@@ -45,10 +45,6 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if len(runID.String()) != 27 {
-			http.Error(w, "invalid run id", http.StatusBadRequest)
-			return
-		}
 
 		// Verify run exists in the database.
 		_, err = st.GetRun(r.Context(), runID)

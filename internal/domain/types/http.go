@@ -13,7 +13,11 @@ func ParseRunIDParam(r *http.Request, key string) (RunID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return RunID(val), nil
+	var id RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // ParseJobIDParam extracts and validates a JobID from a path parameter.
@@ -23,7 +27,11 @@ func ParseJobIDParam(r *http.Request, key string) (JobID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return JobID(val), nil
+	var id JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // ParseNodeIDParam extracts and validates a NodeID from a path parameter.
@@ -33,7 +41,11 @@ func ParseNodeIDParam(r *http.Request, key string) (NodeID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return NodeID(val), nil
+	var id NodeID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // ParseModIDParam extracts and validates a ModID from a path parameter.
@@ -43,7 +55,11 @@ func ParseModIDParam(r *http.Request, key string) (ModID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return ModID(val), nil
+	var id ModID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // ParseModRefParam extracts and validates a ModRef from a path parameter.
@@ -67,7 +83,11 @@ func ParseModRepoIDParam(r *http.Request, key string) (ModRepoID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return ModRepoID(val), nil
+	var id ModRepoID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // ParseSpecIDParam extracts and validates a SpecID from a path parameter.
@@ -77,40 +97,53 @@ func ParseSpecIDParam(r *http.Request, key string) (SpecID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s path parameter is required", key)
 	}
-	return SpecID(val), nil
+	var id SpecID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // OptionalRunIDParam extracts an optional RunID from a path parameter.
 // Returns nil if the parameter is missing or empty.
-func OptionalRunIDParam(r *http.Request, key string) *RunID {
+func OptionalRunIDParam(r *http.Request, key string) (*RunID, error) {
 	val := strings.TrimSpace(r.PathValue(key))
 	if val == "" {
-		return nil
+		return nil, nil
 	}
-	id := RunID(val)
-	return &id
+	var id RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
 }
 
 // OptionalJobIDParam extracts an optional JobID from a path parameter.
 // Returns nil if the parameter is missing or empty.
-func OptionalJobIDParam(r *http.Request, key string) *JobID {
+func OptionalJobIDParam(r *http.Request, key string) (*JobID, error) {
 	val := strings.TrimSpace(r.PathValue(key))
 	if val == "" {
-		return nil
+		return nil, nil
 	}
-	id := JobID(val)
-	return &id
+	var id JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
 }
 
 // OptionalNodeIDParam extracts an optional NodeID from a path parameter.
 // Returns nil if the parameter is missing or empty.
-func OptionalNodeIDParam(r *http.Request, key string) *NodeID {
+func OptionalNodeIDParam(r *http.Request, key string) (*NodeID, error) {
 	val := strings.TrimSpace(r.PathValue(key))
 	if val == "" {
-		return nil
+		return nil, nil
 	}
-	id := NodeID(val)
-	return &id
+	var id NodeID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
 }
 
 // ParseRunIDQuery extracts and validates a RunID from a query parameter.
@@ -120,27 +153,37 @@ func ParseRunIDQuery(r *http.Request, key string) (RunID, error) {
 	if val == "" {
 		return "", fmt.Errorf("%s query parameter is required", key)
 	}
-	return RunID(val), nil
+	var id RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }
 
 // OptionalRunIDQuery extracts an optional RunID from a query parameter.
 // Returns nil if the parameter is missing or empty.
-func OptionalRunIDQuery(r *http.Request, key string) *RunID {
+func OptionalRunIDQuery(r *http.Request, key string) (*RunID, error) {
 	val := strings.TrimSpace(r.URL.Query().Get(key))
 	if val == "" {
-		return nil
+		return nil, nil
 	}
-	id := RunID(val)
-	return &id
+	var id RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
 }
 
 // OptionalJobIDQuery extracts an optional JobID from a query parameter.
 // Returns nil if the parameter is missing or empty.
-func OptionalJobIDQuery(r *http.Request, key string) *JobID {
+func OptionalJobIDQuery(r *http.Request, key string) (*JobID, error) {
 	val := strings.TrimSpace(r.URL.Query().Get(key))
 	if val == "" {
-		return nil
+		return nil, nil
 	}
-	id := JobID(val)
-	return &id
+	var id JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
 }

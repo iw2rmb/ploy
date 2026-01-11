@@ -22,9 +22,15 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 		// Accept id from path parameter first, then fallback to query parameter.
 		// Uses domain type helpers for validation at the boundary.
 		var runID domaintypes.RunID
-		if idPtr := domaintypes.OptionalRunIDParam(r, "id"); idPtr != nil {
+		if idPtr, err := domaintypes.OptionalRunIDParam(r, "id"); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		} else if idPtr != nil {
 			runID = *idPtr
-		} else if qID := domaintypes.OptionalRunIDQuery(r, "id"); qID != nil {
+		} else if qID, err := domaintypes.OptionalRunIDQuery(r, "id"); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		} else if qID != nil {
 			runID = *qID
 		} else {
 			http.Error(w, "id query parameter is required", http.StatusBadRequest)
