@@ -86,7 +86,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// Initialize runtime components using shared helper.
 	// The cleanup function closes logStreamer on exit.
 	// Pass jobID to associate log chunks with this specific job.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
+	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -278,7 +278,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// Initialize runtime components using shared helper.
 	// The cleanup function closes logStreamer on exit.
 	// Pass jobID to associate log chunks with this specific healing job.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
+	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -574,9 +574,9 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 // Parameters:
 //   - ctx: context for initialization operations
 //   - runID: run identifier for logging and telemetry
-//   - jobID: job identifier for associating log chunks with specific jobs; pass empty string
+//   - jobID: job identifier for associating log chunks with specific jobs; pass a zero value
 //     only when job attribution is not available
-func (r *runController) initializeRuntime(ctx context.Context, runID string, jobID string) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
+func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
 	// Initialize git fetcher without snapshot publishing (node agent operates on ephemeral workspaces).
 	gitFetcher, err := r.createGitFetcher()
 	if err != nil {

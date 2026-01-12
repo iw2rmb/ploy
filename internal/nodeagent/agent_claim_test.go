@@ -32,13 +32,14 @@ func TestClaimLoop(t *testing.T) {
 			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
-				RunID:     types.RunID("run-123"),
-				JobID:     types.JobID("job-123"),
-				RepoURL:   "https://github.com/test/repo",
+				RunID:     types.NewRunID(),
+				RepoID:    types.NewModRepoID(),
+				JobID:     types.NewJobID(),
+				RepoURL:   types.RepoURL("https://github.com/test/repo"),
 				Status:    "Started",
 				NodeID:    types.NodeID(testNodeID),
-				BaseRef:   "main",
-				TargetRef: "feature-branch",
+				BaseRef:   types.GitRef("main"),
+				TargetRef: types.GitRef("feature-branch"),
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -281,13 +282,14 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
-				RunID:     types.RunID("run-reset"),
-				JobID:     types.JobID("job-reset"),
-				RepoURL:   "https://github.com/test/repo",
+				RunID:     types.NewRunID(),
+				RepoID:    types.NewModRepoID(),
+				JobID:     types.NewJobID(),
+				RepoURL:   types.RepoURL("https://github.com/test/repo"),
 				Status:    "Started",
 				NodeID:    types.NodeID(testNodeID),
-				BaseRef:   "main",
-				TargetRef: "feature",
+				BaseRef:   types.GitRef("main"),
+				TargetRef: types.GitRef("feature"),
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -376,20 +378,22 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	t.Parallel()
 
-	commit := "deadbeef"
+	commit := types.CommitSHA("deadbeef")
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
 	nodeIDStr := "aB3xY9"
+	repoID := types.NewModRepoID()
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
 		RunID:     runID,
+		RepoID:    repoID,
 		JobID:     jobID,
-		RepoURL:   "https://github.com/acme/thing.git",
+		RepoURL:   types.RepoURL("https://github.com/acme/thing.git"),
 		Status:    "Started",
 		NodeID:    types.NodeID(nodeIDStr),
-		BaseRef:   "main",
-		TargetRef: "feature/x",
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature/x"),
 		CommitSha: &commit,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
@@ -435,17 +439,20 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	if got.RunID != claim.RunID {
 		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
 	}
-	if got.RepoURL.String() != claim.RepoURL {
-		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
+	if got.RepoID != claim.RepoID {
+		t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
 	}
-	if got.BaseRef.String() != claim.BaseRef {
-		t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
+	if got.RepoURL != claim.RepoURL {
+		t.Errorf("RepoURL=%q want %q", got.RepoURL.String(), claim.RepoURL.String())
 	}
-	if got.TargetRef.String() != claim.TargetRef {
-		t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
+	if got.BaseRef != claim.BaseRef {
+		t.Errorf("BaseRef=%q want %q", got.BaseRef.String(), claim.BaseRef.String())
 	}
-	if got.CommitSHA.String() != *claim.CommitSha {
-		t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
+	if got.TargetRef != claim.TargetRef {
+		t.Errorf("TargetRef=%q want %q", got.TargetRef.String(), claim.TargetRef.String())
+	}
+	if got.CommitSHA != *claim.CommitSha {
+		t.Errorf("CommitSHA=%q want %q", got.CommitSHA.String(), claim.CommitSha.String())
 	}
 }
 
@@ -456,21 +463,23 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	t.Parallel()
 
 	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
-	commit := "abc123"
+	commit := types.CommitSHA("abc123")
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
 	nodeIDStr := "aB3xY9"
+	repoID := types.NewModRepoID()
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
 		RunID:     runID,
+		RepoID:    repoID,
 		JobID:     jobID,
 		JobName:   "mod-0",
-		RepoURL:   "https://github.com/acme/multi.git",
+		RepoURL:   types.RepoURL("https://github.com/acme/multi.git"),
 		Status:    "Started",
 		NodeID:    types.NodeID(nodeIDStr),
-		BaseRef:   "main",
-		TargetRef: "feature/multi-step",
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature/multi-step"),
 		CommitSha: &commit,
 		StepIndex: stepIndex, // Job step_index: StepIndex type.
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
@@ -526,14 +535,17 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	if got.RunID != claim.RunID {
 		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
 	}
-	if got.RepoURL.String() != claim.RepoURL {
-		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
+	if got.RepoID != claim.RepoID {
+		t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
 	}
-	if got.BaseRef.String() != claim.BaseRef {
-		t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
+	if got.RepoURL != claim.RepoURL {
+		t.Errorf("RepoURL=%q want %q", got.RepoURL.String(), claim.RepoURL.String())
 	}
-	if got.TargetRef.String() != claim.TargetRef {
-		t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
+	if got.BaseRef != claim.BaseRef {
+		t.Errorf("BaseRef=%q want %q", got.BaseRef.String(), claim.BaseRef.String())
+	}
+	if got.TargetRef != claim.TargetRef {
+		t.Errorf("TargetRef=%q want %q", got.TargetRef.String(), claim.TargetRef.String())
 	}
 }
 
@@ -544,7 +556,10 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	t.Parallel()
 
 	runID := types.NewRunID()
-	commit := "deadbeef"
+	repoID := types.NewModRepoID()
+	commit := types.CommitSHA("deadbeef")
+	nodeID1 := types.NodeID("aB3xY9")
+	nodeID2 := types.NodeID("Z9yX3b")
 
 	// Node1 claims job 0 (pre-gate).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
@@ -552,13 +567,14 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
 		RunID:     runID,
+		RepoID:    repoID,
 		JobID:     types.NewJobID(),
 		JobName:   "pre-gate",
-		RepoURL:   "https://github.com/acme/multi-node.git",
+		RepoURL:   types.RepoURL("https://github.com/acme/multi-node.git"),
 		Status:    "Started",
-		NodeID:    types.NodeID("node-1"),
-		BaseRef:   "main",
-		TargetRef: "feature/parallel-steps",
+		NodeID:    nodeID1,
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature/parallel-steps"),
 		CommitSha: &commit,
 		StepIndex: stepIndex0,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
@@ -571,13 +587,14 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
 		RunID:     runID,
+		RepoID:    repoID,
 		JobID:     types.NewJobID(),
 		JobName:   "mod-0",
-		RepoURL:   "https://github.com/acme/multi-node.git",
+		RepoURL:   types.RepoURL("https://github.com/acme/multi-node.git"),
 		Status:    "Started",
-		NodeID:    types.NodeID("node-2"),
-		BaseRef:   "main",
-		TargetRef: "feature/parallel-steps",
+		NodeID:    nodeID2,
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature/parallel-steps"),
 		CommitSha: &commit,
 		StepIndex: stepIndex1,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
@@ -587,7 +604,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// ===== Simulate Node 1 claiming step 0 from unified queue =====
 	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/node-1/claim":
+		case "/v1/nodes/" + nodeID1.String() + "/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim0)
 		default:
@@ -599,7 +616,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	mock1 := &mockRunController{}
 	cfg1 := Config{
 		ServerURL: ts1.URL,
-		NodeID:    "node-1",
+		NodeID:    nodeID1,
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
 	claimer1, err := NewClaimManager(cfg1, mock1)
@@ -626,7 +643,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// ===== Simulate Node 2 claiming step 1 from unified queue =====
 	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/nodes/node-2/claim":
+		case "/v1/nodes/" + nodeID2.String() + "/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim1)
 		default:
@@ -638,7 +655,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	mock2 := &mockRunController{}
 	cfg2 := Config{
 		ServerURL: ts2.URL,
-		NodeID:    "node-2",
+		NodeID:    nodeID2,
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
 	claimer2, err := NewClaimManager(cfg2, mock2)

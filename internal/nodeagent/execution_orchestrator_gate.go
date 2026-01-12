@@ -24,7 +24,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Initialize runtime components.
 	// Pass jobID to associate log chunks with this specific gate job.
-	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID.String(), req.JobID.String())
+	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID, req.JobID)
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

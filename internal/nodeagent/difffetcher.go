@@ -60,8 +60,8 @@ type diffListResponse struct {
 // are excluded from repo B listing. Response shape is unchanged from legacy endpoint.
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
-func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID, repoID string) ([]diffListItem, error) {
-	url := fmt.Sprintf("%s/v1/runs/%s/repos/%s/diffs", f.cfg.ServerURL, runID, repoID)
+func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, repoID types.ModRepoID) ([]diffListItem, error) {
+	url := fmt.Sprintf("%s/v1/runs/%s/repos/%s/diffs", f.cfg.ServerURL, runID.String(), repoID.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -90,7 +90,7 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID, repoID string
 // FetchDiffsForStepRepo fetches all gzipped patches for non-healing diffs up to (and including)
 // the specified step index for a specific repo execution within a run.
 // This is the v1 repo-scoped version of FetchDiffsForStep that uses repo-scoped diffs listing.
-func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID string, stepIndex types.StepIndex) ([][]byte, error) {
+func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.RunID, repoID types.ModRepoID, stepIndex types.StepIndex) ([][]byte, error) {
 	// Step 1: List all diffs for the repo execution.
 	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)
 	if err != nil {
@@ -159,12 +159,12 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID, repoID s
 // repo execution within a run.
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
-func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID, repoID, diffID string) ([]byte, error) {
+func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.RunID, repoID types.ModRepoID, diffID string) ([]byte, error) {
 	base, err := url.Parse(f.cfg.ServerURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse server url: %w", err)
 	}
-	endpoint := base.JoinPath("v1", "runs", runID, "repos", repoID, "diffs")
+	endpoint := base.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "diffs")
 	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID)

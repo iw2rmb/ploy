@@ -15,7 +15,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -144,29 +143,14 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// is passed to StartRunRequest.
 	envFromSpec, typedOpts := parseSpec(claim.Spec)
 
-	// Derive target ref: prefer server-provided value, otherwise default to
-	// ploy/{run_name|run_id} so MR branch and PLOY_TARGET_REF have a deterministic name.
-	targetRef := strings.TrimSpace(claim.TargetRef)
-	if targetRef == "" {
-		runName := ""
-		if claim.Name != nil {
-			runName = strings.TrimSpace(*claim.Name)
-		}
-		if runName != "" {
-			targetRef = fmt.Sprintf("ploy/%s", runName)
-		} else {
-			targetRef = fmt.Sprintf("ploy/%s", claim.RunID)
-		}
-	}
-
 	startReq := StartRunRequest{
 		RunID:        claim.RunID, // Already types.RunID from ClaimResponse
 		JobID:        claim.JobID, // Already types.JobID from ClaimResponse
 		RepoID:       claim.RepoID,
-		RepoURL:      types.RepoURL(claim.RepoURL),
-		BaseRef:      types.GitRef(claim.BaseRef),
-		TargetRef:    types.GitRef(targetRef),
-		CommitSHA:    types.CommitSHA(stringValue(claim.CommitSha)),
+		RepoURL:      claim.RepoURL,
+		BaseRef:      claim.BaseRef,
+		TargetRef:    claim.TargetRef,
+		CommitSHA:    derefCommitSHA(claim.CommitSha),
 		StepIndex:    claim.StepIndex, // Job step_index from server
 		ModType:      claim.ModType,
 		ModImage:     claim.ModImage,
@@ -187,4 +171,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	slotHeld = false
 
 	return true, nil
+}
+
+func derefCommitSHA(v *types.CommitSHA) types.CommitSHA {
+	if v == nil {
+		return ""
+	}
+	return *v
 }

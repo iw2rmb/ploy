@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestNoOpLogHook(t *testing.T) {
@@ -124,7 +126,7 @@ func TestLogStreamer_WithCustomHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "run-123", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	ls.SetHook(upperHook)
 	defer func() { _ = ls.Close() }()
 
@@ -158,7 +160,7 @@ func TestLogStreamer_HookError(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "run-456", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	ls.SetHook(errorHook)
 	defer func() { _ = ls.Close() }()
 
@@ -191,7 +193,7 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "run-789-nil", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	ls.SetHook(nilHook)
 	defer func() { _ = ls.Close() }()
 
@@ -213,7 +215,7 @@ func TestLogStreamer_DefaultHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "run-789", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	// Verify default hook is NoOpLogHook.
@@ -245,7 +247,7 @@ func TestLogStreamer_SetHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "run-abc", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	// Create a custom hook.
@@ -292,7 +294,7 @@ func BenchmarkLogStreamer_WithNoOpHook(b *testing.B) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, "bench-run", "")
+	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	input := []byte("benchmark log line\n")
