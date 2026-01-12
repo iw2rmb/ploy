@@ -30,26 +30,21 @@ var errCANotConfigured = errors.New("CA not configured")
 // Requires control-plane or cli-admin role (enforced by middleware).
 //
 // POST /v1/bootstrap/tokens
-// Request: { "node_id": "uuid", "expires_in_minutes": 15 }
+// Request: { "node_id": "<nanoid>", "expires_in_minutes": 15 }
 // Response: { "token": "eyJ...", "node_id": "...", "expires_at": "..." }
 func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse request with strict validation.
 		var req struct {
-			NodeID           string `json:"node_id"`
-			ExpiresInMinutes int    `json:"expires_in_minutes"`
+			NodeID           domaintypes.NodeID `json:"node_id"`
+			ExpiresInMinutes int                `json:"expires_in_minutes"`
 		}
 
 		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
-		// Validate node_id.
-		var nodeID domaintypes.NodeID
-		if err := nodeID.UnmarshalText([]byte(req.NodeID)); err != nil {
-			http.Error(w, "invalid node_id", http.StatusBadRequest)
-			return
-		}
+		nodeID := req.NodeID
 
 		// Default expiration to 15 minutes if not specified.
 		if req.ExpiresInMinutes <= 0 {
@@ -110,12 +105,12 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 
 		// Return token.
 		resp := struct {
-			Token     string    `json:"token"`
-			NodeID    string    `json:"node_id"`
-			ExpiresAt time.Time `json:"expires_at"`
+			Token     string             `json:"token"`
+			NodeID    domaintypes.NodeID `json:"node_id"`
+			ExpiresAt time.Time          `json:"expires_at"`
 		}{
 			Token:     token,
-			NodeID:    nodeID.String(),
+			NodeID:    nodeID,
 			ExpiresAt: expiresAt,
 		}
 

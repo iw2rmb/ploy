@@ -100,7 +100,11 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]any{"diff_id": uuid.UUID(diff.ID.Bytes).String()}); err != nil {
+		if err := json.NewEncoder(w).Encode(struct {
+			DiffID domaintypes.DiffID `json:"diff_id"`
+		}{
+			DiffID: domaintypes.DiffID(uuid.UUID(diff.ID.Bytes).String()),
+		}); err != nil {
 			slog.Error("run diff: encode response failed", "err", err)
 		}
 	}

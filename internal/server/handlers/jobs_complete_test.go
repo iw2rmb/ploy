@@ -378,7 +378,7 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 }
 
 // TestCompleteJob_EmptyJobID returns 400 for empty job_id.
-// Job IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+// Job IDs are KSUID strings; empty/whitespace IDs are rejected.
 func TestCompleteJob_EmptyJobID(t *testing.T) {
 	t.Parallel()
 
@@ -387,7 +387,6 @@ func TestCompleteJob_EmptyJobID(t *testing.T) {
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
-	// Note: "not-a-uuid" is now a valid KSUID string ID, so we only test empty ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", "   ") // Whitespace ID
 	req.Header.Set(nodeUUIDHeader, nodeID)
@@ -428,7 +427,7 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 }
 
 // TestCompleteJob_EmptyNodeHeader returns 400 when PLOY_NODE_UUID header is empty.
-// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are rejected.
+// Node IDs are NanoID(6) strings; empty/whitespace IDs are rejected.
 func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	t.Parallel()
 
@@ -459,8 +458,56 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	// Note: "not-a-uuid" is now a valid NanoID string ID, so we test empty header.
 	req.Header.Set(nodeUUIDHeader, "   ") // Whitespace header
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: "ignored",
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if st.updateJobCompletionCalled {
+		t.Fatal("did not expect UpdateJobCompletion to be called")
+	}
+}
+
+func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{"status": "Success"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, "not-a-nanoid")
 
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,

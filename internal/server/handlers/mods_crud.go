@@ -84,7 +84,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Create spec if provided and attach it to the mod.
-		var specIDPtr *string
+		var specIDPtr *domaintypes.SpecID
 		if req.Spec != nil && len(*req.Spec) > 0 {
 			specID := domaintypes.NewSpecID()
 			createdSpec, err := st.CreateSpec(r.Context(), store.CreateSpecParams{
@@ -103,17 +103,17 @@ func createModHandler(st store.Store) http.HandlerFunc {
 				slog.Error("create mod: update spec failed", "mod_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
-			s := createdSpec.ID.String()
-			specIDPtr = &s
+			createdID := createdSpec.ID
+			specIDPtr = &createdID
 		}
 
 		// Build response
 		resp := struct {
-			ID        string  `json:"id"`
-			Name      string  `json:"name"`
-			SpecID    *string `json:"spec_id,omitempty"`
-			CreatedBy *string `json:"created_by,omitempty"`
-			CreatedAt string  `json:"created_at"`
+			ID        string              `json:"id"`
+			Name      string              `json:"name"`
+			SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
+			CreatedBy *string             `json:"created_by,omitempty"`
+			CreatedAt string              `json:"created_at"`
 		}{
 			ID:        mod.ID.String(),
 			Name:      mod.Name,
@@ -275,25 +275,24 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 
 func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 	type modItem struct {
-		ID        string  `json:"id"`
-		Name      string  `json:"name"`
-		SpecID    *string `json:"spec_id,omitempty"`
-		CreatedBy *string `json:"created_by,omitempty"`
-		Archived  bool    `json:"archived"`
-		CreatedAt string  `json:"created_at"`
+		ID        string              `json:"id"`
+		Name      string              `json:"name"`
+		SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
+		CreatedBy *string             `json:"created_by,omitempty"`
+		Archived  bool                `json:"archived"`
+		CreatedAt string              `json:"created_at"`
 	}
 
 	items := make([]modItem, 0, len(mods))
 	for _, mod := range mods {
-		var specIDStrPtr *string
+		var specIDPtr *domaintypes.SpecID
 		if mod.SpecID != nil && !mod.SpecID.IsZero() {
-			s := mod.SpecID.String()
-			specIDStrPtr = &s
+			specIDPtr = mod.SpecID
 		}
 		items = append(items, modItem{
 			ID:        mod.ID.String(),
 			Name:      mod.Name,
-			SpecID:    specIDStrPtr,
+			SpecID:    specIDPtr,
 			CreatedBy: mod.CreatedBy,
 			Archived:  mod.ArchivedAt.Valid,
 			CreatedAt: mod.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),

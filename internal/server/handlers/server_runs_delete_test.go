@@ -76,14 +76,13 @@ func TestDeleteRun_NotFound(t *testing.T) {
 }
 
 // TestDeleteRun_EmptyID verifies 400 is returned for an empty or whitespace run ID.
-// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+// Run IDs are KSUID strings; empty/whitespace IDs are rejected.
 func TestDeleteRun_EmptyID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
 	handler := deleteRunHandler(st)
 
-	// Note: "invalid-uuid" is now a valid KSUID string ID, so we only test empty ID.
 	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/", nil)
 	req.SetPathValue("id", "   ") // Whitespace ID
 	rr := httptest.NewRecorder()

@@ -96,9 +96,14 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
-		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
-		if nodeIDHeader.IsZero() {
+		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+		if nodeIDHeaderStr == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			return
+		}
+		var nodeIDHeader domaintypes.NodeID
+		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
+			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
 			return
 		}
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
@@ -138,8 +143,10 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		// Return success response with diff_id.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"diff_id": uuid.UUID(diff.ID.Bytes).String(),
+		if err := json.NewEncoder(w).Encode(struct {
+			DiffID domaintypes.DiffID `json:"diff_id"`
+		}{
+			DiffID: domaintypes.DiffID(uuid.UUID(diff.ID.Bytes).String()),
 		}); err != nil {
 			slog.Error("diff: encode response failed", "err", err)
 		}

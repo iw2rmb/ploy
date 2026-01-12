@@ -47,9 +47,9 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		// Decode request body with strict validation.
 		// Note: build_id removed; logs are now grouped at job level only.
 		var req struct {
-			JobID   *string `json:"job_id,omitempty"`
-			ChunkNo int32   `json:"chunk_no"`
-			Data    []byte  `json:"data"`
+			JobID   *domaintypes.JobID `json:"job_id,omitempty"`
+			ChunkNo int32              `json:"chunk_no"`
+			Data    []byte             `json:"data"`
 		}
 
 		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
@@ -65,22 +65,10 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Normalize and validate optional job ID (KSUID string).
-		jobIDStr := normalizeOptionalID(req.JobID)
-		var jobID *domaintypes.JobID
-		if jobIDStr != nil {
-			var jid domaintypes.JobID
-			if err := jid.UnmarshalText([]byte(*jobIDStr)); err != nil {
-				http.Error(w, "invalid job_id", http.StatusBadRequest)
-				return
-			}
-			jobID = &jid
-		}
-
 		// Create log row using string run ID and string job ID.
 		params := store.CreateLogParams{
 			RunID:   runID,
-			JobID:   jobID,
+			JobID:   req.JobID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
 		}

@@ -187,3 +187,17 @@ func OptionalJobIDQuery(r *http.Request, key string) (*JobID, error) {
 	}
 	return &id, nil
 }
+
+// ParseDiffIDQuery extracts and validates a DiffID from a query parameter.
+// Returns error if the parameter is missing or empty.
+func ParseDiffIDQuery(r *http.Request, key string) (DiffID, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return "", fmt.Errorf("%s query parameter is required", key)
+	}
+	var id DiffID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
