@@ -469,7 +469,7 @@ func TestBootstrapTLS_PinnedCA(t *testing.T) {
 	// Configure agent with BootstrapCAPath pointing to our test CA.
 	cfg := Config{
 		ServerURL: "https://" + listener.Addr().String(),
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled:         true,
@@ -553,7 +553,7 @@ func TestBootstrapTLS_PinnedCA_WrongCA(t *testing.T) {
 	// Configure agent with wrong BootstrapCAPath.
 	cfg := Config{
 		ServerURL: "https://" + listener.Addr().String(),
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled:         true,
@@ -632,7 +632,7 @@ func TestBootstrapTLS_CAPathFallback(t *testing.T) {
 	// Configure agent without BootstrapCAPath but with existing CAPath.
 	cfg := Config{
 		ServerURL: "https://" + listener.Addr().String(),
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled:         true,
@@ -672,7 +672,7 @@ func TestBootstrapTLS_InvalidCAFile(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "https://127.0.0.1:9999",
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled:         true,
@@ -705,7 +705,7 @@ func TestBootstrapTLS_MissingCAFile(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "https://127.0.0.1:9999",
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled:         true,

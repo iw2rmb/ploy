@@ -76,7 +76,7 @@ func TestEndToEndFlow(t *testing.T) {
 
 		// Create a minimal config pointing to the mock server.
 		cfg := Config{
-			NodeID:    "test-node-e2e",
+			NodeID:    testNodeID,
 			ServerURL: mockServer.URL,
 			HTTP: HTTPConfig{
 				Listen: ":0", // Random port.

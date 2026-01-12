@@ -107,7 +107,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -281,7 +281,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 

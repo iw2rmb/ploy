@@ -93,7 +93,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -246,7 +246,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 

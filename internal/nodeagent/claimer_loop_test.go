@@ -29,7 +29,7 @@ func TestClaimLoop_UnifiedQueue(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + testNodeID + "/claim":
 			// Track unified claim attempts; return 204 (no work available).
 			claimCount++
 			w.WriteHeader(http.StatusNoContent)
@@ -42,7 +42,7 @@ func TestClaimLoop_UnifiedQueue(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{Enabled: false},
 		},
@@ -100,7 +100,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + testNodeID + "/claim":
 			// This is the only claim endpoint that should be called.
 			unifiedClaims++
 			w.WriteHeader(http.StatusNoContent)
@@ -114,7 +114,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{Enabled: false},
 		},

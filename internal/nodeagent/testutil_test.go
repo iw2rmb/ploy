@@ -70,7 +70,7 @@ func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
 		t.Fatalf("generate CA: %v", err)
 	}
 
-	nodeKey, nodeCSR, err := pki.GenerateNodeCSR("test-node", "test-cluster", "127.0.0.1")
+	nodeKey, nodeCSR, err := pki.GenerateNodeCSR(testNodeID, "test-cluster", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("generate node CSR: %v", err)
 	}

@@ -21,7 +21,7 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID("test-node"),
+		NodeID:      types.NodeID(testNodeID),
 		Concurrency: concurrency,
 	}
 
@@ -137,7 +137,7 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID("test-node"),
+		NodeID:      types.NodeID(testNodeID),
 		Concurrency: 0, // Not set - should default to 1.
 	}
 
@@ -227,7 +227,7 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID("test-node"),
+		NodeID:      types.NodeID(testNodeID),
 		Concurrency: 1, // Only 1 slot available.
 	}
 
@@ -278,7 +278,7 @@ func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
 
 	cfg := Config{
 		ServerURL:   "http://localhost:8080",
-		NodeID:      types.NodeID("test-node"),
+		NodeID:      types.NodeID(testNodeID),
 		Concurrency: 1,
 	}
 

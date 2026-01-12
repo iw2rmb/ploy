@@ -110,7 +110,7 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -229,7 +229,7 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 

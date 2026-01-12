@@ -50,7 +50,7 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{ServerURL: server.URL, NodeID: "test-node"}
+	cfg := Config{ServerURL: server.URL, NodeID: testNodeID}
 	controller := &runController{cfg: cfg}
 	if err := controller.uploadOutDir(context.Background(), "run-1", "stage-1", outDir); err != nil {
 		t.Fatalf("uploadOutDir error: %v", err)

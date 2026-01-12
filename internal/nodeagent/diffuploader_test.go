@@ -111,7 +111,7 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 			// Create uploader with test config.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node-id",
+				NodeID:    testNodeID,
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{
 						Enabled: false,
@@ -168,7 +168,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{Enabled: false},
 		},
@@ -233,7 +233,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -339,7 +339,7 @@ func TestBearerToken_TrimsWhitespace(t *testing.T) {
 
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node-id",
+				NodeID:    testNodeID,
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{Enabled: false},
 				},

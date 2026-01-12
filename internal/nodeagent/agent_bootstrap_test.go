@@ -43,7 +43,7 @@ func TestRequestCertificate_Success(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -89,7 +89,7 @@ func TestRequestCertificate_RetryOnNetworkError(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -128,7 +128,7 @@ func TestRequestCertificate_RetryExhaustion(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -175,7 +175,7 @@ func TestRequestCertificate_BackoffProgression(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -233,7 +233,7 @@ func TestRequestCertificate_ContextCancellation(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -278,7 +278,7 @@ func TestRequestCertificate_BearerToken(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 	}
 
 	agent := &Agent{cfg: cfg}
@@ -370,7 +370,7 @@ func TestRequestCertificate_Non200Status(t *testing.T) {
 
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 			}
 
 			agent := &Agent{cfg: cfg}
