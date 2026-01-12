@@ -403,7 +403,7 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 
 	gateMeta := &contracts.BuildGateStageMetadata{
-		LogDigest: "sha256:test",
+		LogDigest: testLogDigest(1),
 		StaticChecks: []contracts.BuildGateStaticCheckReport{
 			{Tool: "maven", Passed: true},
 		},
@@ -426,7 +426,7 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 	if decoded.JobMeta.Kind != contracts.JobKindGate {
 		t.Fatalf("job_meta.Kind = %q, want %q", decoded.JobMeta.Kind, contracts.JobKindGate)
 	}
-	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != "sha256:test" {
-		t.Fatalf("job_meta.Gate.LogDigest = %#v, want sha256:test", decoded.JobMeta.Gate)
+	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != testLogDigest(1) {
+		t.Fatalf("job_meta.Gate.LogDigest = %#v, want %q", decoded.JobMeta.Gate, testLogDigest(1))
 	}
 }
