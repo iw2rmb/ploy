@@ -42,7 +42,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		{
 			name: "global_env_vars_extracted",
 			spec: json.RawMessage(`{
-				"job_id": "job-global-env-123",
+				"job_id": "` + testKSUID + `",
 				"steps": [{"image": "docker.io/test/mod:latest"}],
 				"env": {
 					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
@@ -145,7 +145,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Simulate a spec with global env vars injected by the server.
 	specJSON := json.RawMessage(`{
-		"job_id": "job-e2e-env-456",
+		"job_id": "` + testKSUID + `",
 		"steps": [{"image": "docker.io/test/mod:latest"}],
 		"gitlab_pat": "glpat-test-token",
 		"env": {
@@ -162,7 +162,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
 		RunID:        types.RunID("run-e2e-env-test"),
-		JobID:        types.JobID("job-e2e-env-456"),
+		JobID:        types.JobID(testKSUID),
 		RepoURL:      types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:      types.GitRef("main"),
 		TargetRef:    types.GitRef("feature/global-env"),

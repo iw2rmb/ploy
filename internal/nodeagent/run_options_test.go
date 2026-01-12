@@ -22,7 +22,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 		},
 		"gitlab_pat": "glpat-secret",
 		"mr_on_success": true,
-		"job_id": "job-xyz",
+		"job_id": "` + testKSUID + `",
 		"artifact_name": "bundle.tar.gz",
 		"artifact_paths": ["a.txt", "b/"]
 	}`
@@ -55,8 +55,8 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	if !typedOpts.MRFlagsPresent.MROnSuccessSet || !typedOpts.MRWiring.MROnSuccess {
 		t.Errorf("expected typed mr_on_success=true and present")
 	}
-	if typedOpts.ServerMetadata.JobID.String() != "job-xyz" {
-		t.Errorf("expected typed job_id=job-xyz, got %q", typedOpts.ServerMetadata.JobID.String())
+	if typedOpts.ServerMetadata.JobID.String() != testKSUID {
+		t.Errorf("expected typed job_id=%s, got %q", testKSUID, typedOpts.ServerMetadata.JobID.String())
 	}
 	if typedOpts.Artifacts.Name != "bundle.tar.gz" {
 		t.Errorf("expected typed artifact_name=bundle.tar.gz, got %q", typedOpts.Artifacts.Name)
