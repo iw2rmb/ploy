@@ -26,23 +26,23 @@ type ClaimManager struct {
 // Note: The RunID field uses json:"id" to maintain wire compatibility with the
 // existing API schema while providing type clarity in Go code.
 type ClaimResponse struct {
-	RunID     types.RunID     `json:"id"` // Run ID (KSUID identifying the parent run)
-	Name      *string         `json:"name,omitempty"`
-	RepoID    string          `json:"repo_id"`    // Repo ID (NanoID identifying the repo execution)
-	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
-	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-	ModType   types.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
-	ModImage  string          `json:"mod_image"`  // Container image for mod/heal jobs
-	StepIndex types.StepIndex `json:"step_index"` // Job ordering index
-	RepoURL   string          `json:"repo_url"`
-	Status    string          `json:"status"`
-	NodeID    types.NodeID    `json:"node_id"`
-	BaseRef   string          `json:"base_ref"`
-	TargetRef string          `json:"target_ref"`
-	CommitSha *string         `json:"commit_sha,omitempty"`
-	StartedAt string          `json:"started_at"`
-	CreatedAt string          `json:"created_at"`
-	Spec      json.RawMessage `json:"spec,omitempty"`
+	RunID     types.RunID      `json:"id"` // Run ID (KSUID identifying the parent run)
+	Name      *string          `json:"name,omitempty"`
+	RepoID    types.ModRepoID  `json:"repo_id"`    // Repo ID (NanoID identifying the repo execution)
+	JobID     types.JobID      `json:"job_id"`     // Claimed job ID
+	JobName   string           `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
+	ModType   types.ModType    `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+	ModImage  string           `json:"mod_image"`  // Container image for mod/heal jobs
+	StepIndex types.StepIndex  `json:"step_index"` // Job ordering index
+	RepoURL   types.RepoURL    `json:"repo_url"`
+	Status    string           `json:"status"`
+	NodeID    types.NodeID     `json:"node_id"`
+	BaseRef   types.GitRef     `json:"base_ref"`
+	TargetRef types.GitRef     `json:"target_ref"`
+	CommitSha *types.CommitSHA `json:"commit_sha,omitempty"`
+	StartedAt string           `json:"started_at"`
+	CreatedAt string           `json:"created_at"`
+	Spec      json.RawMessage  `json:"spec,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

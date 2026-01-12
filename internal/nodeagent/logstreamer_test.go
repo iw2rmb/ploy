@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestLogStreamer_Write(t *testing.T) {
@@ -50,8 +50,8 @@ func TestLogStreamer_Write(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: "http://localhost:8443",
 			}
-			runID := domaintypes.NewRunID().String()
-			jobID := domaintypes.NewJobID().String()
+			runID := types.NewRunID()
+			jobID := types.NewJobID()
 			ls := NewLogStreamer(cfg, runID, jobID)
 			defer func() { _ = ls.Close() }()
 
@@ -77,8 +77,8 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	runID := domaintypes.NewRunID().String()
-	ls := NewLogStreamer(cfg, runID, "")
+	runID := types.NewRunID()
+	ls := NewLogStreamer(cfg, runID, types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	// Generate data that will compress to over 1 MiB.
@@ -144,8 +144,8 @@ func TestLogStreamer_Close(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	runID := domaintypes.NewRunID().String()
-	ls := NewLogStreamer(cfg, runID, "")
+	runID := types.NewRunID()
+	ls := NewLogStreamer(cfg, runID, types.JobID(""))
 
 	// Write some data.
 	_, err := ls.Write([]byte("test log\n"))
@@ -175,8 +175,8 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	runID := domaintypes.NewRunID().String()
-	ls := NewLogStreamer(cfg, runID, "")
+	runID := types.NewRunID()
+	ls := NewLogStreamer(cfg, runID, types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	// Write a small amount of data.
@@ -209,8 +209,8 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 		NodeID:    "aB3xY9",
 		ServerURL: "http://localhost:8443",
 	}
-	runID := domaintypes.NewRunID().String()
-	ls := NewLogStreamer(cfg, runID, "")
+	runID := types.NewRunID()
+	ls := NewLogStreamer(cfg, runID, types.JobID(""))
 	defer func() { _ = ls.Close() }()
 
 	// Verify initial chunk number is 0.
@@ -245,18 +245,18 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 
 	// logChunkPayload mirrors the structure sent by sendChunk.
 	type logChunkPayload struct {
-		RunID   domaintypes.RunID `json:"run_id"`
-		JobID   *string           `json:"job_id,omitempty"`
-		ChunkNo int32             `json:"chunk_no"`
-		Data    []byte            `json:"data"`
+		RunID   types.RunID  `json:"run_id"`
+		JobID   *types.JobID `json:"job_id,omitempty"`
+		ChunkNo int32        `json:"chunk_no"`
+		Data    []byte       `json:"data"`
 	}
 
-	runID := domaintypes.NewRunID().String()
-	jobID := domaintypes.NewJobID().String()
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
 
 	tests := []struct {
 		name       string
-		jobID      string
+		jobID      types.JobID
 		wantJobID  bool   // Whether job_id should be present in payload
 		wantJobIDV string // Expected job_id value (if wantJobID is true)
 	}{
@@ -264,7 +264,7 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 			name:       "with job_id",
 			jobID:      jobID,
 			wantJobID:  true,
-			wantJobIDV: jobID,
+			wantJobIDV: jobID.String(),
 		},
 		{
 			name:       "without job_id (empty string)",
@@ -352,19 +352,19 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				// Expect job_id to be present and have the correct value.
 				if payload.JobID == nil {
 					t.Errorf("expected job_id to be present in payload, but it was nil")
-				} else if *payload.JobID != tt.wantJobIDV {
-					t.Errorf("job_id = %q, want %q", *payload.JobID, tt.wantJobIDV)
+				} else if payload.JobID.String() != tt.wantJobIDV {
+					t.Errorf("job_id = %q, want %q", payload.JobID.String(), tt.wantJobIDV)
 				}
 			} else {
 				// Expect job_id to be absent (nil).
 				if payload.JobID != nil {
-					t.Errorf("expected job_id to be nil in payload, but got %q", *payload.JobID)
+					t.Errorf("expected job_id to be nil in payload, but got %q", payload.JobID.String())
 				}
 			}
 
 			// Verify run_id is always present.
-			if string(payload.RunID) != runID {
-				t.Errorf("run_id = %q, want %q", payload.RunID, runID)
+			if payload.RunID != runID {
+				t.Errorf("run_id = %q, want %q", payload.RunID.String(), runID.String())
 			}
 		})
 	}

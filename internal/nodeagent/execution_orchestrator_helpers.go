@@ -28,7 +28,7 @@ import (
 //
 // Usage pattern:
 //
-//	ctx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID.String(), req.JobID.String())
+//	ctx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 //	if err != nil { /* handle error */ }
 //	defer cleanup()
 //	// use ctx.runner, ctx.diffGenerator
@@ -61,7 +61,7 @@ type jobExecutionContext struct {
 //   - ctx: jobExecutionContext with runner, diffGenerator, logStreamer
 //   - cleanup: function to close logStreamer (must be deferred)
 //   - err: non-nil if runtime initialization fails
-func (r *runController) initJobExecutionContext(ctx context.Context, runID string, jobID string) (jobExecutionContext, func(), error) {
+func (r *runController) initJobExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID) (jobExecutionContext, func(), error) {
 	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
 	if err != nil {
 		return jobExecutionContext{}, nil, err

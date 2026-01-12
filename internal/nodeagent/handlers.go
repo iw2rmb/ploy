@@ -33,10 +33,10 @@ import (
 //   - Identifies the job type: "pre_gate", "mod", "post_gate", "heal", "re_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
-	RunID   types.RunID   `json:"run_id,omitempty"`
-	JobID   types.JobID   `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
-	RepoID  string        `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
-	RepoURL types.RepoURL `json:"repo_url,omitempty"` // Repository URL for this run
+	RunID   types.RunID     `json:"run_id,omitempty"`
+	JobID   types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
+	RepoID  types.ModRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
+	RepoURL types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
 	// Name is an optional human-friendly run name provided by the control plane.
 	// When set (e.g., for batch runs), it can be used for branch naming in MR flows.
 	Name      string          `json:"name,omitempty"`

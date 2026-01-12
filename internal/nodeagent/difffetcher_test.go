@@ -18,8 +18,8 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		runID          string
-		repoID         string
+		runID          types.RunID
+		repoID         types.ModRepoID
 		serverResponse diffListResponse
 		serverStatus   int
 		wantErr        bool
@@ -27,8 +27,8 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 	}{
 		{
 			name:   "successful list with diffs",
-			runID:  types.NewRunID().String(),
-			repoID: types.NewModRepoID().String(),
+			runID:  types.NewRunID(),
+			repoID: types.NewModRepoID(),
 			serverResponse: diffListResponse{
 				Diffs: []diffListItem{
 					{ID: "diff-1", JobID: types.NewJobID(), Size: 100},
@@ -41,8 +41,8 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 		},
 		{
 			name:   "empty diff list",
-			runID:  types.NewRunID().String(),
-			repoID: types.NewModRepoID().String(),
+			runID:  types.NewRunID(),
+			repoID: types.NewModRepoID(),
 			serverResponse: diffListResponse{
 				Diffs: []diffListItem{},
 			},
@@ -52,8 +52,8 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 		},
 		{
 			name:         "server error",
-			runID:        types.NewRunID().String(),
-			repoID:       types.NewModRepoID().String(),
+			runID:        types.NewRunID(),
+			repoID:       types.NewModRepoID(),
 			serverStatus: http.StatusInternalServerError,
 			wantErr:      true,
 		},
@@ -67,7 +67,7 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				expectedPath := "/v1/runs/" + tt.runID + "/repos/" + tt.repoID + "/diffs"
+				expectedPath := "/v1/runs/" + tt.runID.String() + "/repos/" + tt.repoID.String() + "/diffs"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -109,8 +109,8 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		runID        string
-		repoID       string
+		runID        types.RunID
+		repoID       types.ModRepoID
 		diffID       string
 		patchContent []byte
 		serverStatus int
@@ -118,8 +118,8 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 	}{
 		{
 			name:         "successful fetch",
-			runID:        types.NewRunID().String(),
-			repoID:       types.NewModRepoID().String(),
+			runID:        types.NewRunID(),
+			repoID:       types.NewModRepoID(),
 			diffID:       "diff-123",
 			patchContent: gzipBytes(t, []byte("test patch content")),
 			serverStatus: http.StatusOK,
@@ -127,8 +127,8 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 		},
 		{
 			name:         "empty patch",
-			runID:        types.NewRunID().String(),
-			repoID:       types.NewModRepoID().String(),
+			runID:        types.NewRunID(),
+			repoID:       types.NewModRepoID(),
 			diffID:       "diff-empty",
 			patchContent: gzipBytes(t, []byte("")),
 			serverStatus: http.StatusOK,
@@ -136,8 +136,8 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 		},
 		{
 			name:         "server error",
-			runID:        types.NewRunID().String(),
-			repoID:       types.NewModRepoID().String(),
+			runID:        types.NewRunID(),
+			repoID:       types.NewModRepoID(),
 			diffID:       "diff-error",
 			serverStatus: http.StatusNotFound,
 			wantErr:      true,
@@ -152,7 +152,7 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Errorf("expected GET, got %s", r.Method)
 				}
-				expectedPath := "/v1/runs/" + tt.runID + "/repos/" + tt.repoID + "/diffs"
+				expectedPath := "/v1/runs/" + tt.runID.String() + "/repos/" + tt.repoID.String() + "/diffs"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -202,8 +202,8 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		runID     string
-		repoID    string
+		runID     types.RunID
+		repoID    types.ModRepoID
 		stepIndex types.StepIndex
 		diffs     []diffListItem
 		patches   map[string][]byte
@@ -212,8 +212,8 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 	}{
 		{
 			name:      "fetch diffs for step 1 (includes step 0 and 1)",
-			runID:     types.NewRunID().String(),
-			repoID:    types.NewModRepoID().String(),
+			runID:     types.NewRunID(),
+			repoID:    types.NewModRepoID(),
 			stepIndex: 1,
 			diffs: []diffListItem{
 				{ID: "diff-0", JobID: types.NewJobID(), Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
@@ -230,8 +230,8 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 		},
 		{
 			name:      "fetch all diffs for step 2",
-			runID:     types.NewRunID().String(),
-			repoID:    types.NewModRepoID().String(),
+			runID:     types.NewRunID(),
+			repoID:    types.NewModRepoID(),
 			stepIndex: 2,
 			diffs: []diffListItem{
 				{ID: "diff-0", JobID: types.NewJobID(), Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
@@ -248,8 +248,8 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 		},
 		{
 			name:      "exclude healing diffs from rehydration chain",
-			runID:     types.NewRunID().String(),
-			repoID:    types.NewModRepoID().String(),
+			runID:     types.NewRunID(),
+			repoID:    types.NewModRepoID(),
 			stepIndex: 1,
 			diffs: []diffListItem{
 				{ID: "diff-0-mod", JobID: types.NewJobID(), Summary: types.NewDiffSummaryBuilder().StepIndex(types.StepIndex(0)).ModType(DiffModTypeMod.String()).MustBuild()},
@@ -277,13 +277,13 @@ func TestDiffFetcher_FetchDiffsForStepRepo(t *testing.T) {
 			t.Parallel()
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" && r.URL.Query().Get("download") != "true" {
+				if r.URL.Path == "/v1/runs/"+tt.runID.String()+"/repos/"+tt.repoID.String()+"/diffs" && r.URL.Query().Get("download") != "true" {
 					w.WriteHeader(http.StatusOK)
 					_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: tt.diffs})
 					return
 				}
 
-				if r.URL.Path == "/v1/runs/"+tt.runID+"/repos/"+tt.repoID+"/diffs" && r.URL.Query().Get("download") == "true" {
+				if r.URL.Path == "/v1/runs/"+tt.runID.String()+"/repos/"+tt.repoID.String()+"/diffs" && r.URL.Query().Get("download") == "true" {
 					diffID := r.URL.Query().Get("diff_id")
 					for _, d := range tt.diffs {
 						if diffID == d.ID {
@@ -337,8 +337,8 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 	t2 := time.Date(2025, 1, 1, 10, 2, 0, 0, time.UTC)
 
 	// Test constants for run/repo IDs.
-	testRunID := types.NewRunID().String()
-	testRepoID := types.NewModRepoID().String()
+	testRunID := types.NewRunID()
+	testRepoID := types.NewModRepoID()
 
 	tests := []struct {
 		name             string
@@ -409,7 +409,7 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 			}
 
 			// Expected path for this test.
-			expectedPath := "/v1/runs/" + testRunID + "/repos/" + testRepoID + "/diffs"
+			expectedPath := "/v1/runs/" + testRunID.String() + "/repos/" + testRepoID.String() + "/diffs"
 
 			// Copy tt.diffs locally for the closure.
 			testDiffs := tt.diffs

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -27,8 +27,8 @@ const (
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
 type LogStreamer struct {
 	cfg        Config
-	runID      string
-	jobID      string
+	runID      types.RunID
+	jobID      types.JobID
 	chunkNo    int32
 	buffer     bytes.Buffer
 	gzWriter   *gzip.Writer
@@ -42,7 +42,7 @@ type LogStreamer struct {
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
 // By default, uses NoOpLogHook (no PII scrubbing).
-func NewLogStreamer(cfg Config, runID string, jobID string) *LogStreamer {
+func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) *LogStreamer {
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
@@ -191,16 +191,16 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Prepare request payload.
 	payload := struct {
-		RunID   domaintypes.RunID `json:"run_id"`
-		JobID   *string           `json:"job_id,omitempty"`
-		ChunkNo int32             `json:"chunk_no"`
-		Data    []byte            `json:"data"`
+		RunID   types.RunID  `json:"run_id"`
+		JobID   *types.JobID `json:"job_id,omitempty"`
+		ChunkNo int32        `json:"chunk_no"`
+		Data    []byte       `json:"data"`
 	}{
-		RunID:   domaintypes.RunID(ls.runID),
+		RunID:   ls.runID,
 		ChunkNo: chunkNo,
 		Data:    data,
 	}
-	if ls.jobID != "" {
+	if !ls.jobID.IsZero() {
 		payload.JobID = &ls.jobID
 	}
 
@@ -210,7 +210,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 	}
 
 	// Send to server endpoint using the node ID string directly.
-	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID)
+	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
 	// Per-request timeout; no struct-stored context.
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
