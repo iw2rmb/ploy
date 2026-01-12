@@ -91,11 +91,11 @@ type StepGateSpec struct {
 
 	// RepoURL is the Git repository URL for remote gate execution.
 	// Populated from StartRunRequest.RepoURL when building manifests.
-	RepoURL string
+	RepoURL types.RepoURL
 
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
 	// Derived from CommitSHA > TargetRef > BaseRef precedence when building manifests.
-	Ref string
+	Ref types.GitRef
 
 	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply
 	// on top of the cloned repo_url+ref baseline. Used by healing re-gates to

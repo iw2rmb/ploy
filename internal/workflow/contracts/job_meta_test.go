@@ -3,6 +3,13 @@ package contracts
 import (
 	"encoding/json"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
+)
+
+const (
+	testDigestA = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	testDigestB = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
 
 func TestJobKind_Valid(t *testing.T) {
@@ -41,7 +48,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			meta: JobMeta{
 				Kind: JobKindGate,
 				Gate: &BuildGateStageMetadata{
-					LogDigest: "sha256:abc123",
+					LogDigest: types.Sha256Digest(testDigestA),
 					StaticChecks: []BuildGateStaticCheckReport{
 						{Tool: "maven", Passed: true},
 					},
@@ -135,10 +142,10 @@ func TestMarshalJobMeta(t *testing.T) {
 			meta: &JobMeta{
 				Kind: JobKindGate,
 				Gate: &BuildGateStageMetadata{
-					LogDigest: "sha256:abc",
+					LogDigest: types.Sha256Digest(testDigestA),
 				},
 			},
-			want: `{"kind":"gate","gate":{"log_digest":"sha256:abc"}}`,
+			want: `{"kind":"gate","gate":{"log_digest":"` + testDigestA + `"}}`,
 		},
 		{
 			name: "build job with metadata",
@@ -191,7 +198,7 @@ func TestUnmarshalJobMeta(t *testing.T) {
 		},
 		{
 			name:    "missing kind field returns error",
-			data:    []byte(`{"gate":{"log_digest":"sha256:abc"}}`),
+			data:    []byte(`{"gate":{"log_digest":"` + testDigestA + `"}}`),
 			wantErr: true,
 		},
 		{
@@ -206,7 +213,7 @@ func TestUnmarshalJobMeta(t *testing.T) {
 		},
 		{
 			name:    "gate metadata on mod job returns error",
-			data:    []byte(`{"kind":"mod","gate":{"log_digest":"sha256:abc"}}`),
+			data:    []byte(`{"kind":"mod","gate":{"log_digest":"` + testDigestA + `"}}`),
 			wantErr: true,
 		},
 		// Valid structured metadata.
@@ -217,7 +224,7 @@ func TestUnmarshalJobMeta(t *testing.T) {
 		},
 		{
 			name:     "gate job",
-			data:     []byte(`{"kind":"gate","gate":{"log_digest":"sha256:abc"}}`),
+			data:     []byte(`{"kind":"gate","gate":{"log_digest":"` + testDigestA + `"}}`),
 			wantKind: JobKindGate,
 		},
 		{
@@ -256,7 +263,7 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 	original := &JobMeta{
 		Kind: JobKindGate,
 		Gate: &BuildGateStageMetadata{
-			LogDigest: "sha256:abc123",
+			LogDigest: types.Sha256Digest(testDigestB),
 			StaticChecks: []BuildGateStaticCheckReport{
 				{
 					Tool:   "maven",
@@ -326,7 +333,7 @@ func TestNewJobMetaConstructors(t *testing.T) {
 	})
 
 	t.Run("NewGateJobMeta", func(t *testing.T) {
-		gate := &BuildGateStageMetadata{LogDigest: "sha256:test"}
+		gate := &BuildGateStageMetadata{LogDigest: types.Sha256Digest(testDigestA)}
 		m := NewGateJobMeta(gate)
 		if m.Kind != JobKindGate {
 			t.Errorf("Kind = %v, want %v", m.Kind, JobKindGate)

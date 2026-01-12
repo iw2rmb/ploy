@@ -3,11 +3,13 @@ package contracts
 import (
 	"fmt"
 	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // BuildGateStageMetadata captures build gate metadata published with checkpoints.
 type BuildGateStageMetadata struct {
-	LogDigest    string                       `json:"log_digest,omitempty"`
+	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
 	// LogsText carries the raw build logs text for node-local processing.

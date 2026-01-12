@@ -184,8 +184,8 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			Enabled: true,
 			Profile: "java-auto",
 			Env:     map[string]string{},
-			RepoURL: strings.TrimSpace(req.RepoURL.String()),
-			Ref:     gateRef,
+			RepoURL: types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
+			Ref:     types.GitRef(strings.TrimSpace(gateRef)),
 		},
 		Inputs: []contracts.StepInput{
 			{

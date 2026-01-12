@@ -13,6 +13,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+const testLogDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 // ===== JobMeta Validation Tests =====
 // These tests verify that job_meta payloads are validated via contracts.UnmarshalJobMeta
 // before persisting to jobs.meta JSONB.
@@ -51,7 +53,7 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
-				"gate": map[string]any{"log_digest": "sha256:abc"},
+				"gate": map[string]any{"log_digest": testLogDigest},
 			},
 		},
 	})
@@ -181,7 +183,7 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 		"stats": map[string]any{
 			"job_meta": map[string]any{
 				"kind": "mod",
-				"gate": map[string]any{"log_digest": "sha256:abc"},
+				"gate": map[string]any{"log_digest": testLogDigest},
 			},
 		},
 	})
@@ -244,7 +246,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 			"job_meta": map[string]any{
 				"kind": "gate",
 				"gate": map[string]any{
-					"log_digest": "sha256:abc123",
+					"log_digest": testLogDigest,
 					"static_checks": []map[string]any{
 						{"tool": "maven", "passed": true},
 					},
@@ -676,7 +678,7 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 		},
 		{
 			name:    "valid gate kind",
-			payload: JobStatsPayload{JobMeta: []byte(`{"kind":"gate","gate":{"log_digest":"sha256:abc"}}`)},
+			payload: JobStatsPayload{JobMeta: []byte("{\"kind\":\"gate\",\"gate\":{\"log_digest\":\"" + testLogDigest + "\"}}")},
 			wantErr: false,
 		},
 		{
@@ -686,7 +688,7 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 		},
 		{
 			name:    "missing kind field",
-			payload: JobStatsPayload{JobMeta: []byte(`{"gate":{"log_digest":"sha256:abc"}}`)},
+			payload: JobStatsPayload{JobMeta: []byte("{\"gate\":{\"log_digest\":\"" + testLogDigest + "\"}}")},
 			wantErr: true,
 		},
 		{
@@ -696,7 +698,7 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 		},
 		{
 			name:    "gate metadata on mod kind",
-			payload: JobStatsPayload{JobMeta: []byte(`{"kind":"mod","gate":{"log_digest":"sha256:abc"}}`)},
+			payload: JobStatsPayload{JobMeta: []byte("{\"kind\":\"mod\",\"gate\":{\"log_digest\":\"" + testLogDigest + "\"}}")},
 			wantErr: true,
 		},
 		{

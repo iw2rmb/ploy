@@ -315,12 +315,12 @@ type Result struct {
 
 // StageTiming captures duration of each execution stage.
 type StageTiming struct {
-	HydrationDuration time.Duration
-	ExecutionDuration time.Duration
-	BuildGateDuration time.Duration
-	DiffDuration      time.Duration
-	PublishDuration   time.Duration
-	TotalDuration     time.Duration
+	HydrationDuration types.Duration
+	ExecutionDuration types.Duration
+	BuildGateDuration types.Duration
+	DiffDuration      types.Duration
+	PublishDuration   types.Duration
+	TotalDuration     types.Duration
 }
 
 // ErrBuildGateFailed is returned when the pre-mod Build Gate fails
@@ -339,7 +339,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			return Result{}, fmt.Errorf("workspace hydration failed: %w", err)
 		}
 	}
-	result.Timings.HydrationDuration = time.Since(hydrationStart)
+	result.Timings.HydrationDuration = types.Duration(time.Since(hydrationStart))
 
 	// Stage 2: Pre-mod Build Gate validation.
 	// Run the Build Gate before executing the mod container to fail fast if the codebase doesn't build.
@@ -361,12 +361,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		if !gatePassed {
 			// Gate failed. Always return error; node agent orchestration layer
 			// will handle healing if configured.
-			result.Timings.BuildGateDuration = time.Since(gateStart)
-			result.Timings.TotalDuration = time.Since(totalStart)
+			result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
+			result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mod validation failed")
 		}
 	}
-	result.Timings.BuildGateDuration = time.Since(gateStart)
+	result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
 
 	// Stage 3: Execute container via configured runtime (real execution when available).
 	executionStart := time.Now()
@@ -376,7 +376,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			_, _ = fmt.Fprintf(r.LogWriter, "Starting execution for manifest %s\n", req.Manifest.ID)
 		}
 		result.ExitCode = 0
-		result.Timings.ExecutionDuration = time.Since(executionStart)
+		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
 		// Build container spec from manifest and workspace path plus optional /out and /in mounts.
 		spec, err := buildContainerSpec(req.RunID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
@@ -401,7 +401,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			}
 		}
 		result.ExitCode = cRes.ExitCode
-		result.Timings.ExecutionDuration = time.Since(executionStart)
+		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 
 		// Explicitly remove the container unless retention is requested.
 		if !req.Manifest.Retention.RetainContainer {
@@ -419,10 +419,10 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		}
 		_ = diffBytes // Node agent independently uploads diffs; avoid duplicate publish with stubbed publisher.
 	}
-	result.Timings.DiffDuration = time.Since(diffStart)
+	result.Timings.DiffDuration = types.Duration(time.Since(diffStart))
 
 	// Stage 5: (removed) Artifact publishing is performed by the node agent.
 
-	result.Timings.TotalDuration = time.Since(totalStart)
+	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestSubjectsForRun(t *testing.T) {
-	subjects := SubjectsForRun("run-123")
+	subjects := SubjectsForRun(types.RunID("run-123"))
 	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
@@ -20,7 +20,7 @@ func TestSubjectsForRun(t *testing.T) {
 }
 
 func TestSubjectsForRunTrimsInput(t *testing.T) {
-	subjects := SubjectsForRun("  run-123  ")
+	subjects := SubjectsForRun(types.RunID("  run-123  "))
 	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
@@ -33,7 +33,7 @@ func TestSubjectsForRunTrimsInput(t *testing.T) {
 }
 
 func TestSubjectsForRunEmptyRunID(t *testing.T) {
-	subjects := SubjectsForRun("")
+	subjects := SubjectsForRun(types.RunID(""))
 	if subjects.CheckpointStream != "" {
 		t.Fatalf("expected empty checkpoint stream, got %s", subjects.CheckpointStream)
 	}
@@ -101,7 +101,7 @@ func TestWorkflowRunValidate(t *testing.T) {
 
 func TestBuildGateMetadataValidate(t *testing.T) {
 	meta := BuildGateStageMetadata{
-		LogDigest: "bafy-build",
+		LogDigest: types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 		StaticChecks: []BuildGateStaticCheckReport{{
 			Language: "go",
 			Tool:     "go vet",

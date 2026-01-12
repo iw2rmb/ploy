@@ -175,7 +175,7 @@ func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
 
 	result := step.Result{
 		BuildGate: postGateMeta,
-		Timings:   step.StageTiming{BuildGateDuration: 700 * time.Millisecond},
+		Timings:   step.StageTiming{BuildGateDuration: types.Duration(700 * time.Millisecond)},
 	}
 
 	got := rc.buildGateStats(types.RunID("run-precedence"), types.JobID("stage-precedence"), result, execRes)

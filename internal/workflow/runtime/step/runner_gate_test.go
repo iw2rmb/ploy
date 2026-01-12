@@ -307,7 +307,7 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 	}
 
 	// Verify gate timing measurement is reasonable
-	if result.Timings.BuildGateDuration < gateDelay {
+	if time.Duration(result.Timings.BuildGateDuration) < gateDelay {
 		t.Errorf("Run() BuildGateDuration = %v, expected >= %v", result.Timings.BuildGateDuration, gateDelay)
 	}
 }
