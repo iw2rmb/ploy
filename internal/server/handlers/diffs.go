@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,16 +71,12 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 
 		// Optional download mode: serve the gzipped patch for a specific diff.
 		if r.URL.Query().Get("download") == "true" {
-			diffIDStr := strings.TrimSpace(r.URL.Query().Get("diff_id"))
-			if diffIDStr == "" {
-				http.Error(w, "diff_id is required when download=true", http.StatusBadRequest)
-				return
-			}
-			diffUUID, err := uuid.Parse(diffIDStr)
+			diffID, err := domaintypes.ParseDiffIDQuery(r, "diff_id")
 			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid diff_id: %v", err), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+			diffUUID := uuid.MustParse(diffID.String())
 
 			d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
 			if err != nil {
@@ -90,7 +85,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to get diff: %v", err), http.StatusInternalServerError)
-				slog.Error("download run repo diff: get diff failed", "run_id", runID, "repo_id", repoID, "diff_id", diffIDStr, "err", err)
+				slog.Error("download run repo diff: get diff failed", "run_id", runID, "repo_id", repoID, "diff_id", diffID.String(), "err", err)
 				return
 			}
 			// Ensure the diff belongs to this run.
@@ -110,7 +105,7 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 					return
 				}
 				http.Error(w, fmt.Sprintf("failed to get diff job: %v", err), http.StatusInternalServerError)
-				slog.Error("download run repo diff: get job failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffIDStr, "job_id", d.JobID.String(), "err", err)
+				slog.Error("download run repo diff: get job failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "job_id", d.JobID.String(), "err", err)
 				return
 			}
 			if job.RepoID != repoID {

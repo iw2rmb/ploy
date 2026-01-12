@@ -58,7 +58,7 @@ func TestRunLogsRawOutput(t *testing.T) {
 		logEvents: []sseTestEvent{
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:00Z","stream":"stdout","line":"ready"}`},
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:01Z","stream":"stderr","line":"warn"}`},
-			{event: "retention", data: `{"retained":false,"ttl":"","expires_at":"","bundle_cid":""}`},
+			{event: "retention", data: `{"retained":false,"ttl":"","expires_at":""}`},
 			{event: "done", data: `{"status":"completed"}`},
 		},
 	})

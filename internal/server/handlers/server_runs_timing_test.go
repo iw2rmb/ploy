@@ -90,14 +90,13 @@ func TestGetRunTiming_NotFound(t *testing.T) {
 }
 
 // TestGetRunTiming_EmptyID verifies 400 for empty or whitespace ID.
-// Run IDs are now KSUID strings; only empty/whitespace IDs are rejected.
+// Run IDs are KSUID strings; empty/whitespace IDs are rejected.
 func TestGetRunTiming_EmptyID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
 	handler := getRunTimingHandler(st)
 
-	// Note: "invalid-uuid" is now a valid KSUID string ID, so we only test empty ID.
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//timing", nil)
 	req.SetPathValue("id", "   ") // Whitespace ID
 	rr := httptest.NewRecorder()

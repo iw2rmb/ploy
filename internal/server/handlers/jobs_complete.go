@@ -240,9 +240,14 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Derive node ID from required header. auth middleware already enforces
 		// presence for worker-role callers; this handler performs an additional
 		// check and uses the value for job ownership validation.
-		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
-		if nodeIDHeader.IsZero() {
+		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+		if nodeIDHeaderStr == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			return
+		}
+		var nodeIDHeader domaintypes.NodeID
+		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
+			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
 			return
 		}
 

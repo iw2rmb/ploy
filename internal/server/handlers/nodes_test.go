@@ -57,12 +57,11 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 }
 
 // TestDrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
-// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are invalid.
+// Node IDs are NanoID(6) strings; invalid IDs are rejected.
 func TestDrainNodeHandlerInvalidID(t *testing.T) {
 	st := &mockStore{}
 	handler := drainNodeHandler(st)
 
-	// Note: "not-a-uuid" is now a valid NanoID string, so we only test empty/whitespace.
 	cases := []struct {
 		name  string
 		id    string
@@ -70,6 +69,7 @@ func TestDrainNodeHandlerInvalidID(t *testing.T) {
 	}{
 		{"empty id", "", "x"},
 		{"whitespace", "   ", "x"},
+		{"invalid nanoid", "not-a-nanoid", "x"},
 	}
 
 	for _, tc := range cases {
@@ -186,12 +186,11 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 }
 
 // TestUndrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
-// Node IDs are now NanoID(6) strings; only empty/whitespace IDs are invalid.
+// Node IDs are NanoID(6) strings; invalid IDs are rejected.
 func TestUndrainNodeHandlerInvalidID(t *testing.T) {
 	st := &mockStore{}
 	handler := undrainNodeHandler(st)
 
-	// Note: "not-a-uuid" is now a valid NanoID string, so we only test empty/whitespace.
 	cases := []struct {
 		name  string
 		id    string
@@ -199,6 +198,7 @@ func TestUndrainNodeHandlerInvalidID(t *testing.T) {
 	}{
 		{"empty id", "", "x"},
 		{"whitespace", "   ", "x"},
+		{"invalid nanoid", "not-a-nanoid", "x"},
 	}
 
 	for _, tc := range cases {

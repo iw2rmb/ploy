@@ -100,10 +100,14 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 
 		// Verify the job is assigned to the calling node using the
 		// PLOY_NODE_UUID header, which is required for worker requests.
-		// Node IDs are now NanoID(6) strings; validate non-empty and match job assignment.
-		nodeIDHeader := domaintypes.NodeID(strings.TrimSpace(r.Header.Get(nodeUUIDHeader)))
-		if nodeIDHeader.IsZero() {
+		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
+		if nodeIDHeaderStr == "" {
 			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			return
+		}
+		var nodeIDHeader domaintypes.NodeID
+		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
+			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
 			return
 		}
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
