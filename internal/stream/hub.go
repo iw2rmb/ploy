@@ -55,10 +55,10 @@ type LogRecord struct {
 
 // RetentionHint carries retention metadata emitted on the stream.
 type RetentionHint struct {
-	Retained bool   `json:"retained"`
-	TTL      string `json:"ttl"`
-	Expires  string `json:"expires_at"`
-	Bundle   string `json:"bundle_cid"`
+	Retained bool            `json:"retained"`
+	TTL      string          `json:"ttl"`
+	Expires  string          `json:"expires_at"`
+	Bundle   domaintypes.CID `json:"bundle_cid,omitempty"`
 }
 
 // Status announces terminal stream states.
@@ -89,16 +89,20 @@ func (s Subscription) Cancel() {
 // Hub manages log streams published by nodes and consumed by SSE clients.
 type Hub struct {
 	mu      sync.RWMutex
-	streams map[string]*stream
+	streams map[domaintypes.RunID]*stream
 	opts    normalizedOptions
 }
 
 // NewHub constructs a log stream hub.
 func NewHub(opts Options) *Hub {
 	return &Hub{
-		streams: make(map[string]*stream),
+		streams: make(map[domaintypes.RunID]*stream),
 		opts:    normalizeOptions(opts),
 	}
+}
+
+func normalizeRunID(runID domaintypes.RunID) domaintypes.RunID {
+	return domaintypes.RunID(domaintypes.Normalize(runID.String()))
 }
 
 // Ensure creates the stream if it does not already exist.
@@ -107,10 +111,10 @@ func (h *Hub) Ensure(runID domaintypes.RunID) error {
 	if runID.IsZero() {
 		return ErrInvalidRunID
 	}
-	streamID := runID.String()
+	runID = normalizeRunID(runID)
 	h.mu.Lock()
-	if _, exists := h.streams[streamID]; !exists {
-		h.streams[streamID] = newStream(streamID, h.opts)
+	if _, exists := h.streams[runID]; !exists {
+		h.streams[runID] = newStream(runID, h.opts)
 	}
 	h.mu.Unlock()
 	return nil
@@ -141,7 +145,8 @@ func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status
 	if err := h.publish(ctx, runID, domaintypes.SSEEventDone, status); err != nil {
 		return err
 	}
-	stream := h.getStream(runID.String())
+	runID = normalizeRunID(runID)
+	stream := h.getStream(runID)
 	if stream != nil {
 		stream.finish()
 	}
@@ -167,14 +172,14 @@ func (h *Hub) publish(ctx context.Context, runID domaintypes.RunID, eventType do
 	if runID.IsZero() {
 		return ErrInvalidRunID
 	}
+	runID = normalizeRunID(runID)
 	if err := eventType.Validate(); err != nil {
 		return ErrInvalidEventType
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
-	streamID := runID.String()
-	stream := h.getOrCreate(streamID)
+	stream := h.getOrCreate(runID)
 	if stream == nil {
 		return nil
 	}
@@ -192,14 +197,14 @@ func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID do
 	if runID.IsZero() {
 		return Subscription{}, ErrInvalidRunID
 	}
+	runID = normalizeRunID(runID)
 	if !sinceID.Valid() {
 		return Subscription{}, errors.New("logstream: invalid since id")
 	}
 	if ctx != nil && ctx.Err() != nil {
 		return Subscription{}, ctx.Err()
 	}
-	streamID := runID.String()
-	stream := h.getOrCreate(streamID)
+	stream := h.getOrCreate(runID)
 	if stream == nil {
 		return Subscription{}, errors.New("logstream: stream unavailable")
 	}
@@ -232,11 +237,11 @@ func (h *Hub) Close(runID domaintypes.RunID) {
 	if runID.IsZero() {
 		return
 	}
-	streamID := runID.String()
+	runID = normalizeRunID(runID)
 	h.mu.Lock()
-	stream, ok := h.streams[streamID]
+	stream, ok := h.streams[runID]
 	if ok {
-		delete(h.streams, streamID)
+		delete(h.streams, runID)
 	}
 	h.mu.Unlock()
 	if ok {
@@ -244,26 +249,26 @@ func (h *Hub) Close(runID domaintypes.RunID) {
 	}
 }
 
-func (h *Hub) getOrCreate(streamID string) *stream {
+func (h *Hub) getOrCreate(runID domaintypes.RunID) *stream {
 	h.mu.RLock()
-	stream := h.streams[streamID]
+	stream := h.streams[runID]
 	h.mu.RUnlock()
 	if stream != nil {
 		return stream
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	stream = h.streams[streamID]
+	stream = h.streams[runID]
 	if stream == nil {
-		stream = newStream(streamID, h.opts)
-		h.streams[streamID] = stream
+		stream = newStream(runID, h.opts)
+		h.streams[runID] = stream
 	}
 	return stream
 }
 
-func (h *Hub) getStream(streamID string) *stream {
+func (h *Hub) getStream(runID domaintypes.RunID) *stream {
 	h.mu.RLock()
-	stream := h.streams[streamID]
+	stream := h.streams[runID]
 	h.mu.RUnlock()
 	return stream
 }
@@ -274,7 +279,8 @@ func (h *Hub) Snapshot(runID domaintypes.RunID) []Event {
 	if runID.IsZero() {
 		return nil
 	}
-	stream := h.getStream(runID.String())
+	runID = normalizeRunID(runID)
+	stream := h.getStream(runID)
 	if stream == nil {
 		return nil
 	}
@@ -305,7 +311,7 @@ func normalizeOptions(opts Options) normalizedOptions {
 }
 
 type stream struct {
-	id          string
+	id          domaintypes.RunID
 	opts        normalizedOptions
 	mu          sync.Mutex
 	history     []Event
@@ -326,7 +332,7 @@ func (s *stream) snapshot() []Event {
 	return out
 }
 
-func newStream(id string, opts normalizedOptions) *stream {
+func newStream(id domaintypes.RunID, opts normalizedOptions) *stream {
 	return &stream{
 		id:          id,
 		opts:        opts,
