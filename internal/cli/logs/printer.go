@@ -164,7 +164,7 @@ func (p *Printer) PrintRetentionSummary() {
 	ret := *p.retention
 	ttl := strings.TrimSpace(ret.TTL)
 	expires := strings.TrimSpace(ret.Expires)
-	bundle := strings.TrimSpace(ret.Bundle)
+	bundle := strings.TrimSpace(string(ret.Bundle))
 
 	// Format retention summary with available fields.
 	switch {

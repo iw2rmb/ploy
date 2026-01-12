@@ -45,7 +45,7 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 			if !errors.Is(err, ErrInvalidEventType) {
 				t.Fatalf("expected ErrInvalidEventType, got %v", err)
 			}
-			if hub.getStream(invalidRunID.String()) != nil {
+			if hub.getStream(invalidRunID) != nil {
 				t.Fatalf("expected no stream creation for invalid event type")
 			}
 		})
