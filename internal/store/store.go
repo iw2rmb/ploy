@@ -97,56 +97,69 @@ func validateJSONB(raw []byte) error {
 	return nil
 }
 
+// withJSONB validates a JSONB field and executes the provided function.
+// Returns ErrInvalidJSON wrapped with fieldName if validation fails.
+func withJSONB[T any](fieldName string, raw []byte, fn func() (T, error)) (T, error) {
+	var zero T
+	if err := validateJSONB(raw); err != nil {
+		return zero, fmt.Errorf("%s: %w", fieldName, err)
+	}
+	return fn()
+}
+
+// withJSONBNoResult validates a JSONB field and executes the provided function.
+// Returns ErrInvalidJSON wrapped with fieldName if validation fails.
+func withJSONBNoResult(fieldName string, raw []byte, fn func() error) error {
+	if err := validateJSONB(raw); err != nil {
+		return fmt.Errorf("%s: %w", fieldName, err)
+	}
+	return fn()
+}
+
 // CreateJob validates the Meta JSONB field and creates a new job.
 // Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
 func (s *PgStore) CreateJob(ctx context.Context, arg CreateJobParams) (Job, error) {
-	if err := validateJSONB(arg.Meta); err != nil {
-		return Job{}, fmt.Errorf("jobs.meta: %w", err)
-	}
-	return s.Queries.CreateJob(ctx, arg)
+	return withJSONB("jobs.meta", arg.Meta, func() (Job, error) {
+		return s.Queries.CreateJob(ctx, arg)
+	})
 }
 
 // CreateSpec validates the Spec JSONB field and creates a new spec.
 // Returns ErrInvalidJSON if Spec contains invalid JSON bytes.
 func (s *PgStore) CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error) {
-	if err := validateJSONB(arg.Spec); err != nil {
-		return Spec{}, fmt.Errorf("specs.spec: %w", err)
-	}
-	return s.Queries.CreateSpec(ctx, arg)
+	return withJSONB("specs.spec", arg.Spec, func() (Spec, error) {
+		return s.Queries.CreateSpec(ctx, arg)
+	})
 }
 
 // CreateDiff validates the Summary JSONB field and creates a new diff.
 // Returns ErrInvalidJSON if Summary contains invalid JSON bytes.
 func (s *PgStore) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
-	if err := validateJSONB(arg.Summary); err != nil {
-		return Diff{}, fmt.Errorf("diffs.summary: %w", err)
-	}
-	return s.Queries.CreateDiff(ctx, arg)
+	return withJSONB("diffs.summary", arg.Summary, func() (Diff, error) {
+		return s.Queries.CreateDiff(ctx, arg)
+	})
 }
 
 // UpdateJobMeta validates the Meta JSONB field and updates job metadata.
 // Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
 func (s *PgStore) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
-	if err := validateJSONB(arg.Meta); err != nil {
-		return fmt.Errorf("jobs.meta: %w", err)
-	}
-	return s.Queries.UpdateJobMeta(ctx, arg)
+	return withJSONBNoResult("jobs.meta", arg.Meta, func() error {
+		return s.Queries.UpdateJobMeta(ctx, arg)
+	})
 }
 
 // UpdateJobCompletionWithMeta validates the Meta JSONB field and completes a job with metadata.
 // Returns ErrInvalidJSON if Meta contains invalid JSON bytes.
 func (s *PgStore) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
-	if err := validateJSONB(arg.Meta); err != nil {
-		return fmt.Errorf("jobs.meta: %w", err)
-	}
-	return s.Queries.UpdateJobCompletionWithMeta(ctx, arg)
+	return withJSONBNoResult("jobs.meta", arg.Meta, func() error {
+		return s.Queries.UpdateJobCompletionWithMeta(ctx, arg)
+	})
 }
 
 // UpdateRunCompletion validates the Stats JSONB field and completes a run.
 // Returns ErrInvalidJSON if Stats contains invalid JSON bytes.
 func (s *PgStore) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
-	if err := validateJSONB(arg.Stats); err != nil {
-		return fmt.Errorf("runs.stats: %w", err)
-	}
-	return s.Queries.UpdateRunCompletion(ctx, arg)
+	return withJSONBNoResult("runs.stats", arg.Stats, func() error {
+		return s.Queries.UpdateRunCompletion(ctx, arg)
+	})
 }

@@ -16,21 +16,16 @@ import (
 
 // StatusUploader uploads terminal status and stats to the control-plane server.
 type StatusUploader struct {
-	cfg    Config
-	client *http.Client
+	*baseUploader
 }
 
 // NewStatusUploader creates a new status uploader.
 func NewStatusUploader(cfg Config) (*StatusUploader, error) {
-	client, err := createHTTPClient(cfg)
+	base, err := newBaseUploader(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("create http client: %w", err)
+		return nil, err
 	}
-
-	return &StatusUploader{
-		cfg:    cfg,
-		client: client,
-	}, nil
+	return &StatusUploader{baseUploader: base}, nil
 }
 
 // UploadJobStatus uploads terminal status and stats directly to the job-level endpoint.

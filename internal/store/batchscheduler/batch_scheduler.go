@@ -13,12 +13,19 @@ package batchscheduler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// ErrNilStore is returned when New is called with a nil Store.
+var ErrNilStore = errors.New("batchscheduler: store is required")
+
+// ErrNilRepoStarter is returned when New is called with a nil RepoStarter.
+var ErrNilRepoStarter = errors.New("batchscheduler: repo starter is required")
 
 // StartPendingReposResult contains the result of starting pending repos in a batch run.
 // This type is defined here to avoid circular imports with the handlers package.
@@ -64,10 +71,13 @@ type Scheduler struct {
 }
 
 // New constructs a new batch scheduler.
-// Returns nil if store or repoStarter is nil.
+// Returns ErrNilStore if opts.Store is nil, or ErrNilRepoStarter if opts.RepoStarter is nil.
 func New(opts Options) (*Scheduler, error) {
-	if opts.Store == nil || opts.RepoStarter == nil {
-		return nil, nil
+	if opts.Store == nil {
+		return nil, ErrNilStore
+	}
+	if opts.RepoStarter == nil {
+		return nil, ErrNilRepoStarter
 	}
 
 	interval := opts.Interval

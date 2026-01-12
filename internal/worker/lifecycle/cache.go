@@ -7,6 +7,9 @@ import (
 // Cache stores the latest lifecycle status snapshot for reuse.
 // Stores typed NodeStatus for compile-time safety; use LatestStatus()
 // to retrieve the cached status.
+//
+// Cache methods are nil-safe: calling Store or LatestStatus on a nil
+// Cache is a no-op, allowing optional cache usage without nil checks.
 type Cache struct {
 	mu     sync.RWMutex
 	status *NodeStatus
@@ -40,40 +43,4 @@ func (c *Cache) LatestStatus() (NodeStatus, bool) {
 		return NodeStatus{}, false
 	}
 	return *c.status, true
-}
-
-func cloneAnyMap(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[string]any, len(src))
-	for key, value := range src {
-		switch typed := value.(type) {
-		case map[string]any:
-			dst[key] = cloneAnyMap(typed)
-		case []any:
-			dst[key] = cloneAnySlice(typed)
-		default:
-			dst[key] = typed
-		}
-	}
-	return dst
-}
-
-func cloneAnySlice(src []any) []any {
-	if len(src) == 0 {
-		return nil
-	}
-	out := make([]any, len(src))
-	for idx, value := range src {
-		switch typed := value.(type) {
-		case map[string]any:
-			out[idx] = cloneAnyMap(typed)
-		case []any:
-			out[idx] = cloneAnySlice(typed)
-		default:
-			out[idx] = typed
-		}
-	}
-	return out
 }

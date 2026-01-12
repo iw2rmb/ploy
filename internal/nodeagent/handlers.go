@@ -11,6 +11,9 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+// maxRequestBodySize limits request body size to prevent OOM from large payloads.
+const maxRequestBodySize = 10 << 20 // 10 MiB
+
 // StartRunRequest describes a run start request from the server.
 //
 // TypedOptions contains all run configuration options in strongly-typed form.
@@ -79,6 +82,9 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent OOM attacks.
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+
 	var req StartRunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
@@ -133,6 +139,9 @@ func (s *Server) handleRunStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Limit request body size to prevent OOM attacks.
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
 	var req StopRunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

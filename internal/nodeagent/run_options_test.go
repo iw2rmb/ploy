@@ -28,7 +28,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	resolved, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestParseSpec_EnvMergingSemantics(t *testing.T) {
 		}`
 
 		var raw json.RawMessage = []byte(specJSON)
-		env, _ := parseSpec(raw)
+		env, _, _ := parseSpec(raw)
 
 		if env["A"] != "1" || env["B"] != "step" || env["C"] != "3" {
 			t.Fatalf("env merge mismatch: got %+v", env)
@@ -96,7 +96,7 @@ func TestParseSpec_EnvMergingSemantics(t *testing.T) {
 		}`
 
 		var raw json.RawMessage = []byte(specJSON)
-		env, typedOpts := parseSpec(raw)
+		env, typedOpts, _ := parseSpec(raw)
 
 		if env["A"] != "1" || len(env) != 1 {
 			t.Fatalf("env should contain only global env for multi-step, got %+v", env)
@@ -122,7 +122,7 @@ func TestParseSpec_ModIndexRejected(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	if len(typedOpts.Steps) != 0 {
 		t.Fatalf("expected mod_index to be rejected (zero typed options), got steps_len=%d", len(typedOpts.Steps))
@@ -146,7 +146,7 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	mavenImg, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackJavaMaven)
 	if err != nil {

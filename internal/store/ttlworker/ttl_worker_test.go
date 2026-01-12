@@ -64,10 +64,10 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 }
 
 func TestNew(t *testing.T) {
-	t.Run("nil store returns nil worker", func(t *testing.T) {
+	t.Run("nil store returns error", func(t *testing.T) {
 		worker, err := New(Options{Store: nil})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
+		if !errors.Is(err, ErrNilStore) {
+			t.Errorf("expected ErrNilStore, got %v", err)
 		}
 		if worker != nil {
 			t.Errorf("expected nil worker, got %v", worker)
@@ -209,7 +209,7 @@ func TestWorker_Run(t *testing.T) {
 		}
 	})
 
-	t.Run("continues on error", func(t *testing.T) {
+	t.Run("continues on error and returns aggregated errors", func(t *testing.T) {
 		mock := &mockStore{
 			deleteLogsErr:      errors.New("logs delete failed"),
 			deleteEventsErr:    errors.New("events delete failed"),
@@ -223,9 +223,10 @@ func TestWorker_Run(t *testing.T) {
 			t.Fatalf("failed to create worker: %v", err)
 		}
 
-		// Should not return error even if individual operations fail.
-		if err := worker.Run(context.Background()); err != nil {
-			t.Errorf("expected no error, got %v", err)
+		// Should return aggregated errors.
+		err = worker.Run(context.Background())
+		if err == nil {
+			t.Error("expected aggregated error, got nil")
 		}
 
 		// All operations should still be attempted.

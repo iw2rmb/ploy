@@ -95,18 +95,8 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	// path (for example, when a per-step workspace is a copy of an existing base clone).
 	if dest != "" {
 		if info, err := os.Stat(dest); err == nil && info.IsDir() {
-			gitDir := filepath.Join(dest, ".git")
-			if _, err := os.Stat(gitDir); err == nil {
-				cmd := exec.CommandContext(ctx, "git", "-C", dest, "remote", "get-url", "origin")
-				cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
-				output, err := cmd.CombinedOutput()
-				if err == nil {
-					remoteURL := strings.TrimSpace(string(output))
-					if vcs.NormalizeRepoURL(remoteURL) == vcs.NormalizeRepoURL(url) {
-						// Destination repo already matches requested URL; treat as hydrated.
-						return nil
-					}
-				}
+			if validateCloneOrigin(ctx, dest, url) {
+				return nil
 			}
 		}
 	}
@@ -116,15 +106,17 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		cacheKey := computeCacheKey(url, baseRef, commitSHA)
 		cachedClonePath := filepath.Join(g.opts.CacheDir, "git-clones", cacheKey)
 
-		// If cache exists, copy it to dest and return early.
+		// If cache exists, copy it to dest and validate before using.
 		if _, err := os.Stat(cachedClonePath); err == nil {
-			if err := copyGitClone(cachedClonePath, dest); err != nil {
-				// Cache copy failed; fall through to fresh clone.
-				// We don't treat this as a hard error since we can still fetch fresh.
-			} else {
-				// Cache hit: successfully reused cached clone.
-				return nil
+			if err := copyGitClone(cachedClonePath, dest); err == nil {
+				// Validate the cached clone matches expected URL.
+				if validateCloneOrigin(ctx, dest, url) {
+					return nil
+				}
+				// Cache invalid or corrupted; remove and fall through to fresh clone.
+				os.RemoveAll(dest)
 			}
+			// Cache copy failed or invalid; fall through to fresh clone.
 		}
 
 		// Cache miss or copy failed: perform fresh clone and populate cache.
@@ -195,6 +187,23 @@ func computeCacheKey(url, baseRef, commitSHA string) string {
 
 	hash := sha256.Sum256([]byte(keyInput))
 	return hex.EncodeToString(hash[:])
+}
+
+// validateCloneOrigin checks if dest is a git repository with the expected origin URL.
+// Returns true if the clone is valid and matches the expected URL.
+func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
+	gitDir := filepath.Join(dest, ".git")
+	if _, err := os.Stat(gitDir); err != nil {
+		return false
+	}
+	cmd := exec.CommandContext(ctx, "git", "-C", dest, "remote", "get-url", "origin")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+	remoteURL := strings.TrimSpace(string(output))
+	return vcs.NormalizeRepoURL(remoteURL) == vcs.NormalizeRepoURL(expectedURL)
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.

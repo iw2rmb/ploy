@@ -3,6 +3,7 @@ package ttlworker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -14,6 +15,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// partitionTable describes a partitioned table and how to list its partitions.
+type partitionTable struct {
+	name   string
+	listFn func(context.Context) ([]string, error)
+}
+
 // partitionPattern matches partition names like "ploy.logs_2025_10" and extracts year and month.
 // partitionPattern enforces month range 01..12 to avoid mis-parsing invalid names
 // like 00 or 13, which Go's time.Date would otherwise normalize to adjacent months.
@@ -22,39 +29,35 @@ var partitionPattern = regexp.MustCompile(`^ploy\.(\w+)_(\d{4})_(0[1-9]|1[0-2])$
 // DropOldPartitions drops entire monthly partitions older than the cutoff date.
 // This is much more efficient than row-by-row deletion for large partitions.
 // Stray rows in the parent table (if any) are handled by the fallback DELETE queries.
+// Returns an aggregated error if any table operations fail.
 func DropOldPartitions(ctx context.Context, pool *pgxpool.Pool, st store.Store, cutoff time.Time, logger *slog.Logger) error {
 	if pool == nil || st == nil {
 		return nil
 	}
 
-	// Drop old log partitions.
-	if err := dropPartitionsForTable(ctx, pool, st, "logs", cutoff, logger, st.ListLogPartitions); err != nil {
-		logger.Error("partition-dropper: failed to drop old log partitions", "err", err)
+	// Define partitioned tables and their list functions.
+	tables := []partitionTable{
+		{"logs", st.ListLogPartitions},
+		{"events", st.ListEventPartitions},
+		{"artifact_bundles", st.ListArtifactBundlePartitions},
+		{"node_metrics", st.ListNodeMetricsPartitions},
 	}
 
-	// Drop old event partitions.
-	if err := dropPartitionsForTable(ctx, pool, st, "events", cutoff, logger, st.ListEventPartitions); err != nil {
-		logger.Error("partition-dropper: failed to drop old event partitions", "err", err)
+	var errs []error
+	for _, table := range tables {
+		if err := dropPartitionsForTable(ctx, pool, table.name, cutoff, logger, table.listFn); err != nil {
+			logger.Error("partition-dropper: failed to drop old partitions", "table", table.name, "err", err)
+			errs = append(errs, err)
+		}
 	}
 
-	// Drop old artifact_bundles partitions.
-	if err := dropPartitionsForTable(ctx, pool, st, "artifact_bundles", cutoff, logger, st.ListArtifactBundlePartitions); err != nil {
-		logger.Error("partition-dropper: failed to drop old artifact_bundles partitions", "err", err)
-	}
-
-	// Drop old node_metrics partitions.
-	if err := dropPartitionsForTable(ctx, pool, st, "node_metrics", cutoff, logger, st.ListNodeMetricsPartitions); err != nil {
-		logger.Error("partition-dropper: failed to drop old node_metrics partitions", "err", err)
-	}
-
-	return nil
+	return errors.Join(errs...)
 }
 
 // dropPartitionsForTable drops partitions for a specific table that are older than cutoff.
 func dropPartitionsForTable(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	st store.Store,
 	tableName string,
 	cutoff time.Time,
 	logger *slog.Logger,

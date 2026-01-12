@@ -231,3 +231,41 @@ func componentToMap(status ComponentStatus) map[string]any {
 	}
 	return component
 }
+
+// cloneAnyMap performs a deep copy of a map[string]any structure.
+func cloneAnyMap(src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]any, len(src))
+	for key, value := range src {
+		switch typed := value.(type) {
+		case map[string]any:
+			dst[key] = cloneAnyMap(typed)
+		case []any:
+			dst[key] = cloneAnySlice(typed)
+		default:
+			dst[key] = typed
+		}
+	}
+	return dst
+}
+
+// cloneAnySlice performs a deep copy of a []any slice.
+func cloneAnySlice(src []any) []any {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]any, len(src))
+	for idx, value := range src {
+		switch typed := value.(type) {
+		case map[string]any:
+			out[idx] = cloneAnyMap(typed)
+		case []any:
+			out[idx] = cloneAnySlice(typed)
+		default:
+			out[idx] = typed
+		}
+	}
+	return out
+}

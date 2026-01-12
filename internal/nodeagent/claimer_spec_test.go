@@ -22,7 +22,7 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	    }`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	if typedOpts.Healing == nil {
 		t.Fatal("expected Healing config to be parsed")
@@ -48,7 +48,7 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
         "build_gate": {"enabled": false, "profile": "java-maven"}
     }`
 	var raw json.RawMessage = []byte(specJSON)
-	env, typedOpts := parseSpec(raw)
+	env, typedOpts, _ := parseSpec(raw)
 
 	// Verify execution options are extracted.
 	img, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
@@ -100,7 +100,7 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
         "build_gate": {"enabled": false, "profile": "java-maven"}
     }`
 	var raw json.RawMessage = []byte(specJSON)
-	env, typedOpts := parseSpec(raw)
+	env, typedOpts, _ := parseSpec(raw)
 
 	// steps[0] should drive single-step extraction; unknown top-level "mod" is ignored.
 	img, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
@@ -157,7 +157,7 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	if len(typedOpts.Steps) != 3 {
 		t.Fatalf("expected 3 steps in typed options, got %d", len(typedOpts.Steps))
@@ -260,7 +260,7 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 			t.Parallel()
 
 			var raw json.RawMessage = []byte(tc.specJSON)
-			_, typedOpts := parseSpec(raw)
+			_, typedOpts, _ := parseSpec(raw)
 
 			// Verify typed options.
 			if typedOpts.Healing == nil {
@@ -302,7 +302,7 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	if typedOpts.Healing == nil {
 		t.Fatal("expected healing config to be parsed")
@@ -354,7 +354,7 @@ func TestParseSpec_ProducesTypedOptions_SingleStepExecArray(t *testing.T) {
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
-	_, typedOpts := parseSpec(raw)
+	_, typedOpts, _ := parseSpec(raw)
 
 	// Verify that Execution.Command.Exec is populated (regression test).
 	// Before the fix, this would be empty because []any != []string.

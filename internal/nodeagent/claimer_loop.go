@@ -93,12 +93,12 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 
 	// Lazy initialization: create HTTP client if not yet initialized.
 	// This allows bootstrap() to run first and create certificates.
-	if c.client == nil {
-		client, err := createHTTPClient(c.cfg)
-		if err != nil {
-			return false, fmt.Errorf("create http client: %w", err)
-		}
-		c.client = client
+	// Uses sync.Once for thread-safe initialization.
+	c.clientOnce.Do(func() {
+		c.client, c.clientErr = createHTTPClient(c.cfg)
+	})
+	if c.clientErr != nil {
+		return false, fmt.Errorf("create http client: %w", c.clientErr)
 	}
 
 	// POST /v1/nodes/{id}/claim
@@ -141,7 +141,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Parse spec into typed RunOptions and environment variables.
 	// The typed RunOptions is the canonical source of truth; no raw map[string]any
 	// is passed to StartRunRequest.
-	envFromSpec, typedOpts := parseSpec(claim.Spec)
+	envFromSpec, typedOpts, err := parseSpec(claim.Spec)
+	if err != nil {
+		return true, fmt.Errorf("parse spec: %w", err)
+	}
 
 	startReq := StartRunRequest{
 		RunID:        claim.RunID, // Already types.RunID from ClaimResponse

@@ -17,7 +17,7 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 		"gitlab_domain": "https://gitlab.example.com"
 	}`)
 
-	env, typedOpts := parseSpec(spec)
+	env, typedOpts, _ := parseSpec(spec)
 
 	if typedOpts.ServerMetadata.JobID.String() != testKSUID {
 		t.Errorf("job_id = %q, want %s", typedOpts.ServerMetadata.JobID.String(), testKSUID)
@@ -54,7 +54,7 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	}`)
 
 	// Parse the spec.
-	_, typedOpts := parseSpec(spec)
+	_, typedOpts, _ := parseSpec(spec)
 
 	// Verify all fields are extracted into typed options.
 	if typedOpts.ServerMetadata.JobID.String() != testKSUID {

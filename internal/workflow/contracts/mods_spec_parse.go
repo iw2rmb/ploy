@@ -52,9 +52,9 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 
 	// Parse server-injected fields.
 	if v, ok := raw["job_id"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("job_id: expected string, got %T", v)
+		s, err := expectString(v, "job_id")
+		if err != nil {
+			return nil, err
 		}
 		s = strings.TrimSpace(s)
 		if s != "" {
@@ -71,16 +71,16 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 
 	// Parse optional metadata fields.
 	if v, ok := raw["apiVersion"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("apiVersion: expected string, got %T", v)
+		s, err := expectString(v, "apiVersion")
+		if err != nil {
+			return nil, err
 		}
 		spec.APIVersion = strings.TrimSpace(s)
 	}
 	if v, ok := raw["kind"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("kind: expected string, got %T", v)
+		s, err := expectString(v, "kind")
+		if err != nil {
+			return nil, err
 		}
 		spec.Kind = strings.TrimSpace(s)
 	}
@@ -121,29 +121,29 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 
 	// Parse build_gate.
 	if v, ok := raw["build_gate"]; ok && v != nil {
-		bgRaw, ok := v.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("build_gate: expected object, got %T", v)
+		bgRaw, err := expectMap(v, "build_gate")
+		if err != nil {
+			return nil, err
 		}
 		bg := &BuildGateConfig{}
 		if vv, ok := bgRaw["enabled"]; ok && vv != nil {
-			b, ok := vv.(bool)
-			if !ok {
-				return nil, fmt.Errorf("build_gate.enabled: expected bool, got %T", vv)
+			b, err := expectBool(vv, "build_gate.enabled")
+			if err != nil {
+				return nil, err
 			}
 			bg.Enabled = b
 		}
 		if vv, ok := bgRaw["profile"]; ok && vv != nil {
-			s, ok := vv.(string)
-			if !ok {
-				return nil, fmt.Errorf("build_gate.profile: expected string, got %T", vv)
+			s, err := expectString(vv, "build_gate.profile")
+			if err != nil {
+				return nil, err
 			}
 			bg.Profile = strings.TrimSpace(s)
 		}
 		if vv, ok := bgRaw["healing"]; ok && vv != nil {
-			healRaw, ok := vv.(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("build_gate.healing: expected object, got %T", vv)
+			healRaw, err := expectMap(vv, "build_gate.healing")
+			if err != nil {
+				return nil, err
 			}
 			heal, err := parseHealingSpec(healRaw, "build_gate.healing")
 			if err != nil {
@@ -156,39 +156,39 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 
 	// Parse GitLab integration.
 	if v, ok := raw["gitlab_pat"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("gitlab_pat: expected string, got %T", v)
+		s, err := expectString(v, "gitlab_pat")
+		if err != nil {
+			return nil, err
 		}
 		spec.GitLabPAT = s
 	}
 	if v, ok := raw["gitlab_domain"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("gitlab_domain: expected string, got %T", v)
+		s, err := expectString(v, "gitlab_domain")
+		if err != nil {
+			return nil, err
 		}
 		spec.GitLabDomain = strings.TrimSpace(s)
 	}
 	if v, ok := raw["mr_on_success"]; ok && v != nil {
-		b, ok := v.(bool)
-		if !ok {
-			return nil, fmt.Errorf("mr_on_success: expected bool, got %T", v)
+		b, err := expectBool(v, "mr_on_success")
+		if err != nil {
+			return nil, err
 		}
 		spec.MROnSuccess = &b
 	}
 	if v, ok := raw["mr_on_fail"]; ok && v != nil {
-		b, ok := v.(bool)
-		if !ok {
-			return nil, fmt.Errorf("mr_on_fail: expected bool, got %T", v)
+		b, err := expectBool(v, "mr_on_fail")
+		if err != nil {
+			return nil, err
 		}
 		spec.MROnFail = &b
 	}
 
 	// Parse artifact configuration.
 	if v, ok := raw["artifact_name"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("artifact_name: expected string, got %T", v)
+		s, err := expectString(v, "artifact_name")
+		if err != nil {
+			return nil, err
 		}
 		spec.ArtifactName = strings.TrimSpace(s)
 	}
@@ -220,48 +220,22 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 
 	// Parse optional name.
 	if v, ok := raw["name"]; ok && v != nil {
-		s, ok := v.(string)
-		if !ok {
-			return step, fmt.Errorf("%s.name: expected string, got %T", prefix, v)
+		s, err := expectString(v, prefix+".name")
+		if err != nil {
+			return step, err
 		}
 		step.Name = strings.TrimSpace(s)
 	}
 
-	// Parse image.
-	if v, ok := raw["image"]; ok && v != nil {
-		img, err := ParseModImage(v)
-		if err != nil {
-			return step, fmt.Errorf("%s.image: %w", prefix, err)
-		}
-		step.Image = img
+	// Parse shared mod-like fields (image, command, env, retain_container).
+	f, err := parseModLikeFields(raw, prefix)
+	if err != nil {
+		return step, err
 	}
-
-	// Parse command.
-	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := parseCommandSpec(v)
-		if err != nil {
-			return step, fmt.Errorf("%s.command: %w", prefix, err)
-		}
-		step.Command = cmd
-	}
-
-	// Parse env.
-	if v, ok := raw["env"]; ok && v != nil {
-		env, err := parseEnvMap(v, prefix+".env")
-		if err != nil {
-			return step, err
-		}
-		step.Env = env
-	}
-
-	// Parse retain_container.
-	if v, ok := raw["retain_container"]; ok && v != nil {
-		b, ok := v.(bool)
-		if !ok {
-			return step, fmt.Errorf("%s.retain_container: expected bool, got %T", prefix, v)
-		}
-		step.RetainContainer = b
-	}
+	step.Image = f.Image
+	step.Command = f.Command
+	step.Env = f.Env
+	step.RetainContainer = f.RetainContainer
 
 	return step, nil
 }
@@ -284,9 +258,9 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 
 	// Parse healing mod.
 	if v, ok := raw["mod"]; ok && v != nil {
-		modRaw, ok := v.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("%s.mod: expected object, got %T", prefix, v)
+		modRaw, err := expectMap(v, prefix+".mod")
+		if err != nil {
+			return nil, err
 		}
 		mod, err := parseHealingModSpec(modRaw, prefix+".mod")
 		if err != nil {
@@ -299,45 +273,17 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 }
 
 func parseHealingModSpec(raw map[string]any, prefix string) (*HealingModSpec, error) {
-	mod := &HealingModSpec{}
-
-	// Parse image.
-	if v, ok := raw["image"]; ok && v != nil {
-		img, err := ParseModImage(v)
-		if err != nil {
-			return nil, fmt.Errorf("%s.image: %w", prefix, err)
-		}
-		mod.Image = img
+	// Parse shared mod-like fields (image, command, env, retain_container).
+	f, err := parseModLikeFields(raw, prefix)
+	if err != nil {
+		return nil, err
 	}
-
-	// Parse command.
-	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := parseCommandSpec(v)
-		if err != nil {
-			return nil, fmt.Errorf("%s.command: %w", prefix, err)
-		}
-		mod.Command = cmd
-	}
-
-	// Parse env.
-	if v, ok := raw["env"]; ok && v != nil {
-		env, err := parseEnvMap(v, prefix+".env")
-		if err != nil {
-			return nil, err
-		}
-		mod.Env = env
-	}
-
-	// Parse retain_container.
-	if v, ok := raw["retain_container"]; ok && v != nil {
-		b, ok := v.(bool)
-		if !ok {
-			return nil, fmt.Errorf("%s.retain_container: expected bool, got %T", prefix, v)
-		}
-		mod.RetainContainer = b
-	}
-
-	return mod, nil
+	return &HealingModSpec{
+		Image:           f.Image,
+		Command:         f.Command,
+		Env:             f.Env,
+		RetainContainer: f.RetainContainer,
+	}, nil
 }
 
 // parseCommandSpec parses a command from polymorphic input (string or array).

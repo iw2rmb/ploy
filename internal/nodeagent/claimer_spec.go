@@ -35,21 +35,20 @@ func stringValue(s *string) string {
 //     plus step env for single-step runs; multi-step step env is handled per-step
 //     during manifest building).
 //   - typedOpts: RunOptions with typed accessors for all understood option keys.
+//   - err: non-nil if spec parsing fails.
 //
-// If the spec is empty or invalid JSON, returns an empty env map and zero RunOptions.
-func parseSpec(spec json.RawMessage) (map[string]string, RunOptions) {
+// If the spec is empty, returns an empty env map and zero RunOptions with nil error.
+func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	env := map[string]string{}
 	var typedOpts RunOptions
 	if len(spec) == 0 {
-		return env, typedOpts
+		return env, typedOpts, nil
 	}
 
 	// Parse using the canonical parser for structural validation.
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
-		// If spec is invalid, return empty env/options and let downstream execution fail fast
-		// when required fields are missing.
-		return env, typedOpts
+		return env, typedOpts, err
 	}
 
 	// Derive env with legacy semantics:
@@ -62,7 +61,7 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions) {
 	// Direct conversion from typed ModsSpec to RunOptions.
 	typedOpts = modsSpecToRunOptions(modsSpec)
 
-	return env, typedOpts
+	return env, typedOpts, nil
 }
 
 func modsSpecToEnv(spec *contracts.ModsSpec) map[string]string {

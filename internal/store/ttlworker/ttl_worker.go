@@ -3,6 +3,7 @@ package ttlworker
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// ErrNilStore is returned when New is called with a nil Store.
+var ErrNilStore = errors.New("ttlworker: store is required")
 
 // Options configures the TTL worker.
 type Options struct {
@@ -38,9 +42,10 @@ type Worker struct {
 }
 
 // New constructs a new TTL worker.
+// Returns ErrNilStore if opts.Store is nil.
 func New(opts Options) (*Worker, error) {
 	if opts.Store == nil {
-		return nil, nil
+		return nil, ErrNilStore
 	}
 	ttl := opts.TTL
 	if ttl <= 0 {
@@ -73,7 +78,14 @@ func (w *Worker) Interval() time.Duration {
 	return w.interval
 }
 
+// deleteOp describes a TTL deletion operation.
+type deleteOp struct {
+	name string
+	fn   func(context.Context, pgtype.Timestamptz) (int64, error)
+}
+
 // Run executes the TTL cleanup logic.
+// Returns an aggregated error if any delete operations fail.
 func (w *Worker) Run(ctx context.Context) error {
 	if w == nil || w.store == nil {
 		return nil
@@ -88,51 +100,43 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	w.logger.Info("ttl-worker: starting cleanup", "cutoff", cutoff.Format(time.RFC3339), "drop_partitions", w.dropPartitions)
 
+	var errs []error
+
 	// Drop old partitions if enabled.
 	if w.dropPartitions {
 		if err := DropOldPartitions(ctx, w.store.Pool(), w.store, cutoff, w.logger); err != nil {
 			w.logger.Error("ttl-worker: partition dropper failed", "err", err)
+			errs = append(errs, err)
 		}
 	}
 
-	// Delete expired logs (fallback for stray rows or if partition dropping is disabled).
-	logsDeleted, err := w.store.DeleteExpiredLogs(ctx, cutoffTS)
-	if err != nil {
-		w.logger.Error("ttl-worker: delete expired logs", "err", err)
-	} else {
-		w.logger.Info("ttl-worker: deleted expired logs", "rows", logsDeleted)
+	// Define delete operations.
+	ops := []deleteOp{
+		{"logs", w.store.DeleteExpiredLogs},
+		{"events", w.store.DeleteExpiredEvents},
+		{"diffs", w.store.DeleteExpiredDiffs},
+		{"artifact_bundles", w.store.DeleteExpiredArtifactBundles},
 	}
 
-	// Delete expired events.
-	eventsDeleted, err := w.store.DeleteExpiredEvents(ctx, cutoffTS)
-	if err != nil {
-		w.logger.Error("ttl-worker: delete expired events", "err", err)
-	} else {
-		w.logger.Info("ttl-worker: deleted expired events", "rows", eventsDeleted)
-	}
-
-	// Delete expired diffs.
-	diffsDeleted, err := w.store.DeleteExpiredDiffs(ctx, cutoffTS)
-	if err != nil {
-		w.logger.Error("ttl-worker: delete expired diffs", "err", err)
-	} else {
-		w.logger.Info("ttl-worker: deleted expired diffs", "rows", diffsDeleted)
-	}
-
-	// Delete expired artifact bundles.
-	artifactsDeleted, err := w.store.DeleteExpiredArtifactBundles(ctx, cutoffTS)
-	if err != nil {
-		w.logger.Error("ttl-worker: delete expired artifact bundles", "err", err)
-	} else {
-		w.logger.Info("ttl-worker: deleted expired artifact bundles", "rows", artifactsDeleted)
+	// Execute each delete operation and collect results.
+	counts := make(map[string]int64, len(ops))
+	for _, op := range ops {
+		deleted, err := op.fn(ctx, cutoffTS)
+		if err != nil {
+			w.logger.Error("ttl-worker: delete expired "+op.name, "err", err)
+			errs = append(errs, err)
+		} else {
+			w.logger.Info("ttl-worker: deleted expired "+op.name, "rows", deleted)
+			counts[op.name] = deleted
+		}
 	}
 
 	w.logger.Info("ttl-worker: cleanup completed",
-		"logs", logsDeleted,
-		"events", eventsDeleted,
-		"diffs", diffsDeleted,
-		"artifacts", artifactsDeleted,
+		"logs", counts["logs"],
+		"events", counts["events"],
+		"diffs", counts["diffs"],
+		"artifacts", counts["artifact_bundles"],
 	)
 
-	return nil
+	return errors.Join(errs...)
 }

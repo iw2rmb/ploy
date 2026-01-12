@@ -100,6 +100,20 @@ func (r resourceSnapshot) toNodeResources() NodeResources {
 	}
 }
 
+// cpuFreeMillis calculates free CPU millis from load average and total capacity.
+// Clamps result to [0, totalMillis] range.
+func cpuFreeMillis(load1 float64, totalMillis int64) int32 {
+	usedMillis := int64(math.Round(load1 * 1000))
+	freeMillis := totalMillis - usedMillis
+	if freeMillis < 0 {
+		freeMillis = 0
+	}
+	if freeMillis > totalMillis {
+		freeMillis = totalMillis
+	}
+	return int32(freeMillis)
+}
+
 func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, error) {
 	if c.resourcesFunc != nil {
 		return c.resourcesFunc(ctx)
@@ -120,15 +134,7 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 	if c.loadFunc != nil {
 		if avg, err := c.loadFunc(ctx); err == nil {
 			snapshot.CPULoad1 = avg.Load1
-			usedMillis := int64(math.Round(avg.Load1 * 1000))
-			freeMillis := totalMillis64 - usedMillis
-			if freeMillis < 0 {
-				freeMillis = 0
-			}
-			if freeMillis > totalMillis64 {
-				freeMillis = totalMillis64
-			}
-			snapshot.CPUFreeMillis = int32(freeMillis)
+			snapshot.CPUFreeMillis = cpuFreeMillis(avg.Load1, totalMillis64)
 		} else if !errors.Is(err, context.Canceled) {
 			snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 			errs = append(errs, "load:"+err.Error())
@@ -137,15 +143,7 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 		}
 	} else if avg, err := load.AvgWithContext(ctx); err == nil {
 		snapshot.CPULoad1 = avg.Load1
-		usedMillis := int64(math.Round(avg.Load1 * 1000))
-		freeMillis := totalMillis64 - usedMillis
-		if freeMillis < 0 {
-			freeMillis = 0
-		}
-		if freeMillis > totalMillis64 {
-			freeMillis = totalMillis64
-		}
-		snapshot.CPUFreeMillis = int32(freeMillis)
+		snapshot.CPUFreeMillis = cpuFreeMillis(avg.Load1, totalMillis64)
 	} else if !errors.Is(err, context.Canceled) {
 		snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 		errs = append(errs, "load:"+err.Error())

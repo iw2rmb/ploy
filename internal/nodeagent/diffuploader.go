@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -19,21 +18,16 @@ import (
 
 // DiffUploader uploads diff and summary data to the control-plane server.
 type DiffUploader struct {
-	cfg    Config
-	client *http.Client
+	*baseUploader
 }
 
 // NewDiffUploader creates a new diff uploader.
 func NewDiffUploader(cfg Config) (*DiffUploader, error) {
-	client, err := createHTTPClient(cfg)
+	base, err := newBaseUploader(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("create http client: %w", err)
+		return nil, err
 	}
-
-	return &DiffUploader{
-		cfg:    cfg,
-		client: client,
-	}, nil
+	return &DiffUploader{baseUploader: base}, nil
 }
 
 // UploadDiff compresses and uploads a diff to the server.
@@ -88,9 +82,8 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID 
 	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status.
-	if resp.StatusCode != http.StatusCreated {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+	if err := httpError(resp, http.StatusCreated, "upload diff"); err != nil {
+		return err
 	}
 
 	return nil

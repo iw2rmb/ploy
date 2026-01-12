@@ -111,7 +111,10 @@ func NewCollector(opts Options) (*Collector, error) {
 // Returns typed NodeStatus and NodeCapacity instead of map[string]any.
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	now := c.now()
-	host, _ := c.hostname()
+	host, err := c.hostname()
+	if err != nil {
+		host = "[unavailable]"
+	}
 
 	resources, resErr := c.collectResources(ctx)
 
@@ -176,41 +179,31 @@ func (c *Collector) checkComponent(ctx context.Context, checker HealthChecker) C
 	return status
 }
 
+// statePriority returns the severity level for a state (higher = worse).
+var statePriority = map[string]int{
+	stateOK:       0,
+	stateUnknown:  1,
+	stateDegraded: 2,
+	stateError:    3,
+}
+
+// worstState returns the more severe of two states.
+func worstState(current, component string) string {
+	componentNorm := strings.ToLower(component)
+	if statePriority[componentNorm] > statePriority[current] {
+		return componentNorm
+	}
+	return current
+}
+
 // aggregateComponentState computes the overall node state from individual component statuses.
-// Replaces map iteration with explicit component checks for type safety.
+// Returns the worst state across resource errors and component health.
 func aggregateComponentState(docker, gate ComponentStatus, resErr error) string {
 	state := stateOK
 	if resErr != nil {
 		state = stateDegraded
 	}
-
-	// Check docker component.
-	switch strings.ToLower(docker.State) {
-	case stateError:
-		return stateError
-	case stateDegraded:
-		if state != stateError {
-			state = stateDegraded
-		}
-	case stateUnknown:
-		if state == stateOK {
-			state = stateUnknown
-		}
-	}
-
-	// Check gate component.
-	switch strings.ToLower(gate.State) {
-	case stateError:
-		return stateError
-	case stateDegraded:
-		if state != stateError {
-			state = stateDegraded
-		}
-	case stateUnknown:
-		if state == stateOK {
-			state = stateUnknown
-		}
-	}
-
+	state = worstState(state, docker.State)
+	state = worstState(state, gate.State)
 	return state
 }
