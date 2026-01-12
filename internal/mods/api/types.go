@@ -101,7 +101,7 @@ type StageStatus struct {
 // total step count.
 type StageMetadata struct {
 	// ModType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
-	ModType string `json:"mod_type,omitempty"`
+	ModType domaintypes.ModType `json:"mod_type,omitempty"`
 	// ModImage is the container image for this job (optional, for diagnostics).
 	ModImage string `json:"mod_image,omitempty"`
 }

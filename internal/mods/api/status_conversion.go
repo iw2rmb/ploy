@@ -135,7 +135,7 @@ func IsGateJob(meta []byte) bool {
 	if err := json.Unmarshal(meta, &sm); err != nil {
 		return false
 	}
-	modType := domaintypes.ModType(strings.TrimSpace(sm.ModType))
+	modType := domaintypes.ModType(strings.TrimSpace(sm.ModType.String()))
 	// Gate job types: pre_gate (initial), post_gate (after mods), re_gate (after healing).
 	return modType == domaintypes.ModTypePreGate ||
 		modType == domaintypes.ModTypePostGate ||
