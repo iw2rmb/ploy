@@ -19,12 +19,12 @@ func TestNewCollector_RejectsEmptyNodeID(t *testing.T) {
 func TestNewCollector_AcceptsNodeID(t *testing.T) {
 	c, err := NewCollector(Options{
 		Role:   "node",
-		NodeID: domaintypes.NodeID("test-node-123"),
+		NodeID: domaintypes.NodeID("abc123"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if c.nodeID != domaintypes.NodeID("test-node-123") {
-		t.Fatalf("nodeID=%q want %q", c.nodeID, domaintypes.NodeID("test-node-123"))
+	if c.nodeID != domaintypes.NodeID("abc123") {
+		t.Fatalf("nodeID=%q want %q", c.nodeID, domaintypes.NodeID("abc123"))
 	}
 }
