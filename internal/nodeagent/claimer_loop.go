@@ -27,7 +27,7 @@ import (
 // Nodes claim from a single unified jobs queue (FIFO by step_index).
 func (c *ClaimManager) Start(ctx context.Context) error {
 	// Initialize ticker with the initial backoff interval from shared policy.
-	ticker := time.NewTicker(c.backoff.GetDuration())
+	ticker := time.NewTicker(time.Duration(c.backoff.GetDuration()))
 	defer ticker.Stop()
 
 	for {
@@ -52,7 +52,7 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 			}
 
 			// Update ticker interval based on current backoff duration from shared policy.
-			ticker.Reset(c.backoff.GetDuration())
+			ticker.Reset(time.Duration(c.backoff.GetDuration()))
 		}
 	}
 }

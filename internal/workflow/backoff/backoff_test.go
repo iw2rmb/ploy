@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestDefaultPolicy verifies the default policy values.
@@ -13,16 +15,16 @@ func TestDefaultPolicy(t *testing.T) {
 	t.Parallel()
 	p := DefaultPolicy()
 
-	if p.InitialInterval != 2*time.Second {
+	if time.Duration(p.InitialInterval) != 2*time.Second {
 		t.Errorf("InitialInterval = %v, want 2s", p.InitialInterval)
 	}
-	if p.MaxInterval != 30*time.Second {
+	if time.Duration(p.MaxInterval) != 30*time.Second {
 		t.Errorf("MaxInterval = %v, want 30s", p.MaxInterval)
 	}
 	if p.Multiplier != 2.0 {
 		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
 	}
-	if p.MaxElapsedTime != 5*time.Minute {
+	if time.Duration(p.MaxElapsedTime) != 5*time.Minute {
 		t.Errorf("MaxElapsedTime = %v, want 5m", p.MaxElapsedTime)
 	}
 	if p.MaxAttempts != 10 {
@@ -35,10 +37,10 @@ func TestRolloutPolicy(t *testing.T) {
 	t.Parallel()
 	p := RolloutPolicy()
 
-	if p.InitialInterval != 2*time.Second {
+	if time.Duration(p.InitialInterval) != 2*time.Second {
 		t.Errorf("InitialInterval = %v, want 2s", p.InitialInterval)
 	}
-	if p.MaxInterval != 30*time.Second {
+	if time.Duration(p.MaxInterval) != 30*time.Second {
 		t.Errorf("MaxInterval = %v, want 30s", p.MaxInterval)
 	}
 	if p.Multiplier != 2.0 {
@@ -51,10 +53,10 @@ func TestHeartbeatPolicy(t *testing.T) {
 	t.Parallel()
 	p := HeartbeatPolicy()
 
-	if p.InitialInterval != 5*time.Second {
+	if time.Duration(p.InitialInterval) != 5*time.Second {
 		t.Errorf("InitialInterval = %v, want 5s", p.InitialInterval)
 	}
-	if p.MaxInterval != 5*time.Minute {
+	if time.Duration(p.MaxInterval) != 5*time.Minute {
 		t.Errorf("MaxInterval = %v, want 5m", p.MaxInterval)
 	}
 	if p.Multiplier != 2.0 {
@@ -73,10 +75,10 @@ func TestClaimLoopPolicy(t *testing.T) {
 	t.Parallel()
 	p := ClaimLoopPolicy()
 
-	if p.InitialInterval != 250*time.Millisecond {
+	if time.Duration(p.InitialInterval) != 250*time.Millisecond {
 		t.Errorf("InitialInterval = %v, want 250ms", p.InitialInterval)
 	}
-	if p.MaxInterval != 5*time.Second {
+	if time.Duration(p.MaxInterval) != 5*time.Second {
 		t.Errorf("MaxInterval = %v, want 5s", p.MaxInterval)
 	}
 	if p.Multiplier != 2.0 {
@@ -90,11 +92,11 @@ func TestGitLabMRPolicy(t *testing.T) {
 	p := GitLabMRPolicy()
 
 	// Initial delay: 1s.
-	if p.InitialInterval != 1*time.Second {
+	if time.Duration(p.InitialInterval) != 1*time.Second {
 		t.Errorf("InitialInterval = %v, want 1s", p.InitialInterval)
 	}
 	// Max delay: 4s (1s * 2^2).
-	if p.MaxInterval != 4*time.Second {
+	if time.Duration(p.MaxInterval) != 4*time.Second {
 		t.Errorf("MaxInterval = %v, want 4s", p.MaxInterval)
 	}
 	// Multiplier: 2.0 for exponential backoff.
@@ -115,10 +117,10 @@ func TestGitLabMRPolicy(t *testing.T) {
 func TestNewExponentialBackoff(t *testing.T) {
 	t.Parallel()
 	p := Policy{
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     10 * time.Second,
+		InitialInterval: domaintypes.Duration(1 * time.Second),
+		MaxInterval:     domaintypes.Duration(10 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  1 * time.Minute,
+		MaxElapsedTime:  domaintypes.Duration(1 * time.Minute),
 		MaxAttempts:     5,
 	}
 
@@ -144,8 +146,8 @@ func TestRunWithBackoff_Success(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 100 * time.Millisecond,
-		MaxInterval:     1 * time.Second,
+		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(1 * time.Second),
 		Multiplier:      2.0,
 		MaxAttempts:     3,
 	}
@@ -170,8 +172,8 @@ func TestRunWithBackoff_RetryUntilSuccess(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     5,
 	}
@@ -199,8 +201,8 @@ func TestRunWithBackoff_ExhaustAttempts(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     3,
 	}
@@ -226,8 +228,8 @@ func TestRunWithBackoff_ContextCancellation(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	p := Policy{
-		InitialInterval: 100 * time.Millisecond,
-		MaxInterval:     1 * time.Second,
+		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(1 * time.Second),
 		Multiplier:      2.0,
 		MaxAttempts:     10,
 	}
@@ -256,8 +258,8 @@ func TestPollWithBackoff_ConditionMet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 100 * time.Millisecond,
-		MaxInterval:     1 * time.Second,
+		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(1 * time.Second),
 		Multiplier:      2.0,
 		MaxAttempts:     3,
 	}
@@ -282,8 +284,8 @@ func TestPollWithBackoff_ConditionEventuallyMet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     5,
 	}
@@ -308,8 +310,8 @@ func TestPollWithBackoff_ConditionError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     3,
 	}
@@ -334,8 +336,8 @@ func TestPollWithBackoff_ExhaustAttempts(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     4,
 	}
@@ -359,8 +361,8 @@ func TestPollWithBackoff_ExhaustAttempts(t *testing.T) {
 func TestStatefulBackoff_ApplyAndReset(t *testing.T) {
 	t.Parallel()
 	p := Policy{
-		InitialInterval: 100 * time.Millisecond,
-		MaxInterval:     1 * time.Second,
+		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(1 * time.Second),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // Infinite.
 		MaxAttempts:     0, // Infinite.
@@ -369,39 +371,39 @@ func TestStatefulBackoff_ApplyAndReset(t *testing.T) {
 	sb := NewStatefulBackoff(p)
 
 	// Initial state: GetDuration returns initial interval.
-	if d := sb.GetDuration(); d != 100*time.Millisecond {
+	if d := time.Duration(sb.GetDuration()); d != 100*time.Millisecond {
 		t.Errorf("GetDuration() = %v, want 100ms (initial)", d)
 	}
 
 	// Apply backoff: uses NextBackOff() which returns initial interval with jitter.
 	// For InitialInterval=100ms with 50% jitter: [50ms, 150ms].
 	d1 := sb.Apply()
-	if d1 < 50*time.Millisecond || d1 > 150*time.Millisecond {
+	if time.Duration(d1) < 50*time.Millisecond || time.Duration(d1) > 150*time.Millisecond {
 		t.Errorf("Apply() = %v, want in range [50ms, 150ms]", d1)
 	}
 
 	// Apply again: NextBackOff() doubles the base with jitter.
 	// Expected base ~200ms with 50% jitter: [100ms, 300ms], capped at 1s.
 	d2 := sb.Apply()
-	if d2 < 100*time.Millisecond || d2 > 1*time.Second {
+	if time.Duration(d2) < 100*time.Millisecond || time.Duration(d2) > 1*time.Second {
 		t.Errorf("Apply() = %v, want in range [100ms, 1s]", d2)
 	}
 
 	// Apply again: should continue to grow (with jitter), capped at max 1s.
 	d3 := sb.Apply()
-	if d3 < 100*time.Millisecond || d3 > 1*time.Second {
+	if time.Duration(d3) < 100*time.Millisecond || time.Duration(d3) > 1*time.Second {
 		t.Errorf("Apply() = %v, want in range [100ms, 1s]", d3)
 	}
 
 	// Reset: should return to initial state.
 	sb.Reset()
-	if d := sb.GetDuration(); d != 100*time.Millisecond {
+	if d := time.Duration(sb.GetDuration()); d != 100*time.Millisecond {
 		t.Errorf("GetDuration() after Reset = %v, want 100ms", d)
 	}
 
 	// Apply after reset: should start from initial again with jitter.
 	d4 := sb.Apply()
-	if d4 < 50*time.Millisecond || d4 > 150*time.Millisecond {
+	if time.Duration(d4) < 50*time.Millisecond || time.Duration(d4) > 150*time.Millisecond {
 		t.Errorf("Apply() after Reset = %v, want in range [50ms, 150ms]", d4)
 	}
 }
@@ -410,8 +412,8 @@ func TestStatefulBackoff_ApplyAndReset(t *testing.T) {
 func TestStatefulBackoff_CapAtMaxInterval(t *testing.T) {
 	t.Parallel()
 	p := Policy{
-		InitialInterval: 50 * time.Millisecond,
-		MaxInterval:     200 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(50 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(200 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // Infinite.
 		MaxAttempts:     0, // Infinite.
@@ -422,7 +424,7 @@ func TestStatefulBackoff_CapAtMaxInterval(t *testing.T) {
 	// Apply backoff multiple times; should eventually cap at 200ms.
 	var lastDuration time.Duration
 	for i := 0; i < 10; i++ {
-		lastDuration = sb.Apply()
+		lastDuration = time.Duration(sb.Apply())
 	}
 
 	// After many applies, should be capped at max interval (200ms).
@@ -437,8 +439,8 @@ func TestStatefulBackoff_CapAtMaxInterval(t *testing.T) {
 func TestStatefulBackoff_JitterBounds(t *testing.T) {
 	t.Parallel()
 	p := Policy{
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     10 * time.Second,
+		InitialInterval: domaintypes.Duration(1 * time.Second),
+		MaxInterval:     domaintypes.Duration(10 * time.Second),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,
@@ -449,21 +451,21 @@ func TestStatefulBackoff_JitterBounds(t *testing.T) {
 	// First apply: NextBackOff() returns initial interval with jitter.
 	// For InitialInterval=1s with 50% jitter: [500ms, 1.5s].
 	d1 := sb.Apply()
-	if d1 < 500*time.Millisecond || d1 > 1500*time.Millisecond {
+	if time.Duration(d1) < 500*time.Millisecond || time.Duration(d1) > 1500*time.Millisecond {
 		t.Errorf("Apply() = %v, want in range [500ms, 1.5s]", d1)
 	}
 
 	// Second apply: NextBackOff() doubles the base with jitter.
 	// Base 2s with 50% jitter: [1s, 3s].
 	d2 := sb.Apply()
-	if d2 < 1*time.Second || d2 > 3*time.Second {
+	if time.Duration(d2) < 1*time.Second || time.Duration(d2) > 3*time.Second {
 		t.Errorf("Apply() = %v, want in range [1s, 3s]", d2)
 	}
 
 	// Third apply: NextBackOff() doubles again with jitter.
 	// Base 4s with 50% jitter: [2s, 6s].
 	d3 := sb.Apply()
-	if d3 < 2*time.Second || d3 > 6*time.Second {
+	if time.Duration(d3) < 2*time.Second || time.Duration(d3) > 6*time.Second {
 		t.Errorf("Apply() = %v, want in range [2s, 6s]", d3)
 	}
 }
@@ -473,8 +475,8 @@ func TestRunWithBackoff_NilLogger(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     2,
 	}
@@ -500,8 +502,8 @@ func TestPollWithBackoff_NilLogger(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     2,
 	}
@@ -530,8 +532,8 @@ func TestRunWithBackoff_ZeroMaxAttempts(t *testing.T) {
 	defer cancel()
 
 	p := Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     20 * time.Millisecond,
+		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(20 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxAttempts:     0, // Infinite attempts.
 	}
@@ -556,15 +558,15 @@ func TestRunWithBackoff_ZeroMaxAttempts(t *testing.T) {
 func TestStatefulBackoff_GetDurationBeforeApply(t *testing.T) {
 	t.Parallel()
 	p := Policy{
-		InitialInterval: 500 * time.Millisecond,
-		MaxInterval:     5 * time.Second,
+		InitialInterval: domaintypes.Duration(500 * time.Millisecond),
+		MaxInterval:     domaintypes.Duration(5 * time.Second),
 		Multiplier:      2.0,
 	}
 
 	sb := NewStatefulBackoff(p)
 
 	// Before any Apply, GetDuration should return InitialInterval.
-	if d := sb.GetDuration(); d != 500*time.Millisecond {
+	if d := time.Duration(sb.GetDuration()); d != 500*time.Millisecond {
 		t.Errorf("GetDuration() before Apply = %v, want 500ms", d)
 	}
 }

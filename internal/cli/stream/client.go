@@ -100,7 +100,7 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			}
 			// Apply backoff and retry.
 			retries++
-			backoffDuration := sb.Apply()
+			backoffDuration := time.Duration(sb.Apply())
 			logger.Warn("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration, "error", err.Error())
 			if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 				return err
@@ -246,7 +246,7 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 				return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
 			}
 			retries++
-			backoffDuration := sb.Apply()
+			backoffDuration := time.Duration(sb.Apply())
 			logger.Warn("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration)
 			if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 				return err
@@ -260,7 +260,7 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
 		}
 		retries++
-		backoffDuration := sb.Apply()
+		backoffDuration := time.Duration(sb.Apply())
 		logger.Debug("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration)
 		if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 			return err

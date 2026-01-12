@@ -212,8 +212,8 @@ func TestClaimLoopBackoff(t *testing.T) {
 
 	// Set backoff parameters using custom policy.
 	testPolicy := backoff.Policy{
-		InitialInterval: 50 * time.Millisecond,
-		MaxInterval:     200 * time.Millisecond,
+		InitialInterval: types.Duration(50 * time.Millisecond),
+		MaxInterval:     types.Duration(200 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,
@@ -320,8 +320,8 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 	// Set backoff parameters using custom policy.
 	testPolicy := backoff.Policy{
-		InitialInterval: 50 * time.Millisecond,
-		MaxInterval:     200 * time.Millisecond,
+		InitialInterval: types.Duration(50 * time.Millisecond),
+		MaxInterval:     types.Duration(200 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,
