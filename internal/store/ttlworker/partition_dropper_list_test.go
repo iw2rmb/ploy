@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -227,8 +228,8 @@ func TestDropPartitionsForTable_PartitionNameParsing(t *testing.T) {
 }
 
 // TestDropOldPartitions_ListErrors ensures that listing errors for individual
-// tables do not cause the entire DropOldPartitions operation to fail. Errors
-// are logged but the function continues processing other tables.
+// tables are aggregated and returned. The function continues processing other
+// tables even when errors occur.
 func TestDropOldPartitions_ListErrors(t *testing.T) {
 	ctx := context.Background()
 	cutoff := time.Now()
@@ -237,30 +238,35 @@ func TestDropOldPartitions_ListErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupStore func(*mockStoreWithPartitions)
+		wantErr    string
 	}{
 		{
 			name: "list logs error",
 			setupStore: func(m *mockStoreWithPartitions) {
 				m.listLogsErr = errors.New("list logs failed")
 			},
+			wantErr: "list logs failed",
 		},
 		{
 			name: "list events error",
 			setupStore: func(m *mockStoreWithPartitions) {
 				m.listEventsErr = errors.New("list events failed")
 			},
+			wantErr: "list events failed",
 		},
 		{
 			name: "list artifacts error",
 			setupStore: func(m *mockStoreWithPartitions) {
 				m.listArtifactsErr = errors.New("list artifacts failed")
 			},
+			wantErr: "list artifacts failed",
 		},
 		{
 			name: "list metrics error",
 			setupStore: func(m *mockStoreWithPartitions) {
 				m.listMetricsErr = errors.New("list metrics failed")
 			},
+			wantErr: "list metrics failed",
 		},
 	}
 
@@ -269,13 +275,26 @@ func TestDropOldPartitions_ListErrors(t *testing.T) {
 			mock := &mockStoreWithPartitions{}
 			tt.setupStore(mock)
 
-			// Should not return error even if listing fails (errors are logged).
+			// Should return error when listing fails (errors are aggregated).
 			err := DropOldPartitions(ctx, &pgxpool.Pool{}, mock, cutoff, logger)
-			if err != nil {
-				t.Errorf("expected no error, got %v", err)
+			if err == nil {
+				t.Error("expected error, got nil")
+			} else if !errors.Is(err, errors.Unwrap(err)) {
+				// Just verify we got an error containing the expected message
+				if !containsError(err, tt.wantErr) {
+					t.Errorf("expected error containing %q, got %v", tt.wantErr, err)
+				}
 			}
 		})
 	}
+}
+
+// containsError checks if the error message contains the given substring.
+func containsError(err error, substr string) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), substr)
 }
 
 // TestDropOldPartitions_NoPartitionsExist validates that when no partitions

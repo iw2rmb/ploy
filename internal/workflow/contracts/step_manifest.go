@@ -159,6 +159,25 @@ type StepRetentionSpec struct {
 
 // Validate ensures the manifest is well-formed.
 func (m StepManifest) Validate() error {
+	if err := m.validateIdentity(); err != nil {
+		return err
+	}
+	if err := m.validateEnv(); err != nil {
+		return err
+	}
+	if err := m.validateInputs(); err != nil {
+		return err
+	}
+	if err := m.validateGate(); err != nil {
+		return err
+	}
+	if err := m.validateResources(); err != nil {
+		return err
+	}
+	return m.validateRetention()
+}
+
+func (m StepManifest) validateIdentity() error {
 	if m.ID.IsZero() {
 		return errors.New("step manifest id required")
 	}
@@ -177,21 +196,30 @@ func (m StepManifest) Validate() error {
 	if m.WorkingDir != "" && !filepath.IsAbs(m.WorkingDir) {
 		return fmt.Errorf("step manifest working dir must be absolute: %q", m.WorkingDir)
 	}
-	if len(m.Env) > 0 {
-		keys := make([]string, 0, len(m.Env))
-		for key := range m.Env {
-			keys = append(keys, key)
+	return nil
+}
+
+func (m StepManifest) validateEnv() error {
+	if len(m.Env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m.Env))
+	for key := range m.Env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if strings.TrimSpace(key) == "" {
+			return errors.New("step manifest environment key required")
 		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			if strings.TrimSpace(key) == "" {
-				return errors.New("step manifest environment key required")
-			}
-			if !envKeyPattern.MatchString(key) {
-				return fmt.Errorf("step manifest environment key invalid: %q", key)
-			}
+		if !envKeyPattern.MatchString(key) {
+			return fmt.Errorf("step manifest environment key invalid: %q", key)
 		}
 	}
+	return nil
+}
+
+func (m StepManifest) validateInputs() error {
 	if len(m.Inputs) == 0 {
 		return errors.New("step manifest inputs required")
 	}
@@ -220,36 +248,45 @@ func (m StepManifest) Validate() error {
 		default:
 			return fmt.Errorf("%s mount mode invalid: %q", position, input.Mode)
 		}
+
 		hasSnapshot := strings.TrimSpace(string(input.SnapshotCID)) != ""
 		hasDiff := strings.TrimSpace(string(input.DiffCID)) != ""
 		if input.Hydration != nil {
 			if err := input.Hydration.validate(fmt.Sprintf("%s hydration", position)); err != nil {
 				return err
 			}
-		}
-		if input.Hydration == nil {
+			if !hasSnapshot && !hasDiff && !input.Hydration.hasSource() {
+				return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
+			}
+		} else {
+			// No hydration: must have exactly one of snapshot or diff.
 			if hasSnapshot == hasDiff {
 				return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
 			}
-		} else if !hasSnapshot && !hasDiff && !input.Hydration.hasSource() {
-			return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
 		}
 	}
-	if m.Gate != nil {
-		if m.Gate.Enabled || strings.TrimSpace(m.Gate.Profile) != "" {
-			if strings.TrimSpace(m.Gate.Profile) == "" {
-				return errors.New("gate profile required when enabled")
-			}
-			if len(m.Gate.Env) > 0 {
-				for key := range m.Gate.Env {
-					if !envKeyPattern.MatchString(key) {
-						return fmt.Errorf("gate environment key invalid: %q", key)
-					}
-				}
-			}
+	return nil
+}
+
+func (m StepManifest) validateGate() error {
+	if m.Gate == nil {
+		return nil
+	}
+	if !m.Gate.Enabled && strings.TrimSpace(m.Gate.Profile) == "" {
+		return nil
+	}
+	if strings.TrimSpace(m.Gate.Profile) == "" {
+		return errors.New("gate profile required when enabled")
+	}
+	for key := range m.Gate.Env {
+		if !envKeyPattern.MatchString(key) {
+			return fmt.Errorf("gate environment key invalid: %q", key)
 		}
 	}
-	// Resources: ensure non-negative values using type validators.
+	return nil
+}
+
+func (m StepManifest) validateResources() error {
 	if err := m.Resources.CPU.Validate(); err != nil {
 		return fmt.Errorf("resources cpu invalid: %w", err)
 	}
@@ -259,14 +296,15 @@ func (m StepManifest) Validate() error {
 	if err := m.Resources.Disk.Validate(); err != nil {
 		return fmt.Errorf("resources disk invalid: %w", err)
 	}
+	return nil
+}
 
-	// Retention: when retaining container, TTL must be set to a positive duration.
+func (m StepManifest) validateRetention() error {
 	if m.Retention.RetainContainer {
 		if timeDur := int64(m.Retention.TTL); timeDur <= 0 {
 			return errors.New("retention ttl required when retaining container")
 		}
 	}
-
 	return nil
 }
 

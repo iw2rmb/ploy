@@ -3,6 +3,7 @@ package nodeagent
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
@@ -16,6 +17,8 @@ import (
 type ClaimManager struct {
 	cfg        Config
 	client     *http.Client
+	clientOnce sync.Once // Ensures thread-safe lazy HTTP client initialization
+	clientErr  error     // Stores initialization error from clientOnce
 	controller RunController
 	backoff    *backoff.StatefulBackoff
 }

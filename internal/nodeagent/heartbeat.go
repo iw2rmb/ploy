@@ -3,8 +3,6 @@ package nodeagent
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
@@ -36,6 +35,8 @@ type HeartbeatManager struct {
 	cfg           Config
 	collector     *lifecycle.Collector
 	client        *http.Client
+	clientOnce    sync.Once // Ensures thread-safe lazy HTTP client initialization
+	clientErr     error     // Stores initialization error from clientOnce
 	backoff       *backoff.StatefulBackoff
 	backoffActive bool // Tracks whether backoff is currently active (true after 5xx, false after success)
 }
@@ -132,12 +133,12 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	// Lazy initialization: create HTTP client if not yet initialized.
 	// This allows bootstrap() to run first and create certificates and bearer token.
-	if h.client == nil {
-		client, err := createHTTPClient(h.cfg)
-		if err != nil {
-			return fmt.Errorf("create http client: %w", err)
-		}
-		h.client = client
+	// Uses sync.Once for thread-safe initialization.
+	h.clientOnce.Do(func() {
+		h.client, h.clientErr = createHTTPClient(h.cfg)
+	})
+	if h.clientErr != nil {
+		return fmt.Errorf("create http client: %w", h.clientErr)
 	}
 
 	snap, err := h.collector.Collect(ctx)
@@ -239,42 +240,4 @@ func buildURL(base, p string) (string, error) {
 		return "", fmt.Errorf("parse path: %w", err)
 	}
 	return bu.ResolveReference(pu).String(), nil
-}
-
-func newHTTPClient(cfg Config) (*http.Client, error) {
-	if !cfg.HTTP.TLS.Enabled {
-		return &http.Client{Timeout: 30 * time.Second}, nil
-	}
-
-	// Load node certificate and key for client authentication.
-	cert, err := tls.LoadX509KeyPair(cfg.HTTP.TLS.CertPath, cfg.HTTP.TLS.KeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("load certificate: %w", err)
-	}
-
-	// Load CA certificate for server verification.
-	caData, err := os.ReadFile(cfg.HTTP.TLS.CAPath)
-	if err != nil {
-		return nil, fmt.Errorf("load ca certificate: %w", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caData) {
-		return nil, fmt.Errorf("failed to parse ca certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-		MinVersion:   tls.VersionTLS13,
-	}
-
-	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
-	return &http.Client{
-		Timeout:   30 * time.Second,
-		Transport: transport,
-	}, nil
 }

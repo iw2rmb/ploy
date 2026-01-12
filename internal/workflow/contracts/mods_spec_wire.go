@@ -121,41 +121,34 @@ func commandSpecToAny(cmd CommandSpec) any {
 	return nil
 }
 
+// modLikeFieldsToMap serializes the common fields shared by ModStep and HealingModSpec.
+func modLikeFieldsToMap(img ModImage, cmd CommandSpec, env map[string]string, retain bool) map[string]any {
+	result := make(map[string]any)
+	if !img.IsEmpty() {
+		result["image"] = modImageToAny(img)
+	}
+	if !cmd.IsEmpty() {
+		result["command"] = commandSpecToAny(cmd)
+	}
+	if len(env) > 0 {
+		result["env"] = env
+	}
+	if retain {
+		result["retain_container"] = true
+	}
+	return result
+}
+
 // modStepToMap converts ModStep to a map for wire serialization.
 func modStepToMap(mod ModStep) map[string]any {
-	result := make(map[string]any)
+	result := modLikeFieldsToMap(mod.Image, mod.Command, mod.Env, mod.RetainContainer)
 	if mod.Name != "" {
 		result["name"] = mod.Name
-	}
-	if !mod.Image.IsEmpty() {
-		result["image"] = modImageToAny(mod.Image)
-	}
-	if !mod.Command.IsEmpty() {
-		result["command"] = commandSpecToAny(mod.Command)
-	}
-	if len(mod.Env) > 0 {
-		result["env"] = mod.Env
-	}
-	if mod.RetainContainer {
-		result["retain_container"] = true
 	}
 	return result
 }
 
 // healingModToMap converts HealingModSpec to a map for wire serialization.
 func healingModToMap(mod *HealingModSpec) map[string]any {
-	result := make(map[string]any)
-	if !mod.Image.IsEmpty() {
-		result["image"] = modImageToAny(mod.Image)
-	}
-	if !mod.Command.IsEmpty() {
-		result["command"] = commandSpecToAny(mod.Command)
-	}
-	if len(mod.Env) > 0 {
-		result["env"] = mod.Env
-	}
-	if mod.RetainContainer {
-		result["retain_container"] = true
-	}
-	return result
+	return modLikeFieldsToMap(mod.Image, mod.Command, mod.Env, mod.RetainContainer)
 }

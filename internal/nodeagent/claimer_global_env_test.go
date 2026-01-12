@@ -113,7 +113,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			env, _ := parseSpec(tc.spec)
+			env, _, _ := parseSpec(tc.spec)
 
 			// Verify all expected env vars are present with correct values.
 			for key, wantVal := range tc.wantEnv {
@@ -157,7 +157,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}`)
 
 	// Step 1: Parse the spec (simulates claimer_spec.go).
-	env, typedOpts := parseSpec(specJSON)
+	env, typedOpts, _ := parseSpec(specJSON)
 
 	// Step 2: Build StartRunRequest (simulates claimer.go/execution*.go).
 	req := StartRunRequest{
@@ -227,7 +227,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		}
 	}`)
 
-	env, typedOpts := parseSpec(specJSON)
+	env, typedOpts, _ := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-gate-env-test"),
@@ -306,7 +306,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		]
 	}`)
 
-	env, typedOpts := parseSpec(specJSON)
+	env, typedOpts, _ := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-multi-step-env"),
@@ -434,7 +434,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		}
 	}`)
 
-	env, typedOpts := parseSpec(specJSON)
+	env, typedOpts, _ := parseSpec(specJSON)
 
 	req := StartRunRequest{
 		RunID:        types.RunID("run-no-filter-test"),

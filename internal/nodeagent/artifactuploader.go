@@ -18,21 +18,16 @@ import (
 
 // ArtifactUploader uploads artifact bundles (tar.gz) to the control-plane server.
 type ArtifactUploader struct {
-	cfg    Config
-	client *http.Client
+	*baseUploader
 }
 
 // NewArtifactUploader creates a new artifact uploader.
 func NewArtifactUploader(cfg Config) (*ArtifactUploader, error) {
-	client, err := createHTTPClient(cfg)
+	base, err := newBaseUploader(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("create http client: %w", err)
+		return nil, err
 	}
-
-	return &ArtifactUploader{
-		cfg:    cfg,
-		client: client,
-	}, nil
+	return &ArtifactUploader{baseUploader: base}, nil
 }
 
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
@@ -86,15 +81,21 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status.
-	if resp.StatusCode != http.StatusCreated {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", "", fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+	if err := httpError(resp, http.StatusCreated, "upload artifact"); err != nil {
+		return "", "", err
 	}
+
+	// Decode response and validate required fields.
 	var out struct {
 		ArtifactBundleID string `json:"artifact_bundle_id"`
 		CID              string `json:"cid"`
 	}
-	_ = json.NewDecoder(resp.Body).Decode(&out)
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", "", fmt.Errorf("decode response: %w", err)
+	}
+	if out.ArtifactBundleID == "" {
+		return "", "", fmt.Errorf("server returned empty artifact_bundle_id")
+	}
 	return out.ArtifactBundleID, out.CID, nil
 }
 

@@ -65,26 +65,26 @@ func newTestRunID() types.RunID {
 }
 
 func TestNew(t *testing.T) {
-	t.Run("nil store returns nil scheduler", func(t *testing.T) {
+	t.Run("nil store returns error", func(t *testing.T) {
 		sched, err := New(Options{
 			Store:       nil,
 			RepoStarter: newMockRepoStarter(),
 		})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
+		if !errors.Is(err, ErrNilStore) {
+			t.Errorf("expected ErrNilStore, got %v", err)
 		}
 		if sched != nil {
 			t.Errorf("expected nil scheduler, got %v", sched)
 		}
 	})
 
-	t.Run("nil repoStarter returns nil scheduler", func(t *testing.T) {
+	t.Run("nil repoStarter returns error", func(t *testing.T) {
 		sched, err := New(Options{
 			Store:       &mockStore{},
 			RepoStarter: nil,
 		})
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
+		if !errors.Is(err, ErrNilRepoStarter) {
+			t.Errorf("expected ErrNilRepoStarter, got %v", err)
 		}
 		if sched != nil {
 			t.Errorf("expected nil scheduler, got %v", sched)

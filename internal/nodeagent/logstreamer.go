@@ -3,7 +3,9 @@ package nodeagent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -211,8 +213,10 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Send to server endpoint using the node ID string directly.
 	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
-	// Per-request timeout; no struct-stored context.
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	// Create per-request context with timeout for proper cancellation.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -239,6 +243,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 }
 
 // Close flushes any remaining logs and stops the streamer.
+// Returns all errors encountered during close using errors.Join.
 func (ls *LogStreamer) Close() error {
 	var closeErr error
 	ls.closeOnce.Do(func() {
@@ -250,14 +255,19 @@ func (ls *LogStreamer) Close() error {
 		ls.mu.Lock()
 		defer ls.mu.Unlock()
 
+		var errs []error
 		if ls.buffer.Len() > 0 {
-			closeErr = ls.flushLocked()
+			if err := ls.flushLocked(); err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		// Close the gzip writer.
-		if err := ls.gzWriter.Close(); err != nil && closeErr == nil {
-			closeErr = fmt.Errorf("close gzip writer: %w", err)
+		if err := ls.gzWriter.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close gzip writer: %w", err))
 		}
+
+		closeErr = errors.Join(errs...)
 	})
 
 	return closeErr

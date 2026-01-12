@@ -325,8 +325,15 @@ func TestClientTLSWiring(t *testing.T) {
 		},
 	}
 
-	// Test that newHTTPClient creates a client with correct TLS config.
-	client, err := newHTTPClient(cfg)
+	// Set up bearer token for createHTTPClient.
+	tokenPath := filepath.Join(tmpDir, "bearer-token")
+	if err := os.WriteFile(tokenPath, []byte("test-bearer-token"), 0600); err != nil {
+		t.Fatalf("write bearer token: %v", err)
+	}
+	t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
+
+	// Test that createHTTPClient creates a client with correct TLS config.
+	client, err := createHTTPClient(cfg)
 	if err != nil {
 		t.Fatalf("create http client: %v", err)
 	}

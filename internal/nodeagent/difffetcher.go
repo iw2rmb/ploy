@@ -74,9 +74,8 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, r
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list run repo diffs failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+	if err := httpError(resp, http.StatusOK, "list run repo diffs"); err != nil {
+		return nil, err
 	}
 
 	var result diffListResponse
@@ -181,9 +180,8 @@ func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.Run
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("fetch run repo diff patch failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+	if err := httpError(resp, http.StatusOK, "fetch run repo diff patch"); err != nil {
+		return nil, err
 	}
 
 	// Read the entire gzipped patch into memory.

@@ -52,42 +52,6 @@ func TestBuildURLEscapesNodeID(t *testing.T) {
 	}
 }
 
-// TestNewHTTPClientWithoutTLS verifies HTTP client creation without TLS.
-func TestNewHTTPClientWithoutTLS(t *testing.T) {
-	cfg := Config{
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-	}
-
-	client, err := newHTTPClient(cfg)
-	if err != nil {
-		t.Fatalf("newHTTPClient error: %v", err)
-	}
-
-	if client == nil {
-		t.Fatal("expected non-nil client")
-	}
-
-	if client.Timeout != 30*time.Second {
-		t.Errorf("timeout = %v, want %v", client.Timeout, 30*time.Second)
-	}
-
-	if client.Transport != nil {
-		t.Error("expected nil transport for non-TLS client")
-	}
-}
-
-// TLS client construction is not supported in bearer-only mode; ensure disabled config succeeds.
-func TestNewHTTPClientTLSDisabled(t *testing.T) {
-	cfg := Config{HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}
-	if _, err := newHTTPClient(cfg); err != nil {
-		t.Fatalf("newHTTPClient error: %v", err)
-	}
-}
-
 // TestSendHeartbeatSuccess verifies successful heartbeat POST request and payload.
 func TestSendHeartbeatSuccess(t *testing.T) {
 	var receivedPayload HeartbeatPayload
@@ -227,41 +191,6 @@ func TestSendHeartbeatHandlesServerError(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestNewHTTPClientConfiguresMTLS verifies mTLS configuration with client certificates.
-func TestNewHTTPClientConfiguresMTLS(t *testing.T) {
-	certPEM, keyPEM, caPEM := generateTestCerts(t)
-
-	certPath := writeTempFile(t, certPEM)
-	keyPath := writeTempFile(t, keyPEM)
-	caPath := writeTempFile(t, caPEM)
-
-	cfg := Config{
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled:  true,
-				CertPath: certPath,
-				KeyPath:  keyPath,
-				CAPath:   caPath,
-			},
-		},
-	}
-
-	client, err := newHTTPClient(cfg)
-	if err != nil {
-		t.Fatalf("newHTTPClient error: %v", err)
-	}
-
-	if client == nil {
-		t.Fatal("expected non-nil client")
-	}
-
-	if client.Timeout != 30*time.Second {
-		t.Errorf("timeout = %v, want %v", client.Timeout, 30*time.Second)
-	}
-
-	// In bearer/HTTP mode, transport may be default; no TLS assertions here.
 }
 
 // TestNewHeartbeatManagerParsesNetIgnoreEnv verifies that PLOY_LIFECYCLE_NET_IGNORE
