@@ -17,7 +17,7 @@ func TestCacheStoreAndCopy(t *testing.T) {
 		Timestamp: now,
 		Heartbeat: now,
 		Role:      "node",
-		NodeID:    "test-node-123",
+		NodeID:    "abc123",
 		Hostname:  "test-host",
 		Resources: NodeResources{
 			CPU: CPUResources{
@@ -68,8 +68,8 @@ func TestCacheStoreAndCopy(t *testing.T) {
 	if got.State != "ok" {
 		t.Fatalf("unexpected state: got %v, want ok", got.State)
 	}
-	if got.NodeID != "test-node-123" {
-		t.Fatalf("unexpected node_id: got %v, want test-node-123", got.NodeID)
+	if got.NodeID != "abc123" {
+		t.Fatalf("unexpected node_id: got %v, want abc123", got.NodeID)
 	}
 
 	// Verify ToMap() produces the expected wire format for JSON serialization.

@@ -84,8 +84,8 @@ func NewCollector(opts Options) (*Collector, error) {
 	}
 
 	nodeID := domaintypes.NodeID(domaintypes.Normalize(opts.NodeID.String()))
-	if nodeID.IsZero() {
-		return nil, domaintypes.ErrEmpty
+	if _, err := nodeID.MarshalText(); err != nil {
+		return nil, err
 	}
 
 	return &Collector{
