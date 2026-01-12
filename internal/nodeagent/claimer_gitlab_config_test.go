@@ -12,15 +12,15 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 
 	spec := json.RawMessage(`{
 		"steps": [{"image": "docker.io/test/mod:latest"}],
-		"job_id": "job-123",
+		"job_id": "` + testKSUID + `",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com"
 	}`)
 
 	env, typedOpts := parseSpec(spec)
 
-	if typedOpts.ServerMetadata.JobID.String() != "job-123" {
-		t.Errorf("job_id = %q, want job-123", typedOpts.ServerMetadata.JobID.String())
+	if typedOpts.ServerMetadata.JobID.String() != testKSUID {
+		t.Errorf("job_id = %q, want %s", typedOpts.ServerMetadata.JobID.String(), testKSUID)
 	}
 
 	// Verify gitlab config is extracted into typed options.
@@ -47,7 +47,7 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 
 	spec := json.RawMessage(`{
 		"steps": [{"image": "docker.io/test/mod:latest"}],
-		"job_id": "job-123",
+		"job_id": "` + testKSUID + `",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com",
 		"mr_on_success": true
@@ -57,8 +57,8 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	_, typedOpts := parseSpec(spec)
 
 	// Verify all fields are extracted into typed options.
-	if typedOpts.ServerMetadata.JobID.String() != "job-123" {
-		t.Errorf("job_id = %q, want job-123", typedOpts.ServerMetadata.JobID.String())
+	if typedOpts.ServerMetadata.JobID.String() != testKSUID {
+		t.Errorf("job_id = %q, want %s", typedOpts.ServerMetadata.JobID.String(), testKSUID)
 	}
 	if typedOpts.MRWiring.GitLabPAT != "server-default-token" {
 		t.Errorf("gitlab_pat = %q, want server-default-token", typedOpts.MRWiring.GitLabPAT)
