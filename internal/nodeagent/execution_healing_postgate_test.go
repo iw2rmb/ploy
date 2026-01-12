@@ -72,7 +72,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{
@@ -217,7 +217,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{

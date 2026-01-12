@@ -98,7 +98,7 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 			t.Errorf("method = %s, want POST", r.Method)
 		}
 
-		expectedPath := "/v1/nodes/test-node-123/heartbeat"
+		expectedPath := "/v1/nodes/" + testNodeID + "/heartbeat"
 		if r.URL.Path != expectedPath {
 			t.Errorf("path = %s, want %s", r.URL.Path, expectedPath)
 		}
@@ -124,7 +124,7 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 	defer srv.Close()
 
 	cfg := Config{
-		NodeID:    "test-node-123",
+		NodeID:    testNodeID,
 		ServerURL: srv.URL,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
@@ -199,7 +199,7 @@ func TestSendHeartbeatHandlesServerError(t *testing.T) {
 			defer srv.Close()
 
 			cfg := Config{
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				ServerURL: srv.URL,
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{
@@ -336,7 +336,7 @@ func TestNewHeartbeatManagerParsesNetIgnoreEnv(t *testing.T) {
 			})
 
 			cfg := Config{
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				ServerURL: "http://localhost:8080",
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{

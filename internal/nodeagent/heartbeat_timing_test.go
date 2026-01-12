@@ -22,7 +22,7 @@ func TestSendHeartbeatRespectsTimeout(t *testing.T) {
 	defer srv.Close()
 
 	cfg := Config{
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		ServerURL: srv.URL,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
@@ -128,7 +128,7 @@ func TestBackoffOn5xxErrors(t *testing.T) {
 			defer srv.Close()
 
 			cfg := Config{
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				ServerURL: srv.URL,
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{
@@ -194,7 +194,7 @@ func TestServerErrorType(t *testing.T) {
 	defer srv.Close()
 
 	cfg := Config{
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		ServerURL: srv.URL,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
@@ -231,7 +231,7 @@ func TestServerErrorType(t *testing.T) {
 // TestBackoffDoesNotApplyToNon5xxErrors verifies backoff only applies to 5xx server errors.
 func TestBackoffDoesNotApplyToNon5xxErrors(t *testing.T) {
 	cfg := Config{
-		NodeID: "test-node",
+		NodeID: testNodeID,
 	}
 	mgr, err := NewHeartbeatManager(cfg)
 	if err != nil {
@@ -286,7 +286,7 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 	defer srv.Close()
 
 	cfg := Config{
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		ServerURL: srv.URL,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{

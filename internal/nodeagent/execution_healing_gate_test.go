@@ -86,7 +86,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -164,7 +164,7 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -240,7 +240,7 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -336,7 +336,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -433,7 +433,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{
@@ -534,7 +534,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -650,7 +650,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{
@@ -755,7 +755,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{
@@ -813,7 +813,7 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{
@@ -953,7 +953,7 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	}
 
 	rc := &runController{
-		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: testNodeID},
 	}
 
 	req := StartRunRequest{

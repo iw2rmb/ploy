@@ -29,7 +29,7 @@ func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *tes
 	rc := &runController{
 		cfg: Config{
 			ServerURL: server.URL,
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 			HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 		},
 	}

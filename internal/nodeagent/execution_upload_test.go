@@ -93,7 +93,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
@@ -207,7 +207,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
@@ -272,7 +272,7 @@ func TestRunController_uploadStatus(t *testing.T) {
 			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
@@ -362,7 +362,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
@@ -589,7 +589,7 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 			// Uploaders are lazily initialized by ensureUploaders() when needed.
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node",
+				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 

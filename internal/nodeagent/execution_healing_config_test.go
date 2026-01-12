@@ -50,7 +50,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 
@@ -174,7 +174,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 

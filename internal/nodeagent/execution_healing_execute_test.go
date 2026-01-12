@@ -91,7 +91,7 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 	rc := &runController{
 		cfg: Config{
 			ServerURL: "http://localhost:9999",
-			NodeID:    "test-node",
+			NodeID:    testNodeID,
 		},
 	}
 

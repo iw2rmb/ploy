@@ -55,7 +55,7 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 	// Create uploader.
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 	}
 	uploader, err := NewArtifactUploader(cfg)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 func TestArtifactUploader_UploadArtifact_EmptyPaths(t *testing.T) {
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 	}
 	uploader, err := NewArtifactUploader(cfg)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestArtifactUploader_UploadArtifact_ServerError(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 	}
 	uploader, err := NewArtifactUploader(cfg)
 	if err != nil {
@@ -440,7 +440,7 @@ func TestArtifactUploader_SizeCap(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: "http://localhost:8443",
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 	}
 	uploader, err := NewArtifactUploader(cfg)
 	if err != nil {

@@ -95,7 +95,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 
 			cfg := Config{
 				ServerURL: server.URL,
-				NodeID:    "test-node-id",
+				NodeID:    testNodeID,
 				HTTP: HTTPConfig{
 					TLS: TLSConfig{
 						Enabled: false,
@@ -144,7 +144,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -196,7 +196,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -248,7 +248,7 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: server.URL,
-		NodeID:    "test-node-id",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,

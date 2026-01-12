@@ -26,7 +26,7 @@ func TestClaimLoop(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + testNodeID + "/claim":
 			calls = append(calls, "claim")
 			// Return a run to claim.
 			// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
@@ -36,7 +36,7 @@ func TestClaimLoop(t *testing.T) {
 				JobID:     types.JobID("job-123"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "Started",
-				NodeID:    types.NodeID("test-node"),
+				NodeID:    types.NodeID(testNodeID),
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
 			}
@@ -53,7 +53,7 @@ func TestClaimLoop(t *testing.T) {
 	// Create config.
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -109,7 +109,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 	callCount := 0
 	// Server for unified claim queue; returns 204 No Content (no work available).
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/nodes/test-node/claim" {
+		if r.URL.Path == "/v1/nodes/"+testNodeID+"/claim" {
 			callCount++
 			// Return 204 No Content (no work available).
 			w.WriteHeader(http.StatusNoContent)
@@ -122,7 +122,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -175,7 +175,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		if r.URL.Path == "/v1/nodes/test-node/claim" {
+		if r.URL.Path == "/v1/nodes/"+testNodeID+"/claim" {
 			now := time.Now()
 			if !lastCall.IsZero() {
 				intervals = append(intervals, now.Sub(lastCall))
@@ -192,7 +192,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
@@ -263,7 +263,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
-		case "/v1/nodes/test-node/claim":
+		case "/v1/nodes/" + testNodeID + "/claim":
 			now := time.Now()
 			if !lastCall.IsZero() {
 				intervals = append(intervals, now.Sub(lastCall))
@@ -285,7 +285,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 				JobID:     types.JobID("job-reset"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "Started",
-				NodeID:    types.NodeID("test-node"),
+				NodeID:    types.NodeID(testNodeID),
 				BaseRef:   "main",
 				TargetRef: "feature",
 			}
@@ -300,7 +300,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 	cfg := Config{
 		ServerURL: ts.URL,
-		NodeID:    "test-node",
+		NodeID:    testNodeID,
 		HTTP: HTTPConfig{
 			TLS: TLSConfig{
 				Enabled: false,
