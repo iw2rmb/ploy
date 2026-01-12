@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	units "github.com/docker/go-units"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 
 	// Import moby client for ContainerStats/Inspect option types used in
@@ -268,7 +269,7 @@ fi`
 		logs = logs[:maxLogBytes]
 	}
 	meta.LogsText = string(logs)
-	meta.LogDigest = sha256Hex(logs)
+	meta.LogDigest = sha256Digest(logs)
 
 	// Gather resource usage via Docker stats when available.
 	// Moby Engine v29 SDK uses client.ContainerStatsOptions{Stream: false} instead
@@ -389,9 +390,9 @@ fi
 `
 }
 
-func sha256Hex(b []byte) string {
+func sha256Digest(b []byte) types.Sha256Digest {
 	h := sha256.Sum256(b)
-	return fmt.Sprintf("%x", h[:])
+	return types.Sha256Digest(fmt.Sprintf("sha256:%x", h[:]))
 }
 
 // dockerStatsOptions returns the moby client.ContainerStatsOptions for a

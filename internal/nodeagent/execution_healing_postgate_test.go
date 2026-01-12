@@ -11,6 +11,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
+func testLogDigest(n int) types.Sha256Digest {
+	return types.Sha256Digest(fmt.Sprintf("sha256:%064x", n))
+}
+
 // TestExecuteWithHealing_PostGate_PassesWithoutHealing verifies the post-mod gate path when:
 // - Pre-mod gate passes immediately (no healing)
 // - Main mod executes and exits 0
@@ -35,7 +39,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 					{Tool: "maven", Passed: true},
 				},
 				LogsText:  fmt.Sprintf("[INFO] Gate %d success\n", gateCallCount),
-				LogDigest: fmt.Sprintf("digest-%d", gateCallCount),
+				LogDigest: testLogDigest(gateCallCount),
 			}, nil
 		},
 	}
@@ -126,8 +130,8 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		t.Fatal("BuildGate should be set to post-mod gate result")
 	}
 	// The post-mod gate is the second gate call (after pre-mod from runner.Run).
-	if execResult.BuildGate.LogDigest != "digest-2" {
-		t.Errorf("BuildGate.LogDigest = %q, want 'digest-2' (post-mod gate)", execResult.BuildGate.LogDigest)
+	if execResult.BuildGate.LogDigest != testLogDigest(2) {
+		t.Errorf("BuildGate.LogDigest = %q, want %q (post-mod gate)", execResult.BuildGate.LogDigest, testLogDigest(2))
 	}
 
 	// Verify gate call count: 1 pre-mod (from runner.Run) + 1 post-mod = 2.
@@ -166,21 +170,21 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
 					LogsText:     "[INFO] Pre-mod success\n",
-					LogDigest:    "pre-mod-digest",
+					LogDigest:    testLogDigest(1),
 				}, nil
 			case 2:
 				// Post-mod gate fails (triggers healing).
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
 					LogsText:     "[ERROR] Post-mod failure\n",
-					LogDigest:    "post-mod-fail-digest",
+					LogDigest:    testLogDigest(2),
 				}, nil
 			default:
 				// Post-mod re-gate passes after healing.
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
 					LogsText:     "[INFO] Post-mod success after healing\n",
-					LogDigest:    "post-mod-heal-digest",
+					LogDigest:    testLogDigest(3),
 				}, nil
 			}
 		},
@@ -275,8 +279,8 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	if execResult.PreGate == nil {
 		t.Fatal("PreGate should be captured")
 	}
-	if execResult.PreGate.Metadata.LogDigest != "pre-mod-digest" {
-		t.Errorf("PreGate.LogDigest = %q, want 'pre-mod-digest'", execResult.PreGate.Metadata.LogDigest)
+	if execResult.PreGate.Metadata.LogDigest != testLogDigest(1) {
+		t.Errorf("PreGate.LogDigest = %q, want %q", execResult.PreGate.Metadata.LogDigest, testLogDigest(1))
 	}
 
 	// ReGates should contain 2 entries: initial post-mod gate (failed) + post-mod re-gate (passed).
@@ -285,16 +289,16 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	}
 
 	// First entry: initial post-mod gate (failed).
-	if execResult.ReGates[0].Metadata.LogDigest != "post-mod-fail-digest" {
-		t.Errorf("ReGates[0].LogDigest = %q, want 'post-mod-fail-digest'", execResult.ReGates[0].Metadata.LogDigest)
+	if execResult.ReGates[0].Metadata.LogDigest != testLogDigest(2) {
+		t.Errorf("ReGates[0].LogDigest = %q, want %q", execResult.ReGates[0].Metadata.LogDigest, testLogDigest(2))
 	}
 	if execResult.ReGates[0].Metadata.StaticChecks[0].Passed {
 		t.Error("ReGates[0] should have failed")
 	}
 
 	// Second entry: post-mod re-gate (passed after healing).
-	if execResult.ReGates[1].Metadata.LogDigest != "post-mod-heal-digest" {
-		t.Errorf("ReGates[1].LogDigest = %q, want 'post-mod-heal-digest'", execResult.ReGates[1].Metadata.LogDigest)
+	if execResult.ReGates[1].Metadata.LogDigest != testLogDigest(3) {
+		t.Errorf("ReGates[1].LogDigest = %q, want %q", execResult.ReGates[1].Metadata.LogDigest, testLogDigest(3))
 	}
 	if !execResult.ReGates[1].Metadata.StaticChecks[0].Passed {
 		t.Error("ReGates[1] should have passed")
@@ -304,8 +308,8 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	if execResult.BuildGate == nil {
 		t.Fatal("BuildGate should be set")
 	}
-	if execResult.BuildGate.LogDigest != "post-mod-heal-digest" {
-		t.Errorf("BuildGate.LogDigest = %q, want 'post-mod-heal-digest'", execResult.BuildGate.LogDigest)
+	if execResult.BuildGate.LogDigest != testLogDigest(3) {
+		t.Errorf("BuildGate.LogDigest = %q, want %q", execResult.BuildGate.LogDigest, testLogDigest(3))
 	}
 
 	// Gate call count: 1 pre-mod + 1 post-mod + 1 post-mod re-gate = 3.

@@ -362,7 +362,7 @@ func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, res
 	// otherwise fall back to the pre-mod gate (for runs where no mods executed).
 	// This ensures CLI/API gate summaries always have a final_gate to report on.
 	if result.BuildGate != nil {
-		gate.FinalGate = buildGatePhase(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
+		gate.FinalGate = buildGatePhase(result.BuildGate, time.Duration(result.Timings.BuildGateDuration).Milliseconds(), "")
 	} else if execResult.PreGate != nil {
 		// No post-mod gate executed (run terminated at pre-mod phase or no mods).
 		// Use the pre-mod gate as the final gate for consistent summary output.

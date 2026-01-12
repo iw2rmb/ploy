@@ -363,8 +363,8 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 
 	// --- Server Metadata ---
 	// Direct assignment from typed spec fields.
-	if trimmed := strings.TrimSpace(spec.JobID); trimmed != "" {
-		runOpts.ServerMetadata.JobID = domaintypes.JobID(trimmed)
+	if !spec.JobID.IsZero() {
+		runOpts.ServerMetadata.JobID = domaintypes.JobID(spec.JobID)
 	}
 
 	return runOpts

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -196,10 +197,10 @@ func (r *runController) uploadModDiffWithBaseline(
 		ModType(DiffModTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
-			result.Timings.HydrationDuration.Milliseconds(),
-			result.Timings.ExecutionDuration.Milliseconds(),
-			result.Timings.DiffDuration.Milliseconds(),
-			result.Timings.TotalDuration.Milliseconds(),
+			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
+			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
+			time.Duration(result.Timings.DiffDuration).Milliseconds(),
+			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		).
 		MustBuild()
 

@@ -3,6 +3,8 @@ package contracts
 import (
 	"fmt"
 	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // SchemaVersion identifies the JSON envelope version used by workflow
@@ -28,8 +30,8 @@ type SubjectSet struct {
 // SubjectsForRun derives the subjects used to publish checkpoints,
 // artifacts, and status events for a given run ID. When the provided
 // run ID is empty or whitespace, all fields in the returned set are empty.
-func SubjectsForRun(runID string) SubjectSet {
-	trimmedRunID := strings.TrimSpace(runID)
+func SubjectsForRun(runID types.RunID) SubjectSet {
+	trimmedRunID := strings.TrimSpace(runID.String())
 	checkpointStream := ""
 	artifactStream := ""
 	statusStream := ""

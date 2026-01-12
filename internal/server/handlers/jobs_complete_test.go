@@ -251,7 +251,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 			"job_meta": map[string]any{
 				"kind": "gate",
 				"gate": map[string]any{
-					"log_digest": "sha256:test",
+					"log_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				},
 			},
 		},

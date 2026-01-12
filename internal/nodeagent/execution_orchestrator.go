@@ -194,10 +194,10 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 			ExitCode(result.ExitCode).
 			DurationMs(duration.Milliseconds()).
 			TimingsFromDurations(
-				result.Timings.HydrationDuration.Milliseconds(),
-				result.Timings.ExecutionDuration.Milliseconds(),
-				result.Timings.DiffDuration.Milliseconds(),
-				result.Timings.TotalDuration.Milliseconds(),
+				time.Duration(result.Timings.HydrationDuration).Milliseconds(),
+				time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
+				time.Duration(result.Timings.DiffDuration).Milliseconds(),
+				time.Duration(result.Timings.TotalDuration).Milliseconds(),
 			).
 			MustBuild()
 

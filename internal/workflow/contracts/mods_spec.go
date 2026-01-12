@@ -44,6 +44,7 @@ import (
 	"fmt"
 	"strings"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -64,7 +65,7 @@ type ModsSpec struct {
 	// not required (and typically not present) in CLI-submitted specs.
 
 	// JobID is the claimed job ID injected into the spec at claim time.
-	JobID string `json:"job_id,omitempty" yaml:"job_id,omitempty"`
+	JobID types.JobID `json:"job_id,omitempty" yaml:"job_id,omitempty"`
 
 	// APIVersion is an optional schema version identifier (e.g., "ploy.mod/v1alpha1").
 	// Informational only; the control plane forwards specs as opaque JSON.
@@ -367,7 +368,14 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 		if !ok {
 			return nil, fmt.Errorf("job_id: expected string, got %T", v)
 		}
-		spec.JobID = strings.TrimSpace(s)
+		s = strings.TrimSpace(s)
+		if s != "" {
+			var id types.JobID
+			if err := id.UnmarshalText([]byte(s)); err != nil {
+				return nil, fmt.Errorf("job_id: %w", err)
+			}
+			spec.JobID = id
+		}
 	}
 	if _, ok := raw["mod_index"]; ok {
 		return nil, fmt.Errorf("mod_index: forbidden (derived internally from step_index; must not be provided)")
@@ -723,8 +731,8 @@ func (s ModsSpec) ToMap() map[string]any {
 	result := make(map[string]any)
 
 	// Server-injected metadata.
-	if strings.TrimSpace(s.JobID) != "" {
-		result["job_id"] = strings.TrimSpace(s.JobID)
+	if !s.JobID.IsZero() {
+		result["job_id"] = s.JobID.String()
 	}
 
 	// Metadata.

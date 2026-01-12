@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // RunGateOnly executes only the gate validation phase without container execution.
@@ -38,7 +40,7 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 			return Result{}, fmt.Errorf("workspace hydration failed: %w", err)
 		}
 	}
-	result.Timings.HydrationDuration = time.Since(hydrationStart)
+	result.Timings.HydrationDuration = types.Duration(time.Since(hydrationStart))
 
 	// Stage 2: Build Gate validation.
 	// Run static validation on the workspace. This is the primary purpose of
@@ -61,15 +63,15 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 		if !gatePassed {
 			// Gate failed. Return error so the orchestration layer can handle
 			// healing if configured.
-			result.Timings.BuildGateDuration = time.Since(gateStart)
-			result.Timings.TotalDuration = time.Since(totalStart)
+			result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
+			result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "gate validation failed")
 		}
 	}
-	result.Timings.BuildGateDuration = time.Since(gateStart)
+	result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
 
 	// No container execution or diff generation — exit immediately.
 	// ExitCode remains 0 since no mod was executed.
-	result.Timings.TotalDuration = time.Since(totalStart)
+	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
 }

@@ -31,7 +31,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 						{Tool: "maven", Passed: false},
 					},
 					LogsText:  "[ERROR] Initial pre-gate failure\n",
-					LogDigest: "pre-initial",
+					LogDigest: testLogDigest(1),
 				}, nil
 			case 2:
 				// Re-gate after healing succeeds.
@@ -40,7 +40,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 						{Tool: "maven", Passed: true},
 					},
 					LogsText:  "[INFO] Gate passed after healing\n",
-					LogDigest: "regate-final",
+					LogDigest: testLogDigest(2),
 				}, nil
 			default:
 				t.Fatalf("unexpected gate call %d", gateCallCount)
@@ -160,8 +160,8 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 	if execResult.PreGate == nil || execResult.PreGate.Metadata == nil {
 		t.Fatalf("PreGate should be populated for initial failing gate")
 	}
-	if execResult.PreGate.Metadata.LogDigest != "pre-initial" {
-		t.Errorf("PreGate.LogDigest = %q, want %q", execResult.PreGate.Metadata.LogDigest, "pre-initial")
+	if execResult.PreGate.Metadata.LogDigest != testLogDigest(1) {
+		t.Errorf("PreGate.LogDigest = %q, want %q", execResult.PreGate.Metadata.LogDigest, testLogDigest(1))
 	}
 
 	// ReGates should contain the successful healing re-gate.
@@ -169,16 +169,16 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		t.Fatalf("len(execResult.ReGates) = %d, want 1 (healing re-gate only)", len(execResult.ReGates))
 	}
 	finalReGate := execResult.ReGates[0]
-	if finalReGate.Metadata == nil || finalReGate.Metadata.LogDigest != "regate-final" {
-		t.Fatalf("final re-gate metadata = %#v, want LogDigest=%q", finalReGate.Metadata, "regate-final")
+	if finalReGate.Metadata == nil || finalReGate.Metadata.LogDigest != testLogDigest(2) {
+		t.Fatalf("final re-gate metadata = %#v, want LogDigest=%q", finalReGate.Metadata, testLogDigest(2))
 	}
 
 	// Final gate in Result.BuildGate should reflect the last healing re-gate, not the initial pre-gate.
 	if execResult.BuildGate == nil {
 		t.Fatal("Result.BuildGate should be populated from final healing re-gate")
 	}
-	if execResult.BuildGate.LogDigest != "regate-final" {
-		t.Errorf("Result.BuildGate.LogDigest = %q, want %q", execResult.BuildGate.LogDigest, "regate-final")
+	if execResult.BuildGate.LogDigest != testLogDigest(2) {
+		t.Errorf("Result.BuildGate.LogDigest = %q, want %q", execResult.BuildGate.LogDigest, testLogDigest(2))
 	}
 	if len(execResult.BuildGate.StaticChecks) == 0 || !execResult.BuildGate.StaticChecks[0].Passed {
 		t.Errorf("Result.BuildGate should represent a passing gate after healing")
@@ -228,7 +228,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 					{Tool: "maven", Language: "java", Passed: passed},
 				},
 				LogsText:  gateLogs[idx],
-				LogDigest: fmt.Sprintf("digest-%d", gateCallCount),
+				LogDigest: testLogDigest(gateCallCount),
 				Resources: &contracts.BuildGateResourceUsage{
 					CPUTotalNs:    uint64(gateCallCount * 100000000), // Distinct per call.
 					MemUsageBytes: uint64(gateCallCount * 10485760),
@@ -335,8 +335,8 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	if execResult.PreGate.Metadata.LogsText != gateLogs[0] {
 		t.Errorf("PreGate logs = %q, want %q", execResult.PreGate.Metadata.LogsText, gateLogs[0])
 	}
-	if execResult.PreGate.Metadata.LogDigest != "digest-1" {
-		t.Errorf("PreGate digest = %q, want 'digest-1'", execResult.PreGate.Metadata.LogDigest)
+	if execResult.PreGate.Metadata.LogDigest != testLogDigest(1) {
+		t.Errorf("PreGate digest = %q, want %q", execResult.PreGate.Metadata.LogDigest, testLogDigest(1))
 	}
 	if len(execResult.PreGate.Metadata.StaticChecks) == 0 || execResult.PreGate.Metadata.StaticChecks[0].Passed {
 		t.Error("PreGate should have failed check")
@@ -356,7 +356,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		if regate.Metadata == nil {
 			t.Fatalf("ReGates[%d].Metadata should not be nil", i)
 		}
-		expectedDigest := fmt.Sprintf("digest-%d", i+2) // digest-2, digest-3, digest-4
+		expectedDigest := testLogDigest(i + 2) // digest-2, digest-3, digest-4
 		if regate.Metadata.LogDigest != expectedDigest {
 			t.Errorf("ReGates[%d] digest = %q, want %q", i, regate.Metadata.LogDigest, expectedDigest)
 		}
@@ -379,8 +379,8 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	if postGate.Metadata == nil {
 		t.Fatal("post-mod gate metadata should not be nil")
 	}
-	if postGate.Metadata.LogDigest != "digest-5" {
-		t.Errorf("post-mod gate digest = %q, want 'digest-5'", postGate.Metadata.LogDigest)
+	if postGate.Metadata.LogDigest != testLogDigest(5) {
+		t.Errorf("post-mod gate digest = %q, want %q", postGate.Metadata.LogDigest, testLogDigest(5))
 	}
 	if !postGate.Metadata.StaticChecks[0].Passed {
 		t.Error("post-mod gate should have passed")

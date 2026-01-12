@@ -64,11 +64,11 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 	}
 
 	// Verify timing measurements are reasonable
-	if result.Timings.HydrationDuration < hydrationDelay {
+	if time.Duration(result.Timings.HydrationDuration) < hydrationDelay {
 		t.Errorf("Run() HydrationDuration = %v, expected >= %v", result.Timings.HydrationDuration, hydrationDelay)
 	}
 
-	if result.Timings.BuildGateDuration < gateDelay {
+	if time.Duration(result.Timings.BuildGateDuration) < gateDelay {
 		t.Errorf("Run() BuildGateDuration = %v, expected >= %v", result.Timings.BuildGateDuration, gateDelay)
 	}
 

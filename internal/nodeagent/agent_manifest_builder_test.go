@@ -509,12 +509,12 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 
 		// RepoURL must match the request's RepoURL.
-		if manifest.Gate.RepoURL != req.RepoURL.String() {
+		if manifest.Gate.RepoURL.String() != req.RepoURL.String() {
 			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
 		}
 
 		// Ref must be CommitSHA (highest precedence).
-		if manifest.Gate.Ref != req.CommitSHA.String() {
+		if manifest.Gate.Ref.String() != req.CommitSHA.String() {
 			t.Errorf("Gate.Ref=%q, want CommitSHA %q", manifest.Gate.Ref, req.CommitSHA.String())
 		}
 	})
@@ -538,7 +538,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 
 		// Ref must be TargetRef (second precedence).
-		if manifest.Gate.Ref != req.TargetRef.String() {
+		if manifest.Gate.Ref.String() != req.TargetRef.String() {
 			t.Errorf("Gate.Ref=%q, want TargetRef %q", manifest.Gate.Ref, req.TargetRef.String())
 		}
 	})
@@ -561,7 +561,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 
 		// Ref must be BaseRef (lowest precedence fallback).
-		if manifest.Gate.Ref != req.BaseRef.String() {
+		if manifest.Gate.Ref.String() != req.BaseRef.String() {
 			t.Errorf("Gate.Ref=%q, want BaseRef %q", manifest.Gate.Ref, req.BaseRef.String())
 		}
 	})
@@ -583,7 +583,7 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 
 		// RepoURL still set, Ref is empty (callers should validate before HTTP gate).
-		if manifest.Gate.RepoURL != req.RepoURL.String() {
+		if manifest.Gate.RepoURL.String() != req.RepoURL.String() {
 			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
 		}
 		if manifest.Gate.Ref != "" {
@@ -609,11 +609,11 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 
 		// Verify whitespace is trimmed.
 		wantURL := "https://gitlab.com/iw2rmb/ploy-orw.git"
-		if manifest.Gate.RepoURL != wantURL {
+		if manifest.Gate.RepoURL.String() != wantURL {
 			t.Errorf("Gate.RepoURL=%q, want trimmed %q", manifest.Gate.RepoURL, wantURL)
 		}
 		wantRef := "abc123"
-		if manifest.Gate.Ref != wantRef {
+		if manifest.Gate.Ref.String() != wantRef {
 			t.Errorf("Gate.Ref=%q, want trimmed %q", manifest.Gate.Ref, wantRef)
 		}
 	})
@@ -643,10 +643,10 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			t.Errorf("Gate.Profile=%q, want java-maven", manifest.Gate.Profile)
 		}
 		// Repo metadata still populated.
-		if manifest.Gate.RepoURL != req.RepoURL.String() {
+		if manifest.Gate.RepoURL.String() != req.RepoURL.String() {
 			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
 		}
-		if manifest.Gate.Ref != req.TargetRef.String() {
+		if manifest.Gate.Ref.String() != req.TargetRef.String() {
 			t.Errorf("Gate.Ref=%q, want %q", manifest.Gate.Ref, req.TargetRef.String())
 		}
 	})
@@ -699,7 +699,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 	if !manifest.Gate.Enabled {
 		t.Error("expected Gate.Enabled=true for build_gate_enabled option")
 	}
-	if manifest.Gate.RepoURL != req.RepoURL.String() {
+	if manifest.Gate.RepoURL.String() != req.RepoURL.String() {
 		t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
 	}
 }
