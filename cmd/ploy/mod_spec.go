@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
-	"github.com/iw2rmb/ploy/internal/domain/types"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModSpec routes mod spec subcommands.
@@ -71,7 +71,7 @@ func handleModSpecSet(args []string, stderr io.Writer) error {
 	cmd := mods.SetModSpecCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
+		ModRef:  domaintypes.ModRef(modRef),
 		Spec:    specData,
 	}
 

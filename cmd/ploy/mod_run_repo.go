@@ -320,17 +320,17 @@ type runRepoRestartRequest struct {
 // v1 model: run_repos uses composite PK (run_id, repo_id), not a standalone id field.
 // RepoID refers to mod_repos.id (the repository identifier within a mod project).
 type runRepoResponse struct {
-	RunID      domaintypes.RunID `json:"run_id"`
-	RepoID     string            `json:"repo_id"` // mod_repos.id (NanoID, 8 chars)
-	RepoURL    string            `json:"repo_url"`
-	BaseRef    string            `json:"base_ref"`   // Snapshot from run_repos.repo_base_ref
-	TargetRef  string            `json:"target_ref"` // Snapshot from run_repos.repo_target_ref
-	Status     string            `json:"status"`
-	Attempt    int32             `json:"attempt"`
-	LastError  *string           `json:"last_error,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	StartedAt  *time.Time        `json:"started_at,omitempty"`
-	FinishedAt *time.Time        `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoID     domaintypes.ModRepoID `json:"repo_id"` // mod_repos.id (NanoID, 8 chars)
+	RepoURL    string                `json:"repo_url"`
+	BaseRef    string                `json:"base_ref"`   // Snapshot from run_repos.repo_base_ref
+	TargetRef  string                `json:"target_ref"` // Snapshot from run_repos.repo_target_ref
+	Status     string                `json:"status"`
+	Attempt    int32                 `json:"attempt"`
+	LastError  *string               `json:"last_error,omitempty"`
+	CreatedAt  time.Time             `json:"created_at"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 // doRunRepoAdd sends POST /v1/runs/{id}/repos to add a repo to a batch.

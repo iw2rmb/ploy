@@ -11,7 +11,7 @@ import (
 	"io"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
-	"github.com/iw2rmb/ploy/internal/domain/types"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModArchive implements 'ploy mod archive <mod-id|name>'.
@@ -40,7 +40,7 @@ func handleModArchive(args []string, stderr io.Writer) error {
 	cmd := mods.ArchiveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
+		ModRef:  domaintypes.ModRef(modRef),
 	}
 
 	result, err := cmd.Run(ctx)

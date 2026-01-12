@@ -32,8 +32,8 @@ func TestRolloutNodesResume(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/nodes" {
 			nodes := []map[string]interface{}{
-				{"id": "node-1", "name": "worker-1", "ip_address": "10.0.0.1", "drained": false, "last_heartbeat": "2025-11-03T12:00:00Z"},
-				{"id": "node-2", "name": "worker-2", "ip_address": "10.0.0.2", "drained": false, "last_heartbeat": "2025-11-03T12:00:00Z"},
+				{"id": "a1b2c3", "name": "worker-1", "ip_address": "10.0.0.1", "drained": false, "last_heartbeat": "2025-11-03T12:00:00Z"},
+				{"id": "d4e5f6", "name": "worker-2", "ip_address": "10.0.0.2", "drained": false, "last_heartbeat": "2025-11-03T12:00:00Z"},
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(nodes)
@@ -77,8 +77,8 @@ func TestRolloutNodesResume(t *testing.T) {
 		Version:     1,
 		RetryPolicy: rolloutRetryPolicy{MaxAttempts: 3},
 		Nodes: map[string]nodeRolloutStatus{
-			"node-1": {
-				NodeID:      "node-1",
+			"a1b2c3": {
+				NodeID:      "a1b2c3",
 				NodeName:    "worker-1",
 				InProgress:  false,
 				Completed:   true,

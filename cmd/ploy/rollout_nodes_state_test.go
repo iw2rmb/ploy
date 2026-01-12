@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestLoadAndSaveRolloutState(t *testing.T) {
@@ -15,12 +17,13 @@ func TestLoadAndSaveRolloutState(t *testing.T) {
 
 	// Test saving state.
 	now := time.Now().UTC().Format(time.RFC3339)
+	nodeID := domaintypes.NodeID("a1b2c3")
 	state := &rolloutState{
 		Version:     1,
 		RetryPolicy: rolloutRetryPolicy{MaxAttempts: 3},
 		Nodes: map[string]nodeRolloutStatus{
-			"node-1": {
-				NodeID:      "node-1",
+			nodeID.String(): {
+				NodeID:      nodeID,
 				NodeName:    "worker-1",
 				InProgress:  true,
 				Completed:   false,
@@ -54,9 +57,9 @@ func TestLoadAndSaveRolloutState(t *testing.T) {
 		t.Fatalf("expected 1 node in state, got %d", len(loaded.Nodes))
 	}
 
-	status, ok := loaded.Nodes["node-1"]
+	status, ok := loaded.Nodes[nodeID.String()]
 	if !ok {
-		t.Fatalf("expected node-1 in state")
+		t.Fatalf("expected %s in state", nodeID.String())
 	}
 
 	if status.NodeName != "worker-1" {
