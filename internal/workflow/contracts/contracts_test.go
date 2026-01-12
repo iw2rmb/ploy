@@ -6,10 +6,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-const (
-	buildGateStage = "build-gate"
-)
-
 func TestSubjectsForRun(t *testing.T) {
 	subjects := SubjectsForRun("run-123")
 	if subjects.CheckpointStream != "ploy.workflow.run-123.checkpoints" {

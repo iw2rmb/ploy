@@ -469,15 +469,3 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 		t.Errorf("heartbeat attempts = %d, want at least 1", heartbeatAttempts)
 	}
 }
-
-// extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
-// extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
-//
-//nolint:unused // helper retained for potential future assertions
-func extractPort(addr string) string {
-	// Handle IPv6 format [::]:port
-	if idx := strings.LastIndex(addr, ":"); idx != -1 {
-		return addr[idx+1:]
-	}
-	return ""
-}

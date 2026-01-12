@@ -465,8 +465,3 @@ func TestDiffFetcher_FetchDiffsForStepRepo_Ordering(t *testing.T) {
 		})
 	}
 }
-
-// stepIndex returns a StepIndex value.
-func stepIndex(v int32) types.StepIndex {
-	return types.StepIndex(v)
-}

@@ -298,13 +298,3 @@ func validateGitLabConfig(cfg *gitLabConfigPayload) error {
 	}
 	return nil
 }
-
-// min returns the minimum of two integers.
-//
-//nolint:unused // kept for future CLI range helpers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
