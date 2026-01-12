@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleConfigEnv routes env subcommands: list, show, set, unset.
@@ -57,18 +59,18 @@ func printConfigEnvUsage(w io.Writer) {
 // globalEnvListItem matches the server's list response structure.
 // For secrets, the value is omitted (empty) in the list view.
 type globalEnvListItem struct {
-	Key    string `json:"key"`
-	Value  string `json:"value,omitempty"`
-	Scope  string `json:"scope"`
-	Secret bool   `json:"secret"`
+	Key    string                     `json:"key"`
+	Value  string                     `json:"value,omitempty"`
+	Scope  domaintypes.GlobalEnvScope `json:"scope"`
+	Secret bool                       `json:"secret"`
 }
 
 // globalEnvResponse matches the server's single-entry response structure.
 type globalEnvResponse struct {
-	Key    string `json:"key"`
-	Value  string `json:"value"`
-	Scope  string `json:"scope"`
-	Secret bool   `json:"secret"`
+	Key    string                     `json:"key"`
+	Value  string                     `json:"value"`
+	Scope  domaintypes.GlobalEnvScope `json:"scope"`
+	Secret bool                       `json:"secret"`
 }
 
 // handleConfigEnvList retrieves and displays all global environment variables.
@@ -118,6 +120,11 @@ func handleConfigEnvList(args []string, stderr io.Writer) error {
 	var items []globalEnvListItem
 	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
 		return fmt.Errorf("decode response: %w", err)
+	}
+	for _, item := range items {
+		if err := item.Scope.Validate(); err != nil {
+			return fmt.Errorf("invalid scope %q in response: %w", item.Scope, err)
+		}
 	}
 
 	// Display the list in a readable tabular format.
@@ -211,6 +218,9 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
+	if err := entry.Scope.Validate(); err != nil {
+		return fmt.Errorf("invalid scope %q in response: %w", entry.Scope, err)
+	}
 
 	// Display the entry, redacting secret values unless --raw is specified.
 	displayValue := entry.Value
@@ -240,9 +250,9 @@ func printConfigEnvShowUsage(w io.Writer) {
 
 // globalEnvSetRequest is the request body for PUT /v1/config/env/{key}.
 type globalEnvSetRequest struct {
-	Value  string `json:"value"`
-	Scope  string `json:"scope"`
-	Secret *bool  `json:"secret,omitempty"`
+	Value  string                     `json:"value"`
+	Scope  domaintypes.GlobalEnvScope `json:"scope"`
+	Secret *bool                      `json:"secret,omitempty"`
 }
 
 // handleConfigEnvSet creates or updates a global environment variable.
@@ -289,10 +299,9 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		return errors.New("--value and --file are mutually exclusive")
 	}
 
-	// Validate scope.
-	validScopes := map[string]bool{"all": true, "mods": true, "heal": true, "gate": true}
-	if !validScopes[scope] {
-		return fmt.Errorf("invalid scope %q: must be one of: all, mods, heal, gate", scope)
+	parsedScope, err := domaintypes.ParseGlobalEnvScope(scope)
+	if err != nil {
+		return fmt.Errorf("invalid scope %q: %w", scope, err)
 	}
 
 	// Read value from file if --file is specified.
@@ -310,7 +319,7 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	// Build request body. Default secret to true if not explicitly set.
 	reqBody := globalEnvSetRequest{
 		Value: actualValue,
-		Scope: scope,
+		Scope: parsedScope,
 	}
 	if secret.set {
 		reqBody.Secret = &secret.value

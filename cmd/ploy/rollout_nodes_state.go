@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type rolloutState struct {
@@ -23,13 +25,13 @@ type rolloutRetryPolicy struct {
 }
 
 type nodeRolloutStatus struct {
-	NodeID      string `json:"node_id"`
-	NodeName    string `json:"node_name"`
-	InProgress  bool   `json:"in_progress"`
-	Completed   bool   `json:"completed"`
-	Error       string `json:"error,omitempty"`
-	Attempts    int    `json:"attempts"`
-	LastAttempt string `json:"last_attempt,omitempty"`
+	NodeID      domaintypes.NodeID `json:"node_id"`
+	NodeName    string             `json:"node_name"`
+	InProgress  bool               `json:"in_progress"`
+	Completed   bool               `json:"completed"`
+	Error       string             `json:"error,omitempty"`
+	Attempts    int                `json:"attempts"`
+	LastAttempt string             `json:"last_attempt,omitempty"`
 }
 
 func rolloutStateDir() (string, error) {

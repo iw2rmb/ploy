@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/deploy"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type rolloutNodesConfig struct {
@@ -199,7 +200,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 
 			// Mark as in-progress and increment attempts.
 			state.Nodes[node.ID] = nodeRolloutStatus{
-				NodeID:      node.ID,
+				NodeID:      domaintypes.NodeID(node.ID),
 				NodeName:    node.Name,
 				InProgress:  true,
 				Completed:   false,
@@ -227,7 +228,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 				_, _ = fmt.Fprintf(stderr, "[%s] Rollout failed: %v\n", node.Name, err)
 				logRolloutError(logger, "node_rollout", err, "node_id", node.ID, "node_name", node.Name, "attempt", attemptNum, "duration_ms", time.Since(nodeStart).Milliseconds())
 				state.Nodes[node.ID] = nodeRolloutStatus{
-					NodeID:      node.ID,
+					NodeID:      domaintypes.NodeID(node.ID),
 					NodeName:    node.Name,
 					InProgress:  false,
 					Completed:   false,
@@ -246,7 +247,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 			_, _ = fmt.Fprintf(stderr, "[%s] Rollout complete\n", node.Name)
 			logRolloutStep(logger, "node_rollout", "completed", "node_id", node.ID, "node_name", node.Name, "attempt", attemptNum, "duration_ms", time.Since(nodeStart).Milliseconds())
 			state.Nodes[node.ID] = nodeRolloutStatus{
-				NodeID:      node.ID,
+				NodeID:      domaintypes.NodeID(node.ID),
 				NodeName:    node.Name,
 				InProgress:  false,
 				Completed:   true,

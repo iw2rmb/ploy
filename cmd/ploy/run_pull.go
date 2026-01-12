@@ -217,10 +217,10 @@ func handleRunPull(args []string, stderr io.Writer) error {
 // runRepoDetails holds the repo details needed for pull operations.
 // This is a simplified structure containing only the fields we need.
 type runRepoDetails struct {
-	RepoID    string `json:"repo_id"`
-	BaseRef   string `json:"base_ref"`
-	TargetRef string `json:"target_ref"`
-	Status    string `json:"status"`
+	RepoID    domaintypes.ModRepoID `json:"repo_id"`
+	BaseRef   string                `json:"base_ref"`
+	TargetRef string                `json:"target_ref"`
+	Status    string                `json:"status"`
 }
 
 // fetchRunRepoDetails fetches the repo details for a run/repo pair.
@@ -257,7 +257,7 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 	}
 
 	for _, repo := range result.Repos {
-		if repo.RepoID == repoID.String() {
+		if repo.RepoID == repoID {
 			return &repo, nil
 		}
 	}

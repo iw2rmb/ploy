@@ -18,6 +18,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // handleModRepo routes mod repo subcommands.
@@ -99,7 +100,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
+		ModRef:  domaintypes.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -110,7 +111,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	cmd := mods.AddModRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
-		ModRef:    types.ModRef(modID),
+		ModRef:    domaintypes.ModRef(modID),
 		RepoURL:   *repoURL,
 		BaseRef:   *baseRef,
 		TargetRef: *targetRef,
@@ -151,7 +152,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
+		ModRef:  domaintypes.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -162,7 +163,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	cmd := mods.ListModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modID),
+		ModRef:  domaintypes.ModRef(modID),
 	}
 
 	results, err := cmd.Run(ctx)
@@ -235,7 +236,7 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modRef),
+		ModRef:  domaintypes.ModRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -246,8 +247,8 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	cmd := mods.RemoveModRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  types.ModRef(modID),
-		RepoID:  types.ModRepoID(*repoID),
+		ModRef:  domaintypes.ModRef(modID),
+		RepoID:  domaintypes.ModRepoID(*repoID),
 	}
 
 	if err := cmd.Run(ctx); err != nil {

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
@@ -31,6 +33,10 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	var submitCalled bool
 	var capturedRequest map[string]any
 
+	runID := domaintypes.NewRunID().String()
+	modID := domaintypes.NewModID().String()
+	specID := domaintypes.NewSpecID().String()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Handle POST /v1/runs for run submission.
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
@@ -46,7 +52,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 			// Return 201 Created with run_id.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"run-test-123","mod_id":"mod-test-456","spec_id":"spec-test-789"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 
@@ -106,11 +112,11 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 
 	// Validate output contains run_id and mod_id.
 	output := buf.String()
-	if !strings.Contains(output, "run_id: run-test-123") {
-		t.Errorf("expected output to contain run_id 'run-test-123': %s", output)
+	if !strings.Contains(output, "run_id: "+runID) {
+		t.Errorf("expected output to contain run_id %q: %s", runID, output)
 	}
-	if !strings.Contains(output, "mod_id: mod-test-456") {
-		t.Errorf("expected output to contain mod_id 'mod-test-456': %s", output)
+	if !strings.Contains(output, "mod_id: "+modID) {
+		t.Errorf("expected output to contain mod_id %q: %s", modID, output)
 	}
 }
 
@@ -170,6 +176,9 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 
 	var submitCalled bool
 	var capturedRequest map[string]any
+	runID := domaintypes.NewRunID().String()
+	modID := domaintypes.NewModID().String()
+	specID := domaintypes.NewSpecID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
 			submitCalled = true
@@ -180,7 +189,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"run-stdin-test","mod_id":"mod-stdin-test","spec_id":"spec-stdin-test"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -245,13 +254,16 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 	}
 
 	var submitCalled bool
+	runID := domaintypes.NewRunID().String()
+	modID := domaintypes.NewModID().String()
+	specID := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
 			submitCalled = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"run-json-test","mod_id":"mod-json-test","spec_id":"spec-json-test"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -276,11 +288,11 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 		t.Fatal("expected POST /v1/runs to be called")
 	}
 	output := buf.String()
-	if !strings.Contains(output, "run_id: run-json-test") {
-		t.Errorf("expected output to contain run_id 'run-json-test': %s", output)
+	if !strings.Contains(output, "run_id: "+runID) {
+		t.Errorf("expected output to contain run_id %q: %s", runID, output)
 	}
-	if !strings.Contains(output, "mod_id: mod-json-test") {
-		t.Errorf("expected output to contain mod_id 'mod-json-test': %s", output)
+	if !strings.Contains(output, "mod_id: "+modID) {
+		t.Errorf("expected output to contain mod_id %q: %s", modID, output)
 	}
 }
 

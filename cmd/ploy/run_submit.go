@@ -125,13 +125,13 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	}
 
 	// Print run_id and mod_id on success.
-	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID)
-	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID)
+	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
+	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
 
 	return nil
 }
 
-func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (runID string, modID string, err error) {
+func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.ModID, error) {
 	if base == nil {
 		return "", "", fmt.Errorf("run submit: base url required")
 	}
@@ -174,19 +174,17 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 	}
 
 	var created struct {
-		RunID  string `json:"run_id"`
-		ModID  string `json:"mod_id"`
-		SpecID string `json:"spec_id"`
+		RunID  domaintypes.RunID  `json:"run_id"`
+		ModID  domaintypes.ModID  `json:"mod_id"`
+		SpecID domaintypes.SpecID `json:"spec_id"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
 		return "", "", fmt.Errorf("run submit: decode response: %w", err)
 	}
-	created.RunID = strings.TrimSpace(created.RunID)
-	created.ModID = strings.TrimSpace(created.ModID)
-	if created.RunID == "" {
+	if created.RunID.IsZero() {
 		return "", "", fmt.Errorf("run submit: empty run_id in response")
 	}
-	if created.ModID == "" {
+	if created.ModID.IsZero() {
 		return "", "", fmt.Errorf("run submit: empty mod_id in response")
 	}
 	return created.RunID, created.ModID, nil
