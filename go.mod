@@ -4,21 +4,21 @@ go 1.24.0
 
 toolchain go1.25.5
 
-	require (
-		github.com/cenkalti/backoff/v5 v5.0.3
-		// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
-		github.com/docker/go-units v0.5.0
+require (
+	github.com/cenkalti/backoff/v5 v5.0.3
+	// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
+	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
-		// KSUID for time-sortable, globally unique identifiers (runs, jobs, builds).
-		// NanoID for compact, human-friendly identifiers (run repos, node keys).
-		github.com/matoous/go-nanoid/v2 v2.1.0
-		// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
-		// See docs/how-to/deploy-a-cluster.md#L24 for installation requirements.
-		github.com/moby/moby/api v1.52.0
-		github.com/moby/moby/client v0.2.1
+	// KSUID for time-sortable, globally unique identifiers (runs, jobs, builds).
+	// NanoID for compact, human-friendly identifiers (run repos, node keys).
+	github.com/matoous/go-nanoid/v2 v2.1.0
+	// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
+	// See docs/how-to/deploy-a-cluster.md#L24 for installation requirements.
+	github.com/moby/moby/api v1.52.0
+	github.com/moby/moby/client v0.2.1
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.23.2
 	github.com/segmentio/ksuid v1.0.4

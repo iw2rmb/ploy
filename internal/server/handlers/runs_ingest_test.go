@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -180,15 +179,6 @@ func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 
 func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
 	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
-}
-
-// Ensure 404 is returned when the run does not exist.
-type mockStoreRunArtifactsNotFound struct {
-	store.Store
-}
-
-func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id domaintypes.RunID) (store.Run, error) {
-	return store.Run{}, pgx.ErrNoRows
 }
 
 func TestCreateModArtifactBundleHandler_RunNotFound(t *testing.T) {

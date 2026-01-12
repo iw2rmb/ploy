@@ -413,12 +413,11 @@ The ORW Mods honor an existing `rewrite.yml` in the workspace:
 - Image resolution in executor: `internal/nodeagent/run_options.go`.
 - Unit tests: `internal/workflow/contracts/mod_image_test.go`.
 
-## 1.3 Job Graph (DAG) Visualization
+## 1.3 Job Order (DAG)
 
-Mods runs form a directed acyclic graph (DAG) of jobs. The graph package
-(`internal/workflow/graph`) materializes jobs into an explicit graph structure
-for visualization and debugging. Jobs are ordered by `step_index` (float values
-like 1000, 2000, 3000), which determines execution order and edge relationships.
+Mods runs form a directed acyclic graph (DAG) of jobs derived from `step_index`
+(float values like 1000, 2000, 3000) and healing logic that can insert
+intermediate steps.
 
 ### Node types
 
@@ -475,9 +474,8 @@ post-gate  ───────────────▶├─▶ heal-a (150
 
 ### Implementation references
 
-- Graph types: `internal/workflow/graph/types.go`
-- Graph builder: `internal/workflow/graph/builder.go`
-- Detailed DAG documentation: `ROADMAP_DAG.md`
+- Job ordering/claim semantics: `internal/store/queries/jobs.sql`, `internal/nodeagent/claimer.go`
+- Healing job insertion: `internal/server/handlers/nodes_complete_healing.go`
 
 ## 1.4 Batched Mods Runs (`runs` + `run_repos`)
 
@@ -1176,10 +1174,6 @@ Code paths most relevant for Mods:
   - `internal/nodeagent/execution_orchestrator.go`
   - `internal/nodeagent/execution_healing.go`
   - `internal/workflow/runtime/step/*`
-- Graph:
-  - `internal/workflow/graph/types.go` — graph node/edge types
-  - `internal/workflow/graph/builder.go` — DAG materialization from jobs
-  - `ROADMAP_DAG.md` — detailed job graph documentation
 
 For concrete end-to-end scenarios and sample specs see:
 

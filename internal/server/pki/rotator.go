@@ -11,8 +11,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"math/big"
-	"net"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -169,21 +167,6 @@ func parseCA(certPEM, keyPEM []byte) (*x509.Certificate, *ecdsa.PrivateKey, erro
 		return nil, nil, err
 	}
 	return cert, key, nil
-}
-
-// hostFromURL best-effort extracts host or IP from a URL for SAN preservation.
-//
-//nolint:unused // helper kept for potential SAN-preserving rotation logic
-func hostFromURL(u string) string {
-	parsed, err := url.Parse(u)
-	if err != nil {
-		return ""
-	}
-	h := parsed.Hostname()
-	if ip := net.ParseIP(h); ip != nil {
-		return ip.String()
-	}
-	return h
 }
 
 // newBigInt returns a large max for random serial generation (~128-bit).

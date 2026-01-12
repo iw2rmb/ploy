@@ -7,33 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
-
-// testConfig creates a Config with sensible defaults for testing.
-// The serverURL should typically point to a httptest.NewServer URL.
-func testConfig(serverURL string, nodeID string) Config {
-	return Config{
-		ServerURL:   serverURL,
-		NodeID:      types.NodeID(nodeID),
-		Concurrency: 1,
-		HTTP: HTTPConfig{
-			Listen: ":0", // random port
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-			ReadTimeout:  30 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			IdleTimeout:  120 * time.Second,
-		},
-		Heartbeat: HeartbeatConfig{
-			Interval: 100 * time.Millisecond, // fast for testing
-			Timeout:  10 * time.Second,
-		},
-	}
-}
 
 // testBackoffPolicy returns a fast backoff policy suitable for tests.
 func testBackoffPolicy() backoff.Policy {

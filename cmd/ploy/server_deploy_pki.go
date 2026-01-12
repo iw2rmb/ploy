@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -9,13 +8,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
-	"strings"
 )
 
 // handleRefreshAdminCert is deprecated - bearer token authentication replaces mTLS certificates.
@@ -82,80 +78,4 @@ func generateAdminCSR(clusterID string) (csrPEM, keyPEM []byte, err error) {
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 
 	return csrPEM, keyPEM, nil
-}
-
-// refreshAdminCertFromServer generates a CSR and calls the server PKI endpoint to sign it.
-//
-//nolint:unused // reserved for future server PKI rotation flow
-func refreshAdminCertFromServer(ctx context.Context, clusterID string, stderr io.Writer) (caPEM, certPEM, keyPEM string, err error) {
-	if stderr == nil {
-		stderr = io.Discard
-	}
-
-	// Generate CSR and private key.
-	_, _ = fmt.Fprintln(stderr, "Generating admin certificate signing request...")
-	csrPEMBytes, keyPEMBytes, err := generateAdminCSR(clusterID)
-	if err != nil {
-		return "", "", "", fmt.Errorf("generate admin CSR: %w", err)
-	}
-
-	// Get server URL and HTTP client from descriptor.
-	serverURL, client, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return "", "", "", fmt.Errorf("resolve control plane URL: %w", err)
-	}
-
-	// Build request body.
-	reqBody := struct {
-		CSR string `json:"csr"`
-	}{CSR: string(csrPEMBytes)}
-	bodyJSON, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", "", "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	// Call server PKI endpoint.
-	endpoint := strings.TrimSuffix(serverURL.String(), "/") + "/v1/pki/sign/admin"
-	_, _ = fmt.Fprintf(stderr, "Requesting admin certificate from server: %s\n", endpoint)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
-	if err != nil {
-		return "", "", "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", "", "", fmt.Errorf("call server PKI endpoint: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		bodyStr := strings.TrimSpace(string(bodyBytes))
-		if bodyStr != "" {
-			return "", "", "", fmt.Errorf("server returned status %d: %s", resp.StatusCode, bodyStr)
-		}
-		return "", "", "", fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-
-	// Decode response.
-	var signResp struct {
-		Certificate string `json:"certificate"`
-		CABundle    string `json:"ca_bundle"`
-		Serial      string `json:"serial"`
-		Fingerprint string `json:"fingerprint"`
-		NotBefore   string `json:"not_before"`
-		NotAfter    string `json:"not_after"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&signResp); err != nil {
-		return "", "", "", fmt.Errorf("decode response: %w", err)
-	}
-
-	_, _ = fmt.Fprintf(stderr, "Admin certificate issued successfully\n")
-	_, _ = fmt.Fprintf(stderr, "  Serial: %s\n", signResp.Serial)
-	_, _ = fmt.Fprintf(stderr, "  Fingerprint: %s\n", signResp.Fingerprint)
-	_, _ = fmt.Fprintf(stderr, "  Valid: %s to %s\n", signResp.NotBefore, signResp.NotAfter)
-
-	return signResp.CABundle, signResp.Certificate, string(keyPEMBytes), nil
 }

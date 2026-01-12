@@ -7,18 +7,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-const (
-	//nolint:unused // reserved for future CA rotation configuration defaults
-	defaultCAValidity   = 365 * 24 * time.Hour //nolint:unused // reserved for future CA rotation defaults
-	defaultLeafValidity = 90 * 24 * time.Hour  //nolint:unused // reserved for future CA rotation defaults
-	certSerialBitSize   = 160                  //nolint:unused // reserved for future CA rotation defaults
-	clusterSecurityRoot = "/ploy/clusters"     //nolint:unused // reserved for future CA rotation defaults
-
-	certificateRoleControlPlane = "control-plane" //nolint:unused // reserved for future CA rotation ACLs
-	certificateRoleWorker       = "worker"        //nolint:unused // reserved for future CA rotation ACLs
-	certificateRoleCLIAdmin     = "cli-admin"     //nolint:unused // reserved for future CA rotation ACLs
-)
-
 var (
 	// ErrPKINotBootstrapped indicates the cluster security materials have not been generated yet.
 	ErrPKINotBootstrapped = errors.New("deploy: cluster PKI not bootstrapped")

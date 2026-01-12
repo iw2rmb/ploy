@@ -4,7 +4,7 @@
 #
 # Enforces coverage thresholds per GOLANG.md (line 140) and AGENTS.md:
 #   - ≥60% overall coverage
-#   - ≥90% on critical workflow runner packages (scheduler, worker/jobs)
+#   - ≥90% on critical workflow runner packages (scheduler)
 #   - ≥60% on protected workflow/worker paths (runtime/step, lifecycle)
 #
 # RED→GREEN→REFACTOR discipline: this script runs as part of the GREEN validation
@@ -21,7 +21,6 @@ PROTECTED_THRESHOLD=60
 # These are the core packages responsible for scheduling and executing workflow runs.
 CRITICAL_PATHS=(
     "github.com/iw2rmb/ploy/internal/server/scheduler"
-    "github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
 # Protected workflow/worker paths - require ≥60% coverage.
