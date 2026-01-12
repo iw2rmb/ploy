@@ -106,7 +106,7 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 
 		// If backoff is active (triggered by prior 5xx error), wait before next heartbeat.
 		if h.backoffActive {
-			delay = h.backoff.GetDuration()
+			delay = time.Duration(h.backoff.GetDuration())
 			slog.Warn("heartbeat backoff active", "duration", delay)
 		}
 

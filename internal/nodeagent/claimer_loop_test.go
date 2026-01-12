@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -55,8 +56,8 @@ func TestClaimLoop_UnifiedQueue(t *testing.T) {
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,
@@ -127,8 +128,8 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,

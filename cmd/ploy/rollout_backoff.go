@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -34,8 +35,8 @@ func DefaultRetryPolicy() RetryPolicy {
 // Maps rollout-specific fields to the shared package's policy structure.
 func (p RetryPolicy) toBackoffPolicy() backoff.Policy {
 	return backoff.Policy{
-		InitialInterval: p.InitialInterval,
-		MaxInterval:     p.MaxInterval,
+		InitialInterval: domaintypes.Duration(p.InitialInterval),
+		MaxInterval:     domaintypes.Duration(p.MaxInterval),
 		Multiplier:      p.Multiplier,
 		MaxAttempts:     p.MaxAttempts,
 		MaxElapsedTime:  0, // No time limit for rollout operations.

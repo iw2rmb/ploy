@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -14,8 +15,8 @@ import (
 // testBackoffPolicy returns a fast backoff policy suitable for tests.
 func testBackoffPolicy() backoff.Policy {
 	return backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     100 * time.Millisecond,
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(100 * time.Millisecond),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,

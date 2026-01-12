@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -165,7 +166,7 @@ func TestBackoffOn5xxErrors(t *testing.T) {
 				wantRange := tt.wantBackoffs[i]
 				var actualDuration time.Duration
 				if mgr.backoffActive {
-					actualDuration = mgr.backoff.GetDuration()
+					actualDuration = time.Duration(mgr.backoff.GetDuration())
 				} else {
 					actualDuration = 0
 				}
@@ -304,8 +305,8 @@ func TestHeartbeatStart_BackoffOverridesInterval(t *testing.T) {
 	}
 
 	mgr.backoff = backoff.NewStatefulBackoff(backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     10 * time.Millisecond,
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(10 * time.Millisecond),
 		Multiplier:      1.0,
 		MaxElapsedTime:  0,
 		MaxAttempts:     0,

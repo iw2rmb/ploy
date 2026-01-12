@@ -12,15 +12,16 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Policy encapsulates exponential backoff configuration.
 // Used to create backoff instances for retry operations.
 type Policy struct {
-	InitialInterval time.Duration
-	MaxInterval     time.Duration
+	InitialInterval types.Duration
+	MaxInterval     types.Duration
 	Multiplier      float64
-	MaxElapsedTime  time.Duration
+	MaxElapsedTime  types.Duration
 	MaxAttempts     int
 }
 
@@ -28,10 +29,10 @@ type Policy struct {
 // Initial interval: 2s, max interval: 30s, multiplier: 2.0, max elapsed: 5m, max attempts: 10.
 func DefaultPolicy() Policy {
 	return Policy{
-		InitialInterval: 2 * time.Second,
-		MaxInterval:     30 * time.Second,
+		InitialInterval: types.Duration(2 * time.Second),
+		MaxInterval:     types.Duration(30 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  5 * time.Minute,
+		MaxElapsedTime:  types.Duration(5 * time.Minute),
 		MaxAttempts:     10,
 	}
 }
@@ -40,10 +41,10 @@ func DefaultPolicy() Policy {
 // Matches existing rollout backoff defaults: 2s initial, 30s max, 2.0 multiplier.
 func RolloutPolicy() Policy {
 	return Policy{
-		InitialInterval: 2 * time.Second,
-		MaxInterval:     30 * time.Second,
+		InitialInterval: types.Duration(2 * time.Second),
+		MaxInterval:     types.Duration(30 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  5 * time.Minute,
+		MaxElapsedTime:  types.Duration(5 * time.Minute),
 		MaxAttempts:     10,
 	}
 }
@@ -52,8 +53,8 @@ func RolloutPolicy() Policy {
 // Starts at 5s and caps at 5m to match existing heartbeat behavior.
 func HeartbeatPolicy() Policy {
 	return Policy{
-		InitialInterval: 5 * time.Second,
-		MaxInterval:     5 * time.Minute,
+		InitialInterval: types.Duration(5 * time.Second),
+		MaxInterval:     types.Duration(5 * time.Minute),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit, only 5xx errors trigger backoff.
 		MaxAttempts:     0, // No attempt limit for heartbeat backoff.
@@ -64,8 +65,8 @@ func HeartbeatPolicy() Policy {
 // Starts at 250ms and caps at 5s to match existing claim loop behavior.
 func ClaimLoopPolicy() Policy {
 	return Policy{
-		InitialInterval: 250 * time.Millisecond,
-		MaxInterval:     5 * time.Second,
+		InitialInterval: types.Duration(250 * time.Millisecond),
+		MaxInterval:     types.Duration(5 * time.Second),
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit for claim loop backoff.
 		MaxAttempts:     0, // No attempt limit for claim loop backoff.
@@ -77,8 +78,8 @@ func ClaimLoopPolicy() Policy {
 // Matches existing status uploader retry behavior.
 func StatusUploaderPolicy() Policy {
 	return Policy{
-		InitialInterval: 100 * time.Millisecond,
-		MaxInterval:     400 * time.Millisecond, // 100ms * 2^2 = 400ms (won't exceed this).
+		InitialInterval: types.Duration(100 * time.Millisecond),
+		MaxInterval:     types.Duration(400 * time.Millisecond), // 100ms * 2^2 = 400ms (won't exceed this).
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit for status upload retries.
 		MaxAttempts:     4, // Initial attempt + 3 retries.
@@ -90,8 +91,8 @@ func StatusUploaderPolicy() Policy {
 // Matches existing certificate bootstrap retry behavior (1s, 2s, 4s, 8s, 16s).
 func CertificateBootstrapPolicy() Policy {
 	return Policy{
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     16 * time.Second, // 1s * 2^4 = 16s max.
+		InitialInterval: types.Duration(1 * time.Second),
+		MaxInterval:     types.Duration(16 * time.Second), // 1s * 2^4 = 16s max.
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit for certificate bootstrap retries.
 		MaxAttempts:     5, // Initial attempt + 4 retries.
@@ -103,8 +104,8 @@ func CertificateBootstrapPolicy() Policy {
 // Matches existing GitLab MR retry behavior (1s, 2s, 4s).
 func GitLabMRPolicy() Policy {
 	return Policy{
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     4 * time.Second, // 1s * 2^2 = 4s max.
+		InitialInterval: types.Duration(1 * time.Second),
+		MaxInterval:     types.Duration(4 * time.Second), // 1s * 2^2 = 4s max.
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit for GitLab MR retries.
 		MaxAttempts:     4, // Initial attempt + 3 retries.
@@ -117,8 +118,8 @@ func GitLabMRPolicy() Policy {
 // This policy provides a base configuration; callers override MaxAttempts via Client.MaxRetries.
 func SSEStreamPolicy() Policy {
 	return Policy{
-		InitialInterval: 250 * time.Millisecond,
-		MaxInterval:     30 * time.Second, // Cap reconnect delay at 30s.
+		InitialInterval: types.Duration(250 * time.Millisecond),
+		MaxInterval:     types.Duration(30 * time.Second), // Cap reconnect delay at 30s.
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit; rely on MaxRetries or context cancellation.
 		MaxAttempts:     0, // Unlimited by default; use Client.MaxRetries to cap.
@@ -130,8 +131,8 @@ func SSEStreamPolicy() Policy {
 // Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
 func (p Policy) NewExponentialBackoff() *backoff.ExponentialBackOff {
 	eb := backoff.NewExponentialBackOff()
-	eb.InitialInterval = p.InitialInterval
-	eb.MaxInterval = p.MaxInterval
+	eb.InitialInterval = time.Duration(p.InitialInterval)
+	eb.MaxInterval = time.Duration(p.MaxInterval)
 	eb.Multiplier = p.Multiplier
 	eb.RandomizationFactor = 0.5 // 50% jitter for robustness.
 	return eb
@@ -157,7 +158,7 @@ func RunWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, op 
 		opts = append(opts, backoff.WithMaxTries(uint(policy.MaxAttempts)))
 	}
 	if policy.MaxElapsedTime > 0 {
-		opts = append(opts, backoff.WithMaxElapsedTime(policy.MaxElapsedTime))
+		opts = append(opts, backoff.WithMaxElapsedTime(time.Duration(policy.MaxElapsedTime)))
 	}
 
 	// Add notify callback for logging.
@@ -203,7 +204,7 @@ func PollWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, co
 		opts = append(opts, backoff.WithMaxTries(uint(policy.MaxAttempts)))
 	}
 	if policy.MaxElapsedTime > 0 {
-		opts = append(opts, backoff.WithMaxElapsedTime(policy.MaxElapsedTime))
+		opts = append(opts, backoff.WithMaxElapsedTime(time.Duration(policy.MaxElapsedTime)))
 	}
 
 	// Track attempts for logging.
@@ -255,7 +256,7 @@ func PollWithBackoff(ctx context.Context, policy Policy, logger *slog.Logger, co
 // GetDuration() returns the current or next backoff interval.
 type StatefulBackoff struct {
 	eb      *backoff.ExponentialBackOff
-	current time.Duration
+	current types.Duration
 	started bool
 }
 
@@ -272,7 +273,7 @@ func NewStatefulBackoff(policy Policy) *StatefulBackoff {
 // Apply triggers backoff, advancing to the next interval.
 // Should be called on retry-triggering events (errors, no work available).
 // Returns the new backoff duration.
-func (s *StatefulBackoff) Apply() time.Duration {
+func (s *StatefulBackoff) Apply() types.Duration {
 	// Always get the next backoff duration (this advances the internal state).
 	next := s.eb.NextBackOff()
 	if next == backoff.Stop {
@@ -280,9 +281,9 @@ func (s *StatefulBackoff) Apply() time.Duration {
 		if s.current > 0 {
 			return s.current
 		}
-		return s.eb.MaxInterval
+		return types.Duration(s.eb.MaxInterval)
 	}
-	s.current = next
+	s.current = types.Duration(next)
 	s.started = true
 	return s.current
 }
@@ -297,9 +298,9 @@ func (s *StatefulBackoff) Reset() {
 
 // GetDuration returns the current backoff duration.
 // If backoff has not been applied, returns the initial interval.
-func (s *StatefulBackoff) GetDuration() time.Duration {
+func (s *StatefulBackoff) GetDuration() types.Duration {
 	if !s.started {
-		return s.eb.InitialInterval
+		return types.Duration(s.eb.InitialInterval)
 	}
 	return s.current
 }
