@@ -42,6 +42,10 @@ set -euo pipefail
 # CONFIGURATION
 ################################################################################
 
+# Default to the local Docker cluster descriptor written by scripts/deploy-locally.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 # Locate ploy binary (check multiple possible locations).
 PLOY_BIN=""
 for candidate in "../../../../dist/ploy" "./dist/ploy" "dist/ploy"; do
@@ -82,6 +86,7 @@ echo "=========================================="
 echo "E2E: Post-Mod Gate Healing Scenario"
 echo "=========================================="
 echo "Ploy binary:     $PLOY_BIN"
+echo "PLOY_CONFIG_HOME: $PLOY_CONFIG_HOME"
 echo "Repo URL:        $REPO_URL"
 echo "Base ref:        $REPO_BASE_REF"
 echo "Target ref:      $REPO_TARGET_REF"

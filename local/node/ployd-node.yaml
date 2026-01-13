@@ -1,5 +1,5 @@
 server_url: "http://server:8080"
-node_id: "LOCAL01"
+node_id: "local1"
 cluster_id: "local-dev"
 
 http:

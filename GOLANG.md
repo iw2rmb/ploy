@@ -77,7 +77,7 @@ go test ./internal/worker/lifecycle -run 'DockerChecker' -v
 
 ### Cross-References
 
-- Cluster deployment: `docs/how-to/deploy-a-cluster.md`
+- Local Docker cluster: `docs/how-to/deploy-locally.md`
 - Environment variables: `docs/envs/README.md`
 - Container runtime: `internal/workflow/runtime/step/container_docker.go`
 - Health checker: `internal/worker/lifecycle/health.go`

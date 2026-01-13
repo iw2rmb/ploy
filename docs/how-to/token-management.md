@@ -1,13 +1,12 @@
 # Token Management Guide
 
-This guide covers bearer token authentication in Ploy, including how to create, list, and revoke tokens for CLI access and node provisioning.
+This guide covers bearer token authentication in Ploy, including how to create, list, and revoke tokens for CLI access.
 
 ## Overview
 
 Ploy uses JWT-based bearer tokens for authentication:
 
 - **API Tokens**: Long-lived tokens for CLI authentication (default: 365 days)
-- **Bootstrap Tokens**: Short-lived, single-use tokens for node provisioning (default: 15 minutes)
 
 ## Token Types
 
@@ -22,24 +21,13 @@ API tokens are used by the CLI to authenticate with the control plane. Each toke
 
 API tokens are stored in the `api_tokens` table in PostgreSQL.
 
-### Bootstrap Tokens
-
-Bootstrap tokens are used during node provisioning. They:
-
-- Are tied to a specific `node_id`
-- Expire after 15 minutes (configurable)
-- Can only be used once
-- Are automatically marked as used after certificate issuance
-
-Bootstrap tokens are stored in the `bootstrap_tokens` table in PostgreSQL.
-
 ## Roles
 
 Ploy supports three roles:
 
-- **`cli-admin`**: Full administrative access, including token management and node provisioning
-- **control-plane`**: Standard CLI access for running Mods and viewing cluster state
-- **`worker`**: Node agent role (automatically assigned to bootstrap tokens)
+- **`cli-admin`**: Full administrative access, including token management
+- **`control-plane`**: Standard CLI access for running Mods and viewing cluster state
+- **`worker`**: Node agent role
 
 ## Managing API Tokens
 
@@ -119,14 +107,14 @@ ploy cluster token revoke abc123 --confirm
 
 ### CLI Configuration
 
-Store your token in the cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json`:
+Store your token in the cluster descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
+The local Docker cluster uses `PLOY_CONFIG_HOME="$PWD/local/cli"` and `address: "http://localhost:8080"`.
 
 ```json
 {
-  "cluster_id": "alpha-cluster",
-  "address": "https://ploy.example.com",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "ssh_identity_path": "~/.ssh/id_ed25519"
+  "cluster_id": "local",
+  "address": "http://localhost:8080",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -160,46 +148,10 @@ deploy:
   run: ploy mod run --repo-url ${{ github.repositoryUrl }} --follow
 ```
 
-## Bootstrap Tokens
+## Worker Node Authentication (Local Docker)
 
-Bootstrap tokens are managed automatically by the CLI during node provisioning. You typically don't need to create them manually.
-
-### How Bootstrap Tokens Work
-
-When you run `ploy cluster node add`:
-
-1. CLI generates a unique `node_id`
-2. CLI requests a bootstrap token from `POST /v1/bootstrap/tokens`
-3. CLI writes the token to `/run/ploy/bootstrap-token` on the target host
-4. Node agent reads the token, generates a CSR, and exchanges it for a certificate
-5. Token is marked as used and deleted from the node
-
-### Creating a Bootstrap Token Manually
-
-In rare cases, you may need to create a bootstrap token manually:
-
-```bash
-# This endpoint is not exposed via CLI; use direct API call
-curl -X POST https://ploy.example.com/v1/bootstrap/tokens \
-  -H "Authorization: Bearer $PLOY_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "node_id": "aB3xY9",
-    "expires_in_minutes": 15
-  }'
-```
-
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "node_id": "aB3xY9",
-  "expires_at": "2025-11-19T12:15:00Z"
-}
-```
-
-**Note:** Node IDs are NanoID(6) strings — 6 characters from the URL-safe alphabet (A-Za-z0-9_-).
-This compact format balances brevity with sufficient uniqueness for typical cluster sizes.
+In the local Docker cluster, the worker node uses a long-lived bearer token stored at
+`/etc/ploy/bearer-token` in the node container. `scripts/deploy-locally.sh` provisions this token.
 
 ## Token Security
 
@@ -228,12 +180,6 @@ SELECT token_id, role, description, issued_at, last_used_at
 FROM api_tokens
 WHERE last_used_at < NOW() - INTERVAL '30 days'
   AND revoked_at IS NULL;
-
--- View recent bootstrap token activity
-SELECT node_id, issued_at, used_at, cert_issued_at
-FROM bootstrap_tokens
-WHERE issued_at > NOW() - INTERVAL '7 days'
-ORDER BY issued_at DESC;
 ```
 
 ## Troubleshooting
@@ -272,15 +218,6 @@ Your token's role doesn't allow the requested operation. For example:
 - `control-plane` tokens cannot sign certificates (requires `cli-admin`)
 
 Create a new token with the appropriate role or contact an admin.
-
-### Bootstrap token already used
-
-Bootstrap tokens are single-use. If node provisioning fails after the token is used, you need to:
-
-1. Request a new bootstrap token
-2. Retry the provisioning
-
-The `ploy cluster node add` command handles this automatically by requesting a fresh token for each attempt.
 
 ## API Reference
 
@@ -346,59 +283,8 @@ Revoke an API token.
 }
 ```
 
-### POST /v1/bootstrap/tokens
-
-Create a bootstrap token for node provisioning.
-
-**Authorization**: `control-plane` or `cli-admin` role required
-
-**Request:**
-```json
-{
-  "node_id": "aB3xY9",
-  "expires_in_minutes": 15
-}
-```
-
-**Note:** Node IDs are NanoID(6) strings — 6 characters from the URL-safe alphabet (A-Za-z0-9_-).
-
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "node_id": "aB3xY9",
-  "expires_at": "2025-11-19T12:15:00Z"
-}
-```
-
-### POST /v1/pki/bootstrap
-
-Exchange a bootstrap token for a node certificate.
-
-**Authorization**: Bootstrap token in `Authorization: Bearer` header
-
-**Request:**
-```json
-{
-  "csr": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBATCBqAIBADBb..."
-}
-```
-
-**Response:**
-```json
-{
-  "certificate": "-----BEGIN CERTIFICATE-----\nMIICEjCCAXugAwIBAgIRAL...",
-  "ca_bundle": "-----BEGIN CERTIFICATE-----\nMIIBkTCCATigAwIBAgIQaW...",
-  "serial": "12345",
-  "fingerprint": "SHA256:abc123...",
-  "not_before": "2025-11-19T12:00:00Z",
-  "not_after": "2026-11-19T12:00:00Z"
-}
-```
-
 ## Related Documentation
 
-- [Deploy a Cluster](deploy-a-cluster.md) - Full deployment guide with bootstrap token flow
 - [Deploy Locally](deploy-locally.md) - Local Docker development setup
 - [Environment Variables](../envs/README.md) - Configuration reference
 - [Troubleshooting Guide](bearer-token-troubleshooting.md) - Common authentication issues

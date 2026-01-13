@@ -13,9 +13,7 @@ All files referenced live under `local/` and were added to the repo:
 **Note**: As of the bearer token authentication migration, this deployment uses:
 - **Bearer tokens** for CLI authentication (instead of mTLS client certificates)
 - **Bearer tokens** for worker (node) authentication against the control plane
-- **Plain HTTP** for ployd in this Docker stack (HTTPS termination is expected at a load balancer in VPS deployments)
-
-See also: `docs/how-to/deploy-a-cluster.md` (server/node on VPS) and `docs/envs/README.md` (env vars).
+- **Plain HTTP** for ployd in this Docker stack
 
 ## Prerequisites
 
@@ -180,7 +178,6 @@ docker compose -f local/docker-compose.yml down -v
 - **Docker socket permission**: the `node` service mounts `/var/run/docker.sock`; ensure Docker Desktop is running.
 - **Authentication errors**: Ensure `PLOY_AUTH_SECRET` is set when starting the server and matches across restarts.
 - **Token validation failures**: Check that the token is correctly formatted as a JWT and hasn't expired.
-- **Node bootstrap failures**: Verify the bootstrap token hasn't expired (default: 15 minutes) and hasn't been used already.
 - **Logs**:
   - Server: `docker compose -f local/docker-compose.yml logs -f server`
   - Node: `docker compose -f local/docker-compose.yml logs -f node`
@@ -207,4 +204,4 @@ See `docs/how-to/token-management.md` for detailed token management guide.
 
 ---
 
-This local setup is for development only. For VPS deployment, use `dist/ploy cluster deploy` and `dist/ploy cluster node add` as documented in `docs/how-to/deploy-a-cluster.md`.
+This local Docker setup is the supported environment for development and tests.

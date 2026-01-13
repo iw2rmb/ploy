@@ -96,4 +96,4 @@ go test -race -cover ./internal/nodeagent/...
 
 ## Next Steps
 
-See `docs/how-to/deploy-a-cluster.md` and `docs/how-to/update-a-cluster.md`.
+See `docs/how-to/deploy-locally.md`.

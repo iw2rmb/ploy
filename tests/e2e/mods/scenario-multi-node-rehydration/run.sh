@@ -30,6 +30,10 @@
 
 set -euo pipefail
 
+# Default to the local Docker cluster descriptor written by scripts/deploy-locally.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 ################################################################################
 # CONFIGURATION
 ################################################################################
@@ -233,9 +237,9 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   fi
 
   echo "Next steps:"
-  echo "  - Review control plane logs: journalctl -u ployd-server -f"
-  echo "  - Review node logs: journalctl -u ployd-node -f"
-  echo "  - Check run status: dist/ploy run status <run-id>"
+  echo "  - Review control plane logs: docker compose -f local/docker-compose.yml logs -f server"
+  echo "  - Review node logs: docker compose -f local/docker-compose.yml logs -f node"
+  echo "  - Check run status: PLOY_CONFIG_HOME=$PLOY_CONFIG_HOME dist/ploy run status <run-id>"
   echo ""
 fi
 

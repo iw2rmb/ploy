@@ -11,7 +11,7 @@ Verify your request is using bearer token authentication:
 ```bash
 # Correct format
 curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-     https://ploy.example.com/health
+     http://localhost:8080/health
 
 # Incorrect formats (will fail)
 curl -H "Authorization: eyJ..."  # Missing "Bearer " prefix
@@ -51,7 +51,7 @@ echo "eyJjbHVzdGVyX2lkIjoiYWxwaGEtY2x1c3RlciIsInJvbGUiOiJjb250cm9sLXBsYW5lIiwidG
 Check:
 - `exp` (expiration) is in the future: `date -r 1745256000` (Unix timestamp)
 - `role` matches your expected permissions
-- `token_type` is `"api"` for CLI tokens or `"bootstrap"` for node tokens
+- `token_type` is `"api"`
 
 ## Common Errors
 
@@ -62,10 +62,10 @@ Check:
 **Solution**:
 1. Ensure the CLI descriptor contains a valid token:
    ```bash
-   cat ~/.config/ploy/clusters/default
+   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/clusters/default"
    # Should show the cluster ID
 
-   cat ~/.config/ploy/clusters/<cluster-id>.json
+   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/clusters/<cluster-id>.json"
    # Should contain "token": "eyJ..."
    ```
 
@@ -74,7 +74,7 @@ Check:
   # If you have existing admin access
    ploy cluster token create --role cli-admin --expires 365
 
-   # Otherwise, contact your cluster admin or bootstrap a new token
+   # Otherwise, contact your cluster admin or create a new token
    ```
 
 3. Update the descriptor:
@@ -107,7 +107,7 @@ Check:
 
 2. Check server logs for signature validation errors:
    ```bash
-   journalctl -u ployd.service -n 50 | grep -i "token\|auth"
+   docker compose -f local/docker-compose.yml logs --tail=200 server | rg -i "token|auth|401|403" || true
    ```
 
 3. If the server's `PLOY_AUTH_SECRET` changed, all existing tokens are invalid. Create a new token using the updated secret or contact your cluster admin.
@@ -181,90 +181,14 @@ Check:
 
 3. If you don't have admin access, contact your cluster administrator.
 
-### Bootstrap Token Errors
-
-#### "bootstrap token expired"
-
-**Cause**: Bootstrap tokens expire after 15 minutes by default.
-
-**Solution**:
-
-The `ploy cluster node add` command automatically requests a fresh token, so this should be rare. If provisioning takes longer than 15 minutes:
-
-1. Increase the bootstrap token lifetime (requires server config change):
-   ```yaml
-   # /etc/ploy/ployd.yaml
-   auth:
-     bearer_tokens:
-       bootstrap_token_ttl: 30m  # Extend to 30 minutes
-   ```
-
-2. Restart the server:
-   ```bash
-   systemctl restart ployd.service
-   ```
-
-3. Retry `ploy cluster node add`.
-
-#### "bootstrap token already used"
-
-**Cause**: Bootstrap tokens are single-use and marked as used after successful certificate issuance.
-
-**Solution**:
-
-1. If node provisioning failed after the token was used, the CLI will automatically request a new token on retry.
-
-2. If manually provisioning, request a new bootstrap token:
-   ```bash
-   # Direct API call (not exposed via CLI)
-   curl -X POST https://ploy.example.com/v1/bootstrap/tokens \
-     -H "Authorization: Bearer $PLOY_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "node_id": "aB3xY9",
-       "expires_in_minutes": 15
-     }'
-   ```
-
-#### "CSR CN does not match bootstrap token node_id"
-
-**Cause**: The Certificate Signing Request (CSR) Common Name doesn't match the `node_id` in the bootstrap token.
-
-**Solution**:
-
-Ensure the CSR CN is formatted as `node:<node_id>`:
-
-```bash
-# Correct format (NanoID(6) - 6 characters from URL-safe alphabet A-Za-z0-9_-)
-CN=node:aB3xY9
-
-# Incorrect formats
-CN=aB3xY9           # Missing "node:" prefix
-CN=node-aB3xY9      # Wrong separator (hyphen instead of colon)
-```
-
-The `ploy cluster node add` command handles this automatically. If generating CSRs manually, use:
-
-```bash
-# NODE_ID is a NanoID(6) string (e.g., "aB3xY9")
-openssl req -new -key node.key -out node.csr -subj "/CN=node:$NODE_ID"
-```
-
-## Server-Side Debugging
+## Server-Side Debugging (Local Docker)
 
 ### Check Server Logs
 
 Monitor the server logs for authentication errors:
 
 ```bash
-# Real-time logs
-journalctl -u ployd.service -f
-
-# Recent authentication errors
-journalctl -u ployd.service -n 100 | grep -E "auth|token|401|403"
-
-# Successful authentications
-journalctl -u ployd.service -n 100 | grep "authenticated"
+docker compose -f local/docker-compose.yml logs -f server
 ```
 
 ### Verify Server Configuration
@@ -272,7 +196,7 @@ journalctl -u ployd.service -n 100 | grep "authenticated"
 Check the server's authentication configuration:
 
 ```bash
-cat /etc/ploy/ployd.yaml | grep -A 5 auth
+cat local/server/ployd.yaml | rg -n "auth|bearer" || true
 ```
 
 Expected output:
@@ -286,7 +210,7 @@ auth:
 Verify the environment variable is set:
 
 ```bash
-systemctl show ployd.service | grep PLOY_AUTH_SECRET
+docker compose -f local/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
 ```
 
 ### Check Database State
@@ -305,18 +229,6 @@ SELECT token_id, role, description, expires_at
 FROM api_tokens
 WHERE expires_at < NOW()
   AND revoked_at IS NULL;
-
--- Recent bootstrap token activity
-SELECT node_id, issued_at, used_at, expires_at, cert_issued_at
-FROM bootstrap_tokens
-WHERE issued_at > NOW() - INTERVAL '1 day'
-ORDER BY issued_at DESC;
-
--- Find unused bootstrap tokens
-SELECT node_id, issued_at, expires_at
-FROM bootstrap_tokens
-WHERE used_at IS NULL
-  AND expires_at > NOW();
 ```
 
 ### Validate JWT Secret
@@ -325,7 +237,7 @@ Ensure `PLOY_AUTH_SECRET` is consistent:
 
 ```bash
 # Check current secret (be careful not to log this!)
-sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
+docker compose -f local/docker-compose.yml exec -T server env | rg PLOY_AUTH_SECRET || true
 
 # If the secret changed, all tokens are invalid
 # Generate a new admin token manually via database or API
@@ -345,16 +257,12 @@ sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
    ```sql
    \d api_tokens
    -- Should show indexes on token_id and token_hash
-
-   \d bootstrap_tokens
-   -- Should show indexes on token_id and node_id
    ```
 
 2. Add missing indexes:
    ```sql
    CREATE INDEX IF NOT EXISTS idx_api_tokens_token_id ON api_tokens(token_id);
    CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
-   CREATE INDEX IF NOT EXISTS idx_bootstrap_tokens_token_id ON bootstrap_tokens(token_id);
    ```
 
 ### High Database Load
@@ -367,7 +275,7 @@ sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
 
 1. The server updates `last_used_at` asynchronously to avoid blocking requests. Verify this is working:
    ```bash
-   journalctl -u ployd.service | grep "last_used_at"
+   docker compose -f local/docker-compose.yml logs --tail=500 server | rg "last_used_at" || true
    ```
 
 2. If synchronous updates are blocking, check for database connection pool exhaustion:
@@ -398,7 +306,7 @@ sudo systemctl show ployd.service -p Environment | grep PLOY_AUTH_SECRET
 
 3. Review server logs for suspicious activity:
    ```bash
-   journalctl -u ployd.service | grep <token-id>
+   docker compose -f local/docker-compose.yml logs --tail=500 server | rg <token-id> || true
    ```
 
 4. Create a new token and update all systems using the old token.
@@ -448,8 +356,7 @@ New format (bearer token):
 {
   "cluster_id": "alpha-cluster",
   "address": "https://ploy.example.com",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "ssh_identity_path": "~/.ssh/id_ed25519"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -482,25 +389,12 @@ resp, _ := client.Do(req)
 
 ### Update Node Provisioning
 
-Nodes still use certificates after bootstrap, but the provisioning flow changes:
-
-**Old flow (mTLS)**:
-1. CLI generates node certificate locally
-2. CLI copies certificate to node via SSH
-3. Node uses certificate immediately
-
-**New flow (bootstrap token)**:
-1. CLI requests bootstrap token from server
-2. CLI writes token to node via SSH
-3. Node generates key+CSR locally
-4. Node exchanges token for certificate
-5. Node uses certificate for subsequent requests
-
-No code changes needed if using `ploy cluster node add`.
+In the local Docker cluster, the node authenticates to the control plane using
+the bearer token at `/etc/ploy/bearer-token`. `scripts/deploy-locally.sh` writes
+this file into the node container and restarts it.
 
 ## Related Documentation
 
 - [Token Management Guide](token-management.md) - Creating, listing, and revoking tokens
-- [Deploy a Cluster](deploy-a-cluster.md) - Full deployment guide
 - [Deploy Locally](deploy-locally.md) - Local development setup
 - [Environment Variables](../envs/README.md) - Configuration reference

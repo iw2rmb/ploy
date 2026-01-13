@@ -135,14 +135,6 @@ experiment-role-sep: ## Run role-separated TDD experiment (stub fails, impl pass
 codex-experiment-role-sep: ## Run experiment via Codex CLI (non-interactive)
 	@CODEX_BIN=$${CODEX_BIN:-codex} scripts/codex/role_sep_experiment.sh both
 
-.PHONY: vps-lab-walkthrough
-vps-lab-walkthrough: build ## Run VPS lab deployment walkthrough (requires SSH access to lab hosts)
-	@scripts/vps-lab-walkthrough.sh
-
-.PHONY: vps-lab-walkthrough-dry-run
-vps-lab-walkthrough-dry-run: build ## Validate VPS lab prerequisites without deploying
-	@scripts/vps-lab-walkthrough.sh --dry-run
-
 .PHONY: clean
 clean: ## Remove build artifacts
 	rm -rf $(BUILD_DIR)
@@ -166,6 +158,4 @@ help: ## Show available targets
 	@echo "  make test-untyped-contracts     # Run unit tests for untyped contracts guardrail"
 	@echo "  make ci-check                   # Run all CI checks locally (RED → GREEN workflow)"
 	@echo "  make pre-commit-install         # Install pre-commit hooks"
-	@echo "  make vps-lab-walkthrough        # Run VPS lab deployment walkthrough (requires SSH access)"
-	@echo "  make vps-lab-walkthrough-dry-run # Validate VPS lab prerequisites without deploying"
 	@echo "  make clean                      # Remove build artifacts"

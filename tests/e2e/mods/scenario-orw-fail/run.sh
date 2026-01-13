@@ -3,6 +3,9 @@ set -euo pipefail
 
 # E2E: ORW apply on failing branch -> Build Gate fails -> Healing via Codex -> re‑gate -> proceed.
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}
 
@@ -23,7 +26,7 @@ if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
   EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
 fi
 
-RUN=$(dist/ploy mod run --json \
+RUN=$("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
   --spec "$SPEC" \
@@ -33,7 +36,7 @@ RUN=$(dist/ploy mod run --json \
 
 if [[ -n "${RUN:-}" ]]; then
   # Print run summary for debugging; inspect subcommand has been removed.
-  dist/ploy run status "$RUN" || true
+  "$REPO_ROOT/dist/ploy" run status "$RUN" || true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

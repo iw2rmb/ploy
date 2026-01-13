@@ -23,6 +23,10 @@ set -euo pipefail
 #   PLOY_E2E_BATCH_RUN_DRY=1   - Dry run (print commands without executing)
 # =========================================================================
 
+# Default to the local Docker cluster descriptor written by scripts/deploy-locally.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 # Exit early if test is skipped.
 if [[ "${PLOY_E2E_SKIP_BATCH_RUN:-}" == "1" ]]; then
   echo "SKIP: scenario-batch-run (PLOY_E2E_SKIP_BATCH_RUN=1)"

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Default to the local Docker cluster descriptor written by scripts/deploy-locally.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 # E2E: Stack-aware image selection scenario.
 #
 # This scenario validates that Mods correctly resolves images from a stack-aware
