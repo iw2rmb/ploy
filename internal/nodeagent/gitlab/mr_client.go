@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/nodeagent/redact"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
@@ -54,7 +55,7 @@ type MRCreateRequest struct {
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 4 attempts).
 func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, error) {
 	if err := validateMRCreateRequest(req); err != nil {
-		return "", redactError(fmt.Errorf("invalid request: %w", err), req.PAT)
+		return "", redact.Error(fmt.Errorf("invalid request: %w", err), req.PAT)
 	}
 
 	// Create GitLab API client using the shared configuration helper.
@@ -66,7 +67,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		HTTPClient: c.httpClient,
 	})
 	if err != nil {
-		return "", redactError(fmt.Errorf("create gitlab client: %w", err), req.PAT)
+		return "", redact.Error(fmt.Errorf("create gitlab client: %w", err), req.PAT)
 	}
 
 	// Decode the URL-encoded project ID since the client-go library will re-encode it.
@@ -74,7 +75,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	// but the library expects unencoded strings (e.g., "org/project") and handles encoding internally.
 	projectID, err := url.PathUnescape(req.ProjectID)
 	if err != nil {
-		return "", redactError(fmt.Errorf("invalid project_id: %w", err), req.PAT)
+		return "", redact.Error(fmt.Errorf("invalid project_id: %w", err), req.PAT)
 	}
 
 	// Build merge request creation options using client-go types.
@@ -151,7 +152,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	})
 
 	if err != nil {
-		return "", redactError(err, req.PAT)
+		return "", redact.Error(err, req.PAT)
 	}
 
 	return webURL, nil
@@ -178,51 +179,6 @@ func validateMRCreateRequest(req MRCreateRequest) error {
 		return fmt.Errorf("target_branch is required")
 	}
 	return nil
-}
-
-// redactError replaces any occurrence of the PAT in error messages with [REDACTED].
-// It handles both literal PAT and URL-encoded variants.
-func redactError(err error, pat string) error {
-	if err == nil {
-		return nil
-	}
-	if pat == "" {
-		return err
-	}
-
-	msg := err.Error()
-
-	// Build a set of variants to redact: literal, query-escaped, path-escaped,
-	// and a minimal legacy replacement used in early code paths.
-	variants := map[string]struct{}{
-		pat: {},
-	}
-	if q := url.QueryEscape(pat); q != pat {
-		variants[q] = struct{}{}
-		// Some logs render spaces as %20 not "+"; include that form.
-		variants[strings.ReplaceAll(q, "+", "%20")] = struct{}{}
-	}
-	if p := url.PathEscape(pat); p != pat {
-		variants[p] = struct{}{}
-	}
-	// Legacy minimal encoding coverage.
-	variants[strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")] = struct{}{}
-
-	modified := false
-	for v := range variants {
-		if v == "" || v == msg {
-			continue
-		}
-		if strings.Contains(msg, v) {
-			msg = strings.ReplaceAll(msg, v, "[REDACTED]")
-			modified = true
-		}
-	}
-
-	if modified {
-		return fmt.Errorf("%s", msg)
-	}
-	return err
 }
 
 // ExtractProjectIDFromURL extracts the URL-encoded project ID from a GitLab HTTPS URL.

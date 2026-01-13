@@ -102,7 +102,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// POST /v1/nodes/{id}/claim
-	claimURL := fmt.Sprintf("%s/v1/nodes/%s/claim", c.cfg.ServerURL, c.cfg.NodeID)
+	apiPath := fmt.Sprintf("/v1/nodes/%s/claim", c.cfg.NodeID)
+	claimURL := MustBuildURL(c.cfg.ServerURL, apiPath)
 
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

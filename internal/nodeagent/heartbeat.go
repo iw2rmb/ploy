@@ -167,7 +167,7 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	reqCtx, cancel := context.WithTimeout(ctx, h.cfg.Heartbeat.Timeout)
 	defer cancel()
 
-	hbURL, err := buildURL(h.cfg.ServerURL, path.Join("/v1/nodes", url.PathEscape(h.cfg.NodeID.String()), "heartbeat"))
+	hbURL, err := BuildURL(h.cfg.ServerURL, path.Join("/v1/nodes", url.PathEscape(h.cfg.NodeID.String()), "heartbeat"))
 	if err != nil {
 		return fmt.Errorf("build heartbeat url: %w", err)
 	}
@@ -227,17 +227,4 @@ func (h *HeartbeatManager) applyBackoff(err error) {
 func (h *HeartbeatManager) resetBackoff() {
 	h.backoff.Reset()       // Reset shared backoff helper to initial state.
 	h.backoffActive = false // Deactivate backoff (no wait on next loop iteration).
-}
-
-// buildURL resolves a base URL and a path, preserving scheme/host.
-func buildURL(base, p string) (string, error) {
-	bu, err := url.Parse(base)
-	if err != nil {
-		return "", fmt.Errorf("parse base url: %w", err)
-	}
-	pu, err := url.Parse(p)
-	if err != nil {
-		return "", fmt.Errorf("parse path: %w", err)
-	}
-	return bu.ResolveReference(pu).String(), nil
 }

@@ -61,7 +61,8 @@ type diffListResponse struct {
 //
 // GET /v1/runs/{run_id}/repos/{repo_id}/diffs
 func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, repoID types.ModRepoID) ([]diffListItem, error) {
-	url := fmt.Sprintf("%s/v1/runs/%s/repos/%s/diffs", f.cfg.ServerURL, runID.String(), repoID.String())
+	apiPath := fmt.Sprintf("/v1/runs/%s/repos/%s/diffs", runID.String(), repoID.String())
+	url := MustBuildURL(f.cfg.ServerURL, apiPath)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

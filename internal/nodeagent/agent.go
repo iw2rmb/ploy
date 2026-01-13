@@ -105,9 +105,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		if err := a.heartbeat.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			wrappedErr := fmt.Errorf("heartbeat: %w", err)
 			select {
-			case errCh <- fmt.Errorf("heartbeat: %w", err):
+			case errCh <- wrappedErr:
 			default:
+				slog.Error("error channel full, dropping error", "component", "heartbeat", "error", err)
 			}
 		}
 	}()
@@ -116,9 +118,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		if err := a.claimer.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			wrappedErr := fmt.Errorf("claim loop: %w", err)
 			select {
-			case errCh <- fmt.Errorf("claim loop: %w", err):
+			case errCh <- wrappedErr:
 			default:
+				slog.Error("error channel full, dropping error", "component", "claim loop", "error", err)
 			}
 		}
 	}()

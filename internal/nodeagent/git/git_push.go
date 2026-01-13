@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/nodeagent/redact"
 )
 
 // PushOptions holds configuration for pushing a git branch.
@@ -44,18 +46,18 @@ func NewPusher() Pusher {
 // The PAT is never persisted to disk or embedded in the remote URL.
 func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 	if err := validatePushOptions(opts); err != nil {
-		return redactError(fmt.Errorf("invalid push options: %w", err), opts.PAT)
+		return redact.Error(fmt.Errorf("invalid push options: %w", err), opts.PAT)
 	}
 
 	// Configure git user identity.
 	if err := p.configureGitUser(ctx, opts.RepoDir, opts.UserName, opts.UserEmail); err != nil {
-		return redactError(fmt.Errorf("configure git user: %w", err), opts.PAT)
+		return redact.Error(fmt.Errorf("configure git user: %w", err), opts.PAT)
 	}
 
 	// Push the branch using HTTP extra header for authentication to avoid prompts and
 	// prevent writing secrets to disk. We pass the header via environment only.
 	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, opts.PAT, opts.RemoteURL); err != nil {
-		return redactError(err, opts.PAT)
+		return redact.Error(err, opts.PAT)
 	}
 
 	return nil
@@ -105,7 +107,7 @@ func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat, remote
 	// Equivalent to: git push https://oauth2:<token>@host/path.git HEAD:refs/heads/<targetRef>
 	refspec := "HEAD:refs/heads/" + targetRef
 	if err := runGitCommand(ctx, repoDir, nil, "push", u.String(), refspec); err != nil {
-		return redactError(fmt.Errorf("git push %s: %w", u.Host, err), pat)
+		return redact.Error(fmt.Errorf("git push %s: %w", u.Host, err), pat)
 	}
 	return nil
 }
@@ -134,53 +136,8 @@ func runGitCommand(ctx context.Context, dir string, env []string, args ...string
 			}
 		}
 		baseErr := fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))
-		return redactError(baseErr, pat)
+		return redact.Error(baseErr, pat)
 	}
 
 	return nil
-}
-
-// redactError replaces any occurrence of the PAT in error messages with [REDACTED].
-// It handles both literal PAT and URL-encoded variants.
-func redactError(err error, pat string) error {
-	if err == nil {
-		return nil
-	}
-	if pat == "" {
-		return err
-	}
-
-	msg := err.Error()
-
-	// Build a set of variants to redact: literal, query-escaped, path-escaped,
-	// and a minimal legacy replacement used in early code paths.
-	variants := map[string]struct{}{
-		pat: {},
-	}
-	if q := url.QueryEscape(pat); q != pat {
-		variants[q] = struct{}{}
-		// Some logs render spaces as %20 not "+"; include that form.
-		variants[strings.ReplaceAll(q, "+", "%20")] = struct{}{}
-	}
-	if p := url.PathEscape(pat); p != pat {
-		variants[p] = struct{}{}
-	}
-	// Legacy minimal encoding coverage.
-	variants[strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")] = struct{}{}
-
-	modified := false
-	for v := range variants {
-		if v == "" || v == msg {
-			continue
-		}
-		if strings.Contains(msg, v) {
-			msg = strings.ReplaceAll(msg, v, "[REDACTED]")
-			modified = true
-		}
-	}
-
-	if modified {
-		return fmt.Errorf("%s", msg)
-	}
-	return err
 }

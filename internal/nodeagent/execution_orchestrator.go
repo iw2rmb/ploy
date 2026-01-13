@@ -15,6 +15,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				"run_id", req.RunID,
 				"job_id", req.JobID,
 				"panic", p,
+				"stack", string(debug.Stack()),
 			)
 		}
 

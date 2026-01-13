@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -75,6 +76,23 @@ func (r *runController) createDiffGenerator() step.DiffGenerator {
 // DiffFetcher.FetchDiffsForStepRepo, which filters and sorts diffs by
 // (summary.step_index, created_at, id) before downloading patches.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
+	// Validate paths before proceeding.
+	if strings.TrimSpace(baseClonePath) == "" {
+		return fmt.Errorf("baseClonePath is empty")
+	}
+	if strings.TrimSpace(destWorkspace) == "" {
+		return fmt.Errorf("destWorkspace is empty")
+	}
+
+	// Verify baseClonePath exists and is a directory.
+	info, err := os.Stat(baseClonePath)
+	if err != nil {
+		return fmt.Errorf("baseClonePath validation failed: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("baseClonePath is not a directory: %s", baseClonePath)
+	}
+
 	// Step 1: Copy base clone to destination workspace.
 	// This creates a fresh workspace starting from the base snapshot (base_ref + optional commit_sha).
 	// Using the same copy logic as the git fetcher's cache reuse to ensure consistency.

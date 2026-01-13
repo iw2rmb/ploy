@@ -64,7 +64,8 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 	}
 
 	// Construct URL using job-scoped endpoint.
-	url := fmt.Sprintf("%s/v1/runs/%s/jobs/%s/artifact", u.cfg.ServerURL, runID.String(), jobID.String())
+	apiPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID.String(), jobID.String())
+	url := MustBuildURL(u.cfg.ServerURL, apiPath)
 
 	// Create HTTP request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))

@@ -152,8 +152,13 @@ func (ls *LogStreamer) flushLocked() error {
 	}
 
 	// Close the gzip writer to finalize the compressed data.
-	if err := ls.gzWriter.Close(); err != nil {
-		return fmt.Errorf("close gzip writer: %w", err)
+	// Always create a new writer afterwards, even on error, to prevent double-close
+	// if Close() is called later.
+	closeErr := ls.gzWriter.Close()
+	if closeErr != nil {
+		ls.buffer.Reset()
+		ls.gzWriter = gzip.NewWriter(&ls.buffer)
+		return fmt.Errorf("close gzip writer: %w", closeErr)
 	}
 
 	// Get the compressed data.
@@ -233,7 +238,8 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 	}
 
 	// Send to server endpoint using the node ID string directly.
-	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
+	apiPath := fmt.Sprintf("/v1/nodes/%s/logs", nodeID.String())
+	url := MustBuildURL(ls.cfg.ServerURL, apiPath)
 	// Create per-request context with timeout. We intentionally use context.Background()
 	// rather than a parent context because:
 	// 1. Log uploads should complete even if the job context is canceled

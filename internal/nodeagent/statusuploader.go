@@ -54,7 +54,8 @@ func (u *StatusUploader) UploadJobStatus(ctx context.Context, jobID types.JobID,
 	}
 
 	// Construct URL using job-level endpoint.
-	url := fmt.Sprintf("%s/v1/jobs/%s/complete", u.cfg.ServerURL, jobID)
+	apiPath := fmt.Sprintf("/v1/jobs/%s/complete", jobID)
+	url := MustBuildURL(u.cfg.ServerURL, apiPath)
 
 	// Use shared backoff policy for status upload retries.
 	policy := wfbackoff.StatusUploaderPolicy()
