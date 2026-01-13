@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -34,22 +33,10 @@ func NewDiffUploader(cfg Config) (*DiffUploader, error) {
 // The diff is associated with a specific job via the job_id parameter.
 // Step ordering is determined by the job's step_index in the database.
 func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
-	// Gzip the diff content.
-	var gzBuf bytes.Buffer
-	gzWriter := gzip.NewWriter(&gzBuf)
-	if _, err := gzWriter.Write(diffBytes); err != nil {
-		return fmt.Errorf("gzip diff: %w", err)
-	}
-	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("finalize gzip: %w", err)
-	}
-
-	gzippedDiff := gzBuf.Bytes()
-
-	// Check size cap (≤ 1 MiB gzipped).
-	const maxDiffSize = 1 << 20 // 1 MiB
-	if len(gzippedDiff) > maxDiffSize {
-		return fmt.Errorf("gzipped diff exceeds size cap: %d > %d bytes", len(gzippedDiff), maxDiffSize)
+	// Gzip and validate size using shared compression helper.
+	gzippedDiff, err := gzipCompress(diffBytes, "gzipped diff")
+	if err != nil {
+		return err
 	}
 
 	// Build request payload.

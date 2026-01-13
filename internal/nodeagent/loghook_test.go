@@ -126,7 +126,10 @@ func TestLogStreamer_WithCustomHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	ls.SetHook(upperHook)
 	defer func() { _ = ls.Close() }()
 
@@ -160,7 +163,10 @@ func TestLogStreamer_HookError(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	ls.SetHook(errorHook)
 	defer func() { _ = ls.Close() }()
 
@@ -193,7 +199,10 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	ls.SetHook(nilHook)
 	defer func() { _ = ls.Close() }()
 
@@ -215,7 +224,10 @@ func TestLogStreamer_DefaultHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	// Verify default hook is NoOpLogHook.
@@ -247,7 +259,10 @@ func TestLogStreamer_SetHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	// Create a custom hook.
@@ -294,7 +309,10 @@ func BenchmarkLogStreamer_WithNoOpHook(b *testing.B) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	if err != nil {
+		b.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	input := []byte("benchmark log line\n")

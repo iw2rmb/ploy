@@ -52,7 +52,10 @@ func TestLogStreamer_Write(t *testing.T) {
 			}
 			runID := types.NewRunID()
 			jobID := types.NewJobID()
-			ls := NewLogStreamer(cfg, runID, jobID)
+			ls, err := NewLogStreamer(cfg, runID, jobID)
+			if err != nil {
+				t.Fatalf("NewLogStreamer() failed: %v", err)
+			}
 			defer func() { _ = ls.Close() }()
 
 			n, err := ls.Write([]byte(tt.input))
@@ -78,7 +81,10 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	// Generate data that will compress to over 1 MiB.
@@ -145,10 +151,13 @@ func TestLogStreamer_Close(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 
 	// Write some data.
-	_, err := ls.Write([]byte("test log\n"))
+	_, err = ls.Write([]byte("test log\n"))
 	if err != nil {
 		t.Fatalf("Write() failed: %v", err)
 	}
@@ -176,11 +185,14 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	// Write a small amount of data.
-	_, err := ls.Write([]byte("test log\n"))
+	_, err = ls.Write([]byte("test log\n"))
 	if err != nil {
 		t.Fatalf("Write() failed: %v", err)
 	}
@@ -210,7 +222,10 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
 	defer func() { _ = ls.Close() }()
 
 	// Verify initial chunk number is 0.
@@ -325,10 +340,13 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: server.URL,
 			}
-			ls := NewLogStreamer(cfg, runID, tt.jobID)
+			ls, err := NewLogStreamer(cfg, runID, tt.jobID)
+			if err != nil {
+				t.Fatalf("NewLogStreamer() failed: %v", err)
+			}
 
 			// Write some data to the log streamer.
-			_, err := ls.Write([]byte("test log line for job_id verification\n"))
+			_, err = ls.Write([]byte("test log line for job_id verification\n"))
 			if err != nil {
 				t.Fatalf("Write() failed: %v", err)
 			}

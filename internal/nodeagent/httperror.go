@@ -6,6 +6,17 @@ import (
 	"net/http"
 )
 
+// drainAndClose drains any remaining data from the response body and closes it.
+// Draining ensures the underlying connection can be reused by the connection pool.
+// Without draining, the connection may be closed and a new one must be established.
+func drainAndClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
 // readErrorBody reads and returns the response body as a string.
 // If reading fails, returns a fallback message.
 func readErrorBody(resp *http.Response) string {

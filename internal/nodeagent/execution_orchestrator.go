@@ -37,6 +37,16 @@ import (
 // gates fail, not run inline by the node.
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	defer func() {
+		// Recover from panics to prevent job leaks and slot exhaustion.
+		// Log the panic and stack trace for debugging.
+		if p := recover(); p != nil {
+			slog.Error("executeRun panic recovered",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"panic", p,
+			)
+		}
+
 		r.mu.Lock()
 		// Use typed JobID directly as map key — no string conversion needed.
 		delete(r.jobs, req.JobID)
@@ -607,7 +617,10 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling
 	// per-job log attribution in the control plane.
-	logStreamer := NewLogStreamer(r.cfg, runID, jobID)
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID)
+	if err != nil {
+		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
+	}
 
 	// Assemble the step runner with all components.
 	runner := step.Runner{

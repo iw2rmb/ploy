@@ -72,11 +72,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Build stats with gate metadata.
 	stats := r.buildGateJobStats(gateResult, duration)
 
-	// Check if gate passed.
-	gatePassed := false
-	if gateResult != nil && len(gateResult.StaticChecks) > 0 {
-		gatePassed = gateResult.StaticChecks[0].Passed
-	}
+	// Check if gate passed using shared helper.
+	gatePassed := gateResultPassed(gateResult)
 
 	// Determine status and exit code.
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
@@ -271,12 +268,8 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 		DurationMs(duration.Milliseconds())
 
 	if gateResult != nil {
-		passed := false
-		if len(gateResult.StaticChecks) > 0 {
-			passed = gateResult.StaticChecks[0].Passed
-		}
 		// Use Gate helper for simple gate stats.
-		builder.Gate(passed, duration.Milliseconds())
+		builder.Gate(gateResultPassed(gateResult), duration.Milliseconds())
 
 		// Attach structured job metadata so the control plane can persist
 		// gate results in jobs.meta JSONB.
@@ -305,10 +298,8 @@ func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, res
 			DurationMs: durationMs,
 		}
 
-		// Determine pass/fail.
-		if meta != nil && len(meta.StaticChecks) > 0 {
-			phase.Passed = meta.StaticChecks[0].Passed
-		}
+		// Determine pass/fail using shared helper.
+		phase.Passed = gateResultPassed(meta)
 
 		// Attach resource usage metrics when available.
 		if meta != nil && meta.Resources != nil {

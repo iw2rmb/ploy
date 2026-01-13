@@ -135,13 +135,8 @@ func (r *runController) runGateWithHealing(
 		DurationMs: gateDuration.Milliseconds(),
 	}
 
-	// Check if gate passed.
-	gatePassed := false
-	if len(gateMetadata.StaticChecks) > 0 {
-		gatePassed = gateMetadata.StaticChecks[0].Passed
-	}
-
-	if gatePassed {
+	// Check if gate passed using shared helper.
+	if gateResultPassed(gateMetadata) {
 		slog.Info("gate passed", "run_id", req.RunID, "phase", gatePhase)
 		return initialGate, nil, nil
 	}
@@ -346,13 +341,8 @@ func (r *runController) runGateWithHealing(
 			DurationMs: regateDuration.Milliseconds(),
 		})
 
-		// Check if gate passed.
-		regatePassed := false
-		if len(reGateMetadata.StaticChecks) > 0 {
-			regatePassed = reGateMetadata.StaticChecks[0].Passed
-		}
-
-		if regatePassed {
+		// Check if gate passed using shared helper.
+		if gateResultPassed(reGateMetadata) {
 			slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
 			return initialGate, reGates, nil
 		}
