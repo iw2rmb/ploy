@@ -51,9 +51,19 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
-		// Return that all jobs (1 total) are now Success after completion.
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
-			{Status: store.JobStatusSuccess, Count: 1},
+		// All jobs (1 total) are now Success after completion.
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          jobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusSuccess,
+				ModType:     "mod",
+				StepIndex:   2000,
+			},
 		},
 		// All repos terminal (1 Success), so run becomes Finished.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
@@ -84,15 +94,15 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify CountJobsByRunRepoAttemptGroupByStatus was called to check repo terminal state.
-	if !st.countJobsByRunRepoAttemptGroupByStatusCalled {
-		t.Fatal("expected CountJobsByRunRepoAttemptGroupByStatus to be called")
+	// Verify ListJobsByRunRepoAttempt was called to check repo terminal state.
+	if !st.listJobsByRunRepoAttemptCalled {
+		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
 	}
-	if st.countJobsByRunRepoAttemptGroupByStatusParams.RunID != runID {
-		t.Errorf("expected run_id %s, got %s", runID, st.countJobsByRunRepoAttemptGroupByStatusParams.RunID)
+	if st.listJobsByRunRepoAttemptParams.RunID != runID {
+		t.Errorf("expected run_id %s, got %s", runID, st.listJobsByRunRepoAttemptParams.RunID)
 	}
-	if st.countJobsByRunRepoAttemptGroupByStatusParams.RepoID != repoID {
-		t.Errorf("expected repo_id %s, got %s", repoID, st.countJobsByRunRepoAttemptGroupByStatusParams.RepoID)
+	if st.listJobsByRunRepoAttemptParams.RepoID != repoID {
+		t.Errorf("expected repo_id %s, got %s", repoID, st.listJobsByRunRepoAttemptParams.RepoID)
 	}
 
 	// Verify UpdateRunRepoStatus was called to update repo to Success.
@@ -146,12 +156,20 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 			ID:     runID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:                   job,
-		listJobsByRunResult:            []store.Job{job},
-		listJobsByRunRepoAttemptResult: []store.Job{job},
-		// All jobs terminal: 1 Fail.
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
-			{Status: store.JobStatusFail, Count: 1},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          jobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusFail,
+				ModType:     "mod",
+				StepIndex:   2000,
+			},
 		},
 		// All repos terminal.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
@@ -240,10 +258,29 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		getJobResult:          job1,
 		listJobsByRunResult:   []store.Job{job1, job2},
 		scheduleNextJobResult: job2,
-		// 1 Success, 1 Created => not all terminal.
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
-			{Status: store.JobStatusSuccess, Count: 1},
-			{Status: store.JobStatusCreated, Count: 1},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          jobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "pre-gate",
+				Status:      store.JobStatusSuccess,
+				ModType:     "pre_gate",
+				StepIndex:   1000,
+			},
+			{
+				ID:          nextJobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusCreated,
+				ModType:     "mod",
+				StepIndex:   2000,
+			},
 		},
 	}
 
@@ -283,6 +320,135 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	// Verify next job was scheduled.
 	if !st.scheduleNextJobCalled {
 		t.Fatal("expected ScheduleNextJob to be called")
+	}
+}
+
+// TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
+// terminal, run_repos.status is derived from the terminal status of the last job
+// (highest step_index), ignoring earlier failures.
+func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	repoID := domaintypes.NewModRepoID()
+
+	// Complete the last job (post-gate) successfully. Earlier gate failure exists.
+	postGateJob := store.Job{
+		ID:          jobID,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeID,
+		Name:        "post-gate",
+		Status:      store.JobStatusRunning,
+		ModType:     "post_gate",
+		StepIndex:   3000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        postGateJob,
+		listJobsByRunResult: []store.Job{postGateJob},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			// Earlier pre-gate failure (healed later).
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "pre-gate",
+				Status:      store.JobStatusFail,
+				ModType:     "pre_gate",
+				StepIndex:   1000,
+			},
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "heal-1-0",
+				Status:      store.JobStatusSuccess,
+				ModType:     "heal",
+				StepIndex:   1500,
+			},
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "re-gate-1",
+				Status:      store.JobStatusSuccess,
+				ModType:     "re_gate",
+				StepIndex:   1750,
+			},
+			{
+				ID:          domaintypes.NewJobID(),
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusSuccess,
+				ModType:     "mod",
+				StepIndex:   2000,
+			},
+			// Last job: post-gate succeeded.
+			{
+				ID:          jobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "post-gate",
+				Status:      store.JobStatusSuccess,
+				ModType:     "post_gate",
+				StepIndex:   3000,
+			},
+		},
+		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+			{Status: store.RunRepoStatusSuccess, Count: 1},
+		},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeIDStr,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !st.updateRunRepoStatusCalled {
+		t.Fatal("expected UpdateRunRepoStatus to be called")
+	}
+	lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
+	if lastRepoUpdate.Status != store.RunRepoStatusSuccess {
+		t.Errorf("expected repo status Success, got %s", lastRepoUpdate.Status)
 	}
 }
 
