@@ -23,8 +23,8 @@ ORDER BY created_at ASC, repo_id ASC;
 -- finished_at: set when transitioning to a terminal status.
 UPDATE run_repos
 SET status = $3,
-    started_at = CASE WHEN $3 = 'Running' AND started_at IS NULL THEN now() ELSE started_at END,
-    finished_at = CASE WHEN $3 IN ('Success', 'Fail', 'Cancelled') THEN COALESCE(finished_at, now()) ELSE finished_at END
+    started_at = CASE WHEN $3 = 'Running'::run_repo_status AND started_at IS NULL THEN now() ELSE started_at END,
+    finished_at = CASE WHEN $3 IN ('Success'::run_repo_status, 'Fail'::run_repo_status, 'Cancelled'::run_repo_status) THEN COALESCE(finished_at, now()) ELSE finished_at END
 WHERE run_id = $1 AND repo_id = $2;
 
 -- name: UpdateRunRepoError :exec

@@ -230,7 +230,7 @@ const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2,
     finished_at = CASE
-      WHEN $2 IN ('Cancelled', 'Finished') THEN COALESCE(finished_at, now())
+      WHEN $2 IN ('Cancelled'::run_status, 'Finished'::run_status) THEN COALESCE(finished_at, now())
       ELSE NULL
     END
 WHERE id = $1
