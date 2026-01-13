@@ -21,9 +21,8 @@ import (
 // - MR jobs (mod_type='mr') are excluded from terminal computation.
 //
 // Terminal status derivation rules:
-// - Success: all jobs completed with status=Success
-// - Fail: any job completed with status=Fail
-// - Cancelled: all jobs are terminal and at least one is Cancelled (no Fail)
+// - Cancelled: if the last job is Cancelled
+// - Otherwise: equal to the status of the last job
 //
 // Returns true if the repo status was updated to terminal, false otherwise.
 func maybeUpdateRunRepoStatus(
@@ -33,73 +32,58 @@ func maybeUpdateRunRepoStatus(
 	repoID domaintypes.ModRepoID,
 	attempt int32,
 ) (bool, error) {
-	// Count jobs by status for this repo attempt, excluding MR jobs.
-	// MR jobs are auxiliary post-run jobs that must not affect run_repos/runs status.
-	counts, err := st.CountJobsByRunRepoAttemptGroupByStatus(ctx, store.CountJobsByRunRepoAttemptGroupByStatusParams{
+	// List jobs for this repo attempt and compute terminal status from the last job
+	// (highest step_index), excluding MR jobs.
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
 		RunID:   runID,
 		RepoID:  repoID,
 		Attempt: attempt,
 	})
 	if err != nil {
-		return false, fmt.Errorf("count jobs by repo attempt: %w", err)
+		return false, fmt.Errorf("list jobs by repo attempt: %w", err)
 	}
 
-	// If no jobs (excluding MR), nothing to compute.
-	if len(counts) == 0 {
-		return false, nil
-	}
+	var lastJob *store.Job
+	for i := range jobs {
+		job := &jobs[i]
 
-	// Tally job statuses to determine if repo is terminal.
-	var (
-		total        int32
-		terminal     int32
-		anySuccess   bool
-		anyFail      bool
-		anyCancelled bool
-	)
-	for _, row := range counts {
-		total += row.Count
-		switch row.Status {
-		case store.JobStatusSuccess:
-			terminal += row.Count
-			anySuccess = true
-		case store.JobStatusFail:
-			terminal += row.Count
-			anyFail = true
-		case store.JobStatusCancelled:
-			terminal += row.Count
-			anyCancelled = true
+		mt := domaintypes.ModType(job.ModType)
+		if mt.Validate() == nil && mt == domaintypes.ModTypeMR {
+			continue
 		}
-		// Created, Queued, Running are non-terminal
+
+		// If any non-MR job is non-terminal, the repo attempt is still in progress.
+		switch job.Status {
+		case store.JobStatusSuccess, store.JobStatusFail, store.JobStatusCancelled:
+			// terminal
+		default:
+			return false, nil
+		}
+
+		if !job.StepIndex.Valid() {
+			return false, fmt.Errorf("invalid step_index for job_id=%s step_index=%v", job.ID, float64(job.StepIndex))
+		}
+
+		if lastJob == nil || job.StepIndex.Float64() > lastJob.StepIndex.Float64() {
+			lastJob = job
+		}
 	}
 
-	// If not all jobs are terminal, repo is still in progress.
-	if terminal < total {
+	if lastJob == nil {
 		return false, nil
 	}
 
-	// All jobs are terminal; derive repo status.
-	// Priority: Fail > Cancelled > Success (per v1 rules).
 	var repoStatus store.RunRepoStatus
-	switch {
-	case anyFail:
-		// Any failure means repo failed.
-		repoStatus = store.RunRepoStatusFail
-	case anyCancelled:
-		// No failures but some cancelled means repo cancelled.
-		repoStatus = store.RunRepoStatusCancelled
-	case anySuccess:
-		// All jobs succeeded means repo succeeded.
+	switch lastJob.Status {
+	case store.JobStatusSuccess:
 		repoStatus = store.RunRepoStatusSuccess
+	case store.JobStatusFail:
+		repoStatus = store.RunRepoStatusFail
+	case store.JobStatusCancelled:
+		repoStatus = store.RunRepoStatusCancelled
 	default:
-		// Should not happen if we have terminal jobs, but guard against edge cases.
-		slog.Warn("maybeUpdateRunRepoStatus: unexpected job status distribution",
-			"run_id", runID,
-			"repo_id", repoID,
-			"attempt", attempt,
-			"counts", counts,
-		)
-		return false, nil
+		// Should be unreachable due to terminal guard above.
+		return false, fmt.Errorf("unexpected last job status %q for job_id=%s", lastJob.Status, lastJob.ID)
 	}
 
 	// Update run_repos.status and finished_at timestamp.
