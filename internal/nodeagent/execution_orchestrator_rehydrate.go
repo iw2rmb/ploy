@@ -145,7 +145,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	// only the changes from this step, not cumulative changes from prior steps.
 	if len(gzippedDiffs) > 0 {
 		if err := ensureBaselineCommitForRehydration(ctx, workspacePath, stepIndex); err != nil {
-			_ = os.RemoveAll(workspacePath)
+			if rmErr := os.RemoveAll(workspacePath); rmErr != nil {
+				slog.Warn("failed to remove workspace after baseline commit error", "path", workspacePath, "error", rmErr)
+			}
 			return "", fmt.Errorf("create baseline commit for rehydration: %w", err)
 		}
 		slog.Info("baseline commit created for incremental diff", "run_id", runID, "step_index", stepIndex)

@@ -75,7 +75,9 @@ func (r *runController) initJobExecutionContext(ctx context.Context, runID types
 
 	// Cleanup function closes logStreamer.
 	cleanup := func() {
-		_ = logStreamer.Close()
+		if err := logStreamer.Close(); err != nil {
+			slog.Warn("failed to close log streamer", "run_id", runID, "job_id", jobID, "error", err)
+		}
 	}
 
 	return execCtx, cleanup, nil
@@ -101,7 +103,11 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	if err != nil {
 		return fmt.Errorf("create temp dir %s: %w", prefix, err)
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			slog.Warn("failed to remove temp dir", "path", dir, "error", err)
+		}
+	}()
 
 	return fn(dir)
 }
@@ -154,13 +160,19 @@ func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffT
 	if err := copyGitClone(workspace, snapshotDir); err != nil {
 		slog.Warn(fmt.Sprintf("%s: failed to snapshot baseline workspace", jobTypeStr),
 			"run_id", runID, "job_id", jobID, "error", err)
-		_ = os.RemoveAll(snapshotDir)
+		if rmErr := os.RemoveAll(snapshotDir); rmErr != nil {
+			slog.Warn("failed to remove snapshot dir after copy failure", "path", snapshotDir, "error", rmErr)
+		}
 		return snapshotResult{dir: "", cleanup: func() {}}
 	}
 
 	return snapshotResult{
-		dir:     snapshotDir,
-		cleanup: func() { _ = os.RemoveAll(snapshotDir) },
+		dir: snapshotDir,
+		cleanup: func() {
+			if err := os.RemoveAll(snapshotDir); err != nil {
+				slog.Warn("failed to remove snapshot dir", "path", snapshotDir, "error", err)
+			}
+		},
 	}
 }
 
@@ -200,7 +212,11 @@ func (r *runController) rehydrateWorkspaceWithCleanup(
 
 	return workspaceRehydrationResult{
 		workspace: workspace,
-		cleanup:   func() { _ = os.RemoveAll(workspace) },
+		cleanup: func() {
+			if err := os.RemoveAll(workspace); err != nil {
+				slog.Warn("failed to remove workspace", "path", workspace, "error", err)
+			}
+		},
 	}, nil
 }
 

@@ -3,10 +3,15 @@ package nodeagent
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
+
+// MaxConcurrency is the maximum allowed concurrency for job execution.
+// This prevents excessive resource consumption from misconfigured values.
+const MaxConcurrency = 64
 
 // runController implements the RunController interface for managing runs.
 // Runs are tracked by job_id (not run_id) to support multiple jobs per run.
@@ -73,6 +78,14 @@ func (r *runController) initJobSem() {
 	capacity := r.cfg.Concurrency
 	if capacity < 1 {
 		capacity = 1
+	}
+	// Cap at MaxConcurrency to prevent excessive resource consumption.
+	if capacity > MaxConcurrency {
+		slog.Warn("concurrency exceeds maximum, capping",
+			"configured", capacity,
+			"max", MaxConcurrency,
+		)
+		capacity = MaxConcurrency
 	}
 	r.jobSem = make(chan struct{}, capacity)
 }

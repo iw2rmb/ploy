@@ -15,7 +15,7 @@ import (
 
 // TestBuildURLBasic verifies basic URL construction from server base and path.
 func TestBuildURLBasic(t *testing.T) {
-	u, err := buildURL("http://server.example.com:8080", "/v1/nodes/x/heartbeat")
+	u, err := BuildURL("http://server.example.com:8080", "/v1/nodes/x/heartbeat")
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestBuildURLBasic(t *testing.T) {
 
 // TestBuildURLTrailingSlash verifies URL construction handles trailing slashes correctly.
 func TestBuildURLTrailingSlash(t *testing.T) {
-	u, err := buildURL("http://server.example.com:8080/", "/v1/foo")
+	u, err := BuildURL("http://server.example.com:8080/", "/v1/foo")
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestBuildURLEscapesNodeID(t *testing.T) {
 	base := "http://server.example.com:8080"
 	nodeID := "node/01 abc"
 	p := path.Join("/v1/nodes", url.PathEscape(nodeID), "heartbeat")
-	u, err := buildURL(base, p)
+	u, err := BuildURL(base, p)
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}

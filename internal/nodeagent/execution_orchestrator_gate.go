@@ -49,7 +49,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
-	defer func() { _ = os.RemoveAll(workspace) }()
+	defer func() {
+		if err := os.RemoveAll(workspace); err != nil {
+			slog.Warn("failed to remove workspace", "path", workspace, "error", err)
+		}
+	}()
 
 	// Run the build gate.
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
