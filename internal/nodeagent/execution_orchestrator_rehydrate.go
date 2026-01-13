@@ -110,7 +110,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 
 	diffFetcher, err := NewDiffFetcher(r.cfg)
 	if err != nil {
-		_ = os.RemoveAll(workspacePath)
+		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
+			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
+		}
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
@@ -119,7 +121,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
 	gzippedDiffs, err := diffFetcher.FetchDiffsForStepRepo(ctx, req.RunID, repoID, stepIndex-1)
 	if err != nil {
-		_ = os.RemoveAll(workspacePath)
+		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
+			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
+		}
 		return "", fmt.Errorf("fetch diffs for step: %w", err)
 	}
 
@@ -127,7 +131,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
 	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
-		_ = os.RemoveAll(workspacePath)
+		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
+			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
+		}
 		return "", fmt.Errorf("rehydrate from base and diffs: %w", err)
 	}
 

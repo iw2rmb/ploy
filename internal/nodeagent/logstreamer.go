@@ -17,13 +17,14 @@ import (
 )
 
 const (
-	// maxChunkSize is the maximum size of a gzipped log chunk (1 MiB).
-	maxChunkSize = 1 << 20
-	// softChunkSize provides headroom for gzip footer so finalized chunks
-	// never exceed the hard cap. Keep conservative margin.
-	softChunkSize = maxChunkSize - 64
 	// flushInterval is how often to flush buffered logs to the server.
 	flushInterval = 2 * time.Second
+)
+
+// Aliases for compression constants - keeps local usage clear.
+const (
+	maxChunkSize  = MaxUploadSize
+	softChunkSize = SoftUploadSize
 )
 
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
@@ -38,13 +39,15 @@ type LogStreamer struct {
 	flushDone  chan struct{}
 	closeOnce  sync.Once
 	stopCh     chan struct{}
+	closed     bool    // Set to true when Close() is called to prevent sending during shutdown.
 	hook       LogHook // Optional hook to process logs before compression.
 	httpClient *http.Client
 }
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
 // By default, uses NoOpLogHook (no PII scrubbing).
-func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) *LogStreamer {
+// Returns an error if HTTP client creation fails (e.g., missing bearer token).
+func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) (*LogStreamer, error) {
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
@@ -57,17 +60,18 @@ func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) *LogStream
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
 	// Initialize HTTP client (honors mTLS when enabled in cfg).
-	if c, err := createHTTPClient(cfg); err == nil {
-		ls.httpClient = c
-	} else {
-		slog.Warn("log streamer: create HTTP client failed; using default", "run_id", runID, "error", err)
-		ls.httpClient = &http.Client{Timeout: 10 * time.Second}
+	// Fail hard if client creation fails - a fallback to unauthenticated client
+	// would silently fail all uploads, causing log data loss.
+	client, err := createHTTPClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client for log streamer: %w", err)
 	}
+	ls.httpClient = client
 
 	// Start background flusher.
 	go ls.periodicFlush()
 
-	return ls
+	return ls, nil
 }
 
 // SetHook sets the log processing hook. Must be called before any writes.
@@ -160,9 +164,16 @@ func (ls *LogStreamer) flushLocked() error {
 	if len(compressed) > maxChunkSize {
 		// Drop the oversize payload to preserve forward progress but report an error.
 		// Reset state so subsequent writes proceed with a fresh chunk.
+		// Log at error level since data is permanently lost.
+		slog.Error("log chunk dropped due to size limit",
+			"run_id", ls.runID,
+			"job_id", ls.jobID,
+			"size", len(compressed),
+			"limit", maxChunkSize,
+		)
 		ls.buffer.Reset()
 		ls.gzWriter = gzip.NewWriter(&ls.buffer)
-		return fmt.Errorf("compressed chunk exceeds 1 MiB: %d bytes", len(compressed))
+		return fmt.Errorf("compressed chunk exceeds 1 MiB: %d bytes (data dropped)", len(compressed))
 	}
 
 	// Reset buffer and gzip writer for next chunk.
@@ -173,10 +184,20 @@ func (ls *LogStreamer) flushLocked() error {
 	currentChunkNo := ls.chunkNo
 	ls.chunkNo++
 
+	// Check if Close() was called - if so, skip sending to avoid race condition.
+	if ls.closed {
+		return errors.New("log streamer closed during flush")
+	}
+
 	// Send to server (release lock during network call).
 	ls.mu.Unlock()
 	err := ls.sendChunk(compressed, currentChunkNo)
 	ls.mu.Lock()
+
+	// Check again after re-acquiring lock in case Close() was called during send.
+	if ls.closed {
+		return errors.New("log streamer closed during send")
+	}
 
 	return err
 }
@@ -213,7 +234,11 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Send to server endpoint using the node ID string directly.
 	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
-	// Create per-request context with timeout for proper cancellation.
+	// Create per-request context with timeout. We intentionally use context.Background()
+	// rather than a parent context because:
+	// 1. Log uploads should complete even if the job context is canceled
+	// 2. Close() must be able to flush final logs after job termination
+	// 3. Each request has its own timeout to prevent indefinite blocking
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -223,11 +248,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := ls.httpClient
-	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Second}
-	}
-	resp, err := client.Do(req)
+	resp, err := ls.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
@@ -261,6 +282,9 @@ func (ls *LogStreamer) Close() error {
 				errs = append(errs, err)
 			}
 		}
+
+		// Mark as closed to prevent any pending operations from sending.
+		ls.closed = true
 
 		// Close the gzip writer.
 		if err := ls.gzWriter.Close(); err != nil {

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -43,10 +44,9 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
 
-	// Check size cap (≤ 1 MiB gzipped).
-	const maxBundleSize = 1 << 20 // 1 MiB
-	if len(bundleBytes) > maxBundleSize {
-		return "", "", fmt.Errorf("gzipped artifact bundle exceeds size cap: %d > %d bytes", len(bundleBytes), maxBundleSize)
+	// Check size cap using shared constant.
+	if err := validateUploadSize(bundleBytes, "gzipped artifact bundle"); err != nil {
+		return "", "", err
 	}
 
 	// Build request payload.
@@ -124,7 +124,8 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 		base := filepath.Base(absRoot)
 
 		// Write the root itself (dir or file) and recurse when directory.
-		if err := addPathToTar(tarWriter, absRoot, base, info); err != nil {
+		// Use absRoot as allowed root for symlink validation.
+		if err := addPathToTar(tarWriter, absRoot, base, info, absRoot); err != nil {
 			_ = tarWriter.Close()
 			_ = gzWriter.Close()
 			return nil, fmt.Errorf("add %s to tar: %w", root, err)
@@ -154,7 +155,7 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 					return err
 				}
 				name := filepath.Join(base, rel)
-				return addPathToTar(tarWriter, p, name, fi)
+				return addPathToTar(tarWriter, p, name, fi, absRoot)
 			})
 			if err != nil {
 				_ = tarWriter.Close()
@@ -177,7 +178,9 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 }
 
 // addPathToTar writes a single filesystem entry to the tar using the provided name.
-func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo) error {
+// allowedRoot is the directory that symlinks must resolve within; symlinks pointing
+// outside are logged and skipped to prevent data exfiltration.
+func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo, allowedRoot string) error {
 	// Support symlink headers by reading the target.
 	linkTarget := ""
 	if info.Mode()&os.ModeSymlink != 0 {
@@ -185,6 +188,26 @@ func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo) error {
 		if err != nil {
 			return fmt.Errorf("readlink: %w", err)
 		}
+
+		// Validate symlink target is within allowed root to prevent data exfiltration.
+		// Resolve the absolute target path.
+		absTarget := t
+		if !filepath.IsAbs(t) {
+			absTarget = filepath.Join(filepath.Dir(fsPath), t)
+		}
+		absTarget = filepath.Clean(absTarget)
+
+		// Check if target is within allowed root.
+		rel, err := filepath.Rel(allowedRoot, absTarget)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			slog.Warn("symlink target outside allowed root, skipping",
+				"symlink", fsPath,
+				"target", t,
+				"allowed_root", allowedRoot,
+			)
+			return nil // Skip this symlink
+		}
+
 		linkTarget = t
 	}
 

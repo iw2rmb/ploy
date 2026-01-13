@@ -116,7 +116,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("send claim request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer drainAndClose(resp)
 
 	// Handle 204 No Content (no work available).
 	if resp.StatusCode == http.StatusNoContent {
