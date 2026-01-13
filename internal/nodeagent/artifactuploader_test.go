@@ -395,21 +395,11 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 		t.Errorf("regular.txt content mismatch")
 	}
 
-	// Verify the external symlink is archived as a symlink, NOT as a regular file.
-	// If symlinks were followed, this would be TypeReg with /etc/hosts content.
-	externalEntry, ok := entries[filepath.Join("workspace", "link_to_external")]
-	if !ok {
-		t.Fatal("link_to_external not found in archive")
-	}
-	if externalEntry.typeflag != tar.TypeSymlink {
-		t.Errorf("link_to_external: expected TypeSymlink (%d), got %d - symlink was followed!", tar.TypeSymlink, externalEntry.typeflag)
-	}
-	if externalEntry.linkname != "/etc/hosts" {
-		t.Errorf("link_to_external: expected linkname '/etc/hosts', got %q", externalEntry.linkname)
-	}
-	// Critically: the archive should NOT contain the contents of /etc/hosts.
-	if len(externalEntry.content) > 0 {
-		t.Errorf("link_to_external: should have no content (is a symlink), but got %d bytes", len(externalEntry.content))
+	// External symlinks pointing outside the workspace should be SKIPPED for security.
+	// This prevents data exfiltration via symlinks to sensitive files like /etc/hosts.
+	_, ok = entries[filepath.Join("workspace", "link_to_external")]
+	if ok {
+		t.Error("link_to_external should NOT be in archive - external symlinks should be skipped for security")
 	}
 
 	// Verify the internal symlink is also archived as a symlink.
