@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# Default to the local Docker cluster descriptor written by scripts/deploy-locally.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 # Locate ploy binary (check both dist/ploy and ./dist/ploy)
 PLOY_BIN=""
 if [[ -x "../../../../dist/ploy" ]]; then
@@ -40,6 +44,7 @@ echo "Repo URL:        $REPO_URL"
 echo "Base ref:        $REPO_BASE_REF"
 echo "Target ref:      $REPO_TARGET_REF"
 echo "Spec file:       $SPEC_FILE"
+echo "PLOY_CONFIG_HOME: $PLOY_CONFIG_HOME"
 echo "=========================================="
 
 # Submit the multi-step mod run with --follow to stream logs

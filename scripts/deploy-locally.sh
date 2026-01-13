@@ -17,7 +17,8 @@ cd "$ROOT_DIR"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
-NODE_ID="${NODE_ID:-LOCAL01}"
+# Node IDs must be NanoID(6) strings.
+NODE_ID="${NODE_ID:-local1}"
 AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
@@ -159,10 +160,16 @@ main() {
     ON CONFLICT (token_hash) DO NOTHING;"
 
   log "Provisioning worker bearer token into node container..."
-  $COMPOSE_CMD exec -T node sh -lc "\
-    mkdir -p /etc/ploy && \
-    printf '%s' '${WORKER_TOKEN}' > /etc/ploy/bearer-token && \
-    chmod 600 /etc/ploy/bearer-token"
+  NODE_CONTAINER_ID="$($COMPOSE_CMD ps -q node)"
+  if [[ -z "$NODE_CONTAINER_ID" ]]; then
+    echo "error: could not resolve node container id" >&2
+    exit 1
+  fi
+  TMP_TOKEN_FILE="$(mktemp)"
+  printf '%s' "$WORKER_TOKEN" > "$TMP_TOKEN_FILE"
+  chmod 600 "$TMP_TOKEN_FILE"
+  docker cp "$TMP_TOKEN_FILE" "$NODE_CONTAINER_ID:/etc/ploy/bearer-token"
+  rm -f "$TMP_TOKEN_FILE"
 
   log "Seeding node record in ploy.nodes..."
   UUID="${NODE_ID}"

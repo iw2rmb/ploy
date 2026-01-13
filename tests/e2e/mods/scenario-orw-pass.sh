@@ -3,6 +3,9 @@ set -euo pipefail
 
 # E2E: ORW apply Java 11->17; expect passing Build Gate.
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 # Use a known-good remote ref for the passing scenario.
 # "mods-upgrade-java17" may not exist by default; e2e/success does.
@@ -31,7 +34,7 @@ if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
   EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
 fi
 
-RUN=$(dist/ploy mod run --json \
+RUN=("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
@@ -44,11 +47,13 @@ RUN=$(dist/ploy mod run --json \
   --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \
-  "${EXTRA_FLAGS[@]}" | jq -r '.run_id')
+  "${EXTRA_FLAGS[@]}")
+
+RUN=$("${RUN[@]}" | jq -r '.run_id')
 
 # Print run summary if present; inspect subcommand has been removed.
 if [[ -n "${RUN:-}" ]]; then
-  dist/ploy run status "$RUN" || true
+  "$REPO_ROOT/dist/ploy" run status "$RUN" || true
 fi
 
 echo "OK: orw-pass scenario"

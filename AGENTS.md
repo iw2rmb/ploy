@@ -22,8 +22,8 @@ Unless otherwise specified, the following policies apply when planning changes:
 2. Control-plane API changes must include updates to `docs/api/OpenAPI.yaml`
    alongside human-facing docs.
 3. How-to references:
-   - `docs/how-to/deploy-a-cluster.md` — Deploy a cluster from scratch.
-   - `docs/how-to/update-a-cluster.md` — Update `ployd` across VPS nodes.
+   - `docs/how-to/deploy-locally.md` — Deploy the local Docker cluster.
+   - `tests/e2e/mods/README.md` — E2E scenarios (local cluster).
    - `docs/envs/README.md` — Canonical environment variables.
 
 ## Documentation Layout Policy
@@ -52,14 +52,11 @@ Unless otherwise specified, the following policies apply when planning changes:
 ### TDD Framework (CRITICAL)
 
 - Unit tests and CLI builds (RED/GREEN phases) run locally.
-- VPS lab is reserved for integration/E2E tests and manual smoke:
-  - Nodes: 45.9.42.212 (A), 193.242.109.13 (B), 45.130.213.91 (C).
-  - Reuse the current cluster descriptor from `~/.config/ploy/clusters/` to connect.
-    If multiple descriptors exist, prefer the default marker (`~/.config/ploy/clusters/default`) or
-    pick the one matching the lab's cluster ID.
+- E2E tests run against the local Docker cluster (see `scripts/deploy-locally.sh`).
+  - Default CLI config: `PLOY_CONFIG_HOME=$PWD/local/cli`.
 - Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
-- Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise VPS when needed).
-- For Codex execution details on the Mods E2E harness, consult `tests/e2e/README.md`.
+- Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise E2E when needed).
+- For Mods E2E details, consult `tests/e2e/mods/README.md`.
 
 #### TDD Discipline Validation
 
@@ -97,4 +94,4 @@ Reference: `GOLANG.md` (line 135-141).
 
 ### Deployment Scope
 
-- The VPS lab is the sole environment; no production migration or backward compatibility is required. Prior changes can assume fresh redeploys.
+- The local Docker cluster is the sole environment; no remote/VPS deployment or backward compatibility is required.

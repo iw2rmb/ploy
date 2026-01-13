@@ -16,7 +16,7 @@ require (
 	// NanoID for compact, human-friendly identifiers (run repos, node keys).
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	// Docker Engine v29 SDK modules (moby). Worker nodes require Docker Engine v29.0+.
-	// See docs/how-to/deploy-a-cluster.md#L24 for installation requirements.
+	// See GOLANG.md for installation requirements.
 	github.com/moby/moby/api v1.52.0
 	github.com/moby/moby/client v0.2.1
 	github.com/pelletier/go-toml/v2 v2.2.4

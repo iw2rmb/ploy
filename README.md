@@ -25,8 +25,7 @@ For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This READ
 
 **Docs You'll Want**
 - Overview & quick start: this `README.md`.
-- Deployment: `docs/how-to/deploy-a-cluster.md`.
-- Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy cluster rollout`).
+- Local Docker cluster: `docs/how-to/deploy-locally.md`.
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
 - Environment variables: `docs/envs/README.md`.
 - Mods lifecycle and SSE events: `docs/mods-lifecycle.md`.
@@ -68,13 +67,13 @@ Extract and move the binary to a directory in your `PATH` (e.g., `/usr/local/bin
   make build
   ```
 
-This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote installs).
+This produces `dist/ploy` and `dist/ployd`.
 
 Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFIG_PATH` to change the default (`/etc/ploy/ployd.yaml`). The flag overrides the environment variable when both are provided.
 
 **Listeners**
-- API: `:8443` (TLS 1.3 with mandatory mTLS). Health at `/health`.
-- Metrics: `:9100` (plain HTTP) exposing Prometheus at `/metrics`.
+- Local Docker control plane: `http://localhost:8080` (bearer token auth). Health at `/health`.
+- Metrics: `http://localhost:9100/metrics`.
 
 **Scheduler & TTL**
 - Background tasks run under `internal/server/scheduler`.
@@ -84,35 +83,25 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `ttl_interval`: how often the cleanup runs (default 1h if unset)
   - `drop_partitions`: when true, drop whole monthly partitions older than `ttl`
 
-**Quick Start**
-- Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` is not provided):
+**Quick Start (Local Docker)**
+- Deploy the local Docker stack (server + db + node) and write a local CLI descriptor:
 
   ```bash
-  dist/ploy cluster deploy --address <host-or-ip>
-  ```
-
-  Notes:
-  - By default, the command attempts to detect and reuse an existing cluster CA/server certificate on the host (`--reuse=true`).
-  - To force a fresh PKI, pass `--force-new-ca` (or `--reuse=false`).
-  - `--refresh-admin-cert` is reserved for a follow-up slice and is currently ignored with a warning.
-
-- Add worker nodes to the cluster:
-
-  ```bash
-  dist/ploy cluster node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
+  ./scripts/deploy-locally.sh
+  export PLOY_CONFIG_HOME="$PWD/local/cli"
   ```
 
 - Submit a Mods run and follow events:
 
   ```bash
-  dist/ploy mod run --repo-url https://github.com/example/repo.git \
+  ./dist/ploy mod run --repo-url https://github.com/example/repo.git \
     --repo-base-ref main \
     --follow
   ```
 
   # Optional: include an explicit target ref to control the MR source branch
   # (otherwise the node derives ploy/{run_name|run_id} when an MR is created).
-  dist/ploy mod run --repo-url https://github.com/example/repo.git \
+  ./dist/ploy mod run --repo-url https://github.com/example/repo.git \
     --repo-base-ref main \
     --repo-target-ref feature/upgrade \
     --mr-success \
@@ -121,7 +110,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Stream run logs via SSE:
 
   ```bash
-  dist/ploy run logs <run-id>
+  ./dist/ploy run logs <run-id>
   ```
 
 **Tests & Coverage**
@@ -133,9 +122,8 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 **Environment Variables**
 - Full reference: `docs/envs/README.md`
 - Key variables:
-  - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server (e.g., `postgres://user:pass@localhost:5432/ploy`).
-  - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI now always uses the default descriptor at `~/.config/ploy/clusters/default`.
-  - `PLOY_SERVER_CA_CERT` / `PLOY_SERVER_CA_KEY` — Cluster CA for PKI operations.
+  - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server.
+  - `PLOY_CONFIG_HOME` — CLI config home; local Docker uses `./local/cli`.
   - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional Java image for the Build Gate.
 
 **Contributing**

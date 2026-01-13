@@ -6,7 +6,9 @@
 
 **Prereqs**
 
-- Ploy cluster descriptor present (CLI auto-discovers from `~/.config/ploy/clusters/default`).
+- Local Docker cluster deployed via `scripts/deploy-locally.sh`.
+- CLI configured for the local cluster:
+  - `export PLOY_CONFIG_HOME="$PWD/local/cli"`
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
@@ -30,7 +32,6 @@ Notes:
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
-- `docs/how-to/descriptor-https-quickstart.md` to configure descriptors for HTTPS-only operation.
 
 **Sample Repository**
 

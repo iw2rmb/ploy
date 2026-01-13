@@ -266,8 +266,8 @@ ploy mod run --mr-success \
 
 ## Control Plane
 
-- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and mTLS materials from
-  the cached cluster descriptor created during `ploy cluster deploy`.
+- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and token from
+  the default cluster descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
 
 ### Server (Control Plane)
 
@@ -275,8 +275,6 @@ ploy mod run --mr-success \
   There is no environment variable; set this in `ployd.yaml` under `http.listen`.
 - `metrics.listen` (config YAML) — Address for Prometheus metrics endpoint. Default `:9100`.
   There is no environment variable; set this in `ployd.yaml` under `metrics.listen`.
-- `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy cluster deploy`).
-  Currently set by bootstrap but not yet persisted or loaded by the server runtime.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — PEM-encoded server TLS certificate and key
   used by the bootstrap script to write files at `/etc/ploy/pki/server.crt` and
   `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
@@ -332,9 +330,6 @@ Precedence at server startup:
 
 - `PLOY_POSTGRES_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
-  When `ploy cluster deploy` runs without `--postgresql-dsn`, the bootstrap installs
-  PostgreSQL on the VPS and derives a password‑based TCP DSN suitable for the
-  root‑run `ployd` service, e.g.: `host=127.0.0.1 port=5432 user=ploy password=ploy dbname=ploy sslmode=disable`.
   The server no longer recognizes `PLOY_SERVER_PG_DSN`.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration tests (e.g., `tests/integration/*` and
   packages that hit a real database such as `internal/store`). When unset, such tests skip automatically.
@@ -342,46 +337,11 @@ Precedence at server startup:
 `ployd` reads `PLOY_POSTGRES_DSN` at startup; when unset, it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_POSTGRES_DSN}` in
 the config file are treated as unset unless the environment variable is actually present.
 
-## Bootstrap Script
-
-These environment variables are used internally by the bootstrap script generated during
-`ploy cluster deploy` and `ploy cluster node add` flows. They are not required for day‑to‑day CLI
-usage but are documented here for completeness.
-
-- `PLOY_BOOTSTRAP_VERSION` — Version string exported at the top of generated bootstrap scripts
-  (default: `dev` in source, overridden at build time).
-- `PLOY_INSTALL_POSTGRESQL` — When `true`, the bootstrap script installs PostgreSQL on the
-  target host and derives `PLOY_POSTGRES_DSN`; when `false`, the provided DSN is used as-is.
-  Not exported as an environment variable; checked inline within the script body.
-- `PLOY_DB_PASSWORD` — Ephemeral password generated during PostgreSQL install flows and used
-  to create the `ploy` database role and DSN. Set only within the bootstrap script scope.
-- `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions
-  (e.g., writing server certs instead of node certs). Passed as `--primary` flag and checked
-  inline within the script.
-- `NODE_ID` — Node identifier used in the node agent config. This is a NanoID(6) string
-  (6 characters from URL-safe alphabet). Passed as `--node-id` script argument and
-  referenced in `/etc/ploy/ployd-node.yaml` generation.
-- `CLUSTER_ID` — Cluster identifier passed as `--cluster-id` script argument. Currently used
-  for labeling during provisioning; not yet persisted or consumed by server runtime.
-- `NODE_ADDRESS` — IP/hostname of the node being provisioned, passed as `--node-address` script
-  argument.
 - `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
   and healing mods) to. When set on the node, the node agent's Docker runtime uses this network
   so containers (e.g., `mods-codex`) can reach the control-plane service by its Docker network
   hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
-  network is used (no behavior change for non-Docker/VPS deployments).
-- `PLOY_SERVER_URL` — Control-plane base URL used by `ploy cluster node add` bootstrap to populate
-  `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
-  Additionally, healing containers may consume this variable to call
-  the Build Gate HTTP API directly during the fail→heal→re‑gate workflow. The CLI
-  separately exposes a `--server-url` flag and `PLOY_CONTROL_PLANE_URL` override
-  for client operations.
-
-Primary reuse behavior:
-- On control‑plane (primary) hosts, when `/etc/ploy/pki/ca.key` already exists, the bootstrap
-  script treats the host as an existing cluster and skips all PKI writes (CA cert/key and
-  server cert/key). It logs a reuse message and proceeds to (re)write configs and systemd units
-  only. This prevents accidental clobbering of an existing cluster PKI.
+  network is used.
 
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
@@ -510,7 +470,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - [README.md](../../README.md) — Server/node pivot architecture
 - [GOLANG.md](../../GOLANG.md) — Docker Engine v29 requirements and Go SDK modules
 - See `CHANGELOG.md` for migration status and recent slices
-- [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
+- [docs/how-to/deploy-locally.md](../how-to/deploy-locally.md) — Local Docker cluster
 
 ## Build Gate Limits
 

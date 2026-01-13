@@ -180,7 +180,7 @@ After core functionality is stable and unit-tested:
 2. **E2E Tests** — Test full system with real deployment
   - Location: `tests/e2e/mods/`
   - Documented in: `tests/e2e/mods/README.md`
-   - Run in VPS lab environment
+   - Run against the local Docker cluster
    - Examples: `scenario-orw-pass.sh`
 
 ## Coverage Targets

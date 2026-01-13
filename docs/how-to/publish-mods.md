@@ -57,8 +57,7 @@ docker buildx build \
 ```
 
 Configure node pulls (private repos)
-- During deploy: set `DOCKERHUB_USERNAME` and `DOCKERHUB_PAT` on each node before running the bootstrap script. The installer logs into Docker Hub automatically.
-- Existing clusters (manual): SSH to each node and run:
+- Local Docker cluster: log in on the host Docker engine (the node uses the host Docker daemon via `/var/run/docker.sock`):
 ```bash
 echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 ```

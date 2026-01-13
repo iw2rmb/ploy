@@ -251,7 +251,7 @@ app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
 hydration and still reports required resources.
 
-`upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH). The CLI always targets the default descriptor at `~/.config/ploy/clusters/default`.
+`upload` uses the cached bearer-token cluster descriptor to post gzipped bundles to the control‑plane API. The CLI always targets the default descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.
 
 ## Shell Completion
@@ -287,10 +287,7 @@ The completion command is powered by Cobra and provides:
 - Flag completion for available options
 - Context-aware suggestions based on command hierarchy
 
-Note: Cluster management commands (deploy, node, rollout, token) are nested under `ploy cluster`. For example:
-- `ploy cluster deploy` — Deploy control-plane server
-- `ploy cluster node add` — Add worker nodes
-- `ploy cluster rollout server|nodes` — Roll out binary updates
+Note: Token management commands are nested under `ploy cluster token`:
 - `ploy cluster token create|list|revoke` — Manage API tokens
 
 For persistent setup instructions specific to your shell, run:
