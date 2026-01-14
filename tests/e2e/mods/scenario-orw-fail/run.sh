@@ -8,6 +8,7 @@ export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}
+TARGET_REF=${PLOY_E2E_TARGET_REF:-mods-upgrade-java17-heal}
 
 # Artifacts directory: default to ./tmp/mods/scenario-orw-fail/<YYMMDDHHmmss>/
 TS=$(date +%y%m%d%H%M%S)
@@ -29,6 +30,7 @@ fi
 RUN=$("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
+  --repo-target-ref "$TARGET_REF" \
   --spec "$SPEC" \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \
