@@ -7,33 +7,7 @@ set -Eeuo pipefail
 PLATFORM=${PLATFORM:-linux/amd64}
 PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}        # seconds (default 15m)
 PUSH_RETRIES=${PUSH_RETRIES:-1}          # number of retries on failure
-DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME:-}
-IMAGE_PREFIX=${MODS_IMAGE_PREFIX:-}
-
-if [[ -z "$DOCKERHUB_USERNAME" && -z "$IMAGE_PREFIX" ]]; then
-  echo "error: DOCKERHUB_USERNAME or MODS_IMAGE_PREFIX must be set" >&2
-  echo "hint: export DOCKERHUB_USERNAME in your shell (e.g., via ~/.zshenv)" >&2
-  exit 2
-fi
-
-if ! command -v docker >/dev/null 2>&1; then
-  echo "error: docker CLI not found" >&2; exit 2
-fi
-if ! docker buildx version >/dev/null 2>&1; then
-  echo "error: docker buildx not available (install docker buildx plugin)" >&2; exit 2
-fi
-
-if [[ -n "${DOCKERHUB_PAT:-}" && -n "$DOCKERHUB_USERNAME" ]]; then
-  echo "Logging in to Docker Hub as $DOCKERHUB_USERNAME"
-  if ! printf '%s' "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null 2>&1; then
-    echo "error: docker login failed; aborting push" >&2
-    exit 2
-  fi
-fi
-
-if [[ -z "$IMAGE_PREFIX" ]]; then
-  IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}"
-fi
+IMAGE_PREFIX="ghcr.io/iw2rmb"
 
 discover_images() {
   local root="docker/mods"

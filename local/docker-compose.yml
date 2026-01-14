@@ -1,6 +1,9 @@
 services:
   db:
-    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-db:latest
+    build:
+      context: ..
+      dockerfile: docker/db/Dockerfile
+    image: ploy-db:local
     platform: linux/amd64
     environment:
       - POSTGRES_DB=ploy
@@ -15,7 +18,10 @@ services:
       retries: 20
 
   server:
-    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-server:latest
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
+    image: ploy-server:local
     platform: linux/amd64
     depends_on:
       db:
@@ -43,7 +49,10 @@ services:
       retries: 20
 
   node:
-    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-node:latest
+    build:
+      context: ..
+      dockerfile: docker/node/Dockerfile
+    image: ploy-node:local
     platform: linux/amd64
     user: "0:0"
     depends_on:

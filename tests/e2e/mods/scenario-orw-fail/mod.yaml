@@ -11,7 +11,7 @@ apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
 steps:
-  - image: docker.io/iwtormb/mods-orw-maven:latest
+  - image: ghcr.io/iw2rmb/mods-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -30,7 +30,7 @@ build_gate:
       # Codex edits the workspace and exits when done; the node agent inspects
       # the workspace for diffs and re-runs the Build Gate externally when changes exist.
       # Codex never runs the gate itself.
-      image: docker.io/iwtormb/mods-codex:latest
+      image: ghcr.io/iw2rmb/mods-codex:latest
       env:
         CODEX_PROMPT: |-
           Rules:
