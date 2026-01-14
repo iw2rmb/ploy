@@ -57,10 +57,20 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 		},
 		getJobResult:        job,
 		listJobsByRunResult: []store.Job{job},
-		// v1: repo-scoped progression requires CountJobsByRunRepoAttemptGroupByStatus
-		// to return all jobs terminal for repo status update to occur.
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
-			{Status: store.JobStatusSuccess, Count: 1},
+		// v1: repo-scoped progression requires all non-MR jobs to be terminal and
+		// derives run_repos.status from the last job.
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          jobID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusSuccess,
+				ModType:     "mod",
+				StepIndex:   1000,
+			},
 		},
 		// All repos terminal triggers run completion.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{

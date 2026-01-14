@@ -48,12 +48,9 @@ steps:
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
-      RECIPE_VERSION: "8.20.0"
+      RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.format.AutoFormat
       MAVEN_PLUGIN_VERSION: "6.18.0"
-      MIGRATION_STEP: "0"
-      # Marker for E2E validation and SSE event correlation.
-      E2E_STEP_NAME: "format-warmup"
 
   # Step 1: Migrate to Java 17 (may trigger post-gate failure on fail-missing-symbol branch)
   # This transformation may expose or interact with the UndefinedClass reference.
@@ -65,8 +62,6 @@ steps:
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
       MAVEN_PLUGIN_VERSION: "6.18.0"
-      MIGRATION_STEP: "1"
-      E2E_STEP_NAME: "java17-migration-post-gate-heal"
 
   # Step 2: Apply cleanup recipe (should pass after step 1 healing)
   # This step runs after healing has fixed any post-gate failures from step 1.
@@ -74,11 +69,9 @@ steps:
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
-      RECIPE_VERSION: "8.20.0"
+      RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.cleanup.SimplifyBooleanExpression
       MAVEN_PLUGIN_VERSION: "6.18.0"
-      MIGRATION_STEP: "2"
-      E2E_STEP_NAME: "cleanup-post-heal"
 
 ################################################################################
 # BUILD GATE VALIDATION
@@ -89,18 +82,18 @@ build_gate:
   enabled: true
   profile: auto # Auto-detect Maven or Gradle
 
-################################################################################
-# HEALING POLICY FOR POST-MOD FAILURES
-################################################################################
-# When a post-mod gate fails (transformation broke the build), this healing
-# sequence runs to fix the error. The healing mod:
-# 1. Reads /in/build-gate.log to understand the failure
-# 2. Edits the workspace to fix the issue
-# 3. Edits the workspace and exits; node agent re-gates only when workspace
-#    diffs are present. This tests the critical gate-heal-regate flow for
-#    post-mod failures using the workspace diff handshake.
+  ################################################################################
+  # HEALING POLICY FOR POST-MOD FAILURES
+  ################################################################################
+  # When a post-mod gate fails (transformation broke the build), this healing
+  # sequence runs to fix the error. The healing mod:
+  # 1. Reads /in/build-gate.log to understand the failure
+  # 2. Edits the workspace to fix the issue
+  # 3. Edits the workspace and exits; node agent re-gates only when workspace
+  #    diffs are present. This tests the critical gate-heal-regate flow for
+  #    post-mod failures using the workspace diff handshake.
   healing:
-    retries: 2  # Allow multiple healing attempts for complex errors
+    retries: 2 # Allow multiple healing attempts for complex errors
     mod:
       # Codex healing container using the workspace diff handshake.
       # For this E2E, Codex will analyze the compile error (missing class) and
@@ -120,10 +113,9 @@ build_gate:
           Fix the compilation error described in /in/build-gate.log.
           This is a post-mod gate failure (the mod transformation broke the build).
           Create any missing classes or fix any syntax errors introduced by the transformation.
-        E2E_STEP_NAME: "post-mod-healer-codex"
       # Uncomment if you have Codex auth configured:
-      # env_from_file:
-      #   CODEX_AUTH_JSON: ~/.codex/auth.json
+      env_from_file:
+        CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

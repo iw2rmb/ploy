@@ -105,10 +105,10 @@ func maybeUpdateRunRepoStatus(
 	return true, nil
 }
 
-// maybeCompleteMultiStepRun is kept for handler compatibility, but v1 completion is repo-aggregate:
-// - runs.status transitions to Finished only when all run_repos are terminal (Success/Fail/Cancelled).
-// - success/failure is derived from repo outcomes (not stored on runs.status).
-func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
+// maybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
+// all run_repos are terminal (Success/Fail/Cancelled), and publishes the run and
+// done SSE events.
+func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
 	if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 		return nil
 	}

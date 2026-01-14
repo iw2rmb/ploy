@@ -484,8 +484,6 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 		},
 		getJobResult:        mrJob,
 		listJobsByRunResult: []store.Job{mrJob},
-		// Should NOT be called for MR jobs.
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{},
 	}
 
 	handler := completeJobHandler(st, nil)
@@ -511,9 +509,9 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify CountJobsByRunRepoAttemptGroupByStatus was NOT called for MR jobs.
-	if st.countJobsByRunRepoAttemptGroupByStatusCalled {
-		t.Error("did not expect CountJobsByRunRepoAttemptGroupByStatus to be called for MR job")
+	// Verify ListJobsByRunRepoAttempt was NOT called for MR jobs.
+	if st.listJobsByRunRepoAttemptCalled {
+		t.Error("did not expect ListJobsByRunRepoAttempt to be called for MR job")
 	}
 
 	// Verify repo status was NOT updated.
@@ -562,8 +560,18 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 		getJobResult:        jobRepoA,
 		listJobsByRunResult: []store.Job{jobRepoA},
 		// Repo A is now terminal (all jobs Success).
-		countJobsByRunRepoAttemptGroupByStatusResult: []store.CountJobsByRunRepoAttemptGroupByStatusRow{
-			{Status: store.JobStatusSuccess, Count: 1},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          jobIDRepoA,
+				RunID:       runID,
+				RepoID:      repoIDA,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mod-0",
+				Status:      store.JobStatusSuccess,
+				ModType:     "mod",
+				StepIndex:   2000,
+			},
 		},
 		// But repo B is still Running, so run should NOT become Finished.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
