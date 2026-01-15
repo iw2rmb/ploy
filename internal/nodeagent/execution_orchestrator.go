@@ -24,6 +24,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
+const (
+	// Job layout constants (internal contract)
+	jobStepIndexModStart = 2000
+	jobStepIndexInterval = 1000
+)
+
 // executeRun orchestrates job execution based on job type (ModType).
 // Dispatches to specialized handlers: gate jobs, mod jobs, or healing jobs.
 //
@@ -95,17 +101,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	// Initialize runtime components using shared helper.
-	// The cleanup function closes logStreamer on exit.
-	// Pass jobID to associate log chunks with this specific job.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
-	if err != nil {
-		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-	defer cleanup()
-
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// ModStackUnknown which falls back to "default" in stack maps.
@@ -145,114 +140,16 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		"resolved_image", manifest.Image,
 	)
 
-	// Rehydrate workspace from base + diffs using shared helper.
-	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, manifest, req.StepIndex)
-	if err != nil {
-		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-	defer wsResult.cleanup()
-	workspace := wsResult.workspace
-
-	// Snapshot the pre-mod workspace so we can generate a diff that includes
-	// untracked files (git diff --no-index semantics via GenerateBetween).
-	// This snapshot represents the baseline state: repo clone plus all prior
-	// diffs for this run and step index.
-	var modBaselineDir string
-	if execCtx.diffGenerator != nil {
-		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, DiffModTypeMod, workspace)
-		defer snapshot.cleanup()
-		modBaselineDir = snapshot.dir
+	cfg := standardJobConfig{
+		Manifest:                  manifest,
+		DiffType:                  DiffModTypeMod,
+		OutDirPattern:             "ploy-mod-out-*",
+		UploadConfiguredArtifacts: true,
+		UploadDiff:                r.uploadModDiffWithBaseline,
+		StartTime:                 startTime,
 	}
 
-	// Prepare /out directory using shared helper.
-	var outDir string
-	outDirErr := withTempDir("ploy-mod-out-*", func(dir string) error {
-		outDir = dir
-
-		// Disable gate in manifest - mod jobs don't run gates.
-		disableManifestGate(&manifest)
-
-		// Clear hydration since workspace is already hydrated.
-		clearManifestHydration(&manifest)
-
-		// Run the mod container.
-		// Pass RunID directly for consistent labeling and telemetry.
-		result, runErr := execCtx.runner.Run(ctx, step.Request{
-			RunID:     req.RunID,
-			Manifest:  manifest,
-			Workspace: workspace,
-			OutDir:    outDir,
-			InDir:     "",
-		})
-		duration := time.Since(startTime)
-
-		// Upload diff for this mod using the pre-mod baseline snapshot so untracked
-		// files are captured in the patch (repo+diff semantics).
-		// E3: Pass job name for branch-local diff tagging (mainline mod jobs have empty branch).
-		r.uploadModDiffWithBaseline(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, modBaselineDir, workspace, result, req.StepIndex)
-
-		// Upload /out artifacts.
-		if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
-			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
-		}
-
-		// Upload configured artifacts using typed RunOptions.
-		r.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
-
-		// Build stats using typed builder to eliminate map[string]any construction.
-		stats := types.NewRunStatsBuilder().
-			ExitCode(result.ExitCode).
-			DurationMs(duration.Milliseconds()).
-			TimingsFromDurations(
-				time.Duration(result.Timings.HydrationDuration).Milliseconds(),
-				time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-				time.Duration(result.Timings.DiffDuration).Milliseconds(),
-				time.Duration(result.Timings.TotalDuration).Milliseconds(),
-			).
-			MustBuild()
-
-		// Determine status.
-		// v1 uses capitalized job status values: Success, Fail, Cancelled.
-		if runErr != nil {
-			status := JobStatusFail
-			var exitCode *int32
-			if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
-				status = JobStatusCancelled
-			} else {
-				var runtimeExitCode int32 = -1 // Use -1 to indicate runtime error
-				exitCode = &runtimeExitCode
-			}
-
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload mod terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-			}
-			slog.Info("mod job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", runErr, "duration", duration)
-			return nil
-		}
-
-		if result.ExitCode != 0 {
-			exitCode := int32(result.ExitCode)
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload mod failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-			}
-			slog.Info("mod job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
-			return nil
-		}
-
-		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload mod success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("mod job succeeded", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
-		return nil
-	})
-
-	if outDirErr != nil {
-		slog.Error("failed to create /out directory", "run_id", req.RunID, "error", outDirErr)
-		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
-	}
+	r.executeStandardJob(ctx, req, cfg)
 }
 
 func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
@@ -263,7 +160,7 @@ func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
 	if f != math.Trunc(f) {
 		return 0, fmt.Errorf("step_index %v is not an integer", f)
 	}
-	if f < 2000 {
+	if f < jobStepIndexModStart {
 		return 0, fmt.Errorf("step_index %v is too small for a mod step", f)
 	}
 
@@ -271,8 +168,8 @@ func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
 	// - pre-gate=1000
 	// - mod-N=2000+N*1000
 	// - post-gate=2000+(len(steps))*1000
-	thousands := int64(f) / 1000
-	if int64(f) != thousands*1000 {
+	thousands := int64(f) / jobStepIndexInterval
+	if int64(f) != thousands*jobStepIndexInterval {
 		return 0, fmt.Errorf("step_index %v is not a multiple of 1000", f)
 	}
 	return int(thousands) - 2, nil
@@ -287,17 +184,6 @@ func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
 func (r *runController) executeHealingJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
-	// Initialize runtime components using shared helper.
-	// The cleanup function closes logStreamer on exit.
-	// Pass jobID to associate log chunks with this specific healing job.
-	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
-	if err != nil {
-		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-	defer cleanup()
-
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// ModStackUnknown which falls back to "default" in stack maps.
@@ -308,6 +194,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	typedOpts := req.TypedOptions
 
 	var manifest contracts.StepManifest
+	var err error
 
 	// When build_gate_healing is configured, hydrate the healing manifest from the
 	// typed HealingConfig so that discrete healing jobs use the correct image/env.
@@ -332,170 +219,26 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		"resolved_image", manifest.Image,
 	)
 
-	// Rehydrate workspace from base + diffs using shared helper.
-	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, manifest, req.StepIndex)
-	if err != nil {
-		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
-		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-		return
-	}
-	defer wsResult.cleanup()
-	workspace := wsResult.workspace
-
-	// Snapshot the pre-healing workspace so we can generate a diff that includes
-	// untracked files (git diff --no-index semantics via GenerateBetween). This
-	// snapshot represents the baseline state: repo clone plus all prior diffs for
-	// this run and step index.
-	var healingBaselineDir string
-	if execCtx.diffGenerator != nil {
-		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, DiffModTypeHealing, workspace)
-		defer snapshot.cleanup()
-		healingBaselineDir = snapshot.dir
+	cfg := standardJobConfig{
+		Manifest:      manifest,
+		DiffType:      DiffModTypeHealing,
+		OutDirPattern: "ploy-heal-out-*",
+		InDirPattern:  "ploy-heal-in-*",
+		PopulateInDir: func(inDir string) error {
+			return r.populateHealingInDir(req.RunID, inDir)
+		},
+		InjectEnv: func(m *contracts.StepManifest, ws string) {
+			r.injectHealingEnvVars(m, ws)
+		},
+		MountCerts: func(m *contracts.StepManifest) {
+			r.mountHealingTLSCerts(m)
+		},
+		CheckWorkspaceNoChange: true,
+		UploadDiff:             r.uploadHealingJobDiff,
+		StartTime:              startTime,
 	}
 
-	// Prepare /out directory using shared helper, and /in directory for healing-specific hydration.
-	var outDir, inDir string
-	outDirErr := withTempDir("ploy-heal-out-*", func(out string) error {
-		outDir = out
-		return withTempDir("ploy-heal-in-*", func(in string) error {
-			inDir = in
-
-			// Healing-specific: Hydrate /in/build-gate.log from the first failing gate log.
-			// This gives healing containers (e.g., Codex) a trimmed failure view without
-			// requiring them to re-run the gate themselves.
-			if err := r.populateHealingInDir(req.RunID, inDir); err != nil {
-				slog.Warn("failed to hydrate /in/build-gate.log for healing job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			}
-
-			// Disable gate in manifest - healing jobs don't run gates.
-			disableManifestGate(&manifest)
-
-			// Clear hydration since workspace is already hydrated.
-			clearManifestHydration(&manifest)
-
-			// Healing-specific: Inject healing environment variables for Build Gate API access.
-			r.injectHealingEnvVars(&manifest, workspace)
-
-			// Healing-specific: Mount node TLS certificates into healing container.
-			r.mountHealingTLSCerts(&manifest)
-
-			slog.Info("starting healing job execution",
-				"run_id", req.RunID,
-				"job_id", req.JobID,
-				"step_index", req.StepIndex,
-			)
-
-			// Capture workspace status before running healing so we can detect whether
-			// this discrete healing job produced any net changes. This is used for
-			// diagnostics and terminal status decisions (e.g., "exit 0 but no
-			// workspace changes" is treated as a healing failure). This must not
-			// mutate the container's own exit code; it only affects the status we
-			// upload to the control plane.
-			preStatus, preStatusErr := workspaceStatus(ctx, workspace)
-			if preStatusErr != nil {
-				slog.Warn("healing: failed to compute workspace status before healing; assuming changes may occur",
-					"run_id", req.RunID,
-					"job_id", req.JobID,
-					"error", preStatusErr,
-				)
-			}
-
-			// Run the healing container.
-			// Pass RunID directly for consistent labeling and telemetry.
-			result, runErr := execCtx.runner.Run(ctx, step.Request{
-				RunID:     req.RunID,
-				Manifest:  manifest,
-				Workspace: workspace,
-				OutDir:    outDir,
-				InDir:     inDir,
-			})
-			duration := time.Since(startTime)
-
-			// Determine whether this healing job produced any workspace changes.
-			// A healing job that exits 0 but produces no diff is treated as a
-			// failure: the healing mod promised to fix something but didn't
-			// change anything. We set healingNoChange=true here and handle the
-			// failed status upload below.
-			healingNoChange := false
-			if runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
-				if postStatus, postErr := workspaceStatus(ctx, workspace); postErr != nil {
-					slog.Warn("healing: failed to compute workspace status after healing",
-						"run_id", req.RunID,
-						"job_id", req.JobID,
-						"error", postErr,
-					)
-				} else if postStatus == preStatus {
-					healingNoChange = true
-					slog.Warn("healing job produced no workspace changes",
-						"run_id", req.RunID,
-						"job_id", req.JobID,
-					)
-				}
-			}
-
-			// Upload diff for this healing step using the pre-healing baseline snapshot.
-			// E3: Pass job name for path-local diff tagging in multi-strategy healing.
-			// We upload diffs even for healing jobs that will fail (due to no workspace
-			// changes or non-zero exit code) so diagnostics are preserved.
-			r.uploadHealingJobDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, healingBaselineDir, workspace, result, req.StepIndex)
-
-			// Upload /out artifacts.
-			if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
-				slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
-			}
-
-			// Build stats using typed builder to eliminate map[string]any construction.
-			stats := types.NewRunStatsBuilder().
-				ExitCode(result.ExitCode).
-				DurationMs(duration.Milliseconds()).
-				MustBuild()
-
-			// Determine status.
-			// v1 uses capitalized job status values: Success, Fail, Cancelled.
-			if runErr != nil {
-				status := JobStatusFail
-				var exitCode *int32
-				if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
-					status = JobStatusCancelled
-				} else {
-					var runtimeExitCode int32 = -1 // Use -1 to indicate runtime error
-					exitCode = &runtimeExitCode
-				}
-
-				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-					slog.Error("failed to upload healing terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-				}
-				slog.Info("healing job terminated", "run_id", req.RunID, "job_id", req.JobID, "status", status, "exit_code", result.ExitCode, "error", runErr, "duration", duration)
-				return nil
-			}
-
-			if result.ExitCode != 0 {
-				exitCode := int32(result.ExitCode)
-				if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-					slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-				}
-				slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
-				return nil
-			}
-
-			if healingNoChange {
-				r.uploadHealingNoWorkspaceChangesFailure(ctx, req, stats, duration)
-				return nil
-			}
-
-			var exitCodeZero int32 = 0
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload healing success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-			}
-			slog.Info("healing job succeeded", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
-			return nil
-		})
-	})
-
-	if outDirErr != nil {
-		slog.Error("failed to create temp directories for healing job", "run_id", req.RunID, "error", outDirErr)
-		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
-	}
+	r.executeStandardJob(ctx, req, cfg)
 }
 
 // uploadHealingNoWorkspaceChangesFailure uploads a terminal failure status when a healing job

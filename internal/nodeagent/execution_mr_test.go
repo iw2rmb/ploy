@@ -103,8 +103,11 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 	}}
 
 	// Workspace dir is irrelevant for this orchestration test.
+	// Use a temp dir for workspace to avoid committing to the project repo.
+	workspace := t.TempDir()
+	initGitRepo(t, workspace)
 	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, ".")
+	gotURL, err := r.createMR(ctx, req, manifest, workspace)
 	if err != nil {
 		t.Fatalf("createMR error: %v", err)
 	}
@@ -162,8 +165,11 @@ func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
 		"gitlab_domain": "gitlab.example.com",
 	}}
 
+	// Use a temp dir for workspace to avoid committing to the project repo.
+	workspace := t.TempDir()
+	initGitRepo(t, workspace)
 	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, ".")
+	gotURL, err := r.createMR(ctx, req, manifest, workspace)
 	if err != nil {
 		t.Fatalf("createMR error: %v", err)
 	}
@@ -215,8 +221,11 @@ func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
 		"gitlab_domain": "gitlab.example.com",
 	}}
 
+	// Use a temp dir for workspace to avoid committing to the project repo.
+	workspace := t.TempDir()
+	initGitRepo(t, workspace)
 	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, ".")
+	gotURL, err := r.createMR(ctx, req, manifest, workspace)
 	if err != nil {
 		t.Fatalf("createMR error: %v", err)
 	}
