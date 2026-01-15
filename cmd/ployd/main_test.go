@@ -107,7 +107,7 @@ func TestRun_Shutdown(t *testing.T) {
 	var cfg apiconfig.Config
 	cfg.HTTP.Listen = "127.0.0.1:0"
 	cfg.Metrics.Listen = "127.0.0.1:0"
-	var st store.Store // nil is fine; ttlworker.New handles nil store gracefully.
+	var st store.Store // nil disables ttl worker (server skips ttlworker.New).
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: false,
 		DefaultRole:   auth.RoleControlPlane,
@@ -127,7 +127,7 @@ func TestRun_Shutdown(t *testing.T) {
 
 func TestRun_SchedulerIntegration(t *testing.T) {
 	// Verify scheduler and TTL worker are initialized and started/stopped correctly.
-	// Use a nil store since ttlworker.New handles it gracefully by returning nil worker.
+	// Use a nil store; server skips ttl worker initialization.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
