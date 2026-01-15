@@ -45,15 +45,18 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	configWatcher.Subscribe(pkiManager)
 
 	// Initialize TTL worker.
-	ttlWorker, err := ttlworker.New(ttlworker.Options{
-		Store:          st,
-		TTL:            cfg.Scheduler.TTL,
-		Interval:       cfg.Scheduler.TTLInterval,
-		Logger:         slog.Default(),
-		DropPartitions: cfg.Scheduler.DropPartitions,
-	})
-	if err != nil {
-		return fmt.Errorf("create ttl worker: %w", err)
+	var ttlWorker *ttlworker.Worker
+	if st != nil {
+		ttlWorker, err = ttlworker.New(ttlworker.Options{
+			Store:          st,
+			TTL:            cfg.Scheduler.TTL,
+			Interval:       cfg.Scheduler.TTLInterval,
+			Logger:         slog.Default(),
+			DropPartitions: cfg.Scheduler.DropPartitions,
+		})
+		if err != nil {
+			return fmt.Errorf("create ttl worker: %w", err)
+		}
 	}
 
 	// Initialize events service for SSE fanout.
