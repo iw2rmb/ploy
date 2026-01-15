@@ -21,7 +21,9 @@ type RunRepoJobResponse struct {
 	JobID       domaintypes.JobID     `json:"job_id"`
 	Name        string                `json:"name"`
 	ModType     string                `json:"mod_type"`
+	ModImage    string                `json:"mod_image"`
 	StepIndex   domaintypes.StepIndex `json:"step_index"`
+	NodeID      *domaintypes.NodeID   `json:"node_id"`
 	Status      store.JobStatus       `json:"status"`
 	StartedAt   *time.Time            `json:"started_at,omitempty"`
 	FinishedAt  *time.Time            `json:"finished_at,omitempty"`
@@ -99,7 +101,9 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				JobID:      job.ID,
 				Name:       job.Name,
 				ModType:    job.ModType,
+				ModImage:   job.ModImage,
 				StepIndex:  job.StepIndex,
+				NodeID:     job.NodeID,
 				Status:     job.Status,
 				DurationMs: job.DurationMs,
 			}

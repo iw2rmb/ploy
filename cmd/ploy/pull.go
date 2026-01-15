@@ -36,6 +36,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // pullState represents the persisted state for a pull operation.
@@ -101,7 +102,7 @@ func handlePull(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("pull: %w", err)
 	}
-	_, _ = fmt.Fprintf(stderr, "pull: resolved origin %q → %s\n", *origin, rawOriginURL)
+	_, _ = fmt.Fprintf(stderr, "pull: resolved origin %q → %s\n", *origin, vcs.NormalizeRepoURLSchemless(rawOriginURL))
 
 	// Step 4: Get current HEAD SHA.
 	headSHA, err := resolveHeadSHA(ctx)

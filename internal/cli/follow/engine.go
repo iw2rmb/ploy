@@ -3,14 +3,18 @@
 package follow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
@@ -19,6 +23,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // Config holds follow engine configuration.
@@ -29,16 +34,21 @@ type Config struct {
 
 // RepoEntry represents a repo in the run.
 type RepoEntry struct {
-	RepoID    domaintypes.ModRepoID `json:"repo_id"`
-	RepoURL   string                `json:"repo_url"`
-	BaseRef   string                `json:"base_ref"`
-	TargetRef string                `json:"target_ref"`
-	Status    store.RunRepoStatus   `json:"status"`
-	Attempt   int32                 `json:"attempt"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoURL    string                `json:"repo_url"`
+	BaseRef    string                `json:"base_ref"`
+	TargetRef  string                `json:"target_ref"`
+	Status     store.RunRepoStatus   `json:"status"`
+	Attempt    int32                 `json:"attempt"`
+	LastError  *string               `json:"last_error,omitempty"`
+	CreatedAt  time.Time             `json:"created_at"`
+	StartedAt  *time.Time            `json:"started_at,omitempty"`
+	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
 
 // spinnerFrames defines the animation frames for the running spinner.
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+var spinnerFrames = []string{"⣾ ", "⣽ ", "⣻ ", "⢿ ", "⡿ ", "⣟ ", "⣯ ", "⣷ "}
 
 // Engine manages the follow mode rendering loop.
 type Engine struct {
@@ -53,13 +63,24 @@ type Engine struct {
 	repoURLs     map[domaintypes.ModRepoID]string // RepoID -> RepoURL
 	repoJobs     map[domaintypes.ModRepoID][]runs.RepoJobEntry
 	spinnerFrame int // Current spinner animation frame
+
+	renderedLines int  // number of lines rendered in last frame
+	renderStarted bool // whether we've emitted initial frame controls
 }
+
+type refreshKind int
+
+const (
+	refreshJobs refreshKind = iota
+	refreshReposAndJobs
+)
 
 // NewEngine creates a follow engine.
 func NewEngine(httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, cfg Config) *Engine {
 	streamClient := stream.Client{
 		HTTPClient: httpClient,
 		MaxRetries: cfg.MaxRetries,
+		Logger:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
 	return &Engine{
 		client:    httpClient,
@@ -75,7 +96,9 @@ func NewEngine(httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunI
 
 // Run executes the follow loop until run reaches terminal state.
 func (e *Engine) Run(ctx context.Context) (modsapi.RunState, error) {
-	// 1. Initial fetch of repos and jobs
+	defer e.showCursor()
+
+	// 1. Initial fetch of repos and jobs.
 	if err := e.refreshRepos(ctx); err != nil {
 		return "", err
 	}
@@ -91,38 +114,86 @@ func (e *Engine) Run(ctx context.Context) (modsapi.RunState, error) {
 	}
 
 	var finalState modsapi.RunState
+	finalMu := &sync.Mutex{}
+
+	refreshCh := make(chan refreshKind, 1)
+	streamErrCh := make(chan error, 1)
+
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
 		case "run":
 			var summary modsapi.RunSummary
 			if err := json.Unmarshal(evt.Data, &summary); err == nil {
 				if isTerminalState(summary.State) {
+					finalMu.Lock()
 					finalState = summary.State
-					// Final refresh and render
-					_ = e.refreshRepos(ctx)
-					_ = e.refreshAllJobs(ctx)
-					e.render()
+					finalMu.Unlock()
+					select {
+					case refreshCh <- refreshReposAndJobs:
+					default:
+					}
 					return stream.ErrDone
 				}
 			}
-			// Refresh repos and jobs on run event (new repos may have been added)
-			_ = e.refreshRepos(ctx)
-			_ = e.refreshAllJobs(ctx)
-			e.render()
+			// Refresh repos and jobs on run event (new repos may have been added).
+			select {
+			case refreshCh <- refreshReposAndJobs:
+			default:
+			}
 		case "stage":
-			// Refresh on stage changes (job status updates)
-			_ = e.refreshAllJobs(ctx)
-			e.render()
-			// Ignore "log" events - we don't display logs in follow mode
+			// Refresh on stage changes (job status updates).
+			select {
+			case refreshCh <- refreshJobs:
+			default:
+			}
 		}
 		return nil
 	}
 
-	if err := e.streamCli.Stream(ctx, endpoint, handler); err != nil {
-		return "", err
-	}
+	go func() {
+		streamErrCh <- e.streamCli.Stream(ctx, endpoint, handler)
+	}()
 
-	return finalState, nil
+	// Periodic ticks:
+	// - renderTicker drives the spinner and running duration updates
+	// - refreshTicker keeps job status snapshots fresh even if SSE only emits logs
+	const renderInterval = 200 * time.Millisecond
+	const refreshInterval = 1 * time.Second
+	renderTicker := time.NewTicker(renderInterval)
+	refreshTicker := time.NewTicker(refreshInterval)
+	defer renderTicker.Stop()
+	defer refreshTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case err := <-streamErrCh:
+			// Final refresh + render for a stable terminal snapshot.
+			_ = e.refreshRepos(ctx)
+			_ = e.refreshAllJobs(ctx)
+			e.render()
+
+			if err != nil {
+				return "", err
+			}
+			finalMu.Lock()
+			out := finalState
+			finalMu.Unlock()
+			return out, nil
+		case kind := <-refreshCh:
+			if kind == refreshReposAndJobs {
+				_ = e.refreshRepos(ctx)
+			}
+			_ = e.refreshAllJobs(ctx)
+			e.render()
+		case <-refreshTicker.C:
+			_ = e.refreshAllJobs(ctx)
+			e.render()
+		case <-renderTicker.C:
+			e.render()
+		}
+	}
 }
 
 // refreshRepos fetches the current repos in the run.
@@ -160,11 +231,13 @@ func (e *Engine) refreshRepos(ctx context.Context) error {
 			e.repoOrder = append(e.repoOrder, repo.RepoID)
 		}
 		// Update or set repo URL
-		url := repo.RepoURL
-		if url == "" {
-			url = repo.RepoID.String()
+		repoURL := strings.TrimSpace(repo.RepoURL)
+		if repoURL == "" {
+			repoURL = repo.RepoID.String()
+		} else {
+			repoURL = vcs.NormalizeRepoURLSchemless(repoURL)
 		}
-		e.repoURLs[repo.RepoID] = url
+		e.repoURLs[repo.RepoID] = repoURL
 	}
 
 	return nil
@@ -206,34 +279,86 @@ func (e *Engine) render() {
 		return
 	}
 
-	// Clear screen and move cursor to top (ANSI escape codes)
-	fmt.Fprint(out, "\033[2J\033[H")
+	// Build the full frame into a buffer so we can count lines and redraw in-place.
+	var buf bytes.Buffer
+	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', 0)
+
+	fmt.Fprintln(tw, "Repo\tIndex\tModType\tJob ID\tNodeID\tImage\tSpin\tDuration\tStatus")
 
 	for _, repoID := range e.repoOrder {
 		repoURL := e.repoURLs[repoID]
 		jobs := e.repoJobs[repoID]
 
-		fmt.Fprintf(out, "%s\n", repoURL)
+		if len(jobs) == 0 {
+			fmt.Fprintf(tw, "%s\t\t\t\t\t\t\t\t\n", repoURL)
+			continue
+		}
 
-		for _, job := range jobs {
-			displayName := job.DisplayName
-			if displayName == "" {
-				displayName = job.Name
+		for i, job := range jobs {
+			repoCol := ""
+			if i == 0 {
+				repoCol = repoURL
+			}
+
+			nodeID := "-"
+			if job.NodeID != nil && !job.NodeID.IsZero() {
+				nodeID = job.NodeID.String()
+			}
+			image := strings.TrimSpace(job.ModImage)
+			if image == "" {
+				image = "-"
 			}
 
 			glyph := statusGlyph(string(job.Status), e.spinnerFrame)
 			duration := formatDuration(job)
 			status := strings.ToLower(string(job.Status))
 
-			fmt.Fprintf(out, "  %v %s %s %s %s %s %s\n",
-				job.StepIndex.Float64(), job.ModType, job.JobID.String(),
-				displayName, glyph, duration, status)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				repoCol,
+				formatStepIndex(job.StepIndex),
+				job.ModType,
+				job.JobID.String(),
+				nodeID,
+				image,
+				glyph,
+				duration,
+				status,
+			)
 		}
-		fmt.Fprintln(out)
+		fmt.Fprintln(tw)
 	}
+
+	_ = tw.Flush()
+	frame := buf.String()
+	lines := strings.Count(frame, "\n")
+
+	// In-place redraw: move cursor up over the previously rendered frame and clear.
+	// This keeps output stable (like package managers / docker build) instead of
+	// jumping to the top of the terminal each frame.
+	if !e.renderStarted {
+		// Hide cursor while animating to reduce flicker.
+		fmt.Fprint(out, "\x1b[?25l")
+		e.renderStarted = true
+	} else if e.renderedLines > 0 {
+		fmt.Fprintf(out, "\x1b[%dA", e.renderedLines)
+		fmt.Fprint(out, "\x1b[J")
+	}
+	fmt.Fprint(out, frame)
+	e.renderedLines = lines
 
 	// Advance spinner frame for next render
 	e.spinnerFrame++
+}
+
+func (e *Engine) showCursor() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.config.Output == nil {
+		return
+	}
+	if e.renderStarted {
+		fmt.Fprint(e.config.Output, "\x1b[?25h")
+	}
 }
 
 // statusGlyph returns the display glyph for a job status.
@@ -249,11 +374,17 @@ func statusGlyph(status string, spinnerFrame int) string {
 		return "✗"
 	case "cancelled":
 		return "○"
+	case "created":
+		return "·"
 	case "queued":
 		return "·"
 	default:
 		return " "
 	}
+}
+
+func formatStepIndex(v domaintypes.StepIndex) string {
+	return strconv.FormatFloat(float64(v), 'f', -1, 64)
 }
 
 func formatDuration(job runs.RepoJobEntry) string {

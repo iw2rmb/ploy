@@ -36,6 +36,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleRunPull implements `ploy run pull [--origin <remote>] [--dry-run] <run-id>`.
@@ -111,7 +112,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Log progress for user visibility.
-	_, _ = fmt.Fprintf(stderr, "run pull: resolved origin %q → %s\n", *origin, rawOriginURL)
+	_, _ = fmt.Fprintf(stderr, "run pull: resolved origin %q → %s\n", *origin, vcs.NormalizeRepoURLSchemless(rawOriginURL))
 
 	// Step 4: Resolve repo execution via POST /v1/runs/{run_id}/pull.
 	// This is the v1 API that replaces the legacy repo-centric lookup.

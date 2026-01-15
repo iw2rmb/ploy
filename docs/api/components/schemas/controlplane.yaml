@@ -1061,10 +1061,17 @@ RepoJobItem:
     mod_type:
       type: string
       description: Job phase type (pre_gate, mod, post_gate, heal, re_gate, mr)
+    mod_image:
+      type: string
+      description: Container image used for this job (may be empty)
     step_index:
       type: number
       format: float
       description: Numeric step index for ordering (matches domaintypes.StepIndex)
+    node_id:
+      type: string
+      nullable: true
+      description: Node ID that claimed/executed this job (NanoID 6-character string)
     status:
       type: string
       description: Job status (Created, Queued, Running, Success, Fail, Cancelled)
@@ -1090,6 +1097,7 @@ RepoJobItem:
     - job_id
     - name
     - mod_type
+    - mod_image
     - step_index
     - status
     - duration_ms
