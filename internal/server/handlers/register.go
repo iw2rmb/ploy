@@ -77,6 +77,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
 	// Repo-scoped artifact listing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(st), auth.RoleControlPlane)
+	// Repo-scoped job listing for --follow mode.
+	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/jobs", listRunRepoJobsHandler(st), auth.RoleControlPlane)
 	// Repo-scoped cancel (replacement for DELETE /v1/runs/{id}/repos/{repo_id}).
 	s.HandleFunc("POST /v1/runs/{run_id}/repos/{repo_id}/cancel", cancelRunRepoHandlerV1(st), auth.RoleControlPlane)
 	// Pull resolution for run repos.

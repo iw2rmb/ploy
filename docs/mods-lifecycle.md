@@ -1067,12 +1067,26 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Constructs `RunSubmitRequest` with stage definitions in
     `cmd/ploy/mod_run_exec.go`.
   - Submits via `internal/cli/mods.SubmitCommand`.
-  - Optional `--follow` streams run logs/events via
-    `internal/cli/mods.EventsCommand`, backed by `internal/cli/stream`.
+  - Optional `--follow` displays a summarized per-repo job graph until completion,
+    implemented via `internal/cli/follow.Engine`. The job graph refreshes on
+    SSE events from `/v1/runs/{id}/logs` but does not stream container logs.
+    Use `ploy run logs <run-id>` to stream logs.
 
-- `ploy run logs < run>`:
+- `ploy mod run <mod-id|name>`:
+  - Creates a run from a mod project via `cmd/ploy/mod_run_project.go`.
+  - Supports `--repo`, `--failed` for repo selection.
+  - Optional `--follow` displays the job graph until completion.
+
+- `ploy pull`:
+  - Local repo pull workflow via `cmd/ploy/pull.go`.
+  - Ensures a run exists for the current HEAD SHA and pulls diffs.
+  - Optional `--follow` displays the job graph and proceeds to pull diffs.
+  - Maintains per-repo pull state in `<git-dir>/ploy/pull_state.json`.
+
+- `ploy run logs <run-id>`:
   - Streams logs/events from `/v1/runs/{id}/logs`, focusing on `log` and
     `retention` events (see `internal/cli/mods/logs.go`).
+  - This is the canonical surface for streaming container stdout/stderr.
 
 - Run summaries (gate/MR/job graph) are exposed via:
   - `ploy run status <run-id>` (CLI)

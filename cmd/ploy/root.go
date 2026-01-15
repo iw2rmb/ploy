@@ -61,8 +61,9 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	// Each builder function creates a cobra command tree with proper subcommand structure.
 
 	// Mods workflow commands
-	root.AddCommand(newModCmd(stderr)) // ploy mod (run, fetch, cancel, inspect, artifacts, diffs)
-	root.AddCommand(newRunCmd(stderr)) // ploy run (events, inspect)
+	root.AddCommand(newModCmd(stderr))  // ploy mod (run, fetch, cancel, inspect, artifacts, diffs)
+	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
+	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
 	// Cluster and configuration commands
 	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (deploy, node, rollout, token)
@@ -100,6 +101,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 					printModUsage(stderr)
 				case "run":
 					printRunUsage(stderr)
+				case "pull":
+					printPullUsage(stderr)
 				case "cluster":
 					printClusterUsage(stderr)
 				case "config":

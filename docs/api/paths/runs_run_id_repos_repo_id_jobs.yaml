@@ -1,0 +1,61 @@
+get:
+  tags: [Control]
+  summary: List jobs for a repo execution within a run
+  description: |
+    Returns all jobs for a specific repository execution within a run.
+    This endpoint is used by the `--follow` job graph display.
+
+    Behavior:
+    - Returns jobs for the **current attempt** of the repo execution (default).
+    - Optional `?attempt=N` parameter to query a specific attempt.
+    - Jobs are ordered by `(step_index ASC, name ASC, id ASC)` for stable UI ordering.
+    - Includes `display_name` extracted from job meta (mods_step_name) for mod jobs.
+
+    Response shape: `ListRepoJobsResponse`
+  parameters:
+    - in: path
+      name: run_id
+      required: true
+      schema:
+        type: string
+      # Run IDs are KSUID strings (27 characters, lexicographically sortable).
+      description: Run ID (KSUID string)
+    - in: path
+      name: repo_id
+      required: true
+      schema:
+        type: string
+      # Repo IDs are NanoID strings (8 characters, URL-safe alphabet).
+      description: Repo ID (NanoID 8-character string)
+    - in: query
+      name: attempt
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: Specific attempt number to query. Defaults to current (latest) attempt.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/ListRepoJobsResponse'
+    '400':
+      description: Bad request (missing or empty run_id or repo_id)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found (run or repo not found)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

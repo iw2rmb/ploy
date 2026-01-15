@@ -60,6 +60,11 @@ type JobMeta struct {
 	// Build contains build tool metadata when Kind is JobKindBuild.
 	// This includes tool name, command, status details, and metrics.
 	Build *BuildMeta `json:"build,omitempty"`
+
+	// ModsStepName stores the user-defined step name from ModsSpec.Steps[i].Name
+	// for mod jobs. Used by the CLI to display a friendly name in --follow mode.
+	// Only populated for mod jobs (kind="mod") when a step name is provided.
+	ModsStepName string `json:"mods_step_name,omitempty"`
 }
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
@@ -156,6 +161,13 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 // that don't carry gate or build metadata.
 func NewModJobMeta() *JobMeta {
 	return &JobMeta{Kind: JobKindMod}
+}
+
+// NewModJobMetaWithStepName creates a JobMeta for mod execution jobs
+// with a user-defined step name. The step name is used by the CLI
+// to display a friendly name in --follow mode.
+func NewModJobMetaWithStepName(stepName string) *JobMeta {
+	return &JobMeta{Kind: JobKindMod, ModsStepName: stepName}
 }
 
 // NewGateJobMeta creates a JobMeta for gate validation jobs.

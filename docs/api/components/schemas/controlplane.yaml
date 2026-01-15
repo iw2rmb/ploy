@@ -1041,3 +1041,82 @@ RepoRunSummary:
     - base_ref
     - target_ref
     - attempt
+
+# -------------------------------------------------------------------------
+# Repo-scoped job listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
+# -------------------------------------------------------------------------
+
+RepoJobItem:
+  type: object
+  description: |
+    Job entry for a repo execution within a run.
+    Used by the --follow job graph display in CLI.
+  properties:
+    job_id:
+      type: string
+      description: Job identifier (KSUID string)
+    name:
+      type: string
+      description: Job name (e.g., "mod-0", "pre-gate", "heal")
+    mod_type:
+      type: string
+      description: Job phase type (pre_gate, mod, post_gate, heal, re_gate, mr)
+    step_index:
+      type: number
+      format: float
+      description: Numeric step index for ordering (matches domaintypes.StepIndex)
+    status:
+      type: string
+      description: Job status (Created, Queued, Running, Success, Fail, Cancelled)
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when job execution started
+    finished_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when job completed
+    duration_ms:
+      type: integer
+      format: int64
+      description: Job duration in milliseconds (0 if not finished)
+    display_name:
+      type: string
+      nullable: true
+      description: User-friendly step name from spec (for mod jobs)
+  required:
+    - job_id
+    - name
+    - mod_type
+    - step_index
+    - status
+    - duration_ms
+
+ListRepoJobsResponse:
+  type: object
+  description: |
+    Response from GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
+    Lists all jobs for a specific repo execution within a run.
+  properties:
+    run_id:
+      type: string
+      description: Run identifier (KSUID string)
+    repo_id:
+      type: string
+      description: Repository identifier (NanoID string)
+    attempt:
+      type: integer
+      format: int32
+      description: Attempt number for this repo execution
+    jobs:
+      type: array
+      items:
+        $ref: '#/RepoJobItem'
+      description: Jobs for this repo execution, ordered by step_index
+  required:
+    - run_id
+    - repo_id
+    - attempt
+    - jobs

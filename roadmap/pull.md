@@ -6,11 +6,12 @@ Add a new top-level CLI command `ploy pull` that:
 - ensures a Mods run exists for the **current local repo HEAD SHA** (recorded at initiation time),
 - and then pulls the resulting diffs into the local git worktree (via the existing pull mechanics).
 
-This roadmap is for future work. It documents intended behavior at HEAD and what will change.
+This document started as a roadmap. The `ploy pull` command is now implemented at HEAD; remaining sections are retained as design notes.
 
 ## Current state (HEAD)
 
-There is no top-level `ploy pull` command.
+Implemented at HEAD:
+- Top-level `ploy pull` command exists (`cmd/ploy/pull.go`).
 
 Related existing commands:
 - `ploy run pull <run-id>`: pulls diffs from a specific run into the current repo (`cmd/ploy/run_pull.go` + git helpers in `cmd/ploy/pull_helpers.go`).
@@ -35,7 +36,7 @@ New command:
 
 New flags (v0):
 - `--new-run`: force initiating a new run and overwriting the local pull state.
-- `--follow`: follow run progress until terminal (new meaning; see `roadmap/follow.md`).
+- `--follow`: follow run progress until terminal (job graph; see `internal/cli/follow/engine.go`).
 
 Reused flags (consistent with existing pull commands):
 - `--origin <remote>`: git remote to match (default `origin`) (matches `cmd/ploy/run_pull.go`, `cmd/ploy/mod_pull.go`).
@@ -43,7 +44,7 @@ Reused flags (consistent with existing pull commands):
 
 Non-goals (v0):
 - No “last-failed/last-succeeded” selection. `ploy pull` is HEAD-SHA keyed, not “latest run” keyed.
-- No compatibility behavior for the current `--follow` meaning (log streaming). Use `ploy run logs` (and the new follow behavior in `roadmap/follow.md`).
+- No compatibility behavior for the old `--follow` meaning (log streaming). Use `ploy run logs`.
 
 ### Behavior
 

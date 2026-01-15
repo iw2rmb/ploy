@@ -33,7 +33,7 @@ Treat them as opaque identifiers when passing them between commands or scripts.
 
 Note on `--json` output:
 - When `--json` is supplied (e.g., `ploy mod run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, optional `artifact_dir`, `mr_url`).
-- Human‑readable progress and logs continue to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
+- Human‑readable progress continues to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
 
 Quick capture example:
 ```bash
@@ -50,8 +50,14 @@ compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
-flow into stage metadata so the control plane can respect concurrency/timebox controls. `--cap` enforces an overall
-time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
+flow into stage metadata so the control plane can respect concurrency/timebox controls.
+
+When `--follow` is set, the CLI displays a summarized per-repo job graph that
+refreshes until the run reaches a terminal state. The job graph shows step index,
+job type, job ID, display name, status glyph, duration, and status for each job.
+Note: `--follow` does not stream container logs. Use `ploy run logs <run-id>` for log streaming.
+
+`--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests.
@@ -101,7 +107,7 @@ A single-repo run specifies all repository parameters inline with the initial co
 The run executes immediately against that repository:
 
 ```bash
-# Single repository run — executes mods against one repo and follows logs.
+# Single repository run — executes mods against one repo and follows job graph.
 ploy mod run --spec mod.yaml \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
@@ -243,6 +249,57 @@ ploy mod pull --last-failed <mod-id|name>
 - Working tree must be clean (commit or stash changes first).
 - The origin remote URL must match the `repo_url` used when the run was created.
 - The run must exist and have diffs available.
+
+### Local Repo Pull Workflow (`ploy pull`)
+
+For a streamlined local development workflow, `ploy pull` manages the entire
+run lifecycle for your current repo HEAD. It tracks run state locally and
+handles run initiation, following, and diff pulling automatically.
+
+```bash
+# In your local repo, initiate/reuse a run and pull diffs when done.
+ploy pull --follow
+
+# Force a new run even if one already exists for this HEAD.
+ploy pull --new-run --follow
+
+# Preview what would happen without making changes.
+ploy pull --dry-run
+```
+
+**How it works:**
+1. Reads the current HEAD SHA via `git rev-parse HEAD`.
+2. Checks for saved pull state in `<git-dir>/ploy/pull_state.json`.
+3. If no state exists or `--new-run` is set: infers the mod from the repo
+   and creates a mod-project run scoped to this repo.
+4. If state exists and SHA matches: reuses the saved run ID.
+5. If SHA mismatch: requires `--new-run` to initiate a fresh run.
+6. With `--follow`: displays a job graph until run completes.
+7. On success: pulls diffs using the same logic as `ploy run pull`.
+
+**Flags:**
+- `--new-run` — Force initiating a new run, overwriting any saved pull state.
+- `--follow` — Follow the run until completion (displays job graph).
+- `--origin <remote>` — Git remote to match (default: `origin`).
+- `--dry-run` — Validate and print planned actions without mutating.
+- `--cap <duration>` — Optional time cap for `--follow` (e.g., `30m`, `1h`).
+- `--cancel-on-cap` — Cancel run if cap exceeded.
+
+**Examples:**
+
+```bash
+# Full workflow: initiate (or reuse) run, follow until done, pull diffs.
+ploy pull --follow
+
+# Force a fresh run even if the current HEAD already has one.
+ploy pull --new-run --follow
+
+# Check if a previous run succeeded and pull diffs (no --follow).
+ploy pull
+
+# Preview what would happen.
+ploy pull --dry-run
+```
 
 ---
 

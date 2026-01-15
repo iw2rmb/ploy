@@ -19,6 +19,7 @@ info:
       - `/diffs` — list diffs for a repo execution.
       - `/logs` — SSE stream of logs/events for a repo execution.
       - `/artifacts` — list artifact bundles for a repo execution.
+      - `/jobs` — list jobs for a repo execution (for --follow job graph).
       - `/cancel` — cancel a repo execution within a run.
       - `/restart` — restart a repo execution within a run.
     - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.
@@ -153,6 +154,9 @@ paths:
   # Repo-scoped artifact listing — filters artifacts to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/artifacts:
     $ref: './paths/runs_run_id_repos_repo_id_artifacts.yaml'
+  # Repo-scoped jobs listing — lists jobs for a repo execution
+  /v1/runs/{run_id}/repos/{repo_id}/jobs:
+    $ref: './paths/runs_run_id_repos_repo_id_jobs.yaml'
   # Repo-scoped cancel — cancels a single repo execution within a run
   /v1/runs/{run_id}/repos/{repo_id}/cancel:
     $ref: './paths/runs_run_id_repos_repo_id_cancel.yaml'
@@ -309,6 +313,11 @@ components:
       $ref: './components/schemas/controlplane.yaml#/DiffItem'
     DiffListResponse:
       $ref: './components/schemas/controlplane.yaml#/DiffListResponse'
+    # Repo-scoped jobs listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
+    RepoJobItem:
+      $ref: './components/schemas/controlplane.yaml#/RepoJobItem'
+    ListRepoJobsResponse:
+      $ref: './components/schemas/controlplane.yaml#/ListRepoJobsResponse'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed
