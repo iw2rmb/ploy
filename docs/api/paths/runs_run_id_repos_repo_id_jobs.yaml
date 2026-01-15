@@ -9,7 +9,7 @@ get:
     - Returns jobs for the **current attempt** of the repo execution (default).
     - Optional `?attempt=N` parameter to query a specific attempt.
     - Jobs are ordered by `(step_index ASC, name ASC, id ASC)` for stable UI ordering.
-    - Includes `display_name` extracted from job meta (mods_step_name) for mod jobs.
+    - Includes `node_id` and `mod_image` from the jobs table for CLI display.
 
     Response shape: `ListRepoJobsResponse`
   parameters:

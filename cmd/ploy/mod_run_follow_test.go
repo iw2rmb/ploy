@@ -298,8 +298,8 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 		t.Errorf("expected success in output, got: %s", out)
 	}
 
-	// Verify job graph output contains repo URL and job info.
-	if !strings.Contains(out, "https://example.com/repo.git") {
+	// Verify job graph output contains repo URL (scheme-less normalized) and job info.
+	if !strings.Contains(out, "example.com/repo") {
 		t.Errorf("expected repo URL in output, got: %s", out)
 	}
 	if !strings.Contains(out, "mod") {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleModRepo routes mod repo subcommands.
@@ -121,7 +122,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Repo added: %s (url: %s)\n", result.ID.String(), result.RepoURL)
+	_, _ = fmt.Fprintf(stderr, "Repo added: %s (url: %s)\n", result.ID.String(), vcs.NormalizeRepoURLSchemless(result.RepoURL))
 	return nil
 }
 
@@ -181,7 +182,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	for _, repo := range results {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			repo.ID.String(),
-			repo.RepoURL,
+			vcs.NormalizeRepoURLSchemless(repo.RepoURL),
 			repo.BaseRef.String(),
 			repo.TargetRef.String(),
 			repo.CreatedAt.Format(time.RFC3339),

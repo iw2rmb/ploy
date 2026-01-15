@@ -309,3 +309,59 @@ func TestNormalizeRepoURL_Idempotent(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeRepoURLSchemless(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "https without .git",
+			input:    "https://github.com/org/repo",
+			expected: "github.com/org/repo",
+		},
+		{
+			name:     "https with .git",
+			input:    "https://github.com/org/repo.git",
+			expected: "github.com/org/repo",
+		},
+		{
+			name:     "ssh scheme with user",
+			input:    "ssh://git@github.com/org/repo.git",
+			expected: "github.com/org/repo",
+		},
+		{
+			name:     "scp style with user",
+			input:    "git@github.com:org/repo.git",
+			expected: "github.com/org/repo",
+		},
+		{
+			name:     "https with port retains port",
+			input:    "https://github.com:443/org/repo.git",
+			expected: "github.com:443/org/repo",
+		},
+		{
+			name:     "file scheme becomes path",
+			input:    "file:///path/to/repo.git",
+			expected: "/path/to/repo",
+		},
+		{
+			name:     "empty",
+			input:    "   ",
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := NormalizeRepoURLSchemless(tc.input)
+			if got != tc.expected {
+				t.Fatalf("NormalizeRepoURLSchemless(%q)=%q, want %q", tc.input, got, tc.expected)
+			}
+		})
+	}
+}

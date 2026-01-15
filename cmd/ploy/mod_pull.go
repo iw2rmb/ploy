@@ -29,6 +29,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleModPull implements `ploy mod pull [--origin <remote>] [--dry-run] [--last-failed] [<mod-id|name>]`.
@@ -113,7 +114,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("mod pull: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "mod pull: resolved origin %q → %s\n", *origin, rawOriginURL)
+	_, _ = fmt.Fprintf(stderr, "mod pull: resolved origin %q → %s\n", *origin, vcs.NormalizeRepoURLSchemless(rawOriginURL))
 
 	// Step 4: Get control plane connection.
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
