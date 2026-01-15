@@ -154,25 +154,20 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
 	f := stepIndex.Float64()
-	if math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, fmt.Errorf("invalid step_index %v", f)
-	}
-	if f != math.Trunc(f) {
-		return 0, fmt.Errorf("step_index %v is not an integer", f)
-	}
-	if f < jobStepIndexModStart {
-		return 0, fmt.Errorf("step_index %v is too small for a mod step", f)
+
+	// Validate: must be a finite integer >= jobStepIndexModStart and multiple of 1000.
+	if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) {
+		return 0, fmt.Errorf("step_index %v is not a valid integer", f)
 	}
 
-	// Server job layout (internal contract):
-	// - pre-gate=1000
-	// - mod-N=2000+N*1000
-	// - post-gate=2000+(len(steps))*1000
-	thousands := int64(f) / jobStepIndexInterval
-	if int64(f) != thousands*jobStepIndexInterval {
-		return 0, fmt.Errorf("step_index %v is not a multiple of 1000", f)
+	idx := int64(f)
+	if idx < jobStepIndexModStart || idx%jobStepIndexInterval != 0 {
+		return 0, fmt.Errorf("step_index %v is not a valid mod step (must be >= %d and multiple of %d)",
+			f, jobStepIndexModStart, jobStepIndexInterval)
 	}
-	return int(thousands) - 2, nil
+
+	// Server job layout: mod-N = 2000 + N*1000, so N = (idx/1000) - 2
+	return int(idx/jobStepIndexInterval) - 2, nil
 }
 
 // executeHealingJob runs a healing container job.

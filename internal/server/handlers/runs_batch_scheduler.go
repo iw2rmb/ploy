@@ -87,7 +87,9 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 		if len(jobs) == 0 {
 			if err := createJobsFromSpec(ctx, s.store, runID, rr.RepoID, rr.RepoBaseRef, rr.Attempt, spec.Spec); err != nil {
 				slog.Error("start queued repos: create jobs failed", "run_id", runIDStr, "repo_id", rr.RepoID, "attempt", rr.Attempt, "err", err)
-				_ = s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{RunID: runID, RepoID: rr.RepoID, LastError: ptr(fmt.Sprintf("create jobs: %v", err))})
+				if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{RunID: runID, RepoID: rr.RepoID, LastError: ptr(fmt.Sprintf("create jobs: %v", err))}); updateErr != nil {
+					slog.Error("start queued repos: update repo error failed", "run_id", runIDStr, "repo_id", rr.RepoID, "err", updateErr)
+				}
 				continue
 			}
 			result.Started++
