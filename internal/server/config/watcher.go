@@ -161,6 +161,15 @@ func (w *Watcher) loop(watcher *fsnotify.Watcher) {
 }
 
 func (w *Watcher) reload() {
+	// Check if watcher is still running before processing reload.
+	// This guards against debounce timer callbacks firing after Stop().
+	w.mu.Lock()
+	if !w.running {
+		w.mu.Unlock()
+		return
+	}
+	w.mu.Unlock()
+
 	w.logger.Info("config file changed, reloading", "path", w.path)
 	cfg, err := Load(w.path)
 	if err != nil {

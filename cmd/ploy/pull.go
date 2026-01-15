@@ -274,6 +274,7 @@ func resolveGitDir(ctx context.Context) (string, error) {
 
 // loadPullState loads pull state from the given path.
 // Returns the state and true if it exists, or empty state and false if not.
+// Logs a warning if the file exists but contains invalid JSON.
 func loadPullState(path string) (pullState, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -281,6 +282,8 @@ func loadPullState(path string) (pullState, bool) {
 	}
 	var state pullState
 	if err := json.Unmarshal(data, &state); err != nil {
+		// File exists but is corrupt - log warning so users know state was ignored.
+		_, _ = fmt.Fprintf(os.Stderr, "pull: warning: corrupt state file %s (ignored): %v\n", path, err)
 		return pullState{}, false
 	}
 	return state, true
