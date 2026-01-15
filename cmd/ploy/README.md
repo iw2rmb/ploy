@@ -271,7 +271,8 @@ ploy pull --dry-run
 1. Reads the current HEAD SHA via `git rev-parse HEAD`.
 2. Checks for saved pull state in `<git-dir>/ploy/pull_state.json`.
 3. If no state exists or `--new-run` is set: infers the mod from the repo
-   and creates a mod-project run scoped to this repo.
+   and creates a mod-project run scoped to this repo (unless `--dry-run`, which
+   prints intended actions and exits without initiating a run or saving state).
 4. If state exists and SHA matches: reuses the saved run ID.
 5. If SHA mismatch: requires `--new-run` to initiate a fresh run.
 6. With `--follow`: displays a job graph until run completes.
@@ -281,7 +282,8 @@ ploy pull --dry-run
 - `--new-run` — Force initiating a new run, overwriting any saved pull state.
 - `--follow` — Follow the run until completion (displays job graph).
 - `--origin <remote>` — Git remote to match (default: `origin`).
-- `--dry-run` — Validate and print planned actions without mutating.
+- `--dry-run` — Validate and print planned actions without mutating. Does not initiate
+  a run or save pull state.
 - `--cap <duration>` — Optional time cap for `--follow` (e.g., `30m`, `1h`).
 - `--cancel-on-cap` — Cancel run if cap exceeded.
 
