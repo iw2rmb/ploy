@@ -48,7 +48,7 @@ type pullState struct {
 }
 
 // handlePull implements `ploy pull [--new-run] [--follow] [--origin <remote>] [--dry-run]`.
-// See roadmap/pull.md for full behavior specification.
+// See cmd/ploy/README.md for user-facing behavior.
 func handlePull(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	for _, arg := range args {
@@ -91,11 +91,9 @@ func handlePull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("pull: %w", err)
 	}
 
-	// Step 2: Verify working tree is clean (unless --dry-run).
-	if !*dryRun {
-		if err := ensureCleanWorkingTree(ctx); err != nil {
-			return fmt.Errorf("pull: %w", err)
-		}
+	// Step 2: Verify working tree is clean.
+	if err := ensureCleanWorkingTree(ctx); err != nil {
+		return fmt.Errorf("pull: %w", err)
 	}
 
 	// Step 3: Resolve git remote URL.
@@ -132,6 +130,11 @@ func handlePull(args []string, stderr io.Writer) error {
 	switch {
 	case *newRun:
 		// --new-run: always initiate a new run.
+		if *dryRun {
+			_, _ = fmt.Fprintln(stderr, "pull: --dry-run: would initiate a new run (--new-run)")
+			_, _ = fmt.Fprintln(stderr, "\nDry run complete. No run was initiated and no state was saved.")
+			return nil
+		}
 		_, _ = fmt.Fprintln(stderr, "pull: initiating new run (--new-run)")
 		newRunID, err := initiatePullRun(ctx, httpClient, base, rawOriginURL, stderr)
 		if err != nil {
@@ -152,6 +155,11 @@ func handlePull(args []string, stderr io.Writer) error {
 
 	case !stateExists:
 		// No saved state: must initiate a run.
+		if *dryRun {
+			_, _ = fmt.Fprintln(stderr, "pull: --dry-run: no saved pull state; would initiate a run")
+			_, _ = fmt.Fprintln(stderr, "\nDry run complete. No run was initiated and no state was saved.")
+			return nil
+		}
 		_, _ = fmt.Fprintln(stderr, "pull: no saved pull state; initiating run")
 		newRunID, err := initiatePullRun(ctx, httpClient, base, rawOriginURL, stderr)
 		if err != nil {
@@ -171,7 +179,7 @@ func handlePull(args []string, stderr io.Writer) error {
 		_, _ = fmt.Fprintf(stderr, "pull: initiated run %s\n", runID)
 
 		if !*followFlag {
-			return fmt.Errorf("run initiated (%s); rerun with --follow to wait for completion and pull diffs", runID)
+			return fmt.Errorf("run initiated (%s); rerun with --follow to wait for completion, or inspect status with `ploy run status %s`", runID, runID)
 		}
 
 	case state.HeadSHA != headSHA:
@@ -457,17 +465,6 @@ func isTerminalRunState(s modsapi.RunState) bool {
 		return true
 	}
 	return false
-}
-
-// cloneForStream is defined in mod_run_flags.go but we need it here too.
-// Using a local reference to avoid circular dependencies.
-func cloneForStreamPull(client *http.Client) *http.Client {
-	if client == nil {
-		return &http.Client{Timeout: 0}
-	}
-	clone := *client
-	clone.Timeout = 0
-	return &clone
 }
 
 // printPullUsage prints usage for the pull command.

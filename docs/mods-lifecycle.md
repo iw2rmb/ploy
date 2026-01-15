@@ -1081,6 +1081,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Local repo pull workflow via `cmd/ploy/pull.go`.
   - Ensures a run exists for the current HEAD SHA and pulls diffs.
   - Optional `--follow` displays the job graph and proceeds to pull diffs.
+  - `--dry-run` prints planned actions and does not initiate a run or save pull state.
   - Maintains per-repo pull state in `<git-dir>/ploy/pull_state.json`.
 
 - `ploy run logs <run-id>`:
