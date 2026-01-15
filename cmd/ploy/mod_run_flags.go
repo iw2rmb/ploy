@@ -46,7 +46,6 @@ type modRunFlags struct {
 	CapDuration *time.Duration
 	CancelOnCap *bool
 	MaxRetries  *int
-	LogFormat   *string // Log output format: "structured" or "raw"
 
 	// Artifact and output
 	ArtifactDir *string
@@ -83,11 +82,10 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	flags.RepoWorkspaceHint = fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
 
 	// Follow/polling behavior
-	flags.Follow = fs.Bool("follow", false, "follow run logs until completion")
+	flags.Follow = fs.Bool("follow", false, "display job graph until completion")
 	flags.CapDuration = fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
 	flags.CancelOnCap = fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the run if the cap is exceeded")
 	flags.MaxRetries = fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
-	flags.LogFormat = fs.String("log-format", "structured", "log output format: structured (default, with context) or raw (message only)")
 
 	// Artifact and output
 	flags.ArtifactDir = fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
@@ -115,5 +113,5 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 
 // printModRunUsage writes usage information for the mod run command to the provided writer.
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--log-format structured|raw] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--cancel-on-cap] [--artifact-dir <dir>] [--json] [--max-retries N]")
 }

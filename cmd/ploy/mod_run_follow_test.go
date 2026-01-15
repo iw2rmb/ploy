@@ -16,11 +16,12 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
-// End-to-end happy path for 3.1: submit, follow logs/events, download artifacts.
+// End-to-end happy path for 3.1: submit, follow job graph, download artifacts.
 func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	t.Helper()
 
 	runID := domaintypes.NewRunID().String()
+	repoID := domaintypes.NewModRepoID().String()
 	artifactCID := "bafy-artifact-test"
 	stageID := domaintypes.NewJobID()
 	artifactID := "11111111-1111-1111-1111-111111111111"
@@ -39,6 +40,34 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				ModID  string `json:"mod_id"`
 				SpecID string `json:"spec_id"`
 			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos", runID):
+			// Return repos list for follow engine.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"repos": []map[string]interface{}{
+					{
+						"repo_id":    repoID,
+						"repo_url":   "https://example.com/repo.git",
+						"base_ref":   "main",
+						"target_ref": "feature",
+						"status":     "Running",
+						"attempt":    1,
+					},
+				},
+			})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos/%s/jobs", runID, repoID):
+			// Return jobs for repo.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"run_id":  runID,
+				"repo_id": repoID,
+				"attempt": 1,
+				"jobs": []map[string]interface{}{
+					{"job_id": stageID.String(), "name": "mod-0", "mod_type": "mod", "step_index": 2000, "status": "Success", "duration_ms": 100},
+				},
+			})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			// SSE stream: run running -> run succeeded
@@ -152,15 +181,15 @@ func list(dir string) []string {
 	return out
 }
 
-// TestModRunFollowStreamsUnifiedLogs verifies that mod run --follow renders
-// enriched log events using the shared log printer alongside run/stage updates.
-// This test covers the unified log streaming wired in via ROADMAP line 32.
-func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
+// TestModRunFollowShowsJobGraph verifies that mod run --follow displays
+// the job graph with repo URL, job type, status, and display name.
+// This replaces the old log streaming test since --follow now shows job graphs.
+func TestModRunFollowShowsJobGraph(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
-	nodeID := domaintypes.NewNodeKey()
+	repoID := domaintypes.NewModRepoID().String()
 	jobID := domaintypes.NewJobID().String()
 
-	// Control-plane emulator that sends run, stage, and log events.
+	// Control-plane emulator.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
@@ -180,8 +209,36 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 				State: modsapi.RunStateRunning,
 			})
 
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos", runID):
+			// Return repos list for follow engine.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"repos": []map[string]interface{}{
+					{
+						"repo_id":    repoID,
+						"repo_url":   "https://example.com/repo.git",
+						"base_ref":   "main",
+						"target_ref": "feature",
+						"status":     "Running",
+						"attempt":    1,
+					},
+				},
+			})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos/%s/jobs", runID, repoID):
+			// Return jobs for repo with display_name.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"run_id":  runID,
+				"repo_id": repoID,
+				"attempt": 1,
+				"jobs": []map[string]interface{}{
+					{"job_id": jobID, "name": "mod-0", "mod_type": "mod", "step_index": 2000, "status": "Running", "duration_ms": 0, "display_name": "java17-upgrade"},
+				},
+			})
+
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
-			// SSE stream with run, stage, and log events.
+			// SSE stream: run running -> run succeeded.
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
 			if !ok {
@@ -197,18 +254,6 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(runData)
 			_, _ = w.Write([]byte("\n\n"))
-			fl.Flush()
-
-			// Enriched log event with node_id, mod_type, step_index, job_id.
-			_, _ = w.Write([]byte("event: log\n"))
-			logData := fmt.Sprintf(`{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"%s","job_id":"%s","mod_type":"mod","step_index":2000}`, nodeID, jobID)
-			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
-			fl.Flush()
-
-			// Another log without enriched fields (backward compatibility).
-			_, _ = w.Write([]byte("event: log\n"))
-			logData2 := `{"timestamp":"2025-10-22T10:00:01Z","stream":"stderr","line":"Warning message"}`
-			_, _ = w.Write([]byte("data: " + logData2 + "\n\n"))
 			fl.Flush()
 
 			time.Sleep(5 * time.Millisecond)
@@ -253,35 +298,23 @@ func TestModRunFollowStreamsUnifiedLogs(t *testing.T) {
 		t.Errorf("expected success in output, got: %s", out)
 	}
 
-	// Verify enriched log line is rendered with context fields (structured format).
-	if !strings.Contains(out, "node="+nodeID) {
-		t.Errorf("expected enriched log with node_id, got: %s", out)
+	// Verify job graph output contains repo URL and job info.
+	if !strings.Contains(out, "https://example.com/repo.git") {
+		t.Errorf("expected repo URL in output, got: %s", out)
 	}
-	if !strings.Contains(out, "mod=mod") {
-		t.Errorf("expected enriched log with mod_type, got: %s", out)
-	}
-	if !strings.Contains(out, "step=2000") {
-		t.Errorf("expected enriched log with step_index, got: %s", out)
-	}
-	if !strings.Contains(out, "job="+jobID) {
-		t.Errorf("expected enriched log with job_id, got: %s", out)
-	}
-	if !strings.Contains(out, "Step started") {
-		t.Errorf("expected log message content, got: %s", out)
-	}
-
-	// Verify basic log without enriched fields is also rendered.
-	if !strings.Contains(out, "Warning message") {
-		t.Errorf("expected basic log message, got: %s", out)
+	if !strings.Contains(out, "mod") {
+		t.Errorf("expected mod type in output, got: %s", out)
 	}
 }
 
-// TestModRunFollowRawLogFormat verifies that --log-format raw renders logs
-// as message-only (no timestamps or context fields).
-func TestModRunFollowRawLogFormat(t *testing.T) {
+// TestModRunFollowWithMultipleJobs verifies that mod run --follow displays
+// all jobs in the job graph when a run has multiple jobs.
+func TestModRunFollowWithMultipleJobs(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID().String()
+	repoID := domaintypes.NewModRepoID().String()
+	preGateJobID := domaintypes.NewJobID().String()
+	modJobID := domaintypes.NewJobID().String()
+	postGateJobID := domaintypes.NewJobID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -302,6 +335,36 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 				State: modsapi.RunStateRunning,
 			})
 
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos", runID):
+			// Return repos list for follow engine.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"repos": []map[string]interface{}{
+					{
+						"repo_id":    repoID,
+						"repo_url":   "https://example.com/repo.git",
+						"base_ref":   "main",
+						"target_ref": "feature",
+						"status":     "Running",
+						"attempt":    1,
+					},
+				},
+			})
+
+		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos/%s/jobs", runID, repoID):
+			// Return multiple jobs for repo.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"run_id":  runID,
+				"repo_id": repoID,
+				"attempt": 1,
+				"jobs": []map[string]interface{}{
+					{"job_id": preGateJobID, "name": "pre-gate", "mod_type": "pre_gate", "step_index": 1000, "status": "Success", "duration_ms": 50},
+					{"job_id": modJobID, "name": "mod-0", "mod_type": "mod", "step_index": 2000, "status": "Running", "duration_ms": 0},
+					{"job_id": postGateJobID, "name": "post-gate", "mod_type": "post_gate", "step_index": 3000, "status": "Created", "duration_ms": 0},
+				},
+			})
+
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/logs", runID):
 			w.Header().Set("Content-Type", "text/event-stream")
 			fl, ok := w.(http.Flusher)
@@ -320,11 +383,7 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 			_, _ = w.Write([]byte("\n\n"))
 			fl.Flush()
 
-			// Log event with enriched fields.
-			_, _ = w.Write([]byte("event: log\n"))
-			logData := fmt.Sprintf(`{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Raw log line","node_id":"%s","job_id":"%s","mod_type":"gate","step_index":100}`, nodeID, jobID)
-			_, _ = w.Write([]byte("data: " + logData + "\n\n"))
-			fl.Flush()
+			time.Sleep(5 * time.Millisecond)
 
 			// Run succeeded.
 			_, _ = w.Write([]byte("event: run\n"))
@@ -351,7 +410,6 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 		"--repo-base-ref", "main",
 		"--repo-target-ref", "feature",
 		"--follow",
-		"--log-format", "raw",
 	}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
@@ -359,19 +417,19 @@ func TestModRunFollowRawLogFormat(t *testing.T) {
 
 	out := buf.String()
 
-	// Verify raw log line is present (message only).
-	if !strings.Contains(out, "Raw log line") {
-		t.Errorf("expected raw log message, got: %s", out)
+	// Verify run submission and success.
+	if !strings.Contains(out, "submitted") {
+		t.Errorf("expected submission message, got: %s", out)
+	}
+	if !strings.Contains(strings.ToLower(out), "succeeded") {
+		t.Errorf("expected success in output, got: %s", out)
 	}
 
-	// In raw mode, enriched context fields should NOT appear in the log output.
-	// Note: They may still appear in run/stage output, so check specifically
-	// that the log line itself doesn't have the structured prefix.
-	// The raw line "Raw log line" should appear without "node=" prefix on the same line.
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "Raw log line") && strings.Contains(line, "node=") {
-			t.Errorf("raw format should not include node= context, got line: %s", line)
-		}
+	// Verify job types appear in output.
+	if !strings.Contains(out, "pre_gate") {
+		t.Errorf("expected pre_gate in output, got: %s", out)
+	}
+	if !strings.Contains(out, "post_gate") {
+		t.Errorf("expected post_gate in output, got: %s", out)
 	}
 }

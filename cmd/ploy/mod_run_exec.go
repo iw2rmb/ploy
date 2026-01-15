@@ -22,10 +22,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/logs"
+	"github.com/iw2rmb/ploy/internal/cli/follow"
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
-	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
@@ -136,10 +135,9 @@ func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, requ
 	return cmd.Run(ctx)
 }
 
-// followRunEvents streams run logs/events until the run reaches a terminal state or timeout.
-// Returns the final run state and any errors encountered during streaming.
-// When --follow is used, streams both run/stage events and enriched log events using the
-// shared log printer for a unified, informative view of the Mods execution.
+// followRunEvents displays a job graph per repo until the run reaches a terminal state or timeout.
+// Returns the final run state and any errors encountered during the follow loop.
+// The job graph shows step index, job type, job ID, display name, status glyph, duration, and status.
 func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client, runID string, flags *modRunFlags, stderr io.Writer) (modsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
@@ -148,30 +146,12 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 		defer cancel()
 	}
 
-	// Determine log format from flag; default to structured for unified log output.
-	// The format controls how enriched log events are rendered during follow mode.
-	logFormat := logs.FormatStructured
-	if flags.LogFormat != nil && strings.TrimSpace(*flags.LogFormat) == "raw" {
-		logFormat = logs.FormatRaw
-	}
-
-	// Create shared log printer to render enriched log events alongside run/stage updates.
-	// This provides a consistent, informative view when following a Mods run directly.
-	logPrinter := logs.NewPrinter(logFormat, stderr)
-
-	ev := mods.EventsCommand{
-		Client: stream.Client{
-			HTTPClient: cloneForStream(httpClient),
-			MaxRetries: *flags.MaxRetries,
-			// Backoff is handled by the shared SSE backoff policy in stream.Client.
-		},
-		BaseURL:    base,
-		RunID:      domaintypes.RunID(runID), // Convert to domain type
+	engine := follow.NewEngine(cloneForStream(httpClient), base, domaintypes.RunID(runID), follow.Config{
+		MaxRetries: *flags.MaxRetries,
 		Output:     stderr,
-		LogPrinter: logPrinter, // Wire unified logs into follow mode.
-	}
+	})
 
-	final, err := ev.Run(followCtx)
+	final, err := engine.Run(followCtx)
 	if err != nil {
 		// Handle timeout with optional cancellation.
 		if *flags.CapDuration > 0 && followCtx.Err() == context.DeadlineExceeded {

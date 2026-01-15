@@ -186,18 +186,31 @@ Cross-phase inputs are mounted at `/in` (read-only):
 What to expect with the provided E2E images:
 - Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
 
-**Streaming Events and Reconnection**
+**Follow Mode (`--follow`) and Job Graph**
 
-The control plane exposes SSE streams for real-time event delivery. The CLI `--follow` flag uses resilient SSE streaming with:
+The CLI `--follow` flag displays a summarized per-repo job graph that refreshes until
+the run reaches a terminal state. The job graph shows:
+- Step index, job type, job ID, display name, status glyph, duration, and status
+
+**Note:** `--follow` does not stream container stdout/stderr. Use `ploy run logs <run-id>`
+for log streaming.
+
+The follow engine subscribes to SSE events from `/v1/runs/{id}/logs` for change
+notifications and refreshes the job graph on each event. SSE reconnection uses:
 - **Automatic reconnection**: On connection errors or mid-stream failures, the client reconnects with exponential backoff (250ms initial, 2x multiplier, capped at 30s).
-- **Last-Event-ID support**: The client preserves the last event ID across reconnects to resume from the last processed event and avoid duplicate processing.
-- **Idle timeout**: Default `45s` idle timeout cancels the stream if no events arrive. Configure via `--idle-timeout <duration>` or disable with `--idle-timeout 0`.
-- **Overall timeout**: Use `--timeout <duration>` to cap total stream time (default unlimited).
-- **Max retries**: Default `3` reconnect attempts. Use `--max-retries -1` for unlimited retries.
+- **Max retries**: Default `5` reconnect attempts. Use `--max-retries <n>` to change.
+- **Time cap**: Use `--cap <duration>` to limit follow time. Add `--cancel-on-cap` to cancel the run when the cap is exceeded.
 
-The streaming implementation uses `github.com/tmaxmax/go-sse` and the shared backoff policy from `internal/workflow/backoff`. Server `retry` hints are not consumed; reconnect delays are controlled by the backoff policy.
+Tip: The CLI can also fetch artifacts via `--artifact-dir` when the run succeeds.
 
-Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
+**Log Streaming (`ploy run logs`)**
+
+For container stdout/stderr streaming, use `ploy run logs <run-id>`. This is the canonical
+surface for viewing real-time log output. The log stream supports:
+- **Automatic reconnection**: Same backoff policy as follow mode.
+- **Last-Event-ID support**: Resumes from the last processed event after reconnect.
+- **Idle timeout**: Default `45s` idle timeout. Configure via `--idle-timeout <duration>`.
+- **Max retries**: Default `3` reconnect attempts. Use `--max-retries -1` for unlimited.
 
 **Build Gate Status Visibility**
 
@@ -222,8 +235,10 @@ This makes gate health visible without requiring raw artifact inspection.
   - Export `PLOY_GITLAB_PAT` and confirm the control plane has connectivity to GitLab. The sample repo is public for read; MRs require auth for branch writes.
 - Build Gate keeps failing in Scenario B:
   - Confirm the `mods-llm` image version the cluster pulls includes the healer stub. Re-publish if needed.
-- Live logs:
-  - Use the CLI `--follow` flag to stream events. Check the control plane logs if stages appear stuck (cluster scheduling/resources).
+- Monitoring runs:
+  - Use `--follow` to display the job graph until completion.
+  - Use `ploy run logs <run-id>` to stream container stdout/stderr.
+  - Check the control plane logs if stages appear stuck (cluster scheduling/resources).
 
 **Multi-Step, Multi-Node Rehydration Scenario**
 

@@ -17,7 +17,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/follow"
+	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -34,6 +37,12 @@ type runSubmitFlags struct {
 
 	// Spec file path (required); use "-" for stdin
 	SpecFile *string
+
+	// Follow mode flags
+	Follow      *bool
+	CapDuration *time.Duration
+	CancelOnCap *bool
+	MaxRetries  *int
 }
 
 // parseRunSubmitFlags creates a FlagSet, defines all run submit flags, and parses the provided arguments.
@@ -49,6 +58,13 @@ func parseRunSubmitFlags(args []string) (*runSubmitFlags, error) {
 	flags.BaseRef = fs.String("base-ref", "", "Base Git ref (branch or tag)")
 	flags.TargetRef = fs.String("target-ref", "", "Target Git ref (branch)")
 	flags.SpecFile = fs.String("spec", "", "Path to YAML/JSON spec file (use '-' for stdin)")
+
+	// Follow mode flags
+	flags.Follow = fs.Bool("follow", false, "Follow run until completion (shows job graph)")
+	flags.CapDuration = new(time.Duration)
+	fs.DurationVar(flags.CapDuration, "cap", 0, "Optional time cap for --follow")
+	flags.CancelOnCap = fs.Bool("cancel-on-cap", false, "Cancel run if cap exceeded")
+	flags.MaxRetries = fs.Int("max-retries", 5, "Max SSE reconnect attempts")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -127,6 +143,64 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	// Print run_id and mod_id on success.
 	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
 	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
+
+	// Follow mode: display job graph until completion.
+	if flags.Follow != nil && *flags.Follow {
+		return followRunSubmit(ctx, base, httpClient, runID, flags, stderr)
+	}
+
+	return nil
+}
+
+// followRunSubmit displays the job graph until run completion.
+func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, flags *runSubmitFlags, stderr io.Writer) error {
+	followCtx := ctx
+	var cancel context.CancelFunc
+	capDuration := time.Duration(0)
+	if flags.CapDuration != nil {
+		capDuration = *flags.CapDuration
+	}
+	if capDuration > 0 {
+		followCtx, cancel = context.WithTimeout(ctx, capDuration)
+		defer cancel()
+	}
+
+	maxRetries := 5
+	if flags.MaxRetries != nil {
+		maxRetries = *flags.MaxRetries
+	}
+
+	engine := follow.NewEngine(cloneForStream(client), baseURL, runID, follow.Config{
+		MaxRetries: maxRetries,
+		Output:     stderr,
+	})
+
+	final, err := engine.Run(followCtx)
+	if err != nil {
+		// Handle timeout with optional cancellation.
+		cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
+		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+			if cancelOnCap {
+				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
+				_ = runs.CancelCommand{
+					BaseURL: baseURL,
+					Client:  client,
+					RunID:   runID,
+					Reason:  "cap exceeded",
+					Output:  stderr,
+				}.Run(context.Background())
+			} else {
+				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
+			}
+			return nil
+		}
+		return err
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
+	if final != modsapi.RunStateSucceeded {
+		return fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
+	}
 
 	return nil
 }
@@ -239,18 +313,25 @@ func loadSpec(path string) (json.RawMessage, error) {
 
 // printRunSubmitUsage writes usage information for `ploy run --repo ... --spec ...`.
 func printRunSubmitUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|->")
+	_, _ = fmt.Fprintln(w, "Usage: ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|-> [--follow]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Submits a single-repo run and immediately starts execution.")
 	_, _ = fmt.Fprintln(w, "Creates a mod project as a side-effect; the created mod has name == id.")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Flags:")
+	_, _ = fmt.Fprintln(w, "Required flags:")
 	_, _ = fmt.Fprintln(w, "  --repo <url>       Git repository URL (https/ssh/file)")
 	_, _ = fmt.Fprintln(w, "  --base-ref <ref>   Base Git ref (branch or tag)")
 	_, _ = fmt.Fprintln(w, "  --target-ref <ref> Target Git ref (branch)")
 	_, _ = fmt.Fprintln(w, "  --spec <path|->    Path to YAML/JSON spec file (use '-' for stdin)")
 	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Follow mode:")
+	_, _ = fmt.Fprintln(w, "  --follow            Follow run until completion (shows job graph)")
+	_, _ = fmt.Fprintln(w, "  --cap <duration>    Optional time cap for --follow (e.g., 30m, 1h)")
+	_, _ = fmt.Fprintln(w, "  --cancel-on-cap     Cancel run if cap exceeded")
+	_, _ = fmt.Fprintln(w, "  --max-retries <n>   Max SSE reconnect attempts (default: 5)")
+	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy run --repo https://github.com/org/repo --base-ref main --target-ref feature-branch --spec spec.yaml")
+	_, _ = fmt.Fprintln(w, "  ploy run --repo https://github.com/org/repo --base-ref main --target-ref feature-branch --spec spec.yaml --follow")
 	_, _ = fmt.Fprintln(w, "  cat spec.yaml | ploy run --repo https://github.com/org/repo --base-ref main --target-ref feature-branch --spec -")
 }
