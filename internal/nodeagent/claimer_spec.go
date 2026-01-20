@@ -13,14 +13,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// stringValue safely dereferences a string pointer, returning empty string if nil.
-func stringValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // parseSpec parses a spec JSON payload into environment variables and typed options.
 // It uses the canonical contracts.ParseModsSpecJSON parser for structured
 // validation, then converts to the internal RunOptions format.

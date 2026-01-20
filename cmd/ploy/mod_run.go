@@ -17,12 +17,9 @@ import (
 //   - stop <id>: Stops a run and cancels queued repos.
 //   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
 func handleModRun(args []string, stderr io.Writer) error {
-	if len(args) > 0 {
-		switch args[0] {
+	if len(args) > 0 && args[0] == "repo" {
 		// Repo-level operations for managing repos within a batch.
-		case "repo":
-			return handleModRunRepo(args[1:], stderr)
-		}
+		return handleModRunRepo(args[1:], stderr)
 	}
 	return executeModRun(args, stderr)
 }

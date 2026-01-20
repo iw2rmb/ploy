@@ -194,11 +194,11 @@ func buildAndSendJobClaimResponse(
 		CreatedAt string                `json:"created_at"`
 		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
-		RunID:     domaintypes.RunID(run.ID), // Convert to domain type
+		RunID:     run.ID,
 		Name:      nil,
 		RepoID:    job.RepoID,
 		Attempt:   job.Attempt,
-		JobID:     domaintypes.JobID(job.ID), // Convert to domain type
+		JobID:     job.ID,
 		JobName:   job.Name,
 		ModType:   modType,
 		ModImage:  job.ModImage,

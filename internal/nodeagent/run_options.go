@@ -364,7 +364,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	// --- Server Metadata ---
 	// Direct assignment from typed spec fields.
 	if !spec.JobID.IsZero() {
-		runOpts.ServerMetadata.JobID = domaintypes.JobID(spec.JobID)
+		runOpts.ServerMetadata.JobID = spec.JobID
 	}
 
 	return runOpts

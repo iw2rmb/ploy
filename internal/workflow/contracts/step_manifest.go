@@ -258,11 +258,9 @@ func (m StepManifest) validateInputs() error {
 			if !hasSnapshot && !hasDiff && !input.Hydration.hasSource() {
 				return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
 			}
-		} else {
+		} else if hasSnapshot == hasDiff {
 			// No hydration: must have exactly one of snapshot or diff.
-			if hasSnapshot == hasDiff {
-				return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
-			}
+			return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
 		}
 	}
 	return nil

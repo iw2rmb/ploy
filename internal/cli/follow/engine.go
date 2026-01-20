@@ -283,7 +283,7 @@ func (e *Engine) render() {
 	var buf bytes.Buffer
 	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', 0)
 
-	fmt.Fprintln(tw, "Repo\tIndex\tModType\tJob ID\tNodeID\tImage\tSpin\tDuration\tStatus")
+	_, _ = fmt.Fprintln(tw, "Repo\tIndex\tModType\tJob ID\tNodeID\tImage\tSpin\tDuration\tStatus")
 
 	for _, repoID := range e.repoOrder {
 		repoURL := e.repoURLs[repoID]
@@ -325,7 +325,7 @@ func (e *Engine) render() {
 				status,
 			)
 		}
-		fmt.Fprintln(tw)
+		_, _ = fmt.Fprintln(tw)
 	}
 
 	_ = tw.Flush()
