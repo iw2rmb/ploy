@@ -23,8 +23,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"gopkg.in/yaml.v3"
 )
 
 // runSubmitFlags encapsulates CLI flags for `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`.
@@ -288,27 +286,8 @@ func loadSpec(path string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("spec is empty")
 	}
 
-	// Parse YAML/JSON into a map for normalization.
-	var spec map[string]any
-	if err := json.Unmarshal(data, &spec); err != nil {
-		// Not JSON; try YAML.
-		if err := yaml.Unmarshal(data, &spec); err != nil {
-			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
-		}
-	}
-
-	// Marshal to JSON for submission.
-	jsonBytes, err := json.Marshal(spec)
-	if err != nil {
-		return nil, fmt.Errorf("marshal spec to JSON: %w", err)
-	}
-
-	// Validate spec using the canonical parser to catch structural issues early.
-	if _, err := contracts.ParseModsSpecJSON(jsonBytes); err != nil {
-		return nil, fmt.Errorf("validate spec: %w", err)
-	}
-
-	return jsonBytes, nil
+	// Parse YAML/JSON and validate using the canonical parser to catch structural issues early.
+	return normalizeModsSpecToJSON(data)
 }
 
 // printRunSubmitUsage writes usage information for `ploy run --repo ... --spec ...`.
