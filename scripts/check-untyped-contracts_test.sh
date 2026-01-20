@@ -38,8 +38,12 @@ pass() {
 }
 
 fail() {
-    echo "  ✗ $1"
-    echo "    $2"
+    local msg="$1"
+    local detail="${2:-}"
+    echo "  ✗ $msg"
+    if [ -n "$detail" ]; then
+        echo "    $detail"
+    fi
 }
 
 run_test() {

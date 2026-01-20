@@ -135,6 +135,10 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": out})
+		_ = json.NewEncoder(w).Encode(struct {
+			Artifacts []artifactSummary `json:"artifacts"`
+		}{
+			Artifacts: out,
+		})
 	}
 }

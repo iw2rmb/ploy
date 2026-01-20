@@ -78,16 +78,18 @@ jobs:
       - name: Run staticcheck
         run: make staticcheck
 
-  untyped-contracts:
-    name: Untyped Contracts Check
-    runs-on: ubuntu-latest
-    needs: pre-commit
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check for map[string]any at API boundaries
-        run: make lint-untyped-contracts
-      - name: Run guardrail unit tests
-        run: make test-untyped-contracts
+	  untyped-contracts:
+	    name: Untyped Contracts Check
+	    runs-on: ubuntu-latest
+	    needs: pre-commit
+	    steps:
+	      - uses: actions/checkout@v4
+	      - name: Install ripgrep
+	        run: sudo apt-get update && sudo apt-get install -y ripgrep
+	      - name: Check for map[string]any at API boundaries
+	        run: make lint-untyped-contracts
+	      - name: Run guardrail unit tests
+	        run: make test-untyped-contracts
 
   tests:
     name: Unit Tests & Coverage Threshold

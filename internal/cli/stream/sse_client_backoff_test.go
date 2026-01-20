@@ -89,19 +89,21 @@ func TestSSEClientBackoffResetAfterSuccessfulEvent(t *testing.T) {
 		if f, ok := w.(http.Flusher); ok {
 			f.Flush()
 		}
-		// First connection: send an event then EOF to trigger reconnect.
-		// Second connection: immediately EOF (no event) to trigger backoff.
-		// Third connection: send done event to stop.
-		if attempts == 1 {
+		// Create two consecutive failures to grow backoff, then deliver an event
+		// (which should reset backoff), then fail once more, then stop.
+		switch attempts {
+		case 1, 2:
+			// EOF without events: should apply exponential backoff growth.
+			return
+		case 3:
+			// Deliver an event, then EOF to force reconnect.
 			_, _ = fmt.Fprintf(w, "event: data\n")
-			_, _ = fmt.Fprintf(w, "data: test\n\n")
+			_, _ = fmt.Fprintf(w, "data: ok\n\n")
 			return
-		}
-		if attempts == 2 {
-			// EOF without event: should apply backoff.
+		case 4:
+			// EOF without events: backoff should have been reset by the event on attempt 3.
 			return
-		}
-		if attempts >= 3 {
+		default:
 			_, _ = fmt.Fprintf(w, "event: done\n\n")
 		}
 	}))
@@ -110,7 +112,7 @@ func TestSSEClientBackoffResetAfterSuccessfulEvent(t *testing.T) {
 	client := &SSEClient{
 		HTTPClient:     srv.Client(),
 		MaxRetries:     10,
-		InitialBackoff: 50 * time.Millisecond,
+		InitialBackoff: 300 * time.Millisecond,
 	}
 
 	err := client.Stream(context.Background(), srv.URL, func(e Event) error {
@@ -123,29 +125,16 @@ func TestSSEClientBackoffResetAfterSuccessfulEvent(t *testing.T) {
 		t.Fatalf("Stream error: %v", err)
 	}
 
-	// We expect 3 connection attempts: initial (with event), retry (EOF), retry (done).
-	if len(reconnectTimes) != 3 {
-		t.Fatalf("expected 3 connection attempts, got %d", len(reconnectTimes))
+	// We need at least 4 connection attempts to measure the delay after the successful event.
+	if len(reconnectTimes) < 4 {
+		t.Fatalf("expected at least 4 connection attempts, got %d", len(reconnectTimes))
 	}
 
-	// After first connection with event, backoff should reset.
-	// The second reconnect should use initial backoff again (not doubled).
-	delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
-	delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
-
-	// First delay after event should be small (initial backoff ~50ms with jitter).
-	// Second delay should also be small because backoff was reset after the event.
-	if delay1 < 10*time.Millisecond || delay1 > 200*time.Millisecond {
-		t.Logf("warning: first delay %v outside expected range", delay1)
-	}
-	if delay2 < 10*time.Millisecond || delay2 > 200*time.Millisecond {
-		t.Logf("warning: second delay %v outside expected range", delay2)
-	}
-
-	// The key assertion: second delay should not be significantly larger than first,
-	// indicating that backoff was reset after the event.
-	if delay2 > 3*delay1 {
-		t.Fatalf("backoff was not reset after event: delay1=%v, delay2=%v (expected similar)", delay1, delay2)
+	// Attempt 3 delivers an event. The reconnect after that (attempt 4) should use
+	// the initial backoff again (with jitter), not the grown backoff from attempts 1-2.
+	delayAfterEvent := reconnectTimes[3].Sub(reconnectTimes[2])
+	if delayAfterEvent > 550*time.Millisecond {
+		t.Fatalf("backoff was not reset after event: delayAfterEvent=%v (expected < 550ms)", delayAfterEvent)
 	}
 }
 

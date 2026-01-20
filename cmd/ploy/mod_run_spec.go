@@ -22,6 +22,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
+		}
+	}
+
+	jsonBytes, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("marshal spec to JSON: %w", err)
+	}
+
+	if _, err := contracts.ParseModsSpecJSON(jsonBytes); err != nil {
+		return nil, fmt.Errorf("validate spec: %w", err)
+	}
+
+	return jsonBytes, nil
+}
+
 // resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
 // File content is treated as sensitive, so any errors redact the file path for security.
 func resolveEnvFromFile(path string) (string, error) {

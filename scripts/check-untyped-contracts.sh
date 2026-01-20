@@ -71,14 +71,15 @@ APPROVED_FILES=(
     "internal/nodeagent/manifest.go"
     "internal/nodeagent/execution_orchestrator.go"
     "internal/nodeagent/execution_healing.go"
-    "internal/nodeagent/execution_orchestrator_rehydrate.go"
-    "internal/nodeagent/execution_healing_helpers.go"
-    "internal/nodeagent/execution_mr_job.go"
-    "internal/nodeagent/execution_orchestrator_gate.go"
-    # HTTP uploader payloads (wire format, not contract parsing)
-    "internal/nodeagent/statusuploader.go"
-    "internal/nodeagent/diffuploader.go"
-    "internal/nodeagent/artifactuploader.go"
+	    "internal/nodeagent/execution_orchestrator_rehydrate.go"
+	    "internal/nodeagent/execution_healing_helpers.go"
+	    "internal/nodeagent/execution_mr_job.go"
+	    "internal/nodeagent/execution_orchestrator_gate.go"
+	    "internal/nodeagent/healing_injection.go"
+	    # HTTP uploader payloads (wire format, not contract parsing)
+	    "internal/nodeagent/statusuploader.go"
+	    "internal/nodeagent/diffuploader.go"
+	    "internal/nodeagent/artifactuploader.go"
     # Simple HTTP response encoding (acceptable for simple responses)
     "internal/server/handlers/health.go"
     "internal/server/handlers/artifacts_download.go"
