@@ -1,37 +1,39 @@
 # Stack Gate — Phase 2: Stack Detector (Java MVP)
 
-Status: **Planned (not implemented)**
+Scope: Implement deterministic, filesystem-only detection for declared Java stack (Maven/Gradle + release), including evidence reporting and an explicit “unknown” outcome for ambiguous workspaces.
 
-## Goal
+Documentation: `design/stack-gate.md`, `internal/workflow/stackdetect` (new), `design/java-version-detect.sh` (reference).
 
-Implement deterministic, filesystem-only stack detection for Java (Maven + Gradle) with explicit “unknown vs mismatch” classification.
+Legend: [ ] todo, [x] done.
 
-## What remains unchanged
+## Detector framework
+- [ ] Create `internal/workflow/stackdetect` package — Provides a single entrypoint for stack detection used by Stack Gate.
+  - Repository: ploy
+  - Component: `internal/workflow/stackdetect`
+  - Scope: Add `Detect(ctx, workspace)`, `Observation`, `EvidenceItem`, and typed errors for “unknown/ambiguous”.
+  - Snippets: `Observation{Language:"java", Tool:"maven", Release:ptr("17"), Evidence:[...] }`
+  - Tests: `go test ./internal/workflow/stackdetect -run Detect` — empty workspace returns `unknown` deterministically.
 
-- Gate execution behavior and image selection remain unchanged until Phase 4 (`internal/workflow/runtime/step/gate_docker.go`).
+## Java/Maven detection
+- [ ] Detect Maven Java release from `pom.xml` — Enables Stack Gate to validate declared baseline/target for Maven projects.
+  - Repository: ploy
+  - Component: `internal/workflow/stackdetect`
+  - Scope: Parse (strict precedence) `maven.compiler.release`, then `maven.compiler.source/target`, then `java.version`; implement local parent `<relativePath>` property resolution only.
+  - Snippets: Evidence items like `{path:"pom.xml", key:"maven.compiler.release", value:"11"}`
+  - Tests: `go test ./internal/workflow/stackdetect -run Maven` — precedence + local parent resolution + “unknown” on unresolved placeholders.
 
-## Compatibility impact
+## Java/Gradle detection
+- [ ] Detect Gradle Java release from `build.gradle(.kts)` — Supports Gradle projects with explicit toolchain declarations.
+  - Repository: ploy
+  - Component: `internal/workflow/stackdetect`
+  - Scope: Recognize only explicit/static `JavaLanguageVersion.of(N)` and `sourceCompatibility/targetCompatibility` forms; dynamic logic returns “unknown”.
+  - Snippets: Evidence items like `{path:"build.gradle.kts", key:"toolchain.languageVersion", value:"17"}`
+  - Tests: `go test ./internal/workflow/stackdetect -run Gradle` — static forms pass; dynamic forms classify as unknown.
 
-- None required (new package only; no behavior wired yet).
-
-## Implementation steps (RED → GREEN → REFACTOR)
-
-1. Add detector package:
-   - Create `internal/workflow/stackdetect/` with:
-     - `detect.go` (public `Detect(ctx, workspace)`)
-     - `types.go` (`Observation`, `EvidenceItem`)
-     - `errors.go` (typed error for “unknown/ambiguous”)
-2. Implement Java/Maven detection:
-   - Parse `pom.xml` for `maven.compiler.release`, `maven.compiler.source`/`target`, `java.version` with strict precedence.
-   - Implement local parent resolution via `<parent><relativePath>` when file exists under workspace.
-   - If multiple modules disagree or placeholders can’t be resolved → return “unknown” with evidence.
-3. Implement Java/Gradle detection:
-   - Parse `build.gradle` / `build.gradle.kts` for explicit toolchain / compatibility declarations only (static forms).
-   - Dynamic logic → “unknown” with evidence.
-4. Tests:
-   - Add fixture workspaces under `internal/workflow/stackdetect/testdata/`.
-   - Add unit tests in `internal/workflow/stackdetect/*_test.go` covering:
-     - each precedence rule
-     - property interpolation (local only)
-     - ambiguous/mixed declarations → unknown
-
+## Fixtures and test coverage
+- [ ] Add fixture workspaces under `testdata/` — Keeps detection tests stable and realistic.
+  - Repository: ploy
+  - Component: `internal/workflow/stackdetect`
+  - Scope: `internal/workflow/stackdetect/testdata/` with minimal Maven/Gradle variants (properties, parents, ambiguous cases).
+  - Snippets: N/A
+  - Tests: `go test ./internal/workflow/stackdetect` — all detector tests pass and are deterministic.
