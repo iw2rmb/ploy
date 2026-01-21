@@ -22,6 +22,7 @@ NODE_ID="${NODE_ID:-local1}"
 AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
+PLOY_EXTRA_CA_CERTS_PATH="${PLOY_EXTRA_CA_CERTS_PATH:-}"
 
 log() {
   echo "[$(date -u +%H:%M:%S)] $*"
@@ -32,6 +33,44 @@ need() {
     echo "error: missing dependency: $1" >&2
     exit 1
   fi
+}
+
+build_local_images() {
+  local extra_ca_path="$1"
+  local platform="linux/amd64"
+
+  if ! docker buildx version >/dev/null 2>&1; then
+    echo "error: docker buildx is required (missing 'docker buildx')" >&2
+    exit 1
+  fi
+
+  if [[ -n "$extra_ca_path" ]]; then
+    if [[ ! -f "$extra_ca_path" ]]; then
+      echo "error: PLOY_EXTRA_CA_CERTS_PATH does not exist: $extra_ca_path" >&2
+      exit 1
+    fi
+    log "Building local images with extra CA certs (platform=$platform)..."
+    docker buildx build --platform "$platform" --load \
+      -f docker/server/Dockerfile -t ploy-server:local \
+      --secret "id=ploy_extra_ca,src=$extra_ca_path" \
+      .
+    docker buildx build --platform "$platform" --load \
+      -f docker/node/Dockerfile -t ploy-node:local \
+      --secret "id=ploy_extra_ca,src=$extra_ca_path" \
+      .
+  else
+    log "Building local images (platform=$platform)..."
+    docker buildx build --platform "$platform" --load \
+      -f docker/server/Dockerfile -t ploy-server:local \
+      .
+    docker buildx build --platform "$platform" --load \
+      -f docker/node/Dockerfile -t ploy-node:local \
+      .
+  fi
+
+  docker buildx build --platform "$platform" --load \
+    -f docker/db/Dockerfile -t ploy-db:local \
+    .
 }
 
 generate_tokens() {
@@ -84,6 +123,7 @@ main() {
   need "$PYTHON_BIN"
   need openssl
   need make
+  need curl
 
   log "Building CLI/binaries (make build)..."
   make build
@@ -98,8 +138,10 @@ main() {
   PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
   export CLUSTER_ID
 
-  log "Starting local docker stack with: $COMPOSE_CMD up -d"
-  $COMPOSE_CMD up -d
+  build_local_images "$PLOY_EXTRA_CA_CERTS_PATH"
+
+  log "Starting local docker stack with: $COMPOSE_CMD up -d --no-build"
+  $COMPOSE_CMD up -d --no-build
 
   log "Waiting for database to be ready..."
   for i in {1..60}; do

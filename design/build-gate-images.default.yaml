@@ -1,0 +1,29 @@
+images:
+  - stack: { language: java, tool: maven, release: "11" }
+    image: docker.io/org/stack-gate-java-maven:11
+  - stack: { language: java, tool: maven, release: "17" }
+    image: docker.io/org/stack-gate-java-maven:17
+  - stack: { language: java, tool: gradle, release: "11" }
+    image: docker.io/org/stack-gate-java-gradle:11
+  - stack: { language: java, tool: gradle, release: "17" }
+    image: docker.io/org/stack-gate-java-gradle:17
+
+  # Optional tool-agnostic combined runtime (used only when expectations omit tool).
+  - stack: { language: java, release: "11" }
+    image: docker.io/org/stack-gate-java:11
+  - stack: { language: java, release: "17" }
+    image: docker.io/org/stack-gate-java:17
+
+  # Go (go.mod)
+  - stack: { language: go, tool: go, release: "1.22" }
+    image: docker.io/org/stack-gate-go:1.22
+
+  # Rust (Cargo)
+  - stack: { language: rust, tool: cargo, release: "1.76" }
+    image: docker.io/org/stack-gate-rust:1.76
+
+  # Python (examples; tool can be omitted if runtime image is tool-agnostic)
+  - stack: { language: python, tool: poetry, release: "3.11" }
+    image: docker.io/org/stack-gate-python-poetry:3.11
+  - stack: { language: python, release: "3.11" }
+    image: docker.io/org/stack-gate-python:3.11
