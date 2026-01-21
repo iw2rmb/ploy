@@ -21,6 +21,20 @@ All files referenced live under `local/` and were added to the repo:
 - Go 1.25+ to build local binaries.
 - Open ports: 5432, 8080, 8444, 9100.
 - macOS Apple Silicon: `local/docker-compose.yml` already pins `platform: linux/amd64` for the binaries.
+- (Optional) Corporate TLS MITM / custom registries: set `PLOY_EXTRA_CA_CERTS_PATH` to a PEM bundle to inject extra CAs into the `ployd` and `ployd-node` images during local builds.
+
+## Quickstart (recommended)
+
+Use the automation script from the repo root:
+
+```bash
+# Optional: inject extra CA certs into server/node images during build
+export PLOY_EXTRA_CA_CERTS_PATH=/path/to/ca-bundle.pem
+
+./scripts/deploy-locally.sh
+```
+
+This script builds images with Docker BuildKit and seeds the local DB with the initial tokens and node record.
 
 ## 1) Build Binaries
 
@@ -176,6 +190,7 @@ docker compose -f local/docker-compose.yml down -v
 - **Ports in use**: change the host ports in `local/docker-compose.yml` (default: 5432, 8080, 8444, 9100).
 - **Missing binaries**: re-run `make build` and ensure `dist/ployd-linux` and `dist/ployd-node-linux` exist.
 - **Docker socket permission**: the `node` service mounts `/var/run/docker.sock`; ensure Docker Desktop is running.
+- **`apk add` failures / TLS errors during image build**: set `PLOY_EXTRA_CA_CERTS_PATH` to a PEM bundle and run `./scripts/deploy-locally.sh` (it builds `ploy-server:local` and `ploy-node:local` with the extra CA injected).
 - **Authentication errors**: Ensure `PLOY_AUTH_SECRET` is set when starting the server and matches across restarts.
 - **Token validation failures**: Check that the token is correctly formatted as a JWT and hasn't expired.
 - **Logs**:
