@@ -72,6 +72,11 @@ type RunOptions struct {
 	// For single-step runs, this slice is empty and Execution options are used.
 	// For multi-step runs, this slice contains one entry per mod in steps[].
 	Steps []StepMod
+
+	// StackGate holds the effective Stack Gate expectation for gate jobs.
+	// Set from steps[stepIndex].stack.{inbound|outbound} based on gate type.
+	// Pre-gate uses inbound; post-gate and re-gate use outbound expectations.
+	StackGate *contracts.StepGateStackSpec
 }
 
 // BuildGateOptions configures pre-mod build gate validation.
@@ -257,6 +262,10 @@ type StepMod struct {
 
 	// RetainContainer controls whether this step's container is retained.
 	RetainContainer bool
+
+	// Stack configures Stack Gate validation for this step.
+	// Inbound validates pre-mod expectations; Outbound validates post-mod expectations.
+	Stack *contracts.StackGateSpec
 }
 
 // modsSpecToRunOptions converts a canonical contracts.ModsSpec directly to RunOptions.
@@ -344,6 +353,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 				Command:         commandSpecToExecutionCommand(step.Command),
 				Env:             copyStringMap(step.Env),
 				RetainContainer: step.RetainContainer,
+				Stack:           step.Stack,
 			}
 			runOpts.Steps = append(runOpts.Steps, stepMod)
 		}

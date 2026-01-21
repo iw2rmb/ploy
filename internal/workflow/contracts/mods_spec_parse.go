@@ -237,6 +237,19 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 	step.Env = f.Env
 	step.RetainContainer = f.RetainContainer
 
+	// Parse stack gate configuration.
+	if v, ok := raw["stack"]; ok && v != nil {
+		stackRaw, err := expectMap(v, prefix+".stack")
+		if err != nil {
+			return step, err
+		}
+		stack, err := parseStackGateSpec(stackRaw, prefix+".stack")
+		if err != nil {
+			return step, err
+		}
+		step.Stack = stack
+	}
+
 	return step, nil
 }
 

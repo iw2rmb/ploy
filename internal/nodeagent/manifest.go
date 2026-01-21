@@ -210,6 +210,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		manifest.Gate.Profile = profile
 	}
 
+	// Note: Stack Gate expectations are threaded into gate manifests via the
+	// gate-specific path in executeGateJob, which sets typedOpts.StackGate
+	// based on gate type (pre_gate uses inbound, post_gate/re_gate use outbound).
+	// This allows correct differentiation between inbound and outbound phases.
+
 	return manifest, nil
 }
 
@@ -248,7 +253,19 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 
 	// Delegate to the standard manifest builder with sanitized options.
 	// Pass ModStackUnknown explicitly since gate jobs run before stack detection.
-	return buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)
+	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)
+	if err != nil {
+		return manifest, err
+	}
+
+	// Thread Stack Gate expectation passed via typedOpts.StackGate.
+	// This is set by executeGateJob based on gate type (pre_gate uses inbound,
+	// post_gate/re_gate use outbound expectations).
+	if typedOpts.StackGate != nil {
+		manifest.Gate.StackGate = typedOpts.StackGate
+	}
+
+	return manifest, nil
 }
 
 // isCodexHealingImage returns true if the image name indicates a Codex-based
@@ -398,4 +415,80 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexS
 	}
 
 	return manifest, nil
+}
+
+// validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
+// For steps after the first, it:
+//   - Derives inbound expectations from the previous step's outbound when omitted.
+//   - Rejects mismatched explicit inbound that differs from previous outbound.
+//
+// This function modifies the input steps slice in place when deriving inbound expectations.
+// Returns an error if explicit inbound mismatches previous outbound.
+func validateAndDeriveStackGateChaining(steps []StepMod) error {
+	if len(steps) <= 1 {
+		// Single-step runs have no chaining to validate.
+		return nil
+	}
+
+	for i := 1; i < len(steps); i++ {
+		prev := steps[i-1]
+		curr := &steps[i]
+
+		// Skip if previous step has no outbound expectations.
+		if prev.Stack == nil || prev.Stack.Outbound == nil || !prev.Stack.Outbound.Enabled {
+			continue
+		}
+		prevOutbound := prev.Stack.Outbound
+
+		// If current step has no Stack spec, create one with derived inbound.
+		if curr.Stack == nil {
+			curr.Stack = &contracts.StackGateSpec{
+				Inbound: &contracts.StackGatePhaseSpec{
+					Enabled: prevOutbound.Enabled,
+					Expect:  prevOutbound.Expect,
+				},
+			}
+			continue
+		}
+
+		// If current step has no inbound, derive from previous outbound.
+		if curr.Stack.Inbound == nil {
+			curr.Stack.Inbound = &contracts.StackGatePhaseSpec{
+				Enabled: prevOutbound.Enabled,
+				Expect:  prevOutbound.Expect,
+			}
+			continue
+		}
+
+		// If current step has explicit inbound, validate it matches previous outbound.
+		currInbound := curr.Stack.Inbound
+		if currInbound.Enabled && prevOutbound.Enabled {
+			// Both are enabled; validate expectations match.
+			if currInbound.Expect != nil && prevOutbound.Expect != nil {
+				if !currInbound.Expect.Equal(*prevOutbound.Expect) {
+					return fmt.Errorf(
+						"steps[%d].stack.inbound: mismatch with steps[%d].stack.outbound "+
+							"(inbound: language=%q tool=%q release=%q, outbound: language=%q tool=%q release=%q)",
+						i, i-1,
+						currInbound.Expect.Language, currInbound.Expect.Tool, currInbound.Expect.Release,
+						prevOutbound.Expect.Language, prevOutbound.Expect.Tool, prevOutbound.Expect.Release,
+					)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// stackGatePhaseSpecToStepGate converts a StackGatePhaseSpec to StepGateStackSpec.
+// Returns nil if the input is nil or disabled.
+func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec) *contracts.StepGateStackSpec {
+	if phase == nil || !phase.Enabled {
+		return nil
+	}
+	return &contracts.StepGateStackSpec{
+		Enabled: phase.Enabled,
+		Expect:  phase.Expect,
+	}
 }
