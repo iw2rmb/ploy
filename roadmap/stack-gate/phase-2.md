@@ -1,6 +1,6 @@
 # Stack Gate — Phase 2: Stack Detector (Java MVP)
 
-Scope: Implement deterministic, filesystem-only detection for declared Java stack (Maven/Gradle + release), including evidence reporting and an explicit “unknown” outcome for ambiguous workspaces.
+Scope: Implement deterministic, filesystem-only detection for declared Java stack (Maven/Gradle + release), including evidence reporting and an explicit "ambiguous" outcome for ambiguous workspaces (both build tools present); "unknown" for no build files or version undetectable.
 
 Documentation: `design/stack-gate.md`, `internal/workflow/stackdetect` (new), `design/java-version-detect.sh` (reference).
 
