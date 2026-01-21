@@ -9,8 +9,17 @@ Legend: [ ] todo, [x] done.
 ## Schema and resolution rules
 - [ ] Define typed image mapping rule schema — Makes configuration parseable and validateable.
   - Repository: ploy
-  - Component: config/contracts (TBD), Build Gate runtime
-  - Scope: Add `BuildGateImageRule{StackExpectation, Image}` and validation (image non-empty, language non-empty).
+  - Component: `internal/workflow/contracts` (schema), `internal/workflow/runtime/step` (consumer)
+  - Scope:
+    - Add `BuildGateImageRule{Stack contracts.StackExpectation, Image string}` (YAML/JSON) for:
+      - `/etc/ploy/gates/build-gate-images.yaml` (default file)
+      - `gates.build_gate.images` (cluster/global inline config; where this lives is implementation-defined)
+      - `build_gate.images` (Mods spec; mod-level overrides)
+    - Validation rules:
+      - `stack.language` required
+      - `stack.release` required
+      - `stack.tool` optional (tool-agnostic rules allowed)
+      - `image` required
   - Snippets: `images: [{ stack: { language: java, tool: maven, release: "11" }, image: "docker.io/org/..." }]`
   - Tests: `go test ./... -run BuildGateImageRule` — invalid entries rejected with stable errors.
 - [ ] Implement “most specific match wins” resolution — Ensures deterministic selection for tool-specific vs tool-agnostic rules.
@@ -23,13 +32,17 @@ Legend: [ ] todo, [x] done.
 ## Loading and precedence
 - [ ] Load default mapping from `/etc/ploy/gates/build-gate-images.yaml` — Removes implicit defaults when Stack Gate is enabled.
   - Repository: ploy
-  - Component: nodeagent/gate runtime
-  - Scope: File loader + parse with clear error on missing/invalid file when required by an enabled phase.
+  - Component: `internal/workflow/runtime/step`
+  - Scope: File loader + parse with clear error on missing/invalid file when required by an enabled phase (`StepGateSpec.StackGate.Enabled == true`).
   - Snippets: N/A
   - Tests: `go test ./... -run BuildGateImagesFile` — missing file triggers reject only when Stack Gate needs it.
 - [ ] Merge overrides with explicit precedence — Allows cluster and mod overrides without ambiguity.
   - Repository: ploy
-  - Component: nodeagent config + Mods spec
-  - Scope: Merge order: default file < cluster inline (`gates.build_gate.images`, if present in config model) < mod override (`build_gate.images` in spec); same-specificity duplicates within one precedence level reject.
+  - Component: runtime config model (cluster/global inline), `internal/workflow/contracts` (Mods spec), `internal/workflow/runtime/step` (merge)
+  - Scope:
+    - Merge order: default file < cluster/global inline (`gates.build_gate.images`) < mod override (`build_gate.images`).
+    - Reject duplicates within the same precedence level when they are equal-specificity matches for the same stack selector:
+      - tool-specific selector: `{language, tool, release}`
+      - tool-agnostic selector: `{language, release}` (tool empty)
   - Snippets: N/A
   - Tests: `go test ./... -run BuildGateImagesMerge` — precedence and duplicate detection.
