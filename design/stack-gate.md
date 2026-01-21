@@ -1,6 +1,6 @@
 # Stack Gate (StackGate) — Design
 
-Status: **Phase 1 implemented (spec + contracts + manifest threading); Phases 2+ proposed**  
+Status: **Phases 1–2 implemented (spec/contracts/threading + Java stack detector); Phases 3+ proposed**  
 Owner: Ploy core (workflow runner + node agent)  
 
 ## Implemented (Phase 1)
@@ -26,6 +26,14 @@ Phase 1 is implemented in code as of January 21, 2026:
   - `internal/workflow/contracts/step_manifest.go` adds `StepGateSpec.StackGate`.
   - `internal/nodeagent/execution_orchestrator_gate.go` selects inbound vs outbound expectations per gate job type.
   - `internal/nodeagent/manifest.go` threads the selected expectation into the gate manifest.
+
+## Implemented (Phase 2)
+
+Phase 2 is implemented in code as of January 21, 2026:
+
+- Stack detector framework (filesystem-only, deterministic):
+  - `internal/workflow/stackdetect`
+  - `stackdetect.Detect` returns an `Observation` or a typed `DetectionError` with reason `"unknown"`/`"ambiguous"` plus evidence.
 
 ## Problem
 
@@ -183,9 +191,9 @@ Mismatch/unknown are **policy failures** distinct from “build failed”.
 
 ## Detection (Stack Detector)
 
-### Go package (proposed)
+### Go package (implemented: Java MVP)
 
-Add `internal/workflow/stackdetect` that performs filesystem-only detection and returns a normalized observation:
+`internal/workflow/stackdetect` performs filesystem-only detection and returns a normalized observation:
 
 ```go
 package stackdetect
@@ -198,20 +206,20 @@ type EvidenceItem struct {
 
 type Observation struct {
     Language string         `json:"language"`          // "java"
-    Tool     string         `json:"tool,omitempty"`    // "maven", "gradle"
+    Tool     string         `json:"tool"`              // "maven", "gradle"
     Release  *string        `json:"release,omitempty"` // language release (e.g. "17", "1.22", "3.11")
-    Evidence []EvidenceItem `json:"evidence,omitempty"`
+    Evidence []EvidenceItem `json:"evidence"`
 }
 
-func Detect(ctx context.Context, workspace string) (Observation, error)
+func Detect(ctx context.Context, workspace string) (*Observation, error)
 ```
 
 Notes:
 
 - `Release` is a pointer so “unknown” can be represented without sentinel values.
 - `Release` is a string so all languages can share one selector field (e.g., Java `"17"`, Go `"1.22"`, Python `"3.11"`, Rust `"1.76"`). Canonicalization (dropping patch where appropriate) is detector-specific but must be deterministic.
-- If multiple build tools are present or values are ambiguous, `Detect` returns an `Observation` with missing fields plus evidence, and a typed error (preferred) or a structured “unknown” classification.
-- If multiple modules declare different releases (e.g., Maven multi-module with mixed `maven.compiler.release`), detection is **unknown**.
+- If multiple build tools are present or values are ambiguous, `Detect` returns `(*DetectionError)` with reason `"ambiguous"` and evidence.
+- If a version cannot be determined, `Detect` returns `(*DetectionError)` with reason `"unknown"` (evidence may be present).
 
 Detection must be:
 
@@ -232,15 +240,10 @@ If none yield a usable value → **unknown**.
 
 Notes:
 
-- Property interpolation is supported via **local POM model resolution + limited well-known fields** (selected option “D”):
-  - Load properties from the current POM and any **local parent POMs** reachable via `<parent><relativePath>` when the file exists under `/workspace` (no network).
-  - Resolve `${...}` placeholders from:
-    - the merged `<properties>` map (child overrides parent), and
-    - a small set of well-known Maven model fields:
-      - `project.groupId`, `project.artifactId`, `project.version`
-      - `project.parent.groupId`, `project.parent.artifactId`, `project.parent.version`
-      - CI-friendly placeholders when defined locally: `revision`, `changelist`, `sha1`
-  - Apply cycle detection + a small recursion depth limit; unresolved placeholders → **unknown**.
+- Property interpolation is supported via **local parent `<relativePath>` properties only**:
+  - Load `<properties>` from the current POM and any **local parent POMs** reachable via `<parent><relativePath>` when the file exists under `/workspace` (no network).
+  - Resolve `${...}` placeholders using the merged `<properties>` map (child overrides parent).
+  - Apply cycle detection; unresolved placeholders → **unknown**.
 - If resolution requires remote parents, profiles, plugin execution, or external repositories → **unknown** (filesystem-only, deterministic).
 
 ### Java/Gradle detection
@@ -250,9 +253,9 @@ Inputs: `build.gradle`, `build.gradle.kts`.
 Recognize only explicit, static declarations:
 
 - Toolchain `languageVersion = JavaLanguageVersion.of(17)` (Groovy/Kotlin)
-- `sourceCompatibility = JavaVersion.VERSION_17` / `targetCompatibility = ...`
+- Numeric `sourceCompatibility = 17` / `targetCompatibility = 17` (must match if both present)
 
-If only dynamic logic is present → **unknown**.
+If only dynamic logic is present (variables, findProperty, etc.) → **unknown**.
 
 ### Go detection
 
