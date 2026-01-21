@@ -1,48 +1,43 @@
 # Stack Gate — Phase 1: Spec + Contracts + Invariants
 
-Status: **Planned (not implemented)**
+Scope: Add explicit stack expectations to the Mods spec and gate manifests, and reject contradictory multi-step runs (inbound/outbound chaining) before execution.
 
-## Goal
+Documentation: `design/stack-gate.md`, `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/mods_spec_parse.go`, `internal/workflow/contracts/mods_spec_wire.go`, `internal/workflow/contracts/step_manifest.go`, `internal/nodeagent/manifest.go`.
 
-Add explicit Stack Gate expectations to the Mods spec, thread them through the node agent manifests, and reject contradictory multi-step specs early.
+Legend: [ ] todo, [x] done.
 
-## What remains unchanged
+## Contracts and parsing
+- [ ] Define Stack Gate types in contracts — Enables a typed schema for `steps[].stack.{inbound,outbound}`.
+  - Repository: ploy
+  - Component: `internal/workflow/contracts`
+  - Scope: Add `StackExpectation`, `StackGatePhaseSpec`, `StackGateSpec` (new `internal/workflow/contracts/stack_gate_spec.go`).
+  - Snippets: `stack: { inbound: { enabled: true, expect: { language: java, tool: maven, release: "11" } } }`
+  - Tests: `go test ./internal/workflow/contracts -run StackGate` — new types round-trip and validate.
+- [ ] Add `steps[].stack` to typed Mods spec — Makes Stack Gate expectations available to node agent.
+  - Repository: ploy
+  - Component: `internal/workflow/contracts`
+  - Scope: `internal/workflow/contracts/mods_spec.go` (`type ModStep`), `internal/workflow/contracts/mods_spec_parse.go`, `internal/workflow/contracts/mods_spec_wire.go`.
+  - Snippets: `steps: [{ name: s0, stack: { inbound: ..., outbound: ... } }]`
+  - Tests: `go test ./internal/workflow/contracts -run ModsSpec` — parse + wire round-trip.
 
-- Build Gate still detects stack via tool markers (see `docs/mods-lifecycle.md` → “## 1.2 Stack-Aware Image Selection”).
-- Build Gate still selects runtime images via tool detection / env overrides (see `internal/workflow/runtime/step/gate_docker.go`).
+## Validation and invariants
+- [ ] Validate Stack Gate phase toggles and required fields — Prevents ambiguous specs (enabled without expectation, or expectation with enabled=false).
+  - Repository: ploy
+  - Component: `internal/workflow/contracts`
+  - Scope: `internal/workflow/contracts/mods_spec.go` (`func (s ModsSpec) Validate()`).
+  - Snippets: Reject: `enabled: false` + `expect: {...}`.
+  - Tests: `go test ./internal/workflow/contracts -run StackGate` — invalid specs fail with stable errors.
+- [ ] Enforce multi-step inbound/outbound chaining in manifest build — Prevents contradictory step graphs.
+  - Repository: ploy
+  - Component: `internal/nodeagent`
+  - Scope: `internal/nodeagent/manifest.go` (derive inbound for `i>0` from `steps[i-1].stack.outbound`, reject mismatch when explicitly provided).
+  - Snippets: Derive: `steps[1].stack.inbound.expect := steps[0].stack.outbound.expect` when omitted.
+  - Tests: `go test ./internal/nodeagent -run Manifest.*StackGate` — multi-step chaining derivation and rejection.
 
-## Compatibility impact
-
-- None required (new fields are additive; enforcement is gated behind `stack.*.enabled`).
-
-## Implementation steps (RED → GREEN → REFACTOR)
-
-1. Define typed Stack Gate spec and expectations in contracts:
-   - Add types under `internal/workflow/contracts/` (new file recommended, e.g. `stack_gate_spec.go`):
-     - `StackExpectation` (`language`, optional `tool`, optional `release`)
-     - `StackGatePhaseSpec` (`enabled`, `expect`)
-     - `StackGateSpec` (`inbound`, `outbound`)
-   - Add `Stack *StackGateSpec` to `internal/workflow/contracts/mods_spec.go` → `type ModStep`.
-2. Parse and serialize the new spec fields:
-   - Extend `internal/workflow/contracts/mods_spec_parse.go` to parse `steps[i].stack`.
-   - Extend `internal/workflow/contracts/mods_spec_wire.go` to round-trip `steps[i].stack`.
-3. Validate invariants at spec-parse time:
-   - Extend `internal/workflow/contracts/mods_spec.go` → `func (s ModsSpec) Validate()`:
-     - If `stack.<phase>.enabled == true` then `stack.<phase>.expect.language` must be non-empty.
-     - If `stack.<phase>.enabled == false` then `stack.<phase>.expect` must be omitted (reject to avoid “enabled=false but expect set” ambiguity).
-4. Validate multi-step inbound chaining at manifest-build time:
-   - In `internal/nodeagent/manifest.go` (or the helper that builds per-step manifests), enforce:
-     - `steps[0].stack.inbound.expect` must be present when inbound is enabled.
-     - For `i > 0`, if `steps[i].stack.inbound.expect` is omitted and inbound is enabled, derive it from `steps[i-1].stack.outbound.expect`.
-     - If provided for `i > 0`, it must equal `steps[i-1].stack.outbound.expect` (reject otherwise).
-5. Thread Stack Gate config into gate execution:
-   - Extend `internal/workflow/contracts/step_manifest.go` → `type StepGateSpec` to carry Stack Gate expectations for the relevant phase(s) (shape: one “effective expectation” per gate run, or separate inbound/outbound fields).
-   - Update `internal/nodeagent/manifest.go` to populate the new `StepGateSpec` fields for:
-     - pre-gate (inbound expectation)
-     - post-gate (outbound expectation)
-6. Tests:
-   - Add/extend unit tests in `internal/workflow/contracts/mods_spec_test.go` for:
-     - parsing + round-trip of `steps[].stack`
-     - validation errors for missing `expect.language` when enabled
-   - Add/extend tests around manifest building in `internal/nodeagent/agent_manifest_builder_test.go` (or closest existing tests) for chaining/derivation rules.
-
+## Gate threading
+- [ ] Thread “effective expectation” into gate execution spec — Makes the next phases able to enforce expectations per gate run.
+  - Repository: ploy
+  - Component: `internal/workflow/contracts`, `internal/nodeagent`
+  - Scope: Extend `internal/workflow/contracts/step_manifest.go` (`type StepGateSpec`) and populate it from `internal/nodeagent/manifest.go` for pre-gate (inbound) and post-gate (outbound).
+  - Snippets: Add `StackGate` fields under `StepGateSpec` (shape defined by Phase 1).
+  - Tests: `go test ./internal/nodeagent -run GateManifest.*StackGate` — pre/post gate manifests carry expected values.
