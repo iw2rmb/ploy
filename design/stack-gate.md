@@ -595,7 +595,3 @@ Persist Stack Gate outcome alongside the existing build logs in the gate metadat
      - run detection+match for inbound/outbound phases
 5. **Docs / OpenAPI**
    - When implemented, update `docs/api/OpenAPI.yaml` and the spec schema docs.
-
-## Open questions
-
-1. **Python spec reduction**: which `requires-python` / Poetry spec forms should be supported as deterministic single-version detection vs unknown?
