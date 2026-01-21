@@ -147,6 +147,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return true, fmt.Errorf("parse spec: %w", err)
 	}
 
+	// Validate and derive Stack Gate chaining for multi-step runs.
+	if err := validateAndDeriveStackGateChaining(typedOpts.Steps); err != nil {
+		return true, fmt.Errorf("validate stack gate chaining: %w", err)
+	}
+
 	startReq := StartRunRequest{
 		RunID:        claim.RunID, // Already types.RunID from ClaimResponse
 		JobID:        claim.JobID, // Already types.JobID from ClaimResponse

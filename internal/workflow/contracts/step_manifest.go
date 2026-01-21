@@ -104,6 +104,21 @@ type StepGateSpec struct {
 	// Set by runGateWithHealing when executing re-gates after healing mods.
 	// The diff captures all changes relative to the initial repo_url+ref clone.
 	DiffPatch []byte
+
+	// StackGate holds the Stack Gate configuration for this step.
+	// Used for pre/post gate validation of stack expectations.
+	StackGate *StepGateStackSpec
+}
+
+// StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.
+// This is threaded into manifests from the step's StackGateSpec.
+type StepGateStackSpec struct {
+	// Enabled controls whether Stack Gate validation is active for this phase.
+	Enabled bool
+
+	// Expect holds the stack expectations to validate.
+	// Only validated when Enabled is true.
+	Expect *StackExpectation
 }
 
 // StepInputHydration describes how to materialise repository state for an input.

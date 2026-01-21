@@ -125,6 +125,10 @@ type ModStep struct {
 
 	// RetainContainer controls whether this step's container is retained.
 	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
+
+	// Stack configures Stack Gate validation for this step.
+	// Inbound validates pre-mod expectations; Outbound validates post-mod expectations.
+	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
 // IsMultiStep returns true if this spec defines more than one step.
@@ -144,6 +148,7 @@ func (s ModsSpec) IsSingleStep() bool {
 //   - steps must be non-empty and each step must have a non-empty image.
 //   - HealingSpec.Mod must have a non-empty image when present.
 //   - Retries must be non-negative.
+//   - Stack Gate phases must not be disabled with expectations set.
 func (s ModsSpec) Validate() error {
 	// Validate steps.
 	if len(s.Steps) == 0 {
@@ -152,6 +157,12 @@ func (s ModsSpec) Validate() error {
 	for i, mod := range s.Steps {
 		if mod.Image.IsEmpty() {
 			return fmt.Errorf("steps[%d].image: required", i)
+		}
+		// Validate Stack Gate configuration.
+		if mod.Stack != nil {
+			if err := validateStackGateSpec(mod.Stack, fmt.Sprintf("steps[%d].stack", i)); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -166,5 +177,43 @@ func (s ModsSpec) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+// validateStackGateSpec validates a StackGateSpec for ambiguous configuration.
+// Rejects enabled:false with expect:{...} as this is contradictory.
+func validateStackGateSpec(spec *StackGateSpec, prefix string) error {
+	if spec == nil {
+		return nil
+	}
+	if spec.Inbound != nil {
+		if err := validateStackGatePhaseSpec(spec.Inbound, prefix+".inbound"); err != nil {
+			return err
+		}
+	}
+	if spec.Outbound != nil {
+		if err := validateStackGatePhaseSpec(spec.Outbound, prefix+".outbound"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateStackGatePhaseSpec validates a single phase for ambiguous configuration.
+// Rejects:
+//   - enabled:false with expect:{...} as contradictory (why set expectations if disabled?).
+//   - enabled:true without expect as incomplete (enabled without expectations is meaningless).
+func validateStackGatePhaseSpec(phase *StackGatePhaseSpec, prefix string) error {
+	if phase == nil {
+		return nil
+	}
+	// Reject enabled:false with non-empty expect as ambiguous.
+	if !phase.Enabled && phase.Expect != nil && !phase.Expect.IsEmpty() {
+		return fmt.Errorf("%s: enabled=false with expect is ambiguous; remove expect or set enabled=true", prefix)
+	}
+	// Reject enabled:true without expect as incomplete.
+	if phase.Enabled && (phase.Expect == nil || phase.Expect.IsEmpty()) {
+		return fmt.Errorf("%s: enabled=true requires expect; add expect or set enabled=false", prefix)
+	}
 	return nil
 }

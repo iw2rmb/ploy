@@ -145,6 +145,9 @@ func modStepToMap(mod ModStep) map[string]any {
 	if mod.Name != "" {
 		result["name"] = mod.Name
 	}
+	if mod.Stack != nil && !mod.Stack.IsEmpty() {
+		result["stack"] = stackGateSpecToMap(mod.Stack)
+	}
 	return result
 }
 

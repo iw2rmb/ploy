@@ -35,6 +35,31 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Build manifest using typed options from request.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
 	typedOpts := req.TypedOptions
+
+	// Thread Stack Gate expectation based on gate type (pre_gate vs post_gate/re_gate).
+	// Use req.StepIndex to derive the correct step's stack expectations.
+	stepIndex, _ := modStepIndexFromJobStepIndex(req.StepIndex)
+	if len(typedOpts.Steps) > stepIndex && stepIndex >= 0 {
+		step := typedOpts.Steps[stepIndex]
+		if step.Stack != nil {
+			switch req.ModType {
+			case types.ModTypePreGate:
+				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound)
+				}
+			case types.ModTypePostGate:
+				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound)
+				}
+			// Note: re_gate uses same expectations as post_gate (verifying output after healing)
+			case types.ModTypeReGate:
+				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound)
+				}
+			}
+		}
+	}
+
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)

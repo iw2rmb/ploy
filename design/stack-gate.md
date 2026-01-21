@@ -1,7 +1,31 @@
 # Stack Gate (StackGate) — Design
 
-Status: **Proposed (not implemented)**  
+Status: **Phase 1 implemented (spec + contracts + manifest threading); Phases 2+ proposed**  
 Owner: Ploy core (workflow runner + node agent)  
+
+## Implemented (Phase 1)
+
+Phase 1 is implemented in code as of January 21, 2026:
+
+- Mods spec supports `steps[].stack.{inbound,outbound}` (typed, parsed, and serialized):
+  - `internal/workflow/contracts/stack_gate_spec.go`
+  - `internal/workflow/contracts/stack_gate_spec_parse.go`
+  - `internal/workflow/contracts/stack_gate_spec_wire.go`
+  - `internal/workflow/contracts/mods_spec.go`
+  - `internal/workflow/contracts/mods_spec_parse.go`
+  - `internal/workflow/contracts/mods_spec_wire.go`
+- Spec validation rejects ambiguous/incomplete Stack Gate phases:
+  - `enabled: false` with `expect: {...}` is rejected.
+  - `enabled: true` without `expect: {...}` is rejected.
+  - Implemented in `internal/workflow/contracts/mods_spec.go`.
+- Multi-step chaining invariant is enforced before execution:
+  - For `i > 0`, `steps[i].stack.inbound` is derived from `steps[i-1].stack.outbound` when omitted.
+  - If `steps[i].stack.inbound` is provided, it must match `steps[i-1].stack.outbound`.
+  - Implemented in `internal/nodeagent/manifest.go` and invoked from `internal/nodeagent/claimer_loop.go`.
+- Gate manifests thread the effective expectation for the gate phase:
+  - `internal/workflow/contracts/step_manifest.go` adds `StepGateSpec.StackGate`.
+  - `internal/nodeagent/execution_orchestrator_gate.go` selects inbound vs outbound expectations per gate job type.
+  - `internal/nodeagent/manifest.go` threads the selected expectation into the gate manifest.
 
 ## Problem
 
@@ -134,11 +158,13 @@ Tool-agnostic semantics:
 
 `internal/workflow/contracts.StepGateSpec` is threaded through manifests to the node agent.
 
-Add Stack Gate configuration to this contract (shape TBD), for example:
+Phase 1 adds Stack Gate configuration to this contract:
 
-- `StackGateEnabled bool`
-- `StackGateExpect StackExpectation` (typed union)
-- `StackGateObserved stackdetect.Observation` (captured into metadata, not required as input)
+- `StepGateSpec.StackGate *StepGateStackSpec`
+- `StepGateStackSpec.Enabled bool`
+- `StepGateStackSpec.Expect *StackExpectation`
+
+Observed stack detection and runtime selection metadata are not implemented in Phase 1.
 
 ### Build gate metadata
 
