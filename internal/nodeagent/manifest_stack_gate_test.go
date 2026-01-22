@@ -277,7 +277,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 // TestStackGatePhaseSpecToStepGate tests the conversion helper.
 func TestStackGatePhaseSpecToStepGate(t *testing.T) {
 	t.Run("nil input", func(t *testing.T) {
-		result := stackGatePhaseSpecToStepGate(nil)
+		result := stackGatePhaseSpecToStepGate(nil, nil)
 		if result != nil {
 			t.Error("expected nil for nil input")
 		}
@@ -285,7 +285,7 @@ func TestStackGatePhaseSpecToStepGate(t *testing.T) {
 
 	t.Run("disabled phase", func(t *testing.T) {
 		phase := &contracts.StackGatePhaseSpec{Enabled: false}
-		result := stackGatePhaseSpecToStepGate(phase)
+		result := stackGatePhaseSpecToStepGate(phase, nil)
 		if result != nil {
 			t.Error("expected nil for disabled phase")
 		}
@@ -296,7 +296,7 @@ func TestStackGatePhaseSpecToStepGate(t *testing.T) {
 			Enabled: true,
 			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 		}
-		result := stackGatePhaseSpecToStepGate(phase)
+		result := stackGatePhaseSpecToStepGate(phase, nil)
 		if result == nil {
 			t.Fatal("expected non-nil result")
 		}
@@ -311,6 +311,43 @@ func TestStackGatePhaseSpecToStepGate(t *testing.T) {
 		}
 		if result.Expect.Release != "17" {
 			t.Errorf("result.Expect.Release = %q, want 17", result.Expect.Release)
+		}
+	})
+
+	t.Run("threads mod-level image overrides", func(t *testing.T) {
+		modImages := []contracts.BuildGateImageRule{
+			{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
+		}
+
+		phase := &contracts.StackGatePhaseSpec{
+			Enabled: true,
+			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
+		}
+
+		result := stackGatePhaseSpecToStepGate(phase, modImages)
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if len(result.ImageOverrides) != 1 {
+			t.Fatalf("len(ImageOverrides) = %d, want 1", len(result.ImageOverrides))
+		}
+		if result.ImageOverrides[0].Image != "mod:17" {
+			t.Errorf("ImageOverrides[0].Image = %q, want %q", result.ImageOverrides[0].Image, "mod:17")
+		}
+	})
+
+	t.Run("nil mod images results in empty ImageOverrides", func(t *testing.T) {
+		phase := &contracts.StackGatePhaseSpec{
+			Enabled: true,
+			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
+		}
+
+		result := stackGatePhaseSpecToStepGate(phase, nil)
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if len(result.ImageOverrides) != 0 {
+			t.Errorf("len(ImageOverrides) = %d, want 0", len(result.ImageOverrides))
 		}
 	})
 }

@@ -151,6 +151,17 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			}
 			bg.Healing = heal
 		}
+		if vv, ok := bgRaw["images"]; ok && vv != nil {
+			imagesRaw, ok := vv.([]any)
+			if !ok {
+				return nil, fmt.Errorf("build_gate.images: expected array, got %T", vv)
+			}
+			images, err := parseBuildGateImageRules(imagesRaw, "build_gate.images")
+			if err != nil {
+				return nil, err
+			}
+			bg.Images = images
+		}
 		spec.BuildGate = bg
 	}
 

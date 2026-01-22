@@ -483,12 +483,17 @@ func validateAndDeriveStackGateChaining(steps []StepMod) error {
 
 // stackGatePhaseSpecToStepGate converts a StackGatePhaseSpec to StepGateStackSpec.
 // Returns nil if the input is nil or disabled.
-func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec) *contracts.StepGateStackSpec {
+//
+// The modImages parameter carries mod-level image mapping overrides from
+// build_gate.images in the run spec. These are threaded into ImageOverrides
+// so the resolver can apply the correct precedence (mod > cluster > default).
+func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec, modImages []contracts.BuildGateImageRule) *contracts.StepGateStackSpec {
 	if phase == nil || !phase.Enabled {
 		return nil
 	}
 	return &contracts.StepGateStackSpec{
-		Enabled: phase.Enabled,
-		Expect:  phase.Expect,
+		Enabled:        phase.Enabled,
+		Expect:         phase.Expect,
+		ImageOverrides: modImages,
 	}
 }

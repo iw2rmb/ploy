@@ -177,6 +177,14 @@ func (s ModsSpec) Validate() error {
 		}
 	}
 
+	// Validate build gate images.
+	if s.BuildGate != nil && len(s.BuildGate.Images) > 0 {
+		mapping := BuildGateImageMapping{Images: s.BuildGate.Images}
+		if err := mapping.Validate("build_gate.images"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

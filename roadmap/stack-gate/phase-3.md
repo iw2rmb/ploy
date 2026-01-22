@@ -7,7 +7,7 @@ Documentation: `design/stack-gate.md` (“Build Gate image mapping”), `design/
 Legend: [ ] todo, [x] done.
 
 ## Schema and resolution rules
-- [ ] Define typed image mapping rule schema — Makes configuration parseable and validateable.
+- [x] Define typed image mapping rule schema — Makes configuration parseable and validateable.
   - Repository: ploy
   - Component: `internal/workflow/contracts` (schema), `internal/workflow/runtime/step` (consumer)
   - Scope:
@@ -22,7 +22,7 @@ Legend: [ ] todo, [x] done.
       - `image` required
   - Snippets: `images: [{ stack: { language: java, tool: maven, release: "11" }, image: "docker.io/org/..." }]`
   - Tests: `go test ./... -run BuildGateImageRule` — invalid entries rejected with stable errors.
-- [ ] Implement “most specific match wins” resolution — Ensures deterministic selection for tool-specific vs tool-agnostic rules.
+- [x] Implement “most specific match wins” resolution — Ensures deterministic selection for tool-specific vs tool-agnostic rules.
   - Repository: ploy
   - Component: Build Gate runtime / Stack Gate
   - Scope: Resolver matches `language+tool+release` over `language+release`; ties at same precedence level are configuration errors.
@@ -30,13 +30,13 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./... -run ResolveBuildGateImage` — specificity and tie errors covered.
 
 ## Loading and precedence
-- [ ] Load default mapping from `/etc/ploy/gates/build-gate-images.yaml` — Removes implicit defaults when Stack Gate is enabled.
+- [x] Load default mapping from `/etc/ploy/gates/build-gate-images.yaml` — Removes implicit defaults when Stack Gate is enabled.
   - Repository: ploy
   - Component: `internal/workflow/runtime/step`
   - Scope: File loader + parse with clear error on missing/invalid file when required by an enabled phase (`StepGateSpec.StackGate.Enabled == true`).
   - Snippets: N/A
   - Tests: `go test ./... -run BuildGateImagesFile` — missing file triggers reject only when Stack Gate needs it.
-- [ ] Merge overrides with explicit precedence — Allows cluster and mod overrides without ambiguity.
+- [x] Merge overrides with explicit precedence — Allows cluster and mod overrides without ambiguity.
   - Repository: ploy
   - Component: runtime config model (cluster/global inline), `internal/workflow/contracts` (Mods spec), `internal/workflow/runtime/step` (merge)
   - Scope:

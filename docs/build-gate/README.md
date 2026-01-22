@@ -85,6 +85,33 @@ build_gate:
   profile: auto  # auto, java, java-maven, java-gradle
 ```
 
+### Stack Gate: Build Gate Image Mapping
+
+When Stack Gate is enabled for a gate phase (a gate job carries `gate.stack_gate.expect`),
+Build Gate can resolve its runtime image from an explicit stack→image mapping instead of
+profile-based defaults.
+
+**Resolution sources and precedence (highest wins):**
+1. Mod spec: `build_gate.images[]` (mod-level overrides)
+2. Node config: `gates.build_gate.images[]` (cluster/global inline)
+3. Default file: `/etc/ploy/gates/build-gate-images.yaml`
+
+**Rule format:**
+```yaml
+images:
+  - stack: { language: java, tool: maven, release: "17" }
+    image: docker.io/org/stack-gate-java-maven:17
+  # tool-agnostic fallback (used only when Stack Gate expectation omits tool)
+  - stack: { language: java, release: "17" }
+    image: docker.io/org/stack-gate-java:17
+```
+
+**Validation:**
+- `stack.language`, `stack.release`, and `image` are required; `stack.tool` is optional.
+- Duplicate selectors within the same source are rejected.
+- When Stack Gate mode is active and `PLOY_BUILDGATE_IMAGE` is not set, missing
+  `/etc/ploy/gates/build-gate-images.yaml` is an error.
+
 **Profile detection:**
 - `auto` (default): Detects Maven if `pom.xml` exists; Gradle if `build.gradle(.kts)`
   exists; otherwise plain `java`.

@@ -105,6 +105,88 @@ http:
 `,
 			wantErr: true,
 		},
+		{
+			name: "valid gates.build_gate.images",
+			yaml: `
+server_url: https://server.example.com:8443
+node_id: aB3xY9
+http:
+  tls:
+    enabled: false
+gates:
+  build_gate:
+    images:
+      - stack:
+          language: java
+          release: "17"
+          tool: maven
+        image: maven:3-eclipse-temurin-17
+      - stack:
+          language: java
+          release: "17"
+        image: eclipse-temurin:17-jdk
+`,
+			wantErr: false,
+			check: func(t *testing.T, cfg Config) {
+				if len(cfg.Gates.BuildGate.Images) != 2 {
+					t.Errorf("len(Gates.BuildGate.Images) = %d, want 2", len(cfg.Gates.BuildGate.Images))
+					return
+				}
+				// Verify first rule (tool-specific).
+				if cfg.Gates.BuildGate.Images[0].Stack.Language != "java" {
+					t.Errorf("Images[0].Stack.Language = %q, want java", cfg.Gates.BuildGate.Images[0].Stack.Language)
+				}
+				if cfg.Gates.BuildGate.Images[0].Stack.Tool != "maven" {
+					t.Errorf("Images[0].Stack.Tool = %q, want maven", cfg.Gates.BuildGate.Images[0].Stack.Tool)
+				}
+				if cfg.Gates.BuildGate.Images[0].Image != "maven:3-eclipse-temurin-17" {
+					t.Errorf("Images[0].Image = %q, want maven:3-eclipse-temurin-17", cfg.Gates.BuildGate.Images[0].Image)
+				}
+				// Verify second rule (tool-agnostic).
+				if cfg.Gates.BuildGate.Images[1].Stack.Tool != "" {
+					t.Errorf("Images[1].Stack.Tool = %q, want empty", cfg.Gates.BuildGate.Images[1].Stack.Tool)
+				}
+			},
+		},
+		{
+			name: "invalid gates.build_gate.images - missing language",
+			yaml: `
+server_url: https://server.example.com:8443
+node_id: aB3xY9
+http:
+  tls:
+    enabled: false
+gates:
+  build_gate:
+    images:
+      - stack:
+          release: "17"
+        image: test:latest
+`,
+			wantErr: true,
+		},
+		{
+			name: "invalid gates.build_gate.images - duplicate selector",
+			yaml: `
+server_url: https://server.example.com:8443
+node_id: aB3xY9
+http:
+  tls:
+    enabled: false
+gates:
+  build_gate:
+    images:
+      - stack:
+          language: java
+          release: "17"
+        image: image1:latest
+      - stack:
+          language: java
+          release: "17"
+        image: image2:latest
+`,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

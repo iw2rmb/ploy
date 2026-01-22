@@ -16,6 +16,11 @@ type BuildGateConfig struct {
 	// Healing configures the heal → re-gate loop when Build Gate fails.
 	// This is nested under build_gate to keep gate policy in one place.
 	Healing *HealingSpec `json:"healing,omitempty" yaml:"healing,omitempty"`
+
+	// Images provides mod-level image mapping overrides for Stack Gate.
+	// These rules override default file and cluster/global inline rules.
+	// Each rule maps a stack expectation to a container image.
+	Images []BuildGateImageRule `json:"images,omitempty" yaml:"images,omitempty"`
 }
 
 // HealingSpec describes the heal → re-gate loop configuration.
