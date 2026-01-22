@@ -69,7 +69,7 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 			},
 		},
 	}
-	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true}}
 
 	res, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestExecuteWithHealing_RetriesValueHonored(t *testing.T) {
 			},
 		},
 	}
-	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
@@ -181,7 +181,7 @@ func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 			},
 		},
 	}
-	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true}}
 
 	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
@@ -239,7 +239,7 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 			},
 		},
 	}
-	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true}}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
@@ -343,7 +343,6 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -430,7 +429,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 		},
 	}
 
-	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}}
+	manifest := contracts.StepManifest{ID: types.StepID(req.JobID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true}}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
@@ -533,7 +532,7 @@ func TestExecuteWithHealing_InjectsBearerFromEnv(t *testing.T) {
 		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
-		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate:   &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -627,7 +626,7 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
-		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate:   &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -719,7 +718,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
-		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate:   &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -821,7 +820,7 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
-		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate:   &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
@@ -923,7 +922,7 @@ func TestExecuteWithHealing_DoesNotInjectBearerFromFileWhenTLSEnabled(t *testing
 		ID:     types.StepID(req.JobID),
 		Image:  "main:latest",
 		Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
-		Gate:   &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate:   &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)

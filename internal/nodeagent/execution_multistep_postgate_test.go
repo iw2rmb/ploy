@@ -162,7 +162,6 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		// Enable gate for this test.
 		manifest.Gate = &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		}
 
 		// Execute step with healing (simulates executeWithHealing call).
@@ -362,7 +361,6 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 
 		manifest.Gate = &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		}
 
 		_, execErr := rc.executeWithHealing(

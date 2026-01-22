@@ -618,14 +618,20 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 		}
 	})
 
-	t.Run("gate profile overridden from build_gate_profile option", func(t *testing.T) {
+	t.Run("gate image overrides threaded from build_gate.images", func(t *testing.T) {
 		t.Parallel()
 		req := StartRunRequest{
-			RunID:        types.RunID("run-gate-006"),
-			JobID:        types.JobID("job-gate-006"),
-			RepoURL:      types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
-			TargetRef:    types.GitRef("main"),
-			TypedOptions: RunOptions{BuildGate: BuildGateOptions{Enabled: true, Profile: "java-maven"}},
+			RunID:     types.RunID("run-gate-006"),
+			JobID:     types.JobID("job-gate-006"),
+			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			TargetRef: types.GitRef("main"),
+			TypedOptions: RunOptions{BuildGate: BuildGateOptions{
+				Enabled: true,
+				Images: []contracts.BuildGateImageRule{{
+					Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+					Image: "maven:3-eclipse-temurin-17",
+				}},
+			}},
 		}
 
 		typedOpts := req.TypedOptions
@@ -635,12 +641,15 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		// Gate enabled and profile overridden.
+		// Gate enabled and image overrides threaded.
 		if !manifest.Gate.Enabled {
 			t.Error("expected Gate.Enabled=true")
 		}
-		if manifest.Gate.Profile != "java-maven" {
-			t.Errorf("Gate.Profile=%q, want java-maven", manifest.Gate.Profile)
+		if len(manifest.Gate.ImageOverrides) != 1 {
+			t.Fatalf("len(Gate.ImageOverrides)=%d, want 1", len(manifest.Gate.ImageOverrides))
+		}
+		if got := manifest.Gate.ImageOverrides[0].Image; got != "maven:3-eclipse-temurin-17" {
+			t.Errorf("Gate.ImageOverrides[0].Image=%q, want %q", got, "maven:3-eclipse-temurin-17")
 		}
 		// Repo metadata still populated.
 		if manifest.Gate.RepoURL.String() != req.RepoURL.String() {

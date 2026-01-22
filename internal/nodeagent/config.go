@@ -7,7 +7,6 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,10 +43,8 @@ type GatesConfig struct {
 
 // BuildGateGatesConfig holds Build Gate specific configuration.
 type BuildGateGatesConfig struct {
-	// Images holds cluster-level image mapping rules for Stack Gate.
-	// These rules override default file rules but are overridden by
-	// mod-level image overrides in the run spec.
-	Images []contracts.BuildGateImageRule `yaml:"images"`
+	// Intentionally empty: Build Gate image selection is configured via:
+	//  1) default mapping file, 2) PLOY_BUILDGATE_IMAGE, 3) mod YAML overrides.
 }
 
 // HTTPConfig specifies HTTP listener and TLS settings for the node agent.
@@ -156,13 +153,6 @@ func (c Config) validate() error {
 		}
 		if c.HTTP.TLS.CAPath == "" {
 			return errors.New("http.tls.ca_path is required when TLS is enabled")
-		}
-	}
-	// Validate gates.build_gate.images if present.
-	if len(c.Gates.BuildGate.Images) > 0 {
-		mapping := contracts.BuildGateImageMapping{Images: c.Gates.BuildGate.Images}
-		if err := mapping.Validate("gates.build_gate.images"); err != nil {
-			return err
 		}
 	}
 	return nil

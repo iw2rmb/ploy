@@ -2,7 +2,7 @@
 ##
 ## This format matches the runtime loader used by Build Gate when Stack Gate mode is active.
 ## Operators can copy this file to `/etc/ploy/gates/build-gate-images.yaml` as a starting point,
-## then layer `gates.build_gate.images` (node config) and `build_gate.images` (mod spec) overrides.
+## then layer `build_gate.images` (mod spec) overrides.
 images:
   - stack: { language: java, tool: maven, release: "11" }
     image: docker.io/org/stack-gate-java-maven:11

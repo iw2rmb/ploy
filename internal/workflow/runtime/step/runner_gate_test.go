@@ -46,7 +46,6 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -103,7 +102,6 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: false,
-			Profile: "java",
 		},
 	}
 
@@ -155,7 +153,6 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -211,7 +208,6 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 		// No build_gate_healing configured
 		Options: map[string]any{},
@@ -292,7 +288,6 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -358,7 +353,6 @@ func TestRunGateOnly_Enabled(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -437,7 +431,6 @@ func TestRunGateOnly_Disabled(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: false,
-			Profile: "java",
 		},
 	}
 
@@ -507,7 +500,6 @@ func TestRunGateOnly_GateFailure(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -566,7 +558,6 @@ func TestRunGateOnly_NilGate(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

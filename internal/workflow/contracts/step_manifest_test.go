@@ -40,7 +40,7 @@ func TestStepManifestValidate(t *testing.T) {
 			},
 		},
 		Gate: &StepGateSpec{
-			Profile: "default",
+			Enabled: true,
 			Env: map[string]string{
 				"GATE_TIMEOUT": "5m",
 			},
@@ -136,12 +136,11 @@ func TestStepManifestValidate(t *testing.T) {
 			wantErr: "inputs[0]",
 		},
 		{
-			name: "invalid gate profile",
+			name: "invalid gate env key",
 			mutate: func(m *StepManifest) {
-				m.Gate.Profile = ""
-				m.Gate.Enabled = true
+				m.Gate.Env = map[string]string{"BAD KEY": "x"}
 			},
-			wantErr: "gate profile required",
+			wantErr: "gate environment key invalid",
 		},
 		{
 			name: "invalid digest in hydration diff",

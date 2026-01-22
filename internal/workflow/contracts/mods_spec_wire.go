@@ -50,9 +50,6 @@ func (s ModsSpec) ToMap() map[string]any {
 		if s.BuildGate.Enabled {
 			bg["enabled"] = true
 		}
-		if s.BuildGate.Profile != "" {
-			bg["profile"] = s.BuildGate.Profile
-		}
 		if s.BuildGate.Healing != nil {
 			heal := make(map[string]any)
 			if s.BuildGate.Healing.Retries > 0 {

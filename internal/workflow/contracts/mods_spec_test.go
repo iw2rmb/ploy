@@ -15,7 +15,7 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 			"env": {"FOO": "bar", "BAZ": "qux"},
 			"retain_container": true
 		}],
-		"build_gate": {"enabled": true, "profile": "java-maven"},
+		"build_gate": {"enabled": true},
 		"gitlab_pat": "secret",
 		"gitlab_domain": "gitlab.com",
 		"mr_on_success": true,
@@ -75,9 +75,6 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 	if !spec.BuildGate.Enabled {
 		t.Errorf("build_gate.enabled = false, want true")
 	}
-	if spec.BuildGate.Profile != "java-maven" {
-		t.Errorf("build_gate.profile = %q, want %q", spec.BuildGate.Profile, "java-maven")
-	}
 
 	// Verify GitLab integration.
 	if spec.GitLabPAT != "secret" {
@@ -103,7 +100,6 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 		],
 		"build_gate": {
 			"enabled": true,
-			"profile": "auto",
 			"healing": {
 				"retries": 3,
 				"mod": {
@@ -232,7 +228,7 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 			"command": "echo hello",
 			"env": {"FOO": "bar"}
 		}],
-		"build_gate": {"enabled": true, "profile": "auto"}
+		"build_gate": {"enabled": true}
 	}`
 
 	spec, err := ParseModsSpecJSON([]byte(input))
@@ -312,7 +308,7 @@ func TestModsSpec_ToMap(t *testing.T) {
 			Env:             map[string]string{"FOO": "bar"},
 			RetainContainer: true,
 		}},
-		BuildGate:   &BuildGateConfig{Enabled: true, Profile: "auto"},
+		BuildGate:   &BuildGateConfig{Enabled: true},
 		GitLabPAT:   "secret",
 		MROnSuccess: &mrOnSuccess,
 	}

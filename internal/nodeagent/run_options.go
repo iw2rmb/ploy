@@ -80,19 +80,13 @@ type RunOptions struct {
 }
 
 // BuildGateOptions configures pre-mod build gate validation.
-// These options control whether the gate runs, which profile to use, and
-// environment variables to inject into the gate execution context.
+// These options control whether the gate runs and mod-level image overrides.
 type BuildGateOptions struct {
 	// Enabled controls whether the build gate runs before the main mod execution.
 	Enabled bool
 
-	// Profile specifies the gate profile name (e.g., "java-auto", "java-maven").
-	// The profile determines which static analysis tools and checks to run.
-	Profile string
-
 	// Images holds mod-level image mapping overrides for Stack Gate.
-	// These rules override default file and cluster/global inline rules
-	// when resolving the Build Gate image for Stack Gate mode.
+	// These rules override the default mapping file.
 	Images []contracts.BuildGateImageRule
 }
 
@@ -298,10 +292,9 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	runOpts := RunOptions{}
 
 	// --- Build Gate Options ---
-	// Extract enabled/profile from the typed BuildGate struct.
+	// Extract enabled/images from the typed BuildGate struct.
 	if spec.BuildGate != nil {
 		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
-		runOpts.BuildGate.Profile = spec.BuildGate.Profile
 		runOpts.BuildGate.Images = spec.BuildGate.Images
 
 		// --- Healing Configuration ---

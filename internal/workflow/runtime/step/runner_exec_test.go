@@ -49,7 +49,6 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

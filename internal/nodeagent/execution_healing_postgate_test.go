@@ -87,7 +87,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
 		},
-		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
@@ -238,7 +238,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
 		},
-		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)

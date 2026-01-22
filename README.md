@@ -124,7 +124,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Key variables:
   - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server.
   - `PLOY_CONFIG_HOME` — CLI config home; local Docker uses `./local/cli`.
-  - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional Java image for the Build Gate.
+  - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
 
 **Contributing**
 - Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).

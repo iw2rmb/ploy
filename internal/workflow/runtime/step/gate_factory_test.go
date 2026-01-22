@@ -39,7 +39,7 @@ func TestNewDockerGateExecutor_NilRuntime(t *testing.T) {
 	}
 
 	// dockerGateExecutor with nil runtime returns empty metadata for enabled spec.
-	spec := &contracts.StepGateSpec{Enabled: true, Profile: "java"}
+	spec := &contracts.StepGateSpec{Enabled: true}
 	result, err := executor.Execute(context.Background(), spec, "/workspace")
 
 	// With nil runtime, dockerGateExecutor returns empty metadata without error.

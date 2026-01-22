@@ -52,12 +52,13 @@ func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
+	workspace := createMavenWorkspace(t, "17")
+
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Profile: "java",
 	}
 
-	_, err := executor.Execute(context.Background(), spec, "/tmp/workspace")
+	_, err := executor.Execute(context.Background(), spec, workspace)
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -80,9 +81,10 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
+	workspace := createMavenWorkspace(t, "17")
+
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Profile: "java",
 		Env: map[string]string{
 			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
 			"CODEX_AUTH_JSON":     `{"token":"secret"}`,
@@ -90,7 +92,7 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 		},
 	}
 
-	_, err := executor.Execute(context.Background(), spec, t.TempDir())
+	_, err := executor.Execute(context.Background(), spec, workspace)
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -153,11 +155,11 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
-				Profile: "java",
 				Env:     tc.env,
 			}
 
-			_, err := executor.Execute(context.Background(), spec, t.TempDir())
+			workspace := createMavenWorkspace(t, "17")
+			_, err := executor.Execute(context.Background(), spec, workspace)
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
 			}
@@ -178,15 +180,10 @@ func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
-	// Use an explicit java-gradle profile; workspace contents are irrelevant for this path.
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte{}, 0o644); err != nil {
-		t.Fatalf("failed to create dummy build.gradle: %v", err)
-	}
+	tmpDir := createGradleWorkspace(t, "17")
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Profile: "java-gradle",
 	}
 
 	if _, err := executor.Execute(context.Background(), spec, tmpDir); err != nil {
@@ -221,27 +218,47 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		profile     string
-		setupFile   string // file to create in workspace to trigger detection
+		workspace   func(t *testing.T) string
+		spec        func() *contracts.StepGateSpec
 		expectInCmd string // substring expected in the shell command
 	}{
 		{
-			name:        "maven_profile",
-			profile:     "java-maven",
-			setupFile:   "pom.xml",
+			name:        "maven",
+			workspace:   func(t *testing.T) string { return createMavenWorkspace(t, "17") },
+			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
 			expectInCmd: "mvn --ff -B -q -e",
 		},
 		{
-			name:        "gradle_profile",
-			profile:     "java-gradle",
-			setupFile:   "build.gradle",
+			name:        "gradle",
+			workspace:   func(t *testing.T) string { return createGradleWorkspace(t, "17") },
+			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
 			expectInCmd: "gradle -q --stacktrace",
 		},
 		{
-			name:        "java_profile",
-			profile:     "java",
-			setupFile:   "", // no build file needed for plain java
-			expectInCmd: "javac --release 17",
+			name:        "go",
+			workspace:   func(t *testing.T) string { return createGoWorkspace(t, "1.22") },
+			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
+			expectInCmd: "go test ./...",
+		},
+		{
+			name:        "cargo",
+			workspace:   func(t *testing.T) string { return createCargoWorkspace(t, "1.76") },
+			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
+			expectInCmd: "cargo test",
+		},
+		{
+			name:      "pip",
+			workspace: func(t *testing.T) string { return createPythonWorkspace(t, "3.11") },
+			spec: func() *contracts.StepGateSpec {
+				return &contracts.StepGateSpec{
+					Enabled: true,
+					ImageOverrides: []contracts.BuildGateImageRule{{
+						Stack: contracts.StackExpectation{Language: "python", Release: "3.11"},
+						Image: "python:3.11",
+					}},
+				}
+			},
+			expectInCmd: "python -m compileall",
 		},
 	}
 
@@ -253,18 +270,8 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 			rt := &mockGateRuntimeMinimal{}
 			executor := NewDockerGateExecutor(rt)
 
-			tmpDir := t.TempDir()
-			if tc.setupFile != "" {
-				if err := os.WriteFile(filepath.Join(tmpDir, tc.setupFile), []byte{}, 0o644); err != nil {
-					t.Fatalf("failed to create %s: %v", tc.setupFile, err)
-				}
-			}
-
-			spec := &contracts.StepGateSpec{
-				Enabled: true,
-				Profile: tc.profile,
-			}
-
+			tmpDir := tc.workspace(t)
+			spec := tc.spec()
 			_, err := executor.Execute(context.Background(), spec, tmpDir)
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
@@ -384,6 +391,40 @@ java {
 	return tmpDir
 }
 
+func createGoWorkspace(t *testing.T, goVersion string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	goMod := "module example.com/test\n\ngo " + goVersion + "\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("failed to create go.mod: %v", err)
+	}
+	return tmpDir
+}
+
+func createCargoWorkspace(t *testing.T, rustVersion string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	cargo := `[package]
+name = "test"
+version = "0.1.0"
+edition = "2021"
+rust-version = "` + rustVersion + `"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "Cargo.toml"), []byte(cargo), 0o644); err != nil {
+		t.Fatalf("failed to create Cargo.toml: %v", err)
+	}
+	return tmpDir
+}
+
+func createPythonWorkspace(t *testing.T, pythonVersion string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".python-version"), []byte(pythonVersion+"\n"), 0o644); err != nil {
+		t.Fatalf("failed to create .python-version: %v", err)
+	}
+	return tmpDir
+}
+
 // TestGateDocker_StackGate_PreCheckPass verifies that Stack Gate pre-check passes
 // when detected stack matches expectations, and container is executed.
 func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
@@ -396,6 +437,10 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
+		ImageOverrides: []contracts.BuildGateImageRule{{
+			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			Image: "maven:3-eclipse-temurin-17",
+		}},
 		StackGate: &contracts.StepGateStackSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
@@ -403,10 +448,6 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 				Tool:     "maven",
 				Release:  "17",
 			},
-			ImageOverrides: []contracts.BuildGateImageRule{{
-				Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-				Image: "maven:3-eclipse-temurin-17",
-			}},
 		},
 	}
 
@@ -637,6 +678,10 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
+		ImageOverrides: []contracts.BuildGateImageRule{{
+			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			Image: "custom-maven:java17",
+		}},
 		StackGate: &contracts.StepGateStackSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
@@ -644,10 +689,6 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 				Tool:     "maven",
 				Release:  "17",
 			},
-			ImageOverrides: []contracts.BuildGateImageRule{{
-				Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-				Image: "custom-maven:java17",
-			}},
 		},
 	}
 
@@ -675,31 +716,23 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	}
 }
 
-// TestGateDocker_StackGate_ImageResolutionFailure verifies metadata with Result="unknown"
-// when no matching image rule exists. Container should NOT be executed.
-func TestGateDocker_StackGate_ImageResolutionFailure(t *testing.T) {
+func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testing.T) {
 	t.Parallel()
 
-	workspace := createMavenWorkspace(t, "17")
+	workspace := createPythonWorkspace(t, "3.11")
 
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
-	// Stack Gate expects Java 17 but no matching rules.
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		StackGate: &contracts.StepGateStackSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
-				Language: "java",
-				Tool:     "maven",
-				Release:  "17",
+				Language: "python",
+				Tool:     "pip",
+				Release:  "3.11",
 			},
-			// Non-matching rule: Java 11 instead of 17
-			ImageOverrides: []contracts.BuildGateImageRule{{
-				Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "11"},
-				Image: "maven:java11",
-			}},
 		},
 	}
 
@@ -735,9 +768,7 @@ func TestGateDocker_StackGate_ImageResolutionFailure(t *testing.T) {
 	}
 }
 
-// TestGateDocker_StackGate_NoDefaults_Maven verifies that Stack Gate mode does NOT
-// fall back to default Maven image when no rules match. Returns metadata with Result="unknown".
-func TestGateDocker_StackGate_NoDefaults_Maven(t *testing.T) {
+func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 	t.Parallel()
 
 	workspace := createMavenWorkspace(t, "17")
@@ -745,8 +776,6 @@ func TestGateDocker_StackGate_NoDefaults_Maven(t *testing.T) {
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
-	// Stack Gate enabled but no matching rules - should return metadata with Result="unknown".
-	// With empty ImageOverrides and no default file, we get STACK_GATE_IMAGE_MAPPING_ERROR.
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		StackGate: &contracts.StepGateStackSpec{
@@ -756,114 +785,40 @@ func TestGateDocker_StackGate_NoDefaults_Maven(t *testing.T) {
 				Tool:     "maven",
 				Release:  "17",
 			},
-			ImageOverrides: []contracts.BuildGateImageRule{}, // Empty - no rules.
 		},
 	}
 
 	meta, err := executor.Execute(context.Background(), spec, workspace)
-	// Should return metadata, not error.
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	// Verify container was NOT created.
-	if rt.createCalled {
-		t.Error("expected container Create NOT to be called")
+	if rt.lastSpec.Image != "maven:3-eclipse-temurin-17" {
+		t.Errorf("Image = %q, want %q", rt.lastSpec.Image, "maven:3-eclipse-temurin-17")
 	}
-
-	// Verify stack gate result is unknown.
-	if meta.StackGate == nil {
-		t.Fatal("expected StackGate result in metadata")
-	}
-	if meta.StackGate.Result != "unknown" {
-		t.Errorf("StackGate.Result = %q, want %q", meta.StackGate.Result, "unknown")
-	}
-
-	// Verify log finding with appropriate code (either image mapping error or no rule error).
-	found := false
-	for _, f := range meta.LogFindings {
-		if f.Code == "STACK_GATE_IMAGE_MAPPING_ERROR" || f.Code == "STACK_GATE_NO_IMAGE_RULE" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected log finding with image mapping error code, got %+v", meta.LogFindings)
+	if meta.StackGate == nil || meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Fatalf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
 	}
 }
 
-// TestGateDocker_StackGate_NoDefaults_Gradle verifies that Stack Gate mode does NOT
-// fall back to default Gradle image when no rules match. Returns metadata with Result="unknown".
-func TestGateDocker_StackGate_NoDefaults_Gradle(t *testing.T) {
-	t.Parallel()
-
-	workspace := createGradleWorkspace(t, "17")
-
-	rt := &mockGateRuntimeMinimal{}
-	executor := NewDockerGateExecutor(rt)
-
-	// Stack Gate enabled but no matching rules - should return metadata with Result="unknown".
-	// With empty ImageOverrides and no default file, we get STACK_GATE_IMAGE_MAPPING_ERROR.
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-		StackGate: &contracts.StepGateStackSpec{
-			Enabled: true,
-			Expect: &contracts.StackExpectation{
-				Language: "java",
-				Tool:     "gradle",
-				Release:  "17",
-			},
-			ImageOverrides: []contracts.BuildGateImageRule{}, // Empty - no rules.
-		},
-	}
-
-	meta, err := executor.Execute(context.Background(), spec, workspace)
-	// Should return metadata, not error.
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-
-	// Verify container was NOT created.
-	if rt.createCalled {
-		t.Error("expected container Create NOT to be called")
-	}
-
-	// Verify stack gate result is unknown.
-	if meta.StackGate == nil {
-		t.Fatal("expected StackGate result in metadata")
-	}
-	if meta.StackGate.Result != "unknown" {
-		t.Errorf("StackGate.Result = %q, want %q", meta.StackGate.Result, "unknown")
-	}
-
-	// Verify log finding with appropriate code (either image mapping error or no rule error).
-	found := false
-	for _, f := range meta.LogFindings {
-		if f.Code == "STACK_GATE_IMAGE_MAPPING_ERROR" || f.Code == "STACK_GATE_NO_IMAGE_RULE" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected log finding with image mapping error code, got %+v", meta.LogFindings)
-	}
-}
-
-// TestGateDocker_StackGate_IgnoresBuildgateImageEnv verifies that PLOY_BUILDGATE_IMAGE
-// environment variable is ignored in Stack Gate mode - images are always resolved via mapping.
-func TestGateDocker_StackGate_IgnoresBuildgateImageEnv(t *testing.T) {
+// TestGateDocker_StackGate_UsesBuildgateImageEnv verifies that PLOY_BUILDGATE_IMAGE
+// is honored in Stack Gate mode.
+func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
 	// Cannot use t.Parallel() with t.Setenv.
 
 	workspace := createMavenWorkspace(t, "17")
 
-	// Set env var that SHOULD be ignored in Stack Gate mode.
-	t.Setenv("PLOY_BUILDGATE_IMAGE", "should-be-ignored:latest")
+	t.Setenv("PLOY_BUILDGATE_IMAGE", "override:latest")
 
 	rt := &mockGateRuntimeMinimal{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
+		ImageOverrides: []contracts.BuildGateImageRule{{
+			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			Image: "resolved-from-mapping:17",
+		}},
 		StackGate: &contracts.StepGateStackSpec{
 			Enabled: true,
 			Expect: &contracts.StackExpectation{
@@ -871,10 +826,6 @@ func TestGateDocker_StackGate_IgnoresBuildgateImageEnv(t *testing.T) {
 				Tool:     "maven",
 				Release:  "17",
 			},
-			ImageOverrides: []contracts.BuildGateImageRule{{
-				Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-				Image: "resolved-from-mapping:17",
-			}},
 		},
 	}
 
@@ -883,15 +834,12 @@ func TestGateDocker_StackGate_IgnoresBuildgateImageEnv(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	// Verify the resolved image was used, NOT the env var.
-	if rt.lastSpec.Image != "resolved-from-mapping:17" {
-		t.Errorf("Image = %q, want %q (should ignore PLOY_BUILDGATE_IMAGE)",
-			rt.lastSpec.Image, "resolved-from-mapping:17")
+	if rt.lastSpec.Image != "override:latest" {
+		t.Errorf("Image = %q, want %q", rt.lastSpec.Image, "override:latest")
 	}
 
 	// Verify RuntimeImage in metadata.
-	if meta.StackGate.RuntimeImage != "resolved-from-mapping:17" {
-		t.Errorf("RuntimeImage = %q, want %q",
-			meta.StackGate.RuntimeImage, "resolved-from-mapping:17")
+	if meta.StackGate.RuntimeImage != "override:latest" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "override:latest")
 	}
 }

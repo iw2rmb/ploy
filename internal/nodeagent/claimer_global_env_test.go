@@ -217,8 +217,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 			}
 		],
 		"build_gate": {
-			"enabled": true,
-			"profile": "java-maven"
+			"enabled": true
 		},
 		"env": {
 			"CA_CERTS_PEM_BUNDLE": "gate-test-cert-bundle",
@@ -268,9 +267,6 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	}
 	if !gateManifest.Gate.Enabled {
 		t.Error("expected Gate.Enabled=true")
-	}
-	if gateManifest.Gate.Profile != "java-maven" {
-		t.Errorf("Gate.Profile=%q, want java-maven", gateManifest.Gate.Profile)
 	}
 }
 

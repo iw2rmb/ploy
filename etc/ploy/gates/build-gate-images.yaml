@@ -1,0 +1,29 @@
+## Default Build Gate image mapping (Stack Gate mode).
+##
+## Install this file on worker nodes at:
+##   /etc/ploy/gates/build-gate-images.yaml
+##
+## Rules:
+## - stack.language and stack.release are required.
+## - stack.tool is optional (empty matches any tool), but tool-specific rules
+##   are preferred by the resolver.
+images:
+  # Java (Maven)
+  - stack: { language: java, tool: maven, release: "11" }
+    image: maven:3-eclipse-temurin-11
+  - stack: { language: java, tool: maven, release: "17" }
+    image: maven:3-eclipse-temurin-17
+
+  # Java (Gradle)
+  - stack: { language: java, tool: gradle, release: "11" }
+    image: gradle:8.8-jdk11
+  - stack: { language: java, tool: gradle, release: "17" }
+    image: gradle:8.8-jdk17
+
+  # Go (tool-agnostic)
+  - stack: { language: go, release: "1.22" }
+    image: golang:1.22
+
+  # Rust (tool-agnostic)
+  - stack: { language: rust, release: "1.76" }
+    image: rust:1.76

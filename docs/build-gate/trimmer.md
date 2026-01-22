@@ -87,8 +87,8 @@ The trimmer is invoked inside the Docker-based gate executor:
 
 - File: `internal/workflow/runtime/step/gate_docker.go`
 - When the gate command exits with a non-zero status:
-  - `Tool` is set to `"maven"`, `"gradle"`, or `"java"` depending on profile
-    detection.
+  - `Tool` is set to the detected build tool (e.g. `"maven"`, `"gradle"`, `"go"`,
+    `"cargo"`, `"pip"`, `"poetry"`).
   - `TrimBuildGateLog(tool, string(logs))` is called.
   - The trimmed output (or original logs for unknown tools) is stored in
     `BuildGateStageMetadata.LogFindings[0].Message`.

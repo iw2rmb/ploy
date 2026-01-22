@@ -30,15 +30,8 @@ defaults change, or components adopt additional configuration.
 - `PLOY_BUILDGATE_IMAGE` — Optional unified override for the Docker image used by the
   Build Gate executor for any stack. When set, it takes precedence over language‑specific
   defaults. Commands still auto‑select by workspace (Maven vs Gradle).
-- `PLOY_BUILDGATE_PROFILE` — Optional gate profile selector. Allowed explicit values:
-  `java`, `java-maven`, `java-gradle`. When unset/unknown, auto-detects: pom.xml → maven,
-  build.gradle(.kts) → gradle, else plain `java`.
 - `PLOY_BUILDGATE_TIMEOUT` — Optional maximum duration for Build Gate HTTP polling (e.g., `5m`). When the request
   context has no deadline, HTTP-based gate executors use this value as the polling timeout; defaults to `10m` when unset or invalid.
-- `PLOY_BUILDGATE_JAVA_IMAGE` — Deprecated legacy override for Maven projects. Defaults to
-  `maven:3-eclipse-temurin-17` when neither `PLOY_BUILDGATE_IMAGE` nor this value is set.
-- `PLOY_BUILDGATE_GRADLE_IMAGE` — Deprecated legacy override for Gradle projects. Defaults to
-  `gradle:8.8-jdk17` when neither `PLOY_BUILDGATE_IMAGE` nor this value is set.
 - `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
   are stored. When unset, the CLI falls back to `XDG_CONFIG_HOME/ploy` or `~/.config/ploy`.
   Priority: `PLOY_CONFIG_HOME` → `XDG_CONFIG_HOME/ploy` → `~/.config/ploy`.

@@ -77,7 +77,6 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -209,7 +208,6 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

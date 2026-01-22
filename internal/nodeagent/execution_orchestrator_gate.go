@@ -63,12 +63,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		}
 	}
 
-	// Thread cluster-level images from node config into StackGate.
-	// These override default file rules but are overridden by mod-level images.
-	if typedOpts.StackGate != nil {
-		typedOpts.StackGate.ClusterImages = r.cfg.Gates.BuildGate.Images
-	}
-
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)

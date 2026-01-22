@@ -102,13 +102,13 @@ retain_container: false
 ################################################################################
 # Build Gate settings apply to all mods (both single-mod and multi-step runs).
 # The node agent reuses the same Java gate for Maven/Gradle (maven: -e; gradle:
-# --stacktrace). Profile "auto" detects pom.xml/gradle files.
+# --stacktrace).
 #
 # Gate execution occurs after each mod transformation. For multi-step runs, the
 # gate validates the accumulated changes from all prior steps.
 build_gate:
   enabled: true
-  profile: auto # auto | java | java-maven | java-gradle
+  images: [] # optional stack→image mapping overrides
 
 # Healing configuration executed when the Build Gate fails (applies globally to
 # all mods). For multi-step runs, the healing policy is shared across all mod
@@ -154,7 +154,7 @@ mr_on_fail: true
 #
 # - The agent honors: image, command, env, retain_container,
 #   mods[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
-#   mr_on_fail, build_gate.* (profile), and build_gate_healing.* (retries, mod).
+#   mr_on_fail, build_gate.* (images), and build_gate_healing.* (retries, mod).
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use top-level fields for one transformation.

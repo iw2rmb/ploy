@@ -193,7 +193,6 @@ func TestDisableManifestGate_SetsGateDisabled(t *testing.T) {
 	manifest := contracts.StepManifest{
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

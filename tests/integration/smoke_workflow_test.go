@@ -123,8 +123,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		"image": "docker.io/example/mod-test:latest",
 		"command": ["mod-test", "--input", "/workspace"],
 		"build_gate": {
-			"enabled": true,
-			"profile": "java-maven"
+			"enabled": true
 		}
 	}`)
 	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", "feature/smoke-workflow", modSpec)
@@ -146,7 +145,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		ModType:     "",
 		ModImage:    "",
 		StepIndex:   0,
-		Meta:        []byte(`{"type":"build-gate","profile":"java-maven"}`),
+		Meta:        []byte(`{"type":"build-gate"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(build-gate) failed: %v", err)

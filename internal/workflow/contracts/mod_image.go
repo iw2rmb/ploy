@@ -21,7 +21,7 @@
 //
 // ## Supported Stack Names
 //
-// The following stack names are recognized and correspond to Build Gate profiles:
+// The following stack names are recognized for image resolution:
 //   - "java-maven": Maven-based Java projects (pom.xml detected)
 //   - "java-gradle": Gradle-based Java projects (build.gradle detected)
 //   - "java": Generic Java projects (no build tool detected)
@@ -35,7 +35,6 @@ import (
 )
 
 // ModStack represents a detected build stack for image resolution.
-// Stack values correspond to Build Gate profiles used during validation.
 type ModStack string
 
 const (

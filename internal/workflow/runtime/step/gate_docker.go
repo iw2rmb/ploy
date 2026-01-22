@@ -66,14 +66,15 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 }
 
 // Execute runs the Build Gate inside a container image and returns
-// normalized metadata about the outcome. Detection rules:
-//   - Java (Maven): if pom.xml exists → run `mvn -B -q test` in
-//     `PLOY_BUILDGATE_JAVA_IMAGE` or default `maven:3-eclipse-temurin-17`.
-//   - Java (Gradle): if build.gradle(.kts) exists → run `gradle -q test`
-//     in `PLOY_BUILDGATE_GRADLE_IMAGE` or default `gradle:8.8-jdk17`.
+// normalized metadata about the outcome.
+//
+// Image selection (highest wins):
+//   - `PLOY_BUILDGATE_IMAGE` (single image override)
+//   - Default mapping file (`etc/ploy/gates/build-gate-images.yaml`) + mod YAML overrides (`build_gate.images[]`)
 //
 // The workspace is mounted at /workspace and used as the working directory.
-// Unknown/unsupported projects return an empty metadata object without error.
+// When stack detection fails, the gate fails with a static check report and
+// a structured log finding (including evidence when available).
 // When the container runtime is nil, execution is skipped and empty metadata
 // is returned. A non‑zero exit code is reported as a static check failure and
 // a single log finding containing the captured logs or a synthesized message.
@@ -97,41 +98,21 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	if spec == nil || !spec.Enabled {
 		return nil, nil
 	}
-	// Detect or force profile.
-	// Supported explicit profiles: "java", "java-maven", "java-gradle".
-	// When empty or unknown, auto-detect: pom.xml -> maven; build.gradle(.kts) -> gradle; else plain java.
-	desiredProfile := strings.ToLower(strings.TrimSpace(spec.Profile))
-	if desiredProfile == "" {
-		desiredProfile = strings.ToLower(strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_PROFILE")))
-	}
-
-	hasMaven := fileExists(filepath.Join(workspace, "pom.xml"))
-	hasGradle := fileExists(filepath.Join(workspace, "build.gradle")) || fileExists(filepath.Join(workspace, "build.gradle.kts"))
-
-	var image string
-	var cmd []string
-	var tool string
-	// Unified image override takes precedence for all stacks.
-	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_IMAGE")); v != "" {
-		image = v
-	}
-
-	// Stack Gate mode: resolve image from mapping when Stack Gate is enabled with expectations.
+	envImage := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_IMAGE"))
+	mappingPath := buildGateDefaultImagesFilePath()
 	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
 
-	// In Stack Gate mode, ignore PLOY_BUILDGATE_IMAGE - always resolve via mapping.
+	obs, detectErr := stackdetect.Detect(ctx, workspace)
+
+	var (
+		image    string
+		cmd      []string
+		language string
+		tool     string
+		sgResult *contracts.StackGateResult
+	)
+
 	if stackGateMode {
-		image = ""
-	}
-
-	// sgResult holds the Stack Gate result to attach to final metadata (if in stackGateMode).
-	var sgResult *contracts.StackGateResult
-
-	if stackGateMode {
-		// === STACK GATE PRE-CHECK ===
-		obs, detectErr := stackdetect.Detect(ctx, workspace)
-
-		// Build stack gate result for metadata.
 		sgResult = &contracts.StackGateResult{
 			Enabled:  true,
 			Expected: spec.StackGate.Expect,
@@ -148,7 +129,6 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 				sgResult.Result = "unknown"
 				sgResult.Reason = detectErr.Error()
 			}
-			// FAIL EARLY: return metadata without running container.
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -165,15 +145,12 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			}, nil
 		}
 
-		// Detection succeeded - populate detected stack.
 		sgResult.Detected = observationToStackExpectation(obs)
 
-		// Compare detected vs expected.
 		if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
 			sgResult.Result = "mismatch"
 			sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
 			evidenceStr := formatEvidenceForLog(obs.Evidence)
-			// FAIL EARLY: return metadata without running container.
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -190,130 +167,187 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			}, nil
 		}
 
-		// Pre-check passed.
 		sgResult.Result = "pass"
 
-		// === RESOLVE IMAGE FROM MAPPING ===
-		// Always resolve via mapping in Stack Gate mode.
-		resolver, err := NewBuildGateImageResolver(
-			DefaultMappingPath,
-			spec.StackGate.ClusterImages,  // cluster/global inline from node config
-			spec.StackGate.ImageOverrides, // mod-level overrides from run spec
-			true,                          // stackGateEnabled
-		)
-		if err != nil {
-			sgResult.Result = "unknown"
-			sgResult.Reason = fmt.Sprintf("image mapping error: %s", err.Error())
-			return &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
-					Message:  sgResult.Reason,
-				}},
-			}, nil
+		language = strings.TrimSpace(spec.StackGate.Expect.Language)
+		if language == "" {
+			language = strings.TrimSpace(obs.Language)
 		}
+		tool = strings.TrimSpace(obs.Tool)
 
-		resolvedImage, err := resolver.Resolve(*spec.StackGate.Expect)
-		if err != nil {
-			sgResult.Result = "unknown"
-			sgResult.Reason = fmt.Sprintf("no matching image rule: %s", err.Error())
-			return &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_NO_IMAGE_RULE",
-					Message:  sgResult.Reason,
-				}},
-			}, nil
-		}
-
-		image = resolvedImage
-		sgResult.RuntimeImage = resolvedImage
-
-		// Determine tool from expectation or detect from workspace.
-		tool = spec.StackGate.Expect.Tool
-		if tool == "" {
-			// Tool-agnostic: detect from workspace.
-			tool = detectToolFromWorkspace(workspace, hasMaven, hasGradle)
-		}
-		cmd = buildCommandForTool(tool)
-	}
-
-	chooseMaven := func() {
-		if image == "" {
-			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "maven:3-eclipse-temurin-17")
-		}
-		tool = "maven"
-		// Always include -e for full ERROR-level stack traces. Keep -q to reduce noise.
-		// Use --ff (fail-fast) to stop on the first failing module and run a full
-		// `clean install` so compilation and tests are validated together.
-		// Diagnostic guidance: switch to -X (drop -q) only for deep investigations.
-		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
-		script := caPreambleScript() + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
-		cmd = []string{"/bin/sh", "-lc", script}
-	}
-	chooseGradle := func() {
-		if image == "" {
-			image = defaultString(os.Getenv("PLOY_BUILDGATE_GRADLE_IMAGE"), "gradle:8.8-jdk17")
-		}
-		tool = "gradle"
-		// Include --stacktrace for error stack traces (similar to Maven -e). Keep -q to reduce noise.
-		// Run Gradle tests for the workspace project and let Gradle's default failure semantics apply.
-		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
-		script := caPreambleScript() + "gradle -q --stacktrace test -p /workspace"
-		cmd = []string{"/bin/sh", "-lc", script}
-	}
-	chooseJava := func() {
-		if image == "" {
-			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "eclipse-temurin:17-jdk")
-		}
-		tool = "java"
-		// Compile all Java sources if present; succeed if none found.
-		// Prepend CA preamble to honor CA_CERTS_PEM_BUNDLE from global config.
-		script := caPreambleScript() + `set -e
-tmpdir=$(mktemp -d)
-find /workspace -type f -name "*.java" > "$tmpdir/sources.list" || true
-if [ -s "$tmpdir/sources.list" ]; then
-  mkdir -p "$tmpdir/classes"
-  javac --release 17 -d "$tmpdir/classes" @"$tmpdir/sources.list"
-  echo "javac compile OK"
-else
-  echo "No Java sources under /workspace"
-fi`
-		cmd = []string{"/bin/sh", "-lc", script}
-	}
-
-	// Legacy mode: only when NOT in Stack Gate mode.
-	// Stack Gate mode does not fall back to legacy tool-based defaults.
-	if !stackGateMode {
-		switch desiredProfile {
-		case "java-maven":
-			chooseMaven()
-		case "java-gradle":
-			chooseGradle()
-		case "java":
-			chooseJava()
-		default: // auto
-			switch {
-			case hasMaven:
-				chooseMaven()
-			case hasGradle:
-				chooseGradle()
-			default:
-				// Fall back to plain Java compilation.
-				chooseJava()
+		if envImage != "" {
+			image = envImage
+		} else {
+			if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
+				sgResult.Result = "unknown"
+				sgResult.Reason = "stack gate expectation missing release; cannot resolve runtime image"
+				return &contracts.BuildGateStageMetadata{
+					StackGate: sgResult,
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Language: language,
+						Tool:     "stack-gate",
+						Passed:   false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "STACK_GATE_INVALID_EXPECTATION",
+						Message:  sgResult.Reason,
+					}},
+				}, nil
 			}
+
+			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
+			if err != nil {
+				sgResult.Result = "unknown"
+				sgResult.Reason = fmt.Sprintf("image mapping error: %s", err.Error())
+				return &contracts.BuildGateStageMetadata{
+					StackGate: sgResult,
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Language: language,
+						Tool:     "stack-gate",
+						Passed:   false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
+						Message:  sgResult.Reason,
+					}},
+				}, nil
+			}
+
+			resolvedImage, err := resolver.Resolve(*spec.StackGate.Expect)
+			if err != nil {
+				sgResult.Result = "unknown"
+				sgResult.Reason = fmt.Sprintf("no matching image rule: %s", err.Error())
+				return &contracts.BuildGateStageMetadata{
+					StackGate: sgResult,
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Language: language,
+						Tool:     "stack-gate",
+						Passed:   false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "STACK_GATE_NO_IMAGE_RULE",
+						Message:  sgResult.Reason,
+					}},
+				}, nil
+			}
+			image = resolvedImage
+		}
+
+		sgResult.RuntimeImage = image
+		var err error
+		cmd, err = buildCommandForTool(tool)
+		if err != nil {
+			sgResult.Result = "unknown"
+			sgResult.Reason = err.Error()
+			return &contracts.BuildGateStageMetadata{
+				StackGate: sgResult,
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: language,
+					Tool:     "stack-gate",
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "STACK_GATE_UNKNOWN",
+					Message:  sgResult.Reason,
+				}},
+			}, nil
+		}
+	} else {
+		if detectErr != nil {
+			var detErr *stackdetect.DetectionError
+			var evidenceStr string
+			msg := detectErr.Error()
+			if errors.As(detectErr, &detErr) {
+				msg = detErr.Message
+				evidenceStr = formatEvidenceForLog(detErr.Evidence)
+			}
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Tool:   "stackdetect",
+					Passed: false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+					Message:  msg,
+					Evidence: evidenceStr,
+				}},
+			}, nil
+		}
+
+		exp := observationToStackExpectation(obs)
+		if exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == "" {
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Tool:   "stackdetect",
+					Passed: false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+					Message:  "stack detection produced incomplete result; language and release are required",
+				}},
+			}, nil
+		}
+
+		language = exp.Language
+		tool = obs.Tool
+
+		if envImage != "" {
+			image = envImage
+		} else {
+			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
+			if err != nil {
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Language: language,
+						Tool:     tool,
+						Passed:   false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "BUILD_GATE_IMAGE_MAPPING_ERROR",
+						Message:  err.Error(),
+					}},
+				}, nil
+			}
+			resolved, err := resolver.Resolve(*exp)
+			if err != nil {
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Language: language,
+						Tool:     tool,
+						Passed:   false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "BUILD_GATE_NO_IMAGE_RULE",
+						Message:  err.Error(),
+					}},
+				}, nil
+			}
+			image = resolved
+		}
+
+		var err error
+		cmd, err = buildCommandForTool(tool)
+		if err != nil {
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: language,
+					Tool:     tool,
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "BUILD_GATE_UNKNOWN_TOOL",
+					Message:  err.Error(),
+				}},
+			}, nil
 		}
 	}
 
@@ -387,7 +421,7 @@ fi`
 	passed := res.ExitCode == 0
 	meta := &contracts.BuildGateStageMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Language: "java",
+			Language: language,
 			Tool:     tool,
 			Passed:   passed,
 		}},
@@ -483,11 +517,30 @@ func fileExists(path string) bool {
 	return false
 }
 
-func defaultString(v, def string) string {
-	if strings.TrimSpace(v) != "" {
-		return v
+func buildGateDefaultImagesFilePath() string {
+	installed := "/etc/ploy/gates/build-gate-images.yaml"
+	if fileExists(installed) {
+		return installed
 	}
-	return def
+	wd, err := os.Getwd()
+	if err == nil {
+		dir := wd
+		for {
+			if fileExists(filepath.Join(dir, "go.mod")) {
+				candidate := filepath.Join(dir, DefaultMappingPath)
+				if fileExists(candidate) {
+					return candidate
+				}
+				break
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	return DefaultMappingPath
 }
 
 func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimSpace(s), 10, 64) }
@@ -552,41 +605,27 @@ func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
 	return client.ContainerInspectOptions{Size: true}
 }
 
-// detectToolFromWorkspace detects the build tool from workspace files.
-// Returns "maven" if pom.xml exists, "gradle" if build.gradle exists, otherwise "java".
-func detectToolFromWorkspace(workspace string, hasMaven, hasGradle bool) string {
-	switch {
-	case hasMaven:
-		return "maven"
-	case hasGradle:
-		return "gradle"
-	default:
-		return "java"
-	}
-}
-
 // buildCommandForTool returns the appropriate build command for the given tool.
-func buildCommandForTool(tool string) []string {
+func buildCommandForTool(tool string) ([]string, error) {
 	preamble := caPreambleScript()
-	switch tool {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
 		script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
-		return []string{"/bin/sh", "-lc", script}
+		return []string{"/bin/sh", "-lc", script}, nil
 	case "gradle":
 		script := preamble + "gradle -q --stacktrace test -p /workspace"
-		return []string{"/bin/sh", "-lc", script}
+		return []string{"/bin/sh", "-lc", script}, nil
+	case "go":
+		script := preamble + "go test ./..."
+		return []string{"/bin/sh", "-lc", script}, nil
+	case "cargo":
+		script := preamble + "cargo test"
+		return []string{"/bin/sh", "-lc", script}, nil
+	case "pip", "poetry":
+		script := preamble + "python -m compileall -q /workspace"
+		return []string{"/bin/sh", "-lc", script}, nil
 	default:
-		script := preamble + `set -e
-tmpdir=$(mktemp -d)
-find /workspace -type f -name "*.java" > "$tmpdir/sources.list" || true
-if [ -s "$tmpdir/sources.list" ]; then
-  mkdir -p "$tmpdir/classes"
-  javac --release 17 -d "$tmpdir/classes" @"$tmpdir/sources.list"
-  echo "javac compile OK"
-else
-  echo "No Java sources under /workspace"
-fi`
-		return []string{"/bin/sh", "-lc", script}
+		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}
 }
 

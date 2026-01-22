@@ -126,7 +126,6 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
