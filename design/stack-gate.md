@@ -403,7 +403,14 @@ images:
     image: docker.io/org/stack-gate-java:17
 ```
 
-Reference example in this repo: `design/build-gate-images.default.yaml` (illustrative; not wired into runtime yet).
+Reference example in this repo: `design/build-gate-images.default.yaml`.
+
+Implementation status (Phase 3):
+- Build Gate loads `/etc/ploy/gates/build-gate-images.yaml` when Stack Gate mode is active.
+- Inline cluster/global rules are accepted via node config `gates.build_gate.images`.
+- Mod-level overrides are accepted via spec `build_gate.images`.
+- Resolution and precedence are implemented in `internal/workflow/runtime/step/build_gate_image_resolver.go`
+  and used by the Docker gate executor in `internal/workflow/runtime/step/gate_docker.go`.
 
 Rules:
 

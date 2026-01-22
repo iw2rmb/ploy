@@ -1,0 +1,11 @@
+# invalid-duplicate.yaml - Duplicate selector error
+images:
+  - stack:
+      language: java
+      release: "17"
+    image: eclipse-temurin:17-jdk
+
+  - stack:
+      language: java
+      release: "17"
+    image: openjdk:17

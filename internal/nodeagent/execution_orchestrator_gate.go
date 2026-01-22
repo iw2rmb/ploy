@@ -42,22 +42,31 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if len(typedOpts.Steps) > stepIndex && stepIndex >= 0 {
 		step := typedOpts.Steps[stepIndex]
 		if step.Stack != nil {
+			// Get mod-level images from BuildGate config for image resolution.
+			modImages := typedOpts.BuildGate.Images
+
 			switch req.ModType {
 			case types.ModTypePreGate:
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound)
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, modImages)
 				}
 			case types.ModTypePostGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound)
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
 				}
 			// Note: re_gate uses same expectations as post_gate (verifying output after healing)
 			case types.ModTypeReGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound)
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
 				}
 			}
 		}
+	}
+
+	// Thread cluster-level images from node config into StackGate.
+	// These override default file rules but are overridden by mod-level images.
+	if typedOpts.StackGate != nil {
+		typedOpts.StackGate.ClusterImages = r.cfg.Gates.BuildGate.Images
 	}
 
 	manifest, err := buildGateManifestFromRequest(req, typedOpts)

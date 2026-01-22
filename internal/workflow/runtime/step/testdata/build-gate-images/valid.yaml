@@ -1,0 +1,34 @@
+# valid.yaml - Complete valid image mapping for testing
+images:
+  # Java 17 with Maven
+  - stack:
+      language: java
+      release: "17"
+      tool: maven
+    image: maven:3-eclipse-temurin-17
+
+  # Java 17 with Gradle
+  - stack:
+      language: java
+      release: "17"
+      tool: gradle
+    image: gradle:8.8-jdk17
+
+  # Java 17 tool-agnostic fallback
+  - stack:
+      language: java
+      release: "17"
+    image: eclipse-temurin:17-jdk
+
+  # Java 11 with Maven
+  - stack:
+      language: java
+      release: "11"
+      tool: maven
+    image: maven:3-eclipse-temurin-11
+
+  # Java 11 tool-agnostic fallback
+  - stack:
+      language: java
+      release: "11"
+    image: eclipse-temurin:11-jdk

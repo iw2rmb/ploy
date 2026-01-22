@@ -89,6 +89,11 @@ type BuildGateOptions struct {
 	// Profile specifies the gate profile name (e.g., "java-auto", "java-maven").
 	// The profile determines which static analysis tools and checks to run.
 	Profile string
+
+	// Images holds mod-level image mapping overrides for Stack Gate.
+	// These rules override default file and cluster/global inline rules
+	// when resolving the Build Gate image for Stack Gate mode.
+	Images []contracts.BuildGateImageRule
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -297,6 +302,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	if spec.BuildGate != nil {
 		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
 		runOpts.BuildGate.Profile = spec.BuildGate.Profile
+		runOpts.BuildGate.Images = spec.BuildGate.Images
 
 		// --- Healing Configuration ---
 		// Convert contracts.HealingSpec to nodeagent.HealingConfig directly,

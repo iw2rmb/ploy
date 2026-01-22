@@ -119,6 +119,16 @@ type StepGateStackSpec struct {
 	// Expect holds the stack expectations to validate.
 	// Only validated when Enabled is true.
 	Expect *StackExpectation
+
+	// ImageOverrides holds mod-level image mapping overrides for this step.
+	// These rules override default file and cluster/global inline rules
+	// when resolving the Build Gate image for Stack Gate mode.
+	ImageOverrides []BuildGateImageRule
+
+	// ClusterImages holds cluster/global inline image mapping rules.
+	// These rules override default file rules but are overridden by mod-level
+	// ImageOverrides. Populated from node config gates.build_gate.images.
+	ClusterImages []BuildGateImageRule
 }
 
 // StepInputHydration describes how to materialise repository state for an input.

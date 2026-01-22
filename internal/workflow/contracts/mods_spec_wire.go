@@ -65,6 +65,9 @@ func (s ModsSpec) ToMap() map[string]any {
 				bg["healing"] = heal
 			}
 		}
+		if len(s.BuildGate.Images) > 0 {
+			bg["images"] = buildGateImageRulesToAny(s.BuildGate.Images)
+		}
 		if len(bg) > 0 {
 			result["build_gate"] = bg
 		}

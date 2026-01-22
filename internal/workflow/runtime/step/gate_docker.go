@@ -114,6 +114,35 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		image = v
 	}
 
+	// Stack Gate mode: resolve image from mapping when Stack Gate is enabled with expectations.
+	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
+	if stackGateMode && image == "" {
+		// Resolve image using the image mapping resolver.
+		// Precedence: mod-level ImageOverrides > cluster-level ClusterImages > default file.
+		resolver, err := NewBuildGateImageResolver(
+			DefaultMappingPath,
+			spec.StackGate.ClusterImages,  // cluster/global inline from node config
+			spec.StackGate.ImageOverrides, // mod-level overrides from run spec
+			true,                          // stackGateEnabled
+		)
+		if err != nil {
+			return nil, fmt.Errorf("resolve stack gate image: %w", err)
+		}
+		resolvedImage, err := resolver.Resolve(*spec.StackGate.Expect)
+		if err != nil {
+			return nil, fmt.Errorf("resolve stack gate image: %w", err)
+		}
+		image = resolvedImage
+
+		// Determine tool from expectation or detect from workspace.
+		tool = spec.StackGate.Expect.Tool
+		if tool == "" {
+			// Tool-agnostic: detect from workspace.
+			tool = detectToolFromWorkspace(workspace, hasMaven, hasGradle)
+		}
+		cmd = buildCommandForTool(tool)
+	}
+
 	chooseMaven := func() {
 		if image == "" {
 			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "maven:3-eclipse-temurin-17")
@@ -158,22 +187,25 @@ fi`
 		cmd = []string{"/bin/sh", "-lc", script}
 	}
 
-	switch desiredProfile {
-	case "java-maven":
-		chooseMaven()
-	case "java-gradle":
-		chooseGradle()
-	case "java":
-		chooseJava()
-	default: // auto
-		switch {
-		case hasMaven:
+	// Legacy mode: existing profile-based selection (only when not already resolved via Stack Gate).
+	if !stackGateMode || image == "" {
+		switch desiredProfile {
+		case "java-maven":
 			chooseMaven()
-		case hasGradle:
+		case "java-gradle":
 			chooseGradle()
-		default:
-			// Fall back to plain Java compilation.
+		case "java":
 			chooseJava()
+		default: // auto
+			switch {
+			case hasMaven:
+				chooseMaven()
+			case hasGradle:
+				chooseGradle()
+			default:
+				// Fall back to plain Java compilation.
+				chooseJava()
+			}
 		}
 	}
 
@@ -406,4 +438,42 @@ func dockerStatsOptions() client.ContainerStatsOptions {
 // with Size: true to populate SizeRw and SizeRootFs in the response.
 func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
 	return client.ContainerInspectOptions{Size: true}
+}
+
+// detectToolFromWorkspace detects the build tool from workspace files.
+// Returns "maven" if pom.xml exists, "gradle" if build.gradle exists, otherwise "java".
+func detectToolFromWorkspace(workspace string, hasMaven, hasGradle bool) string {
+	switch {
+	case hasMaven:
+		return "maven"
+	case hasGradle:
+		return "gradle"
+	default:
+		return "java"
+	}
+}
+
+// buildCommandForTool returns the appropriate build command for the given tool.
+func buildCommandForTool(tool string) []string {
+	preamble := caPreambleScript()
+	switch tool {
+	case "maven":
+		script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
+		return []string{"/bin/sh", "-lc", script}
+	case "gradle":
+		script := preamble + "gradle -q --stacktrace test -p /workspace"
+		return []string{"/bin/sh", "-lc", script}
+	default:
+		script := preamble + `set -e
+tmpdir=$(mktemp -d)
+find /workspace -type f -name "*.java" > "$tmpdir/sources.list" || true
+if [ -s "$tmpdir/sources.list" ]; then
+  mkdir -p "$tmpdir/classes"
+  javac --release 17 -d "$tmpdir/classes" @"$tmpdir/sources.list"
+  echo "javac compile OK"
+else
+  echo "No Java sources under /workspace"
+fi`
+		return []string{"/bin/sh", "-lc", script}
+	}
 }
