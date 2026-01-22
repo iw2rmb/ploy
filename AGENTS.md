@@ -14,38 +14,21 @@ Unless otherwise specified, the following policies apply when planning changes:
 - Verify required environment variables (see `docs/envs/README.md`) are
   discoverable or called out as TODOs for future slices.
 
-## Documentation
+## Documentation 
 
-1. Keep documentation synchronized with the codebase. After each change, update
-   the affected docs, link or remove orphaned files, and note completion states
-   where applicable.
-2. Control-plane API changes must include updates to `docs/api/OpenAPI.yaml`
-   alongside human-facing docs.
-3. How-to references:
-   - `docs/how-to/deploy-locally.md` — Deploy the local Docker cluster.
-   - `tests/e2e/mods/README.md` — E2E scenarios (local cluster).
-   - `docs/envs/README.md` — Canonical environment variables.
+### Folders Structure
 
-## Documentation Layout Policy
+- `design/` — design docs (how to implement).
+- `research/` — research docs (what are options and how cool feature can possibly be).
+- `roadmap/` — decomposed plans/implementation notes (in what order what to implement).
+- `docs/` — actual state docs (how it is working right now).
 
-1. `docs/` is normative for the CURRENT IMPLEMENTED state at HEAD only.
-   - Planned/unimplemented behavior MUST NOT live under `docs/`.
-   - If behavior is not implemented, it MUST live under `roadmap/`.
-2. Planned / next-version documentation MUST live under `roadmap/vN/` (e.g. `roadmap/v1/`).
-   - Version folders under `docs/` are not allowed for planned work.
-3. In documents in `roadmap/vN/`:
-   - Every proposed change MUST be explained in-place where it is relevant (API/DB/CLI/etc).
-   - Each proposed change MUST make it clear what remains unchanged by anchoring to the current behavior:
-     - Prefer references to code (file paths + symbols where applicable).
-     - Otherwise reference `docs/` headings (path + heading).
-   - Each change entry MUST state:
-     - what changes (vN behavior),
-     - where it will be implemented (paths + likely symbols/handlers/sql),
-     - compatibility impact (explicit; “none required” when applicable),
-     - and what remains unchanged (usually a reference to the current behavior).
-4. When a roadmap version is implemented:
-   - All implemented behavior MUST be incorporated into `docs/` (and update any existing code comments that cite spec paths).
-   - The corresponding `roadmap/vN/` folder MUST be deleted in the same change to avoid misinterpretation.
+### Policy
+
+- With every commit of any diff it is mandatory to ensure that `docs/` reflect changes in that commit.
+- When updating `docs/`, ensure that every file in that folder is limited within it's specific domain.
+- Keep all documents cross-refereced.
+- When creating file in `roadmap/`, use template from `/Users/vk/@iw2rmb/auto/ROADMAP.md` if not specified otherwise.
 
 ## Development
 
