@@ -1,9 +1,7 @@
 package lifecycle
 
 import (
-	"bytes"
 	"context"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -162,23 +160,6 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	// driver: stable field; storage driver in use (overlay2, vfs, etc.).
 	status.Details["driver"] = strings.TrimSpace(info.Driver)
 	return status
-}
-
-// commandRunner abstracts simple command execution for health checkers.
-type commandRunner interface {
-	Run(ctx context.Context, name string, args ...string) (string, string, error)
-}
-
-type execRunner struct{}
-
-// Run executes the named command and returns stdout, stderr, and error.
-func (execRunner) Run(ctx context.Context, name string, args ...string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.String(), stderr.String(), err
 }
 
 func extractFirstLine(output string) string {

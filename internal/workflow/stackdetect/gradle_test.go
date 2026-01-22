@@ -57,7 +57,7 @@ func TestJavaLanguageVersionRegex(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			matches := javaLanguageVersionRegex.FindStringSubmatch(tt.input)
 			var result string
-			if matches != nil && len(matches) > 1 {
+			if len(matches) > 1 {
 				result = matches[1]
 			}
 			if result != tt.expected {

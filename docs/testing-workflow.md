@@ -137,14 +137,13 @@ Follow the RED → GREEN → REFACTOR cycle for each test.
 Before committing, check that coverage meets thresholds:
 
 ```bash
-make test-coverage-threshold
+make test-coverage
 ```
 
 Expected output:
 ```
-=== Coverage Summary ===
+=== Coverage Summary (statement) ===
 total: (statements) 67.8%
-Coverage: 67.8% (threshold: 60%)
 ```
 
 If coverage is below 60%, add more tests.
@@ -161,7 +160,7 @@ This runs:
 - `make fmt` — Format code
 - `make vet` — Go vet analysis
 - `make staticcheck` — Static analysis (fast, core set)
-- `make test-coverage-threshold` — Tests with 60% threshold
+- `make test-coverage` — Tests with coverage report
 
 Optional:
 - `make lint` — Full golangci-lint suite (slower; broader checks). Use when iterating on refactors or before larger PRs.
@@ -368,7 +367,7 @@ go tool cover -html=coverage.out
 Before every commit:
 
 - [ ] All tests pass locally: `make test`
-- [ ] Coverage meets threshold: `make test-coverage-threshold`
+- [ ] Coverage meets threshold: `make test-coverage`
 - [ ] Code is formatted: `make fmt`
 - [ ] No vet issues: `make vet`
 - [ ] No lint issues: `make lint`
@@ -399,7 +398,7 @@ See `.github/pull_request_template.md` for the full checklist that enforces this
 | **RED** | `go test ./pkg -run TestFoo` | Test fails |
 | **GREEN** | `go test ./pkg -run TestFoo` | Test passes |
 | **REFACTOR** | `go test ./pkg` | All tests pass |
-| **Coverage** | `make test-coverage-threshold` | ≥60% coverage |
+| **Coverage** | `make test-coverage` | ≥60% coverage |
 | **Local CI** | `make ci-check` | All checks pass |
 | **Commit** | `git commit` | Pre-commit hooks pass |
 | **Push** | `git push` | CI passes |
@@ -430,16 +429,16 @@ $ go test ./internal/server/handlers
 PASS
 
 # 5. Verify coverage
-$ make test-coverage-threshold
-Coverage: 68.5% (threshold: 60%)
-✓ Coverage meets threshold
+$ make test-coverage
+=== Coverage Summary (statement) ===
+total: (statements) 68.5%
 
 # 6. Run full CI checks
 $ make ci-check
 ✓ Format check
 ✓ Go vet
 ✓ staticcheck
-✓ Tests with coverage threshold
+✓ Tests with coverage report
 === All CI checks passed ===
 
 # 7. Commit and push

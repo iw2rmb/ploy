@@ -13,7 +13,7 @@ import (
 // parseStackGateSpec parses a StackGateSpec from a raw map.
 // Returns nil if the input is nil or empty (no stack configuration).
 func parseStackGateSpec(raw map[string]any, prefix string) (*StackGateSpec, error) {
-	if raw == nil || len(raw) == 0 {
+	if len(raw) == 0 {
 		return nil, nil
 	}
 

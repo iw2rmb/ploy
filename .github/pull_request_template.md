@@ -38,7 +38,7 @@
 
 - [ ] I added unit tests for new/changed code
 - [ ] All tests pass locally: `make test`
-- [ ] Coverage meets threshold: `make test-coverage-threshold` (≥60% overall)
+- [ ] Coverage meets threshold: `make test-coverage` (≥60% overall)
 - [ ] I verified coverage on critical paths (scheduler/PKI/ingest should be ≥90%)
 
 ## Code Quality
