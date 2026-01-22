@@ -62,7 +62,8 @@ type Engine struct {
 	repoOrder    []domaintypes.ModRepoID          // Order for stable rendering
 	repoURLs     map[domaintypes.ModRepoID]string // RepoID -> RepoURL
 	repoJobs     map[domaintypes.ModRepoID][]runs.RepoJobEntry
-	spinnerFrame int // Current spinner animation frame
+	repoErrors   map[domaintypes.ModRepoID]*string // RepoID -> LastError
+	spinnerFrame int                               // Current spinner animation frame
 
 	renderedLines int  // number of lines rendered in last frame
 	renderStarted bool // whether we've emitted initial frame controls
@@ -83,14 +84,15 @@ func NewEngine(httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunI
 		Logger:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
 	return &Engine{
-		client:    httpClient,
-		streamCli: streamClient,
-		baseURL:   baseURL,
-		runID:     runID,
-		config:    cfg,
-		repoOrder: make([]domaintypes.ModRepoID, 0),
-		repoURLs:  make(map[domaintypes.ModRepoID]string),
-		repoJobs:  make(map[domaintypes.ModRepoID][]runs.RepoJobEntry),
+		client:     httpClient,
+		streamCli:  streamClient,
+		baseURL:    baseURL,
+		runID:      runID,
+		config:     cfg,
+		repoOrder:  make([]domaintypes.ModRepoID, 0),
+		repoURLs:   make(map[domaintypes.ModRepoID]string),
+		repoJobs:   make(map[domaintypes.ModRepoID][]runs.RepoJobEntry),
+		repoErrors: make(map[domaintypes.ModRepoID]*string),
 	}
 }
 
@@ -238,6 +240,7 @@ func (e *Engine) refreshRepos(ctx context.Context) error {
 			repoURL = vcs.NormalizeRepoURLSchemless(repoURL)
 		}
 		e.repoURLs[repo.RepoID] = repoURL
+		e.repoErrors[repo.RepoID] = repo.LastError
 	}
 
 	return nil
@@ -324,6 +327,13 @@ func (e *Engine) render() {
 				duration,
 				status,
 			)
+		}
+		// Display last_error if present
+		if lastErr := e.repoErrors[repoID]; lastErr != nil && *lastErr != "" {
+			fmt.Fprintf(tw, "\t\t\t\t\t\t\t\t\n")
+			for _, line := range strings.Split(*lastErr, "\n") {
+				fmt.Fprintf(tw, "\t✗ %s\t\t\t\t\t\t\t\n", line)
+			}
 		}
 		_, _ = fmt.Fprintln(tw)
 	}

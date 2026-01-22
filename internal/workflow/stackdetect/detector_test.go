@@ -288,3 +288,144 @@ func assertEvidence(t *testing.T, obs *Observation, key, value string) {
 	}
 	t.Errorf("expected evidence with key=%q value=%q, got %+v", key, value, obs.Evidence)
 }
+
+// Cross-language ambiguity tests
+
+func TestDetect_AmbiguousJavaGo(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "ambiguous", "java-go")
+
+	_, err := Detect(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+
+	if !detErr.IsAmbiguous() {
+		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
+	}
+
+	// Verify evidence includes both languages.
+	hasPom := false
+	hasGoMod := false
+	for _, e := range detErr.Evidence {
+		if e.Path == "pom.xml" && e.Key == "build.file" {
+			hasPom = true
+		}
+		if e.Path == "go.mod" && e.Key == "build.file" {
+			hasGoMod = true
+		}
+	}
+	if !hasPom {
+		t.Error("expected evidence for pom.xml")
+	}
+	if !hasGoMod {
+		t.Error("expected evidence for go.mod")
+	}
+}
+
+func TestDetect_AmbiguousPythonRust(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "ambiguous", "python-rust")
+
+	_, err := Detect(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+
+	if !detErr.IsAmbiguous() {
+		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
+	}
+
+	// Verify evidence includes both languages.
+	hasPythonVersion := false
+	hasCargo := false
+	for _, e := range detErr.Evidence {
+		if e.Path == ".python-version" && e.Key == "build.file" {
+			hasPythonVersion = true
+		}
+		if e.Path == "Cargo.toml" && e.Key == "build.file" {
+			hasCargo = true
+		}
+	}
+	if !hasPythonVersion {
+		t.Error("expected evidence for .python-version")
+	}
+	if !hasCargo {
+		t.Error("expected evidence for Cargo.toml")
+	}
+}
+
+func TestDetect_AmbiguousMultiple(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "ambiguous", "multiple")
+
+	_, err := Detect(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+
+	if !detErr.IsAmbiguous() {
+		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
+	}
+
+	// Should have evidence for 3+ languages.
+	if len(detErr.Evidence) < 3 {
+		t.Errorf("expected at least 3 evidence items for multiple languages, got %d", len(detErr.Evidence))
+	}
+}
+
+// New language detection tests via Detect
+
+func TestDetect_Go122(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "go", "go122")
+
+	obs, err := Detect(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertObservation(t, obs, "go", "go", "1.22")
+	assertEvidence(t, obs, "go", "1.22")
+}
+
+func TestDetect_Rust176Cargo(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "rust", "rust176-cargo")
+
+	obs, err := Detect(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertObservation(t, obs, "rust", "cargo", "1.76")
+	assertEvidence(t, obs, "rust-version", "1.76")
+}
+
+func TestDetect_Python311VersionFile(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "python", "python311-version-file")
+
+	obs, err := Detect(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertObservation(t, obs, "python", "pip", "3.11")
+	assertEvidence(t, obs, "python", "3.11")
+}

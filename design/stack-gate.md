@@ -1,6 +1,6 @@
 # Stack Gate (StackGate) — Design
 
-Status: **Phases 1–4 implemented (spec/contracts/threading + Java stack detector + image mapping + Docker gate pre-check + metadata); Phase 5 proposed**  
+Status: **Phases 1–5 implemented (spec/contracts/threading + Java stack detector + image mapping + Docker gate pre-check + metadata + CLI error surfacing)**  
 Owner: Ploy core (workflow runner + node agent)  
 
 ## Implemented (Phase 1)
@@ -508,18 +508,23 @@ If healing for outbound mismatch is desired in the future, it must be explicit a
 
 ### CLI output
 
-When Stack Gate fails, show:
+When Stack Gate fails, `ploy run --follow` displays:
+- Phase: `inbound` (pre_gate) or `outbound` (post_gate/re_gate)
+- Result: `mismatch` or `unknown`
+- Expected vs Detected stack configuration
+- Evidence: file paths and config keys (NOT file contents)
 
-- expected vs detected stack
-- evidence files/keys used for detection
-- phase (inbound/outbound)
+### How failures are surfaced
+
+1. **Server**: `jobs_complete.go` extracts StackGateResult, formats error, sets `run_repos.last_error`
+2. **CLI**: `follow/engine.go` fetches repos with `last_error`, renders below job row
 
 ### Stored metadata
 
 Persist Stack Gate outcome alongside the existing build logs in the gate metadata, so that:
 
 - `mods-codex` can read `/in/build-gate.log` and also see stack mismatch context.
-- Operators can debug “why did this run stop?” without reading full logs.
+- Operators can debug "why did this run stop?" without reading full logs.
 
 ## Security / privacy
 

@@ -139,9 +139,11 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 		if detectErr != nil {
 			var detErr *stackdetect.DetectionError
+			var evidenceStr string
 			if errors.As(detectErr, &detErr) {
 				sgResult.Result = "unknown"
 				sgResult.Reason = detErr.Message
+				evidenceStr = formatEvidenceForLog(detErr.Evidence)
 			} else {
 				sgResult.Result = "unknown"
 				sgResult.Reason = detectErr.Error()
@@ -158,6 +160,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 					Severity: "error",
 					Code:     "STACK_GATE_UNKNOWN",
 					Message:  sgResult.Reason,
+					Evidence: evidenceStr,
 				}},
 			}, nil
 		}
@@ -169,6 +172,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
 			sgResult.Result = "mismatch"
 			sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
+			evidenceStr := formatEvidenceForLog(obs.Evidence)
 			// FAIL EARLY: return metadata without running container.
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
@@ -181,6 +185,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 					Severity: "error",
 					Code:     "STACK_GATE_MISMATCH",
 					Message:  sgResult.Reason,
+					Evidence: evidenceStr,
 				}},
 			}, nil
 		}
@@ -638,5 +643,26 @@ func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackE
 			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
 		}
 	}
-	return "stack mismatch: " + strings.Join(mismatches, "; ")
+	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
+
+	// Append evidence for debugging.
+	if len(obs.Evidence) > 0 {
+		msg += "\nevidence:"
+		for _, e := range obs.Evidence {
+			msg += fmt.Sprintf("\n  - %s: %s = %q", e.Path, e.Key, e.Value)
+		}
+	}
+	return msg
+}
+
+// formatEvidenceForLog formats evidence items for the LogFinding.Evidence field.
+func formatEvidenceForLog(evidence []stackdetect.EvidenceItem) string {
+	if len(evidence) == 0 {
+		return ""
+	}
+	var lines []string
+	for _, e := range evidence {
+		lines = append(lines, fmt.Sprintf("%s: %s = %q", e.Path, e.Key, e.Value))
+	}
+	return strings.Join(lines, "\n")
 }

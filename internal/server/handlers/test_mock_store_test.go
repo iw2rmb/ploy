@@ -381,6 +381,11 @@ type mockStore struct {
 	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
 	updateRunRepoStatusErr    error
 
+	// UpdateRunRepoError tracking (for Stack Gate failures)
+	updateRunRepoErrorCalled bool
+	updateRunRepoErrorParams store.UpdateRunRepoErrorParams
+	updateRunRepoErrorErr    error
+
 	// CreateRunRepo tracking
 	createRunRepoCalled bool
 	createRunRepoParams store.CreateRunRepoParams
@@ -1094,6 +1099,12 @@ func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.Update
 	m.updateRunRepoStatusCalled = true
 	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
 	return m.updateRunRepoStatusErr
+}
+
+func (m *mockStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
+	m.updateRunRepoErrorCalled = true
+	m.updateRunRepoErrorParams = params
+	return m.updateRunRepoErrorErr
 }
 
 func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
