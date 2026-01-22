@@ -36,4 +36,4 @@ Legend: [ ] todo, [x] done.
   - Component: nodeagent + CLI output (where gate results are rendered)
   - Scope: Ensure gate failure output includes phase, expected vs detected, and evidence `{path,key,value}` only.
   - Snippets: N/A
-  - Tests: `go test ./... -run StackGate.*Output` — output contains expected/detected and evidence; no file contents.
+  - Tests: `go test ./internal/server/handlers -run CompleteJob_GateFailureSetsLastError` — output contains expected/detected and evidence; no file contents.
