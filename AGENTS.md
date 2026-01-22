@@ -43,24 +43,22 @@ Unless otherwise specified, the following policies apply when planning changes:
 
 #### TDD Discipline Validation
 
-Use `scripts/validate-tdd-discipline.sh` to enforce RED→GREEN→REFACTOR discipline:
+Use Make targets and standard Go tooling:
 
 ```bash
-# Validate entire repository (recommended before commits)
-./scripts/validate-tdd-discipline.sh
+# Unit tests
+make test
 
-# Validate specific package during development
-./scripts/validate-tdd-discipline.sh ./internal/workflow/...
+# Statement coverage reports (Go built-in coverage is statement coverage, not branch coverage)
+make coverage
+make coverage-html
+
+# Hygiene
+make vet
+make staticcheck
 ```
 
-The validation script checks:
-1. **RED phase**: Test files exist for all packages with implementation code.
-2. **GREEN phase**: All tests pass with `go test -cover ./...`.
-3. **GREEN validation**: Coverage thresholds met (≥60% overall, ≥90% critical paths).
-4. **REFACTOR validation**: Binary size remains under threshold (detects dependency bloat).
-5. **Code quality**: `go vet` and `staticcheck` pass.
-
-Reference: `GOLANG.md` (line 135-141).
+Reference: `GOLANG.md`.
 
 ### CLI Build & Smoke Checks
 
