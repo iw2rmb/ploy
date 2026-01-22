@@ -100,12 +100,15 @@ func (s StackGateSpec) IsEmpty() bool {
 // Equal returns true if both stack gate specs have identical configuration.
 func (s StackGateSpec) Equal(other StackGateSpec) bool {
 	// Compare Inbound.
-	if s.Inbound == nil && other.Inbound == nil {
+	switch {
+	case s.Inbound == nil && other.Inbound == nil:
 		// Both nil, continue.
-	} else if s.Inbound == nil || other.Inbound == nil {
+	case s.Inbound == nil || other.Inbound == nil:
 		return false
-	} else if !s.Inbound.Equal(*other.Inbound) {
-		return false
+	default:
+		if !s.Inbound.Equal(*other.Inbound) {
+			return false
+		}
 	}
 
 	// Compare Outbound.

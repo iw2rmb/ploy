@@ -127,7 +127,7 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 // Returns the numeric version string or empty if not found.
 func extractCompatibilityVersion(regex *regexp.Regexp, text string) string {
 	matches := regex.FindStringSubmatch(text)
-	if matches == nil || len(matches) < 2 {
+	if len(matches) < 2 {
 		return ""
 	}
 	return matches[1]

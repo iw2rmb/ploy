@@ -114,9 +114,9 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   ```
 
 **Tests & Coverage**
-- Run unit tests with coverage: `make test`
-- Enforce ≥60% overall coverage: `make test-coverage-threshold`
-- Enforce ≥90% on critical paths (scheduler/PKI/ingest): `make test-coverage-critical`
+- Run unit tests: `make test`
+- Generate unit test coverage report (ensure ≥60% overall): `make test-coverage`
+- Generate broader coverage report (all packages): `make coverage-all`
 - Full local CI bundle (format, vet, staticcheck if installed, coverage gates): `make ci-check`
 
 **Environment Variables**
@@ -127,7 +127,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
 
 **Contributing**
-- Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).
+- Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test ./internal/... ./cmd/...`).
 - Keep docs in sync; update `README.md` and `docs/` as needed.
 
 License: see `LICENSE` when present.

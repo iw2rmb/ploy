@@ -66,7 +66,7 @@ Before creating a release tag:
   - Note performance improvements
   - Acknowledge contributors
 - [ ] Verify all tests pass: `make test`
-- [ ] Verify coverage thresholds: `make test-coverage-threshold`
+- [ ] Verify coverage thresholds: `make test-coverage`
 - [ ] Run full CI checks locally: `make ci-check`
 - [ ] Verify build succeeds: `make build`
 - [ ] Review open issues and PRs for critical fixes
