@@ -59,9 +59,12 @@ func NewBuildGateImageResolver(
 ) (*BuildGateImageResolver, error) {
 	var allRules []contracts.BuildGateImageRule
 
+	// Determine if file is required: only when Stack Gate enabled AND no inline rules provided.
+	fileRequired := stackGateEnabled && len(clusterInline) == 0 && len(modOverride) == 0
+
 	// Load default file if path is provided.
 	if defaultPath != "" {
-		fileRules, err := loadImageMappingFile(defaultPath, stackGateEnabled)
+		fileRules, err := loadImageMappingFile(defaultPath, fileRequired)
 		if err != nil {
 			return nil, err
 		}

@@ -30,6 +30,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,6 +40,7 @@ import (
 	units "github.com/docker/go-units"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 
 	// Import moby client for ContainerStats/Inspect option types used in
 	// resource usage gathering below. The actual client calls go through
@@ -116,9 +118,78 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 	// Stack Gate mode: resolve image from mapping when Stack Gate is enabled with expectations.
 	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
-	if stackGateMode && image == "" {
-		// Resolve image using the image mapping resolver.
-		// Precedence: mod-level ImageOverrides > cluster-level ClusterImages > default file.
+
+	// In Stack Gate mode, ignore PLOY_BUILDGATE_IMAGE - always resolve via mapping.
+	if stackGateMode {
+		image = ""
+	}
+
+	// sgResult holds the Stack Gate result to attach to final metadata (if in stackGateMode).
+	var sgResult *contracts.StackGateResult
+
+	if stackGateMode {
+		// === STACK GATE PRE-CHECK ===
+		obs, detectErr := stackdetect.Detect(ctx, workspace)
+
+		// Build stack gate result for metadata.
+		sgResult = &contracts.StackGateResult{
+			Enabled:  true,
+			Expected: spec.StackGate.Expect,
+		}
+
+		if detectErr != nil {
+			var detErr *stackdetect.DetectionError
+			if errors.As(detectErr, &detErr) {
+				sgResult.Result = "unknown"
+				sgResult.Reason = detErr.Message
+			} else {
+				sgResult.Result = "unknown"
+				sgResult.Reason = detectErr.Error()
+			}
+			// FAIL EARLY: return metadata without running container.
+			return &contracts.BuildGateStageMetadata{
+				StackGate: sgResult,
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: spec.StackGate.Expect.Language,
+					Tool:     "stack-gate",
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "STACK_GATE_UNKNOWN",
+					Message:  sgResult.Reason,
+				}},
+			}, nil
+		}
+
+		// Detection succeeded - populate detected stack.
+		sgResult.Detected = observationToStackExpectation(obs)
+
+		// Compare detected vs expected.
+		if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
+			sgResult.Result = "mismatch"
+			sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
+			// FAIL EARLY: return metadata without running container.
+			return &contracts.BuildGateStageMetadata{
+				StackGate: sgResult,
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: spec.StackGate.Expect.Language,
+					Tool:     "stack-gate",
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "STACK_GATE_MISMATCH",
+					Message:  sgResult.Reason,
+				}},
+			}, nil
+		}
+
+		// Pre-check passed.
+		sgResult.Result = "pass"
+
+		// === RESOLVE IMAGE FROM MAPPING ===
+		// Always resolve via mapping in Stack Gate mode.
 		resolver, err := NewBuildGateImageResolver(
 			DefaultMappingPath,
 			spec.StackGate.ClusterImages,  // cluster/global inline from node config
@@ -126,13 +197,44 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			true,                          // stackGateEnabled
 		)
 		if err != nil {
-			return nil, fmt.Errorf("resolve stack gate image: %w", err)
+			sgResult.Result = "unknown"
+			sgResult.Reason = fmt.Sprintf("image mapping error: %s", err.Error())
+			return &contracts.BuildGateStageMetadata{
+				StackGate: sgResult,
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: spec.StackGate.Expect.Language,
+					Tool:     "stack-gate",
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
+					Message:  sgResult.Reason,
+				}},
+			}, nil
 		}
+
 		resolvedImage, err := resolver.Resolve(*spec.StackGate.Expect)
 		if err != nil {
-			return nil, fmt.Errorf("resolve stack gate image: %w", err)
+			sgResult.Result = "unknown"
+			sgResult.Reason = fmt.Sprintf("no matching image rule: %s", err.Error())
+			return &contracts.BuildGateStageMetadata{
+				StackGate: sgResult,
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: spec.StackGate.Expect.Language,
+					Tool:     "stack-gate",
+					Passed:   false,
+				}},
+				LogFindings: []contracts.BuildGateLogFinding{{
+					Severity: "error",
+					Code:     "STACK_GATE_NO_IMAGE_RULE",
+					Message:  sgResult.Reason,
+				}},
+			}, nil
 		}
+
 		image = resolvedImage
+		sgResult.RuntimeImage = resolvedImage
 
 		// Determine tool from expectation or detect from workspace.
 		tool = spec.StackGate.Expect.Tool
@@ -187,8 +289,9 @@ fi`
 		cmd = []string{"/bin/sh", "-lc", script}
 	}
 
-	// Legacy mode: existing profile-based selection (only when not already resolved via Stack Gate).
-	if !stackGateMode || image == "" {
+	// Legacy mode: only when NOT in Stack Gate mode.
+	// Stack Gate mode does not fall back to legacy tool-based defaults.
+	if !stackGateMode {
 		switch desiredProfile {
 		case "java-maven":
 			chooseMaven()
@@ -361,6 +464,10 @@ fi`
 	}); ok {
 		_ = remover.Remove(ctx, h)
 	}
+	// If we were in stack gate mode, attach the result.
+	if sgResult != nil {
+		meta.StackGate = sgResult
+	}
 	return meta, nil
 }
 
@@ -476,4 +583,60 @@ else
 fi`
 		return []string{"/bin/sh", "-lc", script}
 	}
+}
+
+// observationToStackExpectation converts a stackdetect.Observation to a StackExpectation.
+func observationToStackExpectation(obs *stackdetect.Observation) *contracts.StackExpectation {
+	if obs == nil {
+		return nil
+	}
+	exp := &contracts.StackExpectation{
+		Language: obs.Language,
+		Tool:     obs.Tool,
+	}
+	if obs.Release != nil {
+		exp.Release = *obs.Release
+	}
+	return exp
+}
+
+// stackMatchesExpectation compares a detected observation against expected values.
+// Returns true if all non-empty expected fields match the observation.
+func stackMatchesExpectation(obs *stackdetect.Observation, expect *contracts.StackExpectation) bool {
+	if expect == nil {
+		return true
+	}
+	if expect.Language != "" && obs.Language != expect.Language {
+		return false
+	}
+	if expect.Tool != "" && obs.Tool != expect.Tool {
+		return false
+	}
+	if expect.Release != "" {
+		if obs.Release == nil || *obs.Release != expect.Release {
+			return false
+		}
+	}
+	return true
+}
+
+// formatMismatchReason generates a human-readable explanation of stack mismatches.
+func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackExpectation) string {
+	var mismatches []string
+	if expect.Language != "" && obs.Language != expect.Language {
+		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
+	}
+	if expect.Tool != "" && obs.Tool != expect.Tool {
+		mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expect.Tool, obs.Tool))
+	}
+	if expect.Release != "" {
+		detected := "<nil>"
+		if obs.Release != nil {
+			detected = *obs.Release
+		}
+		if obs.Release == nil || *obs.Release != expect.Release {
+			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
+		}
+	}
+	return "stack mismatch: " + strings.Join(mismatches, "; ")
 }

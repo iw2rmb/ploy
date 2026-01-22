@@ -12,6 +12,9 @@ type BuildGateStageMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
+	// StackGate captures the outcome of Stack Gate pre-check validation.
+	// Present only when Stack Gate mode is enabled.
+	StackGate *StackGateResult `json:"stack_gate,omitempty"`
 	// LogsText carries the raw build logs text for node-local processing.
 	// Not serialized in JSON APIs.
 	LogsText string `json:"-"`
@@ -49,6 +52,11 @@ func (m BuildGateStageMetadata) Validate() error {
 	for i, finding := range m.LogFindings {
 		if err := finding.Validate(); err != nil {
 			return fmt.Errorf("log finding %d invalid: %w", i, err)
+		}
+	}
+	if m.StackGate != nil {
+		if err := m.StackGate.Validate(); err != nil {
+			return fmt.Errorf("stack_gate invalid: %w", err)
 		}
 	}
 	return nil
@@ -133,6 +141,32 @@ func (f BuildGateLogFinding) Validate() error {
 	}
 	if strings.TrimSpace(f.Severity) == "" {
 		return fmt.Errorf("severity is required")
+	}
+	return nil
+}
+
+// StackGateResult captures the outcome of Stack Gate pre-check validation.
+type StackGateResult struct {
+	Enabled      bool              `json:"enabled"`
+	Expected     *StackExpectation `json:"expected,omitempty"`
+	Detected     *StackExpectation `json:"detected,omitempty"`
+	RuntimeImage string            `json:"runtime_image,omitempty"`
+	Result       string            `json:"result,omitempty"` // "pass", "mismatch", "unknown"
+	Reason       string            `json:"reason,omitempty"`
+}
+
+// Validate ensures stack gate result is well formed.
+func (r StackGateResult) Validate() error {
+	if !r.Enabled {
+		return nil
+	}
+	switch r.Result {
+	case "pass", "mismatch", "unknown":
+		// Valid results.
+	case "":
+		return fmt.Errorf("stack_gate.result required when enabled")
+	default:
+		return fmt.Errorf("stack_gate.result invalid: %q", r.Result)
 	}
 	return nil
 }
