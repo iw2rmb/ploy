@@ -127,7 +127,6 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 		Options: map[string]any{},
 	}

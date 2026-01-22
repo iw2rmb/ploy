@@ -181,11 +181,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		// RepoURL and Ref enable remote gate workers to clone and validate
 		// without direct workspace access.
 		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-			Profile: "java-auto",
-			Env:     map[string]string{},
-			RepoURL: types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
-			Ref:     types.GitRef(strings.TrimSpace(gateRef)),
+			Enabled:        true,
+			Env:            map[string]string{},
+			ImageOverrides: nil,
+			RepoURL:        types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
+			Ref:            types.GitRef(strings.TrimSpace(gateRef)),
 		},
 		Inputs: []contracts.StepInput{
 			{
@@ -206,9 +206,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 
 	// Override Gate from typed build gate options.
 	manifest.Gate.Enabled = typedOpts.BuildGate.Enabled
-	if profile := strings.TrimSpace(typedOpts.BuildGate.Profile); profile != "" {
-		manifest.Gate.Profile = profile
-	}
+	manifest.Gate.ImageOverrides = typedOpts.BuildGate.Images
 
 	// Note: Stack Gate expectations are threaded into gate manifests via the
 	// gate-specific path in executeGateJob, which sets typedOpts.StackGate
@@ -232,7 +230,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 //     and placeholder command are used.
 //
 // This keeps gate manifest image resolution independent of mods[] image maps
-// while preserving Gate profile, repo metadata, and MR wiring options.
+// while preserving repo metadata and MR wiring options.
 //
 // Gate jobs explicitly use contracts.ModStackUnknown since stack detection has
 // not yet occurred. The Build Gate will determine the actual stack (e.g.,
@@ -246,8 +244,8 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 	sanitized.Steps = nil
 
 	// Ignore stack-aware Execution.Image and custom commands for gate jobs.
-	// Gate containers are selected by the Gate executor based on profile and
-	// workspace detection, not by the Mods execution image.
+	// Gate containers are selected by the Gate executor based on workspace
+	// stack detection, not by the Mods execution image.
 	sanitized.Execution.Image = contracts.ModImage{}
 	sanitized.Execution.Command = ExecutionCommand{}
 
@@ -483,17 +481,12 @@ func validateAndDeriveStackGateChaining(steps []StepMod) error {
 
 // stackGatePhaseSpecToStepGate converts a StackGatePhaseSpec to StepGateStackSpec.
 // Returns nil if the input is nil or disabled.
-//
-// The modImages parameter carries mod-level image mapping overrides from
-// build_gate.images in the run spec. These are threaded into ImageOverrides
-// so the resolver can apply the correct precedence (mod > cluster > default).
-func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec, modImages []contracts.BuildGateImageRule) *contracts.StepGateStackSpec {
+func stackGatePhaseSpecToStepGate(phase *contracts.StackGatePhaseSpec, _ []contracts.BuildGateImageRule) *contracts.StepGateStackSpec {
 	if phase == nil || !phase.Enabled {
 		return nil
 	}
 	return &contracts.StepGateStackSpec{
-		Enabled:        phase.Enabled,
-		Expect:         phase.Expect,
-		ImageOverrides: modImages,
+		Enabled: phase.Enabled,
+		Expect:  phase.Expect,
 	}
 }

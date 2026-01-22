@@ -45,7 +45,7 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
             "command": ["/bin/sh","-c","echo hi"]
         }],
         "env": {"A":"1","B":"2"},
-        "build_gate": {"enabled": false, "profile": "java-maven"}
+        "build_gate": {"enabled": false}
     }`
 	var raw json.RawMessage = []byte(specJSON)
 	env, typedOpts, _ := parseSpec(raw)
@@ -79,9 +79,6 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	if typedOpts.BuildGate.Enabled {
 		t.Fatalf("BuildGate.Enabled = true, want false")
 	}
-	if typedOpts.BuildGate.Profile != "java-maven" {
-		t.Fatalf("BuildGate.Profile = %q, want java-maven", typedOpts.BuildGate.Profile)
-	}
 }
 
 func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
@@ -97,7 +94,7 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
             "env": {"A":"999","C":"should-not-merge"},
             "command": "echo ignored"
         },
-        "build_gate": {"enabled": false, "profile": "java-maven"}
+        "build_gate": {"enabled": false}
     }`
 	var raw json.RawMessage = []byte(specJSON)
 	env, typedOpts, _ := parseSpec(raw)
@@ -148,7 +145,6 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		],
 		"build_gate": {
 			"enabled": true,
-			"profile": "auto",
 			"healing": {
 				"retries": 1,
 				"mod": {"image": "docker.io/test/healer:latest"}
@@ -212,9 +208,6 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	// Verify build gate and healing are preserved (global policy).
 	if !typedOpts.BuildGate.Enabled {
 		t.Errorf("expected BuildGate.Enabled=true, got false")
-	}
-	if typedOpts.BuildGate.Profile != "auto" {
-		t.Errorf("expected BuildGate.Profile=auto, got %q", typedOpts.BuildGate.Profile)
 	}
 	if typedOpts.Healing == nil {
 		t.Fatalf("expected Healing config to be parsed")

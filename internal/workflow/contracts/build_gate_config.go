@@ -9,17 +9,12 @@ type BuildGateConfig struct {
 	// Enabled controls whether the build gate runs before/after mod execution.
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 
-	// Profile specifies the gate profile name (e.g., "auto", "java-maven").
-	// The profile determines which static analysis tools and checks to run.
-	Profile string `json:"profile,omitempty" yaml:"profile,omitempty"`
-
 	// Healing configures the heal → re-gate loop when Build Gate fails.
 	// This is nested under build_gate to keep gate policy in one place.
 	Healing *HealingSpec `json:"healing,omitempty" yaml:"healing,omitempty"`
 
-	// Images provides mod-level image mapping overrides for Stack Gate.
-	// These rules override default file and cluster/global inline rules.
-	// Each rule maps a stack expectation to a container image.
+	// Images provides mod-level image mapping overrides for Build Gate image resolution.
+	// These rules override the default mapping file.
 	Images []BuildGateImageRule `json:"images,omitempty" yaml:"images,omitempty"`
 }
 

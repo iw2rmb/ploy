@@ -11,7 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// GateExecutor validates build artifacts using the configured profile.
+// GateExecutor validates build artifacts.
 // The only implementation is dockerGateExecutor (gate_docker.go) which runs
 // validation containers locally via the container runtime.
 type GateExecutor interface {

@@ -21,7 +21,6 @@ steps:
 
 build_gate:
   enabled: true
-  profile: auto
 
   healing:
     retries: 1

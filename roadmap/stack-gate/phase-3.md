@@ -13,7 +13,6 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Add `BuildGateImageRule{Stack contracts.StackExpectation, Image string}` (YAML/JSON) for:
       - `/etc/ploy/gates/build-gate-images.yaml` (default file)
-      - `gates.build_gate.images` (cluster/global inline config; where this lives is implementation-defined)
       - `build_gate.images` (Mods spec; mod-level overrides)
     - Validation rules:
       - `stack.language` required
@@ -36,11 +35,11 @@ Legend: [ ] todo, [x] done.
   - Scope: File loader + parse with clear error on missing/invalid file when required by an enabled phase (`StepGateSpec.StackGate.Enabled == true`).
   - Snippets: N/A
   - Tests: `go test ./... -run BuildGateImagesFile` — missing file triggers reject only when Stack Gate needs it.
-- [x] Merge overrides with explicit precedence — Allows cluster and mod overrides without ambiguity.
+- [x] Merge overrides with explicit precedence — Allows mod overrides without ambiguity.
   - Repository: ploy
-  - Component: runtime config model (cluster/global inline), `internal/workflow/contracts` (Mods spec), `internal/workflow/runtime/step` (merge)
+  - Component: `internal/workflow/contracts` (Mods spec), `internal/workflow/runtime/step` (merge)
   - Scope:
-    - Merge order: default file < cluster/global inline (`gates.build_gate.images`) < mod override (`build_gate.images`).
+    - Merge order: default file < mod override (`build_gate.images`).
     - Reject duplicates within the same precedence level when they are equal-specificity matches for the same stack selector:
       - tool-specific selector: `{language, tool, release}`
       - tool-agnostic selector: `{language, release}` (tool empty)

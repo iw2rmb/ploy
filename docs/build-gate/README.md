@@ -82,19 +82,22 @@ Gates are configured via the mod spec and environment variables on worker nodes.
 ```yaml
 build_gate:
   enabled: true
-  profile: auto  # auto, java, java-maven, java-gradle
+  images: [] # optional stack→image overrides
 ```
 
 ### Stack Gate: Build Gate Image Mapping
 
 When Stack Gate is enabled for a gate phase (a gate job carries `gate.stack_gate.expect`),
-Build Gate can resolve its runtime image from an explicit stack→image mapping instead of
-profile-based defaults.
+Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Resolution sources and precedence (highest wins):**
-1. Mod spec: `build_gate.images[]` (mod-level overrides)
-2. Node config: `gates.build_gate.images[]` (cluster/global inline)
-3. Default file: `/etc/ploy/gates/build-gate-images.yaml`
+1. `PLOY_BUILDGATE_IMAGE` (single image override)
+2. Mod spec: `build_gate.images[]` (per-stack overrides)
+3. Default file: `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images)
+
+**Default file shipping:**
+- The repository default lives at `etc/ploy/gates/build-gate-images.yaml`.
+- The `ploy-node` and `ploy-server` Docker images include it at `/etc/ploy/gates/build-gate-images.yaml` by default.
 
 **Rule format:**
 ```yaml
@@ -109,19 +112,10 @@ images:
 **Validation:**
 - `stack.language`, `stack.release`, and `image` are required; `stack.tool` is optional.
 - Duplicate selectors within the same source are rejected.
-- When Stack Gate mode is active and `PLOY_BUILDGATE_IMAGE` is not set, missing
-  `/etc/ploy/gates/build-gate-images.yaml` is an error.
-
-**Profile detection:**
-- `auto` (default): Detects Maven if `pom.xml` exists; Gradle if `build.gradle(.kts)`
-  exists; otherwise plain `java`.
-- Explicit profiles: `java-maven`, `java-gradle`, `java`.
+- When `PLOY_BUILDGATE_IMAGE` is not set, a missing default mapping file is an error.
 
 **Environment variables (on worker nodes):**
 - `PLOY_BUILDGATE_IMAGE` — Unified override for the gate container image.
-- `PLOY_BUILDGATE_PROFILE` — Override profile detection.
-- `PLOY_BUILDGATE_JAVA_IMAGE` — (Deprecated) Maven image override.
-- `PLOY_BUILDGATE_GRADLE_IMAGE` — (Deprecated) Gradle image override.
 - Resource limits: `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES`, `PLOY_BUILDGATE_LIMIT_CPU_MILLIS`,
   `PLOY_BUILDGATE_LIMIT_DISK_SPACE`.
 
@@ -130,20 +124,21 @@ See `docs/envs/README.md` for the complete environment variable reference.
 ## Inputs
 
 - **Workspace mount:** `/workspace` (required, read-write). Contains the Git checkout.
-- **Profile:** Configurable via spec or auto-detected from workspace markers.
-- **Optional image override:** `PLOY_BUILDGATE_IMAGE` takes precedence over profile defaults.
+- **Optional image override:** `PLOY_BUILDGATE_IMAGE` takes precedence over image mapping.
 - **Resource limits:** Memory, CPU, and disk limits are optional and configurable via
   environment variables.
 
 ## Behavior
 
-Gate validation behavior depends on the detected or configured profile:
+Gate validation behavior depends on the detected tool (from stack detection):
 
-| Profile       | Command                                                                                   |
-|---------------|-------------------------------------------------------------------------------------------|
-| `java-maven`  | `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install` |
-| `java-gradle` | `gradle -q --stacktrace test -p /workspace`                                               |
-| `java`        | `javac --release 17` on all `*.java` files (succeeds when no sources present)             |
+| Tool    | Command                                                                                   |
+|---------|-------------------------------------------------------------------------------------------|
+| `maven` | `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install` |
+| `gradle`| `gradle -q --stacktrace test -p /workspace`                                               |
+| `go`    | `go test ./...`                                                                           |
+| `cargo` | `cargo test`                                                                              |
+| `pip` / `poetry` | `python -m compileall -q /workspace`                                               |
 
 The gate does not modify the repository; it validates the current working tree.
 

@@ -352,8 +352,7 @@ Replace the “JDK 17 by default” selection in `internal/workflow/runtime/step
 
 Image policy is configured explicitly (no silent defaults):
 
-- Cluster/global defaults loaded from `/etc/ploy/gates/build-gate-images.yaml`.
-- Optional cluster/global inline extensions in `gates.build_gate.images`.
+- Default mapping file: `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images).
 - Mod YAML overrides in root `build_gate.images`.
 
 If a rule override results in an image selection that is inconsistent with the expectation, Stack Gate rejects the phase.
@@ -373,17 +372,7 @@ Stack Gate removes implicit defaults. The operator (or spec author) must provide
 
 Proposed config model:
 
-- Cluster/global config contains:
-  - Build Gate loads an image mapping file from `/etc/ploy/gates/build-gate-images.yaml` by default.
-  - Optionally extend/override the mapping with inline images (merged after defaults).
-
-Example (conceptual):
-
-```yaml
-gates:
-  build_gate:
-    images: [] # optional inline extensions/overrides
-```
+- Build Gate loads the default mapping file from `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images).
 
 Default mapping file format (no compound keys; structured stack selectors):
 
@@ -404,11 +393,12 @@ images:
     image: docker.io/org/stack-gate-java:17
 ```
 
-Reference example in this repo: `design/build-gate-images.default.yaml`.
+Reference files in this repo:
+- Default mapping (shipped in Docker images): `etc/ploy/gates/build-gate-images.yaml`
+- Example template (illustrative): `design/build-gate-images.default.yaml`
 
 Implementation status (Phase 3):
-- Build Gate loads `/etc/ploy/gates/build-gate-images.yaml` when Stack Gate mode is active.
-- Inline cluster/global rules are accepted via node config `gates.build_gate.images`.
+- Build Gate loads the default mapping file (installed at `/etc/ploy/gates/build-gate-images.yaml`) when Stack Gate mode is active.
 - Mod-level overrides are accepted via spec `build_gate.images`.
 - Resolution and precedence are implemented in `internal/workflow/runtime/step/build_gate_image_resolver.go`
   and used by the Docker gate executor in `internal/workflow/runtime/step/gate_docker.go`.
@@ -418,7 +408,7 @@ Rules:
 - If a phase requires a rule that cannot be resolved → **reject** early (no defaults).
 - Rule resolution uses “most specific match wins”:
   - `language+tool+release` beats `language+release`.
-  - For equal specificity, precedence order applies: `build_gate.images` (mod YAML) > `gates.build_gate.images` (cluster/global inline) > `/etc/ploy/gates/build-gate-images.yaml` (cluster/global default).
+  - For equal specificity, precedence order applies: `build_gate.images` (mod YAML) > default mapping file.
   - Remaining ties/conflicts at the same specificity *within the same precedence level* are configuration errors (reject).
 - Image references are opaque strings; Ploy does not parse image names/tags to infer stack or version.
 - Mod YAML overrides may specify additional images, but Ploy validates the resolved image still corresponds to the expected stack (otherwise reject).
@@ -448,13 +438,12 @@ steps:
 
 Merge order:
 
-1. `/etc/ploy/gates/build-gate-images.yaml` images (cluster/global default)
-2. `gates.build_gate.images` (cluster/global inline)
-3. `build_gate.images` (mod YAML)
+1. Default mapping file images
+2. `build_gate.images` (mod YAML)
 
 Override semantics:
 
-- For a given stack selector at the same specificity, entries from `build_gate.images` **override** cluster-level entries.
+	- For a given stack selector at the same specificity, entries from `build_gate.images` **override** default file entries.
 - Overrides are allowed only when the stack selector is identical at that specificity (e.g., overriding `{language: java, tool: maven, release: "11"}` with another image).
 - If `build_gate.images` contains multiple entries that match the same stack selector at the same specificity, the config is invalid (reject).
 

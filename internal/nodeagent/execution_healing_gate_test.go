@@ -106,7 +106,6 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -178,7 +177,6 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -255,7 +253,6 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -356,7 +353,6 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 		Name: "Test",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -450,7 +446,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	manifest := contracts.StepManifest{
 		ID:   types.StepID(req.JobID),
 		Name: "Test",
-		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
@@ -565,7 +561,6 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -680,7 +675,6 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -772,7 +766,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	manifest := contracts.StepManifest{
 		ID:   types.StepID(req.JobID),
 		Name: "Test",
-		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
 	preGate, reGates, gateErr := rc.runGateWithHealing(
@@ -858,11 +852,13 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 			gateCallCount++
 			specCopy := &contracts.StepGateSpec{
-				Enabled:   spec.Enabled,
-				Profile:   spec.Profile,
-				RepoURL:   spec.RepoURL,
-				Ref:       spec.Ref,
-				DiffPatch: append([]byte(nil), spec.DiffPatch...),
+				Enabled:        spec.Enabled,
+				Env:            spec.Env,
+				ImageOverrides: append([]contracts.BuildGateImageRule(nil), spec.ImageOverrides...),
+				RepoURL:        spec.RepoURL,
+				Ref:            spec.Ref,
+				DiffPatch:      append([]byte(nil), spec.DiffPatch...),
+				StackGate:      spec.StackGate,
 			}
 			gateSpecs = append(gateSpecs, specCopy)
 
@@ -970,7 +966,7 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	manifest := contracts.StepManifest{
 		ID:   types.StepID(req.JobID),
 		Name: "Test",
-		Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
 	_, _, gateErr := rc.runGateWithHealing(

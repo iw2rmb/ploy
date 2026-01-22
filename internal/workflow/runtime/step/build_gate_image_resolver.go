@@ -2,9 +2,8 @@
 //
 // The resolver selects runtime images for Build Gate containers when Stack Gate
 // is enabled. It loads rules from multiple sources with precedence ordering:
-//  1. Default file (/etc/ploy/gates/build-gate-images.yaml) - lowest precedence
-//  2. Cluster/global inline config - medium precedence
-//  3. Mod-level overrides - highest precedence
+//  1. Default file (etc/ploy/gates/build-gate-images.yaml) - lowest precedence
+//  2. Mod-level overrides - highest precedence
 //
 // Resolution uses "most specific match wins" semantics:
 //   - Tool-specific rules (specificity 3) beat tool-agnostic rules (specificity 2)
@@ -20,8 +19,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// DefaultMappingPath is the default location for Build Gate image mapping files.
-const DefaultMappingPath = "/etc/ploy/gates/build-gate-images.yaml"
+// DefaultMappingPath is the repository-relative location of the default Build Gate
+// image mapping file.
+//
+// The ploy Docker images install this file at /etc/ploy/gates/build-gate-images.yaml.
+const DefaultMappingPath = "etc/ploy/gates/build-gate-images.yaml"
 
 // BuildGateImageResolver resolves stack expectations to container images.
 // Rules are merged from multiple sources with higher-precedence sources
@@ -38,33 +40,27 @@ type BuildGateImageResolver struct {
 //
 // Parameters:
 //   - defaultPath: Path to the default mapping file (empty to skip file loading)
-//   - clusterInline: Cluster/global inline rules (may be nil)
 //   - modOverride: Mod-level override rules (may be nil)
-//   - stackGateEnabled: Whether Stack Gate is enabled (controls file requirement)
+//   - requireDefaultFile: Whether the default file must exist
 //
 // Merge order (lowest to highest precedence):
 //   - Default file rules
-//   - Cluster inline rules
 //   - Mod override rules
 //
 // Returns an error if:
-//   - stackGateEnabled is true and defaultPath is set but file doesn't exist
+//   - requireDefaultFile is true and defaultPath is set but file doesn't exist
 //   - File exists but is invalid YAML or fails validation
 //   - Any source has duplicate selectors
 func NewBuildGateImageResolver(
 	defaultPath string,
-	clusterInline []contracts.BuildGateImageRule,
 	modOverride []contracts.BuildGateImageRule,
-	stackGateEnabled bool,
+	requireDefaultFile bool,
 ) (*BuildGateImageResolver, error) {
 	var allRules []contracts.BuildGateImageRule
 
-	// Determine if file is required: only when Stack Gate enabled AND no inline rules provided.
-	fileRequired := stackGateEnabled && len(clusterInline) == 0 && len(modOverride) == 0
-
 	// Load default file if path is provided.
 	if defaultPath != "" {
-		fileRules, err := loadImageMappingFile(defaultPath, fileRequired)
+		fileRules, err := loadImageMappingFile(defaultPath, requireDefaultFile)
 		if err != nil {
 			return nil, err
 		}
@@ -76,15 +72,6 @@ func NewBuildGateImageResolver(
 			}
 			allRules = append(allRules, fileRules...)
 		}
-	}
-
-	// Add cluster inline rules.
-	if len(clusterInline) > 0 {
-		mapping := contracts.BuildGateImageMapping{Images: clusterInline}
-		if err := mapping.Validate("cluster_inline"); err != nil {
-			return nil, fmt.Errorf("cluster inline: %w", err)
-		}
-		allRules = append(allRules, clusterInline...)
 	}
 
 	// Add mod override rules (highest precedence).

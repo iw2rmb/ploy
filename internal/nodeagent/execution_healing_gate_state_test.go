@@ -142,7 +142,6 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -314,7 +313,6 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

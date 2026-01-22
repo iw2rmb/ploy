@@ -24,9 +24,10 @@ RUN --mount=type=secret,id=ploy_extra_ca,required=false \
     apk add --no-cache ca-certificates bash tzdata curl jq && \
     if [ -s /run/secrets/ploy_extra_ca ]; then cat /run/secrets/ploy_extra_ca >> /etc/ssl/certs/ca-certificates.crt; fi && \
     adduser -D -H -s /sbin/nologin ploy && \
-    mkdir -p /etc/ploy /etc/ploy/pki /var/lib/ploy && \
+    mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY --from=build /out/ployd /usr/local/bin/ployd
+COPY --chown=ploy:ploy etc/ploy/gates/build-gate-images.yaml /etc/ploy/gates/build-gate-images.yaml
 USER ploy
 EXPOSE 8443 9100
 ENTRYPOINT ["/usr/local/bin/ployd"]

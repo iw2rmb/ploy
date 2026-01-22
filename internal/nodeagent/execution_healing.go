@@ -319,11 +319,12 @@ func (r *runController) runGateWithHealing(
 		// gate validation runs directly against the mutated workspace, and discrete
 		// healing jobs publish baseline-based diffs for rehydration.
 		regateSpec := &contracts.StepGateSpec{
-			Enabled: gateSpec.Enabled,
-			Profile: gateSpec.Profile,
-			Env:     gateSpec.Env,
-			RepoURL: gateSpec.RepoURL,
-			Ref:     gateSpec.Ref,
+			Enabled:        gateSpec.Enabled,
+			Env:            gateSpec.Env,
+			ImageOverrides: gateSpec.ImageOverrides,
+			RepoURL:        gateSpec.RepoURL,
+			Ref:            gateSpec.Ref,
+			StackGate:      gateSpec.StackGate,
 		}
 
 		regateStart := time.Now()

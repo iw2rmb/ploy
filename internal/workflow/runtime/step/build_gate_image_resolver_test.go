@@ -92,11 +92,6 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "default:17"},
 	}
 
-	// Cluster inline rules (medium precedence).
-	clusterRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "cluster:17"},
-	}
-
 	// Mod override rules (highest precedence).
 	modRules := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
@@ -105,28 +100,18 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 	tests := []struct {
 		name         string
 		defaultRules []contracts.BuildGateImageRule
-		clusterRules []contracts.BuildGateImageRule
 		modRules     []contracts.BuildGateImageRule
 		wantImage    string
 	}{
 		{
 			name:         "mod overrides all",
 			defaultRules: defaultRules,
-			clusterRules: clusterRules,
 			modRules:     modRules,
 			wantImage:    "mod:17",
 		},
 		{
-			name:         "cluster overrides default",
-			defaultRules: defaultRules,
-			clusterRules: clusterRules,
-			modRules:     nil,
-			wantImage:    "cluster:17",
-		},
-		{
 			name:         "default when no overrides",
 			defaultRules: defaultRules,
-			clusterRules: nil,
 			modRules:     nil,
 			wantImage:    "default:17",
 		},
@@ -137,7 +122,6 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 			// Build merged rules manually (simulating NewBuildGateImageResolver without file loading).
 			var rules []contracts.BuildGateImageRule
 			rules = append(rules, tt.defaultRules...)
-			rules = append(rules, tt.clusterRules...)
 			rules = append(rules, tt.modRules...)
 
 			resolver := &BuildGateImageResolver{rules: rules}
@@ -173,25 +157,17 @@ func TestBuildGateImageResolver_PrecedenceLastWins(t *testing.T) {
 
 // TestBuildGateImageResolver_MissingFile tests error handling for missing file.
 func TestBuildGateImageResolver_MissingFile(t *testing.T) {
-	// When stackGateEnabled=true and file is missing, should error.
-	_, err := NewBuildGateImageResolver(
-		"/nonexistent/path/build-gate-images.yaml",
-		nil, nil,
-		true, // stackGateEnabled
-	)
+	// When requireDefaultFile=true and file is missing, should error.
+	_, err := NewBuildGateImageResolver("/nonexistent/path/build-gate-images.yaml", nil, true)
 	if err == nil {
-		t.Fatal("expected error for missing file when stackGateEnabled=true")
+		t.Fatal("expected error for missing file when requireDefaultFile=true")
 	}
 	if !strings.Contains(err.Error(), "required but not found") {
 		t.Errorf("error = %q, want to contain 'required but not found'", err.Error())
 	}
 
-	// When stackGateEnabled=false and file is missing, should not error.
-	resolver, err := NewBuildGateImageResolver(
-		"/nonexistent/path/build-gate-images.yaml",
-		nil, nil,
-		false, // stackGateEnabled
-	)
+	// When requireDefaultFile=false and file is missing, should not error.
+	resolver, err := NewBuildGateImageResolver("/nonexistent/path/build-gate-images.yaml", nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -208,12 +184,7 @@ func TestBuildGateImageResolver_DuplicateInLevel(t *testing.T) {
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "image2:17"},
 	}
 
-	_, err := NewBuildGateImageResolver(
-		"", // no file
-		duplicateRules,
-		nil,
-		false,
-	)
+	_, err := NewBuildGateImageResolver("", duplicateRules, false)
 	if err == nil {
 		t.Fatal("expected duplicate validation error")
 	}
@@ -229,7 +200,7 @@ func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
 		t.Skip("test data file not found")
 	}
 
-	resolver, err := NewBuildGateImageResolver(testFile, nil, nil, true)
+	resolver, err := NewBuildGateImageResolver(testFile, nil, true)
 	if err != nil {
 		t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 	}
@@ -300,7 +271,7 @@ func TestBuildGateImageResolver_LoadInvalidFile(t *testing.T) {
 				t.Skip("test data file not found")
 			}
 
-			_, err := NewBuildGateImageResolver(tt.file, nil, nil, true)
+			_, err := NewBuildGateImageResolver(tt.file, nil, true)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -372,16 +343,12 @@ images:
 `), 0644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
-
-	clusterRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "cluster:17"},
-	}
 	modRules := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
 	}
 
-	t.Run("mod overrides cluster and default", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, clusterRules, modRules, true)
+	t.Run("mod overrides default", func(t *testing.T) {
+		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 		}
@@ -391,27 +358,12 @@ images:
 			t.Fatalf("Resolve failed: %v", err)
 		}
 		if got != "mod:17" {
-			t.Errorf("Resolve() = %q, want %q (mod should override all)", got, "mod:17")
-		}
-	})
-
-	t.Run("cluster overrides default when no mod", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, clusterRules, nil, true)
-		if err != nil {
-			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
-		}
-
-		got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
-		if err != nil {
-			t.Fatalf("Resolve failed: %v", err)
-		}
-		if got != "cluster:17" {
-			t.Errorf("Resolve() = %q, want %q (cluster should override default)", got, "cluster:17")
+			t.Errorf("Resolve() = %q, want %q (mod should override default)", got, "mod:17")
 		}
 	})
 
 	t.Run("default used when no overrides", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, nil, nil, true)
+		resolver, err := NewBuildGateImageResolver(defaultFile, nil, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 		}
@@ -426,8 +378,8 @@ images:
 	})
 
 	t.Run("default used for non-overridden stack", func(t *testing.T) {
-		// mod and cluster only override java:17, not java:11.
-		resolver, err := NewBuildGateImageResolver(defaultFile, clusterRules, modRules, true)
+		// mod only overrides java:17, not java:11.
+		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 		}

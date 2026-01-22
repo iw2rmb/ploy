@@ -36,7 +36,6 @@ steps:
 
 build_gate:
   enabled: true
-  profile: auto
 
 mr_on_fail: false
 mr_on_success: false

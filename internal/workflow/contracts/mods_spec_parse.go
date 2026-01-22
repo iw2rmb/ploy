@@ -126,19 +126,15 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			return nil, err
 		}
 		bg := &BuildGateConfig{}
+		if _, ok := bgRaw["profile"]; ok {
+			return nil, fmt.Errorf("build_gate.profile: forbidden")
+		}
 		if vv, ok := bgRaw["enabled"]; ok && vv != nil {
 			b, err := expectBool(vv, "build_gate.enabled")
 			if err != nil {
 				return nil, err
 			}
 			bg.Enabled = b
-		}
-		if vv, ok := bgRaw["profile"]; ok && vv != nil {
-			s, err := expectString(vv, "build_gate.profile")
-			if err != nil {
-				return nil, err
-			}
-			bg.Profile = strings.TrimSpace(s)
 		}
 		if vv, ok := bgRaw["healing"]; ok && vv != nil {
 			healRaw, err := expectMap(vv, "build_gate.healing")

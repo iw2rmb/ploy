@@ -129,7 +129,6 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 		Image: "test/image:latest",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -248,7 +247,6 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 		Image: "test/image:latest",
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

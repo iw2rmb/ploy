@@ -415,7 +415,6 @@ steps:
       TARGET: java17
 build_gate:
   enabled: true
-  profile: auto
   healing:
     retries: 1
     mod:

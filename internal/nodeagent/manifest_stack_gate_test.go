@@ -314,42 +314,6 @@ func TestStackGatePhaseSpecToStepGate(t *testing.T) {
 		}
 	})
 
-	t.Run("threads mod-level image overrides", func(t *testing.T) {
-		modImages := []contracts.BuildGateImageRule{
-			{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
-		}
-
-		phase := &contracts.StackGatePhaseSpec{
-			Enabled: true,
-			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
-		}
-
-		result := stackGatePhaseSpecToStepGate(phase, modImages)
-		if result == nil {
-			t.Fatal("expected non-nil result")
-		}
-		if len(result.ImageOverrides) != 1 {
-			t.Fatalf("len(ImageOverrides) = %d, want 1", len(result.ImageOverrides))
-		}
-		if result.ImageOverrides[0].Image != "mod:17" {
-			t.Errorf("ImageOverrides[0].Image = %q, want %q", result.ImageOverrides[0].Image, "mod:17")
-		}
-	})
-
-	t.Run("nil mod images results in empty ImageOverrides", func(t *testing.T) {
-		phase := &contracts.StackGatePhaseSpec{
-			Enabled: true,
-			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
-		}
-
-		result := stackGatePhaseSpecToStepGate(phase, nil)
-		if result == nil {
-			t.Fatal("expected non-nil result")
-		}
-		if len(result.ImageOverrides) != 0 {
-			t.Errorf("len(ImageOverrides) = %d, want 0", len(result.ImageOverrides))
-		}
-	})
 }
 
 // TestBuildGateManifestFromRequest_StackGateThreading tests that StackGate
@@ -405,6 +369,33 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 		}
 		if manifest.Gate.StackGate != nil {
 			t.Error("manifest.Gate.StackGate should be nil when not set")
+		}
+	})
+
+	t.Run("threads build_gate.images into Gate.ImageOverrides", func(t *testing.T) {
+		req := baseStartRunRequest()
+		typedOpts := RunOptions{
+			BuildGate: BuildGateOptions{
+				Enabled: true,
+				Images: []contracts.BuildGateImageRule{
+					{Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"}, Image: "maven:3-eclipse-temurin-17"},
+				},
+			},
+		}
+
+		manifest, err := buildGateManifestFromRequest(req, typedOpts)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if manifest.Gate == nil {
+			t.Fatal("manifest.Gate should not be nil")
+		}
+		if len(manifest.Gate.ImageOverrides) != 1 {
+			t.Fatalf("len(Gate.ImageOverrides) = %d, want 1", len(manifest.Gate.ImageOverrides))
+		}
+		if manifest.Gate.ImageOverrides[0].Image != "maven:3-eclipse-temurin-17" {
+			t.Errorf("Gate.ImageOverrides[0].Image = %q, want %q", manifest.Gate.ImageOverrides[0].Image, "maven:3-eclipse-temurin-17")
 		}
 	})
 

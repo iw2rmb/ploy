@@ -21,7 +21,7 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 // nodeagent. Callers must use TypedOptions fields instead of raw map[string]any
 // access. The typed options include:
 //
-//   - BuildGate: enabled flag and profile for pre-mod gate validation.
+//   - BuildGate: enabled flag and image overrides for gate validation.
 //   - Healing: heal → re-gate loop policy (retries, healing mod spec).
 //   - MRWiring: GitLab PAT, domain, and MR creation triggers (mr_on_success, mr_on_fail).
 //   - Execution: container image, command, and retention settings.

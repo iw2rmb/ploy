@@ -86,8 +86,11 @@ type StepArtifact struct {
 //  3. BaseRef — fallback for baseline validations.
 type StepGateSpec struct {
 	Enabled bool
-	Profile string
 	Env     map[string]string
+
+	// ImageOverrides holds mod-level image mapping overrides for gate execution.
+	// These rules override the default mapping file.
+	ImageOverrides []BuildGateImageRule
 
 	// RepoURL is the Git repository URL for remote gate execution.
 	// Populated from StartRunRequest.RepoURL when building manifests.
@@ -119,16 +122,6 @@ type StepGateStackSpec struct {
 	// Expect holds the stack expectations to validate.
 	// Only validated when Enabled is true.
 	Expect *StackExpectation
-
-	// ImageOverrides holds mod-level image mapping overrides for this step.
-	// These rules override default file and cluster/global inline rules
-	// when resolving the Build Gate image for Stack Gate mode.
-	ImageOverrides []BuildGateImageRule
-
-	// ClusterImages holds cluster/global inline image mapping rules.
-	// These rules override default file rules but are overridden by mod-level
-	// ImageOverrides. Populated from node config gates.build_gate.images.
-	ClusterImages []BuildGateImageRule
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
@@ -295,11 +288,8 @@ func (m StepManifest) validateGate() error {
 	if m.Gate == nil {
 		return nil
 	}
-	if !m.Gate.Enabled && strings.TrimSpace(m.Gate.Profile) == "" {
+	if !m.Gate.Enabled {
 		return nil
-	}
-	if strings.TrimSpace(m.Gate.Profile) == "" {
-		return errors.New("gate profile required when enabled")
 	}
 	for key := range m.Gate.Env {
 		if !envKeyPattern.MatchString(key) {

@@ -80,7 +80,6 @@ steps:
 # Post-mod gate failures trigger the healing sequence below.
 build_gate:
   enabled: true
-  profile: auto # Auto-detect Maven or Gradle
 
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES

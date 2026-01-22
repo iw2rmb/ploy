@@ -133,7 +133,6 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 
@@ -281,7 +280,6 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
-			Profile: "java",
 		},
 	}
 

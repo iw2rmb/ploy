@@ -55,7 +55,7 @@ Example spec:
 
 The `--spec` flag accepts a YAML or JSON file defining:
 - **Main mod configuration** (`image`, `command`, `env`, `env_from_file`)
-- **Build Gate settings** (`build_gate.enabled`, `build_gate.profile`)
+- **Build Gate settings** (`build_gate.enabled`, `build_gate.images`)
 - **Healing configuration** (`build_gate_healing.retries`, `build_gate_healing.mod`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
 
@@ -225,7 +225,7 @@ This makes gate health visible without requiring raw artifact inspection.
 - Cluster targeting:
   - CLI reads the default descriptor at `~/.config/ploy/clusters/` (no env override).
 - Build Gate image override:
-  - To change the Java build executor container (e.g., custom Maven image), use `PLOY_BUILDGATE_JAVA_IMAGE` on worker nodes.
+  - To change the Build Gate executor container image, use `PLOY_BUILDGATE_IMAGE` on worker nodes.
 
 **Troubleshooting**
 

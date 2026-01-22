@@ -17,8 +17,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 			"retain_container": true
 		}],
 		"build_gate": {
-			"enabled": false,
-			"profile": "java-auto"
+			"enabled": false
 		},
 		"gitlab_pat": "glpat-secret",
 		"mr_on_success": true,
@@ -45,9 +44,6 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}
 	if typedOpts.BuildGate.Enabled {
 		t.Errorf("expected typed build_gate.enabled=false")
-	}
-	if typedOpts.BuildGate.Profile != "java-auto" {
-		t.Errorf("expected typed build_gate.profile=java-auto, got %q", typedOpts.BuildGate.Profile)
 	}
 	if typedOpts.MRWiring.GitLabPAT != "glpat-secret" {
 		t.Errorf("expected typed gitlab_pat=glpat-secret, got %q", typedOpts.MRWiring.GitLabPAT)
@@ -269,7 +265,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			},
 			BuildGate: &contracts.BuildGateConfig{
 				Enabled: true,
-				Profile: "java-maven",
 				Healing: &contracts.HealingSpec{
 					Retries: 3,
 					Mod: &contracts.HealingModSpec{
@@ -316,9 +311,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 
 		if !runOpts.BuildGate.Enabled {
 			t.Error("BuildGate.Enabled: expected true")
-		}
-		if runOpts.BuildGate.Profile != "java-maven" {
-			t.Errorf("BuildGate.Profile: got %q, want %q", runOpts.BuildGate.Profile, "java-maven")
 		}
 
 		if runOpts.Healing == nil {
