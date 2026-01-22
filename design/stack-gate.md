@@ -1,6 +1,6 @@
 # Stack Gate (StackGate) — Design
 
-Status: **Phases 1–2 implemented (spec/contracts/threading + Java stack detector); Phases 3+ proposed**  
+Status: **Phases 1–4 implemented (spec/contracts/threading + Java stack detector + image mapping + Docker gate pre-check + metadata); Phase 5 proposed**  
 Owner: Ploy core (workflow runner + node agent)  
 
 ## Implemented (Phase 1)
@@ -160,7 +160,7 @@ Tool-agnostic semantics:
 - Gate execution uses the detected tool to pick the build command.
 - If both Maven and Gradle markers are present, detection is `unknown` unless a policy defines precedence.
 
-## Contracts / data model changes (proposed)
+## Contracts / data model changes
 
 ### Gate spec threading
 
@@ -172,20 +172,21 @@ Phase 1 adds Stack Gate configuration to this contract:
 - `StepGateStackSpec.Enabled bool`
 - `StepGateStackSpec.Expect *StackExpectation`
 
-Observed stack detection and runtime selection metadata are not implemented in Phase 1.
+Observed stack detection and runtime selection metadata are not part of `StepGateSpec` (Phase 1). They are captured in Build Gate metadata (Phase 4).
 
-### Build gate metadata
+### Build gate metadata (implemented: Phase 4)
 
-Extend `contracts.BuildGateStageMetadata` (and the stored job meta) to include:
+`contracts.BuildGateStageMetadata` includes optional Stack Gate metadata under `stack_gate`:
 
 - `stack_gate.enabled`
-- `stack_gate.expected` (canonical form)
-- `stack_gate.detected` (canonical form + evidence hints)
+- `stack_gate.expected` (canonical expectation for this phase)
+- `stack_gate.detected` (detected stack, as a StackExpectation)
 - `stack_gate.runtime_image` (resolved Build Gate runtime image for this phase)
-- `stack_gate.result`:
+- `stack_gate.result` (one of):
   - `pass`
   - `mismatch`
   - `unknown` (detection failed / ambiguous)
+- `stack_gate.reason` (human-readable explanation; set for mismatch/unknown and mapping failures)
 
 Mismatch/unknown are **policy failures** distinct from “build failed”.
 
