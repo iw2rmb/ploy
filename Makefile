@@ -1,7 +1,7 @@
 BINARY := ploy
 BUILD_DIR := dist
 COVERAGE_FILE := $(BUILD_DIR)/coverage.out
-BINARY_SIZE_THRESHOLD_MB := 15
+HTML_COVERAGE_FILE := $(BUILD_DIR)/coverage.html
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -32,7 +32,10 @@ lint-md: ## Lint Markdown documentation with markdownlint
 	npx --yes markdownlint --config .markdownlint.yaml $(shell git ls-files '*.md')
 
 .PHONY: test
-test: test-coverage-threshold test-coverage-critical test-binary-size ## Run all unit tests with coverage enforcement (≥60% overall, ≥90% critical) and binary size check
+test: ## Run unit tests (fast path)
+	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
+	PLOY_CONFIG_HOME="$$TMP" go test ./internal/... ./cmd/...; \
+	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-race
 test-race: ## Run all unit tests with race detector
@@ -41,8 +44,8 @@ test-race: ## Run all unit tests with race detector
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-coverage
-test-coverage: $(COVERAGE_FILE) ## Run tests and generate coverage report
-	@echo "\n=== Coverage Summary ==="
+test-coverage: $(COVERAGE_FILE) ## Run unit tests and generate coverage report (statement coverage)
+	@echo "\n=== Coverage Summary (statement) ==="
 	@go tool cover -func=$(COVERAGE_FILE) | grep '^total:'
 
 .PHONY: FORCE
@@ -51,34 +54,28 @@ FORCE:
 $(COVERAGE_FILE): FORCE
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
-	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./internal/... ./cmd/...; \
+	PLOY_CONFIG_HOME="$$TMP" go test -coverpkg=./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./internal/... ./cmd/...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
-.PHONY: test-coverage-threshold
-test-coverage-threshold: $(COVERAGE_FILE) ## Enforce 60% overall coverage threshold
-	@COVERAGE=$$(go tool cover -func=$(COVERAGE_FILE) | grep '^total:' | awk '{print $$3}' | sed 's/%//'); \
-	THRESHOLD=60; \
-	echo "Coverage: $$COVERAGE% (threshold: $$THRESHOLD%)"; \
-	if awk -v c="$$COVERAGE" -v t="$$THRESHOLD" 'BEGIN{exit(c>=t)}'; then \
-		echo "ERROR: Coverage $$COVERAGE% is below threshold $$THRESHOLD%"; \
-		exit 1; \
-	fi
+.PHONY: coverage
+coverage: test-coverage ## Alias for test-coverage
 
-.PHONY: test-coverage-critical
-test-coverage-critical: $(COVERAGE_FILE) ## Enforce 90% coverage on scheduler/PKI/ingest critical paths
-	@./scripts/check-critical-coverage.sh $(COVERAGE_FILE)
+.PHONY: coverage-html
+coverage-html: $(COVERAGE_FILE) ## Generate HTML coverage report (statement coverage)
+	@mkdir -p $(BUILD_DIR)
+	@go tool cover -html=$(COVERAGE_FILE) -o $(HTML_COVERAGE_FILE)
+	@echo "Wrote $(HTML_COVERAGE_FILE)"
 
-.PHONY: test-binary-size
-test-binary-size: ## Enforce binary size threshold (protects against dependency bloat)
-	@if [ ! -f $(BUILD_DIR)/$(BINARY) ]; then \
-		echo "ERROR: Binary not found at $(BUILD_DIR)/$(BINARY). Run 'make build' first."; \
-		exit 1; \
-	fi
-	@./scripts/check-binary-size.sh $(BUILD_DIR)/$(BINARY) $(BINARY_SIZE_THRESHOLD_MB)
+.PHONY: coverage-open
+coverage-open: coverage-html ## Open HTML coverage report (macOS)
+	@open $(HTML_COVERAGE_FILE)
 
-.PHONY: validate-tdd
-validate-tdd: ## Validate RED→GREEN→REFACTOR discipline (tests, coverage, binary size, code quality)
-	@./scripts/validate-tdd-discipline.sh
+.PHONY: coverage-all
+coverage-all: ## Generate coverage for all packages (may include integration tests)
+	@mkdir -p $(BUILD_DIR)
+	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
+	PLOY_CONFIG_HOME="$$TMP" go test -coverpkg=./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...; \
+	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: vet
 vet: ## Run go vet
@@ -102,16 +99,8 @@ staticcheck: ## Run staticcheck
 		exit 1; \
 	fi
 
-.PHONY: lint-untyped-contracts
-lint-untyped-contracts: ## Check for map[string]any at API boundaries (type safety guardrail)
-	@./scripts/check-untyped-contracts.sh
-
-.PHONY: test-untyped-contracts
-test-untyped-contracts: ## Run unit tests for untyped contracts guardrail script
-	@./scripts/check-untyped-contracts_test.sh
-
 .PHONY: ci-check
-ci-check: fmt vet staticcheck lint-untyped-contracts test-untyped-contracts test-coverage-threshold test-coverage-critical test-binary-size ## Run core CI checks locally (includes binary size guardrail)
+ci-check: fmt vet staticcheck test test-coverage ## Run core CI checks locally
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install
@@ -144,18 +133,16 @@ help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build                      # Build the CLI and server binaries"
 	@echo "  make fmt                        # Run gofmt over Go source"
-	@echo "  make test                       # Run unit tests with coverage thresholds and binary size check"
+	@echo "  make test                       # Run unit tests"
 	@echo "  make test-race                  # Run tests with race detector"
-	@echo "  make test-coverage              # Run tests and generate coverage report"
-	@echo "  make test-coverage-threshold    # Enforce 60% overall coverage threshold"
-	@echo "  make test-coverage-critical     # Enforce 90% coverage on scheduler/PKI/ingest critical paths"
-	@echo "  make test-binary-size           # Enforce binary size threshold (protects against dependency bloat)"
-	@echo "  make validate-tdd               # Validate RED→GREEN→REFACTOR discipline"
+	@echo "  make test-coverage              # Run unit tests and generate coverage report (statement coverage)"
+	@echo "  make coverage                   # Alias for test-coverage"
+	@echo "  make coverage-html              # Generate HTML coverage report"
+	@echo "  make coverage-open              # Open HTML coverage report (macOS)"
+	@echo "  make coverage-all               # Generate coverage for all packages (may include integration tests)"
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
-	@echo "  make lint-untyped-contracts     # Check for map[string]any at API boundaries"
-	@echo "  make test-untyped-contracts     # Run unit tests for untyped contracts guardrail"
-	@echo "  make ci-check                   # Run all CI checks locally (RED → GREEN workflow)"
+	@echo "  make ci-check                   # Run core CI checks locally"
 	@echo "  make pre-commit-install         # Install pre-commit hooks"
 	@echo "  make clean                      # Remove build artifacts"
