@@ -118,6 +118,74 @@ func (p JobStatsPayload) ValidateJobMeta() error {
 	return nil
 }
 
+// formatStackGateError formats a Stack Gate failure for run_repos.last_error.
+// Returns nil if job meta doesn't contain a stack gate failure.
+func formatStackGateError(modType domaintypes.ModType, jobMeta json.RawMessage) *string {
+	if len(jobMeta) == 0 {
+		return nil
+	}
+	meta, err := contracts.UnmarshalJobMeta(jobMeta)
+	if err != nil || meta.Kind != "gate" || meta.Gate == nil || meta.Gate.StackGate == nil {
+		return nil
+	}
+	sg := meta.Gate.StackGate
+	if sg.Result == "pass" {
+		return nil
+	}
+
+	// Derive phase from mod_type
+	phase := "unknown"
+	switch modType {
+	case domaintypes.ModTypePreGate:
+		phase = "inbound"
+	case domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
+		phase = "outbound"
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Stack Gate [%s]: %s\n", phase, sg.Result))
+
+	if sg.Expected != nil {
+		sb.WriteString(fmt.Sprintf("  Expected: {language: %s", sg.Expected.Language))
+		if sg.Expected.Tool != "" {
+			sb.WriteString(fmt.Sprintf(", tool: %s", sg.Expected.Tool))
+		}
+		if sg.Expected.Release != "" {
+			sb.WriteString(fmt.Sprintf(", release: %q", sg.Expected.Release))
+		}
+		sb.WriteString("}\n")
+	}
+
+	if sg.Detected != nil {
+		sb.WriteString(fmt.Sprintf("  Detected: {language: %s", sg.Detected.Language))
+		if sg.Detected.Tool != "" {
+			sb.WriteString(fmt.Sprintf(", tool: %s", sg.Detected.Tool))
+		}
+		if sg.Detected.Release != "" {
+			sb.WriteString(fmt.Sprintf(", release: %q", sg.Detected.Release))
+		}
+		sb.WriteString("}\n")
+	}
+
+	// Extract evidence from LogFindings
+	if meta.Gate != nil && len(meta.Gate.LogFindings) > 0 {
+		for _, finding := range meta.Gate.LogFindings {
+			if finding.Evidence != "" {
+				sb.WriteString("  Evidence:\n")
+				for _, line := range strings.Split(finding.Evidence, "\n") {
+					if line = strings.TrimSpace(line); line != "" {
+						sb.WriteString(fmt.Sprintf("    - %s\n", line))
+					}
+				}
+				break
+			}
+		}
+	}
+
+	result := strings.TrimSuffix(sb.String(), "\n")
+	return &result
+}
+
 // completeJobHandler marks a job as completed with terminal status and stats.
 // This endpoint simplifies the node → server contract by addressing jobs directly
 // via the URL path (/v1/jobs/{job_id}/complete) rather than requiring run_id and
@@ -337,6 +405,22 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 					"step_index", job.StepIndex,
 				)
 			case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
+				// Set last_error for Stack Gate failures
+				if statsPayload.HasJobMeta() {
+					if errMsg := formatStackGateError(modType, statsPayload.JobMeta); errMsg != nil {
+						if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
+							RunID:     job.RunID,
+							RepoID:    job.RepoID,
+							LastError: errMsg,
+						}); updateErr != nil {
+							slog.Error("complete job: failed to set repo last_error",
+								"job_id", jobID,
+								"repo_id", job.RepoID,
+								"err", updateErr,
+							)
+						}
+					}
+				}
 				if healErr := maybeCreateHealingJobs(ctx, st, run, job.RunID, job.RepoID, job.Attempt, job.StepIndex); healErr != nil {
 					slog.Error("complete job: failed to create healing jobs",
 						"job_id", jobID,

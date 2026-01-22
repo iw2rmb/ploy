@@ -136,6 +136,13 @@ post-gate) is surfaced in:
 Gate summary is exposed in `RunSummary.Metadata["gate_summary"]` and can be consumed via
 `GET /v1/runs/{id}/status` or CLI surfaces such as `ploy run status`.
 
+### Stack Gate failures
+
+Stack Gate enforces stack expectations at gate boundaries. When failures occur:
+1. No healing attempted (policy failures, not build failures)
+2. Error stored in `run_repos.last_error`, shown in CLI follow output
+3. Includes: phase, expected/detected, evidence (paths/keys only)
+
 ### Healing configuration
 
 Healing configuration uses a single `mod`:

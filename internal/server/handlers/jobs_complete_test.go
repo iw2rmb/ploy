@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -811,5 +812,137 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+}
+
+// TestCompleteJob_GateFailureSetsLastError verifies that when a gate job fails
+// with Stack Gate mismatch metadata, the handler sets run_repos.last_error.
+func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID,
+		RunID:     runID,
+		RepoID:    repoID,
+		NodeID:    &nodeID,
+		Name:      "pre-gate",
+		Status:    store.JobStatusRunning,
+		ModType:   "pre_gate",
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	// Build Stack Gate mismatch metadata
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Fail",
+		"exit_code": 1,
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"log_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					"stack_gate": map[string]any{
+						"enabled": true,
+						"result":  "mismatch",
+						"expected": map[string]any{
+							"language": "java",
+							"tool":     "maven",
+							"release":  "17",
+						},
+						"detected": map[string]any{
+							"language": "java",
+							"tool":     "maven",
+							"release":  "11",
+						},
+					},
+					"log_findings": []map[string]any{
+						{
+							"severity": "error",
+							"message":  "Stack mismatch",
+							"evidence": "pom.xml: maven.compiler.release=11",
+						},
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeIDStr,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify UpdateRunRepoError was called
+	if !st.updateRunRepoErrorCalled {
+		t.Fatal("expected UpdateRunRepoError to be called")
+	}
+
+	// Verify params
+	if st.updateRunRepoErrorParams.RunID != runID {
+		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoErrorParams.RunID)
+	}
+	if st.updateRunRepoErrorParams.RepoID != repoID {
+		t.Fatalf("expected RepoID %s, got %s", repoID, st.updateRunRepoErrorParams.RepoID)
+	}
+	if st.updateRunRepoErrorParams.LastError == nil {
+		t.Fatal("expected LastError to be set")
+	}
+
+	errMsg := *st.updateRunRepoErrorParams.LastError
+
+	// Verify output contains phase
+	if !strings.Contains(errMsg, "inbound") {
+		t.Errorf("expected error to contain 'inbound', got: %s", errMsg)
+	}
+
+	// Verify output contains expected/detected
+	if !strings.Contains(errMsg, "Expected:") {
+		t.Errorf("expected error to contain 'Expected:', got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "Detected:") {
+		t.Errorf("expected error to contain 'Detected:', got: %s", errMsg)
+	}
+
+	// Verify output contains release info
+	if !strings.Contains(errMsg, `release: "17"`) {
+		t.Errorf("expected error to contain expected release '17', got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, `release: "11"`) {
+		t.Errorf("expected error to contain detected release '11', got: %s", errMsg)
+	}
+
+	// Verify output contains evidence (paths/keys, not file contents)
+	if !strings.Contains(errMsg, "Evidence:") {
+		t.Errorf("expected error to contain 'Evidence:', got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "pom.xml") {
+		t.Errorf("expected error to contain evidence path 'pom.xml', got: %s", errMsg)
 	}
 }

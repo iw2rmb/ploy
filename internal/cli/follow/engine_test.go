@@ -125,3 +125,58 @@ func TestStatusGlyph_RunningUsesConfiguredSpinnerFrames(t *testing.T) {
 		t.Fatalf("statusGlyph(running,0)=%q, want %q", got, "⣾ ")
 	}
 }
+
+func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	jobID := domaintypes.NewJobID()
+
+	var out strings.Builder
+	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
+	e.repoOrder = []domaintypes.ModRepoID{repoID}
+	e.repoURLs[repoID] = "example.com/org/repo"
+	e.repoJobs[repoID] = []runs.RepoJobEntry{{
+		JobID:     jobID,
+		Name:      "pre-gate",
+		ModType:   "pre_gate",
+		StepIndex: 1000,
+		Status:    store.JobStatusFail,
+	}}
+
+	// Set Stack Gate failure message
+	errMsg := `Stack Gate [inbound]: mismatch
+  Expected: {language: java, tool: maven, release: "17"}
+  Detected: {language: java, tool: maven, release: "11"}
+  Evidence:
+    - pom.xml: maven.compiler.release=11`
+	e.repoErrors[repoID] = &errMsg
+
+	e.render()
+
+	s := stripANSI(out.String())
+
+	// Verify output contains error details
+	if !strings.Contains(s, "Stack Gate [inbound]: mismatch") {
+		t.Errorf("expected output to contain Stack Gate failure, got: %q", s)
+	}
+
+	// Verify output includes expected/detected
+	if !strings.Contains(s, "Expected:") {
+		t.Errorf("expected output to contain 'Expected:', got: %q", s)
+	}
+	if !strings.Contains(s, "Detected:") {
+		t.Errorf("expected output to contain 'Detected:', got: %q", s)
+	}
+
+	// Verify output includes evidence paths/keys
+	if !strings.Contains(s, "pom.xml") {
+		t.Errorf("expected output to contain evidence path 'pom.xml', got: %q", s)
+	}
+
+	// Verify the error marker is present
+	if !strings.Contains(s, "✗") {
+		t.Errorf("expected output to contain error marker '✗', got: %q", s)
+	}
+}
