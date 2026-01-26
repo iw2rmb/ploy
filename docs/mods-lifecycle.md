@@ -841,7 +841,7 @@ value is a `StageStatus` object describing that job's execution state.
 	    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
 	    - `node_id` — which node claimed this job.
 	    - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`, `mr`).
-	    - `mod_image` — container image name for this job (persisted by the node immediately before execution).
+	    - `mod_image` — container image name for this job (persisted by the node for mod/heal/gate jobs).
 	    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
   - Float `step_index` enables dynamic job insertion:
     - Initial jobs: `pre-gate` (1000), `mod-0` (2000), `post-gate` (3000).

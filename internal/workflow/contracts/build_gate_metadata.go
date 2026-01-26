@@ -12,6 +12,9 @@ type BuildGateStageMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
+	// RuntimeImage is the container image name used to run the gate container.
+	// Not serialized in JSON APIs.
+	RuntimeImage string `json:"-"`
 	// StackGate captures the outcome of Stack Gate pre-check validation.
 	// Present only when Stack Gate mode is enabled.
 	StackGate *StackGateResult `json:"stack_gate,omitempty"`

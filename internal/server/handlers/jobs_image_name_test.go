@@ -163,7 +163,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 	}
 }
 
-func TestSaveJobImageName_ConflictWrongModType(t *testing.T) {
+func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	t.Parallel()
 
 	nodeIDStr := domaintypes.NewNodeKey()
@@ -177,6 +177,42 @@ func TestSaveJobImageName_ConflictWrongModType(t *testing.T) {
 		NodeID:  &nodeID,
 		Status:  store.JobStatusRunning,
 		ModType: "pre_gate",
+	}
+
+	st := &mockStore{getJobResult: job}
+	handler := saveJobImageNameHandler(st)
+
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/mods:latest"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: nodeIDStr}))
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobImageNameCalled {
+		t.Fatalf("expected UpdateJobImageName to be called")
+	}
+}
+
+func TestSaveJobImageName_ConflictWrongModType(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:      jobID,
+		RunID:   runID,
+		NodeID:  &nodeID,
+		Status:  store.JobStatusRunning,
+		ModType: "mr",
 	}
 
 	st := &mockStore{getJobResult: job}
