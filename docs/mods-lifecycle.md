@@ -840,9 +840,9 @@ value is a `StageStatus` object describing that job's execution state.
 	  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 	    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
 	    - `node_id` — which node claimed this job.
-	    - `meta` — JSONB with job metadata:
-	      - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`).
-	      - `mod_image` — container image for this job (optional, for diagnostics).
+	    - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`, `mr`).
+	    - `mod_image` — container image name for this job (persisted by the node immediately before execution).
+	    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
   - Float `step_index` enables dynamic job insertion:
     - Initial jobs: `pre-gate` (1000), `mod-0` (2000), `post-gate` (3000).
     - Healing jobs inserted at midpoints: `heal-1` (1500), `re-gate` (1750).
@@ -988,8 +988,8 @@ For a spec with `mods[]`:
    or reorder entries).
 2. `POST /v1/runs`:
    - Creates jobs for pre-gate, each mod, and post-gates with float step_index.
-   - Job metadata includes `mod_type` (pre_gate, mod, post_gate, heal, re_gate)
-     and `mod_image`.
+   - Each job row includes `mod_type` (pre_gate, mod, post_gate, heal, re_gate)
+     and `mod_image` (saved by the executing node before the container starts).
 3. Scheduler and nodeagents:
    - ClaimJob returns jobs in step_index order for the unified queue, and the server promotes the next job for a repo attempt only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.

@@ -619,6 +619,24 @@ func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJob
 	return err
 }
 
+const updateJobImageName = `-- name: UpdateJobImageName :exec
+UPDATE jobs
+SET mod_image = $2
+WHERE id = $1
+`
+
+type UpdateJobImageNameParams struct {
+	ID       types.JobID `json:"id"`
+	ModImage string      `json:"mod_image"`
+}
+
+// Persist the container image name used to execute a mod/heal job.
+// This is set by the node immediately before job execution starts.
+func (q *Queries) UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error {
+	_, err := q.db.Exec(ctx, updateJobImageName, arg.ID, arg.ModImage)
+	return err
+}
+
 const updateJobMeta = `-- name: UpdateJobMeta :exec
 UPDATE jobs
 SET meta = $2

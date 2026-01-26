@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -333,6 +334,14 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		}
 		if cfg.MountCerts != nil {
 			cfg.MountCerts(&manifest)
+		}
+
+		imageName := strings.TrimSpace(manifest.Image)
+		if imageName == "" {
+			return fmt.Errorf("resolved job image is empty")
+		}
+		if err := r.SaveJobImageName(ctx, req.JobID, imageName); err != nil {
+			return fmt.Errorf("save job image name: %w", err)
 		}
 
 		// Pre-run workspace status check (for healing no-change detection).

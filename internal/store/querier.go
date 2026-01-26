@@ -164,7 +164,7 @@ type Querier interface {
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
 	ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
-	// See docs/envs/README.md#Global Env Configuration for scope/precedence rules.
+	// Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 	// Returns all global environment entries, ordered by key for consistent iteration.
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
@@ -179,15 +179,15 @@ type Querier interface {
 	// Returns log metadata (without the data blob) for a run.
 	// Use GetLog to fetch the actual log data by id.
 	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error)
-	// Returns log metadata (without the data blob) for a run since a given id.
-	// Use GetLog to fetch the actual log data by id.
-	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error)
 	// Returns log metadata (without the data blob) for a run and job.
 	// Use GetLog to fetch the actual log data by id.
 	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error)
 	// Returns log metadata (without the data blob) for a run and job since a given id.
 	// Use GetLog to fetch the actual log data by id.
 	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]ListLogsMetaByRunAndJobSinceRow, error)
+	// Returns log metadata (without the data blob) for a run since a given id.
+	// Use GetLog to fetch the actual log data by id.
+	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error)
 	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
@@ -224,6 +224,9 @@ type Querier interface {
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
+	// Persist the container image name used to execute a mod/heal job.
+	// This is set by the node immediately before job execution starts.
+	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateModRepoRefs(ctx context.Context, arg UpdateModRepoRefsParams) error

@@ -55,6 +55,10 @@ type runController struct {
 	// Created once at controller initialization and reused across all jobs.
 	// Safe for concurrent use by multiple goroutines.
 	statusUploader *StatusUploader
+
+	// jobImageNameSaver persists the resolved container image name that will be
+	// used to execute a mod/heal job (jobs.mod_image).
+	jobImageNameSaver *JobImageNameSaver
 }
 
 type jobContext struct {
@@ -184,6 +188,13 @@ func (r *runController) ensureUploaders() error {
 		r.statusUploader, err = NewStatusUploader(r.cfg)
 		if err != nil {
 			return fmt.Errorf("create status uploader: %w", err)
+		}
+	}
+
+	if r.jobImageNameSaver == nil {
+		r.jobImageNameSaver, err = NewJobImageNameSaver(r.cfg)
+		if err != nil {
+			return fmt.Errorf("create job image name saver: %w", err)
 		}
 	}
 

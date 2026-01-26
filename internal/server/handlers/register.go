@@ -116,6 +116,9 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService), auth.RoleWorker)
+	// Job-level runtime image persistence — nodes persist the resolved container image name
+	// that will be used to execute a mod/heal job (stack-aware resolution).
+	s.HandleFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)
 
 	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},
 	// POST /v1/nodes/{id}/buildgate/*, etc.) have been removed. Gate execution now runs

@@ -1,0 +1,53 @@
+# Job-level runtime image persistence endpoint — persists the resolved container image name.
+# Nodes call this endpoint immediately before starting mod/heal job execution so the
+# control plane can surface the exact runtime image via jobs.mod_image.
+parameters:
+  - in: path
+    name: job_id
+    required: true
+    schema: { type: string }
+    description: Job ID (KSUID string)
+  - in: header
+    name: PLOY_NODE_UUID
+    required: true
+    schema: { type: string }
+    description: Worker node ID (NanoID 6-character string) saving job image name
+
+post:
+  tags: [Control]
+  summary: Persist the runtime container image name for a job
+  description: |
+    Nodes call this endpoint immediately before job execution starts to persist the
+    resolved container image name that will be used to run the job.
+
+    This is primarily used for stack-aware image resolution: the job row may be created
+    with an empty or generic `mod_image`, and the node persists the exact image it will run.
+
+    Ownership is enforced: only the node that claimed the job may update the image, and
+    only while the job is in `Running` status. Only `mod` and `heal` jobs are accepted.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [ image ]
+          properties:
+            image:
+              type: string
+              description: Container image reference that will be used to run the job
+  responses:
+    '204':
+      description: Saved; job image name persisted
+    '400':
+      description: Bad request (missing job_id, missing node header, or empty image)
+    '403':
+      description: Forbidden — job is not assigned to the calling node
+    '404':
+      description: Job not found (invalid job ID)
+    '409':
+      description: |
+        Conflict — job not in `Running` status or job is not a mod/heal job.
+    '500':
+      description: Internal server error
+

@@ -61,7 +61,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
-ORDER BY step_index ASC, name ASC, id ASC;
+ORDER BY step_index ASC, id ASC;
 
 -- name: CreateJob :one
 -- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -240,6 +240,13 @@ WHERE id = $1;
 -- name: UpdateJobMeta :exec
 UPDATE jobs
 SET meta = $2
+WHERE id = $1;
+
+-- name: UpdateJobImageName :exec
+-- Persist the container image name used to execute a mod/heal job.
+-- This is set by the node immediately before job execution starts.
+UPDATE jobs
+SET mod_image = $2
 WHERE id = $1;
 
 -- name: UpdateJobCompletionWithMeta :exec
