@@ -98,10 +98,13 @@ build_gate:
 ```
 
 - `build_gate.pre.stack` applies to the `pre_gate` job.
-- `build_gate.post.stack` applies to the `post_gate` and `re_gate` jobs.
+- `build_gate.post.stack` applies to the `post_gate` job.
 - When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
 - When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
 - When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
+- For Gradle, Java `release` detection reads `sourceCompatibility` / `targetCompatibility` (and falls back to Kotlin `kotlinOptions.jvmTarget`); unrelated build logic (tasks, repositories, `ext[...]`, etc.) does not block detection.
+
+`re_gate` always re-runs Build Gate using the stack detected from the workspace (via `stackdetect`) to select the gate runtime image/tool.
 
 ### Stack Gate: Build Gate Image Mapping
 

@@ -23,11 +23,11 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/stackdetect -run Maven` — precedence + local parent resolution + “unknown” on unresolved placeholders.
 
 ## Java/Gradle detection
-- [x] Detect Gradle Java release from `build.gradle(.kts)` — Supports Gradle projects with explicit toolchain declarations.
+- [x] Detect Gradle Java release from `build.gradle(.kts)` — Supports Gradle projects with explicit source/target compatibility and Kotlin JVM target hints.
   - Repository: ploy
   - Component: `internal/workflow/stackdetect`
-  - Scope: Recognize only explicit/static `JavaLanguageVersion.of(N)` and `sourceCompatibility/targetCompatibility` forms; dynamic logic returns “unknown”.
-  - Snippets: Evidence items like `{path:"build.gradle.kts", key:"toolchain.languageVersion", value:"17"}`
+  - Scope: Recognize only explicit/static `sourceCompatibility/targetCompatibility` forms (including `JavaVersion.VERSION_XX` / `VERSION_XX`) and `kotlinOptions.jvmTarget`; dynamic logic returns “unknown”.
+  - Snippets: Evidence items like `{path:"build.gradle.kts", key:"sourceCompatibility", value:"17"}`
   - Tests: `go test ./internal/workflow/stackdetect -run Gradle` — static forms pass; dynamic forms classify as unknown.
 
 ## Fixtures and test coverage

@@ -1,5 +1,5 @@
 # Job-level runtime image persistence endpoint — persists the resolved container image name.
-# Nodes call this endpoint immediately before starting mod/heal job execution so the
+# Nodes call this endpoint to persist the resolved container image name so the
 # control plane can surface the exact runtime image via jobs.mod_image.
 parameters:
   - in: path
@@ -17,11 +17,15 @@ post:
   tags: [Control]
   summary: Persist the runtime container image name for a job
   description: |
-    Nodes call this endpoint immediately before job execution starts to persist the
-    resolved container image name that will be used to run the job.
+    Nodes call this endpoint (while the job is `Running`) to persist the resolved
+    container image name used for the job.
 
     This is primarily used for stack-aware image resolution: the job row may be created
     with an empty or generic `mod_image`, and the node persists the exact image it will run.
+
+    For Stack Gate early failures (e.g., `stack_gate` mismatch/unknown), gate jobs may
+    persist the resolved *expected* runtime image even when the validation container
+    is not started.
 
     Ownership is enforced: only the node that claimed the job may update the image, and
     only while the job is in `Running` status. Only `mod`, `heal`, and gate jobs

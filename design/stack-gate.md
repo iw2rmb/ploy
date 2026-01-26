@@ -253,8 +253,12 @@ Inputs: `build.gradle`, `build.gradle.kts`.
 
 Recognize only explicit, static declarations:
 
-- Toolchain `languageVersion = JavaLanguageVersion.of(17)` (Groovy/Kotlin)
-- Numeric `sourceCompatibility = 17` / `targetCompatibility = 17` (must match if both present)
+- `sourceCompatibility` / `targetCompatibility` as:
+  - Numeric literals (`17`, `"17"`) (must match if both present)
+  - Gradle `JavaVersion` constants (`JavaVersion.VERSION_17` or `VERSION_17`)
+- Kotlin JVM hint via `kotlinOptions.jvmTarget`:
+  - `kotlinOptions.jvmTarget = "17"` / `kotlinOptions.jvmTarget = JavaVersion.VERSION_17`
+  - `kotlinOptions { jvmTarget = "17" }` / `kotlinOptions { jvmTarget = JavaVersion.VERSION_17 }`
 
 If only dynamic logic is present (variables, findProperty, etc.) → **unknown**.
 

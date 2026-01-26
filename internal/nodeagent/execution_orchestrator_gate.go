@@ -70,18 +70,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	// Thread Build Gate stack detection fallback config based on gate type.
-	// pre_gate uses build_gate.pre.stack; post_gate and re_gate use build_gate.post.stack.
-	switch req.ModType {
-	case types.ModTypePreGate:
-		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
-			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
-		}
-	case types.ModTypePostGate, types.ModTypeReGate:
-		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
-			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
-		}
-	}
+	applyGateStackDetect(&manifest, req.ModType, typedOpts)
 
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
@@ -183,6 +172,30 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		"mod_type", req.ModType,
 		"duration", duration,
 	)
+}
+
+// applyGateStackDetect wires the optional StackDetect override into the gate manifest.
+//
+// Semantics:
+// - pre_gate may use build_gate.pre.stack as a fallback/override.
+// - post_gate may use build_gate.post.stack as a fallback/override.
+// - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
+//   stackdetect output to select the runtime image/tool.
+func applyGateStackDetect(manifest *contracts.StepManifest, modType types.ModType, typedOpts RunOptions) {
+	if manifest == nil || manifest.Gate == nil {
+		return
+	}
+
+	switch modType {
+	case types.ModTypePreGate:
+		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
+			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
+		}
+	case types.ModTypePostGate:
+		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
+			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
+		}
+	}
 }
 
 // runGate executes the build gate and returns the result.
