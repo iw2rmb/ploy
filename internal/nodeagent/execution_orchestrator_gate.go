@@ -86,6 +86,16 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Run the build gate.
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
+	// Persist the runtime image used for this gate job (when available) so the control plane
+	// can surface the exact gate container image for diagnostics.
+	if gateResult != nil {
+		if img := strings.TrimSpace(gateResult.RuntimeImage); img != "" {
+			if err := r.SaveJobImageName(ctx, req.JobID, img); err != nil {
+				slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			}
+		}
+	}
+
 	// Persist the detected stack for this run so mod and healing jobs can
 	// resolve stack-specific images consistently. This is done for all gate
 	// results (pass or fail) to ensure deterministic image selection.

@@ -425,6 +425,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			Tool:     tool,
 			Passed:   passed,
 		}},
+		RuntimeImage: image,
 	}
 	if !passed {
 		// For known tools (Maven, Gradle), trim logs down to the most relevant
