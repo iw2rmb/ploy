@@ -158,6 +158,28 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			}
 			bg.Images = images
 		}
+		if vv, ok := bgRaw["pre"]; ok && vv != nil {
+			preRaw, err := expectMap(vv, "build_gate.pre")
+			if err != nil {
+				return nil, err
+			}
+			pre, err := parseBuildGatePhaseConfig(preRaw, "build_gate.pre")
+			if err != nil {
+				return nil, err
+			}
+			bg.Pre = pre
+		}
+		if vv, ok := bgRaw["post"]; ok && vv != nil {
+			postRaw, err := expectMap(vv, "build_gate.post")
+			if err != nil {
+				return nil, err
+			}
+			post, err := parseBuildGatePhaseConfig(postRaw, "build_gate.post")
+			if err != nil {
+				return nil, err
+			}
+			bg.Post = post
+		}
 		spec.BuildGate = bg
 	}
 
@@ -304,6 +326,82 @@ func parseHealingModSpec(raw map[string]any, prefix string) (*HealingModSpec, er
 		Env:             f.Env,
 		RetainContainer: f.RetainContainer,
 	}, nil
+}
+
+func parseBuildGatePhaseConfig(raw map[string]any, prefix string) (*BuildGatePhaseConfig, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	phase := &BuildGatePhaseConfig{}
+
+	if v, ok := raw["stack"]; ok && v != nil {
+		stackRaw, err := expectMap(v, prefix+".stack")
+		if err != nil {
+			return nil, err
+		}
+		stack, err := parseBuildGateStackConfig(stackRaw, prefix+".stack")
+		if err != nil {
+			return nil, err
+		}
+		phase.Stack = stack
+	}
+
+	if phase.Stack == nil {
+		return nil, nil
+	}
+
+	return phase, nil
+}
+
+func parseBuildGateStackConfig(raw map[string]any, prefix string) (*BuildGateStackConfig, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	stack := &BuildGateStackConfig{}
+
+	if v, ok := raw["enabled"]; ok && v != nil {
+		b, err := expectBool(v, prefix+".enabled")
+		if err != nil {
+			return nil, err
+		}
+		stack.Enabled = b
+	}
+
+	if v, ok := raw["default"]; ok && v != nil {
+		b, err := expectBool(v, prefix+".default")
+		if err != nil {
+			return nil, err
+		}
+		stack.Default = b
+	}
+
+	if v, ok := raw["language"]; ok && v != nil {
+		s, err := expectString(v, prefix+".language")
+		if err != nil {
+			return nil, err
+		}
+		stack.Language = strings.TrimSpace(s)
+	}
+
+	if v, ok := raw["tool"]; ok && v != nil {
+		s, err := expectString(v, prefix+".tool")
+		if err != nil {
+			return nil, err
+		}
+		stack.Tool = strings.TrimSpace(s)
+	}
+
+	if v, ok := raw["release"]; ok && v != nil {
+		release, err := parseReleaseValue(v, prefix+".release")
+		if err != nil {
+			return nil, err
+		}
+		stack.Release = release
+	}
+
+	return stack, nil
 }
 
 // parseCommandSpec parses a command from polymorphic input (string or array).

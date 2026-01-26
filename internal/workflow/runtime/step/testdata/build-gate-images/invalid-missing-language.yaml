@@ -1,6 +1,5 @@
 # invalid-missing-language.yaml - Missing required language field
-images:
-  - stack:
-      release: "17"
-      tool: maven
-    image: maven:3-eclipse-temurin-17
+BuildGateImages:
+  - image: maven:3-eclipse-temurin-17
+    tool: maven
+    release: "17"

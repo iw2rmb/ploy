@@ -154,6 +154,26 @@ func TestDetect_MavenNoJavaVersion(t *testing.T) {
 	}
 }
 
+func TestDetectTool_MavenNoJavaVersion_ReturnsTool(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "maven", "no-java-version")
+
+	obs, err := DetectTool(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if obs.Language != "java" {
+		t.Fatalf("Language = %q, want %q", obs.Language, "java")
+	}
+	if obs.Tool != "maven" {
+		t.Fatalf("Tool = %q, want %q", obs.Tool, "maven")
+	}
+	if obs.Release != nil {
+		t.Fatalf("Release = %v, want nil", *obs.Release)
+	}
+}
+
 func TestDetect_GradleJava17Toolchain(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "gradle", "java17-toolchain")

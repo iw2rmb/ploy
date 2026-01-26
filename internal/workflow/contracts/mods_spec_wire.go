@@ -50,6 +50,16 @@ func (s ModsSpec) ToMap() map[string]any {
 		if s.BuildGate.Enabled {
 			bg["enabled"] = true
 		}
+		if s.BuildGate.Pre != nil && s.BuildGate.Pre.Stack != nil {
+			if pre := buildGatePhaseConfigToMap(s.BuildGate.Pre); pre != nil {
+				bg["pre"] = pre
+			}
+		}
+		if s.BuildGate.Post != nil && s.BuildGate.Post.Stack != nil {
+			if post := buildGatePhaseConfigToMap(s.BuildGate.Post); post != nil {
+				bg["post"] = post
+			}
+		}
 		if s.BuildGate.Healing != nil {
 			heal := make(map[string]any)
 			if s.BuildGate.Healing.Retries > 0 {
@@ -92,6 +102,43 @@ func (s ModsSpec) ToMap() map[string]any {
 		result["artifact_paths"] = s.ArtifactPaths
 	}
 
+	return result
+}
+
+func buildGatePhaseConfigToMap(phase *BuildGatePhaseConfig) map[string]any {
+	if phase == nil || phase.Stack == nil {
+		return nil
+	}
+	stack := buildGateStackConfigToMap(phase.Stack)
+	if stack == nil {
+		return nil
+	}
+	return map[string]any{"stack": stack}
+}
+
+func buildGateStackConfigToMap(stack *BuildGateStackConfig) map[string]any {
+	if stack == nil {
+		return nil
+	}
+	result := make(map[string]any)
+	if stack.Enabled {
+		result["enabled"] = true
+	}
+	if stack.Language != "" {
+		result["language"] = stack.Language
+	}
+	if stack.Tool != "" {
+		result["tool"] = stack.Tool
+	}
+	if stack.Release != "" {
+		result["release"] = stack.Release
+	}
+	if stack.Default {
+		result["default"] = true
+	}
+	if len(result) == 0 {
+		return nil
+	}
 	return result
 }
 

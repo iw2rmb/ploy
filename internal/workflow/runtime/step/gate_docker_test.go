@@ -2,6 +2,7 @@ package step
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -343,7 +344,7 @@ func createTestMappingFile(t *testing.T, rules string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	mappingPath := filepath.Join(tmpDir, "build-gate-images.yaml")
-	content := `images:
+	content := `BuildGateImages:
 ` + rules
 	if err := os.WriteFile(mappingPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to create mapping file: %v", err)
@@ -364,6 +365,23 @@ func createMavenWorkspace(t *testing.T, javaVersion string) string {
   <properties>
     <maven.compiler.release>` + javaVersion + `</maven.compiler.release>
   </properties>
+</project>`
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(pomContent), 0o644); err != nil {
+		t.Fatalf("failed to create pom.xml: %v", err)
+	}
+	return tmpDir
+}
+
+// createMavenWorkspaceNoJavaVersion creates a workspace with pom.xml but no Java release configured.
+func createMavenWorkspaceNoJavaVersion(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	pomContent := `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>test</groupId>
+  <artifactId>test</artifactId>
+  <version>1.0</version>
 </project>`
 	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(pomContent), 0o644); err != nil {
 		t.Fatalf("failed to create pom.xml: %v", err)
@@ -841,5 +859,83 @@ func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
 	// Verify RuntimeImage in metadata.
 	if meta.StackGate.RuntimeImage != "override:latest" {
 		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "override:latest")
+	}
+}
+
+func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing.T) {
+	t.Parallel()
+
+	workspace := createMavenWorkspaceNoJavaVersion(t)
+
+	rt := &mockGateRuntimeMinimal{}
+	executor := NewDockerGateExecutor(rt)
+
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		// Provide inline mapping for the fallback expectation.
+		ImageOverrides: []contracts.BuildGateImageRule{{
+			Stack: contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			Image: "custom-maven:java17",
+		}},
+		StackDetect: &contracts.BuildGateStackConfig{
+			Enabled:  true,
+			Language: "java",
+			Release:  "17",
+			Default:  true,
+		},
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	// Container should be executed.
+	if !rt.createCalled {
+		t.Fatal("expected container Create to be called")
+	}
+	if rt.lastSpec.Image != "custom-maven:java17" {
+		t.Fatalf("Image = %q, want %q", rt.lastSpec.Image, "custom-maven:java17")
+	}
+	if meta == nil || len(meta.StaticChecks) == 0 {
+		t.Fatal("expected non-empty metadata")
+	}
+	if meta.StaticChecks[0].Tool != "maven" {
+		t.Fatalf("tool = %q, want %q", meta.StaticChecks[0].Tool, "maven")
+	}
+}
+
+func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testing.T) {
+	t.Parallel()
+
+	workspace := createMavenWorkspaceNoJavaVersion(t)
+
+	rt := &mockGateRuntimeMinimal{}
+	executor := NewDockerGateExecutor(rt)
+
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		StackDetect: &contracts.BuildGateStackConfig{
+			Enabled:  true,
+			Language: "java",
+			Release:  "17",
+			Default:  false,
+		},
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrRepoCancelled) {
+		t.Fatalf("error = %v, want ErrRepoCancelled", err)
+	}
+
+	// Container must NOT be executed.
+	if rt.createCalled {
+		t.Fatal("expected container Create NOT to be called")
+	}
+	if meta == nil || len(meta.LogFindings) == 0 {
+		t.Fatal("expected log findings in metadata")
 	}
 }

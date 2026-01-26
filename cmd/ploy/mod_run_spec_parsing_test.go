@@ -86,6 +86,76 @@ mr_on_success: true
 	}
 }
 
+func TestBuildSpecPayloadFromYAML_BuildGateStackPrePost(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "test.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mod:latest
+build_gate:
+  enabled: true
+  pre:
+    stack:
+      enabled: true
+      language: java
+      release: 11
+      default: true
+  post:
+    stack:
+      enabled: true
+      language: java
+      release: "17"
+      default: true
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	buildGate, ok := result["build_gate"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate in payload")
+	}
+	pre, ok := buildGate["pre"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.pre in payload")
+	}
+	preStack, ok := pre["stack"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.pre.stack in payload")
+	}
+	if preStack["language"] != "java" {
+		t.Fatalf("expected build_gate.pre.stack.language=java, got %v", preStack["language"])
+	}
+	if preStack["default"] != true {
+		t.Fatalf("expected build_gate.pre.stack.default=true, got %v", preStack["default"])
+	}
+	if rel, ok := preStack["release"].(float64); !ok || rel != 11 {
+		t.Fatalf("expected build_gate.pre.stack.release=11, got %T %v", preStack["release"], preStack["release"])
+	}
+
+	post, ok := buildGate["post"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.post in payload")
+	}
+	postStack, ok := post["stack"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.post.stack in payload")
+	}
+	if postStack["release"] != "17" {
+		t.Fatalf("expected build_gate.post.stack.release=\"17\", got %v", postStack["release"])
+	}
+}
+
 // TestBuildSpecPayloadFromJSON verifies that buildSpecPayload correctly parses
 // a JSON spec file and produces the expected payload structure.
 func TestBuildSpecPayloadFromJSON(t *testing.T) {

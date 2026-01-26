@@ -154,20 +154,20 @@ func loadImageMappingFile(path string, required bool) ([]contracts.BuildGateImag
 
 	// Parse YAML into intermediate structure.
 	var raw struct {
-		Images []map[string]any `yaml:"images"`
+		BuildGateImages []map[string]any `yaml:"BuildGateImages"`
 	}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse image mapping file: %w", err)
 	}
 
-	if len(raw.Images) == 0 {
+	if len(raw.BuildGateImages) == 0 {
 		return nil, nil
 	}
 
 	// Convert to typed rules.
-	rules := make([]contracts.BuildGateImageRule, 0, len(raw.Images))
-	for i, item := range raw.Images {
-		rule, err := parseImageRuleFromYAML(item, fmt.Sprintf("images[%d]", i))
+	rules := make([]contracts.BuildGateImageRule, 0, len(raw.BuildGateImages))
+	for i, item := range raw.BuildGateImages {
+		rule, err := parseImageRuleFromYAML(item, fmt.Sprintf("BuildGateImages[%d]", i))
 		if err != nil {
 			return nil, fmt.Errorf("image mapping file %s: %w", path, err)
 		}
@@ -181,35 +181,41 @@ func loadImageMappingFile(path string, required bool) ([]contracts.BuildGateImag
 func parseImageRuleFromYAML(raw map[string]any, prefix string) (contracts.BuildGateImageRule, error) {
 	var rule contracts.BuildGateImageRule
 
-	// Parse stack.
-	if v, ok := raw["stack"]; ok && v != nil {
-		stackMap, ok := v.(map[string]any)
-		if !ok {
-			return rule, fmt.Errorf("%s.stack: expected object, got %T", prefix, v)
+	// Parse language.
+	if v, ok := raw["language"]; ok && v != nil {
+		if s, ok := v.(string); ok {
+			rule.Stack.Language = s
+		} else {
+			return rule, fmt.Errorf("%s.language: expected string, got %T", prefix, v)
 		}
-		if lang, ok := stackMap["language"]; ok {
-			if s, ok := lang.(string); ok {
-				rule.Stack.Language = s
+	}
+
+	// Parse release (string or number).
+	if v, ok := raw["release"]; ok && v != nil {
+		switch r := v.(type) {
+		case string:
+			rule.Stack.Release = r
+		case int:
+			rule.Stack.Release = fmt.Sprintf("%d", r)
+		case int64:
+			rule.Stack.Release = fmt.Sprintf("%d", r)
+		case float64:
+			if r == float64(int64(r)) {
+				rule.Stack.Release = fmt.Sprintf("%d", int64(r))
+			} else {
+				rule.Stack.Release = fmt.Sprintf("%g", r)
 			}
+		default:
+			return rule, fmt.Errorf("%s.release: expected string or number, got %T", prefix, v)
 		}
-		if release, ok := stackMap["release"]; ok {
-			switch r := release.(type) {
-			case string:
-				rule.Stack.Release = r
-			case int:
-				rule.Stack.Release = fmt.Sprintf("%d", r)
-			case float64:
-				if r == float64(int64(r)) {
-					rule.Stack.Release = fmt.Sprintf("%d", int64(r))
-				} else {
-					rule.Stack.Release = fmt.Sprintf("%g", r)
-				}
-			}
-		}
-		if tool, ok := stackMap["tool"]; ok {
-			if s, ok := tool.(string); ok {
-				rule.Stack.Tool = s
-			}
+	}
+
+	// Parse tool.
+	if v, ok := raw["tool"]; ok && v != nil {
+		if s, ok := v.(string); ok {
+			rule.Stack.Tool = s
+		} else {
+			return rule, fmt.Errorf("%s.tool: expected string, got %T", prefix, v)
 		}
 	}
 

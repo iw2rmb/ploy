@@ -70,6 +70,19 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
+	// Thread Build Gate stack detection fallback config based on gate type.
+	// pre_gate uses build_gate.pre.stack; post_gate and re_gate use build_gate.post.stack.
+	switch req.ModType {
+	case types.ModTypePreGate:
+		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
+			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
+		}
+	case types.ModTypePostGate, types.ModTypeReGate:
+		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
+			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
+		}
+	}
+
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
 	if err != nil {
@@ -128,6 +141,19 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			"job_id", req.JobID,
 			"mod_type", req.ModType,
 			"duration", duration,
+		)
+		return
+	}
+	if gateErr != nil && errors.Is(gateErr, step.ErrRepoCancelled) {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload gate cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		}
+		slog.Info("gate job cancelled",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"mod_type", req.ModType,
+			"duration", duration,
+			"reason", gateErr.Error(),
 		)
 		return
 	}
