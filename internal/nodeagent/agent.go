@@ -50,14 +50,20 @@ func New(cfg Config) (*Agent, error) {
 		return nil, fmt.Errorf("create status uploader: %w", err)
 	}
 
+	jobImageNameSaver, err := NewJobImageNameSaver(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create job image name saver: %w", err)
+	}
+
 	// Initialize controller with typed JobID keys for compile-time safety.
 	// The shared uploaders are passed in to enable HTTP client reuse.
 	controller := &runController{
-		cfg:              cfg,
-		jobs:             make(map[types.JobID]*jobContext),
-		diffUploader:     diffUploader,
-		artifactUploader: artifactUploader,
-		statusUploader:   statusUploader,
+		cfg:               cfg,
+		jobs:              make(map[types.JobID]*jobContext),
+		diffUploader:      diffUploader,
+		artifactUploader:  artifactUploader,
+		statusUploader:    statusUploader,
+		jobImageNameSaver: jobImageNameSaver,
 	}
 
 	server, err := NewServer(cfg, controller)

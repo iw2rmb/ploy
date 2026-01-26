@@ -274,53 +274,6 @@ func (q *Queries) ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]L
 	return items, nil
 }
 
-const listLogsMetaByRunSince = `-- name: ListLogsMetaByRunSince :many
-SELECT id, run_id, job_id, chunk_no, created_at FROM logs
-WHERE run_id = $1 AND id > $2
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsMetaByRunSinceParams struct {
-	RunID types.RunID `json:"run_id"`
-	ID    int64       `json:"id"`
-}
-
-type ListLogsMetaByRunSinceRow struct {
-	ID        int64              `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	ChunkNo   int32              `json:"chunk_no"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-// Returns log metadata (without the data blob) for a run since a given id.
-// Use GetLog to fetch the actual log data by id.
-func (q *Queries) ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error) {
-	rows, err := q.db.Query(ctx, listLogsMetaByRunSince, arg.RunID, arg.ID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListLogsMetaByRunSinceRow{}
-	for rows.Next() {
-		var i ListLogsMetaByRunSinceRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.ChunkNo,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listLogsMetaByRunAndJob = `-- name: ListLogsMetaByRunAndJob :many
 SELECT id, run_id, job_id, chunk_no, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2
@@ -399,6 +352,53 @@ func (q *Queries) ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogs
 	items := []ListLogsMetaByRunAndJobSinceRow{}
 	for rows.Next() {
 		var i ListLogsMetaByRunAndJobSinceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.ChunkNo,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsMetaByRunSince = `-- name: ListLogsMetaByRunSince :many
+SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+WHERE run_id = $1 AND id > $2
+ORDER BY chunk_no ASC, id ASC
+`
+
+type ListLogsMetaByRunSinceParams struct {
+	RunID types.RunID `json:"run_id"`
+	ID    int64       `json:"id"`
+}
+
+type ListLogsMetaByRunSinceRow struct {
+	ID        int64              `json:"id"`
+	RunID     types.RunID        `json:"run_id"`
+	JobID     *types.JobID       `json:"job_id"`
+	ChunkNo   int32              `json:"chunk_no"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// Returns log metadata (without the data blob) for a run since a given id.
+// Use GetLog to fetch the actual log data by id.
+func (q *Queries) ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error) {
+	rows, err := q.db.Query(ctx, listLogsMetaByRunSince, arg.RunID, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLogsMetaByRunSinceRow{}
+	for rows.Next() {
+		var i ListLogsMetaByRunSinceRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
