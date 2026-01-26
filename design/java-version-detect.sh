@@ -77,12 +77,14 @@ evidence_item() {
 }
 
 normalize_jvm_target() {
-  # Accept "17" or "11" or legacy "1.8"
+  # Accept "17" or "11" or legacy "1.8"/"1_8"
   local v="${1}"
-  case "$v" in
-    1.8) printf '8' ;;
-    *) printf '%s' "$v" ;;
-  esac
+  v="${v//_/.}"
+  if [[ "$v" == 1.* ]]; then
+    printf '%s' "${v#1.}"
+    return 0
+  fi
+  printf '%s' "$v"
 }
 
 extract_first_xml_tag_value_flat() {
@@ -184,28 +186,19 @@ detect_gradle_release() {
   local file="$1"
   local -a evidence=()
 
-  # Prefer toolchain languageVersion (most explicit).
-  local lv
-  lv="$(rg -n --no-heading -o 'JavaLanguageVersion\\.of\\(([0-9]+)\\)' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*(\\([0-9][0-9]*\\)).*/\\1/p' || true)"
-  if [[ -n "$lv" ]]; then
-    evidence+=("$(evidence_item "$file" "JavaLanguageVersion.of" "$lv")")
-    emit_result "gradle" "$lv" "${evidence[@]}"
-    return 0
-  fi
-
-  # Next: JavaVersion.VERSION_17 style.
-  local jv
-  jv="$(rg -n --no-heading -o 'JavaVersion\\.VERSION_([0-9]+)' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*VERSION_\\([0-9][0-9]*\\).*/\\1/p' || true)"
-  if [[ -n "$jv" ]]; then
-    evidence+=("$(evidence_item "$file" "JavaVersion.VERSION_*" "$jv")")
-    emit_result "gradle" "$jv" "${evidence[@]}"
-    return 0
-  fi
-
-  # Next: source/targetCompatibility = "17" (best-effort).
+  # Prefer source/targetCompatibility (best-effort; must match if both present).
   local sc tc
-  sc="$(rg -n --no-heading -o 'sourceCompatibility\\s*=\\s*\"?[0-9]+\"?' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*=\\s*\"?([0-9]+)\"?.*/\\1/' || true)"
-  tc="$(rg -n --no-heading -o 'targetCompatibility\\s*=\\s*\"?[0-9]+\"?' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*=\\s*\"?([0-9]+)\"?.*/\\1/' || true)"
+  sc="$(rg -n --no-heading -o 'sourceCompatibility\\s*=\\s*(?:JavaVersion\\.)?VERSION_[0-9_]+' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*VERSION_\\([0-9_][0-9_]*\\).*/\\1/p' || true)"
+  tc="$(rg -n --no-heading -o 'targetCompatibility\\s*=\\s*(?:JavaVersion\\.)?VERSION_[0-9_]+' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*VERSION_\\([0-9_][0-9_]*\\).*/\\1/p' || true)"
+  if [[ -z "$sc" ]]; then
+    sc="$(rg -n --no-heading -o 'sourceCompatibility\\s*=\\s*\"?[0-9]+(?:\\.[0-9]+)?\"?' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*=\\s*\"?([0-9]+(?:\\.[0-9]+)?)\"?.*/\\1/' || true)"
+  fi
+  if [[ -z "$tc" ]]; then
+    tc="$(rg -n --no-heading -o 'targetCompatibility\\s*=\\s*\"?[0-9]+(?:\\.[0-9]+)?\"?' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*=\\s*\"?([0-9]+(?:\\.[0-9]+)?)\"?.*/\\1/' || true)"
+  fi
+
+  [[ -n "$sc" ]] && sc="$(normalize_jvm_target "$sc")"
+  [[ -n "$tc" ]] && tc="$(normalize_jvm_target "$tc")"
   [[ -n "$sc" ]] && evidence+=("$(evidence_item "$file" "sourceCompatibility" "$sc")")
   [[ -n "$tc" ]] && evidence+=("$(evidence_item "$file" "targetCompatibility" "$tc")")
   if [[ -n "$sc" && -n "$tc" && "$sc" != "$tc" ]]; then
@@ -220,13 +213,22 @@ detect_gradle_release() {
     return 0
   fi
 
-  # Kotlin JVM hint: kotlinOptions.jvmTarget = "17" (NOTE: not strictly Java language level).
+  # Kotlin JVM hint: kotlinOptions.jvmTarget (NOTE: not strictly Java language level).
   local kt
-  kt="$(rg -n --no-heading -o 'kotlinOptions\\.jvmTarget\\s*=\\s*\"[^\"]+\"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*\"([^\"]+)\".*/\\1/' || true)"
+  kt="$(rg -n --no-heading -o 'kotlinOptions\\.jvmTarget\\s*=\\s*(?:JavaVersion\\.)?VERSION_[0-9_]+' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*VERSION_\\([0-9_][0-9_]*\\).*/\\1/p' || true)"
+  if [[ -z "$kt" ]]; then
+    kt="$(rg -n --no-heading -o 'kotlinOptions\\.jvmTarget\\s*=\\s*\"[^\"]+\"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*\"([^\"]+)\".*/\\1/' || true)"
+  fi
+  if [[ -z "$kt" ]]; then
+    kt="$(rg -n --no-heading -o 'jvmTarget\\s*=\\s*(?:JavaVersion\\.)?VERSION_[0-9_]+' "$file" 2>/dev/null | head -n 1 | sed -n 's/.*VERSION_\\([0-9_][0-9_]*\\).*/\\1/p' || true)"
+  fi
+  if [[ -z "$kt" ]]; then
+    kt="$(rg -n --no-heading -o 'jvmTarget\\s*=\\s*\"[^\"]+\"' "$file" 2>/dev/null | head -n 1 | sed -E 's/.*\"([^\"]+)\".*/\\1/' || true)"
+  fi
   if [[ -n "$kt" ]]; then
     local norm
     norm="$(normalize_jvm_target "$kt")"
-    evidence+=("$(evidence_item "$file" "kotlinOptions.jvmTarget" "$kt")")
+    evidence+=("$(evidence_item "$file" "kotlinOptions.jvmTarget" "$norm")")
     if [[ "$norm" =~ ^[0-9]+$ ]]; then
       emit_result "gradle" "$norm" "${evidence[@]}"
       return 0

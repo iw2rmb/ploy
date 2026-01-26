@@ -114,6 +114,20 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	)
 
 	if stackGateMode {
+		resolveExpectedRuntimeImage := func() (string, error) {
+			if envImage != "" {
+				return envImage, nil
+			}
+			if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
+				return "", fmt.Errorf("stack gate expectation missing release")
+			}
+			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
+			if err != nil {
+				return "", err
+			}
+			return resolver.Resolve(*spec.StackGate.Expect)
+		}
+
 		sgResult = &contracts.StackGateResult{
 			Enabled:  true,
 			Expected: spec.StackGate.Expect,
@@ -130,6 +144,11 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 				sgResult.Result = "unknown"
 				sgResult.Reason = detectErr.Error()
 			}
+			var runtimeImage string
+			if img, err := resolveExpectedRuntimeImage(); err == nil {
+				runtimeImage = strings.TrimSpace(img)
+				sgResult.RuntimeImage = runtimeImage
+			}
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -137,6 +156,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 					Tool:     "stack-gate",
 					Passed:   false,
 				}},
+				RuntimeImage: runtimeImage,
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
 					Code:     "STACK_GATE_UNKNOWN",
@@ -152,6 +172,11 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			sgResult.Result = "mismatch"
 			sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
 			evidenceStr := formatEvidenceForLog(obs.Evidence)
+			var runtimeImage string
+			if img, err := resolveExpectedRuntimeImage(); err == nil {
+				runtimeImage = strings.TrimSpace(img)
+				sgResult.RuntimeImage = runtimeImage
+			}
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -159,6 +184,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 					Tool:     "stack-gate",
 					Passed:   false,
 				}},
+				RuntimeImage: runtimeImage,
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
 					Code:     "STACK_GATE_MISMATCH",
@@ -250,6 +276,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 					Tool:     "stack-gate",
 					Passed:   false,
 				}},
+				RuntimeImage: image,
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
 					Code:     "STACK_GATE_UNKNOWN",

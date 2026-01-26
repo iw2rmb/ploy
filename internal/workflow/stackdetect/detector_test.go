@@ -174,9 +174,9 @@ func TestDetectTool_MavenNoJavaVersion_ReturnsTool(t *testing.T) {
 	}
 }
 
-func TestDetect_GradleJava17Toolchain(t *testing.T) {
+func TestDetect_GradleJava17CompatibilityJavaVersion(t *testing.T) {
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "java17-toolchain")
+	workspace := filepath.Join("testdata", "gradle", "java17-compatibility-javaversion")
 
 	obs, err := Detect(ctx, workspace)
 	if err != nil {
@@ -184,7 +184,7 @@ func TestDetect_GradleJava17Toolchain(t *testing.T) {
 	}
 
 	assertObservation(t, obs, "java", "gradle", "17")
-	assertEvidence(t, obs, "toolchain.languageVersion", "17")
+	assertEvidence(t, obs, "sourceCompatibility", "17")
 }
 
 func TestDetect_GradleJava11Compatibility(t *testing.T) {
@@ -237,6 +237,19 @@ func TestDetect_GradleNoJavaConfig(t *testing.T) {
 	}
 }
 
+func TestDetect_GradleKotlinJvmTargetJavaVersion(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "gradle", "kotlin-jvmtarget-javaversion")
+
+	obs, err := Detect(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertObservation(t, obs, "java", "gradle", "17")
+	assertEvidence(t, obs, "kotlinOptions.jvmTarget", "17")
+}
+
 // Precedence tests
 
 func TestDetect_MavenPrecedenceReleaseOverSourceTarget(t *testing.T) {
@@ -266,18 +279,18 @@ func TestDetect_MavenPrecedenceSourceTargetOverJavaVersion(t *testing.T) {
 	assertObservation(t, obs, "java", "maven", "17")
 }
 
-func TestDetect_GradlePrecedenceToolchainOverCompatibility(t *testing.T) {
+func TestDetect_GradlePrecedenceCompatibilityOverKotlinJvmTarget(t *testing.T) {
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "precedence-toolchain-over-compatibility")
+	workspace := filepath.Join("testdata", "gradle", "precedence-compatibility-over-kotlin-jvmtarget")
 
 	obs, err := Detect(ctx, workspace)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// JavaLanguageVersion.of(21) should take precedence over sourceCompatibility=17
-	assertObservation(t, obs, "java", "gradle", "21")
-	assertEvidence(t, obs, "toolchain.languageVersion", "21")
+	// sourceCompatibility/targetCompatibility should take precedence over kotlinOptions.jvmTarget
+	assertObservation(t, obs, "java", "gradle", "11")
+	assertEvidence(t, obs, "sourceCompatibility", "11")
 }
 
 // assertObservation validates the observation fields.

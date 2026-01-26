@@ -398,9 +398,8 @@ func createGradleWorkspace(t *testing.T, javaVersion string) string {
 }
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(` + javaVersion + `)
-    }
+    sourceCompatibility = JavaVersion.VERSION_` + javaVersion + `
+    targetCompatibility = JavaVersion.VERSION_` + javaVersion + `
 }
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(gradleContent), 0o644); err != nil {
@@ -549,6 +548,14 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 		t.Errorf("StackGate.Reason = %q, expected to contain 'release:'", meta.StackGate.Reason)
 	}
 
+	// Verify runtime image is still resolved for observability (even though the container is not run).
+	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+
 	// Verify static check reports failure.
 	if len(meta.StaticChecks) == 0 || meta.StaticChecks[0].Passed {
 		t.Errorf("expected static check to report failure, got %+v", meta.StaticChecks)
@@ -629,6 +636,14 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 		t.Errorf("StackGate.Reason = %q, expected to contain 'ambiguous'", meta.StackGate.Reason)
 	}
 
+	// Verify runtime image is still resolved for observability (even though the container is not run).
+	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+
 	// Verify log finding with STACK_GATE_UNKNOWN code.
 	found := false
 	for _, f := range meta.LogFindings {
@@ -681,6 +696,14 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	}
 	if meta.StackGate.Result != "unknown" {
 		t.Errorf("StackGate.Result = %q, want %q", meta.StackGate.Result, "unknown")
+	}
+
+	// Verify runtime image is still resolved for observability (even though the container is not run).
+	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
 	}
 }
 

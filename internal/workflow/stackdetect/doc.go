@@ -38,8 +38,8 @@
 //  3. java.version property
 //
 // Gradle (build.gradle/.kts) precedence:
-//  1. JavaLanguageVersion.of(N) - toolchain API
-//  2. sourceCompatibility / targetCompatibility (must match if both present)
+//  1. sourceCompatibility / targetCompatibility (must match if both present)
+//  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 //
 // # Error Handling
 //

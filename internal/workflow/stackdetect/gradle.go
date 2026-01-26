@@ -5,19 +5,25 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 // Regex patterns for Gradle version detection.
 var (
-	// JavaLanguageVersion.of(17) - toolchain API
-	javaLanguageVersionRegex = regexp.MustCompile(`JavaLanguageVersion\.of\((\d+)\)`)
-
 	// sourceCompatibility = "17" or sourceCompatibility = 17
-	sourceCompatibilityRegex = regexp.MustCompile(`sourceCompatibility\s*=\s*"?(\d+)"?`)
+	// sourceCompatibility = JavaVersion.VERSION_17 or sourceCompatibility = VERSION_17
+	sourceCompatibilityRegex = regexp.MustCompile(`sourceCompatibility\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
 
 	// targetCompatibility = "17" or targetCompatibility = 17
-	targetCompatibilityRegex = regexp.MustCompile(`targetCompatibility\s*=\s*"?(\d+)"?`)
+	// targetCompatibility = JavaVersion.VERSION_17 or targetCompatibility = VERSION_17
+	targetCompatibilityRegex = regexp.MustCompile(`targetCompatibility\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
+
+	// kotlinOptions.jvmTarget = "17" or kotlinOptions.jvmTarget = JavaVersion.VERSION_17
+	kotlinOptionsJvmTargetDirectRegex = regexp.MustCompile(`kotlinOptions\.jvmTarget\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
+
+	// kotlinOptions { ... jvmTarget = "17" } or kotlinOptions { ... jvmTarget = JavaVersion.VERSION_17 }
+	kotlinOptionsJvmTargetBlockRegex = regexp.MustCompile(`(?s)kotlinOptions\s*\{.*?jvmTarget\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
 
 	// Dynamic logic patterns that should trigger "unknown".
 	dynamicPatterns = []*regexp.Regexp{
@@ -27,17 +33,15 @@ var (
 		regexp.MustCompile(`project\.properties\s*\[`),
 		regexp.MustCompile(`extra\s*\[`),
 		regexp.MustCompile(`ext\s*\[`),
-		regexp.MustCompile(`val\s+\w+\s*=.*JavaLanguageVersion`),
 		regexp.MustCompile(`val\s+\w+\s*=.*JavaVersion`),
-		regexp.MustCompile(`def\s+\w+\s*=.*JavaLanguageVersion`),
 		regexp.MustCompile(`def\s+\w+\s*=.*JavaVersion`),
 	}
 )
 
 // detectGradle detects Java version from Gradle build files.
 // Precedence (strict order):
-//  1. JavaLanguageVersion.of(N) - toolchain API
-//  2. sourceCompatibility / targetCompatibility (must match if both present)
+//  1. sourceCompatibility / targetCompatibility (must match if both present)
+//  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
 func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observation, error) {
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
@@ -50,30 +54,7 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 	text := string(content)
 	relativePath := relPath(workspace, gradlePath)
 
-	// Check for dynamic logic that makes detection unreliable.
-	for _, pattern := range dynamicPatterns {
-		if pattern.MatchString(text) {
-			return nil, &DetectionError{
-				Reason:  "unknown",
-				Message: "build.gradle contains dynamic version logic; cannot reliably detect Java version",
-			}
-		}
-	}
-
-	// 1. Check JavaLanguageVersion.of(N) - toolchain API (highest precedence).
-	if matches := javaLanguageVersionRegex.FindStringSubmatch(text); matches != nil {
-		version := matches[1]
-		return &Observation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  &version,
-			Evidence: []EvidenceItem{
-				{Path: relativePath, Key: "toolchain.languageVersion", Value: version},
-			},
-		}, nil
-	}
-
-	// 2. Check sourceCompatibility and targetCompatibility.
+	// 1. Check sourceCompatibility and targetCompatibility.
 	sourceVersion := extractCompatibilityVersion(sourceCompatibilityRegex, text)
 	targetVersion := extractCompatibilityVersion(targetCompatibilityRegex, text)
 
@@ -81,13 +62,11 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		var evidence []EvidenceItem
 
 		if sourceVersion != "" {
-			sourceVersion = normalizeJavaVersion(sourceVersion)
 			evidence = append(evidence, EvidenceItem{
 				Path: relativePath, Key: "sourceCompatibility", Value: sourceVersion,
 			})
 		}
 		if targetVersion != "" {
-			targetVersion = normalizeJavaVersion(targetVersion)
 			evidence = append(evidence, EvidenceItem{
 				Path: relativePath, Key: "targetCompatibility", Value: targetVersion,
 			})
@@ -116,10 +95,58 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		}, nil
 	}
 
+	// 2. Kotlin JVM hint: kotlinOptions.jvmTarget.
+	jvmTargetDirect := extractCompatibilityVersion(kotlinOptionsJvmTargetDirectRegex, text)
+	jvmTargetBlock := extractCompatibilityVersion(kotlinOptionsJvmTargetBlockRegex, text)
+
+	if jvmTargetDirect != "" || jvmTargetBlock != "" {
+		var evidence []EvidenceItem
+
+		if jvmTargetDirect != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "kotlinOptions.jvmTarget", Value: jvmTargetDirect,
+			})
+		}
+		if jvmTargetBlock != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "kotlinOptions.jvmTarget", Value: jvmTargetBlock,
+			})
+		}
+
+		// If both present, they must match.
+		if jvmTargetDirect != "" && jvmTargetBlock != "" && jvmTargetDirect != jvmTargetBlock {
+			return nil, &DetectionError{
+				Reason:   "unknown",
+				Message:  "kotlinOptions.jvmTarget differs between assignments",
+				Evidence: evidence,
+			}
+		}
+
+		version := jvmTargetDirect
+		if version == "" {
+			version = jvmTargetBlock
+		}
+
+		return &Observation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  &version,
+			Evidence: evidence,
+		}, nil
+	}
+
 	// No Java version found.
+	for _, pattern := range dynamicPatterns {
+		if pattern.MatchString(text) {
+			return nil, &DetectionError{
+				Reason:  "unknown",
+				Message: "build.gradle contains dynamic version logic; cannot reliably detect Java version",
+			}
+		}
+	}
 	return nil, &DetectionError{
 		Reason:  "unknown",
-		Message: "no Java version configuration found in " + filepath.Base(gradlePath),
+		Message: "no supported Java version configuration found in " + filepath.Base(gradlePath),
 	}
 }
 
@@ -130,12 +157,24 @@ func extractCompatibilityVersion(regex *regexp.Regexp, text string) string {
 	if len(matches) < 2 {
 		return ""
 	}
-	return matches[1]
+	for i := 1; i < len(matches); i++ {
+		if matches[i] == "" {
+			continue
+		}
+		return normalizeJavaVersion(matches[i])
+	}
+	return ""
 }
 
 // normalizeJavaVersion normalizes legacy version strings like "1.8" to "8".
 func normalizeJavaVersion(v string) string {
 	v = strings.TrimSpace(v)
+	v = strings.ReplaceAll(v, "_", ".")
+	if strings.HasPrefix(v, "1.") {
+		if n, err := strconv.Atoi(strings.TrimPrefix(v, "1.")); err == nil {
+			return strconv.Itoa(n)
+		}
+	}
 	switch v {
 	case "1.8":
 		return "8"
