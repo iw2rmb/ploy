@@ -92,6 +92,11 @@ type StepGateSpec struct {
 	// These rules override the default mapping file.
 	ImageOverrides []BuildGateImageRule
 
+	// StackDetect configures stack detection behavior for this gate.
+	// When enabled with default=true, the gate may fall back to the configured
+	// values when stack detection cannot determine tool or release.
+	StackDetect *BuildGateStackConfig
+
 	// RepoURL is the Git repository URL for remote gate execution.
 	// Populated from StartRunRequest.RepoURL when building manifests.
 	RepoURL types.RepoURL

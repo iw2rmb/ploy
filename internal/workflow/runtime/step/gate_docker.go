@@ -103,6 +103,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
 
 	obs, detectErr := stackdetect.Detect(ctx, workspace)
+	stackDetectCfg := spec.StackDetect
 
 	var (
 		image    string
@@ -257,45 +258,154 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			}, nil
 		}
 	} else {
-		if detectErr != nil {
+		exp := observationToStackExpectation(obs)
+		expIncomplete := exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
+
+		// If StackDetect is enabled for this gate phase, treat it as the expected stack
+		// for runtime selection and mismatch validation. Tool is optional and can be
+		// inferred from detection when omitted.
+		if stackDetectCfg != nil && stackDetectCfg.Enabled {
+			expectedLanguage := strings.TrimSpace(stackDetectCfg.Language)
+			expectedRelease := strings.TrimSpace(stackDetectCfg.Release)
+			expectedTool := strings.TrimSpace(stackDetectCfg.Tool)
+
+			// Validate mismatch only when we have a complete strict detection.
+			if detectErr == nil && !expIncomplete && obs != nil {
+				var mismatches []string
+				if expectedLanguage != "" && strings.TrimSpace(obs.Language) != expectedLanguage {
+					mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expectedLanguage, obs.Language))
+				}
+				if expectedRelease != "" && obs.Release != nil && strings.TrimSpace(*obs.Release) != expectedRelease {
+					mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expectedRelease, strings.TrimSpace(*obs.Release)))
+				}
+				if expectedTool != "" && strings.TrimSpace(obs.Tool) != "" && strings.TrimSpace(obs.Tool) != expectedTool {
+					mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expectedTool, strings.TrimSpace(obs.Tool)))
+				}
+				if len(mismatches) > 0 {
+					return &contracts.BuildGateStageMetadata{
+						StaticChecks: []contracts.BuildGateStaticCheckReport{{
+							Language: expectedLanguage,
+							Tool:     "stackdetect",
+							Passed:   false,
+						}},
+						LogFindings: []contracts.BuildGateLogFinding{{
+							Severity: "error",
+							Code:     "BUILD_GATE_STACK_MISMATCH",
+							Message:  "stack mismatch: " + strings.Join(mismatches, "; "),
+							Evidence: formatEvidenceForLog(obs.Evidence),
+						}},
+					}, nil
+				}
+			}
+
+			// Select tool: expected tool wins; otherwise use detected tool (from strict detect),
+			// and fall back to tool-only detection when strict detection failed.
+			chosenTool := expectedTool
+			if chosenTool == "" && obs != nil && strings.TrimSpace(obs.Tool) != "" {
+				chosenTool = strings.TrimSpace(obs.Tool)
+			}
+			if chosenTool == "" && (detectErr != nil || expIncomplete) {
+				toolObs, toolErr := stackdetect.DetectTool(ctx, workspace)
+				if toolErr == nil && toolObs != nil {
+					chosenTool = strings.TrimSpace(toolObs.Tool)
+				}
+			}
+
+			if chosenTool == "" {
+				// Detection couldn't determine tool. Apply default/cancel policy.
+				if !stackDetectCfg.Default {
+					meta := &contracts.BuildGateStageMetadata{
+						StaticChecks: []contracts.BuildGateStaticCheckReport{{
+							Tool:   "stackdetect",
+							Passed: false,
+						}},
+						LogFindings: []contracts.BuildGateLogFinding{{
+							Severity: "error",
+							Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+							Message:  "stack detection could not determine build tool",
+						}},
+					}
+					return meta, ErrRepoCancelled
+				}
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Tool:   "stackdetect",
+						Passed: false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+						Message:  "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
+					}},
+				}, nil
+			}
+
+			language = expectedLanguage
+			tool = chosenTool
+			exp = &contracts.StackExpectation{
+				Language: expectedLanguage,
+				Tool:     chosenTool,
+				Release:  expectedRelease,
+			}
+			// When StackDetect is enabled, we always use the configured language+release
+			// for image resolution, regardless of detected release.
+			expIncomplete = exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
+		}
+
+		if detectErr != nil || expIncomplete {
 			var detErr *stackdetect.DetectionError
 			var evidenceStr string
-			msg := detectErr.Error()
-			if errors.As(detectErr, &detErr) {
-				msg = detErr.Message
-				evidenceStr = formatEvidenceForLog(detErr.Evidence)
+			msg := "stack detection failed"
+			if detectErr != nil {
+				msg = detectErr.Error()
+				if errors.As(detectErr, &detErr) {
+					msg = detErr.Message
+					evidenceStr = formatEvidenceForLog(detErr.Evidence)
+				}
+			} else {
+				msg = "stack detection produced incomplete result; language and release are required"
 			}
-			return &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Tool:   "stackdetect",
-					Passed: false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-					Message:  msg,
-					Evidence: evidenceStr,
-				}},
-			}, nil
-		}
 
-		exp := observationToStackExpectation(obs)
-		if exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == "" {
-			return &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Tool:   "stackdetect",
-					Passed: false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-					Message:  "stack detection produced incomplete result; language and release are required",
-				}},
-			}, nil
-		}
+			// Policy: when StackDetect is enabled and default=false, treat a detection failure
+			// as a repo-level cancellation (no healing / no further execution).
+			if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
+				meta := &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Tool:   "stackdetect",
+						Passed: false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+						Message:  msg,
+						Evidence: evidenceStr,
+					}},
+				}
+				return meta, ErrRepoCancelled
+			}
 
-		language = exp.Language
-		tool = obs.Tool
+			if stackDetectCfg == nil || !stackDetectCfg.Enabled {
+				// Default behavior: fail the gate (not cancelled).
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{
+						Tool:   "stackdetect",
+						Passed: false,
+					}},
+					LogFindings: []contracts.BuildGateLogFinding{{
+						Severity: "error",
+						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
+						Message:  msg,
+						Evidence: evidenceStr,
+					}},
+				}, nil
+			}
+		} else {
+			// No StackDetect: use detected language/tool.
+			if stackDetectCfg == nil || !stackDetectCfg.Enabled {
+				language = exp.Language
+				tool = obs.Tool
+			}
+		}
 
 		if envImage != "" {
 			image = envImage

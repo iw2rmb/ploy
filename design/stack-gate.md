@@ -377,20 +377,30 @@ Proposed config model:
 Default mapping file format (no compound keys; structured stack selectors):
 
 ```yaml
-images:
-  - stack: { language: java, tool: maven, release: "11" }
-    image: docker.io/org/stack-gate-java-maven:11
-  - stack: { language: java, tool: maven, release: "17" }
-    image: docker.io/org/stack-gate-java-maven:17
-  - stack: { language: java, tool: gradle, release: "11" }
-    image: docker.io/org/stack-gate-java-gradle:11
-  - stack: { language: java, tool: gradle, release: "17" }
-    image: docker.io/org/stack-gate-java-gradle:17
+BuildGateImages:
+  - image: docker.io/org/stack-gate-java-maven:11
+    language: java
+    tool: maven
+    release: "11"
+  - image: docker.io/org/stack-gate-java-maven:17
+    language: java
+    tool: maven
+    release: "17"
+  - image: docker.io/org/stack-gate-java-gradle:11
+    language: java
+    tool: gradle
+    release: "11"
+  - image: docker.io/org/stack-gate-java-gradle:17
+    language: java
+    tool: gradle
+    release: "17"
   # Tool-agnostic combined runtime (optional; used only when expectations omit tool)
-  - stack: { language: java, release: "11" }
-    image: docker.io/org/stack-gate-java:11
-  - stack: { language: java, release: "17" }
-    image: docker.io/org/stack-gate-java:17
+  - image: docker.io/org/stack-gate-java:11
+    language: java
+    release: "11"
+  - image: docker.io/org/stack-gate-java:17
+    language: java
+    release: "17"
 ```
 
 Reference files in this repo:

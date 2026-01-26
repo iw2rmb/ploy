@@ -83,7 +83,25 @@ Gates are configured via the mod spec and environment variables on worker nodes.
 build_gate:
   enabled: true
   images: [] # optional stack→image overrides
+  pre:
+    stack:
+      enabled: true
+      language: java
+      release: "11"
+      default: true
+  post:
+    stack:
+      enabled: true
+      language: java
+      release: "17"
+      default: true
 ```
+
+- `build_gate.pre.stack` applies to the `pre_gate` job.
+- `build_gate.post.stack` applies to the `post_gate` and `re_gate` jobs.
+- When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
+- When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
+- When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
 
 ### Stack Gate: Build Gate Image Mapping
 
@@ -101,16 +119,19 @@ Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Rule format:**
 ```yaml
-images:
-  - stack: { language: java, tool: maven, release: "17" }
-    image: docker.io/org/stack-gate-java-maven:17
-  # tool-agnostic fallback (used only when Stack Gate expectation omits tool)
-  - stack: { language: java, release: "17" }
-    image: docker.io/org/stack-gate-java:17
+BuildGateImages:
+  - image: docker.io/org/stack-gate-java-maven:17
+    language: java
+    tool: maven
+    release: "17"
+  # tool-agnostic fallback (used only when expectations omit tool)
+  - image: docker.io/org/stack-gate-java:17
+    language: java
+    release: "17"
 ```
 
 **Validation:**
-- `stack.language`, `stack.release`, and `image` are required; `stack.tool` is optional.
+- `language`, `release`, and `image` are required; `tool` is optional.
 - Duplicate selectors within the same source are rejected.
 - When `PLOY_BUILDGATE_IMAGE` is not set, a missing default mapping file is an error.
 

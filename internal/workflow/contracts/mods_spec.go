@@ -32,6 +32,7 @@ package contracts
 
 import (
 	"fmt"
+	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -185,6 +186,43 @@ func (s ModsSpec) Validate() error {
 		}
 	}
 
+	// Validate build gate stack configuration (pre/post).
+	if s.BuildGate != nil {
+		if s.BuildGate.Pre != nil && s.BuildGate.Pre.Stack != nil {
+			if err := validateBuildGateStackConfig(s.BuildGate.Pre.Stack, "build_gate.pre.stack"); err != nil {
+				return err
+			}
+		}
+		if s.BuildGate.Post != nil && s.BuildGate.Post.Stack != nil {
+			if err := validateBuildGateStackConfig(s.BuildGate.Post.Stack, "build_gate.post.stack"); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) error {
+	if stack == nil {
+		return nil
+	}
+
+	// Reject enabled:false with any configured fields (ambiguous).
+	if !stack.Enabled {
+		if stack.Language != "" || stack.Tool != "" || stack.Release != "" || stack.Default {
+			return fmt.Errorf("%s: enabled=false with stack fields is ambiguous; remove stack fields or set enabled=true", prefix)
+		}
+		return nil
+	}
+
+	// Enabled:true requires at least language and release.
+	if strings.TrimSpace(stack.Language) == "" {
+		return fmt.Errorf("%s.language: required", prefix)
+	}
+	if strings.TrimSpace(stack.Release) == "" {
+		return fmt.Errorf("%s.release: required", prefix)
+	}
 	return nil
 }
 

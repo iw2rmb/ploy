@@ -88,6 +88,12 @@ type BuildGateOptions struct {
 	// Images holds mod-level image mapping overrides for Stack Gate.
 	// These rules override the default mapping file.
 	Images []contracts.BuildGateImageRule
+
+	// PreStack configures stack detection fallback for pre-gate.
+	PreStack *contracts.BuildGateStackConfig
+
+	// PostStack configures stack detection fallback for post-gate and re-gate.
+	PostStack *contracts.BuildGateStackConfig
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -296,6 +302,12 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	if spec.BuildGate != nil {
 		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
 		runOpts.BuildGate.Images = spec.BuildGate.Images
+		if spec.BuildGate.Pre != nil {
+			runOpts.BuildGate.PreStack = spec.BuildGate.Pre.Stack
+		}
+		if spec.BuildGate.Post != nil {
+			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
+		}
 
 		// --- Healing Configuration ---
 		// Convert contracts.HealingSpec to nodeagent.HealingConfig directly,

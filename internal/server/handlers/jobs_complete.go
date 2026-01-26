@@ -439,6 +439,24 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 		}
 
+		// When a job is cancelled (not by explicit run cancel), ensure the repo attempt
+		// reaches a terminal state by cancelling remaining jobs after this step.
+		// This is critical for policy-driven cancellations (e.g., stack detection required).
+		if jobStatus == store.JobStatusCancelled && err == nil {
+			modType := domaintypes.ModType(job.ModType)
+			if modType.Validate() == nil && modType == domaintypes.ModTypeMR {
+				// MR jobs are best-effort and must not affect run-level progression.
+			} else {
+				if cerr := cancelRemainingJobsAfterFailure(ctx, st, job.RunID, job.RepoID, job.Attempt, job.StepIndex); cerr != nil {
+					slog.Error("complete job: failed to cancel remaining jobs after cancellation",
+						"job_id", jobID,
+						"step_index", job.StepIndex,
+						"err", cerr,
+					)
+				}
+			}
+		}
+
 		// Server-driven scheduling: after job succeeds, schedule the next job.
 		if jobStatus == store.JobStatusSuccess {
 			if _, err := st.ScheduleNextJob(ctx, store.ScheduleNextJobParams{RunID: job.RunID, RepoID: job.RepoID, Attempt: job.Attempt}); err != nil {

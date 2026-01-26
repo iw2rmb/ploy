@@ -1,34 +1,29 @@
 # valid.yaml - Complete valid image mapping for testing
-images:
+BuildGateImages:
   # Java 17 with Maven
-  - stack:
-      language: java
-      release: "17"
-      tool: maven
-    image: maven:3-eclipse-temurin-17
+  - image: maven:3-eclipse-temurin-17
+    language: java
+    tool: maven
+    release: "17"
 
   # Java 17 with Gradle
-  - stack:
-      language: java
-      release: "17"
-      tool: gradle
-    image: gradle:8.8-jdk17
+  - image: gradle:8.8-jdk17
+    language: java
+    tool: gradle
+    release: "17"
 
   # Java 17 tool-agnostic fallback
-  - stack:
-      language: java
-      release: "17"
-    image: eclipse-temurin:17-jdk
+  - image: eclipse-temurin:17-jdk
+    language: java
+    release: "17"
 
   # Java 11 with Maven
-  - stack:
-      language: java
-      release: "11"
-      tool: maven
-    image: maven:3-eclipse-temurin-11
+  - image: maven:3-eclipse-temurin-11
+    language: java
+    tool: maven
+    release: "11"
 
   # Java 11 tool-agnostic fallback
-  - stack:
-      language: java
-      release: "11"
-    image: eclipse-temurin:11-jdk
+  - image: eclipse-temurin:11-jdk
+    language: java
+    release: "11"

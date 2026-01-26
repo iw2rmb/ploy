@@ -331,15 +331,13 @@ func TestBuildGateImageResolver_FullPrecedenceWithFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	defaultFile := filepath.Join(tmpDir, "default.yaml")
 	if err := os.WriteFile(defaultFile, []byte(`
-images:
-  - stack:
-      language: java
-      release: "17"
-    image: default:17
-  - stack:
-      language: java
-      release: "11"
-    image: default:11
+BuildGateImages:
+  - image: default:17
+    language: java
+    release: "17"
+  - image: default:11
+    language: java
+    release: "11"
 `), 0644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
