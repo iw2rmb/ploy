@@ -149,6 +149,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 				runtimeImage = strings.TrimSpace(img)
 				sgResult.RuntimeImage = runtimeImage
 			}
+			reportGateRuntimeImage(ctx, runtimeImage)
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -177,6 +178,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 				runtimeImage = strings.TrimSpace(img)
 				sgResult.RuntimeImage = runtimeImage
 			}
+			reportGateRuntimeImage(ctx, runtimeImage)
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -269,6 +271,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		if err != nil {
 			sgResult.Result = "unknown"
 			sgResult.Reason = err.Error()
+			reportGateRuntimeImage(ctx, image)
 			return &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -487,6 +490,8 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			}, nil
 		}
 	}
+
+	reportGateRuntimeImage(ctx, image)
 
 	// Build container spec with workspace mount.
 	mounts := []ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}
