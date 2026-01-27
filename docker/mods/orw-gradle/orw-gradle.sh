@@ -264,8 +264,28 @@ gradle_home="$(mktemp -d)"
 project_cache_dir="$(mktemp -d)"
 export GRADLE_USER_HOME="$gradle_home"
 
+# Inject remote build cache init script when cache URL is configured.
+if [[ -n "${PLOY_GRADLE_BUILD_CACHE_URL:-}" ]]; then
+  mkdir -p "$gradle_home/init.d"
+  cat > "$gradle_home/init.d/ploy-remote-build-cache.init.gradle" <<'INITGRADLE'
+settingsEvaluated { settings ->
+  def url = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
+  if (url == null || url.trim().isEmpty()) return
+
+  settings.buildCache {
+    local { enabled = true }
+    remote(HttpBuildCache) {
+      this.url = new URI(url)
+      push = (System.getenv("PLOY_GRADLE_BUILD_CACHE_PUSH") ?: "true").toBoolean()
+      allowInsecureProtocol = true
+    }
+  }
+}
+INITGRADLE
+fi
+
 status=0
-"$gradle_cmd" --no-daemon --stacktrace \
+"$gradle_cmd" --no-daemon --stacktrace --build-cache \
   --project-cache-dir "$project_cache_dir" \
   rewriteRun \
   -Drewrite.configLocation="$cfg" \

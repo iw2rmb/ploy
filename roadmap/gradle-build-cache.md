@@ -7,7 +7,7 @@ Documentation: `design/gradle-build-cache.md`
 Legend: [ ] todo, [x] done.
 
 ## Local Deploy
-- [ ] Add Gradle Build Cache Node service — Provides a shared remote cache endpoint for local gate/mod containers
+- [x] Add Gradle Build Cache Node service — Provides a shared remote cache endpoint for local gate/mod containers
   - Repository: ploy
   - Component: local docker-compose stack
   - Scope: `local/docker-compose.yml` add service `gradle-build-cache` using `gradle/build-cache-node:latest` exposing `5071`, with a named volume for the data dir
@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `docker compose -f local/docker-compose.yml up -d gradle-build-cache` — container starts and listens on `5071`
 
 ## Build Gate (Gradle)
-- [ ] Enable build cache in Gradle gate command — Ensures caching is on even without image defaults
+- [x] Enable build cache in Gradle gate command — Ensures caching is on even without image defaults
   - Repository: ploy
   - Component: `internal/workflow/runtime/step`
   - Scope: `internal/workflow/runtime/step/gate_docker.go` update `buildCommandForTool("gradle")` to include `--build-cache`
@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/runtime/step -run GateDocker` — command contains `--build-cache`
 
 ## Gate Gradle Images
-- [ ] Create dedicated Gradle gate images — Allows injecting `gradle.properties` and init scripts without repo changes
+- [x] Create dedicated Gradle gate images — Allows injecting `gradle.properties` and init scripts without repo changes
   - Repository: ploy
   - Component: Docker images for Build Gate
   - Scope: add new Dockerfiles under `docker/gates/gradle/` (JDK 11 + JDK 17) that:
@@ -33,7 +33,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: N/A
   - Tests: `docker build` the images and run a trivial `gradle --version` smoke command
 
-- [ ] Switch default image mapping to new images — Ensures Build Gate uses the configured Gradle gate images by default
+- [x] Switch default image mapping to new images — Ensures Build Gate uses the configured Gradle gate images by default
   - Repository: ploy
   - Component: Build Gate image mapping
   - Scope: `etc/ploy/gates/build-gate-images.yaml` replace `gradle:8.8-jdk11` / `gradle:8.8-jdk17` entries with the new images
@@ -41,7 +41,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/runtime/step -run GateDocker` — image resolution still succeeds for `java+gradle` expectations
 
 ## Remote Cache Wiring (env-driven)
-- [ ] Document and use cache env vars in gate jobs — Allows local deploy to point gate containers to the cache service
+- [x] Document and use cache env vars in gate jobs — Allows local deploy to point gate containers to the cache service
   - Repository: ploy
   - Component: docs + global env injection
   - Scope:
@@ -51,10 +51,9 @@ Legend: [ ] todo, [x] done.
   - Tests: manual local run — set `PLOY_GRADLE_BUILD_CACHE_URL=http://gradle-build-cache:5071/cache/` and observe cache hits on second run
 
 ## orw-gradle (OpenRewrite)
-- [ ] Enable build cache for `orw-gradle` — Avoids repeated work for rewrite runs while keeping isolated `GRADLE_USER_HOME`
+- [x] Enable build cache for `orw-gradle` — Avoids repeated work for rewrite runs while keeping isolated `GRADLE_USER_HOME`
   - Repository: ploy
   - Component: `docker/mods/orw-gradle`
   - Scope: `docker/mods/orw-gradle/orw-gradle.sh` add `--build-cache` and remote cache wiring (same env vars + init script approach) to the `gradle rewriteRun` invocation
   - Snippets: N/A
   - Tests: run `mods-orw-gradle` twice on the same Gradle project; second run should show cache reuse (and/or reduced duration)
-

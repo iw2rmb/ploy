@@ -1,0 +1,3 @@
+FROM gradle:8.8-jdk17
+COPY gradle.properties /root/.gradle/gradle.properties
+COPY ploy-remote-build-cache.init.gradle /root/.gradle/init.d/ploy-remote-build-cache.init.gradle
