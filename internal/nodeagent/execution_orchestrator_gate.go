@@ -86,17 +86,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}()
 
 	// Run the build gate.
-	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
-
-	// Persist the runtime image used for this gate job (when available) so the control plane
-	// can surface the exact gate container image for diagnostics.
-	if gateResult != nil {
-		if img := strings.TrimSpace(gateResult.RuntimeImage); img != "" {
-			if err := r.SaveJobImageName(ctx, req.JobID, img); err != nil {
-				slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			}
+	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {
+		if err := r.SaveJobImageName(obsCtx, req.JobID, image); err != nil {
+			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		}
-	}
+	})
+	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
 	// Persist the detected stack for this run so mod and healing jobs can
 	// resolve stack-specific images consistently. This is done for all gate
@@ -177,10 +172,10 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 // applyGateStackDetect wires the optional StackDetect override into the gate manifest.
 //
 // Semantics:
-// - pre_gate may use build_gate.pre.stack as a fallback/override.
-// - post_gate may use build_gate.post.stack as a fallback/override.
-// - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
-//   stackdetect output to select the runtime image/tool.
+//   - pre_gate may use build_gate.pre.stack as a fallback/override.
+//   - post_gate may use build_gate.post.stack as a fallback/override.
+//   - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
+//     stackdetect output to select the runtime image/tool.
 func applyGateStackDetect(manifest *contracts.StepManifest, modType types.ModType, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return

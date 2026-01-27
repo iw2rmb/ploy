@@ -21,9 +21,13 @@ type mockGateRuntimeMinimal struct {
 	logsCalled   bool
 	removeCalled bool
 	lastSpec     ContainerSpec
+	beforeCreate func()
 }
 
 func (m *mockGateRuntimeMinimal) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
+	if m.beforeCreate != nil {
+		m.beforeCreate()
+	}
 	m.createCalled = true
 	m.lastSpec = spec
 	return ContainerHandle{ID: "mock-id"}, nil
@@ -69,6 +73,43 @@ func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
 	}
 	if !rt.createCalled || !rt.startCalled || !rt.waitCalled || !rt.logsCalled {
 		t.Fatalf("expected create/start/wait/logs to be called before remove; got %+v", rt)
+	}
+}
+
+func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.T) {
+	t.Setenv("PLOY_BUILDGATE_IMAGE", "docker.io/example/gate:latest")
+
+	var (
+		observerCalled bool
+		observedImage  string
+	)
+
+	rt := &mockGateRuntimeMinimal{
+		beforeCreate: func() {
+			if !observerCalled {
+				t.Fatalf("expected runtime image observer to be called before container Create")
+			}
+		},
+	}
+	executor := NewDockerGateExecutor(rt)
+
+	ctx := WithGateRuntimeImageObserver(context.Background(), func(_ context.Context, image string) {
+		observerCalled = true
+		observedImage = image
+	})
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{Enabled: true}
+
+	if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	if !observerCalled {
+		t.Fatalf("expected runtime image observer to be called")
+	}
+	if observedImage != "docker.io/example/gate:latest" {
+		t.Fatalf("observed image = %q, want %q", observedImage, "docker.io/example/gate:latest")
 	}
 }
 
