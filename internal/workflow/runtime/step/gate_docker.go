@@ -756,7 +756,7 @@ func buildCommandForTool(tool string) ([]string, error) {
 		script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
 		return []string{"/bin/sh", "-lc", script}, nil
 	case "gradle":
-		script := preamble + "gradle -q --stacktrace test -p /workspace"
+		script := preamble + "gradle -q --stacktrace --build-cache test -p /workspace"
 		return []string{"/bin/sh", "-lc", script}, nil
 	case "go":
 		script := preamble + "go test ./..."

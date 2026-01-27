@@ -240,8 +240,8 @@ func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
 	}
 
 	cmd := rt.lastSpec.Command[2]
-	if !strings.Contains(cmd, "gradle -q --stacktrace") {
-		t.Fatalf("expected gradle command with -q --stacktrace, got %q", cmd)
+	if !strings.Contains(cmd, "gradle -q --stacktrace --build-cache") {
+		t.Fatalf("expected gradle command with -q --stacktrace --build-cache, got %q", cmd)
 	}
 	if strings.Contains(cmd, "--fail-fast") {
 		t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
