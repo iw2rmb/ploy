@@ -69,3 +69,14 @@ services:
       - /private/tmp:/private/tmp
     command:
       ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
+
+  gradle-build-cache:
+    image: gradle/build-cache-node:latest
+    platform: linux/amd64
+    volumes:
+      - gradle-build-cache-data:/data
+    ports:
+      - "5071:5071"
+
+volumes:
+  gradle-build-cache-data:

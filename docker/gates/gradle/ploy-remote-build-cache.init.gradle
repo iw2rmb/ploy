@@ -1,0 +1,13 @@
+settingsEvaluated { settings ->
+  def url = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
+  if (url == null || url.trim().isEmpty()) return
+
+  settings.buildCache {
+    local { enabled = true }
+    remote(HttpBuildCache) {
+      this.url = new URI(url)
+      push = (System.getenv("PLOY_GRADLE_BUILD_CACHE_PUSH") ?: "true").toBoolean()
+      allowInsecureProtocol = true
+    }
+  }
+}

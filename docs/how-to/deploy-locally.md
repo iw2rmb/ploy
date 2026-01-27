@@ -179,7 +179,35 @@ ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
 ./dist/ploy config gitlab show || true
 ```
 
-## 7) Stop / Clean
+## 7) Gradle Build Cache (optional)
+
+The local stack includes a Gradle Build Cache Node (`gradle-build-cache`)
+that gate containers can use to share compiled outputs across runs.
+
+Build the local Build Gate Gradle images (required for `java+gradle` gates when using the default image mapping):
+
+```bash
+docker build -t ploy-gate-gradle:jdk11 -f docker/gates/gradle/Dockerfile.jdk11 docker/gates/gradle
+docker build -t ploy-gate-gradle:jdk17 -f docker/gates/gradle/Dockerfile.jdk17 docker/gates/gradle
+```
+
+Configure gate + mod jobs to use the cache:
+
+```bash
+./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL \
+  --value "http://gradle-build-cache:5071/cache/" --scope gate
+./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL \
+  --value "http://gradle-build-cache:5071/cache/" --scope mods
+
+./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH \
+  --value "true" --scope gate
+./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH \
+  --value "true" --scope mods
+```
+
+The cache node UI is available at `http://localhost:5071`.
+
+## 8) Stop / Clean
 
 ```
 docker compose -f local/docker-compose.yml down -v

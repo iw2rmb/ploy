@@ -19,11 +19,11 @@ BuildGateImages:
     release: "17"
 
   # Java (Gradle)
-  - image: gradle:8.8-jdk11
+  - image: ploy-gate-gradle:jdk11
     language: java
     tool: gradle
     release: "11"
-  - image: gradle:8.8-jdk17
+  - image: ploy-gate-gradle:jdk17
     language: java
     tool: gradle
     release: "17"
