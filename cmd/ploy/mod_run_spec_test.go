@@ -351,3 +351,92 @@ env:
 		t.Errorf("expected steps[0].image from spec to be preserved, got %v", step0["image"])
 	}
 }
+
+func TestBuildSpecPayload_EnvFromFile_Router(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Write a secret file.
+	secretFile := filepath.Join(tmpDir, "auth.json")
+	if err := os.WriteFile(secretFile, []byte(`{"key":"secret"}`), 0o644); err != nil {
+		t.Fatalf("write secret file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "test.yaml")
+	specContent := strings.ReplaceAll(`
+steps:
+  - image: docker.io/test/mod:latest
+build_gate:
+  healing:
+    retries: 1
+    image: docker.io/test/heal:latest
+  router:
+    image: docker.io/test/router:latest
+    env_from_file:
+      CODEX_AUTH_JSON: SECRET_PATH
+`, "SECRET_PATH", secretFile)
+
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	bg := result["build_gate"].(map[string]any)
+	router := bg["router"].(map[string]any)
+	env := router["env"].(map[string]any)
+	if v, ok := env["CODEX_AUTH_JSON"].(string); !ok || v != `{"key":"secret"}` {
+		t.Errorf("expected CODEX_AUTH_JSON resolved, got %v", env["CODEX_AUTH_JSON"])
+	}
+}
+
+func TestBuildSpecPayload_EnvFromFile_FlattenedHealing(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	secretFile := filepath.Join(tmpDir, "auth.json")
+	if err := os.WriteFile(secretFile, []byte(`{"key":"healing-secret"}`), 0o644); err != nil {
+		t.Fatalf("write secret file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "test.yaml")
+	specContent := strings.ReplaceAll(`
+steps:
+  - image: docker.io/test/mod:latest
+build_gate:
+  healing:
+    retries: 1
+    image: docker.io/test/heal:latest
+    env_from_file:
+      CODEX_AUTH_JSON: SECRET_PATH
+  router:
+    image: docker.io/test/router:latest
+`, "SECRET_PATH", secretFile)
+
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	bg := result["build_gate"].(map[string]any)
+	healing := bg["healing"].(map[string]any)
+	env := healing["env"].(map[string]any)
+	if v, ok := env["CODEX_AUTH_JSON"].(string); !ok || v != `{"key":"healing-secret"}` {
+		t.Errorf("expected CODEX_AUTH_JSON resolved, got %v", env["CODEX_AUTH_JSON"])
+	}
+}

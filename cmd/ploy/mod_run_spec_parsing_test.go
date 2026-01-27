@@ -25,8 +25,9 @@ env:
 build_gate:
   healing:
     retries: 1
-    mod:
-      image: docker.io/test/healer:latest
+    image: docker.io/test/healer:latest
+  router:
+    image: docker.io/test/router:latest
 gitlab_domain: gitlab.example.com
 mr_on_success: true
 `
@@ -170,9 +171,10 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
   "build_gate": {
     "healing": {
       "retries": 2,
-      "mod": {
-        "image": "docker.io/test/healer:latest"
-      }
+      "image": "docker.io/test/healer:latest"
+    },
+    "router": {
+      "image": "docker.io/test/router:latest"
     }
   }
 }`
@@ -400,12 +402,12 @@ steps:
 build_gate:
   healing:
     retries: 2
-    mod:
-      image: docker.io/test/healer:latest
-      command: "heal.sh"
-      env:
-        HEALING_MODE: auto
-      retain_container: false
+    image: docker.io/test/healer:latest
+    command: "heal.sh"
+    env:
+      HEALING_MODE: auto
+  router:
+    image: docker.io/test/router:latest
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -435,28 +437,23 @@ build_gate:
 		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
 	}
 
-	// Verify mod entry
-	mod, ok := healing["mod"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected build_gate.healing.mod to be a map, got %T", healing["mod"])
+	// Verify flattened healing fields (no "mod" key)
+	if img, ok := healing["image"].(string); !ok || img != "docker.io/test/healer:latest" {
+		t.Errorf("expected healing.image=docker.io/test/healer:latest, got %v", healing["image"])
 	}
-
-	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/healer:latest" {
-		t.Errorf("expected mod.image=docker.io/test/healer:latest, got %v", mod["image"])
+	if cmd, ok := healing["command"].(string); !ok || cmd != "heal.sh" {
+		t.Errorf("expected healing.command=heal.sh, got %v", healing["command"])
 	}
-	if cmd, ok := mod["command"].(string); !ok || cmd != "heal.sh" {
-		t.Errorf("expected mod.command=heal.sh, got %v", mod["command"])
-	}
-	if env, ok := mod["env"].(map[string]any); ok {
+	if env, ok := healing["env"].(map[string]any); ok {
 		if mode, _ := env["HEALING_MODE"].(string); mode != "auto" {
-			t.Errorf("expected mod.env.HEALING_MODE=auto, got %v", mode)
+			t.Errorf("expected healing.env.HEALING_MODE=auto, got %v", mode)
 		}
 	} else {
-		t.Errorf("expected mod.env to be a map")
+		t.Errorf("expected healing.env to be a map")
 	}
-	if retain, ok := mod["retain_container"].(bool); !ok || retain {
-		// retain_container=false in the spec; ensure we see the value.
-		t.Errorf("expected mod.retain_container=false, got %v", mod["retain_container"])
+	// retain_container=false → omitted from serialized output (omitempty).
+	if _, ok := healing["retain_container"]; ok {
+		t.Errorf("expected retain_container to be omitted (false → omitempty), got %v", healing["retain_container"])
 	}
 }
 
@@ -487,8 +484,9 @@ build_gate:
   enabled: true
   healing:
     retries: 1
-    mod:
-      image: docker.io/test/healer:latest
+    image: docker.io/test/healer:latest
+  router:
+    image: docker.io/test/router:latest
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)

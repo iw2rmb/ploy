@@ -88,7 +88,7 @@ func maybeCreateHealingJobs(
 	if spec.BuildGate != nil {
 		healing = spec.BuildGate.Healing
 	}
-	if healing == nil || healing.Mod == nil {
+	if healing == nil || healing.Image.IsEmpty() {
 		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
 			"run_id", runID,
 		)
@@ -249,8 +249,8 @@ func maybeCreateHealingJobs(
 	)
 
 	modImage := ""
-	if healing.Mod.Image.Universal != "" {
-		modImage = strings.TrimSpace(healing.Mod.Image.Universal)
+	if healing.Image.Universal != "" {
+		modImage = strings.TrimSpace(healing.Image.Universal)
 	}
 
 	// Create a single healing job for this attempt.

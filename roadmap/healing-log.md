@@ -7,7 +7,7 @@ Documentation: `design/healing-log.md`, `design/healing-log.yaml`, `tests/e2e/mo
 Legend: [ ] todo, [x] done.
 
 ## Spec Schema
-- [ ] Flatten `build_gate.healing` (remove `mod`) — Makes healing config consistent with step-like specs and matches `design/healing-log.yaml`.
+- [x] Flatten `build_gate.healing` (remove `mod`) — Makes healing config consistent with step-like specs and matches `design/healing-log.yaml`.
   - Repository: ploy
   - Component: `internal/workflow/contracts`
   - Scope:
@@ -18,7 +18,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `build_gate.healing.image: ghcr.io/iw2rmb/mods-codex:latest`
   - Tests: `go test ./internal/workflow/contracts -run ModsSpec` — parsing + validation accepts the new shape
 
-- [ ] Add `build_gate.router` config — Enables a dedicated coding-agent call to summarize `/in/build-gate.log` before healing.
+- [x] Add `build_gate.router` config — Enables a dedicated coding-agent call to summarize `/in/build-gate.log` before healing.
   - Repository: ploy
   - Component: `internal/workflow/contracts`
   - Scope:
@@ -30,7 +30,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run ModsSpec` — invalid/missing router config is rejected
 
 ## CLI Spec Preprocessing (`env_from_file`)
-- [ ] Update `env_from_file` resolution for new paths — Keeps e2e specs working with secrets for router + healing.
+- [x] Update `env_from_file` resolution for new paths — Keeps e2e specs working with secrets for router + healing.
   - Repository: ploy
   - Component: `cmd/ploy`
   - Scope:
@@ -43,7 +43,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ploy -run EnvFromFile` — router + healing sections inline file contents and drop `env_from_file`
 
 ## Job Metadata (store one-liners)
-- [ ] Add `bug_summary` to gate metadata — Persists the router-derived one-liner onto the failing gate job.
+- [x] Add `bug_summary` to gate metadata — Persists the router-derived one-liner onto the failing gate job.
   - Repository: ploy
   - Component: `internal/workflow/contracts`
   - Scope:
@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `{"kind":"gate","gate":{"bug_summary":"…"}}`
   - Tests: `go test ./internal/workflow/contracts -run BuildGateStageMetadata` — invalid summaries rejected
 
-- [ ] Add `action_summary` to mod job metadata — Persists the healer-derived one-liner onto the healing job.
+- [x] Add `action_summary` to mod job metadata — Persists the healer-derived one-liner onto the healing job.
   - Repository: ploy
   - Component: `internal/workflow/contracts`
   - Scope:
@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run JobMeta` — rejects action_summary on non-mod jobs
 
 ## Router Execution (before healing)
-- [ ] Execute router agent on gate failure and persist `bug_summary` — Ensures the bug one-liner is stored on the *gate job* before healing runs.
+- [x] Execute router agent on gate failure and persist `bug_summary` — Ensures the bug one-liner is stored on the *gate job* before healing runs.
   - Repository: ploy
   - Component: `internal/nodeagent`
   - Scope:
@@ -76,7 +76,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run Router` — failing gate triggers router run and job_meta includes bug_summary
 
 ## Healing Execution (action summary + `/in` artifacts)
-- [ ] Capture `action_summary` from the healing step — Makes the healer responsible for a one-line “what I did”.
+- [x] Capture `action_summary` from the healing step — Makes the healer responsible for a one-line “what I did”.
   - Repository: ploy
   - Component: `internal/nodeagent`, `docker/mods/mod-codex`
   - Scope:
@@ -85,7 +85,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: healer final message: `{"action_summary":"…"}`
   - Tests: `go test ./internal/nodeagent -run HealingSummary` — healing completion persists action_summary
 
-- [ ] Write per-iteration `/in` artifacts and `/in/healing-log.md` — Provides the required iteration-indexed logs and markdown summary.
+- [x] Write per-iteration `/in` artifacts and `/in/healing-log.md` — Provides the required iteration-indexed logs and markdown summary.
   - Repository: ploy
   - Component: `internal/nodeagent`
   - Scope:
@@ -98,7 +98,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run HealingLog` — files exist with correct names and markdown formatting
 
 ## Server Persistence Path
-- [ ] Ensure `jobs_complete` persists the new job_meta fields — Makes sure the server accepts and stores `bug_summary`/`action_summary`.
+- [x] Ensure `jobs_complete` persists the new job_meta fields — Makes sure the server accepts and stores `bug_summary`/`action_summary`.
   - Repository: ploy
   - Component: `internal/server/handlers`, `internal/store`
   - Scope:
@@ -108,7 +108,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run CompleteJob_.*JobMeta` — verifies stored `jobs.meta` includes the new fields
 
 ## E2E + Docs
-- [ ] Update e2e scenario spec to new schema — Locks in the router + flattened healing shape.
+- [x] Update e2e scenario spec to new schema — Locks in the router + flattened healing shape.
   - Repository: ploy
   - Component: `tests/e2e/mods`
   - Scope:
@@ -116,7 +116,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: N/A
   - Tests: `tests/e2e/mods/scenario-orw-fail/run.sh` (or equivalent) — gate fail triggers router, healing runs, re-gate passes/fails as expected, and `/in/healing-log.md` is present in the healing container context
 
-- [ ] Update user-facing docs and schema example — Prevents drift and documents the new required contract for Codex output.
+- [x] Update user-facing docs and schema example — Prevents drift and documents the new required contract for Codex output.
   - Repository: ploy
   - Component: `docs/`
   - Scope:

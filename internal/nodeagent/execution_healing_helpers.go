@@ -53,6 +53,10 @@ type executionResult struct {
 	// The slice length equals the number of healing retry iterations executed.
 	// Combined with PreGate, this provides the full gate history for the run.
 	ReGates []gateRunMetadata
+	// ActionSummary holds the last action_summary produced by the healing container
+	// during the inline gate-heal-regate loop. Populated by runGateWithHealing when
+	// the healer writes a valid action_summary to /out/codex-last.txt.
+	ActionSummary string
 }
 
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job by

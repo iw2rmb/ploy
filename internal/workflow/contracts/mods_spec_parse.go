@@ -147,6 +147,17 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 			}
 			bg.Healing = heal
 		}
+		if vv, ok := bgRaw["router"]; ok && vv != nil {
+			routerRaw, err := expectMap(vv, "build_gate.router")
+			if err != nil {
+				return nil, err
+			}
+			router, err := parseRouterSpec(routerRaw, "build_gate.router")
+			if err != nil {
+				return nil, err
+			}
+			bg.Router = router
+		}
 		if vv, ok := bgRaw["images"]; ok && vv != nil {
 			imagesRaw, ok := vv.([]any)
 			if !ok {
@@ -298,29 +309,25 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 		}
 	}
 
-	// Parse healing mod.
-	if v, ok := raw["mod"]; ok && v != nil {
-		modRaw, err := expectMap(v, prefix+".mod")
-		if err != nil {
-			return nil, err
-		}
-		mod, err := parseHealingModSpec(modRaw, prefix+".mod")
-		if err != nil {
-			return nil, err
-		}
-		heal.Mod = mod
-	}
-
-	return heal, nil
-}
-
-func parseHealingModSpec(raw map[string]any, prefix string) (*HealingModSpec, error) {
-	// Parse shared mod-like fields (image, command, env, retain_container).
+	// Parse mod-like fields directly on the healing map (flattened form).
 	f, err := parseModLikeFields(raw, prefix)
 	if err != nil {
 		return nil, err
 	}
-	return &HealingModSpec{
+	heal.Image = f.Image
+	heal.Command = f.Command
+	heal.Env = f.Env
+	heal.RetainContainer = f.RetainContainer
+
+	return heal, nil
+}
+
+func parseRouterSpec(raw map[string]any, prefix string) (*RouterSpec, error) {
+	f, err := parseModLikeFields(raw, prefix)
+	if err != nil {
+		return nil, err
+	}
+	return &RouterSpec{
 		Image:           f.Image,
 		Command:         f.Command,
 		Env:             f.Env,

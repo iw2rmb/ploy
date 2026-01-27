@@ -303,3 +303,41 @@ func TestBuildGateStageMetadata_StackGate_JSONRoundtrip(t *testing.T) {
 		t.Errorf("Expected.Release: got %v, want 17", decoded.StackGate.Expected)
 	}
 }
+
+func TestBuildGateStageMetadata_BugSummary_Valid(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		BugSummary: "Missing semicolon on line 42 of Main.java",
+	}
+	if err := meta.Validate(); err != nil {
+		t.Errorf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestBuildGateStageMetadata_BugSummary_TooLong(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		BugSummary: strings.Repeat("x", 201),
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for >200 char bug_summary")
+	}
+	if !strings.Contains(err.Error(), "bug_summary") {
+		t.Errorf("error = %q, want substring 'bug_summary'", err.Error())
+	}
+}
+
+func TestBuildGateStageMetadata_BugSummary_Multiline(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		BugSummary: "line one\nline two",
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for multiline bug_summary")
+	}
+	if !strings.Contains(err.Error(), "single-line") {
+		t.Errorf("error = %q, want substring 'single-line'", err.Error())
+	}
+}

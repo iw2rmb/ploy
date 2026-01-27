@@ -9,6 +9,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -230,7 +231,23 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		},
 		CheckWorkspaceNoChange: true,
 		UploadDiff:             r.uploadHealingJobDiff,
-		StartTime:              startTime,
+		BuildJobMeta: func(outDir string) json.RawMessage {
+			actionSummary := parseActionSummary(outDir)
+			if actionSummary == "" {
+				return nil
+			}
+			meta := &contracts.JobMeta{
+				Kind:          contracts.JobKindMod,
+				ActionSummary: actionSummary,
+			}
+			data, err := contracts.MarshalJobMeta(meta)
+			if err != nil {
+				slog.Warn("failed to marshal healing job meta", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+				return nil
+			}
+			return data
+		},
+		StartTime: startTime,
 	}
 
 	r.executeStandardJob(ctx, req, cfg)

@@ -3,6 +3,7 @@ package contracts
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -24,6 +25,9 @@ type BuildGateStageMetadata struct {
 	// Resources summarizes container limits and observed usage for the gate run.
 	// Not serialized in JSON APIs.
 	Resources *BuildGateResourceUsage `json:"-"`
+	// BugSummary is a short one-line description of the build failure produced
+	// by the router container. Max 200 chars, no newlines.
+	BugSummary string `json:"bug_summary,omitempty"`
 }
 
 // DetectedStack returns the ModStack derived from the first static check's tool.
@@ -60,6 +64,14 @@ func (m BuildGateStageMetadata) Validate() error {
 	if m.StackGate != nil {
 		if err := m.StackGate.Validate(); err != nil {
 			return fmt.Errorf("stack_gate invalid: %w", err)
+		}
+	}
+	if m.BugSummary != "" {
+		if strings.ContainsAny(m.BugSummary, "\n\r") {
+			return fmt.Errorf("bug_summary: must be single-line")
+		}
+		if utf8.RuneCountInString(m.BugSummary) > 200 {
+			return fmt.Errorf("bug_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.BugSummary))
 		}
 	}
 	return nil

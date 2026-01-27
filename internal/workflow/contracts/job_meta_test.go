@@ -397,3 +397,56 @@ func TestBuildMeta_JSON(t *testing.T) {
 		t.Errorf("Metrics len = %d, want %d", len(got.Metrics), len(bm.Metrics))
 	}
 }
+
+func TestJobMeta_ActionSummary_Valid(t *testing.T) {
+	t.Parallel()
+	m := &JobMeta{
+		Kind:          JobKindMod,
+		ActionSummary: "Fixed missing import in Main.java",
+	}
+	if err := m.Validate(); err != nil {
+		t.Errorf("Validate() unexpected error: %v", err)
+	}
+
+	// Verify round-trip.
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("Marshal() error: %v", err)
+	}
+	var decoded JobMeta
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal() error: %v", err)
+	}
+	if decoded.ActionSummary != m.ActionSummary {
+		t.Errorf("ActionSummary round-trip: got %q, want %q", decoded.ActionSummary, m.ActionSummary)
+	}
+}
+
+func TestJobMeta_ActionSummary_OnGateJob_Rejected(t *testing.T) {
+	t.Parallel()
+	m := &JobMeta{
+		Kind:          JobKindGate,
+		Gate:          &BuildGateStageMetadata{},
+		ActionSummary: "should not be here",
+	}
+	err := m.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for action_summary on gate job")
+	}
+}
+
+func TestJobMeta_ActionSummary_TooLong(t *testing.T) {
+	t.Parallel()
+	long := ""
+	for i := 0; i < 201; i++ {
+		long += "x"
+	}
+	m := &JobMeta{
+		Kind:          JobKindMod,
+		ActionSummary: long,
+	}
+	err := m.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for >200 char action_summary")
+	}
+}

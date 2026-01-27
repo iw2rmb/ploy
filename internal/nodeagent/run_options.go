@@ -52,6 +52,10 @@ type RunOptions struct {
 	// Healing configures the heal → re-gate loop when build gate fails.
 	Healing *HealingConfig
 
+	// Router configures the router container that runs on gate failure
+	// to produce a bug_summary before healing begins.
+	Router *RouterConfig
+
 	// MRWiring configures GitLab merge request creation.
 	MRWiring MRWiringOptions
 
@@ -124,6 +128,22 @@ type HealingMod struct {
 	Env map[string]string
 
 	// RetainContainer controls whether the healing container is retained for debugging.
+	RetainContainer bool
+}
+
+// RouterConfig describes the router container configuration.
+// Router runs on gate failure to produce a bug_summary before healing begins.
+type RouterConfig struct {
+	// Image is the container image for the router (required).
+	Image contracts.ModImage
+
+	// Command is the container command override (optional).
+	Command HealingCommand
+
+	// Env holds environment variables to inject into the router container.
+	Env map[string]string
+
+	// RetainContainer controls whether the router container is retained.
 	RetainContainer bool
 }
 
@@ -321,12 +341,25 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 				healing.Retries = 1
 			}
 
-			// Convert healing mod specification.
-			if spec.BuildGate.Healing.Mod != nil {
-				healing.Mod = healingModSpecToHealingMod(spec.BuildGate.Healing.Mod)
+			// Convert flattened healing spec fields directly.
+			healing.Mod = HealingMod{
+				Image:           spec.BuildGate.Healing.Image,
+				Command:         commandSpecToHealingCommand(spec.BuildGate.Healing.Command),
+				Env:             copyStringMap(spec.BuildGate.Healing.Env),
+				RetainContainer: spec.BuildGate.Healing.RetainContainer,
 			}
 
 			runOpts.Healing = healing
+		}
+
+		// --- Router Configuration ---
+		if spec.BuildGate.Router != nil {
+			runOpts.Router = &RouterConfig{
+				Image:           spec.BuildGate.Router.Image,
+				Command:         commandSpecToHealingCommand(spec.BuildGate.Router.Command),
+				Env:             copyStringMap(spec.BuildGate.Router.Env),
+				RetainContainer: spec.BuildGate.Router.RetainContainer,
+			}
 		}
 	}
 
@@ -389,21 +422,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	}
 
 	return runOpts
-}
-
-// healingModSpecToHealingMod converts contracts.HealingModSpec to nodeagent.HealingMod.
-// This direct conversion avoids the map[string]any bridge for healing mod parsing.
-func healingModSpecToHealingMod(spec *contracts.HealingModSpec) HealingMod {
-	if spec == nil {
-		return HealingMod{}
-	}
-
-	return HealingMod{
-		Image:           spec.Image,
-		Command:         commandSpecToHealingCommand(spec.Command),
-		Env:             copyStringMap(spec.Env),
-		RetainContainer: spec.RetainContainer,
-	}
 }
 
 // commandSpecToExecutionCommand converts contracts.CommandSpec to ExecutionCommand.

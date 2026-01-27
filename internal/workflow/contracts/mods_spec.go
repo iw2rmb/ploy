@@ -147,7 +147,8 @@ func (s ModsSpec) IsSingleStep() bool {
 //
 // Validation rules:
 //   - steps must be non-empty and each step must have a non-empty image.
-//   - HealingSpec.Mod must have a non-empty image when present.
+//   - build_gate.healing.image must be non-empty when healing is configured.
+//   - build_gate.router must be configured when healing is configured.
 //   - Retries must be non-negative.
 //   - Stack Gate phases must not be disabled with expectations set.
 func (s ModsSpec) Validate() error {
@@ -173,8 +174,19 @@ func (s ModsSpec) Validate() error {
 			return fmt.Errorf("build_gate.healing.retries: must be non-negative, got %d",
 				s.BuildGate.Healing.Retries)
 		}
-		if s.BuildGate.Healing.Mod != nil && s.BuildGate.Healing.Mod.Image.IsEmpty() {
-			return fmt.Errorf("build_gate.healing.mod.image: required when healing mod is specified")
+		if s.BuildGate.Healing.Image.IsEmpty() {
+			return fmt.Errorf("build_gate.healing.image: required when healing is configured")
+		}
+		// Healing requires a router to be configured (router runs before healing).
+		if s.BuildGate.Router == nil || s.BuildGate.Router.Image.IsEmpty() {
+			return fmt.Errorf("build_gate.router: required when healing is configured")
+		}
+	}
+
+	// Validate router spec.
+	if s.BuildGate != nil && s.BuildGate.Router != nil {
+		if s.BuildGate.Router.Image.IsEmpty() {
+			return fmt.Errorf("build_gate.router.image: required when router is specified")
 		}
 	}
 

@@ -16,7 +16,10 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	        "build_gate": {
 	            "healing": {
 	                "retries": 2,
-	                "mod": { "image": "docker.io/test/heal:latest" }
+	                "image": "docker.io/test/heal:latest"
+	            },
+	            "router": {
+	                "image": "docker.io/test/router:latest"
 	            }
 	        }
 	    }`
@@ -147,7 +150,10 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 			"enabled": true,
 			"healing": {
 				"retries": 1,
-				"mod": {"image": "docker.io/test/healer:latest"}
+				"image": "docker.io/test/healer:latest"
+			},
+			"router": {
+				"image": "docker.io/test/router:latest"
 			}
 		}
 	}`
@@ -236,10 +242,11 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 				"build_gate": {
 					"healing": {
 						"retries": 3,
-						"mod": {
-							"image": "docker.io/test/codex:latest",
-							"command": "fix-with-ai"
-						}
+						"image": "docker.io/test/codex:latest",
+						"command": "fix-with-ai"
+					},
+					"router": {
+						"image": "docker.io/test/router:latest"
 					}
 				}
 			}`,
@@ -281,15 +288,16 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		"build_gate": {
 			"healing": {
 				"retries": 1,
-				"mod": {
-					"image": "docker.io/test/healer:v1",
-					"command": "heal.sh --fix",
-					"env": {
-						"MODE": "aggressive",
-						"DEBUG": "true"
-					},
-					"retain_container": true
-				}
+				"image": "docker.io/test/healer:v1",
+				"command": "heal.sh --fix",
+				"env": {
+					"MODE": "aggressive",
+					"DEBUG": "true"
+				},
+				"retain_container": true
+			},
+			"router": {
+				"image": "docker.io/test/router:latest"
 			}
 		}
 	}`

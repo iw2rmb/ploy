@@ -61,15 +61,18 @@ func (s ModsSpec) ToMap() map[string]any {
 			}
 		}
 		if s.BuildGate.Healing != nil {
-			heal := make(map[string]any)
+			heal := modLikeFieldsToMap(s.BuildGate.Healing.Image, s.BuildGate.Healing.Command, s.BuildGate.Healing.Env, s.BuildGate.Healing.RetainContainer)
 			if s.BuildGate.Healing.Retries > 0 {
 				heal["retries"] = s.BuildGate.Healing.Retries
 			}
-			if s.BuildGate.Healing.Mod != nil {
-				heal["mod"] = healingModToMap(s.BuildGate.Healing.Mod)
-			}
 			if len(heal) > 0 {
 				bg["healing"] = heal
+			}
+		}
+		if s.BuildGate.Router != nil {
+			router := modLikeFieldsToMap(s.BuildGate.Router.Image, s.BuildGate.Router.Command, s.BuildGate.Router.Env, s.BuildGate.Router.RetainContainer)
+			if len(router) > 0 {
+				bg["router"] = router
 			}
 		}
 		if len(s.BuildGate.Images) > 0 {
@@ -168,7 +171,7 @@ func commandSpecToAny(cmd CommandSpec) any {
 	return nil
 }
 
-// modLikeFieldsToMap serializes the common fields shared by ModStep and HealingModSpec.
+// modLikeFieldsToMap serializes the common fields shared by ModStep, HealingSpec, and RouterSpec.
 func modLikeFieldsToMap(img ModImage, cmd CommandSpec, env map[string]string, retain bool) map[string]any {
 	result := make(map[string]any)
 	if !img.IsEmpty() {
@@ -196,9 +199,4 @@ func modStepToMap(mod ModStep) map[string]any {
 		result["stack"] = stackGateSpecToMap(mod.Stack)
 	}
 	return result
-}
-
-// healingModToMap converts HealingModSpec to a map for wire serialization.
-func healingModToMap(mod *HealingModSpec) map[string]any {
-	return modLikeFieldsToMap(mod.Image, mod.Command, mod.Env, mod.RetainContainer)
 }
