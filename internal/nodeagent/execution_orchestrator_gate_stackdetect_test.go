@@ -50,4 +50,3 @@ func TestApplyGateStackDetect_PrePostAndNotReGate(t *testing.T) {
 		}
 	})
 }
-
