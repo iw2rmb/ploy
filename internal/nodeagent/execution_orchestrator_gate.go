@@ -93,22 +93,52 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	})
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
+	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
+	// and must not trigger healing. Treat them as terminal cancellations for this repo
+	// attempt so the control plane cancels remaining jobs without scheduling heal/re-gate.
+	if gateErr != nil || gateResult == nil {
+		duration := time.Since(startTime)
+		errMsg := gateErr
+		if errMsg == nil {
+			errMsg = errors.New("gate returned nil result with nil error")
+		}
+
+		stats := types.NewRunStatsBuilder().
+			DurationMs(duration.Milliseconds()).
+			Error(fmt.Sprintf("gate execution failed: %s", errMsg.Error())).
+			MustBuild()
+
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload gate cancellation status after gate execution error",
+				"run_id", req.RunID,
+				"job_id", req.JobID,
+				"error", uploadErr,
+			)
+		}
+		slog.Error("gate execution failed; cancelling repo attempt (no healing)",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"mod_type", req.ModType,
+			"duration", duration,
+			"error", errMsg,
+		)
+		return
+	}
+
 	// Persist the detected stack for this run so mod and healing jobs can
 	// resolve stack-specific images consistently. This is done for all gate
 	// results (pass or fail) to ensure deterministic image selection.
-	if gateResult != nil {
-		r.persistGateStack(req.RunID, gateResult)
-	}
+	r.persistGateStack(req.RunID, gateResult)
 
 	// Persist the first failing gate log for this run so discrete healing jobs
 	// can hydrate /in/build-gate.log with a trimmed failure view.
-	if gateErr != nil || (gateResult != nil && !gateResultPassed(gateResult)) {
+	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
 
 	// When gate fails and healing is configured, run the router once to produce
 	// bug_summary and attach it to the gate job metadata before uploading status.
-	if gateErr == nil && gateResult != nil && !gateResultPassed(gateResult) {
+	if !gateResultPassed(gateResult) {
 		r.runRouterForGateFailure(ctx, runner, req, typedOpts, workspace, gateResult)
 	}
 
@@ -122,32 +152,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Determine status and exit code.
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	if gateErr != nil && (errors.Is(gateErr, context.Canceled) || errors.Is(gateErr, context.DeadlineExceeded)) {
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload gate cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("gate job cancelled",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"mod_type", req.ModType,
-			"duration", duration,
-		)
-		return
-	}
-	if gateErr != nil && errors.Is(gateErr, step.ErrRepoCancelled) {
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload gate cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("gate job cancelled",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"mod_type", req.ModType,
-			"duration", duration,
-			"reason", gateErr.Error(),
-		)
-		return
-	}
-	if gateErr != nil || !gatePassed {
+	if !gatePassed {
 		// Gate failed - exit code 1 signals gate failure for healing.
 		var exitCode int32 = 1
 		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
