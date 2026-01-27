@@ -558,6 +558,151 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_ValidJobMeta_GateWithBugSummary verifies that gate job_meta with
+// bug_summary is accepted and persisted.
+func TestCompleteJob_ValidJobMeta_GateWithBugSummary(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	// Gate job_meta with bug_summary in gate metadata.
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Fail",
+		"exit_code": 1,
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"log_digest":  testLogDigest,
+					"bug_summary": "Missing semicolon on line 42 of Main.java",
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeIDStr,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobCompletionWithMetaCalled {
+		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
+	}
+	// Verify bug_summary is persisted in gate metadata.
+	var meta map[string]any
+	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+		t.Fatalf("failed to unmarshal persisted meta: %v", err)
+	}
+	gate, ok := meta["gate"].(map[string]any)
+	if !ok {
+		t.Fatal("expected gate metadata to be present")
+	}
+	if bs, ok := gate["bug_summary"].(string); !ok || bs != "Missing semicolon on line 42 of Main.java" {
+		t.Fatalf("expected bug_summary = %q, got %#v", "Missing semicolon on line 42 of Main.java", gate["bug_summary"])
+	}
+}
+
+// TestCompleteJob_ValidJobMeta_ModWithActionSummary verifies that mod job_meta
+// with action_summary is accepted and persisted.
+func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
+	t.Parallel()
+
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	job := store.Job{
+		ID:        jobID,
+		RunID:     runID,
+		NodeID:    &nodeID,
+		Status:    store.JobStatusRunning,
+		StepIndex: 2000,
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     runID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	// Mod job_meta with action_summary.
+	body, _ := json.Marshal(map[string]any{
+		"status":    "Success",
+		"exit_code": 0,
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind":           "mod",
+				"action_summary": "Fixed missing import in Main.java",
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
+		Role:       auth.RoleWorker,
+		CommonName: nodeIDStr,
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobCompletionWithMetaCalled {
+		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
+	}
+	// Verify action_summary is persisted in meta.
+	var meta map[string]any
+	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+		t.Fatalf("failed to unmarshal persisted meta: %v", err)
+	}
+	if as, ok := meta["action_summary"].(string); !ok || as != "Fixed missing import in Main.java" {
+		t.Fatalf("expected action_summary = %q, got %#v", "Fixed missing import in Main.java", meta["action_summary"])
+	}
+}
+
 // ===== JobStatsPayload Unit Tests =====
 // These tests verify the typed JobStatsPayload struct behavior.
 

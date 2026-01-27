@@ -156,7 +156,8 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // 2. Resolve env_from_file references in:
 //   - top-level env
 //   - steps[] entries
-//   - build_gate.healing.mod (healing mod)
+//   - build_gate.healing (healing)
+//   - build_gate.router (router)
 //
 // 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
 //
@@ -203,13 +204,16 @@ func buildSpecPayload(
 		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
-	// Resolve env_from_file references in build_gate.healing.mod if present.
+	// Resolve env_from_file references in build_gate.healing and build_gate.router.
 	if bg, ok := base["build_gate"].(map[string]any); ok {
 		if healing, ok := bg["healing"].(map[string]any); ok {
-			if modEntry, ok := healing["mod"].(map[string]any); ok {
-				if err := resolveEnvFromFileInPlace(modEntry); err != nil {
-					return nil, fmt.Errorf("resolve env from file (build_gate.healing.mod): %w", err)
-				}
+			if err := resolveEnvFromFileInPlace(healing); err != nil {
+				return nil, fmt.Errorf("resolve env from file (build_gate.healing): %w", err)
+			}
+		}
+		if router, ok := bg["router"].(map[string]any); ok {
+			if err := resolveEnvFromFileInPlace(router); err != nil {
+				return nil, fmt.Errorf("resolve env from file (build_gate.router): %w", err)
 			}
 		}
 	}

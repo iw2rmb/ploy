@@ -109,7 +109,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 		},
 	}
 
-	_, _, gateErr := rc.runGateWithHealing(
+	_, _, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -180,7 +180,7 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 		},
 	}
 
-	initialGate, reGates, gateErr := rc.runGateWithHealing(
+	initialGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -256,7 +256,7 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 		},
 	}
 
-	initialGate, reGates, gateErr := rc.runGateWithHealing(
+	initialGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -356,7 +356,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 		},
 	}
 
-	initialGate, reGates, gateErr := rc.runGateWithHealing(
+	initialGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -449,7 +449,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
-	initialGate, reGates, gateErr := rc.runGateWithHealing(
+	initialGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -564,7 +564,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 		},
 	}
 
-	preGate, reGates, gateErr := rc.runGateWithHealing(
+	preGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -678,7 +678,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		},
 	}
 
-	preGate, reGates, gateErr := rc.runGateWithHealing(
+	preGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -769,7 +769,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
-	preGate, reGates, gateErr := rc.runGateWithHealing(
+	preGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -821,7 +821,7 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 		// Gate nil or disabled.
 	}
 
-	initialGate, reGates, gateErr := rc.runGateWithHealing(
+	initialGate, reGates, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
@@ -969,7 +969,7 @@ func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 		Gate: &contracts.StepGateSpec{Enabled: true},
 	}
 
-	_, _, gateErr := rc.runGateWithHealing(
+	_, _, _, gateErr := rc.runGateWithHealing(
 		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 

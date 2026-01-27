@@ -143,31 +143,90 @@ Stack Gate enforces stack expectations at gate boundaries. When failures occur:
 2. Error stored in `run_repos.last_error`, shown in CLI follow output
 3. Includes: phase, expected/detected, evidence (paths/keys only)
 
-### Healing configuration
+### Router and healing configuration
 
-Healing configuration uses a single `mod`:
+When the Build Gate fails and healing is configured, the node agent runs an
+optional **router** (to summarize the failure) followed by a **healing** loop
+(to fix the failure). Both are specified under `build_gate`:
 
 ```yaml
-build_gate_healing:
-  retries: 2
-  mod:
+build_gate:
+  enabled: true
+
+  # Router runs once after gate failure to produce bug_summary.
+  router:
     image: docker.io/user/mods-codex:latest
-    command: mod-codex --input /workspace --out /out
+    env:
+      CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+
+  # Healing runs after router, retrying up to `retries` times.
+  healing:
+    retries: 2
+    image: docker.io/user/mods-codex:latest
     env:
       CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
-Semantics:
+Healing fields (image, command, env, retain_container) are specified directly
+under `healing` — there is no nested `mod` key.
+
+**Router** runs once per gate failure that triggers healing (each iteration),
+before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
+`/out/codex-last.txt` containing `{"bug_summary":"..."}`. The bug_summary
+(max 200 chars, single-line) is persisted in `jobs.meta.gate.bug_summary`.
+Router is required when healing is configured.
+
+**Healing** semantics:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
 - **Linear execution**: The healing mod runs, then the gate is re-run.
 - **Retries**: If the gate still fails, the healing mod may be retried up to `retries`.
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
+- **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
+  for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
+  `jobs.meta.action_summary` for mod jobs.
+
+### Per-iteration artifacts and healing log
+
+During the heal → re-gate loop, the node agent writes per-iteration artifacts
+to `/in` for debugging and cross-iteration context:
+
+| Artifact | Description |
+|---|---|
+| `/in/build-gate.log` | Latest gate failure log (updated after each re-gate) |
+| `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
+| `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
+| `/in/healing-log.md` | Cumulative markdown log across all iterations |
+
+The `healing-log.md` format:
+
+```markdown
+# Healing Log
+
+## Iteration 1
+
+- Bug Summary: Missing semicolon on line 42 of Main.java
+  Build Log: /in/build-gate-iteration-1.log
+- Healing Attempt: Added missing semicolon to Main.java:42
+  Agent Log: /in/healing-iteration-1.log
+
+## Iteration 2
+...
+```
 
 Implementation references:
 
-- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`).
-- Spec parsing: `internal/nodeagent/claimer_spec.go` (`parseSpec`) and `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
+- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`, `RouterConfig`).
+- Spec parsing: `internal/workflow/contracts/mods_spec_parse.go` (`parseHealingSpec`, `parseRouterSpec`).
+- Spec conversion: `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
+- Router/healing execution: `internal/nodeagent/execution_healing.go` (`runGateWithHealing`).
+- Summary parsing: `internal/nodeagent/execution_healing.go` (`parseBugSummary`, `parseActionSummary`).
+- Metadata types: `internal/workflow/contracts/build_gate_metadata.go` (`BugSummary`),
+  `internal/workflow/contracts/job_meta.go` (`ActionSummary`).
 - Schema example: `docs/schemas/mod.example.yaml`.
 
 ### Workspace and rehydration semantics
@@ -252,7 +311,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (top-level, in `mods[]`, and in `build_gate_healing.mod`) accepts two forms:
+The `image` field (top-level, in `mods[]`, and in `build_gate.healing`/`build_gate.router`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -1023,6 +1082,10 @@ Mods container images are standard OCI images with the following expectations:
   - `/out` — output directory for artifacts and summaries (read-write).
   - `/in` — optional read-only mount for cross-phase inputs such as:
     - initial Build Gate logs (`/in/build-gate.log`),
+    - per-iteration gate logs (`/in/build-gate-iteration-N.log`),
+    - per-iteration healing logs (`/in/healing-iteration-N.log`),
+    - cumulative healing log (`/in/healing-log.md`),
+    - Codex session state (`/in/codex-session.txt`),
     - prompt files (`/in/prompt.txt`), etc.
 
 - **Environment**
@@ -1033,7 +1096,7 @@ Mods container images are standard OCI images with the following expectations:
     - Supported on:
       - top-level spec (single-step runs),
       - each `mods[]` entry (multi-step runs),
-      - `build_gate_healing.mod`.
+      - `build_gate.healing` and `build_gate.router`.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
     env vars are filtered by scope (`all`, `mods`, `heal`, `gate`) to match job types:

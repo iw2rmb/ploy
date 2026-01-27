@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-// modLikeFields holds the common fields shared between ModStep and HealingModSpec.
+// modLikeFields holds the common fields shared between ModStep, HealingSpec, and RouterSpec.
 type modLikeFields struct {
 	Image           ModImage
 	Command         CommandSpec
@@ -16,7 +16,7 @@ type modLikeFields struct {
 	RetainContainer bool
 }
 
-// parseModLikeFields parses the common fields shared by ModStep and HealingModSpec.
+// parseModLikeFields parses the common fields shared by ModStep, HealingSpec, and RouterSpec.
 func parseModLikeFields(raw map[string]any, prefix string) (modLikeFields, error) {
 	var f modLikeFields
 

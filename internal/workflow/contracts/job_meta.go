@@ -7,6 +7,8 @@ package contracts
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 )
 
 // JobKind identifies the execution type for a job in the unified queue.
@@ -65,6 +67,11 @@ type JobMeta struct {
 	// for mod jobs. Used by the CLI to display a friendly name in --follow mode.
 	// Only populated for mod jobs (kind="mod") when a step name is provided.
 	ModsStepName string `json:"mods_step_name,omitempty"`
+
+	// ActionSummary is a short one-line description of what the healing mod did,
+	// produced by the healing container. Only allowed for mod jobs (kind="mod").
+	// Max 200 chars, no newlines.
+	ActionSummary string `json:"action_summary,omitempty"`
 }
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
@@ -97,6 +104,18 @@ func (m JobMeta) Validate() error {
 	if m.Gate != nil {
 		if err := m.Gate.Validate(); err != nil {
 			return fmt.Errorf("gate metadata invalid: %w", err)
+		}
+	}
+	// ActionSummary is only valid for mod jobs.
+	if m.ActionSummary != "" {
+		if m.Kind != JobKindMod {
+			return fmt.Errorf("action_summary present but kind is %q (only allowed for %q)", m.Kind, JobKindMod)
+		}
+		if strings.ContainsAny(m.ActionSummary, "\n\r") {
+			return fmt.Errorf("action_summary: must be single-line")
+		}
+		if utf8.RuneCountInString(m.ActionSummary) > 200 {
+			return fmt.Errorf("action_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.ActionSummary))
 		}
 	}
 	return nil

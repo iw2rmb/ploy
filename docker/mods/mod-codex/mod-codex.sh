@@ -178,6 +178,27 @@ if [[ -n "$session_id" ]]; then
   printf "%s\n" "$session_id" > "$out_dir/codex-session.txt"
 fi
 
+# Ensure codex-last.txt always exists (reliable capture for nodeagent parseCodexLastField).
+# If --output-last-message was unavailable or didn't produce a file, fall back to
+# extracting from JSONL events or the raw log.
+if [[ ! -s "$out_dir/codex-last.txt" ]]; then
+  last_msg=""
+  # Try extracting the last assistant message from JSONL events.
+  if command -v jq >/dev/null 2>&1 && [[ -s "$jsonl" ]]; then
+    last_msg="$(jq -r 'select(.type=="message" and .role=="assistant") | .content // empty' "$jsonl" 2>/dev/null | tail -1 || true)"
+  fi
+  # Fall back to the last non-empty line from codex.log.
+  if [[ -z "$last_msg" && -s "$logfile" ]]; then
+    last_msg="$(grep -v '^\s*$' "$logfile" | tail -1 || true)"
+  fi
+  if [[ -n "$last_msg" ]]; then
+    printf "%s\n" "$last_msg" > "$out_dir/codex-last.txt"
+  else
+    # Write an empty marker so the file always exists.
+    touch "$out_dir/codex-last.txt"
+  fi
+fi
+
 # Write run manifest with all captured metadata for nodeagent consumption.
 # Fields:
 #   ts                       - ISO timestamp of completion

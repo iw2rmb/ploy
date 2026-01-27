@@ -327,7 +327,7 @@ env:
 		}
 	})
 
-	t.Run("env_from_file in build_gate_healing.mod", func(t *testing.T) {
+	t.Run("env_from_file in build_gate_healing (flattened)", func(t *testing.T) {
 		healingAuthFile := filepath.Join(tmpDir, "healing-auth.json")
 		healingAuthContent := `{"healing":"token"}`
 		if err := os.WriteFile(healingAuthFile, []byte(healingAuthContent), 0o644); err != nil {
@@ -341,12 +341,13 @@ steps:
 build_gate:
   healing:
     retries: 1
-    mod:
-      image: docker.io/test/healer:latest
-      env:
-        HEALER_KEY: literal
-      env_from_file:
-        HEALER_AUTH: ` + healingAuthFile + `
+    image: docker.io/test/healer:latest
+    env:
+      HEALER_KEY: literal
+    env_from_file:
+      HEALER_AUTH: ` + healingAuthFile + `
+  router:
+    image: docker.io/test/router:latest
 `
 		if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
 			t.Fatalf("write spec file: %v", err)
@@ -362,7 +363,7 @@ build_gate:
 			t.Fatalf("unmarshal payload: %v", err)
 		}
 
-		// Navigate to build_gate.healing.mod
+		// Navigate to build_gate.healing (flattened — no "mod" nesting)
 		buildGate, ok := result["build_gate"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected build_gate in result")
@@ -371,20 +372,16 @@ build_gate:
 		if !ok {
 			t.Fatalf("expected build_gate.healing in result")
 		}
-		mod0, ok := healing["mod"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected build_gate.healing.mod to be a map")
-		}
 
-		// env_from_file should be removed from mod entry
-		if _, ok := mod0["env_from_file"]; ok {
-			t.Errorf("expected env_from_file to be removed from healing mod")
+		// env_from_file should be removed from healing
+		if _, ok := healing["env_from_file"]; ok {
+			t.Errorf("expected env_from_file to be removed from healing")
 		}
 
 		// env should contain merged values
-		env, ok := mod0["env"].(map[string]any)
+		env, ok := healing["env"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected env map in healing mod")
+			t.Fatalf("expected env map in healing")
 		}
 		if env["HEALER_KEY"] != "literal" {
 			t.Errorf("expected env.HEALER_KEY=literal, got %v", env["HEALER_KEY"])

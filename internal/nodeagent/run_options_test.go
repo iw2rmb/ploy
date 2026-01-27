@@ -266,13 +266,11 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			BuildGate: &contracts.BuildGateConfig{
 				Enabled: true,
 				Healing: &contracts.HealingSpec{
-					Retries: 3,
-					Mod: &contracts.HealingModSpec{
-						Image:           contracts.ModImage{Universal: "docker.io/test/heal:v1"},
-						Command:         contracts.CommandSpec{Shell: "fix.sh"},
-						Env:             map[string]string{"MODE": "auto"},
-						RetainContainer: true,
-					},
+					Retries:         3,
+					Image:           contracts.ModImage{Universal: "docker.io/test/heal:v1"},
+					Command:         contracts.CommandSpec{Shell: "fix.sh"},
+					Env:             map[string]string{"MODE": "auto"},
+					RetainContainer: true,
 				},
 			},
 			GitLabPAT:     "glpat-secret",
@@ -433,7 +431,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			BuildGate: &contracts.BuildGateConfig{
 				Healing: &contracts.HealingSpec{
 					Retries: 0,
-					Mod:     &contracts.HealingModSpec{Image: contracts.ModImage{Universal: "heal"}},
+					Image:   contracts.ModImage{Universal: "heal"},
 				},
 			},
 		}

@@ -13,6 +13,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -281,6 +282,11 @@ type standardJobConfig struct {
 	// UploadDiff is the strategy for uploading diffs.
 	UploadDiff func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result, stepIndex types.StepIndex)
 
+	// BuildJobMeta is an optional callback to produce job_meta for the completion payload.
+	// Called after container execution with the /out directory path.
+	// Returns nil if no job_meta should be attached.
+	BuildJobMeta func(outDir string) json.RawMessage
+
 	// StartTime is the time when the job execution started (including manifest build).
 	// If zero, defaults to time.Now() inside executeStandardJob.
 	StartTime time.Time
@@ -399,6 +405,14 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				time.Duration(result.Timings.DiffDuration).Milliseconds(),
 				time.Duration(result.Timings.TotalDuration).Milliseconds(),
 			)
+
+		// Attach job_meta if provided (e.g., action_summary for healing jobs).
+		if cfg.BuildJobMeta != nil {
+			if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
+				statsBuilder.JobMeta(meta)
+			}
+		}
+
 		stats := statsBuilder.MustBuild()
 
 		// Handle terminal status.

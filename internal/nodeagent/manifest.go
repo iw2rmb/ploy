@@ -415,6 +415,75 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexS
 	return manifest, nil
 }
 
+// buildRouterManifest constructs a StepManifest from a typed RouterConfig.
+// The router container runs with /in (RO) containing build-gate.log and /out (RW)
+// for writing codex-last.txt with the bug_summary JSON one-liner.
+func buildRouterManifest(req StartRunRequest, router RouterConfig, stack contracts.ModStack) (contracts.StepManifest, error) {
+	if req.JobID.IsZero() {
+		return contracts.StepManifest{}, errors.New("job_id required")
+	}
+	if router.Image.IsEmpty() {
+		return contracts.StepManifest{}, fmt.Errorf("router: image required")
+	}
+	image, err := router.Image.ResolveImage(stack)
+	if err != nil {
+		return contracts.StepManifest{}, fmt.Errorf("router image resolution: %w", err)
+	}
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return contracts.StepManifest{}, fmt.Errorf("router: image required")
+	}
+
+	command := router.Command.ToSlice()
+
+	env := make(map[string]string, len(router.Env)+4)
+	for k, v := range router.Env {
+		env[k] = v
+	}
+
+	// Inject repo metadata.
+	if repoURL := strings.TrimSpace(req.RepoURL.String()); repoURL != "" {
+		env["PLOY_REPO_URL"] = repoURL
+	}
+	if baseRef := strings.TrimSpace(req.BaseRef.String()); baseRef != "" {
+		env["PLOY_BASE_REF"] = baseRef
+	}
+	if targetRef := strings.TrimSpace(req.TargetRef.String()); targetRef != "" {
+		env["PLOY_TARGET_REF"] = targetRef
+	}
+	if commitSHA := strings.TrimSpace(req.CommitSHA.String()); commitSHA != "" {
+		env["PLOY_COMMIT_SHA"] = commitSHA
+	}
+
+	routerStepID := types.StepID(fmt.Sprintf("%s-router", req.JobID))
+
+	manifest := contracts.StepManifest{
+		ID:         routerStepID,
+		Name:       fmt.Sprintf("Router for run %s", req.RunID),
+		Image:      image,
+		Command:    command,
+		WorkingDir: "/workspace",
+		Env:        env,
+		Gate:       &contracts.StepGateSpec{Enabled: false},
+		Inputs: []contracts.StepInput{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+				Mode:      contracts.StepInputModeReadOnly,
+			},
+		},
+		Retention: contracts.StepRetentionSpec{
+			RetainContainer: router.RetainContainer,
+			TTL:             types.Duration(time.Hour),
+		},
+		Options: map[string]any{
+			"mount_docker_socket": true,
+		},
+	}
+
+	return manifest, nil
+}
+
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
 // For steps after the first, it:
 //   - Derives inbound expectations from the previous step's outbound when omitted.

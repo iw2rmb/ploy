@@ -53,12 +53,16 @@ type ContainerResult struct {
 // The runID parameter threads the workflow run identifier into container labels
 // for correlation with telemetry and log aggregation systems.
 func buildContainerSpec(runID types.RunID, manifest contracts.StepManifest, workspace string, outDir string, inDir string) (ContainerSpec, error) {
-	// Mount the first RW input at its mount path; fallback to working dir.
+	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
-	// Always mount the hydrated workspace to the declared RW mount (first RW input)
+	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
 	if len(manifest.Inputs) > 0 {
 		in := manifest.Inputs[0]
-		mounts = append(mounts, ContainerMount{Source: workspace, Target: in.MountPath, ReadOnly: false})
+		mounts = append(mounts, ContainerMount{
+			Source:   workspace,
+			Target:   in.MountPath,
+			ReadOnly: in.Mode == contracts.StepInputModeReadOnly,
+		})
 	} else {
 		mounts = append(mounts, ContainerMount{Source: workspace, Target: "/workspace", ReadOnly: false})
 	}

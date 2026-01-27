@@ -1,4 +1,4 @@
-# Minimal spec for the failing Build Gate → Codex heal → re-gate → ORW apply scenario.
+# Minimal spec for the failing Build Gate → router summary → Codex heal → re-gate → ORW apply scenario.
 # Submit with:
 #   dist/ploy mod run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
@@ -22,25 +22,44 @@ steps:
 build_gate:
   enabled: true
 
+  # Router runs BEFORE healing. It reads /in/build-gate.log and outputs a single-line
+  # JSON final message with {"bug_summary":"..."} used to persist jobs.meta.gate.bug_summary.
+  router:
+    image: ghcr.io/iw2rmb/mods-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Read /in/build-gate.log.
+        - Do not edit /workspace.
+        - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+          {"bug_summary":"<<=200 chars, single line>"}
+        - Do not output any other text in the final message.
+
+        Task:
+        Summarize the build failure in /in/build-gate.log as a single bug_summary one-liner.
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+
   healing:
     retries: 1
-    mod:
-      # Codex healing mod using the workspace diff handshake.
-      # Codex edits the workspace and exits when done; the node agent inspects
-      # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-      # Codex never runs the gate itself.
-      image: ghcr.io/iw2rmb/mods-codex:latest
-      env:
-        CODEX_PROMPT: |-
-          Rules:
-          - Use /workspace and /in/build-gate.log to understand the compile error.
-          - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-          Task:
-          Fix the compilation error described in /in/build-gate.log.
-      env_from_file:
-        CODEX_AUTH_JSON: ~/.codex/auth.json
+    # Healing runs AFTER router. It edits /workspace, then outputs a single-line JSON
+    # final message with {"action_summary":"..."} used to persist jobs.meta.action_summary.
+    image: ghcr.io/iw2rmb/mods-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Use /workspace and /in/build-gate.log to understand the compile error.
+        - Edit files under /workspace as needed to fix the error.
+        - When you believe the code is ready for a full build validation, stop editing and end the session.
+        - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+          {"action_summary":"<<=200 chars, single line>"}
+        - Do not output any other text in the final message.
+
+        Task:
+        Fix the compilation error described in /in/build-gate.log.
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
 
 mr_on_fail: false
 mr_on_success: true

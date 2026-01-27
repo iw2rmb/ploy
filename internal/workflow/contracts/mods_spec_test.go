@@ -102,11 +102,12 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 			"enabled": true,
 			"healing": {
 				"retries": 3,
-				"mod": {
-					"image": "docker.io/user/codex:latest",
-					"command": "fix-it",
-					"env": {"PROMPT": "fix the build"}
-				}
+				"image": "docker.io/user/codex:latest",
+				"command": "fix-it",
+				"env": {"PROMPT": "fix the build"}
+			},
+			"router": {
+				"image": "docker.io/user/router:latest"
 			}
 		}
 	}`
@@ -161,16 +162,20 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	if spec.BuildGate.Healing.Retries != 3 {
 		t.Errorf("build_gate.healing.retries = %d, want 3", spec.BuildGate.Healing.Retries)
 	}
-	if spec.BuildGate.Healing.Mod == nil {
-		t.Fatal("build_gate.healing.mod is nil")
+	if spec.BuildGate.Healing.Image.Universal != "docker.io/user/codex:latest" {
+		t.Errorf("build_gate.healing.image = %q, want %q",
+			spec.BuildGate.Healing.Image.Universal, "docker.io/user/codex:latest")
 	}
-	if spec.BuildGate.Healing.Mod.Image.Universal != "docker.io/user/codex:latest" {
-		t.Errorf("build_gate.healing.mod.image = %q, want %q",
-			spec.BuildGate.Healing.Mod.Image.Universal, "docker.io/user/codex:latest")
+	if spec.BuildGate.Healing.Command.Shell != "fix-it" {
+		t.Errorf("build_gate.healing.command = %q, want %q",
+			spec.BuildGate.Healing.Command.Shell, "fix-it")
 	}
-	if spec.BuildGate.Healing.Mod.Command.Shell != "fix-it" {
-		t.Errorf("build_gate.healing.mod.command = %q, want %q",
-			spec.BuildGate.Healing.Mod.Command.Shell, "fix-it")
+	if spec.BuildGate.Router == nil {
+		t.Fatal("build_gate.router is nil")
+	}
+	if spec.BuildGate.Router.Image.Universal != "docker.io/user/router:latest" {
+		t.Errorf("build_gate.router.image = %q, want %q",
+			spec.BuildGate.Router.Image.Universal, "docker.io/user/router:latest")
 	}
 }
 
@@ -397,14 +402,32 @@ func TestParseModsSpecJSON_ValidationError(t *testing.T) {
 
 // TestParseModsSpecJSON_HealingValidation tests healing spec validation.
 func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
-	// Healing mod without image.
+	// Healing with image but no router.
 	input := `{
 		"steps": [{"image": "test:latest"}],
-		"build_gate": {"healing": {"retries": 1, "mod": {"command": "fix"}}}
+		"build_gate": {"healing": {"retries": 1, "image": "codex:latest", "command": "fix"}}
 	}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
-		t.Fatal("expected validation error for healing mod without image")
+		t.Fatal("expected validation error for healing without router")
+	}
+}
+
+func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
+	// Healing configured without an image.
+	input := `{
+		"steps": [{"image": "test:latest"}],
+		"build_gate": {
+			"healing": {"retries": 1},
+			"router": {"image": "router:latest"}
+		}
+	}`
+	_, err := ParseModsSpecJSON([]byte(input))
+	if err == nil {
+		t.Fatal("expected validation error for healing without image")
+	}
+	if want := "build_gate.healing.image: required when healing is configured"; err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
 
@@ -468,9 +491,10 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		BuildGate: &BuildGateConfig{
 			Healing: &HealingSpec{
 				Retries: 2,
-				Mod: &HealingModSpec{
-					Image: ModImage{Universal: "codex:latest"},
-				},
+				Image:   ModImage{Universal: "codex:latest"},
+			},
+			Router: &RouterSpec{
+				Image: ModImage{Universal: "router:latest"},
 			},
 		},
 	}

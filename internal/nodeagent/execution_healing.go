@@ -43,12 +43,14 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
@@ -112,12 +114,12 @@ func (r *runController) runGateWithHealing(
 	inDir *string,
 	gatePhase string, // "pre" or "post"
 	stepIndex int, // logical step index for logging and stats
-) (*gateRunMetadata, []gateRunMetadata, error) {
+) (*gateRunMetadata, []gateRunMetadata, string, error) {
 	gateSpec := manifest.Gate
 
 	// If gate is disabled or executor unavailable, return immediately.
 	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
-		return nil, nil, nil
+		return nil, nil, "", nil
 	}
 
 	// Execute initial gate.
@@ -126,7 +128,7 @@ func (r *runController) runGateWithHealing(
 	gateDuration := time.Since(gateStart)
 
 	if gateErr != nil {
-		return nil, nil, fmt.Errorf("gate execution failed: %w", gateErr)
+		return nil, nil, "", fmt.Errorf("gate execution failed: %w", gateErr)
 	}
 
 	// Capture initial gate metadata for stats.
@@ -138,7 +140,7 @@ func (r *runController) runGateWithHealing(
 	// Check if gate passed using shared helper.
 	if gateResultPassed(gateMetadata) {
 		slog.Info("gate passed", "run_id", req.RunID, "phase", gatePhase)
-		return initialGate, nil, nil
+		return initialGate, nil, "", nil
 	}
 
 	// Gate failed. Check if healing is configured using typed options from request.
@@ -146,7 +148,7 @@ func (r *runController) runGateWithHealing(
 	if typedOpts.Healing == nil || typedOpts.Healing.Mod.Image.IsEmpty() {
 		// No healing configured (or healing configured without a mod); return the gate failure.
 		slog.Info("gate failed, no healing configured", "run_id", req.RunID, "phase", gatePhase)
-		return initialGate, nil, step.ErrBuildGateFailed
+		return initialGate, nil, "", step.ErrBuildGateFailed
 	}
 
 	healingConfig := typedOpts.Healing
@@ -157,7 +159,7 @@ func (r *runController) runGateWithHealing(
 		tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
 		if dirErr != nil {
 			slog.Error("failed to create /in directory for healing", "run_id", req.RunID, "error", dirErr)
-			return initialGate, nil, step.ErrBuildGateFailed
+			return initialGate, nil, "", step.ErrBuildGateFailed
 		}
 		*inDir = tmpInDir
 		// Caller handles cleanup via defer.
@@ -187,6 +189,9 @@ func (r *runController) runGateWithHealing(
 	// Track re-gate runs for stats.
 	var reGates []gateRunMetadata
 
+	// Track the last action_summary produced by healing containers across iterations.
+	var lastActionSummary string
+
 	// Track healing session state across healing loop iterations.
 	// When a healing agent writes a session file (codex-session.txt) to /out,
 	// the agent reads and persists this session ID to /in for subsequent attempts.
@@ -201,8 +206,84 @@ func (r *runController) runGateWithHealing(
 	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running a healing mod).
 	//  2. The retry count is user-configured (manifest-specified retries parameter).
 	//  3. No exponential backoff is needed; each healing attempt runs immediately after the healing mod completes.
+	// healingLogBuf accumulates the /in/healing-log.md content across iterations.
+	var healingLogBuf strings.Builder
+
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries, "phase", gatePhase)
+
+		// Stack-aware image selection uses the stack derived from the gate metadata
+		// that triggered this healing attempt.
+		stackForAttempt := contracts.ModStackUnknown
+		switch {
+		case attempt == 1 && initialGate != nil && initialGate.Metadata != nil:
+			stackForAttempt = initialGate.Metadata.DetectedStack()
+		case len(reGates) > 0 && reGates[len(reGates)-1].Metadata != nil:
+			stackForAttempt = reGates[len(reGates)-1].Metadata.DetectedStack()
+		}
+		if stackForAttempt == "" {
+			stackForAttempt = contracts.ModStackUnknown
+		}
+
+		// --- Per-iteration artifact: /in/build-gate-iteration-N.log ---
+		// Write the current gate failure log as a per-iteration snapshot.
+		if logPayload != "" {
+			iterGateLogPath := filepath.Join(*inDir, fmt.Sprintf("build-gate-iteration-%d.log", attempt))
+			if writeErr := os.WriteFile(iterGateLogPath, []byte(logPayload), 0o644); writeErr != nil {
+				slog.Warn("failed to write build-gate-iteration log", "run_id", req.RunID, "attempt", attempt, "error", writeErr)
+			}
+		}
+
+		// --- Per-iteration router execution (bug_summary) ---
+		// Run router before healing so we capture a one-line summary for the current
+		// failing build-gate.log (which may change across re-gate attempts).
+		bugSummary := ""
+		if typedOpts.Router != nil && !typedOpts.Router.Image.IsEmpty() {
+			slog.Info("running router for bug_summary", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
+
+			func() {
+				routerOutDir, routerDirErr := os.MkdirTemp("", "ploy-router-out-*")
+				if routerDirErr != nil {
+					slog.Error("failed to create router /out directory", "run_id", req.RunID, "attempt", attempt, "error", routerDirErr)
+					return
+				}
+				defer os.RemoveAll(routerOutDir)
+
+				routerManifest, routerBuildErr := buildRouterManifest(req, *typedOpts.Router, stackForAttempt)
+				if routerBuildErr != nil {
+					slog.Error("failed to build router manifest", "run_id", req.RunID, "attempt", attempt, "error", routerBuildErr)
+					return
+				}
+
+				r.injectHealingEnvVars(&routerManifest, workspace)
+				r.mountHealingTLSCerts(&routerManifest)
+
+				_, routerErr := runner.Run(ctx, step.Request{
+					RunID:     req.RunID,
+					Manifest:  routerManifest,
+					Workspace: workspace,
+					OutDir:    routerOutDir,
+					InDir:     *inDir,
+				})
+				if routerErr != nil {
+					slog.Warn("router execution failed", "run_id", req.RunID, "attempt", attempt, "error", routerErr)
+					return
+				}
+
+				bugSummary = parseBugSummary(routerOutDir)
+				if bugSummary == "" {
+					return
+				}
+
+				// Attach bug_summary to the initial gate metadata for downstream stats.
+				// Inline healing does not have a separate gate job, but this preserves
+				// the first failing gate's bug_summary in run stats.
+				if attempt == 1 && initialGate != nil && initialGate.Metadata != nil {
+					initialGate.Metadata.BugSummary = bugSummary
+				}
+				slog.Info("router produced bug_summary", "run_id", req.RunID, "attempt", attempt, "bug_summary", bugSummary)
+			}()
+		}
 
 		// Capture workspace status before running the healing mod so we can detect
 		// whether this healing attempt produced any net changes.
@@ -224,12 +305,12 @@ func (r *runController) runGateWithHealing(
 		// CODEX_RESUME=1 for Codex-based healers) can be injected by
 		// buildHealingManifest when appropriate.
 		// Stack is unknown during inline healing loops since the gate result
-		// that detected the stack is the one that just failed. Use explicit
-		// ModStackUnknown to indicate this is intentional, not a fallback.
-		healManifest, buildErr := buildHealingManifest(req, mod, healingIndex, healingSession, contracts.ModStackUnknown)
+		// that detected the stack is the one that just failed. Use stackForAttempt
+		// (derived from that gate metadata) for deterministic stack-aware image selection.
+		healManifest, buildErr := buildHealingManifest(req, mod, healingIndex, healingSession, stackForAttempt)
 		if buildErr != nil {
 			slog.Error("failed to build healing manifest", "run_id", req.RunID, "healing_index", healingIndex, "error", buildErr)
-			return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", healingIndex, buildErr)
+			return initialGate, reGates, lastActionSummary, fmt.Errorf("build healing manifest[%d]: %w", healingIndex, buildErr)
 		}
 
 		slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "healing_index", healingIndex, "image", healManifest.Image, "phase", gatePhase)
@@ -253,7 +334,7 @@ func (r *runController) runGateWithHealing(
 
 		if healErr != nil {
 			slog.Error("healing mod execution failed", "run_id", req.RunID, "healing_index", healingIndex, "error", healErr)
-			return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", healingIndex, healErr)
+			return initialGate, reGates, lastActionSummary, fmt.Errorf("healing mod[%d] failed: %w", healingIndex, healErr)
 		}
 
 		if healResult.ExitCode != 0 {
@@ -286,6 +367,46 @@ func (r *runController) runGateWithHealing(
 			}
 		}
 
+		// --- Capture action_summary from healing container ---
+		actionSummary := parseActionSummary(outDir)
+		if actionSummary != "" {
+			lastActionSummary = actionSummary
+			slog.Info("healing: captured action_summary", "run_id", req.RunID, "attempt", attempt, "action_summary", actionSummary)
+		}
+
+		// --- Per-iteration artifact: /in/healing-iteration-N.log ---
+		// Copy healing agent output (codex.log or equivalent) to /in for history.
+		healingIterLogPath := filepath.Join(*inDir, fmt.Sprintf("healing-iteration-%d.log", attempt))
+		if codexLog, readErr := os.ReadFile(filepath.Join(outDir, "codex.log")); readErr == nil {
+			if writeErr := os.WriteFile(healingIterLogPath, codexLog, 0o644); writeErr != nil {
+				slog.Warn("failed to write healing-iteration log", "run_id", req.RunID, "attempt", attempt, "error", writeErr)
+			}
+		}
+
+		// --- Append iteration block to /in/healing-log.md ---
+		if attempt == 1 {
+			healingLogBuf.WriteString("# Healing Log\n\n")
+		}
+		fmt.Fprintf(&healingLogBuf, "## Iteration %d\n\n", attempt)
+		if bugSummary != "" {
+			fmt.Fprintf(&healingLogBuf, "- Bug Summary: %s\n", bugSummary)
+		} else {
+			healingLogBuf.WriteString("- Bug Summary: N/A\n")
+		}
+		fmt.Fprintf(&healingLogBuf, "  Build Log: /in/build-gate-iteration-%d.log\n", attempt)
+		if actionSummary != "" {
+			fmt.Fprintf(&healingLogBuf, "- Healing Attempt: %s\n", actionSummary)
+		} else {
+			healingLogBuf.WriteString("- Healing Attempt: N/A\n")
+		}
+		fmt.Fprintf(&healingLogBuf, "  Agent Log: /in/healing-iteration-%d.log\n\n", attempt)
+
+		// Write healing-log.md after each iteration so it's available even if we bail out early.
+		healingLogPath := filepath.Join(*inDir, "healing-log.md")
+		if writeErr := os.WriteFile(healingLogPath, []byte(healingLogBuf.String()), 0o644); writeErr != nil {
+			slog.Warn("failed to write healing-log.md", "run_id", req.RunID, "error", writeErr)
+		}
+
 		// Capture workspace status after the healing mod completes and compare with
 		// the pre-healing status. If both are available and identical, then this
 		// healing attempt produced no net workspace changes and there is no point
@@ -307,7 +428,7 @@ func (r *runController) runGateWithHealing(
 				"phase", gatePhase,
 			)
 			// Retries are effectively exhausted because healing cannot make further progress.
-			return initialGate, reGates, fmt.Errorf("%w: healing produced no workspace changes", step.ErrBuildGateFailed)
+			return initialGate, reGates, lastActionSummary, fmt.Errorf("%w: healing produced no workspace changes", step.ErrBuildGateFailed)
 		}
 
 		// Re-run the gate after the healing mod completes.
@@ -333,7 +454,7 @@ func (r *runController) runGateWithHealing(
 
 		if regateErr != nil {
 			slog.Error("re-gate execution failed", "run_id", req.RunID, "error", regateErr)
-			return initialGate, reGates, fmt.Errorf("re-gate execution failed: %w", regateErr)
+			return initialGate, reGates, lastActionSummary, fmt.Errorf("re-gate execution failed: %w", regateErr)
 		}
 
 		// Capture re-gate metadata for stats.
@@ -345,16 +466,34 @@ func (r *runController) runGateWithHealing(
 		// Check if gate passed using shared helper.
 		if gateResultPassed(reGateMetadata) {
 			slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
-			return initialGate, reGates, nil
+			return initialGate, reGates, lastActionSummary, nil
 		}
 
-		// Re-gate failed; continue to next retry or exit when exhausted.
+		// Re-gate failed; update logPayload and /in/build-gate.log for the next iteration.
 		slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
+
+		// Refresh logPayload from the re-gate result so the next iteration's
+		// build-gate-iteration-N.log and healing-log.md reflect the latest failure.
+		logPayload = reGateMetadata.LogsText
+		if len(reGateMetadata.LogFindings) > 0 {
+			if trimmed := strings.TrimSpace(reGateMetadata.LogFindings[0].Message); trimmed != "" {
+				logPayload = trimmed
+				if !strings.HasSuffix(logPayload, "\n") {
+					logPayload += "\n"
+				}
+			}
+		}
+		if logPayload != "" {
+			inLogPath := filepath.Join(*inDir, "build-gate.log")
+			if writeErr := os.WriteFile(inLogPath, []byte(logPayload), 0o644); writeErr != nil {
+				slog.Warn("failed to update /in/build-gate.log after re-gate", "run_id", req.RunID, "error", writeErr)
+			}
+		}
 	}
 
 	// Retries exhausted; return the gate failure.
 	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID, "phase", gatePhase)
-	return initialGate, reGates, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
+	return initialGate, reGates, lastActionSummary, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
 }
 
 // executeWithHealing runs the main step with optional healing loop when the build gate fails.
@@ -421,7 +560,7 @@ func (r *runController) executeWithHealing(
 	// This centralizes all gate execution in runGateWithHealing, ensuring gate failures
 	// are handled uniformly with healing support. Runner.Run is reserved for container execution.
 	// Pass stepIndex so gate history and stats remain aligned with the Mods step index.
-	preGate, preReGates, preGateErr := r.runGateWithHealing(
+	preGate, preReGates, preActionSummary, preGateErr := r.runGateWithHealing(
 		ctx, runner, req, manifest, workspace, outDir, inDir, "pre", stepIndex,
 	)
 
@@ -437,9 +576,10 @@ func (r *runController) executeWithHealing(
 			result.BuildGate = preGate.Metadata
 		}
 		return executionResult{
-			Result:  result,
-			PreGate: preGate,
-			ReGates: reGates,
+			Result:        result,
+			PreGate:       preGate,
+			ReGates:       reGates,
+			ActionSummary: preActionSummary,
 		}, preGateErr
 	}
 
@@ -486,9 +626,10 @@ func (r *runController) executeWithHealing(
 	// Handle execution error (not a gate failure since gate is disabled).
 	if err != nil {
 		return executionResult{
-			Result:  result,
-			PreGate: preGate,
-			ReGates: reGates,
+			Result:        result,
+			PreGate:       preGate,
+			ReGates:       reGates,
+			ActionSummary: preActionSummary,
 		}, err
 	}
 
@@ -497,7 +638,7 @@ func (r *runController) executeWithHealing(
 	// as pre-mod gates, keeping gate orchestration consistent.
 	// Pass stepIndex so post-mod gate history and stats remain aligned with the Mods step index.
 	if result.ExitCode == 0 {
-		postGate, postReGates, postErr := r.runGateWithHealing(
+		postGate, postReGates, postActionSummary, postErr := r.runGateWithHealing(
 			ctx, runner, req, manifest, workspace, outDir, inDir, "post", stepIndex,
 		)
 		// Append initial post-gate run to history.
@@ -517,17 +658,97 @@ func (r *runController) executeWithHealing(
 			result.BuildGate = postGate.Metadata
 		}
 
+		// Prefer post-gate action_summary; fall back to pre-gate.
+		actionSummary := postActionSummary
+		if actionSummary == "" {
+			actionSummary = preActionSummary
+		}
 		return executionResult{
-			Result:  result,
-			PreGate: preGate,
-			ReGates: reGates,
+			Result:        result,
+			PreGate:       preGate,
+			ReGates:       reGates,
+			ActionSummary: actionSummary,
 		}, postErr
 	}
 
 	// Main mod exited with non-zero code; no post-gate runs.
 	return executionResult{
-		Result:  result,
-		PreGate: preGate,
-		ReGates: reGates,
+		Result:        result,
+		PreGate:       preGate,
+		ReGates:       reGates,
+		ActionSummary: preActionSummary,
 	}, nil
+}
+
+// parseBugSummary reads /out/codex-last.txt and extracts the "bug_summary" field
+// from a JSON one-liner. Returns an empty string if the file is missing, unreadable,
+// or does not contain a bug_summary field.
+func parseBugSummary(outDir string) string {
+	return parseCodexLastField(outDir, "bug_summary")
+}
+
+// parseActionSummary reads /out/codex-last.txt and extracts the "action_summary"
+// field from a JSON one-liner. Returns an empty string if the file is missing,
+// unreadable, or does not contain an action_summary field.
+func parseActionSummary(outDir string) string {
+	return parseCodexLastField(outDir, "action_summary")
+}
+
+// parseCodexLastField reads codex-last.txt from outDir and extracts a named string
+// field from the JSON content. The file is expected to contain one or more lines;
+// each line is tried as a JSON object. The first line containing the requested field
+// wins. The returned value is trimmed and truncated to 200 characters.
+func parseCodexLastField(outDir, field string) string {
+	data, err := os.ReadFile(filepath.Join(outDir, "codex-last.txt"))
+	if err != nil {
+		return ""
+	}
+
+	truncateOneLine := func(s string, maxRunes int) string {
+		s = strings.TrimSpace(s)
+		s = strings.ReplaceAll(s, "\r", " ")
+		s = strings.ReplaceAll(s, "\n", " ")
+		if maxRunes <= 0 {
+			return ""
+		}
+		if utf8.RuneCountInString(s) <= maxRunes {
+			return s
+		}
+		// Reserve 1 rune for an ellipsis.
+		if maxRunes == 1 {
+			return "…"
+		}
+		r := []rune(s)
+		return string(r[:maxRunes-1]) + "…"
+	}
+
+	// Try each line as a potential JSON object.
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] != '{' {
+			continue
+		}
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &obj); err != nil {
+			continue
+		}
+		if val, ok := obj[field]; ok {
+			if s, ok := val.(string); ok {
+				return truncateOneLine(s, 200)
+			}
+		}
+	}
+
+	// If line-by-line didn't work, try the entire content as a single JSON object
+	// (in case the file is a single-line JSON without trailing newline).
+	var obj map[string]interface{}
+	if err := json.Unmarshal(data, &obj); err == nil {
+		if val, ok := obj[field]; ok {
+			if s, ok := val.(string); ok {
+				return truncateOneLine(s, 200)
+			}
+		}
+	}
+
+	return ""
 }

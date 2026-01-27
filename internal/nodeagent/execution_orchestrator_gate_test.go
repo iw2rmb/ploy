@@ -1,9 +1,11 @@
 package nodeagent
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -428,5 +430,66 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 	}
 	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != testLogDigest(1) {
 		t.Fatalf("job_meta.Gate.LogDigest = %#v, want %q", decoded.JobMeta.Gate, testLogDigest(1))
+	}
+}
+
+func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
+	t.Parallel()
+
+	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
+
+	workspace := t.TempDir()
+
+	const wantBugSummary = "javac: cannot find symbol FooBar"
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			if strings.Contains(spec.Image, "router") {
+				for _, m := range spec.Mounts {
+					if m.Target == "/out" {
+						_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"),
+							[]byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
+					}
+				}
+			}
+			return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return nil, nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	runner := step.Runner{Containers: mockContainer}
+
+	req := StartRunRequest{
+		RunID:   types.RunID("run-router-gate"),
+		JobID:   types.JobID("job-router-gate"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+	}
+
+	typedOpts := RunOptions{
+		Healing: &HealingConfig{
+			Retries: 1,
+			Mod: HealingMod{
+				Image: contracts.ModImage{Universal: "test/healer:latest"},
+			},
+		},
+		Router: &RouterConfig{
+			Image: contracts.ModImage{Universal: "test/router:latest"},
+		},
+	}
+
+	gateResult := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+		LogsText:     "[ERROR] build failed\n",
+	}
+
+	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
+
+	if gateResult.BugSummary != wantBugSummary {
+		t.Fatalf("gateResult.BugSummary = %q, want %q", gateResult.BugSummary, wantBugSummary)
 	}
 }
