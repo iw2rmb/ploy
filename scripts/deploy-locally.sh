@@ -240,6 +240,27 @@ main() {
 JSON
   ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
 
+  log "Configuring local Gradle Build Cache (gate + mods)..."
+  if [[ -x "./dist/ploy" ]]; then
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
+      --key PLOY_GRADLE_BUILD_CACHE_URL \
+      --value "http://gradle-build-cache:5071/cache/" \
+      --scope gate
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
+      --key PLOY_GRADLE_BUILD_CACHE_URL \
+      --value "http://gradle-build-cache:5071/cache/" \
+      --scope mods
+
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
+      --key PLOY_GRADLE_BUILD_CACHE_PUSH \
+      --value "true" \
+      --scope gate
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
+      --key PLOY_GRADLE_BUILD_CACHE_PUSH \
+      --value "true" \
+      --scope mods
+  fi
+
   log "Smoke testing CLI cluster token list (optional)..."
   # NOTE: Token operations are now accessible only via `ploy cluster token`.
   if [[ -x "./dist/ploy" ]]; then
