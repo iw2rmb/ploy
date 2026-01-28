@@ -75,6 +75,11 @@ type fakeDockerClient struct {
 	pullErr    error
 	pullCalled bool
 	pullRef    string // captured image reference
+
+	// ImageInspect behavior (used by pull policy tests)
+	imageInspectErr    error
+	imageInspectCalled bool
+	imageInspectRef    string
 }
 
 // ContainerCreate simulates container creation.
@@ -142,6 +147,13 @@ func (f *fakeDockerClient) ImagePull(ctx context.Context, refStr string, options
 	}
 	// Return a type that satisfies client.ImagePullResponse (io.ReadCloser + extra methods).
 	return &fakeImagePullResponse{Reader: strings.NewReader("")}, nil
+}
+
+// ImageInspect simulates inspecting an image reference.
+func (f *fakeDockerClient) ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error) {
+	f.imageInspectCalled = true
+	f.imageInspectRef = imageID
+	return client.ImageInspectResult{}, f.imageInspectErr
 }
 
 // fakeImagePullResponse implements client.ImagePullResponse for testing.

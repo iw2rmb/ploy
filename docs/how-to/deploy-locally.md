@@ -186,6 +186,8 @@ that gate containers can use to share compiled outputs across runs.
 
 Build the local Build Gate Gradle images (required for `java+gradle` gates when using the default image mapping):
 
+The node resolves these images via the local Docker daemon. When the image already exists locally, the node will use it as-is; it only pulls from a registry when the image is missing.
+
 ```bash
 docker build -t ploy-gate-gradle:jdk11 -f docker/gates/gradle/Dockerfile.jdk11 docker/gates/gradle
 docker build -t ploy-gate-gradle:jdk17 -f docker/gates/gradle/Dockerfile.jdk17 docker/gates/gradle

@@ -63,7 +63,8 @@ func (h *filesystemWorkspaceHydrator) Hydrate(ctx context.Context, manifest cont
 
 // DockerContainerRuntimeOptions holds configuration for Docker runtime.
 type DockerContainerRuntimeOptions struct {
-	// PullImage controls whether the runtime pulls the image before start.
+	// PullImage controls whether the runtime ensures the image is available
+	// (by pulling it only when missing) before container creation.
 	PullImage bool
 	// Network is optional Docker network name (empty => default bridge).
 	Network string
