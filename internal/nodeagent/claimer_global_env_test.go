@@ -268,6 +268,20 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	if !gateManifest.Gate.Enabled {
 		t.Error("expected Gate.Enabled=true")
 	}
+
+	// The Docker-based gate executor reads env vars from Gate.Env (not StepManifest.Env).
+	// Gate manifests must mirror job env vars into Gate.Env so build images (e.g. Gradle)
+	// can consume injected settings like PLOY_GRADLE_BUILD_CACHE_*.
+	for key, wantVal := range expectedEnv {
+		gotVal, ok := gateManifest.Gate.Env[key]
+		if !ok {
+			t.Errorf("gateManifest.Gate.Env missing key %q", key)
+			continue
+		}
+		if gotVal != wantVal {
+			t.Errorf("gateManifest.Gate.Env[%q] = %q, want %q", key, gotVal, wantVal)
+		}
+	}
 }
 
 // TestGlobalEnvPropagation_MultiStepRun verifies that global env vars are

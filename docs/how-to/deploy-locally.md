@@ -217,6 +217,12 @@ If you started the stack manually, configure it via:
 
 The cache node UI is available at `http://localhost:5071`.
 
+Run the Gradle build cache E2E scenario:
+
+```bash
+bash tests/e2e/gradle/build-cache/run.sh
+```
+
 ## 8) Stop / Clean
 
 ```

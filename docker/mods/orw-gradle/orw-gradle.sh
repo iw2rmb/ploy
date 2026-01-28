@@ -269,13 +269,15 @@ if [[ -n "${PLOY_GRADLE_BUILD_CACHE_URL:-}" ]]; then
   mkdir -p "$gradle_home/init.d"
   cat > "$gradle_home/init.d/ploy-remote-build-cache.init.gradle" <<'INITGRADLE'
 settingsEvaluated { settings ->
-  def url = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
-  if (url == null || url.trim().isEmpty()) return
+  def cacheUrl = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
+  if (cacheUrl == null || cacheUrl.trim().isEmpty()) return
 
   settings.buildCache {
     local { enabled = true }
     remote(HttpBuildCache) {
-      this.url = new URI(url)
+      // NOTE: In Groovy closures, `this` refers to the script object, not the delegate.
+      // Assign to the delegate property directly.
+      url = new URI(cacheUrl)
       push = (System.getenv("PLOY_GRADLE_BUILD_CACHE_PUSH") ?: "true").toBoolean()
       allowInsecureProtocol = true
     }
