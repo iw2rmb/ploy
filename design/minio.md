@@ -281,15 +281,7 @@ Wire the server container to MinIO:
 - add `depends_on: minio`
 - add `PLOY_OBJECTSTORE_*` env vars pointing to `http://minio:9000`
 
-Optional: update `scripts/deploy-locally.sh` to wait for MinIO health (if needed).
-
-## Risks / Tradeoffs
-
-- **Consistency**: DB write + MinIO upload is not fully atomic.
-  - Mitigation: upload first to a temporary key then “finalize” (copy/rename) after DB commit, or best-effort cleanup on failure.
-  - Acceptable for local and early iterations if the TTL lifecycle cleans up orphans.
-- **Drop partitions**: without MinIO lifecycle rules, dropping DB partitions will leak objects.
-- **Operational config**: MinIO credentials become a required server dependency.
+Update `scripts/deploy-locally.sh` to wait for MinIO health (if needed).
 
 ## Follow-up work (implementation slice)
 
