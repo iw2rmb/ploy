@@ -1,0 +1,9 @@
+steps:
+  - image: ubuntu:latest
+    command:
+      - /bin/sh
+      - -lc
+      - echo "noop mod step (gradle build-cache e2e)"
+
+build_gate:
+  enabled: true

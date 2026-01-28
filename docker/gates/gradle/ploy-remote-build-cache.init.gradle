@@ -1,13 +1,48 @@
 settingsEvaluated { settings ->
-  def url = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
-  if (url == null || url.trim().isEmpty()) return
+  def cacheUrl = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
+  if (cacheUrl == null || cacheUrl.trim().isEmpty()) return
 
   settings.buildCache {
     local { enabled = true }
     remote(HttpBuildCache) {
-      this.url = new URI(url)
+      // NOTE: In Groovy closures, `this` refers to the script object, not the delegate.
+      // Assign to the delegate property directly.
+      url = new URI(cacheUrl)
       push = (System.getenv("PLOY_GRADLE_BUILD_CACHE_PUSH") ?: "true").toBoolean()
       allowInsecureProtocol = true
+    }
+  }
+}
+
+// Emit a stable marker when tasks are loaded from the build cache.
+// This is used by E2E tests to verify that the remote build cache node is actually used.
+def _ployCacheURL = System.getenv("PLOY_GRADLE_BUILD_CACHE_URL")
+if (_ployCacheURL != null && !_ployCacheURL.trim().isEmpty()) {
+  gradle.taskGraph.afterTask { task, state ->
+    def msg = state.getSkipMessage()
+    def outcomeStr = null
+    try {
+      outcomeStr = state.getOutcome()?.toString()
+    } catch (Throwable ignored) {
+      // Older Gradle versions may not expose getOutcome(); skip.
+    }
+
+    def hit = false
+    if (msg != null && msg.toUpperCase().contains("FROM-CACHE")) hit = true
+    if (outcomeStr != null && outcomeStr.toUpperCase().contains("FROM_CACHE")) hit = true
+
+    if (hit) {
+      // Best-effort: record cache hits in the workspace so the gate executor can surface
+      // them in structured metadata (even when Gradle runs with `-q`).
+      try {
+        def hitsFile = new File("/workspace/.ploy-gradle-build-cache-hits")
+        hitsFile << (task.path + "\n")
+      } catch (Throwable ignored) {
+        // Do not fail the build if workspace is not writable.
+      }
+
+      // Use stderr so markers are visible even under `gradle -q`.
+      System.err.println("[ploy-gradle-cache] HIT " + task.path)
     }
   }
 }

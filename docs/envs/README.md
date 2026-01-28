@@ -394,7 +394,9 @@ The `scope` parameter controls which job types receive each variable:
 3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
    in the spec are never overwritten by global env.
 4. **Container injection**: The node agent propagates the merged `env` map to the
-   container runtime, which sets them in the running container.
+   container runtime, which sets them in the running container. For Build Gate jobs,
+   the node agent mirrors job env into the gate spec env so gate build images
+   receive the same injected variables.
 
 ### Common Variables Consumed by Official Images
 

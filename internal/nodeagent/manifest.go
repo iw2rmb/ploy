@@ -170,6 +170,15 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	// across jobs within the same run (pre_gate/mod/post_gate/heal/re_gate).
 	stepID := types.StepID(req.JobID)
 
+	// Gate env should mirror the job env. Gate jobs (pre_gate/post_gate/re_gate)
+	// execute in separate build images and must receive the same env vars the
+	// server injected for the job scope (e.g., PLOY_GRADLE_BUILD_CACHE_* for gate,
+	// CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON).
+	gateEnv := make(map[string]string, len(env))
+	for k, v := range env {
+		gateEnv[k] = v
+	}
+
 	manifest := contracts.StepManifest{
 		ID:         stepID,
 		Name:       fmt.Sprintf("Run %s", req.RunID),
@@ -182,7 +191,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		// without direct workspace access.
 		Gate: &contracts.StepGateSpec{
 			Enabled:        true,
-			Env:            map[string]string{},
+			Env:            gateEnv,
 			ImageOverrides: nil,
 			RepoURL:        types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
 			Ref:            types.GitRef(strings.TrimSpace(gateRef)),

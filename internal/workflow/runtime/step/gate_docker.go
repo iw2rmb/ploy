@@ -27,6 +27,7 @@
 package step
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -34,6 +35,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -57,6 +59,37 @@ import (
 // behavior and complete history capture.
 type dockerGateExecutor struct {
 	rt ContainerRuntime
+}
+
+func readGradleBuildCacheHits(workspace string) []string {
+	path := filepath.Join(workspace, ".ploy-gradle-build-cache-hits")
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	defer func() { _ = os.Remove(path) }()
+
+	seen := make(map[string]struct{})
+	var hits []string
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		s := strings.TrimSpace(scanner.Text())
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		hits = append(hits, s)
+	}
+	if len(hits) == 0 {
+		return nil
+	}
+	sort.Strings(hits)
+	return hits
 }
 
 // NewDockerGateExecutor constructs a GateExecutor that uses the provided
@@ -568,6 +601,15 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			Passed:   passed,
 		}},
 		RuntimeImage: image,
+	}
+	if passed && strings.EqualFold(tool, "gradle") {
+		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
+			meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{
+				Severity: "info",
+				Code:     "GRADLE_BUILD_CACHE_HIT",
+				Message:  fmt.Sprintf("gradle build cache hits (%d): %s", len(hits), strings.Join(hits, ", ")),
+			})
+		}
 	}
 	if !passed {
 		// For known tools (Maven, Gradle), trim logs down to the most relevant
