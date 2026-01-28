@@ -47,17 +47,6 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	gzippedLog := gzipData(t, logLine)
 
 	mock := &mockStore{
-		// CreateLog returns the persisted log record.
-		createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
-			return store.Log{
-				ID:        1,
-				RunID:     arg.RunID,
-				JobID:     arg.JobID,
-				ChunkNo:   arg.ChunkNo,
-				Data:      arg.Data,
-				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}, nil
-		},
 		// GetJob returns job metadata for enrichment.
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			if id != jobID {
@@ -84,14 +73,18 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	params := store.CreateLogParams{
-		RunID:   runID,
-		JobID:   &jobID,
-		ChunkNo: 1,
-		Data:    gzippedLog,
+	// CreateAndPublishLog now takes the already-persisted log metadata and data bytes.
+	// The log is already persisted via blobpersist; this method only handles SSE fanout.
+	logRow := store.Log{
+		ID:        1,
+		RunID:     runID,
+		JobID:     &jobID,
+		ChunkNo:   1,
+		DataSize:  int64(len(gzippedLog)),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	_, err = svc.CreateAndPublishLog(ctx, params)
+	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	if err != nil {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
@@ -142,16 +135,6 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	gzippedLog := gzipData(t, logLine)
 
 	mock := &mockStore{
-		createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
-			return store.Log{
-				ID:        1,
-				RunID:     arg.RunID,
-				JobID:     arg.JobID,
-				ChunkNo:   arg.ChunkNo,
-				Data:      arg.Data,
-				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}, nil
-		},
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{
 				ID:        jobID,
@@ -170,12 +153,15 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err = svc.CreateAndPublishLog(ctx, store.CreateLogParams{
-		RunID:   runID,
-		JobID:   &jobID,
-		ChunkNo: 1,
-		Data:    gzippedLog,
-	})
+	logRow := store.Log{
+		ID:        1,
+		RunID:     runID,
+		JobID:     &jobID,
+		ChunkNo:   1,
+		DataSize:  int64(len(gzippedLog)),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	if err != nil {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
@@ -218,15 +204,6 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 
 	getJobCalled := false
 	mock := &mockStore{
-		createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
-			return store.Log{
-				ID:        1,
-				RunID:     arg.RunID,
-				JobID:     arg.JobID, // No job ID.
-				Data:      arg.Data,
-				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}, nil
-		},
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			getJobCalled = true
 			return store.Job{}, nil
@@ -243,14 +220,17 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	params := store.CreateLogParams{
-		RunID:   runID,
-		JobID:   nil, // No job ID.
-		ChunkNo: 1,
-		Data:    gzippedLog,
+	// Log without job ID (log already persisted via blobpersist).
+	logRow := store.Log{
+		ID:        1,
+		RunID:     runID,
+		JobID:     nil, // No job ID.
+		ChunkNo:   1,
+		DataSize:  int64(len(gzippedLog)),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	_, err = svc.CreateAndPublishLog(ctx, params)
+	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	if err != nil {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
@@ -299,15 +279,6 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	gzippedLog := gzipData(t, logLine)
 
 	mock := &mockStore{
-		createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
-			return store.Log{
-				ID:        1,
-				RunID:     arg.RunID,
-				JobID:     arg.JobID,
-				Data:      arg.Data,
-				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-			}, nil
-		},
 		// Simulate job lookup failure.
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{}, context.DeadlineExceeded
@@ -324,15 +295,17 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	params := store.CreateLogParams{
-		RunID:   runID,
-		JobID:   &jobID,
-		ChunkNo: 1,
-		Data:    gzippedLog,
+	logRow := store.Log{
+		ID:        1,
+		RunID:     runID,
+		JobID:     &jobID,
+		ChunkNo:   1,
+		DataSize:  int64(len(gzippedLog)),
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
 	// Should succeed despite job lookup failure.
-	_, err = svc.CreateAndPublishLog(ctx, params)
+	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	if err != nil {
 		t.Fatalf("CreateAndPublishLog should succeed despite job lookup failure: %v", err)
 	}

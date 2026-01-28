@@ -10,18 +10,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createJobArtifactHandler stores gzipped artifact bundle in artifact_bundles table (≤1 MiB), rejects oversize.
+// createJobArtifactHandler stores gzipped artifact bundle in object storage and metadata in artifact_bundles table (≤1 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/artifact
 //
 // Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 // Note: build_id removed as part of builds table removal; artifacts now use job-level grouping only.
-func createJobArtifactHandler(st store.Store) http.HandlerFunc {
+func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
+	if bp == nil {
+		panic("createJobArtifactHandler: blobpersist is required")
+	}
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
 	const maxBodySize = 2 << 20   // 2 MiB
@@ -123,20 +126,13 @@ func createJobArtifactHandler(st store.Store) http.HandlerFunc {
 			RunID:  runID,
 			JobID:  &jobID,
 			Name:   req.Name,
-			Bundle: req.Bundle,
 			Cid:    &cid,
 			Digest: &digest,
 		}
 
-		// Persist artifact bundle to DB.
-		artifact, err := st.CreateArtifactBundle(r.Context(), params)
+		// Persist artifact bundle metadata to database and upload blob to object storage.
+		artifact, err := bp.CreateArtifactBundle(r.Context(), params, req.Bundle)
 		if err != nil {
-			// Check if the error is a constraint violation (size cap exceeded).
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23514" { // check_violation
-				http.Error(w, "artifact bundle size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
-				return
-			}
 			http.Error(w, fmt.Sprintf("failed to create artifact bundle: %v", err), http.StatusInternalServerError)
 			slog.Error("artifact: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return

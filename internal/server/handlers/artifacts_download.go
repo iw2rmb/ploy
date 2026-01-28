@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -68,9 +72,9 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 }
 
 // getArtifactHandler handles GET /v1/artifacts/{id}[?download=true] for artifact retrieval.
-// If download=true, returns the raw bundle bytes with Content-Disposition header.
+// If download=true, returns the raw bundle bytes streamed from object storage with Content-Disposition header.
 // Otherwise, returns artifact metadata in JSON.
-func getArtifactHandler(st store.Store) http.HandlerFunc {
+func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr, err := requiredPathParam(r, "id")
 		if err != nil {
@@ -99,13 +103,27 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		// Check if download mode is requested.
 		download := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("download"))) == "true"
 		if download {
-			// Return raw bundle bytes.
+			// Stream from object storage.
+			if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
+				http.Error(w, "artifact blob not found", http.StatusNotFound)
+				slog.Error("download artifact: no object_key", "artifact_id", idStr)
+				return
+			}
+
+			rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
+			if err != nil {
+				http.Error(w, "failed to retrieve artifact blob", http.StatusServiceUnavailable)
+				slog.Error("download artifact: blob get failed", "artifact_id", idStr, "object_key", *bundle.ObjectKey, "err", err)
+				return
+			}
+			defer rc.Close()
+
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.bin", idStr))
+			w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write(bundle.Bundle); err != nil {
-				// Log write errors but response is already committed.
-				return
+			if _, err := io.Copy(w, rc); err != nil {
+				slog.Error("download artifact: stream failed", "artifact_id", idStr, "err", err)
 			}
 			return
 		}
@@ -128,7 +146,7 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		detail := artifactDetail{
 			ID:    uuid.UUID(bundle.ID.Bytes).String(),
 			RunID: bundle.RunID,
-			Size:  int64(len(bundle.Bundle)),
+			Size:  bundle.BundleSize,
 		}
 		if bundle.JobID != nil && *bundle.JobID != "" {
 			jobID := *bundle.JobID

@@ -232,11 +232,15 @@ CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 --   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
 -- Rehydration applies diffs from jobs ordered by step_index.
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
+-- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  patch      BYTEA NOT NULL CHECK (octet_length(patch) <= 1048576),      -- expected gzipped (cap: 1 MiB)
+  patch_size BIGINT NOT NULL CHECK (patch_size > 0),
+  object_key TEXT GENERATED ALWAYS AS (
+    'diffs/run/' || run_id || '/diff/' || id::text || '.patch.gz'
+  ) STORED,
   summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -248,12 +252,16 @@ CREATE INDEX IF NOT EXISTS diffs_job_idx ON diffs(job_id);
 -- the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- logs.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
+-- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS logs (
   id         BIGSERIAL PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   chunk_no   INTEGER NOT NULL,
-  data       BYTEA NOT NULL CHECK (octet_length(data) <= 1048576),      -- expected gzipped (cap: 1 MiB)
+  data_size  BIGINT NOT NULL CHECK (data_size > 0),
+  object_key TEXT GENERATED ALWAYS AS (
+    'logs/run/' || run_id || '/job/' || COALESCE(job_id, 'none') || '/chunk/' || chunk_no::text || '/log/' || id::text || '.gz'
+  ) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -266,15 +274,19 @@ CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 -- part of the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- artifact_bundles.id is UUID to allow client-side generation and offline staging.
+-- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS artifact_bundles (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  job_id     TEXT REFERENCES jobs(id) ON DELETE SET NULL,
-  name       TEXT,                -- optional logical name
-  bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
-  cid        TEXT,                -- content-addressed ID for deduplication
-  digest     TEXT,                -- content hash
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id      TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  job_id      TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  name        TEXT,                -- optional logical name
+  bundle_size BIGINT NOT NULL CHECK (bundle_size > 0),
+  object_key  TEXT GENERATED ALWAYS AS (
+    'artifacts/run/' || run_id || '/bundle/' || id::text || '.tar.gz'
+  ) STORED,
+  cid         TEXT,                -- content-addressed ID for deduplication
+  digest      TEXT,                -- content hash
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS artifact_bundles_run_idx ON artifact_bundles(run_id);
 CREATE INDEX IF NOT EXISTS artifact_bundles_job_idx ON artifact_bundles(job_id);

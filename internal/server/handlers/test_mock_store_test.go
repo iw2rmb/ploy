@@ -191,7 +191,7 @@ type mockStore struct {
 	// ListArtifactBundlesMetaByCID tracking
 	listArtifactBundlesMetaByCIDCalled bool
 	listArtifactBundlesMetaByCIDParams *string
-	listArtifactBundlesMetaByCIDResult []store.ListArtifactBundlesMetaByCIDRow
+	listArtifactBundlesMetaByCIDResult []store.ArtifactBundle
 	listArtifactBundlesMetaByCIDErr    error
 
 	// ListArtifactBundlesByRun tracking
@@ -203,7 +203,7 @@ type mockStore struct {
 	// ListArtifactBundlesMetaByRun tracking
 	listArtifactBundlesMetaByRunCalled bool
 	listArtifactBundlesMetaByRunParam  string
-	listArtifactBundlesMetaByRunResult []store.ListArtifactBundlesMetaByRunRow
+	listArtifactBundlesMetaByRunResult []store.ArtifactBundle
 	listArtifactBundlesMetaByRunErr    error
 
 	// GetArtifactBundle tracking
@@ -221,7 +221,7 @@ type mockStore struct {
 	// ListArtifactBundlesMetaByRunAndJob tracking
 	listArtifactBundlesMetaByRunAndJobCalled bool
 	listArtifactBundlesMetaByRunAndJobParams store.ListArtifactBundlesMetaByRunAndJobParams
-	listArtifactBundlesMetaByRunAndJobResult []store.ListArtifactBundlesMetaByRunAndJobRow
+	listArtifactBundlesMetaByRunAndJobResult []store.ArtifactBundle
 	listArtifactBundlesMetaByRunAndJobErr    error
 
 	// CreateJob tracking
@@ -297,7 +297,7 @@ type mockStore struct {
 	// ListDiffsMetaByRunRepo tracking (v1 repo-scoped diffs listing; metadata-only)
 	listDiffsMetaByRunRepoCalled bool
 	listDiffsMetaByRunRepoParams store.ListDiffsMetaByRunRepoParams
-	listDiffsMetaByRunRepoResult []store.ListDiffsMetaByRunRepoRow
+	listDiffsMetaByRunRepoResult []store.Diff
 	listDiffsMetaByRunRepoErr    error
 
 	// GetDiff tracking
@@ -816,7 +816,7 @@ func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) (
 	return m.listArtifactBundlesByCIDResult, m.listArtifactBundlesByCIDErr
 }
 
-func (m *mockStore) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]store.ListArtifactBundlesMetaByCIDRow, error) {
+func (m *mockStore) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
 	m.listArtifactBundlesMetaByCIDCalled = true
 	m.listArtifactBundlesMetaByCIDParams = cid
 	return m.listArtifactBundlesMetaByCIDResult, m.listArtifactBundlesMetaByCIDErr
@@ -828,7 +828,7 @@ func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID types.Ru
 	return m.listArtifactBundlesByRunResult, m.listArtifactBundlesByRunErr
 }
 
-func (m *mockStore) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]store.ListArtifactBundlesMetaByRunRow, error) {
+func (m *mockStore) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
 	m.listArtifactBundlesMetaByRunCalled = true
 	m.listArtifactBundlesMetaByRunParam = runID.String()
 	return m.listArtifactBundlesMetaByRunResult, m.listArtifactBundlesMetaByRunErr
@@ -846,7 +846,7 @@ func (m *mockStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg stor
 	return m.listArtifactBundlesByRunAndJobResult, m.listArtifactBundlesByRunAndJobErr
 }
 
-func (m *mockStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ListArtifactBundlesMetaByRunAndJobRow, error) {
+func (m *mockStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	m.listArtifactBundlesMetaByRunAndJobCalled = true
 	m.listArtifactBundlesMetaByRunAndJobParams = arg
 	return m.listArtifactBundlesMetaByRunAndJobResult, m.listArtifactBundlesMetaByRunAndJobErr
@@ -987,7 +987,7 @@ func (m *mockStore) ListDiffsByRunRepo(ctx context.Context, arg store.ListDiffsB
 }
 
 // ListDiffsMetaByRunRepo implements the v1 repo-scoped diffs metadata query.
-func (m *mockStore) ListDiffsMetaByRunRepo(ctx context.Context, arg store.ListDiffsMetaByRunRepoParams) ([]store.ListDiffsMetaByRunRepoRow, error) {
+func (m *mockStore) ListDiffsMetaByRunRepo(ctx context.Context, arg store.ListDiffsMetaByRunRepoParams) ([]store.Diff, error) {
 	m.listDiffsMetaByRunRepoCalled = true
 	m.listDiffsMetaByRunRepoParams = arg
 	return m.listDiffsMetaByRunRepoResult, m.listDiffsMetaByRunRepoErr

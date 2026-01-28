@@ -13,25 +13,26 @@ import (
 )
 
 const createLog = `-- name: CreateLog :one
-INSERT INTO logs (run_id, job_id, chunk_no, data)
+INSERT INTO logs (run_id, job_id, chunk_no, data_size)
 VALUES ($1, $2, $3, $4)
-RETURNING id, run_id, job_id, chunk_no, data, created_at
+RETURNING id, run_id, job_id, chunk_no, data_size, object_key, created_at
 `
 
 type CreateLogParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	JobID   *types.JobID `json:"job_id"`
-	ChunkNo int32        `json:"chunk_no"`
-	Data    []byte       `json:"data"`
+	RunID    types.RunID  `json:"run_id"`
+	JobID    *types.JobID `json:"job_id"`
+	ChunkNo  int32        `json:"chunk_no"`
+	DataSize int64        `json:"data_size"`
 }
 
-// Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
+// Creates a new log chunk metadata. Blob data is stored in MinIO.
+// Logs are grouped at the job level only (build_id removed).
 func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, error) {
 	row := q.db.QueryRow(ctx, createLog,
 		arg.RunID,
 		arg.JobID,
 		arg.ChunkNo,
-		arg.Data,
+		arg.DataSize,
 	)
 	var i Log
 	err := row.Scan(
@@ -39,7 +40,8 @@ func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, erro
 		&i.RunID,
 		&i.JobID,
 		&i.ChunkNo,
-		&i.Data,
+		&i.DataSize,
+		&i.ObjectKey,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -66,10 +68,11 @@ func (q *Queries) DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Time
 }
 
 const getLog = `-- name: GetLog :one
-SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE id = $1
 `
 
+// Returns log metadata including object_key for MinIO retrieval.
 func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 	row := q.db.QueryRow(ctx, getLog, id)
 	var i Log
@@ -78,18 +81,20 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 		&i.RunID,
 		&i.JobID,
 		&i.ChunkNo,
-		&i.Data,
+		&i.DataSize,
+		&i.ObjectKey,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listLogsByRun = `-- name: ListLogsByRun :many
-SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
 
+// Returns log metadata including object_key for MinIO retrieval.
 func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRun, runID)
 	if err != nil {
@@ -104,7 +109,8 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, 
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
-			&i.Data,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -118,7 +124,7 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, 
 }
 
 const listLogsByRunAndJob = `-- name: ListLogsByRunAndJob :many
-SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -128,6 +134,7 @@ type ListLogsByRunAndJobParams struct {
 	JobID *types.JobID `json:"job_id"`
 }
 
+// Returns log metadata including object_key for MinIO retrieval.
 func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {
@@ -142,7 +149,8 @@ func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJ
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
-			&i.Data,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -156,7 +164,7 @@ func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJ
 }
 
 const listLogsByRunAndJobSince = `-- name: ListLogsByRunAndJobSince :many
-SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC
 `
@@ -167,6 +175,7 @@ type ListLogsByRunAndJobSinceParams struct {
 	ID    int64        `json:"id"`
 }
 
+// Returns log metadata including object_key for MinIO retrieval.
 func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
 	if err != nil {
@@ -181,7 +190,8 @@ func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRu
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
-			&i.Data,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -195,7 +205,7 @@ func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRu
 }
 
 const listLogsByRunSince = `-- name: ListLogsByRunSince :many
-SELECT id, run_id, job_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND id > $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -205,6 +215,7 @@ type ListLogsByRunSinceParams struct {
 	ID    int64       `json:"id"`
 }
 
+// Returns log metadata including object_key for MinIO retrieval.
 func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunSince, arg.RunID, arg.ID)
 	if err != nil {
@@ -219,7 +230,8 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
-			&i.Data,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -233,35 +245,28 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 }
 
 const listLogsMetaByRun = `-- name: ListLogsMetaByRun :many
-SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
 
-type ListLogsMetaByRunRow struct {
-	ID        int64              `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	ChunkNo   int32              `json:"chunk_no"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-// Returns log metadata (without the data blob) for a run.
-// Use GetLog to fetch the actual log data by id.
-func (q *Queries) ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error) {
+// Returns log metadata for a run.
+func (q *Queries) ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsMetaByRun, runID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListLogsMetaByRunRow{}
+	items := []Log{}
 	for rows.Next() {
-		var i ListLogsMetaByRunRow
+		var i Log
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -275,7 +280,7 @@ func (q *Queries) ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]L
 }
 
 const listLogsMetaByRunAndJob = `-- name: ListLogsMetaByRunAndJob :many
-SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -285,30 +290,23 @@ type ListLogsMetaByRunAndJobParams struct {
 	JobID *types.JobID `json:"job_id"`
 }
 
-type ListLogsMetaByRunAndJobRow struct {
-	ID        int64              `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	ChunkNo   int32              `json:"chunk_no"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-// Returns log metadata (without the data blob) for a run and job.
-// Use GetLog to fetch the actual log data by id.
-func (q *Queries) ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error) {
+// Returns log metadata for a run and job.
+func (q *Queries) ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsMetaByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListLogsMetaByRunAndJobRow{}
+	items := []Log{}
 	for rows.Next() {
-		var i ListLogsMetaByRunAndJobRow
+		var i Log
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -322,7 +320,7 @@ func (q *Queries) ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaB
 }
 
 const listLogsMetaByRunAndJobSince = `-- name: ListLogsMetaByRunAndJobSince :many
-SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC
 `
@@ -333,30 +331,23 @@ type ListLogsMetaByRunAndJobSinceParams struct {
 	ID    int64        `json:"id"`
 }
 
-type ListLogsMetaByRunAndJobSinceRow struct {
-	ID        int64              `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	ChunkNo   int32              `json:"chunk_no"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-// Returns log metadata (without the data blob) for a run and job since a given id.
-// Use GetLog to fetch the actual log data by id.
-func (q *Queries) ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]ListLogsMetaByRunAndJobSinceRow, error) {
+// Returns log metadata for a run and job since a given id.
+func (q *Queries) ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsMetaByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListLogsMetaByRunAndJobSinceRow{}
+	items := []Log{}
 	for rows.Next() {
-		var i ListLogsMetaByRunAndJobSinceRow
+		var i Log
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -370,7 +361,7 @@ func (q *Queries) ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogs
 }
 
 const listLogsMetaByRunSince = `-- name: ListLogsMetaByRunSince :many
-SELECT id, run_id, job_id, chunk_no, created_at FROM logs
+SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE run_id = $1 AND id > $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -380,30 +371,23 @@ type ListLogsMetaByRunSinceParams struct {
 	ID    int64       `json:"id"`
 }
 
-type ListLogsMetaByRunSinceRow struct {
-	ID        int64              `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	ChunkNo   int32              `json:"chunk_no"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-// Returns log metadata (without the data blob) for a run since a given id.
-// Use GetLog to fetch the actual log data by id.
-func (q *Queries) ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error) {
+// Returns log metadata for a run since a given id.
+func (q *Queries) ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsMetaByRunSince, arg.RunID, arg.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListLogsMetaByRunSinceRow{}
+	items := []Log{}
 	for rows.Next() {
-		var i ListLogsMetaByRunSinceRow
+		var i Log
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
 			&i.ChunkNo,
+			&i.DataSize,
+			&i.ObjectKey,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

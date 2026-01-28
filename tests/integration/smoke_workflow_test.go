@@ -194,41 +194,41 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	// Build Gate logs
 	buildGateLog := []byte("INFO: Starting build gate validation\nINFO: Running Maven build\nINFO: Build gate passed\n")
 	log1, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
-		JobID:   &jobBuildGate.ID,
-		ChunkNo: 0,
-		Data:    buildGateLog,
+		RunID:    run.ID,
+		JobID:    &jobBuildGate.ID,
+		ChunkNo:  0,
+		DataSize: int64(len(buildGateLog)),
 	})
 	if err != nil {
 		t.Fatalf("CreateLog(build-gate) failed: %v", err)
 	}
-	t.Logf("✓ Created log chunk 0: %d bytes", len(log1.Data))
+	t.Logf("✓ Created log chunk 0: %d bytes", log1.DataSize)
 
 	// Main job logs
 	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
-		JobID:   &jobMain.ID,
-		ChunkNo: 1,
-		Data:    mainLog,
+		RunID:    run.ID,
+		JobID:    &jobMain.ID,
+		ChunkNo:  1,
+		DataSize: int64(len(mainLog)),
 	})
 	if err != nil {
 		t.Fatalf("CreateLog(main) failed: %v", err)
 	}
-	t.Logf("✓ Created log chunk 1: %d bytes", len(log2.Data))
+	t.Logf("✓ Created log chunk 1: %d bytes", log2.DataSize)
 
 	// Post-processing logs
 	postLog := []byte("INFO: Uploading artifacts\nINFO: Artifacts uploaded successfully\n")
 	log3, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
-		JobID:   &jobPost.ID,
-		ChunkNo: 2,
-		Data:    postLog,
+		RunID:    run.ID,
+		JobID:    &jobPost.ID,
+		ChunkNo:  2,
+		DataSize: int64(len(postLog)),
 	})
 	if err != nil {
 		t.Fatalf("CreateLog(post-process) failed: %v", err)
 	}
-	t.Logf("✓ Created log chunk 2: %d bytes", len(log3.Data))
+	t.Logf("✓ Created log chunk 2: %d bytes", log3.DataSize)
 
 	// Step 4: Generate diffs for the main job.
 	diffPatch := []byte(`diff --git a/src/Main.java b/src/Main.java
@@ -247,15 +247,15 @@ index abc1234..def5678 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobMain.ID,
-		Patch:   diffPatch,
-		Summary: diffSummary,
+		RunID:     run.ID,
+		JobID:     &jobMain.ID,
+		PatchSize: int64(len(diffPatch)),
+		Summary:   diffSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff() failed: %v", err)
 	}
-	t.Logf("✓ Created diff: id=%v, patch_len=%d", diff.ID, len(diff.Patch))
+	t.Logf("✓ Created diff: id=%v, patch_size=%d", diff.ID, diff.PatchSize)
 
 	// Step 5: Create events representing workflow state transitions.
 	now := time.Now().UTC()
@@ -381,9 +381,12 @@ index abc1234..def5678 100644
 			t.Errorf("Log chunks not ordered correctly: got chunk_nos %d, %d, %d",
 				logs[0].ChunkNo, logs[1].ChunkNo, logs[2].ChunkNo)
 		}
-		// Spot-check log content
-		if string(logs[0].Data) != string(buildGateLog) {
-			t.Errorf("Log chunk 0 content mismatch")
+		// Spot-check log metadata
+		if logs[0].DataSize != int64(len(buildGateLog)) {
+			t.Errorf("Log chunk 0 size mismatch")
+		}
+		if logs[0].ObjectKey == nil || *logs[0].ObjectKey == "" {
+			t.Errorf("Log chunk 0 missing object_key")
 		}
 	}
 	t.Logf("✓ Verified %d log chunks in correct order", len(logs))
@@ -403,8 +406,11 @@ index abc1234..def5678 100644
 		if diffs[0].JobID == nil || *diffs[0].JobID != jobMain.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", jobMain.ID, diffs[0].JobID)
 		}
-		if string(diffs[0].Patch) != string(diffPatch) {
-			t.Errorf("Diff patch content mismatch")
+		if diffs[0].PatchSize != int64(len(diffPatch)) {
+			t.Errorf("Diff patch_size mismatch")
+		}
+		if diffs[0].ObjectKey == nil || *diffs[0].ObjectKey == "" {
+			t.Errorf("Diff missing object_key")
 		}
 	}
 	t.Logf("✓ Verified %d diff(s) with correct job association", len(diffs))
@@ -522,11 +528,12 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	step1Heal2Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":2}`)
 
 	// Create step 0 mod diff.
+	step0ModPatch := []byte{0x1f, 0x8b, 0x01} // Placeholder gzip bytes.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobStep0.ID,
-		Patch:   []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
-		Summary: step0ModSummary,
+		RunID:     run.ID,
+		JobID:     &jobStep0.ID,
+		PatchSize: int64(len(step0ModPatch)),
+		Summary:   step0ModSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step0-mod) failed: %v", err)
@@ -534,11 +541,12 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 0 mod diff: id=%v", step0ModDiff.ID)
 
 	// Create step 0 healing diff with same step_index.
+	step0HealPatch := []byte{0x1f, 0x8b, 0x02}
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobStep0.ID,
-		Patch:   []byte{0x1f, 0x8b, 0x02},
-		Summary: step0HealSummary,
+		RunID:     run.ID,
+		JobID:     &jobStep0.ID,
+		PatchSize: int64(len(step0HealPatch)),
+		Summary:   step0HealSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step0-heal) failed: %v", err)
@@ -546,11 +554,12 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 0 healing diff: id=%v", step0HealDiff.ID)
 
 	// Create step 1 mod diff.
+	step1ModPatch := []byte{0x1f, 0x8b, 0x03}
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobStep1.ID,
-		Patch:   []byte{0x1f, 0x8b, 0x03},
-		Summary: step1ModSummary,
+		RunID:     run.ID,
+		JobID:     &jobStep1.ID,
+		PatchSize: int64(len(step1ModPatch)),
+		Summary:   step1ModSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-mod) failed: %v", err)
@@ -558,22 +567,24 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 1 mod diff: id=%v", step1ModDiff.ID)
 
 	// Create step 1 healing diffs (2 attempts).
+	step1Heal1Patch := []byte{0x1f, 0x8b, 0x04}
 	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobStep1.ID,
-		Patch:   []byte{0x1f, 0x8b, 0x04},
-		Summary: step1Heal1Summary,
+		RunID:     run.ID,
+		JobID:     &jobStep1.ID,
+		PatchSize: int64(len(step1Heal1Patch)),
+		Summary:   step1Heal1Summary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-heal1) failed: %v", err)
 	}
 	t.Logf("✓ Created step 1 healing diff 1: id=%v", step1Heal1Diff.ID)
 
+	step1Heal2Patch := []byte{0x1f, 0x8b, 0x05}
 	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &jobStep1.ID,
-		Patch:   []byte{0x1f, 0x8b, 0x05},
-		Summary: step1Heal2Summary,
+		RunID:     run.ID,
+		JobID:     &jobStep1.ID,
+		PatchSize: int64(len(step1Heal2Patch)),
+		Summary:   step1Heal2Summary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-heal2) failed: %v", err)

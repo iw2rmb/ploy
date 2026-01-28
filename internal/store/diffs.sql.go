@@ -13,25 +13,25 @@ import (
 )
 
 const createDiff = `-- name: CreateDiff :one
-INSERT INTO diffs (run_id, job_id, patch, summary)
+INSERT INTO diffs (run_id, job_id, patch_size, summary)
 VALUES ($1, $2, $3, $4)
-RETURNING id, run_id, job_id, patch, summary, created_at
+RETURNING id, run_id, job_id, patch_size, object_key, summary, created_at
 `
 
 type CreateDiffParams struct {
-	RunID   types.RunID  `json:"run_id"`
-	JobID   *types.JobID `json:"job_id"`
-	Patch   []byte       `json:"patch"`
-	Summary []byte       `json:"summary"`
+	RunID     types.RunID  `json:"run_id"`
+	JobID     *types.JobID `json:"job_id"`
+	PatchSize int64        `json:"patch_size"`
+	Summary   []byte       `json:"summary"`
 }
 
-// Creates a new diff entry associated with a job.
+// Creates a new diff entry associated with a job. Blob data is stored in MinIO.
 // Ordering is determined by the job's step_index.
 func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
 	row := q.db.QueryRow(ctx, createDiff,
 		arg.RunID,
 		arg.JobID,
-		arg.Patch,
+		arg.PatchSize,
 		arg.Summary,
 	)
 	var i Diff
@@ -39,7 +39,8 @@ func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, e
 		&i.ID,
 		&i.RunID,
 		&i.JobID,
-		&i.Patch,
+		&i.PatchSize,
+		&i.ObjectKey,
 		&i.Summary,
 		&i.CreatedAt,
 	)
@@ -67,10 +68,11 @@ func (q *Queries) DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Tim
 }
 
 const getDiff = `-- name: GetDiff :one
-SELECT id, run_id, job_id, patch, summary, created_at FROM diffs
+SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE id = $1
 `
 
+// Returns diff metadata including object_key for MinIO retrieval.
 func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 	row := q.db.QueryRow(ctx, getDiff, id)
 	var i Diff
@@ -78,7 +80,8 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 		&i.ID,
 		&i.RunID,
 		&i.JobID,
-		&i.Patch,
+		&i.PatchSize,
+		&i.ObjectKey,
 		&i.Summary,
 		&i.CreatedAt,
 	)
@@ -86,7 +89,7 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 }
 
 const listDiffsBeforeStep = `-- name: ListDiffsBeforeStep :many
-SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
+SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 INNER JOIN jobs j ON d.job_id = j.id
 WHERE d.run_id = $1
   AND j.step_index <= $2
@@ -114,7 +117,8 @@ func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeSt
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.Patch,
+			&i.PatchSize,
+			&i.ObjectKey,
 			&i.Summary,
 			&i.CreatedAt,
 		); err != nil {
@@ -129,7 +133,7 @@ func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeSt
 }
 
 const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
-SELECT d.id, d.run_id, d.job_id, d.patch, d.summary, d.created_at FROM diffs d
+SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
@@ -157,7 +161,8 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
-			&i.Patch,
+			&i.PatchSize,
+			&i.ObjectKey,
 			&i.Summary,
 			&i.CreatedAt,
 		); err != nil {
@@ -172,38 +177,29 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 }
 
 const listDiffsMetaByRun = `-- name: ListDiffsMetaByRun :many
-SELECT id, run_id, job_id, summary, created_at, octet_length(patch)::BIGINT AS patch_size FROM diffs
+SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE run_id = $1
 ORDER BY created_at ASC, id ASC
 `
 
-type ListDiffsMetaByRunRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Summary   []byte             `json:"summary"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	PatchSize int64              `json:"patch_size"`
-}
-
-// Returns diff metadata (without the patch blob) for a run.
-// Use GetDiff to fetch the actual patch data by id.
-func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]ListDiffsMetaByRunRow, error) {
+// Returns diff metadata for a run.
+func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsMetaByRun, runID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListDiffsMetaByRunRow{}
+	items := []Diff{}
 	for rows.Next() {
-		var i ListDiffsMetaByRunRow
+		var i Diff
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
+			&i.PatchSize,
+			&i.ObjectKey,
 			&i.Summary,
 			&i.CreatedAt,
-			&i.PatchSize,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +212,7 @@ func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]
 }
 
 const listDiffsMetaByRunRepo = `-- name: ListDiffsMetaByRunRepo :many
-SELECT d.id, d.run_id, d.job_id, d.summary, d.created_at, octet_length(patch)::BIGINT AS patch_size FROM diffs d
+SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
@@ -227,33 +223,24 @@ type ListDiffsMetaByRunRepoParams struct {
 	RepoID types.ModRepoID `json:"repo_id"`
 }
 
-type ListDiffsMetaByRunRepoRow struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Summary   []byte             `json:"summary"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	PatchSize int64              `json:"patch_size"`
-}
-
-// Returns diff metadata (without the patch blob) for a specific repo within a run.
-// Use GetDiff to fetch the actual patch data by id.
-func (q *Queries) ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]ListDiffsMetaByRunRepoRow, error) {
+// Returns diff metadata for a specific repo within a run.
+func (q *Queries) ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsMetaByRunRepo, arg.RunID, arg.RepoID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListDiffsMetaByRunRepoRow{}
+	items := []Diff{}
 	for rows.Next() {
-		var i ListDiffsMetaByRunRepoRow
+		var i Diff
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
 			&i.JobID,
+			&i.PatchSize,
+			&i.ObjectKey,
 			&i.Summary,
 			&i.CreatedAt,
-			&i.PatchSize,
 		); err != nil {
 			return nil, err
 		}

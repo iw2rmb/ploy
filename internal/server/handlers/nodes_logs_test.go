@@ -3,11 +3,14 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -26,11 +29,13 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	}
 
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
+	objKey := fmt.Sprintf("logs/run/%s/job/none/chunk/%d/log/%d.gz", runID.String(), chunkNo, logID)
 	st.createLogResult = store.Log{
-		ID:      logID,
-		RunID:   runID,
-		ChunkNo: chunkNo,
-		Data:    []byte{0x1f, 0x8b},
+		ID:        logID,
+		RunID:     runID,
+		ChunkNo:   chunkNo,
+		DataSize:  2,
+		ObjectKey: &objKey,
 	}
 
 	// Create events service with the mock store — required for log ingestion.
@@ -38,6 +43,9 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
+
+	// Create blobpersist service for coordinated writes.
+	bp := blobpersist.New(st, bsmock.New())
 
 	// Prepare request payload.
 	reqBody := map[string]interface{}{
@@ -55,7 +63,7 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	req.SetPathValue("id", nodeIDStr)
 	req.Header.Set("Content-Type", "application/json")
 
-	createNodeLogsHandler(st, eventsService).ServeHTTP(rr, req)
+	createNodeLogsHandler(st, bp, eventsService).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status %d, want 201", rr.Code)

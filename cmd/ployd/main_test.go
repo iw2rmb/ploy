@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	apiconfig "github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -120,7 +122,9 @@ func TestRun_Shutdown(t *testing.T) {
 		t.Fatalf("create temp config: %v", err)
 	}
 
-	if err := run(ctx, cfg, configPath, st, authorizer, "test-secret"); err != nil {
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+	if err := run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp); err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
 }
@@ -153,10 +157,14 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 		t.Fatalf("create temp config: %v", err)
 	}
 
+	// Create mock blobstore and blobpersist
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+
 	// Start run in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret")
+		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp)
 	}()
 
 	// Cancel context to trigger shutdown

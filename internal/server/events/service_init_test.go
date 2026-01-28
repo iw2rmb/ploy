@@ -98,7 +98,8 @@ func TestStorage_ServiceStartStop(t *testing.T) {
 }
 
 // TestStorage_WithoutStore verifies that the service correctly returns
-// errors when attempting to persist events or logs without a configured store.
+// errors when attempting to persist events without a configured store.
+// CreateAndPublishLog only handles SSE fanout (no store required), so it doesn't fail.
 // This ensures proper error handling for services created without database backing.
 func TestStorage_WithoutStore(t *testing.T) {
 	svc, err := New(Options{
@@ -112,15 +113,16 @@ func TestStorage_WithoutStore(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test CreateAndPublishEvent without store.
+	// Test CreateAndPublishEvent without store — should fail (requires DB persistence).
 	_, err = svc.CreateAndPublishEvent(ctx, store.CreateEventParams{})
 	if err == nil {
 		t.Fatal("expected error when store not configured, got nil")
 	}
 
-	// Test CreateAndPublishLog without store.
-	_, err = svc.CreateAndPublishLog(ctx, store.CreateLogParams{})
-	if err == nil {
-		t.Fatal("expected error when store not configured, got nil")
+	// Test CreateAndPublishLog without store — should NOT fail since it only fans out to SSE.
+	// The log metadata is already persisted via blobpersist; this method only handles SSE fanout.
+	err = svc.CreateAndPublishLog(ctx, store.Log{}, []byte{})
+	if err != nil {
+		t.Fatalf("expected no error for CreateAndPublishLog (SSE-only), got: %v", err)
 	}
 }

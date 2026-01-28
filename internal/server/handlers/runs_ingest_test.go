@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -24,7 +27,12 @@ type mockStoreRunLogs struct {
 // Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParams) (store.Log, error) {
 	m.lastCreate = arg
-	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
+	jobKey := "none"
+	if arg.JobID != nil && !arg.JobID.IsZero() {
+		jobKey = arg.JobID.String()
+	}
+	objKey := "logs/run/" + arg.RunID.String() + "/job/" + jobKey + "/chunk/" + fmt.Sprintf("%d", arg.ChunkNo) + "/log/1.gz"
+	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, ChunkNo: arg.ChunkNo, DataSize: arg.DataSize, ObjectKey: &objKey}, nil
 }
 
 // GetJob returns an empty job for log enrichment (no-op for this test).
@@ -39,7 +47,8 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	h := createRunLogHandler(ms, eventsService)
+	bp := blobpersist.New(ms, bsmock.New())
+	h := createRunLogHandler(ms, bp, eventsService)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
@@ -66,7 +75,8 @@ func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	h := createRunLogHandler(ms, eventsService)
+	bp := blobpersist.New(ms, bsmock.New())
+	h := createRunLogHandler(ms, bp, eventsService)
 	runID := domaintypes.NewRunID()
 	big := make([]byte, 1<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}
@@ -97,7 +107,8 @@ func (m *mockStoreRunDiffs) GetRun(_ context.Context, id domaintypes.RunID) (sto
 }
 func (m *mockStoreRunDiffs) CreateDiff(_ context.Context, p store.CreateDiffParams) (store.Diff, error) {
 	m.created = p
-	return store.Diff{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}}, nil
+	objKey := "diffs/run/" + p.RunID.String() + "/diff/" + uuid.New().String() + ".patch.gz"
+	return store.Diff{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, PatchSize: p.PatchSize, ObjectKey: &objKey}, nil
 }
 
 func TestCreateRunDiffHandler_Success(t *testing.T) {
@@ -107,7 +118,8 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 		job: store.Job{ID: jobID, RunID: runID},
 		run: store.Run{ID: runID},
 	}
-	h := createRunDiffHandler(ms)
+	bp := blobpersist.New(ms, bsmock.New())
+	h := createRunDiffHandler(ms, bp)
 	payload := map[string]any{"job_id": jobID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/diffs", bytes.NewReader(b))
@@ -138,14 +150,16 @@ func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.
 	m.created = p
 	cid := "bafy-test"
 	digest := "sha256:test"
+	objKey := "artifacts/run/" + p.RunID.String() + "/bundle/" + uuid.New().String() + ".tar.gz"
 	return store.ArtifactBundle{
-		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:  p.RunID,
-		JobID:  p.JobID,
-		Name:   p.Name,
-		Bundle: p.Bundle,
-		Cid:    &cid,
-		Digest: &digest,
+		ID:         pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:      p.RunID,
+		JobID:      p.JobID,
+		Name:       p.Name,
+		BundleSize: p.BundleSize,
+		ObjectKey:  &objKey,
+		Cid:        &cid,
+		Digest:     &digest,
 	}, nil
 }
 
@@ -158,7 +172,8 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 		job: store.Job{ID: jobID, RunID: runID, NodeID: &nodeID},
 		run: store.Run{ID: runID},
 	}
-	h := createJobArtifactHandler(ms)
+	bp := blobpersist.New(ms, bsmock.New())
+	h := createJobArtifactHandler(ms, bp)
 	payload := map[string]any{"name": "artifact-name", "bundle": []byte("gz-tar")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/jobs/"+jobID.String()+"/artifact", bytes.NewReader(b))

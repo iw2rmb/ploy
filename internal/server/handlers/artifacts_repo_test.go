@@ -56,7 +56,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(1000)},
 			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(2000)},
 		},
-		listArtifactBundlesMetaByRunResult: []store.ListArtifactBundlesMetaByRunRow{
+		listArtifactBundlesMetaByRunResult: []store.ArtifactBundle{
 			{
 				ID:         pgtype.UUID{Bytes: id2, Valid: true},
 				RunID:      runIDTyped,

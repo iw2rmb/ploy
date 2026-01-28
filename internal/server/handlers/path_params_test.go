@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 )
 
 // TestPathParamsUseDomainTypes validates that handlers reject invalid/blank
@@ -55,7 +58,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		t.Parallel()
 
 		st := &mockStore{}
-		h := createJobDiffHandler(st)
+		bp := blobpersist.New(st, bsmock.New())
+		h := createJobDiffHandler(st, bp)
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/runs//jobs//diff", nil)
 		req.SetPathValue("run_id", "")

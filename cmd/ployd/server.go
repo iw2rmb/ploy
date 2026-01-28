@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
@@ -21,7 +23,7 @@ import (
 )
 
 // run executes the main server loop and blocks until the context is canceled.
-func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer, tokenSecret string) error {
+func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer, tokenSecret string, bs blobstore.Store, bp *blobpersist.Service) error {
 	// Initialize PKI manager for certificate renewal.
 	rotator := pki.NewDefaultRotator(slog.Default())
 	pkiManager, err := pki.New(pki.Options{
@@ -151,7 +153,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, eventsService, configHolder, tokenSecret)
+	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{

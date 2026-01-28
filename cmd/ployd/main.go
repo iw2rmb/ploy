@@ -10,7 +10,9 @@ import (
 	"strings"
 	"syscall"
 
+	bsminio "github.com/iw2rmb/ploy/internal/blobstore/minio"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 	iversion "github.com/iw2rmb/ploy/internal/version"
@@ -98,10 +100,31 @@ func runMain() int {
 		Querier:       st,
 	})
 
+	// Initialize object store (MinIO) from config or environment.
+	objStoreCfg := resolveObjectStoreConfig(cfg)
+	if objStoreCfg.Endpoint == "" {
+		slog.Error("object store endpoint not configured", "hint", "set PLOY_OBJECTSTORE_ENDPOINT or configure object_store.endpoint in config file")
+		return 1
+	}
+	if objStoreCfg.Bucket == "" {
+		slog.Error("object store bucket not configured", "hint", "set PLOY_OBJECTSTORE_BUCKET or configure object_store.bucket in config file")
+		return 1
+	}
+
+	bs, err := bsminio.New(objStoreCfg)
+	if err != nil {
+		slog.Error("initialize object store", "err", err)
+		return 1
+	}
+
+	// Initialize blobpersist service for coordinated DB + object store writes.
+	bp := blobpersist.New(st, bs)
+
 	// Reflect configured transport settings in startup logs (before listeners come up).
 	slog.Info("ployd server starting",
 		"config", configPath,
 		"bearer_tokens", cfg.Auth.BearerTokens.Enabled,
+		"object_store", objStoreCfg.Endpoint,
 	)
 
 	// Set up signal handling for graceful shutdown.
@@ -109,7 +132,7 @@ func runMain() int {
 	defer cancel()
 
 	// Run server.
-	if err := run(ctx, cfg, configPath, st, authorizer, authSecret); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(ctx, cfg, configPath, st, authorizer, authSecret, bs, bp); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("server exited", "err", err)
 		return 1
 	}

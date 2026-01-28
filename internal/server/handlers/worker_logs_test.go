@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -30,7 +33,8 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
@@ -96,7 +100,8 @@ func TestCreateNodeLogsHandler_WithJobID(t *testing.T) {
 		t.Fatalf("failed to create events service: %v", err)
 	}
 
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
@@ -161,7 +166,8 @@ func TestCreateNodeLogsHandler_InvalidNodeID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Create request with invalid node ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid/logs", strings.NewReader("{}"))
@@ -187,7 +193,8 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Create decoded payload larger than 1 MiB (will trigger 413 after decode).
 	largeData := make([]byte, 1<<20+1)
@@ -225,7 +232,8 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Craft a request whose JSON body exceeds 2 MiB due to base64 overhead.
 	// 2 MiB raw → ~2.66 MiB base64 → trips MaxBytesReader body cap.
@@ -264,7 +272,8 @@ func TestCreateNodeLogsHandler_MissingRunID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Create payload without run_id.
 	payload := map[string]interface{}{
@@ -300,7 +309,8 @@ func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Create payload with empty data.
 	payload := map[string]interface{}{
@@ -337,7 +347,8 @@ func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
 	}
-	handler := createNodeLogsHandler(mockStore, eventsService)
+	bp := blobpersist.New(mockStore, bsmock.New())
+	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 	// Create valid payload.
 	payload := map[string]interface{}{
@@ -382,12 +393,18 @@ func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogPar
 	m.logCreated = true
 	m.lastCreateLog = arg
 	// Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
+	jobKey := "none"
+	if arg.JobID != nil && !arg.JobID.IsZero() {
+		jobKey = arg.JobID.String()
+	}
+	objKey := fmt.Sprintf("logs/run/%s/job/%s/chunk/%d/log/1.gz", arg.RunID.String(), jobKey, arg.ChunkNo)
 	return store.Log{
-		ID:      1,
-		RunID:   arg.RunID,
-		JobID:   arg.JobID,
-		ChunkNo: arg.ChunkNo,
-		Data:    arg.Data,
+		ID:        1,
+		RunID:     arg.RunID,
+		JobID:     arg.JobID,
+		ChunkNo:   arg.ChunkNo,
+		DataSize:  arg.DataSize,
+		ObjectKey: &objKey,
 	}, nil
 }
 

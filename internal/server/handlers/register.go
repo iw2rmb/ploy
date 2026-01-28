@@ -1,14 +1,16 @@
 package handlers
 
 import (
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string) {
+func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string) {
 	// Health
 	s.HandleFunc("/health", healthHandler)
 
@@ -56,7 +58,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Artifact download endpoints
 	s.HandleFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/artifacts/{id}", getArtifactHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/artifacts/{id}", getArtifactHandler(st, bs), auth.RoleControlPlane)
 
 	// Runs — batch lifecycle endpoints for listing, inspecting, cancelling, starting, and streaming logs/events.
 	s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)
@@ -72,7 +74,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
 	// Repo-scoped diffs listing.
-	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
+	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
 	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
 	// Repo-scoped artifact listing.
@@ -90,8 +92,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Runs (control plane) — legacy write/management endpoints
 	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st, bp, eventsService), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st, bp), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Node management endpoints
@@ -107,11 +109,11 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
 	// Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, bp, eventsService), auth.RoleWorker)
 
 	// Job artifact and diff upload endpoints (run-scoped, no node ID)
-	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st), auth.RoleWorker)
-	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st, bp), auth.RoleWorker)
+	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st, bp), auth.RoleWorker)
 
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.

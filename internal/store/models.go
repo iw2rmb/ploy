@@ -35,12 +35,11 @@ func (e *JobStatus) Scan(src interface{}) error {
 		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
 	}
 	switch JobStatus(s) {
-	case JobStatusCreated, JobStatusQueued, JobStatusRunning,
-		JobStatusSuccess, JobStatusFail, JobStatusCancelled:
+	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusCancelled:
 		*e = JobStatus(s)
 		return nil
 	default:
-		return fmt.Errorf("unknown JobStatus %q", s)
+		return fmt.Errorf("unknown JobStatus: %q", s)
 	}
 }
 
@@ -88,12 +87,11 @@ func (e *RunRepoStatus) Scan(src interface{}) error {
 		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
 	}
 	switch RunRepoStatus(s) {
-	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled,
-		RunRepoStatusFail, RunRepoStatusSuccess:
+	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled, RunRepoStatusFail, RunRepoStatusSuccess:
 		*e = RunRepoStatus(s)
 		return nil
 	default:
-		return fmt.Errorf("unknown RunRepoStatus %q", s)
+		return fmt.Errorf("unknown RunRepoStatus: %q", s)
 	}
 }
 
@@ -143,7 +141,7 @@ func (e *RunStatus) Scan(src interface{}) error {
 		*e = RunStatus(s)
 		return nil
 	default:
-		return fmt.Errorf("unknown RunStatus %q", s)
+		return fmt.Errorf("unknown RunStatus: %q", s)
 	}
 }
 
@@ -186,14 +184,15 @@ type ApiToken struct {
 }
 
 type ArtifactBundle struct {
-	ID        pgtype.UUID        `json:"id"`
-	RunID     types.RunID        `json:"run_id"`
-	JobID     *types.JobID       `json:"job_id"`
-	Name      *string            `json:"name"`
-	Bundle    []byte             `json:"bundle"`
-	Cid       *string            `json:"cid"`
-	Digest    *string            `json:"digest"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID         pgtype.UUID        `json:"id"`
+	RunID      types.RunID        `json:"run_id"`
+	JobID      *types.JobID       `json:"job_id"`
+	Name       *string            `json:"name"`
+	BundleSize int64              `json:"bundle_size"`
+	ObjectKey  *string            `json:"object_key"`
+	Cid        *string            `json:"cid"`
+	Digest     *string            `json:"digest"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type BootstrapToken struct {
@@ -222,7 +221,8 @@ type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     types.RunID        `json:"run_id"`
 	JobID     *types.JobID       `json:"job_id"`
-	Patch     []byte             `json:"patch"`
+	PatchSize int64              `json:"patch_size"`
+	ObjectKey *string            `json:"object_key"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
@@ -261,7 +261,8 @@ type Log struct {
 	RunID     types.RunID        `json:"run_id"`
 	JobID     *types.JobID       `json:"job_id"`
 	ChunkNo   int32              `json:"chunk_no"`
-	Data      []byte             `json:"data"`
+	DataSize  int64              `json:"data_size"`
+	ObjectKey *string            `json:"object_key"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 

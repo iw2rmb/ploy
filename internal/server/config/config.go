@@ -17,6 +17,7 @@ type Config struct {
 	Transfers    TransfersConfig     `yaml:"transfers"`
 	Postgres     PostgresConfig      `yaml:"postgres"`
 	GitLab       GitLabConfig        `yaml:"gitlab"`
+	ObjectStore  ObjectStoreConfig   `yaml:"object_store"`
 	FilePath     string              `yaml:"-"`
 	Environment  map[string]string   `yaml:"environment"`
 	Features     map[string]bool     `yaml:"features"`
