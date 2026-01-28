@@ -205,14 +205,12 @@ If you started the stack manually, configure it via:
 
 ```bash
 ./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL \
-  --value "http://gradle-build-cache:5071/cache/" --scope gate
-./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL \
-  --value "http://gradle-build-cache:5071/cache/" --scope mods
+  --value "http://gradle-build-cache:5071/cache/" \
+  --scope all
 
 ./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH \
-  --value "true" --scope gate
-./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH \
-  --value "true" --scope mods
+  --value "true" \
+  --scope all
 ```
 
 The cache node UI is available at `http://localhost:5071`.
