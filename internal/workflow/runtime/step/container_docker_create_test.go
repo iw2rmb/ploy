@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 )
 
@@ -22,6 +23,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 		createRes   client.ContainerCreateResult
 		createErr   error
 		pullImage   bool
+		inspectErr  error
 		pullErr     error
 		wantErr     bool
 		errContains string
@@ -99,7 +101,21 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			},
 			createRes: client.ContainerCreateResult{ID: "pulled-container"},
 			pullImage: true,
-			wantErr:   false,
+			// Simulate a missing image so PullImage triggers a registry pull.
+			inspectErr: cerrdefs.ErrNotFound,
+			wantErr:    false,
+		},
+		{
+			name: "success_skip_pull_when_image_present",
+			spec: ContainerSpec{
+				Image: "ploy-gate-gradle:jdk11",
+			},
+			createRes: client.ContainerCreateResult{ID: "local-image-container"},
+			pullImage: true,
+			// Image is present locally, but a registry pull would fail (private/local tag).
+			// Runtime should skip pull when inspect succeeds.
+			pullErr: errors.New("pull access denied"),
+			wantErr: false,
 		},
 		{
 			name: "error_image_pull_fails",
@@ -107,6 +123,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 				Image: "private/image:latest",
 			},
 			pullImage:   true,
+			inspectErr:  cerrdefs.ErrNotFound,
 			pullErr:     errors.New("authentication required"),
 			wantErr:     true,
 			errContains: "pull image",
@@ -118,9 +135,10 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fake := &fakeDockerClient{
-				createResult: tc.createRes,
-				createErr:    tc.createErr,
-				pullErr:      tc.pullErr,
+				createResult:    tc.createRes,
+				createErr:       tc.createErr,
+				imageInspectErr: tc.inspectErr,
+				pullErr:         tc.pullErr,
 			}
 			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{
 				PullImage: tc.pullImage,
@@ -143,11 +161,12 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			if handle.ID != tc.createRes.ID {
 				t.Errorf("got ID %q, want %q", handle.ID, tc.createRes.ID)
 			}
-			// Verify image pull was called when configured.
-			if tc.pullImage && !fake.pullCalled {
+			// Verify image pull was called only when configured and the image is missing.
+			expectPull := tc.pullImage && cerrdefs.IsNotFound(tc.inspectErr)
+			if expectPull && !fake.pullCalled {
 				t.Error("image pull should have been called")
 			}
-			if !tc.pullImage && fake.pullCalled {
+			if !expectPull && fake.pullCalled {
 				t.Error("image pull should NOT have been called")
 			}
 		})

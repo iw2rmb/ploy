@@ -11,6 +11,7 @@ import (
 
 	// Docker Engine v29 SDK modules (moby). These replace the deprecated
 	// github.com/docker/docker imports with supported Engine v29 equivalents.
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
@@ -38,6 +39,8 @@ type dockerClientAPI interface {
 	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
 	// ImagePull fetches an image from a registry (moby returns ImagePullResponse).
 	ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error)
+	// ImageInspect returns image information (used to detect local availability).
+	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
 }
 
 // DockerContainerRuntime executes containers using the local Docker daemon.
@@ -92,7 +95,7 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 	}
 	// Pull image before creation if configured.
 	if r.opts.PullImage {
-		if err := r.pullImage(ctx, spec.Image); err != nil {
+		if err := r.ensureImageAvailable(ctx, spec.Image); err != nil {
 			return ContainerHandle{}, err
 		}
 	}
@@ -282,6 +285,22 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 	// Returns (ContainerRemoveResult, error); result is empty, discard it.
 	_, err := r.client.ContainerRemove(ctx, handle.ID, client.ContainerRemoveOptions{Force: true})
 	return err
+}
+
+// ensureImageAvailable checks whether the image exists locally and pulls it from
+// a registry only when it is missing.
+//
+// This avoids failing local development runs when tags (e.g. ploy-gate-gradle:jdk11)
+// are built locally and not published to a registry.
+func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
+	_, err := r.client.ImageInspect(ctx, imageRef)
+	if err == nil {
+		return nil
+	}
+	if cerrdefs.IsNotFound(err) {
+		return r.pullImage(ctx, imageRef)
+	}
+	return fmt.Errorf("step: inspect image %s: %w", imageRef, err)
 }
 
 // pullImage pulls the specified image using the moby client ImagePull API.
