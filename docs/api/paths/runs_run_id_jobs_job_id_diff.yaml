@@ -22,7 +22,7 @@ post:
   description: |
     Nodes upload a gzipped unified diff for a specific job of a run. The server stores
     the diff in PostgreSQL under the `diffs` table. The decoded patch bytes are limited
-    to ≤ 1 MiB. The request body allows up to ~2 MiB to accommodate base64 overhead.
+    to ≤ 10 MiB. The request body allows up to 16 MiB to accommodate base64 overhead.
   requestBody:
     required: true
     content:
@@ -33,7 +33,7 @@ post:
           properties:
             patch:
               type: string
-              description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
+              description: Gzipped unified diff (≤10 MiB gzipped), base64-encoded.
               contentEncoding: base64
             summary:
               type: object
@@ -43,7 +43,7 @@ post:
             summary: Minimal diff upload
             description: |
               Basic diff upload with gzipped unified diff data (base64-encoded).
-              The patch field contains the gzipped diff limited to 1 MiB.
+              The patch field contains the gzipped diff limited to 10 MiB.
             value:
               patch: "H4sIAAAAAAAA/0rOyS9NScxRKM8vyknV1VHIT0/VLy4pysxL1wEAAAD//3fmxMMbAAAA"
           with_summary:
@@ -61,9 +61,9 @@ post:
           size_limit:
             summary: Maximum size boundary
             description: |
-              The decoded gzipped patch is capped at 1 MiB (1048576 bytes).
-              The JSON body limit is 2 MiB to accommodate base64 encoding overhead (~33%).
-              Server returns 413 if decoded patch exceeds 1 MiB or body exceeds 2 MiB.
+              The decoded gzipped patch is capped at 10 MiB (10485760 bytes).
+              The JSON body limit is 16 MiB to accommodate base64 encoding overhead (~33%).
+              Server returns 413 if decoded patch exceeds 10 MiB or body exceeds 16 MiB.
   responses:
     '201':
       description: Created
@@ -81,6 +81,6 @@ post:
     '404':
       description: Run or Job not found
     '413':
-      description: Payload Too Large (decoded patch > 1 MiB or body over limit)
+      description: Payload Too Large (decoded patch > 10 MiB or body over limit)
     '500':
       description: Internal server error

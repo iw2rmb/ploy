@@ -92,7 +92,7 @@ The trimmer is invoked inside the Docker-based gate executor:
   - `TrimBuildGateLog(tool, string(logs))` is called.
   - The trimmed output (or original logs for unknown tools) is stored in
     `BuildGateStageMetadata.LogFindings[0].Message`.
-- `BuildGateStageMetadata.LogsText` still carries the full (truncated, ≤1 MiB)
+- `BuildGateStageMetadata.LogsText` still carries the full (truncated, ≤10 MiB)
   logs for:
   - Node-side artifact upload (`build-gate.log` bundles).
   - Control-plane storage and manual inspection.

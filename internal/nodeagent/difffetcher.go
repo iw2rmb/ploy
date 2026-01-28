@@ -186,7 +186,7 @@ func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.Run
 	}
 
 	// Read the entire gzipped patch into memory.
-	// Diffs are capped at 1 MiB gzipped by the uploader, so this is safe.
+	// Diffs are capped at 10 MiB gzipped by the uploader, so this is safe.
 	patchBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read patch bytes: %w", err)

@@ -178,7 +178,7 @@ func (ls *LogStreamer) flushLocked() error {
 		)
 		ls.buffer.Reset()
 		ls.gzWriter = gzip.NewWriter(&ls.buffer)
-		return fmt.Errorf("compressed chunk exceeds 1 MiB: %d bytes (data dropped)", len(compressed))
+		return fmt.Errorf("compressed chunk exceeds 10 MiB: %d bytes (data dropped)", len(compressed))
 	}
 
 	// Reset buffer and gzip writer for next chunk.

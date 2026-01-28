@@ -716,7 +716,7 @@ Diff:
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
-      description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped unified diff (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
     summary: {}
     created_at: { type: string, format: date-time }
@@ -729,7 +729,7 @@ CreateDiffRequest:
     job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
-      description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped unified diff (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
     summary: {}
   required: [patch]
@@ -770,7 +770,7 @@ Log:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
     created_at: { type: string, format: date-time }
   required: [id, run_id, chunk_no, data, created_at]
@@ -793,7 +793,7 @@ CreateLogRequest:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [chunk_no, data]
 
@@ -807,7 +807,7 @@ NodeCreateLogRequest:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [run_id, chunk_no, data]
 
@@ -821,7 +821,7 @@ ArtifactBundle:
     name: { type: string, nullable: true }
     bundle:
       type: string
-      description: Gzipped tar archive (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped tar archive (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
     created_at: { type: string, format: date-time }
   required: [id, run_id, bundle, created_at]
@@ -834,7 +834,7 @@ CreateArtifactBundleRequest:
     name: { type: string, nullable: true }
     bundle:
       type: string
-      description: Gzipped tar archive (≤1 MiB gzipped), base64-encoded.
+      description: Gzipped tar archive (≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [bundle]
 

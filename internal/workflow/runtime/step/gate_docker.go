@@ -118,7 +118,7 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // used by the node agent for decision-making and history capture. It includes:
 //   - StaticChecks: Pass/fail status with language and tool information
 //   - LogFindings: Structured error messages extracted from build output
-//   - LogsText: Full build log text (truncated to 256 KiB) for debugging
+//   - LogsText: Full build log text (truncated to 10 MiB) for debugging
 //   - LogDigest: SHA-256 hash of logs for deduplication and verification
 //   - Resources: Container resource usage metrics (CPU, memory, disk I/O)
 //
@@ -623,7 +623,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
 	}
 	// Attach logs text (truncated) for node-side artifact upload, and compute a digest.
-	const maxLogBytes = 1 << 20 // 1 MiB safety cap in memory
+	const maxLogBytes = 10 << 20 // 10 MiB safety cap in memory
 	if len(logs) > maxLogBytes {
 		logs = logs[:maxLogBytes]
 	}

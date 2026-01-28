@@ -6,9 +6,9 @@ Status: draft (design only)
 
 Today Ploy stores “blob” data directly in PostgreSQL:
 
-- `ploy.logs.data` (`BYTEA`, gzipped chunks, cap: 1 MiB per chunk)
-- `ploy.diffs.patch` (`BYTEA`, gzipped unified diff, cap: 1 MiB)
-- `ploy.artifact_bundles.bundle` (`BYTEA`, gzipped tar, cap: 1 MiB)
+- `ploy.logs.data` (`BYTEA`, gzipped chunks, cap: 10 MiB per chunk)
+- `ploy.diffs.patch` (`BYTEA`, gzipped unified diff, cap: 10 MiB)
+- `ploy.artifact_bundles.bundle` (`BYTEA`, gzipped tar, cap: 10 MiB)
 
 This inflates the DB, makes backups expensive, and puts pressure on Postgres I/O for data that is better suited for an object store.
 

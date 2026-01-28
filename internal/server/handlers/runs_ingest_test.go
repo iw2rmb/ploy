@@ -78,7 +78,7 @@ func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	bp := blobpersist.New(ms, bsmock.New())
 	h := createRunLogHandler(ms, bp, eventsService)
 	runID := domaintypes.NewRunID()
-	big := make([]byte, 1<<20+1)
+	big := make([]byte, 10<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/logs", bytes.NewReader(b))
