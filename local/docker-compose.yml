@@ -71,10 +71,11 @@ services:
       ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
 
   gradle-build-cache:
-    image: gradle/build-cache-node:latest
+    image: gradle/build-cache-node:21.2
     platform: linux/amd64
     volumes:
       - gradle-build-cache-data:/data
+    command: ["start", "--config", "cache.accessControl.anonymousLevel=readwrite"]
     ports:
       - "5071:5071"
 

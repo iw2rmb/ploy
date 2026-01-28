@@ -184,6 +184,9 @@ ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
 The local stack includes a Gradle Build Cache Node (`gradle-build-cache`)
 that gate containers can use to share compiled outputs across runs.
 
+For local development, the cache node is configured to allow **anonymous read/write**
+access on the Docker network. Do not reuse this configuration in non-local environments.
+
 Build the local Build Gate Gradle images (required for `java+gradle` gates when using the default image mapping):
 
 The node resolves these images via the local Docker daemon. When the image already exists locally, the node will use it as-is; it only pulls from a registry when the image is missing.
@@ -193,7 +196,8 @@ docker build -t ploy-gate-gradle:jdk11 -f docker/gates/gradle/Dockerfile.jdk11 d
 docker build -t ploy-gate-gradle:jdk17 -f docker/gates/gradle/Dockerfile.jdk17 docker/gates/gradle
 ```
 
-Configure gate + mod jobs to use the cache:
+`./scripts/deploy-locally.sh` configures gate + mod jobs to use the cache automatically.
+If you started the stack manually, configure it via:
 
 ```bash
 ./dist/ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL \
