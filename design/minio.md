@@ -231,13 +231,13 @@ Add MinIO to `local/docker-compose.yml`:
 ```yaml
   minio:
     image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: ["server", "/data", "--console-address", ":8999"]
     environment:
       - MINIO_ROOT_USER=ploy
       - MINIO_ROOT_PASSWORD=ploy-unsafe-local
     ports:
       - "9000:9000"
-      - "9001:9001"
+      - "8999:8999"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -266,7 +266,7 @@ volumes:
   - image `minio/minio`
   - ports:
     - `9000` (S3 API) exposed to localhost for debugging
-    - `9001` (console) optional
+    - `8999` (console) optional
   - volume `minio-data:/data`
   - env `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
   - healthcheck on `/minio/health/live`

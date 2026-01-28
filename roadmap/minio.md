@@ -168,7 +168,7 @@ Legend: [ ] todo, [x] done.
   - Component: `local/` + `scripts/`
   - Scope:
     - Update `local/docker-compose.yml`:
-      - Add `minio` service (S3 API `:9000`, optional console `:9001`) + `minio-data` volume.
+      - Add `minio` service (S3 API `:9000`, optional console `:8999`) + `minio-data` volume.
       - Add `minio-init` one-shot service using `minio/mc` to create the bucket (e.g. `ploy`).
       - Wire server container env vars `PLOY_OBJECTSTORE_*` to point at `http://minio:9000`.
     - Update `scripts/deploy-locally.sh` to wait for MinIO health if required.
@@ -189,4 +189,3 @@ Legend: [ ] todo, [x] done.
   - Snippets:
     - `mc ilm add --expire-days 30 local/ploy`
   - Tests: Manual local verification (`mc ilm ls local/ploy`) — Expect expiration rule present.
-
