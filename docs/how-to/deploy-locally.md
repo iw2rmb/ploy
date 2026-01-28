@@ -187,6 +187,10 @@ that gate containers can use to share compiled outputs across runs.
 For local development, the cache node is configured to allow **anonymous read/write**
 access on the Docker network. Do not reuse this configuration in non-local environments.
 
+The local stack seeds the node config from `local/gradle-build-cache/config.yaml` and forces
+`anonymousLevel: readwrite` on every startup (persisted under the `gradle-build-cache-data`
+volume at `/data/conf/config.yaml`).
+
 Build the local Build Gate Gradle images (required for `java+gradle` gates when using the default image mapping):
 
 The node resolves these images via the local Docker daemon. When the image already exists locally, the node will use it as-is; it only pulls from a registry when the image is missing.

@@ -75,7 +75,9 @@ services:
     platform: linux/amd64
     volumes:
       - gradle-build-cache-data:/data
-    command: ["start", "--config", "cache.accessControl.anonymousLevel=readwrite"]
+      - ./gradle-build-cache/config.yaml:/seed/config.yaml:ro
+      - ./gradle-build-cache/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
     ports:
       - "5071:5071"
 

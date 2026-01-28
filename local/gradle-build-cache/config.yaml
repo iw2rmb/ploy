@@ -1,0 +1,14 @@
+version: 5
+cache:
+  accessControl:
+    users: {}
+    anonymousLevel: readwrite
+  freeSpaceBufferSize: 1024
+  maxEntryAgeInHours: null
+  targetSize:
+    type: fixed
+    size: 10000
+  maxArtifactSize: 100
+registration: null
+uiAccess:
+  type: open
