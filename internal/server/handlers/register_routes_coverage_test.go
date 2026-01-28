@@ -16,7 +16,9 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	httpapi "github.com/iw2rmb/ploy/internal/server/http"
@@ -56,8 +58,10 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 			t.Fatalf("events: %v", err)
 		}
 		st := &mockStore{} // minimal store; handlers may still return 4xx
+		bs := bsmock.New()
+		bp := blobpersist.New(st, bs)
 		cfg := NewConfigHolder(config.GitLabConfig{}, nil)
-		RegisterRoutes(srv, st, ev, cfg, "test-secret")
+		RegisterRoutes(srv, st, bs, bp, ev, cfg, "test-secret")
 		return srv, ev
 	}
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -18,11 +19,13 @@ import (
 // IDs are treated as opaque; validation is limited to non-empty checks.
 // Note: build_id removed as part of builds table removal; logs now use job-level grouping only.
 //
-// The eventsService parameter is required and must not be nil. Log ingestion always
-// goes through the events service to ensure both database persistence and SSE fanout
-// occur in a single path. Direct store writes are no longer supported.
-func createRunLogHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
-	// Validate eventsService is provided — log ingestion requires SSE fanout.
+// The blobpersist service handles database metadata and object storage writes.
+// The events service handles SSE fanout.
+func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService *events.Service) http.HandlerFunc {
+	// Validate dependencies are provided.
+	if bp == nil {
+		panic("createRunLogHandler: blobpersist is required")
+	}
 	if eventsService == nil {
 		panic("createRunLogHandler: eventsService is required")
 	}
@@ -70,15 +73,20 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			RunID:   runID,
 			JobID:   req.JobID,
 			ChunkNo: req.ChunkNo,
-			Data:    req.Data,
 		}
-		// Persist log to database and publish to SSE hub via events service.
-		// This is the single canonical logging path — no direct store fallback.
-		logRow, err := eventsService.CreateAndPublishLog(r.Context(), params)
+
+		// Persist log metadata to database and upload blob to object storage.
+		logRow, err := bp.CreateLog(r.Context(), params, req.Data)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
 			slog.Error("run logs: create failed", "run_id", runID, "chunk_no", req.ChunkNo, "err", err)
 			return
+		}
+
+		// Publish to SSE hub for real-time streaming.
+		if err := eventsService.CreateAndPublishLog(r.Context(), logRow, req.Data); err != nil {
+			// Log the error but don't fail the operation since DB/blob write succeeded.
+			slog.Error("run logs: SSE fanout failed", "log_id", logRow.ID, "err", err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

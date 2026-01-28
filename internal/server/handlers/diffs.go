@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -45,7 +48,7 @@ type diffListResponse struct {
 //
 // Download mode:
 // - GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
-// - Returns the gzipped patch bytes for the requested diff, if it belongs to (run_id, repo_id).
+// - Returns the gzipped patch bytes for the requested diff, streamed from object storage.
 //
 // v1 repo-scoped diffs listing:
 // - Repo attribution comes from joining diffs.job_id → jobs.repo_id
@@ -53,7 +56,7 @@ type diffListResponse struct {
 // - Response shape is unchanged from legacy endpoint (diffListResponse)
 //
 // Run and job IDs are KSUID-backed strings; repo IDs are NanoID-backed strings.
-func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
+func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter using the shared helper.
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
@@ -113,10 +116,28 @@ func listRunRepoDiffsHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 
+			// Stream from object storage.
+			if d.ObjectKey == nil || *d.ObjectKey == "" {
+				http.Error(w, "diff blob not found", http.StatusNotFound)
+				slog.Error("download run repo diff: no object_key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+				return
+			}
+
+			rc, size, err := bs.Get(r.Context(), *d.ObjectKey)
+			if err != nil {
+				http.Error(w, "failed to retrieve diff blob", http.StatusServiceUnavailable)
+				slog.Error("download run repo diff: blob get failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *d.ObjectKey, "err", err)
+				return
+			}
+			defer rc.Close()
+
 			w.Header().Set("Content-Type", "application/gzip")
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=diff-%s.patch.gz", diffUUID.String()))
+			w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(d.Patch)
+			if _, err := io.Copy(w, rc); err != nil {
+				slog.Error("download run repo diff: stream failed", "diff_id", diffID.String(), "err", err)
+			}
 			return
 		}
 

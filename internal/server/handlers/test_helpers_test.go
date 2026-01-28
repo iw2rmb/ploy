@@ -6,7 +6,9 @@ import (
 	"os"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	httpapi "github.com/iw2rmb/ploy/internal/server/http"
@@ -62,6 +64,9 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *httpapi.Server {
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
-	RegisterRoutes(srv, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
+	st := &mockStore{}
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
 	return srv
 }

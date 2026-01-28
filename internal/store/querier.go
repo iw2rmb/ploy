@@ -32,15 +32,17 @@ type Querier interface {
 	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
-	// Creates a new artifact bundle. Bundles are grouped at the job level only (build_id removed).
+	// Creates a new artifact bundle metadata. Blob data is stored in MinIO.
+	// Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
-	// Creates a new diff entry associated with a job.
+	// Creates a new diff entry associated with a job. Blob data is stored in MinIO.
 	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
-	// Creates a new log chunk. Logs are grouped at the job level only (build_id removed).
+	// Creates a new log chunk metadata. Blob data is stored in MinIO.
+	// Logs are grouped at the job level only (build_id removed).
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
 	CreateModRepo(ctx context.Context, arg CreateModRepoParams) (ModRepo, error)
@@ -83,8 +85,10 @@ type Querier interface {
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
 	// Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
+	// Returns artifact bundle metadata including object_key for MinIO retrieval.
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
+	// Returns diff metadata including object_key for MinIO retrieval.
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	// Retrieves a single environment entry by key.
@@ -96,6 +100,7 @@ type Querier interface {
 	// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
 	// Order by created_at DESC to get the newest matching run_repos row.
 	GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error)
+	// Returns log metadata including object_key for MinIO retrieval.
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMod(ctx context.Context, id types.ModID) (Mod, error)
 	GetModByName(ctx context.Context, name string) (Mod, error)
@@ -118,18 +123,18 @@ type Querier interface {
 	ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
+	// Returns artifact bundle metadata including object_key for MinIO retrieval.
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata including object_key for MinIO retrieval.
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata including object_key for MinIO retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata (without the bundle blob) for a given cid.
-	// Use GetArtifactBundle to fetch the actual bundle data by id.
-	ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ListArtifactBundlesMetaByCIDRow, error)
-	// Returns artifact bundle metadata (without the bundle blob) for a run.
-	// Use GetArtifactBundle to fetch the actual bundle data by id.
-	ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]ListArtifactBundlesMetaByRunRow, error)
-	// Returns artifact bundle metadata (without the bundle blob) for a run and job.
-	// Use GetArtifactBundle to fetch the actual bundle data by id.
-	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ListArtifactBundlesMetaByRunAndJobRow, error)
+	// Returns artifact bundle metadata for a given cid.
+	ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata for a run.
+	ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
+	// Returns artifact bundle metadata for a run and job.
+	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
 	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
@@ -140,12 +145,10 @@ type Querier interface {
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 	// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
-	// Returns diff metadata (without the patch blob) for a run.
-	// Use GetDiff to fetch the actual patch data by id.
-	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]ListDiffsMetaByRunRow, error)
-	// Returns diff metadata (without the patch blob) for a specific repo within a run.
-	// Use GetDiff to fetch the actual patch data by id.
-	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]ListDiffsMetaByRunRepoRow, error)
+	// Returns diff metadata for a run.
+	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
+	// Returns diff metadata for a specific repo within a run.
+	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error)
 	// v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
@@ -172,22 +175,22 @@ type Querier interface {
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
+	// Returns log metadata including object_key for MinIO retrieval.
 	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
+	// Returns log metadata including object_key for MinIO retrieval.
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
+	// Returns log metadata including object_key for MinIO retrieval.
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
+	// Returns log metadata including object_key for MinIO retrieval.
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
-	// Returns log metadata (without the data blob) for a run.
-	// Use GetLog to fetch the actual log data by id.
-	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]ListLogsMetaByRunRow, error)
-	// Returns log metadata (without the data blob) for a run and job.
-	// Use GetLog to fetch the actual log data by id.
-	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]ListLogsMetaByRunAndJobRow, error)
-	// Returns log metadata (without the data blob) for a run and job since a given id.
-	// Use GetLog to fetch the actual log data by id.
-	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]ListLogsMetaByRunAndJobSinceRow, error)
-	// Returns log metadata (without the data blob) for a run since a given id.
-	// Use GetLog to fetch the actual log data by id.
-	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]ListLogsMetaByRunSinceRow, error)
+	// Returns log metadata for a run.
+	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]Log, error)
+	// Returns log metadata for a run and job.
+	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]Log, error)
+	// Returns log metadata for a run and job since a given id.
+	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]Log, error)
+	// Returns log metadata for a run since a given id.
+	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]Log, error)
 	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
 	// Lists mods with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.

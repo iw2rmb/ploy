@@ -8,6 +8,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 )
 
 // FuzzCreateNodeLogsHandler ensures robust decoding and size checks across arbitrary inputs.
@@ -23,7 +26,8 @@ func FuzzCreateNodeLogsHandler(f *testing.F) {
 		if err != nil {
 			t.Skip("failed to create events service")
 		}
-		handler := createNodeLogsHandler(mockStore, eventsService)
+		bp := blobpersist.New(mockStore, bsmock.New())
+		handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
 		payload := map[string]any{
 			"run_id":   uuid.New().String(),

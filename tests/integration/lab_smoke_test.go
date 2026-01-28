@@ -117,23 +117,23 @@ func TestLabSmoke(t *testing.T) {
 	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).
 	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build job\n")
 	log, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
-		JobID:   &job.ID,
-		ChunkNo: 0,
-		Data:    logData,
+		RunID:    run.ID,
+		JobID:    &job.ID,
+		ChunkNo:  0,
+		DataSize: int64(len(logData)),
 	})
 	if err != nil {
 		t.Fatalf("CreateLog() failed: %v", err)
 	}
-	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_len=%d", log.ID, log.RunID, log.ChunkNo, len(log.Data))
+	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_size=%d", log.ID, log.RunID, log.ChunkNo, log.DataSize)
 
 	// Create a second log chunk to simulate continued streaming.
 	log2Data := []byte("INFO: Build completed successfully\nINFO: Running tests\nINFO: All tests passed\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
-		RunID:   run.ID,
-		JobID:   &job.ID,
-		ChunkNo: 1,
-		Data:    log2Data,
+		RunID:    run.ID,
+		JobID:    &job.ID,
+		ChunkNo:  1,
+		DataSize: int64(len(log2Data)),
 	})
 	if err != nil {
 		t.Fatalf("CreateLog() #2 failed: %v", err)
@@ -153,15 +153,15 @@ index 1234567..abcdefg 100644
 `)
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:   run.ID,
-		JobID:   &job.ID,
-		Patch:   diffPatch,
-		Summary: diffSummary,
+		RunID:     run.ID,
+		JobID:     &job.ID,
+		PatchSize: int64(len(diffPatch)),
+		Summary:   diffSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff() failed: %v", err)
 	}
-	t.Logf("Created diff: id=%v, run_id=%v, job_id=%v, patch_len=%d", diff.ID, diff.RunID, diff.JobID, len(diff.Patch))
+	t.Logf("Created diff: id=%v, run_id=%v, job_id=%v, patch_size=%d", diff.ID, diff.RunID, diff.JobID, diff.PatchSize)
 
 	// Step 7: Assert logs are stored - Verify logs can be listed by run.
 	logs, err := db.ListLogsByRun(ctx, run.ID)
@@ -176,11 +176,11 @@ index 1234567..abcdefg 100644
 		if logs[0].ChunkNo != 0 || logs[1].ChunkNo != 1 {
 			t.Errorf("Logs not ordered correctly: chunk_no[0]=%d, chunk_no[1]=%d", logs[0].ChunkNo, logs[1].ChunkNo)
 		}
-		if string(logs[0].Data) != string(logData) {
-			t.Errorf("Log chunk 0 data mismatch")
+		if logs[0].DataSize != int64(len(logData)) {
+			t.Errorf("Log chunk 0 data_size mismatch")
 		}
-		if string(logs[1].Data) != string(log2Data) {
-			t.Errorf("Log chunk 1 data mismatch")
+		if logs[1].DataSize != int64(len(log2Data)) {
+			t.Errorf("Log chunk 1 data_size mismatch")
 		}
 	}
 	t.Logf("✓ Verified %d log chunks stored correctly", len(logs))
@@ -206,8 +206,8 @@ index 1234567..abcdefg 100644
 		if diffs[0].JobID == nil || *diffs[0].JobID != job.ID {
 			t.Errorf("Diff job_id mismatch: expected %v, got %v", job.ID, diffs[0].JobID)
 		}
-		if string(diffs[0].Patch) != string(diffPatch) {
-			t.Errorf("Diff patch mismatch")
+		if diffs[0].PatchSize != int64(len(diffPatch)) {
+			t.Errorf("Diff patch_size mismatch")
 		}
 		if string(diffs[0].Summary) != string(diffSummary) {
 			t.Errorf("Diff summary mismatch")

@@ -144,15 +144,15 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	// Step 5: Simulate node appends - Create logs.
 	logData := []byte("INFO: Starting integration test run\nINFO: Cloning repository\nINFO: Building project\n")
 	logParams := store.CreateLogParams{
-		RunID:   run.ID,
-		ChunkNo: 0,
-		Data:    logData,
+		RunID:    run.ID,
+		ChunkNo:  0,
+		DataSize: int64(len(logData)),
 	}
 	log, err := db.CreateLog(ctx, logParams)
 	if err != nil {
 		t.Fatalf("CreateLog() failed: %v", err)
 	}
-	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_len=%d", log.ID, log.RunID, log.ChunkNo, len(log.Data))
+	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_size=%d", log.ID, log.RunID, log.ChunkNo, log.DataSize)
 
 	// Verify the log was created with expected values.
 	if log.RunID != run.ID {
@@ -161,16 +161,16 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if log.ChunkNo != 0 {
 		t.Errorf("Expected chunk_no 0, got %d", log.ChunkNo)
 	}
-	if string(log.Data) != string(logData) {
-		t.Errorf("Expected log data %s, got %s", logData, log.Data)
+	if log.DataSize != int64(len(logData)) {
+		t.Errorf("Expected log data_size %d, got %d", len(logData), log.DataSize)
 	}
 
 	// Create a second log chunk to simulate streaming appends.
 	log2Data := []byte("INFO: Tests passing\nINFO: Build complete\n")
 	log2Params := store.CreateLogParams{
-		RunID:   run.ID,
-		ChunkNo: 1,
-		Data:    log2Data,
+		RunID:    run.ID,
+		ChunkNo:  1,
+		DataSize: int64(len(log2Data)),
 	}
 	log2, err := db.CreateLog(ctx, log2Params)
 	if err != nil {

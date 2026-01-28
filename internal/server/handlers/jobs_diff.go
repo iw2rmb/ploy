@@ -10,15 +10,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createJobDiffHandler stores gzipped diff in diffs table (≤1 MiB), rejects oversize.
+// createJobDiffHandler stores gzipped diff in object storage and metadata in diffs table (≤1 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/diff
-func createJobDiffHandler(st store.Store) http.HandlerFunc {
+func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
+	if bp == nil {
+		panic("createJobDiffHandler: blobpersist is required")
+	}
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded patch bytes.
 	const maxBodySize = 2 << 20  // 2 MiB
@@ -122,19 +125,12 @@ func createJobDiffHandler(st store.Store) http.HandlerFunc {
 		params := store.CreateDiffParams{
 			RunID:   runID,
 			JobID:   &jobID,
-			Patch:   req.Patch,
 			Summary: summaryBytes,
 		}
 
-		// Persist diff to DB.
-		diff, err := st.CreateDiff(r.Context(), params)
+		// Persist diff metadata to database and upload blob to object storage.
+		diff, err := bp.CreateDiff(r.Context(), params, req.Patch)
 		if err != nil {
-			// Check if the error is a constraint violation (size cap exceeded).
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23514" { // check_violation
-				http.Error(w, "diff size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
-				return
-			}
 			http.Error(w, fmt.Sprintf("failed to create diff: %v", err), http.StatusInternalServerError)
 			slog.Error("diff: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return

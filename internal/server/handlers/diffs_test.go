@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -23,19 +25,26 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	diffID := uuid.New()
 	patch := []byte{0x1f, 0x8b, 0x08, 0x00}
 	repoIDTyped := domaintypes.ModRepoID(repoID)
+	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
 	st.getDiffResult = store.Diff{
-		ID:    pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID: runID,
-		JobID: &jobID,
-		Patch: patch,
+		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
+		RunID:     runID,
+		JobID:     &jobID,
+		PatchSize: int64(len(patch)),
+		ObjectKey: &objKey,
 	}
 	st.getJobResult = store.Job{ID: jobID, RunID: runID, RepoID: repoIDTyped}
+
+	// Create mock blobstore and pre-populate with patch data.
+	bs := bsmock.New()
+	_, _ = bs.Put(context.TODO(), objKey, "application/gzip", patch)
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&diff_id="+diffID.String(), nil)
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", repoID)
-	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
 	}
@@ -86,13 +95,14 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	_ = repoAID   // repo A owns the diff
 
 	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.listDiffsMetaByRunRepoResult = []store.ListDiffsMetaByRunRepoRow{} // Empty: repo A's diff excluded
+	st.listDiffsMetaByRunRepoResult = []store.Diff{} // Empty: repo A's diff excluded
 
+	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoBID+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", repoBID)
-	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
@@ -131,7 +141,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
 	// Store returns the diff that belongs to this repo
-	st.listDiffsMetaByRunRepoResult = []store.ListDiffsMetaByRunRepoRow{{
+	st.listDiffsMetaByRunRepoResult = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
@@ -140,11 +150,12 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 		PatchSize: 3,
 	}}
 
+	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs", nil)
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", repoID)
-	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
@@ -177,11 +188,12 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 // TestRunRepoDiffs_MissingRunID verifies that missing run_id returns 400.
 func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 	st := &mockStore{}
+	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//repos/repoAAAA/diffs", nil)
 	req.SetPathValue("run_id", "")
 	req.SetPathValue("repo_id", "repoAAAA")
-	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", rr.Code)
@@ -191,12 +203,13 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 // TestRunRepoDiffs_MissingRepoID verifies that missing repo_id returns 400.
 func TestRunRepoDiffs_MissingRepoID(t *testing.T) {
 	st := &mockStore{}
+	bs := bsmock.New()
 	runID := domaintypes.NewRunID()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos//diffs", nil)
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", "")
-	listRunRepoDiffsHandler(st).ServeHTTP(rr, req)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", rr.Code)

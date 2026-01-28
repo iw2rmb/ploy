@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -39,7 +41,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		runID := domaintypes.NewRunID()
 
 		st := &mockStore{
-			listArtifactBundlesMetaByCIDResult: []store.ListArtifactBundlesMetaByCIDRow{
+			listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{
 				{
 					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
 					RunID:      runID,
@@ -92,7 +94,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 
 	t.Run("SuccessWithNoResults", func(t *testing.T) {
 		st := &mockStore{
-			listArtifactBundlesMetaByCIDResult: []store.ListArtifactBundlesMetaByCIDRow{},
+			listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{},
 		}
 		testCID := "bafy-not-found"
 
@@ -121,7 +123,8 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 func TestGetArtifactHandler(t *testing.T) {
 	t.Run("MissingID", func(t *testing.T) {
 		st := &mockStore{}
-		handler := getArtifactHandler(st)
+		bs := bsmock.New()
+		handler := getArtifactHandler(st, bs)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/", nil)
 		// Simulate missing path value
@@ -135,7 +138,8 @@ func TestGetArtifactHandler(t *testing.T) {
 
 	t.Run("InvalidID", func(t *testing.T) {
 		st := &mockStore{}
-		handler := getArtifactHandler(st)
+		bs := bsmock.New()
+		handler := getArtifactHandler(st, bs)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/not-a-uuid", nil)
 		req.SetPathValue("id", "not-a-uuid")
@@ -152,8 +156,8 @@ func TestGetArtifactHandler(t *testing.T) {
 		st := &mockStore{
 			getArtifactBundleErr: pgx.ErrNoRows,
 		}
-
-		handler := getArtifactHandler(st)
+		bs := bsmock.New()
+		handler := getArtifactHandler(st, bs)
 		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String(), nil)
 		req.SetPathValue("id", artifactID.String())
 		w := httptest.NewRecorder()
@@ -170,20 +174,20 @@ func TestGetArtifactHandler(t *testing.T) {
 		testCID := "bafy123xyz"
 		testDigest := "sha256:fedcba"
 		testName := "metadata-test"
-		testBundle := []byte("metadata-bundle")
+		testBundleSize := int64(15)
 
 		st := &mockStore{
 			getArtifactBundleResult: store.ArtifactBundle{
-				ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:  runID,
-				Cid:    &testCID,
-				Digest: &testDigest,
-				Name:   &testName,
-				Bundle: testBundle,
+				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+				RunID:      runID,
+				Cid:        &testCID,
+				Digest:     &testDigest,
+				Name:       &testName,
+				BundleSize: testBundleSize,
 			},
 		}
-
-		handler := getArtifactHandler(st)
+		bs := bsmock.New()
+		handler := getArtifactHandler(st, bs)
 		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String(), nil)
 		req.SetPathValue("id", artifactID.String())
 		w := httptest.NewRecorder()
@@ -210,8 +214,8 @@ func TestGetArtifactHandler(t *testing.T) {
 		if response.CID != testCID {
 			t.Errorf("expected CID %s, got %s", testCID, response.CID)
 		}
-		if response.Size != int64(len(testBundle)) {
-			t.Errorf("expected size %d, got %d", len(testBundle), response.Size)
+		if response.Size != testBundleSize {
+			t.Errorf("expected size %d, got %d", testBundleSize, response.Size)
 		}
 	})
 
@@ -221,18 +225,24 @@ func TestGetArtifactHandler(t *testing.T) {
 		testCID := "bafy-download"
 		testDigest := "sha256:download"
 		testBundle := []byte("download-bundle-data")
+		objKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactID.String() + ".tar.gz"
 
 		st := &mockStore{
 			getArtifactBundleResult: store.ArtifactBundle{
-				ID:     pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:  runID,
-				Cid:    &testCID,
-				Digest: &testDigest,
-				Bundle: testBundle,
+				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+				RunID:      runID,
+				Cid:        &testCID,
+				Digest:     &testDigest,
+				BundleSize: int64(len(testBundle)),
+				ObjectKey:  &objKey,
 			},
 		}
 
-		handler := getArtifactHandler(st)
+		// Pre-populate mock blobstore with the bundle data.
+		bs := bsmock.New()
+		_, _ = bs.Put(context.TODO(), objKey, "application/gzip", testBundle)
+
+		handler := getArtifactHandler(st, bs)
 		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String()+"?download=true", nil)
 		req.SetPathValue("id", artifactID.String())
 		w := httptest.NewRecorder()

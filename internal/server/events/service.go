@@ -118,37 +118,27 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 	return event, nil
 }
 
-// CreateAndPublishLog persists a log chunk to the database and publishes it to the SSE hub.
-// The runID is used as the streamID for SSE fanout. Log data is decoded into per-line
-// stdout LogRecord frames before fanout so clients see structured "log" events.
+// CreateAndPublishLog publishes a log to the SSE hub. The log metadata must already
+// be persisted via blobpersist; this method only handles SSE fanout.
+// Log data is decoded into per-line stdout LogRecord frames before fanout
+// so clients see structured "log" events.
 //
 // params.RunID is a KSUID-backed RunID; normalized for hub operations.
-func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
-	if s.store == nil {
-		return store.Log{}, errors.New("events: store not configured")
-	}
-
-	// Persist to database first.
-	log, err := s.store.CreateLog(ctx, params)
-	if err != nil {
-		return store.Log{}, fmt.Errorf("persist log: %w", err)
-	}
-
+func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
 	// Normalize for hub operations.
-	runID := domaintypes.RunID(domaintypes.Normalize(params.RunID.String()))
+	runID := domaintypes.RunID(domaintypes.Normalize(log.RunID.String()))
 	if runID.IsZero() {
-		// DB succeeded but SSE fanout skipped; log and return.
-		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
-		return log, nil
+		s.logger.Warn("log runID invalid for SSE fanout", "log_id", log.ID)
+		return nil
 	}
 
-	// Fan out to SSE hub.
-	if err := s.publishLogToHub(ctx, runID, log); err != nil {
-		// Log the error but don't fail the operation since DB write succeeded.
-		s.logger.Error("log persisted but SSE fanout failed", "log_id", log.ID, "error", err)
+	// Fan out to SSE hub with the provided data bytes.
+	if err := s.publishLogToHubWithBytes(ctx, runID, log, data); err != nil {
+		s.logger.Error("SSE fanout failed", "log_id", log.ID, "error", err)
+		return err
 	}
 
-	return log, nil
+	return nil
 }
 
 // PublishRun publishes a run lifecycle event (queued/running/succeeded/failed/cancelled)
@@ -183,10 +173,10 @@ func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID
 	return s.hub.PublishLog(ctx, runID, record)
 }
 
-// publishLogToHub converts a database log to a logstream event and publishes it.
+// publishLogToHubWithBytes converts log data to logstream events and publishes them.
 // It enriches each LogRecord with execution context (node_id, job_id, mod_type,
 // step_index) by looking up the associated job metadata when available.
-func (s *Service) publishLogToHub(ctx context.Context, runID domaintypes.RunID, log store.Log) error {
+func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
 	// Fetch job metadata to enrich log records with execution context.
@@ -195,7 +185,7 @@ func (s *Service) publishLogToHub(ctx context.Context, runID domaintypes.RunID, 
 	jobCtx := s.loadJobContext(ctx, log.JobID)
 
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
-	zr, err := gzip.NewReader(bytes.NewReader(log.Data))
+	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err == nil {
 		defer func() {
 			_ = zr.Close()
@@ -242,7 +232,7 @@ func (s *Service) publishLogToHub(ctx context.Context, runID domaintypes.RunID, 
 	rec := logstream.LogRecord{
 		Timestamp: ts,
 		Stream:    "log",
-		Line:      string(log.Data),
+		Line:      string(data),
 		NodeID:    jobCtx.NodeID,
 		JobID:     jobCtx.JobID,
 		ModType:   jobCtx.ModType,

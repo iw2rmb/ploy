@@ -11,11 +11,15 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createRunDiffHandler stores a gzipped diff for a run using an optional job-scoped association.
-func createRunDiffHandler(st store.Store) http.HandlerFunc {
+func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
+	if bp == nil {
+		panic("createRunDiffHandler: blobpersist is required")
+	}
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded patch bytes.
 	const maxBodySize = 2 << 20  // 2 MiB
@@ -89,10 +93,11 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		params := store.CreateDiffParams{
 			RunID:   runID,
 			JobID:   jobID,
-			Patch:   req.Patch,
 			Summary: summaryBytes,
 		}
-		diff, err := st.CreateDiff(r.Context(), params)
+
+		// Persist diff metadata to database and upload blob to object storage.
+		diff, err := bp.CreateDiff(r.Context(), params, req.Patch)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create diff: %v", err), http.StatusInternalServerError)
 			slog.Error("run diff: create failed", "run_id", runID.String(), "err", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -29,7 +30,8 @@ func TestListArtifactsByCIDHandler_DBError(t *testing.T) {
 func TestGetArtifactHandler_DBError(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{getArtifactBundleErr: errors.New("db down")}
-	h := getArtifactHandler(st)
+	bs := bsmock.New()
+	h := getArtifactHandler(st, bs)
 	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+id.String(), nil)
 	req.SetPathValue("id", id.String())
 	w := httptest.NewRecorder()
@@ -44,12 +46,13 @@ func TestGetArtifactHandler_Metadata_Fields(t *testing.T) {
 	id := uuid.New()
 	runID := domaintypes.NewRunID()
 	st := &mockStore{getArtifactBundleResult: store.ArtifactBundle{
-		ID:    pgtype.UUID{Bytes: id, Valid: true},
-		RunID: runID,
+		ID:         pgtype.UUID{Bytes: id, Valid: true},
+		RunID:      runID,
+		BundleSize: 1,
 		// no CreatedAt valid timestamp here; handler should omit formatting without panicking
-		Bundle: []byte("x"),
 	}}
-	h := getArtifactHandler(st)
+	bs := bsmock.New()
+	h := getArtifactHandler(st, bs)
 	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+id.String(), nil)
 	req.SetPathValue("id", id.String())
 	w := httptest.NewRecorder()
