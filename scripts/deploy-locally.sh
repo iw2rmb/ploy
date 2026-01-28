@@ -267,6 +267,10 @@ JSON
     PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy cluster token list || true
   fi
 
+  if [[ -n "$PLOY_EXTRA_CA_CERTS_PATH" ]]; then
+      PLOY_CONFIG_HOME=$PWD/local/cli ./dist/ploy config env set --key CA_CERTS_PEM_BUNDLE --file /Users/v.v.kovalev/ploy-mods/ca-certs.pem --scope gate
+  fi
+
   log "Local Ploy cluster is up."
   log "Admin JWT (save securely):"
   echo "$ADMIN_TOKEN"
