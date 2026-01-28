@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	// MaxUploadSize is the maximum size for gzipped uploads (1 MiB).
+	// MaxUploadSize is the maximum size for gzipped uploads (10 MiB).
 	// Used by artifact bundles, diffs, and log chunks to enforce server limits.
-	MaxUploadSize = 1 << 20
+	MaxUploadSize = 10 << 20
 
 	// SoftUploadSize provides headroom for gzip footer so finalized chunks
 	// never exceed the hard cap. Keep conservative margin.

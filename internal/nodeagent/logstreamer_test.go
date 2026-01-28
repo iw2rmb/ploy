@@ -87,8 +87,8 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 	}
 	defer func() { _ = ls.Close() }()
 
-	// Generate data that will compress to over 1 MiB.
-	// We use repeating patterns which gzip compresses well, but we need enough raw data.
+	// Exercise buffering/flush behavior with a moderate amount of log data.
+	// The log chunk cap is enforced on the gzipped bytes (MaxUploadSize).
 	chunk := strings.Repeat("test log line with some content\n", 1024)
 	for i := 0; i < 50; i++ {
 		_, err := ls.Write([]byte(chunk))

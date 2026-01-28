@@ -139,9 +139,9 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 }
 
 func TestDiffUploader_SizeLimit(t *testing.T) {
-	// Create incompressible data (~2 MiB of random bytes) so gzip stays > 1 MiB.
+	// Create incompressible data (> MaxUploadSize) so gzip stays > MaxUploadSize.
 	// This should trigger the client-side size cap before any HTTP call.
-	rnd := make([]byte, 2<<20)
+	rnd := make([]byte, MaxUploadSize+1)
 	if _, err := io.ReadFull(bytes.NewReader(func() []byte {
 		// Fill with pseudo-random looking bytes deterministically for test speed.
 		// Avoid crypto/rand to keep tests fast and hermetic.

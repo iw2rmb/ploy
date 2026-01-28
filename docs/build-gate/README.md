@@ -169,7 +169,7 @@ The gate does not modify the repository; it validates the current working tree.
 ## Outputs
 
 - **Exit code:** `0` = success; non-zero = failure.
-- **Logs:** Combined stdout/stderr captured and truncated to ≤1 MiB; uploaded as
+- **Logs:** Combined stdout/stderr captured and truncated to ≤10 MiB; uploaded as
   `build-gate.log` artifact.
 - **Summary:** Pass/fail flag, duration, optional resource usage.
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.

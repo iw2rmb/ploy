@@ -34,10 +34,10 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 	if eventsService == nil {
 		panic("createNodeLogsHandler: eventsService is required")
 	}
-	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
-	const maxBodySize = 2 << 20  // 2 MiB
-	const maxChunkSize = 1 << 20 // 1 MiB
+	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 10 MiB cap on the decoded gzipped bytes.
+	const maxBodySize = 16 << 20  // 16 MiB
+	const maxChunkSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
@@ -77,9 +77,9 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 			return
 		}
 
-		// Enforce 1 MiB cap on decoded gzipped data bytes.
+		// Enforce 10 MiB cap on decoded gzipped data bytes.
 		if len(req.Data) > maxChunkSize {
-			http.Error(w, fmt.Sprintf("data exceeds 1 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
+			http.Error(w, fmt.Sprintf("data exceeds 10 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
 			return
 		}
 

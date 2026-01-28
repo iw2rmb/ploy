@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -416,13 +417,13 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 }
 
 func TestArtifactUploader_SizeCap(t *testing.T) {
-	// Create a large file that will exceed the 1 MiB cap when bundled.
+	// Create a large file that will exceed the 10 MiB cap when bundled.
 	tmpDir := t.TempDir()
 	largeFile := filepath.Join(tmpDir, "large.txt")
-	// Create a 2 MiB file (will exceed 1 MiB cap even when compressed).
-	largeContent := make([]byte, 2<<20)
-	for i := range largeContent {
-		largeContent[i] = byte(i % 256)
+	// Use deterministic pseudo-random bytes so gzip doesn't meaningfully compress.
+	largeContent := make([]byte, MaxUploadSize+1)
+	if _, err := rand.New(rand.NewSource(1)).Read(largeContent); err != nil {
+		t.Fatalf("generate large file content: %v", err)
 	}
 	if err := os.WriteFile(largeFile, largeContent, 0600); err != nil {
 		t.Fatalf("create large file: %v", err)

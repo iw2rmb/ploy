@@ -196,8 +196,8 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 	bp := blobpersist.New(mockStore, bsmock.New())
 	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
-	// Create decoded payload larger than 1 MiB (will trigger 413 after decode).
-	largeData := make([]byte, 1<<20+1)
+	// Create decoded payload larger than 10 MiB (will trigger 413 after decode).
+	largeData := make([]byte, 10<<20+1)
 	payload := map[string]interface{}{
 		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,
@@ -235,9 +235,10 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 	bp := blobpersist.New(mockStore, bsmock.New())
 	handler := createNodeLogsHandler(mockStore, bp, eventsService)
 
-	// Craft a request whose JSON body exceeds 2 MiB due to base64 overhead.
-	// 2 MiB raw → ~2.66 MiB base64 → trips MaxBytesReader body cap.
-	hugeData := make([]byte, 2<<20)
+	// Craft a request whose JSON body exceeds 16 MiB due to base64 overhead.
+	// Any payload large enough to trip the body cap will also exceed the decoded cap,
+	// but MaxBytesReader should fail early before decode.
+	hugeData := make([]byte, 16<<20)
 	payload := map[string]interface{}{
 		"run_id":   domaintypes.NewRunID().String(),
 		"chunk_no": 0,

@@ -16,16 +16,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createJobDiffHandler stores gzipped diff in object storage and metadata in diffs table (≤1 MiB), rejects oversize.
+// createJobDiffHandler stores gzipped diff in object storage and metadata in diffs table (≤10 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/diff
 func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerFunc {
 	if bp == nil {
 		panic("createJobDiffHandler: blobpersist is required")
 	}
-	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 1 MiB cap on the decoded patch bytes.
-	const maxBodySize = 2 << 20  // 2 MiB
-	const maxPatchSize = 1 << 20 // 1 MiB
+	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 10 MiB cap on the decoded patch bytes.
+	const maxBodySize = 16 << 20  // 16 MiB
+	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
@@ -61,9 +61,9 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			return
 		}
 
-		// Enforce decoded patch size cap (≤ 1 MiB gzipped, base64-decoded here).
+		// Enforce decoded patch size cap (≤ 10 MiB gzipped, base64-decoded here).
 		if len(req.Patch) > maxPatchSize {
-			http.Error(w, "diff size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
+			http.Error(w, "diff size exceeds 10 MiB cap", http.StatusRequestEntityTooLarge)
 			return
 		}
 

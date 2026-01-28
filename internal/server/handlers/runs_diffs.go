@@ -20,10 +20,10 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	if bp == nil {
 		panic("createRunDiffHandler: blobpersist is required")
 	}
-	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 1 MiB cap on the decoded patch bytes.
-	const maxBodySize = 2 << 20  // 2 MiB
-	const maxPatchSize = 1 << 20 // 1 MiB
+	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 10 MiB cap on the decoded patch bytes.
+	const maxBodySize = 16 << 20  // 16 MiB
+	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
@@ -50,7 +50,7 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			return
 		}
 		if len(req.Patch) > maxPatchSize {
-			http.Error(w, "diff size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
+			http.Error(w, "diff size exceeds 10 MiB cap", http.StatusRequestEntityTooLarge)
 			return
 		}
 

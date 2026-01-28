@@ -23,7 +23,7 @@ post:
             patch:
               type: string
               format: byte
-              description: Base64-encoded gzipped patch bytes (<= 1 MiB decoded).
+              description: Base64-encoded gzipped patch bytes (<= 10 MiB decoded).
             summary:
               type: object
               additionalProperties: true

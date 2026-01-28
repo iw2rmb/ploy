@@ -29,10 +29,10 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 	if eventsService == nil {
 		panic("createRunLogHandler: eventsService is required")
 	}
-	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
-	const maxBodySize = 2 << 20  // 2 MiB
-	const maxChunkSize = 1 << 20 // 1 MiB
+	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 10 MiB cap on the decoded gzipped bytes.
+	const maxBodySize = 16 << 20  // 16 MiB
+	const maxChunkSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run id from path parameter using domain type helper.
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
@@ -64,7 +64,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 			return
 		}
 		if len(req.Data) > maxChunkSize {
-			http.Error(w, fmt.Sprintf("data exceeds 1 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
+			http.Error(w, fmt.Sprintf("data exceeds 10 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
 			return
 		}
 

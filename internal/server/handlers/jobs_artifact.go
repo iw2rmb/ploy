@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createJobArtifactHandler stores gzipped artifact bundle in object storage and metadata in artifact_bundles table (≤1 MiB), rejects oversize.
+// createJobArtifactHandler stores gzipped artifact bundle in object storage and metadata in artifact_bundles table (≤10 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/artifact
 //
 // Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
@@ -25,10 +25,10 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 	if bp == nil {
 		panic("createJobArtifactHandler: blobpersist is required")
 	}
-	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
-	// while still enforcing a strict 1 MiB cap on the decoded bundle bytes.
-	const maxBodySize = 2 << 20   // 2 MiB
-	const maxBundleSize = 1 << 20 // 1 MiB
+	// Accept up to 16 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 10 MiB cap on the decoded bundle bytes.
+	const maxBodySize = 16 << 20   // 16 MiB
+	const maxBundleSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
@@ -65,9 +65,9 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			return
 		}
 
-		// Enforce decoded bundle size cap (≤ 1 MiB gzipped, base64-decoded here).
+		// Enforce decoded bundle size cap (≤ 10 MiB gzipped, base64-decoded here).
 		if len(req.Bundle) > maxBundleSize {
-			http.Error(w, "artifact bundle size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
+			http.Error(w, "artifact bundle size exceeds 10 MiB cap", http.StatusRequestEntityTooLarge)
 			return
 		}
 

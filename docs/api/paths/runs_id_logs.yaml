@@ -137,7 +137,7 @@ post:
             data:
               type: string
               format: byte
-              description: Base64-encoded gzipped log bytes (<= 1 MiB decoded).
+              description: Base64-encoded gzipped log bytes (<= 10 MiB decoded).
           required: [chunk_no, data]
   responses:
     '201':
