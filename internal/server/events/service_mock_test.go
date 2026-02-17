@@ -43,3 +43,7 @@ func (m *mockStore) Close() {}
 func (m *mockStore) Pool() *pgxpool.Pool {
 	return nil
 }
+
+func (m *mockStore) CancelRunV1(ctx context.Context, runID domaintypes.RunID) error {
+	return nil
+}
