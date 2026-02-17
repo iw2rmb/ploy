@@ -4,10 +4,10 @@ Scope: Incremental refactors and hardening fixes inside `internal/` to reduce op
 
 Documentation: `AGENTS.md`, `/Users/vk/@iw2rmb/auto/ROADMAP.md`, `GOLANG.md`, and the referenced code locations per step.
 
-Legend: [ ] todo, [x] done.
+Legend: [ ] todo, [~] partial, [x] done.
 
 ## Code Quality
-- [ ] Remove redundant `len(nil)` guards (S1009) — Unblocks `staticcheck`.
+- [x] Remove redundant `len(nil)` guards (S1009) — Unblocks `staticcheck`.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/workflow/stackdetect`
   - Scope: Update these checks (no behavior change intended):
@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `staticcheck ./internal/...` + `go test ./internal/...` — Expect clean `staticcheck` run.
 
 ## Server Request Parsing
-- [ ] Enforce EOF after JSON decode in `DecodeJSON` — Prevents accepting `{...} trailing-garbage` payloads.
+- [x] Enforce EOF after JSON decode in `DecodeJSON` — Prevents accepting `{...} trailing-garbage` payloads.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:
@@ -51,7 +51,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/...` — Expect pass.
 
 ## Control Plane API Performance
-- [ ] Add a store query that lists run repos with `repo_url` in one roundtrip — Removes N+1 DB calls in `/v1/runs/{id}/repos`.
+- [~] Add a store query that lists run repos with `repo_url` in one roundtrip — Removes N+1 DB calls in `/v1/runs/{id}/repos`.
   - Repository: `ploy`
   - Component: `internal/store` (sqlc queries)
   - Scope:
@@ -62,6 +62,7 @@ Legend: [ ] todo, [x] done.
   - Snippets:
     - `SELECT rr.*, mr.repo_url FROM run_repos rr JOIN mod_repos mr ON rr.repo_id = mr.id WHERE rr.run_id = $1 ORDER BY rr.created_at ASC, rr.repo_id ASC;`
   - Tests: `go test ./internal/store -run RunRepos` — Expect new query returns URL and preserves ordering.
+  - Status note: `ListRunReposWithURLByRun` exists, but ordering/response shape usage for `/v1/runs/{id}/repos` is not fully wired.
 
 - [ ] Update `GET /v1/runs/{id}/repos` handler to use the joined query — Avoids per-row `GetModRepo` lookups.
   - Repository: `ploy`
@@ -128,7 +129,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run RunsBatch` — Expect identical handler behavior with smaller mocks.
 
 ## File Decomposition (Maintainability)
-- [ ] Split `internal/workflow/runtime/step/gate_docker.go` into focused files — Improves readability and isolates concerns.
+- [~] Split `internal/workflow/runtime/step/gate_docker.go` into focused files — Improves readability and isolates concerns.
   - Repository: `ploy`
   - Component: `internal/workflow/runtime/step`
   - Scope:
@@ -141,8 +142,9 @@ Legend: [ ] todo, [x] done.
     - Blast radius: multiple files in one package; estimate: ~2–4 hours.
   - Snippets: n/a (refactor-only; keep diffs mechanical).
   - Tests: `go test ./internal/workflow/runtime/step` + `go test ./internal/...` + `staticcheck ./internal/...` — Expect no behavior change and clean checks.
+  - Status note: helper extraction is started (`build_gate_image_resolver.go`, `build_gate_log_trimmer.go`), while `gate_docker.go` remains large.
 
-- [ ] Split `internal/nodeagent/execution_healing.go` into focused files — Reduces complexity of the healing retry loop.
+- [~] Split `internal/nodeagent/execution_healing.go` into focused files — Reduces complexity of the healing retry loop.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:
@@ -155,3 +157,4 @@ Legend: [ ] todo, [x] done.
     - Blast radius: multiple files in one package; estimate: ~2–4 hours.
   - Snippets: n/a (refactor-only; keep diffs mechanical).
   - Tests: `go test ./internal/nodeagent` + `go test ./internal/...` + `staticcheck ./internal/...` — Expect no behavior change and clean checks.
+  - Status note: helper extraction is started (`execution_healing_helpers.go`), while core loop logic remains concentrated in `execution_healing.go`.
