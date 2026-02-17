@@ -12,6 +12,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelActiveJobsByRun = `-- name: CancelActiveJobsByRun :execrows
+UPDATE jobs
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now()),
+    duration_ms = CASE
+      WHEN started_at IS NULL THEN 0
+      ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
+    END
+WHERE run_id = $1
+  AND status IN ('Created', 'Queued', 'Running')
+`
+
+// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
+// finished_at is set once; duration_ms is computed from started_at when present.
+func (q *Queries) CancelActiveJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveJobsByRun, runID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimJob = `-- name: ClaimJob :one
 WITH eligible AS (
   SELECT j.id, n.id AS node_id

@@ -12,6 +12,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelActiveRunReposByRun = `-- name: CancelActiveRunReposByRun :execrows
+UPDATE run_repos
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now())
+WHERE run_id = $1
+  AND status IN ('Queued', 'Running')
+`
+
+// Bulk-cancels active repos for a run (Queued/Running -> Cancelled).
+func (q *Queries) CancelActiveRunReposByRun(ctx context.Context, runID types.RunID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveRunReposByRun, runID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countRunReposByStatus = `-- name: CountRunReposByStatus :many
 SELECT status, COUNT(*)::int AS count
 FROM run_repos
