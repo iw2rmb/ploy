@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -69,6 +70,13 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 		}
 		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
 		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		http.Error(w, "invalid request: request body must contain exactly one JSON value", http.StatusBadRequest)
+		if err == nil {
+			return errors.New("request body must contain exactly one JSON value")
+		}
+		return fmt.Errorf("request body must contain exactly one JSON value: %w", err)
 	}
 	return nil
 }

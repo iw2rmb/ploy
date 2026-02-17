@@ -268,3 +268,69 @@ func TestDecodeRejectsLargeBody(t *testing.T) {
 		t.Errorf("status = %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
 	}
 }
+
+// TestDecodeRequiresExactlyOneJSONValue validates that DecodeJSON accepts exactly
+// one JSON value and rejects trailing non-whitespace or additional JSON values.
+func TestDecodeRequiresExactlyOneJSONValue(t *testing.T) {
+	type testRequest struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+		wantErr    bool
+	}{
+		{
+			name:       "single json value is valid",
+			body:       `{"name":"test","value":42}`,
+			wantStatus: http.StatusOK,
+			wantErr:    false,
+		},
+		{
+			name:       "single json value with trailing whitespace is valid",
+			body:       "{\"name\":\"test\",\"value\":42}\n\t  ",
+			wantStatus: http.StatusOK,
+			wantErr:    false,
+		},
+		{
+			name:       "trailing non-whitespace is rejected",
+			body:       `{"name":"test","value":42} trailing`,
+			wantStatus: http.StatusBadRequest,
+			wantErr:    true,
+		},
+		{
+			name:       "multiple json values are rejected",
+			body:       `{"name":"test","value":42} {"name":"next","value":7}`,
+			wantStatus: http.StatusBadRequest,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+
+			var dest testRequest
+			err := DecodeJSON(rr, req, &dest, DefaultMaxBodySize)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if rr.Code != tt.wantStatus {
+					t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
