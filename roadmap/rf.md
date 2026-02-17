@@ -89,7 +89,7 @@ Legend: [ ] todo, [~] partial, [x] done.
     - `UPDATE run_repos SET status = 'Cancelled', finished_at = COALESCE(finished_at, now()) WHERE run_id = $1 AND status IN ('Queued','Running');`
   - Tests: `go test ./internal/store -run Cancel` — Expect only active rows are transitioned.
 
-- [ ] Implement a transactional store method for cancel — Makes cancel atomic and error-checked.
+- [x] Implement a transactional store method for cancel — Makes cancel atomic and error-checked.
   - Repository: `ploy`
   - Component: `internal/store`
   - Scope:

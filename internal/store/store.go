@@ -21,6 +21,7 @@ var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 // The sqlc-generated Queries type will implement the query methods.
 type Store interface {
 	Querier
+	CancelRunV1(ctx context.Context, runID types.RunID) error
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -76,6 +77,54 @@ func (s *PgStore) Close() {
 // such as partition management.
 func (s *PgStore) Pool() *pgxpool.Pool {
 	return s.pool
+}
+
+// CancelRunV1 atomically cancels a v1 run and all active child work.
+// It updates run status (if non-terminal), then bulk-cancels active repos/jobs
+// in a single transaction.
+func (s *PgStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("cancel run v1: begin tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	qtx := s.Queries.WithTx(tx)
+
+	run, err := qtx.GetRun(ctx, runID)
+	if err != nil {
+		return fmt.Errorf("cancel run v1: get run: %w", err)
+	}
+
+	if run.Status != RunStatusFinished && run.Status != RunStatusCancelled {
+		if err := qtx.UpdateRunStatus(ctx, UpdateRunStatusParams{
+			ID:     runID,
+			Status: RunStatusCancelled,
+		}); err != nil {
+			return fmt.Errorf("cancel run v1: update run status: %w", err)
+		}
+	}
+
+	if _, err := qtx.CancelActiveRunReposByRun(ctx, runID); err != nil {
+		return fmt.Errorf("cancel run v1: cancel active repos: %w", err)
+	}
+
+	if _, err := qtx.CancelActiveJobsByRun(ctx, runID); err != nil {
+		return fmt.Errorf("cancel run v1: cancel active jobs: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("cancel run v1: commit tx: %w", err)
+	}
+
+	committed = true
+	return nil
 }
 
 // ClaimJob atomically claims the next claimable job for a node.
