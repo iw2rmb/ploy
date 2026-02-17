@@ -6,7 +6,7 @@ import (
 	"net/url"
 )
 
-// BuildURL resolves a base URL and a path, preserving scheme/host.
+// BuildURL resolves a base URL and a path-only reference, preserving scheme/host.
 // This is used by all HTTP uploaders/fetchers to construct API endpoints.
 //
 // Example:
@@ -21,6 +21,9 @@ func BuildURL(base, p string) (string, error) {
 	pu, err := url.Parse(p)
 	if err != nil {
 		return "", fmt.Errorf("parse path: %w", err)
+	}
+	if pu.IsAbs() || pu.Scheme != "" || pu.Host != "" || pu.User != nil {
+		return "", fmt.Errorf("path must not include scheme or host")
 	}
 	return bu.ResolveReference(pu).String(), nil
 }

@@ -36,7 +36,7 @@ Legend: [ ] todo, [~] partial, [x] done.
     - `go test ./internal/...` + `go vet ./...` — Expect pass.
 
 ## Node Agent HTTP
-- [ ] Reject absolute URLs passed as “path” to `BuildURL` — Prevents scheme/host override via `ResolveReference`.
+- [x] Reject absolute URLs passed as “path” to `BuildURL` — Prevents scheme/host override via `ResolveReference`.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:

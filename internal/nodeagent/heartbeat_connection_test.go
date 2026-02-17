@@ -52,6 +52,44 @@ func TestBuildURLEscapesNodeID(t *testing.T) {
 	}
 }
 
+func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
+	t.Parallel()
+
+	base := "http://server.example.com:8080"
+	tests := []struct {
+		name string
+		p    string
+	}{
+		{
+			name: "https absolute",
+			p:    "https://evil.example/x",
+		},
+		{
+			name: "http absolute",
+			p:    "http://evil.example/x",
+		},
+		{
+			name: "authority reference",
+			p:    "//evil.example/x",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := BuildURL(base, tt.p)
+			if err == nil {
+				t.Fatalf("BuildURL(%q, %q) expected error, got nil", base, tt.p)
+			}
+			const want = "path must not include scheme or host"
+			if !contains(err.Error(), want) {
+				t.Fatalf("BuildURL(%q, %q) err = %q, want substring %q", base, tt.p, err.Error(), want)
+			}
+		})
+	}
+}
+
 // TestSendHeartbeatSuccess verifies successful heartbeat POST request and payload.
 func TestSendHeartbeatSuccess(t *testing.T) {
 	var receivedPayload HeartbeatPayload
