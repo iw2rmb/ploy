@@ -108,11 +108,16 @@ WHERE status = 'Fail';
 
 -- name: ListRunReposWithURLByRun :many
 -- v1: Lists all run_repos for a run with their repo_url (from mod_repos).
--- Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
-SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
+-- Used by:
+-- - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
+-- - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
+SELECT rr.mod_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
+       rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
+       mr.repo_url
 FROM run_repos rr
 JOIN mod_repos mr ON rr.repo_id = mr.id
-WHERE rr.run_id = $1;
+WHERE rr.run_id = $1
+ORDER BY rr.created_at ASC, rr.repo_id ASC;
 
 -- name: GetLatestRunRepoByModAndRepoStatus :one
 -- v1: Gets the newest run_repos row for a specific repo_id in a mod,

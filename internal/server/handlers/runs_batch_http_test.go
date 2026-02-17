@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -235,10 +236,18 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	repoID := domaintypes.NewModRepoID()
 
 	st := &mockStore{
-		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, RepoBaseRef: "main", RepoTargetRef: "feature", Status: store.RunRepoStatusQueued, Attempt: 1},
+		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
+			{
+				RunID:         runID,
+				RepoID:        repoID,
+				RepoBaseRef:   "main",
+				RepoTargetRef: "feature",
+				Status:        store.RunRepoStatusQueued,
+				Attempt:       1,
+				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+				RepoUrl:       "https://github.com/org/repo.git",
+			},
 		},
-		getModRepoResult: store.ModRepo{ID: repoID, RepoUrl: "https://github.com/org/repo.git"},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr+"/repos", nil)
@@ -259,6 +268,39 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	}
 	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoID || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
 		t.Fatalf("unexpected repos response: %+v", resp.Repos)
+	}
+	if !st.listRunReposWithURLByRunCalled {
+		t.Fatalf("expected ListRunReposWithURLByRun to be called")
+	}
+	if st.listRunReposWithURLByRunParam != runIDStr {
+		t.Fatalf("expected run id %q, got %q", runIDStr, st.listRunReposWithURLByRunParam)
+	}
+	if st.listRunReposByRunCalled {
+		t.Fatalf("did not expect ListRunReposByRun to be called")
+	}
+	if st.getModRepoCalled {
+		t.Fatalf("did not expect GetModRepo to be called")
+	}
+}
+
+func TestListRunReposHandler_ListError(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+
+	st := &mockStore{
+		listRunReposWithURLByRunErr: errors.New("db exploded"),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr+"/repos", nil)
+	req.SetPathValue("id", runIDStr)
+	rr := httptest.NewRecorder()
+
+	listRunReposHandler(st).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

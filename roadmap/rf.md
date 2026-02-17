@@ -64,7 +64,7 @@ Legend: [ ] todo, [~] partial, [x] done.
   - Tests: `go test ./internal/store -run RunRepos` — Expect new query returns URL and preserves ordering.
   - Status note: `ListRunReposWithURLByRun` exists, but ordering/response shape usage for `/v1/runs/{id}/repos` is not fully wired.
 
-- [ ] Update `GET /v1/runs/{id}/repos` handler to use the joined query — Avoids per-row `GetModRepo` lookups.
+- [x] Update `GET /v1/runs/{id}/repos` handler to use the joined query — Avoids per-row `GetModRepo` lookups.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:
