@@ -76,7 +76,7 @@ Legend: [ ] todo, [~] partial, [x] done.
   - Tests: `go test ./internal/server/handlers -run ListRunRepos` — Expect correct `repo_url` values and unchanged response shape.
 
 ## Cancellation Robustness (v1)
-- [ ] Add bulk cancellation SQL queries for repos/jobs — Eliminates per-row loops and enables transactional cancel.
+- [x] Add bulk cancellation SQL queries for repos/jobs — Eliminates per-row loops and enables transactional cancel.
   - Repository: `ploy`
   - Component: `internal/store` (sqlc queries)
   - Scope:

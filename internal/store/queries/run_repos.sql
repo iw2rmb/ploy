@@ -55,6 +55,14 @@ FROM run_repos
 WHERE run_id = $1
 GROUP BY status;
 
+-- name: CancelActiveRunReposByRun :execrows
+-- Bulk-cancels active repos for a run (Queued/Running -> Cancelled).
+UPDATE run_repos
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now())
+WHERE run_id = $1
+  AND status IN ('Queued', 'Running');
+
 -- name: DeleteRunRepo :exec
 DELETE FROM run_repos
 WHERE run_id = $1 AND repo_id = $2;

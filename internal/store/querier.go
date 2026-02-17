@@ -16,6 +16,11 @@ type Querier interface {
 	// Archiving must be refused when the mod has any jobs in a running state.
 	// This query only sets the timestamp; validation logic must be in the caller.
 	ArchiveMod(ctx context.Context, id types.ModID) error
+	// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
+	// finished_at is set once; duration_ms is computed from started_at when present.
+	CancelActiveJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
+	// Bulk-cancels active repos for a run (Queued/Running -> Cancelled).
+	CancelActiveRunReposByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	// Atomically claim the next claimable job for a node (unified queue).

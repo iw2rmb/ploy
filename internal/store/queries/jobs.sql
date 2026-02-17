@@ -111,6 +111,19 @@ SET status = $2,
     duration_ms = $5
 WHERE id = $1;
 
+-- name: CancelActiveJobsByRun :execrows
+-- Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
+-- finished_at is set once; duration_ms is computed from started_at when present.
+UPDATE jobs
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now()),
+    duration_ms = CASE
+      WHEN started_at IS NULL THEN 0
+      ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
+    END
+WHERE run_id = $1
+  AND status IN ('Created', 'Queued', 'Running');
+
 -- name: DeleteJob :exec
 DELETE FROM jobs
 WHERE id = $1;
