@@ -17,11 +17,11 @@ import (
 )
 
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
-// POST /v1/runs/{id}/cancel (v1 API) — Marks the run as Cancelled and cancels queued/running repos/jobs.
-// This handler:
-// - Sets runs.status=Cancelled
+// POST /v1/runs/{id}/cancel (v1 API) — Performs transactional cancellation of a run.
+// This handler delegates cancellation to store.CancelRunV1, which atomically:
+// - Sets runs.status=Cancelled (for non-terminal runs)
 // - Cancels all repos with status Queued or Running → Cancelled
-// - Cancels/removes waiting jobs (Created/Queued/Running → Cancelled)
+// - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
@@ -53,49 +53,10 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Update run status to Cancelled.
-		if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: store.RunStatusCancelled}); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update run status: %v", err), http.StatusInternalServerError)
-			slog.Error("cancel run: update status failed", "run_id", runID.String(), "err", err)
+		if err := st.CancelRunV1(r.Context(), runID); err != nil {
+			http.Error(w, fmt.Sprintf("failed to cancel run: %v", err), http.StatusInternalServerError)
+			slog.Error("cancel run: transactional cancel failed", "run_id", runID.String(), "err", err)
 			return
-		}
-
-		now := time.Now().UTC()
-
-		// Cancel all Queued/Running repos → Cancelled (v1 requirement).
-		if repos, err := st.ListRunReposByRun(r.Context(), runID); err == nil {
-			for _, rr := range repos {
-				if rr.Status != store.RunRepoStatusQueued && rr.Status != store.RunRepoStatusRunning {
-					continue
-				}
-				_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
-					RunID:  rr.RunID,
-					RepoID: rr.RepoID,
-					Status: store.RunRepoStatusCancelled,
-				})
-			}
-		}
-
-		// Cancel/remove waiting jobs (Created/Queued/Running → Cancelled).
-		if jobs, err := st.ListJobsByRun(r.Context(), runID); err == nil {
-			for _, job := range jobs {
-				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
-					continue
-				}
-				dur := int64(0)
-				if job.StartedAt.Valid {
-					if d := now.Sub(job.StartedAt.Time).Milliseconds(); d > 0 {
-						dur = d
-					}
-				}
-				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
-					ID:         job.ID,
-					Status:     store.JobStatusCancelled,
-					StartedAt:  job.StartedAt,
-					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
-					DurationMs: dur,
-				})
-			}
 		}
 
 		// Return updated run summary.
