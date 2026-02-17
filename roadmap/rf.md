@@ -103,7 +103,7 @@ Legend: [ ] todo, [~] partial, [x] done.
     - Transaction wrapper around the three update statements.
   - Tests: `go test ./internal/store -run CancelRunV1` — Expect all-or-nothing behavior on injected error.
 
-- [ ] Update `cancelRunHandlerV1` to use the transactional store method — Stops silently ignoring update failures.
+- [x] Update `cancelRunHandlerV1` to use the transactional store method — Stops silently ignoring update failures.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:

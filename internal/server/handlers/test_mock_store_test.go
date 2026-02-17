@@ -162,6 +162,11 @@ type mockStore struct {
 	updateRunStatusParams store.UpdateRunStatusParams
 	updateRunStatusErr    error
 
+	// CancelRunV1 tracking
+	cancelRunV1Called bool
+	cancelRunV1Param  string
+	cancelRunV1Err    error
+
 	// UpdateRunResume tracking (resume_count, last_resumed_at)
 	updateRunResumeCalled bool
 	updateRunResumeParam  string
@@ -785,6 +790,12 @@ func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunS
 	m.updateRunStatusCalled = true
 	m.updateRunStatusParams = params
 	return m.updateRunStatusErr
+}
+
+func (m *mockStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
+	m.cancelRunV1Called = true
+	m.cancelRunV1Param = runID.String()
+	return m.cancelRunV1Err
 }
 
 func (m *mockStore) UpdateRunResume(ctx context.Context, id types.RunID) error {

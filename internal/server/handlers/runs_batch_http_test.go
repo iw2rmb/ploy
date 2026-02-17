@@ -102,7 +102,7 @@ func TestGetRunHandler_Success_WithCounts(t *testing.T) {
 }
 
 // TestCancelRunHandlerV1_CancelsRunAndWork verifies that POST /v1/runs/{id}/cancel
-// cancels the run, cancels Queued/Running repos, and cancels Created/Queued/Running jobs.
+// performs transactional cancellation via store.CancelRunV1.
 func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
@@ -110,9 +110,6 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	runIDStr := runID.String()
 	modID := domaintypes.NewModID()
 	specID := domaintypes.NewSpecID()
-	queuedRepoID := domaintypes.NewModRepoID()
-	runningRepoID := domaintypes.NewModRepoID()
-	doneRepoID := domaintypes.NewModRepoID()
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -121,17 +118,6 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 			SpecID:    specID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		},
-		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: queuedRepoID, Status: store.RunRepoStatusQueued},
-			{RunID: runID, RepoID: runningRepoID, Status: store.RunRepoStatusRunning},
-			{RunID: runID, RepoID: doneRepoID, Status: store.RunRepoStatusSuccess},
-		},
-		listJobsByRunResult: []store.Job{
-			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusCreated},
-			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusQueued},
-			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-5 * time.Second).UTC(), Valid: true}},
-			{ID: domaintypes.NewJobID(), RunID: runID, Status: store.JobStatusSuccess},
 		},
 	}
 
@@ -144,38 +130,79 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.updateRunStatusCalled {
-		t.Fatalf("expected UpdateRunStatus to be called")
+	if !st.cancelRunV1Called {
+		t.Fatalf("expected CancelRunV1 to be called")
 	}
-	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusCancelled {
-		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
+	if st.cancelRunV1Param != runIDStr {
+		t.Fatalf("expected CancelRunV1 run id %q, got %q", runIDStr, st.cancelRunV1Param)
 	}
-	if len(st.updateRunRepoStatusParams) != 2 {
-		t.Fatalf("expected 2 repo status updates (Queued + Running), got %d", len(st.updateRunRepoStatusParams))
+	if st.updateRunStatusCalled {
+		t.Fatalf("did not expect UpdateRunStatus to be called directly")
 	}
-	updatedRepos := map[string]store.UpdateRunRepoStatusParams{}
-	for _, p := range st.updateRunRepoStatusParams {
-		updatedRepos[p.RepoID.String()] = p
+	if st.updateRunRepoStatusCalled {
+		t.Fatalf("did not expect UpdateRunRepoStatus to be called directly")
 	}
-	for _, repoID := range []domaintypes.ModRepoID{queuedRepoID, runningRepoID} {
-		p, ok := updatedRepos[repoID.String()]
-		if !ok {
-			t.Fatalf("expected repo %s to be cancelled", repoID.String())
-		}
-		if p.RunID != runID || p.Status != store.RunRepoStatusCancelled {
-			t.Fatalf("unexpected UpdateRunRepoStatus params for repo %s: %+v", repoID.String(), p)
-		}
+	if st.updateJobStatusCalled {
+		t.Fatalf("did not expect UpdateJobStatus to be called directly")
 	}
-	if len(st.updateJobStatusCalls) != 3 {
-		t.Fatalf("expected 3 job status updates (Created + Queued + Running), got %d", len(st.updateJobStatusCalls))
+}
+
+func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:        runID,
+			ModID:     domaintypes.NewModID(),
+			SpecID:    domaintypes.NewSpecID(),
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		cancelRunV1Err: errors.New("db exploded"),
 	}
-	for _, p := range st.updateJobStatusCalls {
-		if p.Status != store.JobStatusCancelled {
-			t.Fatalf("expected job status Cancelled, got %+v", p)
-		}
-		if !p.FinishedAt.Valid {
-			t.Fatalf("expected FinishedAt to be set for job %+v", p)
-		}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/cancel", nil)
+	req.SetPathValue("id", runIDStr)
+	rr := httptest.NewRecorder()
+
+	cancelRunHandlerV1(st).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.cancelRunV1Called {
+		t.Fatalf("expected CancelRunV1 to be called")
+	}
+}
+
+func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	runIDStr := runID.String()
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:        runID,
+			ModID:     domaintypes.NewModID(),
+			SpecID:    domaintypes.NewSpecID(),
+			Status:    store.RunStatusCancelled,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/cancel", nil)
+	req.SetPathValue("id", runIDStr)
+	rr := httptest.NewRecorder()
+
+	cancelRunHandlerV1(st).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.cancelRunV1Called {
+		t.Fatalf("did not expect CancelRunV1 to be called for terminal run")
 	}
 }
 
