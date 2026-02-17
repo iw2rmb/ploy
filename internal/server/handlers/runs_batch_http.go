@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,13 +17,62 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+type cancelRunStore interface {
+	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
+	CancelRunV1(ctx context.Context, runID domaintypes.RunID) error
+	CountRunReposByStatus(ctx context.Context, runID domaintypes.RunID) ([]store.CountRunReposByStatusRow, error)
+}
+
+type addRunRepoStore interface {
+	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
+	CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error)
+	CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error)
+	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
+	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
+}
+
+type listRunReposStore interface {
+	ListRunReposWithURLByRun(ctx context.Context, runID domaintypes.RunID) ([]store.ListRunReposWithURLByRunRow, error)
+}
+
+type cancelRunRepoStore interface {
+	GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error)
+	GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error)
+	UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error
+	ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error)
+	UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error
+}
+
+type restartRunRepoStore interface {
+	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
+	GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error)
+	UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error
+	UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error
+	UpdateModRepoRefs(ctx context.Context, params store.UpdateModRepoRefsParams) error
+	IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error
+	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
+	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
+	GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error)
+}
+
+type startRunStore interface {
+	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
+	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
+	ListRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
+	ListQueuedRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
+	ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error)
+	UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error
+	ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error)
+	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
+}
+
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
 // POST /v1/runs/{id}/cancel (v1 API) — Performs transactional cancellation of a run.
 // This handler delegates cancellation to store.CancelRunV1, which atomically:
 // - Sets runs.status=Cancelled (for non-terminal runs)
 // - Cancels all repos with status Queued or Running → Cancelled
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
-func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
+func cancelRunHandlerV1(st cancelRunStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
@@ -73,7 +123,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 
 // addRunRepoHandler adds a repo to an existing run (and to the mod repo set).
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
-func addRunRepoHandler(st store.Store) http.HandlerFunc {
+func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
@@ -170,7 +220,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 
 // listRunReposHandler lists repos for a run.
 // GET /v1/runs/{id}/repos
-func listRunReposHandler(st store.Store) http.HandlerFunc {
+func listRunReposHandler(st listRunReposStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
@@ -214,7 +264,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 
 // cancelRunRepoHandlerV1 cancels a repo execution within a run (v1 API).
 // POST /v1/runs/{run_id}/repos/{repo_id}/cancel
-func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
+func cancelRunRepoHandlerV1(st cancelRunRepoStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
@@ -287,7 +337,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 // restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
 // POST /v1/runs/{id}/repos/{repo_id}/restart
-func restartRunRepoHandler(st store.Store) http.HandlerFunc {
+func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
@@ -408,7 +458,7 @@ type StartRunResponse struct {
 
 // startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
 // POST /v1/runs/{id}/start
-func startRunHandler(st store.Store) http.HandlerFunc {
+func startRunHandler(st startRunStore) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {

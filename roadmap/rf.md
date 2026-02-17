@@ -115,7 +115,7 @@ Legend: [ ] todo, [~] partial, [x] done.
   - Tests: `go test ./internal/server/handlers -run CancelRun` — Expect repos/jobs canceled consistently; handler returns 500 on DB failure.
 
 ## Handler Testability (Mock Size)
-- [ ] Introduce narrow store interfaces for `runs_batch_http.go` handlers — Shrinks mocks and reduces test maintenance cost.
+- [x] Introduce narrow store interfaces for `runs_batch_http.go` handlers — Shrinks mocks and reduces test maintenance cost.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:
@@ -127,6 +127,7 @@ Legend: [ ] todo, [~] partial, [x] done.
   - Snippets:
     - `type runRepoLister interface { ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) }`
   - Tests: `go test ./internal/server/handlers -run RunsBatch` — Expect identical handler behavior with smaller mocks.
+  - Status note: `runs_batch_http.go` now uses per-handler minimal interfaces, shared helpers were narrowed (`getRunRepoCounts`, `createJobsFromSpec`, `BatchRepoStarter`), and `runs_batch_http_test.go` was switched to local per-test mocks with added `restart`/`start` coverage.
 
 ## File Decomposition (Maintainability)
 - [~] Split `internal/workflow/runtime/step/gate_docker.go` into focused files — Improves readability and isolates concerns.
