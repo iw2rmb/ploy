@@ -54,6 +54,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// run_repos.sql - created_at needs repo_id/run_id tie-breakers (composite PK)
 		{"ListRunReposByRun", listRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
 		{"ListQueuedRunReposByRun", listQueuedRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
+		{"ListRunReposWithURLByRun", listRunReposWithURLByRun, "ORDER BY rr.created_at ASC, rr.repo_id ASC"},
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMod", listFailedRepoIDsByMod, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
