@@ -299,3 +299,92 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 		t.Fatalf("expected pgx.ErrNoRows, got %v", err)
 	}
 }
+
+func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", "feature/a", []byte(`{"type":"batch"}`))
+
+	modRepo2ID := types.NewModRepoID()
+	modRepo2, err := db.CreateModRepo(ctx, CreateModRepoParams{
+		ID:        modRepo2ID,
+		ModID:     fx.Mod.ID,
+		RepoUrl:   "https://github.com/org/repo-b",
+		BaseRef:   "main",
+		TargetRef: "feature/b",
+	})
+	if err != nil {
+		t.Fatalf("CreateModRepo() for repo-b failed: %v", err)
+	}
+
+	_, err = db.CreateRunRepo(ctx, CreateRunRepoParams{
+		ModID:         fx.Mod.ID,
+		RunID:         fx.Run.ID,
+		RepoID:        modRepo2.ID,
+		RepoBaseRef:   modRepo2.BaseRef,
+		RepoTargetRef: modRepo2.TargetRef,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunRepo() for repo-b failed: %v", err)
+	}
+
+	rows, err := db.ListRunReposWithURLByRun(ctx, fx.Run.ID)
+	if err != nil {
+		t.Fatalf("ListRunReposWithURLByRun() failed: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 run repos with urls, got %d", len(rows))
+	}
+
+	expectedURLByRepoID := map[types.ModRepoID]string{
+		fx.ModRepo.ID: fx.ModRepo.RepoUrl,
+		modRepo2.ID:   modRepo2.RepoUrl,
+	}
+
+	seen := map[types.ModRepoID]bool{}
+	for i, row := range rows {
+		if row.RunID != fx.Run.ID {
+			t.Fatalf("row[%d] run_id=%q, want %q", i, row.RunID, fx.Run.ID)
+		}
+		if row.RepoUrl == "" {
+			t.Fatalf("row[%d] repo_url is empty", i)
+		}
+
+		wantURL, ok := expectedURLByRepoID[row.RepoID]
+		if !ok {
+			t.Fatalf("row[%d] returned unexpected repo_id=%q", i, row.RepoID)
+		}
+		if row.RepoUrl != wantURL {
+			t.Fatalf("row[%d] repo_url=%q, want %q", i, row.RepoUrl, wantURL)
+		}
+		seen[row.RepoID] = true
+
+		if i == 0 {
+			continue
+		}
+		prev := rows[i-1]
+		if prev.CreatedAt.Time.After(row.CreatedAt.Time) {
+			t.Fatalf("rows not ordered by created_at ASC at index %d", i)
+		}
+		if prev.CreatedAt.Time.Equal(row.CreatedAt.Time) && string(prev.RepoID) > string(row.RepoID) {
+			t.Fatalf("rows with equal created_at not ordered by repo_id ASC at index %d", i)
+		}
+	}
+
+	if !seen[fx.ModRepo.ID] {
+		t.Fatalf("expected repo_id %q in results", fx.ModRepo.ID)
+	}
+	if !seen[modRepo2.ID] {
+		t.Fatalf("expected repo_id %q in results", modRepo2.ID)
+	}
+}

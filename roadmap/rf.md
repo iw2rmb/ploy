@@ -51,7 +51,7 @@ Legend: [ ] todo, [~] partial, [x] done.
     - `go test ./internal/...` — Expect pass.
 
 ## Control Plane API Performance
-- [~] Add a store query that lists run repos with `repo_url` in one roundtrip — Removes N+1 DB calls in `/v1/runs/{id}/repos`.
+- [x] Add a store query that lists run repos with `repo_url` in one roundtrip — Removes N+1 DB calls in `/v1/runs/{id}/repos`.
   - Repository: `ploy`
   - Component: `internal/store` (sqlc queries)
   - Scope:
@@ -62,7 +62,7 @@ Legend: [ ] todo, [~] partial, [x] done.
   - Snippets:
     - `SELECT rr.*, mr.repo_url FROM run_repos rr JOIN mod_repos mr ON rr.repo_id = mr.id WHERE rr.run_id = $1 ORDER BY rr.created_at ASC, rr.repo_id ASC;`
   - Tests: `go test ./internal/store -run RunRepos` — Expect new query returns URL and preserves ordering.
-  - Status note: `ListRunReposWithURLByRun` exists, but ordering/response shape usage for `/v1/runs/{id}/repos` is not fully wired.
+  - Status note: `ListRunReposWithURLByRun` is wired for `/v1/runs/{id}/repos` and covered by store + handler tests.
 
 - [x] Update `GET /v1/runs/{id}/repos` handler to use the joined query — Avoids per-row `GetModRepo` lookups.
   - Repository: `ploy`
