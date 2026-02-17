@@ -20,6 +20,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+type runJobCreator interface {
+	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
+}
+
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
 // Run and job IDs are generated using domaintypes.NewRunID() and domaintypes.NewJobID().
 // UUID parsing is no longer performed for run/job IDs; they are treated as opaque strings.
@@ -205,7 +209,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 //
 // For multi-step runs (mods[] array), creates one mod job per entry.
 // Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
-func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, spec []byte) error {
+func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, spec []byte) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse mods spec: %w", err)
@@ -249,7 +253,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 	return createSingleModJob(ctx, st, runID, repoID, repoBaseRef, attempt, modImage, stepName)
 }
 
-func createSingleModJob(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, modImage string, stepName string) error {
+func createSingleModJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, modImage string, stepName string) error {
 	// v1 job queueing rules: first job is Queued, rest are Created.
 	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued, ""); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
@@ -263,7 +267,7 @@ func createSingleModJob(ctx context.Context, st store.Store, runID domaintypes.R
 	return nil
 }
 
-func createJobWithIndex(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, name string, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus, modsStepName string) error {
+func createJobWithIndex(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, name string, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus, modsStepName string) error {
 	jobID := domaintypes.NewJobID()
 
 	// Build job metadata with step name for mod jobs.
