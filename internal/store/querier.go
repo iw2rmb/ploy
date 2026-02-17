@@ -203,7 +203,9 @@ type Querier interface {
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
-	// Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
+	// Used by:
+	// - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
+	// - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 	ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	// Lists runs for a given repo_id (mod_repos.id).

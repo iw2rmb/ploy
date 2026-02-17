@@ -300,21 +300,34 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 }
 
 const listRunReposWithURLByRun = `-- name: ListRunReposWithURLByRun :many
-SELECT rr.run_id, rr.repo_id, rr.repo_target_ref, mr.repo_url
+SELECT rr.mod_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
+       rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
+       mr.repo_url
 FROM run_repos rr
 JOIN mod_repos mr ON rr.repo_id = mr.id
 WHERE rr.run_id = $1
+ORDER BY rr.created_at ASC, rr.repo_id ASC
 `
 
 type ListRunReposWithURLByRunRow struct {
-	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.ModRepoID `json:"repo_id"`
-	RepoTargetRef string          `json:"repo_target_ref"`
-	RepoUrl       string          `json:"repo_url"`
+	ModID         types.ModID        `json:"mod_id"`
+	RunID         types.RunID        `json:"run_id"`
+	RepoID        types.ModRepoID    `json:"repo_id"`
+	RepoBaseRef   string             `json:"repo_base_ref"`
+	RepoTargetRef string             `json:"repo_target_ref"`
+	Status        RunRepoStatus      `json:"status"`
+	Attempt       int32              `json:"attempt"`
+	LastError     *string            `json:"last_error"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
+	RepoUrl       string             `json:"repo_url"`
 }
 
 // v1: Lists all run_repos for a run with their repo_url (from mod_repos).
-// Used by POST /v1/runs/{run_id}/pull to find a repo by normalized URL.
+// Used by:
+// - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
+// - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error) {
 	rows, err := q.db.Query(ctx, listRunReposWithURLByRun, runID)
 	if err != nil {
@@ -325,9 +338,17 @@ func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunI
 	for rows.Next() {
 		var i ListRunReposWithURLByRunRow
 		if err := rows.Scan(
+			&i.ModID,
 			&i.RunID,
 			&i.RepoID,
+			&i.RepoBaseRef,
 			&i.RepoTargetRef,
+			&i.Status,
+			&i.Attempt,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
 			&i.RepoUrl,
 		); err != nil {
 			return nil, err

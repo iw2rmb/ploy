@@ -217,7 +217,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		repos, err := st.ListRunReposByRun(r.Context(), runID)
+		repos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
 			slog.Error("list run repos: fetch failed", "run_id", runID.String(), "err", err)
@@ -226,11 +226,19 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 
 		reposResp := make([]RunRepoResponse, 0, len(repos))
 		for _, rr := range repos {
-			repoURL := ""
-			if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
-				repoURL = mr.RepoUrl
-			}
-			reposResp = append(reposResp, runRepoToResponse(rr, repoURL))
+			reposResp = append(reposResp, runRepoToResponse(store.RunRepo{
+				ModID:         rr.ModID,
+				RunID:         rr.RunID,
+				RepoID:        rr.RepoID,
+				RepoBaseRef:   rr.RepoBaseRef,
+				RepoTargetRef: rr.RepoTargetRef,
+				Status:        rr.Status,
+				Attempt:       rr.Attempt,
+				LastError:     rr.LastError,
+				CreatedAt:     rr.CreatedAt,
+				StartedAt:     rr.StartedAt,
+				FinishedAt:    rr.FinishedAt,
+			}, rr.RepoUrl))
 		}
 
 		resp := struct {
