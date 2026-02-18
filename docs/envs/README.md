@@ -155,8 +155,8 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
   issues (rare; Engine v29+ handles this automatically).
 
 **Cross-references:**
-- Engine version requirements: `GOLANG.md` § "Docker Engine Requirements"
-- Migration status: complete (moby Engine v29 SDK; `github.com/docker/docker` removed)
+- Engine version requirements: Docker Engine v29+ (moby Engine v29 SDK)
+- Migration status: complete (`github.com/docker/docker` removed)
 
 - `PLOY_CA_CERT_PEM` — Cluster CA certificate presented to the node for mTLS trust (PEM-encoded).
   Required for node→server and server→node mTLS connections.
@@ -493,7 +493,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 ## Related Docs
 
 - [README.md](../../README.md) — Server/node pivot architecture
-- [GOLANG.md](../../GOLANG.md) — Docker Engine v29 requirements and Go SDK modules
+- [docs/testing-workflow.md](../testing-workflow.md) — Go testing workflow and quality checks
 - See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-locally.md](../how-to/deploy-locally.md) — Local Docker cluster
 

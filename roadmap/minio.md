@@ -2,7 +2,7 @@
 
 Scope: Move log/diff/artifact blob bytes out of PostgreSQL `BYTEA` and into MinIO (S3-compatible), keeping only metadata + deterministic object references in Postgres. This is a plan only.
 
-Documentation: `design/minio.md`, `docs/envs/README.md`, `GOLANG.md`, `docs/testing-workflow.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `internal/store/schema.sql`.
+Documentation: `design/minio.md`, `docs/envs/README.md`, `docs/testing-workflow.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `internal/store/schema.sql`.
 
 Legend: [ ] todo, [x] done.
 

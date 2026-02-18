@@ -16,7 +16,7 @@ import (
 func TestServer_Timeouts(t *testing.T) {
 	t.Run("default_timeouts", func(t *testing.T) {
 		// Verify server applies safe default timeouts when not configured.
-		// Per GOLANG.md, timeouts are mandatory for production servers.
+		// Timeouts are mandatory for production servers.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,

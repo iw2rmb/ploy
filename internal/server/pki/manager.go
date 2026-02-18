@@ -116,7 +116,7 @@ func (m *Manager) loop() {
 			return
 		}
 		if err := m.rotator.Renew(ctx, cfg); err != nil {
-			// Background task: log at the edge per GOLANG.md guidance.
+			// Background task: log at the edge.
 			slog.Error("pki renew failed", "err", err)
 		}
 

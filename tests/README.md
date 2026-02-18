@@ -303,7 +303,7 @@ The smoke test suite is designed for CI environments:
 
 ## References
 
-- **Engineering guide:** `/Users/vk/@iw2rmb/mill/GOLANG.md` (TDD, coverage targets)
+- **Engineering guide:** `AGENTS.md` and `docs/testing-workflow.md` (TDD, coverage targets)
 - **E2E documentation:** `tests/e2e/mods/README.md` (container workflows)
 - **System docs:** `docs/` (current contracts and operations)
 - **Agent guide:** `AGENTS.md` (TDD discipline, RED→GREEN→REFACTOR)
