@@ -29,9 +29,6 @@ package step
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,14 +37,8 @@ import (
 	"strings"
 
 	units "github.com/docker/go-units"
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
-
-	// Import moby client for ContainerStats/Inspect option types used in
-	// resource usage gathering below. The actual client calls go through
-	// DockerContainerRuntime.client which is a *client.Client.
-	"github.com/moby/moby/client"
 )
 
 // dockerGateExecutor runs build validation inside language images using the
@@ -109,7 +100,7 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // When stack detection fails, the gate fails with a static check report and
 // a structured log finding (including evidence when available).
 // When the container runtime is nil, execution is skipped and empty metadata
-// is returned. A non‑zero exit code is reported as a static check failure and
+// is returned. A non-zero exit code is reported as a static check failure and
 // a single log finding containing the captured logs or a synthesized message.
 //
 // ## Returned Metadata
@@ -131,400 +122,20 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	if spec == nil || !spec.Enabled {
 		return nil, nil
 	}
+
 	envImage := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_IMAGE"))
 	mappingPath := buildGateDefaultImagesFilePath()
-	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
 
 	obs, detectErr := stackdetect.Detect(ctx, workspace)
-	stackDetectCfg := spec.StackDetect
-
-	var (
-		image    string
-		cmd      []string
-		language string
-		tool     string
-		sgResult *contracts.StackGateResult
-	)
-
-	if stackGateMode {
-		resolveExpectedRuntimeImage := func() (string, error) {
-			if envImage != "" {
-				return envImage, nil
-			}
-			if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
-				return "", fmt.Errorf("stack gate expectation missing release")
-			}
-			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
-			if err != nil {
-				return "", err
-			}
-			return resolver.Resolve(*spec.StackGate.Expect)
+	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, envImage, mappingPath)
+	if terminal != nil {
+		if terminal.reportRuntimeImage {
+			reportGateRuntimeImage(ctx, terminal.runtimeImage)
 		}
-
-		sgResult = &contracts.StackGateResult{
-			Enabled:  true,
-			Expected: spec.StackGate.Expect,
-		}
-
-		if detectErr != nil {
-			var detErr *stackdetect.DetectionError
-			var evidenceStr string
-			if errors.As(detectErr, &detErr) {
-				sgResult.Result = "unknown"
-				sgResult.Reason = detErr.Message
-				evidenceStr = formatEvidenceForLog(detErr.Evidence)
-			} else {
-				sgResult.Result = "unknown"
-				sgResult.Reason = detectErr.Error()
-			}
-			var runtimeImage string
-			if img, err := resolveExpectedRuntimeImage(); err == nil {
-				runtimeImage = strings.TrimSpace(img)
-				sgResult.RuntimeImage = runtimeImage
-			}
-			reportGateRuntimeImage(ctx, runtimeImage)
-			return &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: runtimeImage,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_UNKNOWN",
-					Message:  sgResult.Reason,
-					Evidence: evidenceStr,
-				}},
-			}, nil
-		}
-
-		sgResult.Detected = observationToStackExpectation(obs)
-
-		if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
-			sgResult.Result = "mismatch"
-			sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
-			evidenceStr := formatEvidenceForLog(obs.Evidence)
-			var runtimeImage string
-			if img, err := resolveExpectedRuntimeImage(); err == nil {
-				runtimeImage = strings.TrimSpace(img)
-				sgResult.RuntimeImage = runtimeImage
-			}
-			reportGateRuntimeImage(ctx, runtimeImage)
-			return &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: runtimeImage,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_MISMATCH",
-					Message:  sgResult.Reason,
-					Evidence: evidenceStr,
-				}},
-			}, nil
-		}
-
-		sgResult.Result = "pass"
-
-		language = strings.TrimSpace(spec.StackGate.Expect.Language)
-		if language == "" {
-			language = strings.TrimSpace(obs.Language)
-		}
-		tool = strings.TrimSpace(obs.Tool)
-
-		if envImage != "" {
-			image = envImage
-		} else {
-			if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
-				sgResult.Result = "unknown"
-				sgResult.Reason = "stack gate expectation missing release; cannot resolve runtime image"
-				return &contracts.BuildGateStageMetadata{
-					StackGate: sgResult,
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     "stack-gate",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "STACK_GATE_INVALID_EXPECTATION",
-						Message:  sgResult.Reason,
-					}},
-				}, nil
-			}
-
-			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
-			if err != nil {
-				sgResult.Result = "unknown"
-				sgResult.Reason = fmt.Sprintf("image mapping error: %s", err.Error())
-				return &contracts.BuildGateStageMetadata{
-					StackGate: sgResult,
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     "stack-gate",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
-						Message:  sgResult.Reason,
-					}},
-				}, nil
-			}
-
-			resolvedImage, err := resolver.Resolve(*spec.StackGate.Expect)
-			if err != nil {
-				sgResult.Result = "unknown"
-				sgResult.Reason = fmt.Sprintf("no matching image rule: %s", err.Error())
-				return &contracts.BuildGateStageMetadata{
-					StackGate: sgResult,
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     "stack-gate",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "STACK_GATE_NO_IMAGE_RULE",
-						Message:  sgResult.Reason,
-					}},
-				}, nil
-			}
-			image = resolvedImage
-		}
-
-		sgResult.RuntimeImage = image
-		var err error
-		cmd, err = buildCommandForTool(tool)
-		if err != nil {
-			sgResult.Result = "unknown"
-			sgResult.Reason = err.Error()
-			reportGateRuntimeImage(ctx, image)
-			return &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: image,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_UNKNOWN",
-					Message:  sgResult.Reason,
-				}},
-			}, nil
-		}
-	} else {
-		exp := observationToStackExpectation(obs)
-		expIncomplete := exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
-
-		// If StackDetect is enabled for this gate phase, treat it as the expected stack
-		// for runtime selection and mismatch validation. Tool is optional and can be
-		// inferred from detection when omitted.
-		if stackDetectCfg != nil && stackDetectCfg.Enabled {
-			expectedLanguage := strings.TrimSpace(stackDetectCfg.Language)
-			expectedRelease := strings.TrimSpace(stackDetectCfg.Release)
-			expectedTool := strings.TrimSpace(stackDetectCfg.Tool)
-
-			// Validate mismatch only when we have a complete strict detection.
-			if detectErr == nil && !expIncomplete && obs != nil {
-				var mismatches []string
-				if expectedLanguage != "" && strings.TrimSpace(obs.Language) != expectedLanguage {
-					mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expectedLanguage, obs.Language))
-				}
-				if expectedRelease != "" && obs.Release != nil && strings.TrimSpace(*obs.Release) != expectedRelease {
-					mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expectedRelease, strings.TrimSpace(*obs.Release)))
-				}
-				if expectedTool != "" && strings.TrimSpace(obs.Tool) != "" && strings.TrimSpace(obs.Tool) != expectedTool {
-					mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expectedTool, strings.TrimSpace(obs.Tool)))
-				}
-				if len(mismatches) > 0 {
-					return &contracts.BuildGateStageMetadata{
-						StaticChecks: []contracts.BuildGateStaticCheckReport{{
-							Language: expectedLanguage,
-							Tool:     "stackdetect",
-							Passed:   false,
-						}},
-						LogFindings: []contracts.BuildGateLogFinding{{
-							Severity: "error",
-							Code:     "BUILD_GATE_STACK_MISMATCH",
-							Message:  "stack mismatch: " + strings.Join(mismatches, "; "),
-							Evidence: formatEvidenceForLog(obs.Evidence),
-						}},
-					}, nil
-				}
-			}
-
-			// Select tool: expected tool wins; otherwise use detected tool (from strict detect),
-			// and fall back to tool-only detection when strict detection failed.
-			chosenTool := expectedTool
-			if chosenTool == "" && obs != nil && strings.TrimSpace(obs.Tool) != "" {
-				chosenTool = strings.TrimSpace(obs.Tool)
-			}
-			if chosenTool == "" && (detectErr != nil || expIncomplete) {
-				toolObs, toolErr := stackdetect.DetectTool(ctx, workspace)
-				if toolErr == nil && toolObs != nil {
-					chosenTool = strings.TrimSpace(toolObs.Tool)
-				}
-			}
-
-			if chosenTool == "" {
-				// Detection couldn't determine tool. Apply default/cancel policy.
-				if !stackDetectCfg.Default {
-					meta := &contracts.BuildGateStageMetadata{
-						StaticChecks: []contracts.BuildGateStaticCheckReport{{
-							Tool:   "stackdetect",
-							Passed: false,
-						}},
-						LogFindings: []contracts.BuildGateLogFinding{{
-							Severity: "error",
-							Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-							Message:  "stack detection could not determine build tool",
-						}},
-					}
-					return meta, ErrRepoCancelled
-				}
-				return &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Tool:   "stackdetect",
-						Passed: false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-						Message:  "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
-					}},
-				}, nil
-			}
-
-			language = expectedLanguage
-			tool = chosenTool
-			exp = &contracts.StackExpectation{
-				Language: expectedLanguage,
-				Tool:     chosenTool,
-				Release:  expectedRelease,
-			}
-			// When StackDetect is enabled, we always use the configured language+release
-			// for image resolution, regardless of detected release.
-			expIncomplete = exp == nil || strings.TrimSpace(exp.Language) == "" || strings.TrimSpace(exp.Release) == ""
-		}
-
-		if detectErr != nil || expIncomplete {
-			var detErr *stackdetect.DetectionError
-			var evidenceStr string
-			msg := "stack detection failed"
-			if detectErr != nil {
-				msg = detectErr.Error()
-				if errors.As(detectErr, &detErr) {
-					msg = detErr.Message
-					evidenceStr = formatEvidenceForLog(detErr.Evidence)
-				}
-			} else {
-				msg = "stack detection produced incomplete result; language and release are required"
-			}
-
-			// Policy: when StackDetect is enabled and default=false, treat a detection failure
-			// as a repo-level cancellation (no healing / no further execution).
-			if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
-				meta := &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Tool:   "stackdetect",
-						Passed: false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-						Message:  msg,
-						Evidence: evidenceStr,
-					}},
-				}
-				return meta, ErrRepoCancelled
-			}
-
-			if stackDetectCfg == nil || !stackDetectCfg.Enabled {
-				// Default behavior: fail the gate (not cancelled).
-				return &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Tool:   "stackdetect",
-						Passed: false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-						Message:  msg,
-						Evidence: evidenceStr,
-					}},
-				}, nil
-			}
-		} else {
-			// No StackDetect: use detected language/tool.
-			if stackDetectCfg == nil || !stackDetectCfg.Enabled {
-				language = exp.Language
-				tool = obs.Tool
-			}
-		}
-
-		if envImage != "" {
-			image = envImage
-		} else {
-			resolver, err := NewBuildGateImageResolver(mappingPath, spec.ImageOverrides, true)
-			if err != nil {
-				return &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     tool,
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_IMAGE_MAPPING_ERROR",
-						Message:  err.Error(),
-					}},
-				}, nil
-			}
-			resolved, err := resolver.Resolve(*exp)
-			if err != nil {
-				return &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     tool,
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_NO_IMAGE_RULE",
-						Message:  err.Error(),
-					}},
-				}, nil
-			}
-			image = resolved
-		}
-
-		var err error
-		cmd, err = buildCommandForTool(tool)
-		if err != nil {
-			return &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     tool,
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_UNKNOWN_TOOL",
-					Message:  err.Error(),
-				}},
-			}, nil
-		}
+		return terminal.meta, terminal.err
 	}
 
-	reportGateRuntimeImage(ctx, image)
+	reportGateRuntimeImage(ctx, plan.image)
 
 	// Build container spec with workspace mount.
 	mounts := []ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}
@@ -570,10 +181,10 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			envCopy[k] = v
 		}
 	}
-	specC := ContainerSpec{Image: image, Command: cmd, WorkingDir: "/workspace", Mounts: mounts,
+	specC := ContainerSpec{Image: plan.image, Command: plan.cmd, WorkingDir: "/workspace", Mounts: mounts,
 		Env:              envCopy,
 		LimitMemoryBytes: limitMem,
-		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis → nanos
+		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis -> nanos
 		LimitDiskBytes:   limitDisk,
 		StorageSizeOpt:   strings.TrimSpace(storageSizeOpt),
 	}
@@ -593,104 +204,17 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	}
 	logs, _ := e.rt.Logs(ctx, h)
 
-	passed := res.ExitCode == 0
-	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Language: language,
-			Tool:     tool,
-			Passed:   passed,
-		}},
-		RuntimeImage: image,
-	}
-	if passed && strings.EqualFold(tool, "gradle") {
-		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
-			meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{
-				Severity: "info",
-				Code:     "GRADLE_BUILD_CACHE_HIT",
-				Message:  fmt.Sprintf("gradle build cache hits (%d): %s", len(hits), strings.Join(hits, ", ")),
-			})
-		}
-	}
-	if !passed {
-		// For known tools (Maven, Gradle), trim logs down to the most relevant
-		// failure region to keep diagnostics focused. Unknown tools receive the
-		// raw logs without additional trimming.
-		trimmed := TrimBuildGateLog(tool, string(logs))
-		msg := strings.TrimSpace(trimmed)
-		if msg == "" {
-			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)
-		}
-		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
-	}
-	// Attach logs text (truncated) for node-side artifact upload, and compute a digest.
-	const maxLogBytes = 10 << 20 // 10 MiB safety cap in memory
-	if len(logs) > maxLogBytes {
-		logs = logs[:maxLogBytes]
-	}
-	meta.LogsText = string(logs)
-	meta.LogDigest = sha256Digest(logs)
+	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.image, res, logs)
+	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
-	// Gather resource usage via Docker stats when available.
-	// Moby Engine v29 SDK uses client.ContainerStatsOptions{Stream: false} instead
-	// of a boolean stream parameter. ContainerInspect requires ContainerInspectOptions
-	// with Size: true to populate SizeRw, and returns ContainerInspectResult with
-	// Container field containing the InspectResponse.
-	if d, ok := e.rt.(*DockerContainerRuntime); ok && d != nil && d.client != nil {
-		if stats, err := d.client.ContainerStats(ctx, h.ID, dockerStatsOptions()); err == nil && stats.Body != nil {
-			var sj struct {
-				MemoryStats struct{ Usage, MaxUsage uint64 } `json:"memory_stats"`
-				CPUStats    struct {
-					CPUUsage struct{ TotalUsage uint64 } `json:"cpu_usage"`
-				} `json:"cpu_stats"`
-				// Docker v1.41 Stats JSON fields
-				BlkioStats struct {
-					IoServiceBytesRecursive []struct {
-						Op    string
-						Value uint64
-					}
-				} `json:"blkio_stats"`
-			}
-			_ = json.NewDecoder(stats.Body).Decode(&sj)
-			_ = stats.Body.Close()
-			var readBytes, writeBytes uint64
-			for _, rec := range sj.BlkioStats.IoServiceBytesRecursive {
-				switch strings.ToLower(rec.Op) {
-				case "read":
-					readBytes += rec.Value
-				case "write":
-					writeBytes += rec.Value
-				}
-			}
-			// Inspect for SizeRw if available. Moby v29 SDK requires Size: true in
-			// options and returns ContainerInspectResult with Container.SizeRw.
-			var sizeRw *int64
-			if inspect, ierr := d.client.ContainerInspect(ctx, h.ID, dockerInspectOptionsWithSize()); ierr == nil {
-				if inspect.Container.SizeRw != nil {
-					size := *inspect.Container.SizeRw
-					sizeRw = &size
-				}
-			}
-			meta.Resources = &contracts.BuildGateResourceUsage{
-				LimitNanoCPUs:    specC.LimitNanoCPUs,
-				LimitMemoryBytes: specC.LimitMemoryBytes,
-				CPUTotalNs:       sj.CPUStats.CPUUsage.TotalUsage,
-				MemUsageBytes:    sj.MemoryStats.Usage,
-				MemMaxBytes:      sj.MemoryStats.MaxUsage,
-				BlkioReadBytes:   readBytes,
-				BlkioWriteBytes:  writeBytes,
-				SizeRwBytes:      sizeRw,
-			}
-		}
-	}
 	// Best-effort cleanup: remove container after logs and stats are collected.
 	if remover, ok := e.rt.(interface {
 		Remove(context.Context, ContainerHandle) error
 	}); ok {
 		_ = remover.Remove(ctx, h)
 	}
-	// If we were in stack gate mode, attach the result.
-	if sgResult != nil {
-		meta.StackGate = sgResult
+	if plan.stackGate != nil {
+		meta.StackGate = plan.stackGate
 	}
 	return meta, nil
 }
@@ -772,24 +296,6 @@ fi
 `
 }
 
-func sha256Digest(b []byte) types.Sha256Digest {
-	h := sha256.Sum256(b)
-	return types.Sha256Digest(fmt.Sprintf("sha256:%x", h[:]))
-}
-
-// dockerStatsOptions returns the moby client.ContainerStatsOptions for a
-// one-shot (non-streaming) stats call. Stream: false tells the daemon to
-// return a single stats sample and close the connection.
-func dockerStatsOptions() client.ContainerStatsOptions {
-	return client.ContainerStatsOptions{Stream: false}
-}
-
-// dockerInspectOptionsWithSize returns the moby client.ContainerInspectOptions
-// with Size: true to populate SizeRw and SizeRootFs in the response.
-func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
-	return client.ContainerInspectOptions{Size: true}
-}
-
 // buildCommandForTool returns the appropriate build command for the given tool.
 func buildCommandForTool(tool string) ([]string, error) {
 	preamble := caPreambleScript()
@@ -812,81 +318,4 @@ func buildCommandForTool(tool string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}
-}
-
-// observationToStackExpectation converts a stackdetect.Observation to a StackExpectation.
-func observationToStackExpectation(obs *stackdetect.Observation) *contracts.StackExpectation {
-	if obs == nil {
-		return nil
-	}
-	exp := &contracts.StackExpectation{
-		Language: obs.Language,
-		Tool:     obs.Tool,
-	}
-	if obs.Release != nil {
-		exp.Release = *obs.Release
-	}
-	return exp
-}
-
-// stackMatchesExpectation compares a detected observation against expected values.
-// Returns true if all non-empty expected fields match the observation.
-func stackMatchesExpectation(obs *stackdetect.Observation, expect *contracts.StackExpectation) bool {
-	if expect == nil {
-		return true
-	}
-	if expect.Language != "" && obs.Language != expect.Language {
-		return false
-	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
-		return false
-	}
-	if expect.Release != "" {
-		if obs.Release == nil || *obs.Release != expect.Release {
-			return false
-		}
-	}
-	return true
-}
-
-// formatMismatchReason generates a human-readable explanation of stack mismatches.
-func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackExpectation) string {
-	var mismatches []string
-	if expect.Language != "" && obs.Language != expect.Language {
-		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
-	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
-		mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expect.Tool, obs.Tool))
-	}
-	if expect.Release != "" {
-		detected := "<nil>"
-		if obs.Release != nil {
-			detected = *obs.Release
-		}
-		if obs.Release == nil || *obs.Release != expect.Release {
-			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
-		}
-	}
-	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
-
-	// Append evidence for debugging.
-	if len(obs.Evidence) > 0 {
-		msg += "\nevidence:"
-		for _, e := range obs.Evidence {
-			msg += fmt.Sprintf("\n  - %s: %s = %q", e.Path, e.Key, e.Value)
-		}
-	}
-	return msg
-}
-
-// formatEvidenceForLog formats evidence items for the LogFinding.Evidence field.
-func formatEvidenceForLog(evidence []stackdetect.EvidenceItem) string {
-	if len(evidence) == 0 {
-		return ""
-	}
-	var lines []string
-	for _, e := range evidence {
-		lines = append(lines, fmt.Sprintf("%s: %s = %q", e.Path, e.Key, e.Value))
-	}
-	return strings.Join(lines, "\n")
 }
