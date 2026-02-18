@@ -232,7 +232,7 @@ CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 --   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
 -- Rehydration applies diffs from jobs ordered by step_index.
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
--- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
+-- Blob data is stored in S3-compatible object storage; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -252,7 +252,7 @@ CREATE INDEX IF NOT EXISTS diffs_job_idx ON diffs(job_id);
 -- the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- logs.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
--- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
+-- Blob data is stored in S3-compatible object storage; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS logs (
   id         BIGSERIAL PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -274,7 +274,7 @@ CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 -- part of the builds table removal (job-level grouping is canonical).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- artifact_bundles.id is UUID to allow client-side generation and offline staging.
--- Blob data is stored in MinIO; object_key is a generated column for deterministic paths.
+-- Blob data is stored in S3-compatible object storage; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS artifact_bundles (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id      TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,

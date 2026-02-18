@@ -25,7 +25,7 @@ type CreateDiffParams struct {
 	Summary   []byte       `json:"summary"`
 }
 
-// Creates a new diff entry associated with a job. Blob data is stored in MinIO.
+// Creates a new diff entry associated with a job. Blob data is stored in object storage.
 // Ordering is determined by the job's step_index.
 func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
 	row := q.db.QueryRow(ctx, createDiff,
@@ -72,7 +72,7 @@ SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diff
 WHERE id = $1
 `
 
-// Returns diff metadata including object_key for MinIO retrieval.
+// Returns diff metadata including object_key for object-storage retrieval.
 func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 	row := q.db.QueryRow(ctx, getDiff, id)
 	var i Diff
