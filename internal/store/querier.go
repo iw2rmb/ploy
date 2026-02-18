@@ -37,16 +37,16 @@ type Querier interface {
 	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
-	// Creates a new artifact bundle metadata. Blob data is stored in MinIO.
+	// Creates a new artifact bundle metadata. Blob data is stored in object storage.
 	// Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
-	// Creates a new diff entry associated with a job. Blob data is stored in MinIO.
+	// Creates a new diff entry associated with a job. Blob data is stored in object storage.
 	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
 	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
-	// Creates a new log chunk metadata. Blob data is stored in MinIO.
+	// Creates a new log chunk metadata. Blob data is stored in object storage.
 	// Logs are grouped at the job level only (build_id removed).
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
@@ -90,10 +90,10 @@ type Querier interface {
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
 	// Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
-	// Returns artifact bundle metadata including object_key for MinIO retrieval.
+	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
-	// Returns diff metadata including object_key for MinIO retrieval.
+	// Returns diff metadata including object_key for object-storage retrieval.
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	// Retrieves a single environment entry by key.
@@ -105,7 +105,7 @@ type Querier interface {
 	// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
 	// Order by created_at DESC to get the newest matching run_repos row.
 	GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error)
-	// Returns log metadata including object_key for MinIO retrieval.
+	// Returns log metadata including object_key for object-storage retrieval.
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMod(ctx context.Context, id types.ModID) (Mod, error)
 	GetModByName(ctx context.Context, name string) (Mod, error)
@@ -128,11 +128,11 @@ type Querier interface {
 	ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
-	// Returns artifact bundle metadata including object_key for MinIO retrieval.
+	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata including object_key for MinIO retrieval.
+	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata including object_key for MinIO retrieval.
+	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata for a given cid.
 	ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
@@ -180,13 +180,13 @@ type Querier interface {
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
-	// Returns log metadata including object_key for MinIO retrieval.
+	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
-	// Returns log metadata including object_key for MinIO retrieval.
+	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
-	// Returns log metadata including object_key for MinIO retrieval.
+	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
-	// Returns log metadata including object_key for MinIO retrieval.
+	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	// Returns log metadata for a run.
 	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]Log, error)

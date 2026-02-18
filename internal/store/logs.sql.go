@@ -25,7 +25,7 @@ type CreateLogParams struct {
 	DataSize int64        `json:"data_size"`
 }
 
-// Creates a new log chunk metadata. Blob data is stored in MinIO.
+// Creates a new log chunk metadata. Blob data is stored in object storage.
 // Logs are grouped at the job level only (build_id removed).
 func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, error) {
 	row := q.db.QueryRow(ctx, createLog,
@@ -72,7 +72,7 @@ SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
 WHERE id = $1
 `
 
-// Returns log metadata including object_key for MinIO retrieval.
+// Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 	row := q.db.QueryRow(ctx, getLog, id)
 	var i Log
@@ -94,7 +94,7 @@ WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
 
-// Returns log metadata including object_key for MinIO retrieval.
+// Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRun, runID)
 	if err != nil {
@@ -134,7 +134,7 @@ type ListLogsByRunAndJobParams struct {
 	JobID *types.JobID `json:"job_id"`
 }
 
-// Returns log metadata including object_key for MinIO retrieval.
+// Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {
@@ -175,7 +175,7 @@ type ListLogsByRunAndJobSinceParams struct {
 	ID    int64        `json:"id"`
 }
 
-// Returns log metadata including object_key for MinIO retrieval.
+// Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
 	if err != nil {
@@ -215,7 +215,7 @@ type ListLogsByRunSinceParams struct {
 	ID    int64       `json:"id"`
 }
 
-// Returns log metadata including object_key for MinIO retrieval.
+// Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunSince, arg.RunID, arg.ID)
 	if err != nil {

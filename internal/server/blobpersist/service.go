@@ -54,7 +54,7 @@ func (s *Service) CreateLog(ctx context.Context, params store.CreateLogParams, d
 		return store.Log{}, fmt.Errorf("blobpersist: create log metadata: %w", err)
 	}
 
-	// Upload bytes to MinIO at object_key.
+	// Upload bytes to S3-compatible object storage at object_key.
 	if log.ObjectKey == nil || *log.ObjectKey == "" {
 		return store.Log{}, fmt.Errorf("blobpersist: log %d has no object_key", log.ID)
 	}
@@ -87,7 +87,7 @@ func (s *Service) CreateDiff(ctx context.Context, params store.CreateDiffParams,
 		return store.Diff{}, fmt.Errorf("blobpersist: create diff metadata: %w", err)
 	}
 
-	// Upload bytes to MinIO at object_key.
+	// Upload bytes to S3-compatible object storage at object_key.
 	if diff.ObjectKey == nil || *diff.ObjectKey == "" {
 		return store.Diff{}, fmt.Errorf("blobpersist: diff %v has no object_key", diff.ID)
 	}
@@ -120,7 +120,7 @@ func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateA
 		return store.ArtifactBundle{}, fmt.Errorf("blobpersist: create artifact bundle metadata: %w", err)
 	}
 
-	// Upload bytes to MinIO at object_key.
+	// Upload bytes to S3-compatible object storage at object_key.
 	if artifact.ObjectKey == nil || *artifact.ObjectKey == "" {
 		return store.ArtifactBundle{}, fmt.Errorf("blobpersist: artifact bundle %v has no object_key", artifact.ID)
 	}

@@ -27,7 +27,7 @@ type CreateArtifactBundleParams struct {
 	Digest     *string      `json:"digest"`
 }
 
-// Creates a new artifact bundle metadata. Blob data is stored in MinIO.
+// Creates a new artifact bundle metadata. Blob data is stored in object storage.
 // Bundles are grouped at the job level only (build_id removed).
 func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error) {
 	row := q.db.QueryRow(ctx, createArtifactBundle,
@@ -78,7 +78,7 @@ SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_a
 WHERE id = $1
 `
 
-// Returns artifact bundle metadata including object_key for MinIO retrieval.
+// Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error) {
 	row := q.db.QueryRow(ctx, getArtifactBundle, id)
 	var i ArtifactBundle
@@ -102,7 +102,7 @@ WHERE cid = $1
 ORDER BY created_at DESC, id DESC
 `
 
-// Returns artifact bundle metadata including object_key for MinIO retrieval.
+// Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error) {
 	rows, err := q.db.Query(ctx, listArtifactBundlesByCID, cid)
 	if err != nil {
@@ -139,7 +139,7 @@ WHERE run_id = $1
 ORDER BY created_at DESC, id DESC
 `
 
-// Returns artifact bundle metadata including object_key for MinIO retrieval.
+// Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error) {
 	rows, err := q.db.Query(ctx, listArtifactBundlesByRun, runID)
 	if err != nil {
@@ -181,7 +181,7 @@ type ListArtifactBundlesByRunAndJobParams struct {
 	JobID *types.JobID `json:"job_id"`
 }
 
-// Returns artifact bundle metadata including object_key for MinIO retrieval.
+// Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error) {
 	rows, err := q.db.Query(ctx, listArtifactBundlesByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {

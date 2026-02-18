@@ -52,16 +52,18 @@ Legend: [ ] todo, [x] done.
   - Tests: Manual doc review - Cross-references must be valid and non-contradictory.
 
 ## Phase 4 - End-to-End Validation and Cleanup
-- [ ] Validate blob write/read paths against Garage using exact local scenario - Confirms no runtime regression.
+- [x] Validate blob write/read paths against Garage using exact local scenario - Confirms no runtime regression.
   - Repository: `ploy`
   - Component: server handlers, blobpersist, local cluster
   - Scope: Re-run local flow that writes logs/diffs/artifacts and downloads artifacts/diffs; verify object keys stored in DB and blobs exist in Garage bucket.
   - Snippets: `make test`
   - Tests: `make test` plus local smoke via `scripts/deploy-locally.sh` - Upload/download flows must succeed.
+  - Evidence: `bash tests/e2e/garage/smoke.sh` verifies log/diff/artifact uploads, `ploy mod fetch`, `ploy run diff --download`, DB `object_key` rows, and Garage `HeadObject`.
 
-- [ ] Remove MinIO-only leftovers from code and dependencies - Completes cutover with no dead paths.
+- [x] Remove MinIO-only leftovers from code and dependencies - Completes cutover with no dead paths.
   - Repository: `ploy`
   - Component: `go.mod`, `go.sum`, `local/docker-compose.yml`, docs
   - Scope: Remove unused MinIO images, references, and Go deps if SDK changed; ensure no `minio` mentions remain except historical notes explicitly kept.
   - Snippets: `rg -n "minio|MINIO" cmd internal local docs design roadmap`
   - Tests: `make test` - Repository must compile and tests pass after cleanup.
+  - Evidence: comment cleanup in blobpersist/store/query sources plus `internal/store/minio_reference_guard_test.go` to prevent regressions.

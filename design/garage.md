@@ -74,4 +74,4 @@ See also:
 
 - Data migration from historical DB blob columns.
 - Runtime support for multiple object-store providers at once.
-- Reintroduction of MinIO-specific local defaults.
+- Reintroduction of provider-specific local defaults.

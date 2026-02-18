@@ -1,5 +1,5 @@
 -- name: GetDiff :one
--- Returns diff metadata including object_key for MinIO retrieval.
+-- Returns diff metadata including object_key for object-storage retrieval.
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE id = $1;
 
@@ -14,7 +14,7 @@ WHERE d.run_id = $1
 ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
 
 -- name: CreateDiff :one
--- Creates a new diff entry associated with a job. Blob data is stored in MinIO.
+-- Creates a new diff entry associated with a job. Blob data is stored in object storage.
 -- Ordering is determined by the job's step_index.
 INSERT INTO diffs (run_id, job_id, patch_size, summary)
 VALUES ($1, $2, $3, $4)
