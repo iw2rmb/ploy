@@ -2,6 +2,7 @@
 
 This guide brings up a full local Ploy stack using Docker:
 - PostgreSQL (db)
+- Garage object store (`garage`) with bootstrap job (`garage-init`)
 - Control plane `ployd` (server)
 - One worker `ployd-node` (node) with access to your local Docker daemon
 
@@ -19,7 +20,7 @@ All files referenced live under `local/` and were added to the repo:
 
 - Docker Desktop 4.x (Compose v2). Docker daemon must be running.
 - Go 1.25+ to build local binaries.
-- Open ports: 5432, 8080, 8444, 9100.
+- Open ports: 5432, 3900, 3903, 5071, 8080, 9100.
 - macOS Apple Silicon: `local/docker-compose.yml` already pins `platform: linux/amd64` for the binaries.
 - (Optional) Corporate TLS MITM / custom registries: set `PLOY_EXTRA_CA_CERTS_PATH` to a PEM bundle to inject extra CAs into the `ployd` and `ployd-node` images during local builds.
 
@@ -34,7 +35,7 @@ export PLOY_EXTRA_CA_CERTS_PATH=/path/to/ca-bundle.pem
 ./scripts/deploy-locally.sh
 ```
 
-This script builds images with Docker BuildKit and seeds the local DB with the initial tokens and node record.
+This script builds images with Docker BuildKit, waits for Garage bucket/key bootstrap, and seeds the local DB with the initial tokens and node record.
 
 ## 1) Build Binaries
 
@@ -66,6 +67,7 @@ docker compose -f local/docker-compose.yml up -d
 
 What you get:
 - `db` (PostgreSQL 15) with `ploy` DB/user/password `ploy`.
+- `garage` (S3-compatible object storage) exposing `http://localhost:3900`, with `garage-init` ensuring local bucket/key setup.
 - `server` exposing:
   - API `http://localhost:8080` (plain HTTP, bearer token required)
   - Metrics `http://localhost:9100/metrics`

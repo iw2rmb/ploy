@@ -26,18 +26,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      minio:
+      garage:
         condition: service_healthy
-      minio-init:
+      garage-init:
         condition: service_completed_successfully
     restart: unless-stopped
     environment:
       - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
       - PLOY_CLUSTER_ID=local
-      - PLOY_OBJECTSTORE_ENDPOINT=http://minio:9000
+      - PLOY_OBJECTSTORE_ENDPOINT=http://garage:3900
       - PLOY_OBJECTSTORE_BUCKET=ploy
-      - PLOY_OBJECTSTORE_ACCESS_KEY=ploy
+      - PLOY_OBJECTSTORE_ACCESS_KEY=ploylocal
       - PLOY_OBJECTSTORE_SECRET_KEY=ploy-unsafe-local
       - PLOY_OBJECTSTORE_SECURE=false
     volumes:
@@ -90,37 +90,44 @@ services:
     ports:
       - "5071:5071"
 
-  minio:
-    image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":8999"]
+  garage:
+    image: dxflrs/garage:v2.3.0
+    entrypoint: ["/garage"]
+    command: ["-c", "/etc/garage.toml", "server", "--single-node", "--default-bucket"]
     environment:
-      - MINIO_ROOT_USER=ploy
-      - MINIO_ROOT_PASSWORD=ploy-unsafe-local
+      - GARAGE_DEFAULT_ACCESS_KEY=ploylocal
+      - GARAGE_DEFAULT_SECRET_KEY=ploy-unsafe-local
+      - GARAGE_DEFAULT_BUCKET=ploy
     ports:
-      - "9000:9000"
-      - "8999:8999"
+      - "3900:3900"
+      - "3903:3903"
     volumes:
-      - minio-data:/data
+      - ./garage/config.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "/garage -c /etc/garage.toml status >/dev/null 2>&1 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20
 
-  minio-init:
-    image: minio/mc:latest
+  garage-init:
+    image: dxflrs/garage:v2.3.0
     depends_on:
-      minio:
+      garage:
         condition: service_healthy
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        mc alias set local http://minio:9000 ploy ploy-unsafe-local
-        mc ls local/ploy >/dev/null 2>&1 || mc mb -p local/ploy
-        mc ilm ls local/ploy >/dev/null 2>&1 || mc ilm add --expire-days 30 local/ploy
-        exit 0
+    environment:
+      - GARAGE_DEFAULT_ACCESS_KEY=ploylocal
+      - GARAGE_DEFAULT_SECRET_KEY=ploy-unsafe-local
+      - GARAGE_DEFAULT_BUCKET=ploy
+    volumes:
+      - ./garage/config.toml:/etc/garage.toml:ro
+      - ./garage/setup.sh:/usr/local/bin/garage-setup.sh:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    entrypoint: ["/bin/sh", "/usr/local/bin/garage-setup.sh"]
 
 volumes:
   gradle-build-cache-data:
-  minio-data:
+  garage-meta:
+  garage-data:
