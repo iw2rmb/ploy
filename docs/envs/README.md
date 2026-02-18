@@ -342,15 +342,15 @@ the config file are treated as unset unless the environment variable is actually
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
 
-## Object Store (MinIO/S3)
+## Object Store (Garage/S3)
 
-The control plane uses an S3-compatible object store (e.g., MinIO) for blob storage of logs, diffs,
+The control plane uses an S3-compatible object store (e.g., Garage) for blob storage of logs, diffs,
 and artifacts. Database tables store metadata with deterministic object keys; the blobs themselves
 are stored in the object store.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PLOY_OBJECTSTORE_ENDPOINT` | S3-compatible endpoint URL (e.g., `http://minio:9000`) | - |
+| `PLOY_OBJECTSTORE_ENDPOINT` | S3-compatible endpoint URL (e.g., `http://garage:3900`) | - |
 | `PLOY_OBJECTSTORE_BUCKET` | Bucket name for blob storage | - |
 | `PLOY_OBJECTSTORE_ACCESS_KEY` | Access key ID | - |
 | `PLOY_OBJECTSTORE_SECRET_KEY` | Secret access key | - |
@@ -358,7 +358,7 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional) | - |
 
 For local development, these are configured in `local/docker-compose.yml`. The local stack includes
-a MinIO service with automatic bucket initialization via `minio-init`.
+a Garage service with automatic bucket/access-key bootstrap via `garage-init`.
 
 Alternatively, you can specify these in the server config file under `object_store.*`. Environment
 variables take precedence over the config file when both are present.

@@ -2,7 +2,7 @@
 
 Scope: Replace MinIO in local and server wiring with Garage while keeping a single S3-compatible backend contract. No backward compatibility, no dual-backend runtime.
 
-Documentation: `design/minio.md`, `roadmap/minio.md`, `docs/envs/README.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `cmd/ployd/main.go`, `internal/blobstore/s3/s3.go`.
+Documentation: `design/garage.md`, `docs/envs/README.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `cmd/ployd/main.go`, `internal/blobstore/s3/s3.go`.
 
 Legend: [ ] todo, [x] done.
 
@@ -37,17 +37,17 @@ Legend: [ ] todo, [x] done.
   - Tests: `scripts/deploy-locally.sh` - Full local deployment must complete without manual object-store setup.
 
 ## Phase 3 - Documentation and Configuration Alignment
-- [ ] Rewrite object-store docs from MinIO-specific to Garage-specific local defaults - Keeps docs consistent with implementation.
+- [x] Rewrite object-store docs from MinIO-specific to Garage-specific local defaults - Keeps docs consistent with implementation.
   - Repository: `ploy`
   - Component: `docs/envs/README.md`
   - Scope: Update examples and wording from `http://minio:9000` and `minio-init` to Garage endpoint/bootstrap references; keep env var names unchanged unless explicitly changed in code.
   - Snippets: `PLOY_OBJECTSTORE_*`
   - Tests: Manual doc review - Env table and local stack description must match compose and script behavior.
 
-- [ ] Replace MinIO design/roadmap references with Garage migration docs - Removes stale architecture guidance.
+- [x] Replace MinIO design/roadmap references with Garage migration docs - Removes stale architecture guidance.
   - Repository: `ploy`
   - Component: `design/`, `roadmap/`
-  - Scope: Either rewrite `design/minio.md` to provider-neutral S3 + Garage local profile or add `design/garage.md` and cross-link; update `roadmap/minio.md` references that describe local provider details.
+  - Scope: Replace MinIO-specific docs with `design/garage.md`; remove stale MinIO design/roadmap docs; keep cross-references aligned with Garage local profile.
   - Snippets: `design/garage.md`
   - Tests: Manual doc review - Cross-references must be valid and non-contradictory.
 
