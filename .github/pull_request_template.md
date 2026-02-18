@@ -72,7 +72,7 @@
 - [ ] No security issues (SQL injection, XSS, command injection, etc.)
 - [ ] Database queries use context and handle errors correctly
 - [ ] HTTP handlers set appropriate timeouts and close response bodies
-- [ ] Follows GOLANG.md engineering standards
+- [ ] Follows AGENTS.md and docs/testing-workflow.md engineering standards
 - [ ] Coverage is adequate for the changes
 - [ ] Documentation is clear and complete
 

@@ -58,7 +58,7 @@ make vet
 make staticcheck
 ```
 
-Reference: `GOLANG.md`.
+Reference: `docs/testing-workflow.md`.
 
 ### CLI Build & Smoke Checks
 

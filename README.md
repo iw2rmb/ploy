@@ -29,7 +29,7 @@ For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This READ
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
 - Environment variables: `docs/envs/README.md`.
 - Mods lifecycle and SSE events: `docs/mods-lifecycle.md`.
-- Contributor rules and TDD discipline: `AGENTS.md`, `GOLANG.md`.
+- Contributor rules and TDD discipline: `AGENTS.md`, `docs/testing-workflow.md`.
 
 **Installation**
 
@@ -127,7 +127,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
 
 **Contributing**
-- Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test ./internal/... ./cmd/...`).
+- Follow `AGENTS.md` and `docs/testing-workflow.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test ./internal/... ./cmd/...`).
 - Keep docs in sync; update `README.md` and `docs/` as needed.
 
 License: see `LICENSE` when present.

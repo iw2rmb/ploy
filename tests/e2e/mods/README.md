@@ -117,7 +117,7 @@ Per RED→GREEN→REFACTOR discipline, the following artifacts should be validat
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
 See `tests/unit/mod_codex_sh_test.sh` for unit tests covering these behaviors.
-Cross-reference: `GOLANG.md` Codex Healing Pipeline section.
+Cross-reference: `docs/testing-workflow.md` and `AGENTS.md`.
 
 **Cross-phase inputs available to healing mods:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
