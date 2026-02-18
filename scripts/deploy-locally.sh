@@ -6,7 +6,7 @@ set -euo pipefail
 # - make build
 # - generate auth secret (if missing)
 # - start docker-compose stack
-# - wait for db and server health
+# - wait for object store bootstrap, db and server health
 # - generate JWT admin + worker tokens and insert into api_tokens
 # - seed local node record
 # - provision worker bearer token into node container
@@ -71,6 +71,43 @@ build_local_images() {
   docker buildx build --platform "$platform" --load \
     -f docker/db/Dockerfile -t ploy-db:local \
     .
+}
+
+wait_for_garage_bootstrap() {
+  local garage_cid garage_init_cid garage_health init_state init_exit
+
+  garage_cid="$($COMPOSE_CMD ps -q garage)"
+  garage_init_cid="$($COMPOSE_CMD ps -q garage-init)"
+  if [[ -z "$garage_cid" || -z "$garage_init_cid" ]]; then
+    echo "error: could not resolve garage container IDs" >&2
+    $COMPOSE_CMD ps || true
+    exit 1
+  fi
+
+  log "Waiting for Garage health and bootstrap completion..."
+  for i in {1..90}; do
+    garage_health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$garage_cid" 2>/dev/null || true)"
+    init_state="$(docker inspect -f '{{.State.Status}}' "$garage_init_cid" 2>/dev/null || true)"
+    init_exit="$(docker inspect -f '{{.State.ExitCode}}' "$garage_init_cid" 2>/dev/null || true)"
+
+    if [[ "$garage_health" == "healthy" && "$init_state" == "exited" && "$init_exit" == "0" ]]; then
+      return 0
+    fi
+
+    if [[ "$init_state" == "exited" && "$init_exit" != "0" ]]; then
+      echo "error: garage-init failed with exit code ${init_exit}" >&2
+      $COMPOSE_CMD ps || true
+      $COMPOSE_CMD logs garage garage-init || true
+      exit 1
+    fi
+
+    sleep 1
+  done
+
+  echo "error: garage bootstrap did not complete in time" >&2
+  $COMPOSE_CMD ps || true
+  $COMPOSE_CMD logs garage garage-init || true
+  exit 1
 }
 
 generate_tokens() {
@@ -142,6 +179,8 @@ main() {
 
   log "Starting local docker stack with: $COMPOSE_CMD up -d --no-build"
   $COMPOSE_CMD up -d --no-build
+
+  wait_for_garage_bootstrap
 
   log "Waiting for database to be ready..."
   for i in {1..60}; do
