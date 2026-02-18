@@ -146,7 +146,7 @@ type GitLabConfig struct {
 	TokenFile string `yaml:"token_file"`
 }
 
-// ObjectStoreConfig configures S3-compatible object storage (e.g., MinIO).
+// ObjectStoreConfig configures S3-compatible object storage (e.g., Garage).
 type ObjectStoreConfig struct {
 	Endpoint  string `yaml:"endpoint"`
 	Bucket    string `yaml:"bucket"`

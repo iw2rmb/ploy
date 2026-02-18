@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	bsminio "github.com/iw2rmb/ploy/internal/blobstore/minio"
+	bss3 "github.com/iw2rmb/ploy/internal/blobstore/s3"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
@@ -100,7 +100,7 @@ func runMain() int {
 		Querier:       st,
 	})
 
-	// Initialize object store (MinIO) from config or environment.
+	// Initialize object store (S3-compatible) from config or environment.
 	objStoreCfg := resolveObjectStoreConfig(cfg)
 	if objStoreCfg.Endpoint == "" {
 		slog.Error("object store endpoint not configured", "hint", "set PLOY_OBJECTSTORE_ENDPOINT or configure object_store.endpoint in config file")
@@ -111,7 +111,7 @@ func runMain() int {
 		return 1
 	}
 
-	bs, err := bsminio.New(objStoreCfg)
+	bs, err := bss3.New(objStoreCfg)
 	if err != nil {
 		slog.Error("initialize object store", "err", err)
 		return 1

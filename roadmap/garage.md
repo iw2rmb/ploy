@@ -2,22 +2,22 @@
 
 Scope: Replace MinIO in local and server wiring with Garage while keeping a single S3-compatible backend contract. No backward compatibility, no dual-backend runtime.
 
-Documentation: `design/minio.md`, `roadmap/minio.md`, `docs/envs/README.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `cmd/ployd/main.go`, `internal/blobstore/minio/minio.go`.
+Documentation: `design/minio.md`, `roadmap/minio.md`, `docs/envs/README.md`, `local/docker-compose.yml`, `scripts/deploy-locally.sh`, `cmd/ployd/main.go`, `internal/blobstore/s3/s3.go`.
 
 Legend: [ ] todo, [x] done.
 
 ## Phase 1 - Backend Adapter Cleanup
-- [ ] Replace MinIO-specific package naming with provider-neutral S3 adapter - Removes provider lock in code architecture.
+- [x] Replace MinIO-specific package naming with provider-neutral S3 adapter - Removes provider lock in code architecture.
   - Repository: `ploy`
   - Component: `internal/blobstore`, `cmd/ployd`
   - Scope: Move `internal/blobstore/minio` to `internal/blobstore/s3`; rename package and symbols (`minio.New` call remains if SDK stays unchanged); update imports in `cmd/ployd/main.go`; update comments and error prefixes from `minio:` to `s3:`.
   - Snippets: `bss3 "github.com/iw2rmb/ploy/internal/blobstore/s3"`
   - Tests: `go test ./internal/blobstore/... ./cmd/ployd/...` - Build and unit tests must pass with renamed adapter.
 
-- [ ] Decide SDK strategy for Garage compatibility - Reduces integration risk before infra cutover.
+- [x] Decide SDK strategy for Garage compatibility - Reduces integration risk before infra cutover.
   - Repository: `ploy`
   - Component: `internal/blobstore/s3`, `go.mod`
-  - Scope: Keep `minio-go` if it works against Garage, or replace with AWS SDK v2 S3 client in one step; remove unused dependency set after decision.
+  - Scope: Replace `minio-go` with AWS SDK v2 S3 client in one step; remove unused MinIO dependency set.
   - Snippets: `go mod tidy`
   - Tests: `go test ./internal/blobstore/...` - Adapter tests must pass with the selected client.
 
