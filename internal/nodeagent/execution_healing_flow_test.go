@@ -2,9 +2,7 @@ package nodeagent
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -361,49 +359,6 @@ func (m *mockContainerRuntime) Logs(ctx context.Context, handle step.ContainerHa
 func (m *mockContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
 	if m.removeFn != nil {
 		return m.removeFn(ctx, handle)
-	}
-	return nil
-}
-
-// setupGitRepoWithChange initializes a git repo and creates a staged change for diff testing.
-func setupGitRepoWithChange(workspace string) error {
-	// Initialize git repo.
-	if err := runCommand(workspace, "git", "init"); err != nil {
-		return err
-	}
-	if err := runCommand(workspace, "git", "config", "user.name", "Test User"); err != nil {
-		return err
-	}
-	if err := runCommand(workspace, "git", "config", "user.email", "test@example.com"); err != nil {
-		return err
-	}
-
-	// Create initial commit.
-	testFile := filepath.Join(workspace, "test.txt")
-	if err := os.WriteFile(testFile, []byte("initial content\n"), 0o644); err != nil {
-		return err
-	}
-	if err := runCommand(workspace, "git", "add", "."); err != nil {
-		return err
-	}
-	if err := runCommand(workspace, "git", "commit", "-m", "Initial commit"); err != nil {
-		return err
-	}
-
-	// Make a change (not committed, so diff will show it).
-	if err := os.WriteFile(testFile, []byte("modified content\n"), 0o644); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// runCommand executes a shell command in the specified directory.
-func runCommand(dir, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s failed: %w\nOutput: %s", name, err, output)
 	}
 	return nil
 }

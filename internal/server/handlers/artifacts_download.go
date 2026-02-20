@@ -25,14 +25,14 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cid := strings.TrimSpace(r.URL.Query().Get("cid"))
 		if cid == "" {
-			http.Error(w, "cid query parameter is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "cid query parameter is required")
 			return
 		}
 
 		// Query artifacts by CID (metadata only; excludes bundle bytes).
 		bundles, err := st.ListArtifactBundlesMetaByCID(r.Context(), &cid)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to query artifacts: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to query artifacts: %v", err)
 			return
 		}
 
@@ -78,14 +78,14 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr, err := requiredPathParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse and validate artifact ID.
 		artifactUUID, err := uuid.Parse(idStr)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid id: %v", err)
 			return
 		}
 
@@ -93,10 +93,10 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 		bundle, err := st.GetArtifactBundle(r.Context(), pgtype.UUID{Bytes: artifactUUID, Valid: true})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "artifact not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "artifact not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to retrieve artifact: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to retrieve artifact: %v", err)
 			return
 		}
 
@@ -105,14 +105,14 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 		if download {
 			// Stream from object storage.
 			if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
-				http.Error(w, "artifact blob not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "artifact blob not found")
 				slog.Error("download artifact: no object_key", "artifact_id", idStr)
 				return
 			}
 
 			rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
 			if err != nil {
-				http.Error(w, "failed to retrieve artifact blob", http.StatusServiceUnavailable)
+				httpErr(w, http.StatusServiceUnavailable, "failed to retrieve artifact blob")
 				slog.Error("download artifact: blob get failed", "artifact_id", idStr, "object_key", *bundle.ObjectKey, "err", err)
 				return
 			}

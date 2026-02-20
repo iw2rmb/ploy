@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -46,18 +45,18 @@ func createModHandler(st store.Store) http.HandlerFunc {
 		// Validate and normalize name.
 		name := strings.TrimSpace(req.Name)
 		if name == "" {
-			http.Error(w, "name is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "name is required")
 			return
 		}
 		if err := domaintypes.ModRef(name).Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("name: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "name: %v", err)
 			return
 		}
 
 		// Validate spec early so invalid specs do not create a mod row.
 		if req.Spec != nil && len(*req.Spec) > 0 {
 			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
-				http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "spec: %v", err)
 				return
 			}
 		}
@@ -75,10 +74,10 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			// Check for unique constraint violation (duplicate name)
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				http.Error(w, "mod with this name already exists", http.StatusConflict)
+				httpErr(w, http.StatusConflict, "mod with this name already exists")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to create mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create mod: %v", err)
 			slog.Error("create mod: create mod failed", "mod_id", modID.String(), "err", err)
 			return
 		}
@@ -94,12 +93,12 @@ func createModHandler(st store.Store) http.HandlerFunc {
 				CreatedBy: req.CreatedBy,
 			})
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
 				slog.Error("create mod: create spec failed", "mod_id", modID.String(), "err", err)
 				return
 			}
 			if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
-				http.Error(w, fmt.Sprintf("failed to update mod spec: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to update mod spec: %v", err)
 				slog.Error("create mod: update spec failed", "mod_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
@@ -160,7 +159,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if l := r.URL.Query().Get("limit"); l != "" {
 			parsed, err := strconv.ParseInt(l, 10, 32)
 			if err != nil || parsed < 1 {
-				http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
 				return
 			}
 			limit = int32(parsed)
@@ -171,7 +170,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if o := r.URL.Query().Get("offset"); o != "" {
 			parsed, err := strconv.ParseInt(o, 10, 32)
 			if err != nil || parsed < 0 {
-				http.Error(w, "invalid offset parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
 				return
 			}
 			offset = int32(parsed)
@@ -188,7 +187,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if archivedStr != "" {
 			parsed, err := strconv.ParseBool(archivedStr)
 			if err != nil {
-				http.Error(w, "invalid archived parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid archived parameter")
 				return
 			}
 			archivedOnly = &parsed
@@ -198,7 +197,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if repoURLFilter != "" {
 			repoURLFilter = vcs.NormalizeRepoURL(repoURLFilter)
 			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
-				http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 				return
 			}
 		}
@@ -218,7 +217,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 					NameFilter:   nameFilter,
 				})
 				if err != nil {
-					http.Error(w, fmt.Sprintf("failed to list mods: %v", err), http.StatusInternalServerError)
+					httpErr(w, http.StatusInternalServerError, "failed to list mods: %v", err)
 					slog.Error("list mods: fetch failed", "err", err)
 					return
 				}
@@ -228,7 +227,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 				for _, mod := range page {
 					repos, err := st.ListModReposByMod(r.Context(), mod.ID)
 					if err != nil {
-						http.Error(w, fmt.Sprintf("failed to list mod repos: %v", err), http.StatusInternalServerError)
+						httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
 						slog.Error("list mods: list mod repos failed", "mod_id", mod.ID, "err", err)
 						return
 					}
@@ -264,7 +263,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 			NameFilter:   nameFilter,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list mods: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list mods: %v", err)
 			slog.Error("list mods: fetch failed", "err", err)
 			return
 		}
@@ -320,7 +319,7 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -328,10 +327,10 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("delete mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
@@ -340,18 +339,18 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 		// Check if any runs exist for this mod
 		hasRuns, err := modHasAnyRuns(r.Context(), st, modID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to check runs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check runs: %v", err)
 			slog.Error("delete mod: check runs failed", "mod_id", modID, "err", err)
 			return
 		}
 		if hasRuns {
-			http.Error(w, "cannot delete mod with existing runs", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot delete mod with existing runs")
 			return
 		}
 
 		// Delete the mod
 		if err := st.DeleteMod(r.Context(), modID); err != nil {
-			http.Error(w, fmt.Sprintf("failed to delete mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to delete mod: %v", err)
 			slog.Error("delete mod: database error", "mod_id", modID, "err", err)
 			return
 		}

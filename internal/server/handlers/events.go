@@ -42,7 +42,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -51,10 +51,10 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 			default:
 				slog.Error("get run logs: database error", "run_id", runID.String(), "err", err)
-				http.Error(w, "failed to get run", http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to get run")
 			}
 			return
 		}
@@ -69,7 +69,7 @@ func getRunLogsHandler(st store.Store, eventsService *events.Service) http.Handl
 		// Validation happens inside Ensure; errors are logged but stream proceeds.
 		if err := hub.Ensure(runID); err != nil {
 			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
-			http.Error(w, "invalid run id", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid run id")
 			return
 		}
 

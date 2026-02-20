@@ -18,7 +18,7 @@ import (
 //
 //	runID, err := requiredPathParam(r, "id")
 //	if err != nil {
-//	    http.Error(w, err.Error(), http.StatusBadRequest)
+//	    httpErr(w, http.StatusBadRequest, "%s", err)
 //	    return
 //	}
 func requiredPathParam(r *http.Request, key string) (string, error) {
@@ -39,6 +39,15 @@ func optionalPathParam(r *http.Request, key string) *string {
 		return nil
 	}
 	return &val
+}
+
+// httpErr writes a plain-text HTTP error response. It accepts printf-style
+// formatting for the message body.
+func httpErr(w http.ResponseWriter, code int, msg string, args ...any) {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
+	http.Error(w, msg, code)
 }
 
 // DefaultMaxBodySize is the default request body size limit (1 MiB).
@@ -65,14 +74,14 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 		// Return 413 when MaxBytesReader trips the size cap.
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return err
 		}
-		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		httpErr(w, http.StatusBadRequest, "invalid request: %v", err)
 		return err
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		http.Error(w, "invalid request: request body must contain exactly one JSON value", http.StatusBadRequest)
+		httpErr(w, http.StatusBadRequest, "invalid request: request body must contain exactly one JSON value")
 		if err == nil {
 			return errors.New("request body must contain exactly one JSON value")
 		}

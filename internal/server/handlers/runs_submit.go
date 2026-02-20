@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -48,25 +47,25 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
 		if err := req.RepoURL.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
 		}
 		if err := req.BaseRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
 			return
 		}
 		if err := req.TargetRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
 			return
 		}
 
 		// Validate spec (cannot be empty for single-repo run submission)
 		if len(req.Spec) == 0 {
-			http.Error(w, "spec is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "spec is required")
 			return
 		}
 		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
-			http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}
 
@@ -79,7 +78,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
 			slog.Error("create single-repo run: create spec failed", "err", err)
 			return
 		}
@@ -92,7 +91,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			SpecID:    &createdSpec.ID,
 			CreatedBy: req.CreatedBy,
 		}); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create mod: %v", err)
 			slog.Error("create single-repo run: create mod failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -108,7 +107,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create mod repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
 			slog.Error("create single-repo run: create mod repo failed", "mod_id", modID, "repo_url", req.RepoURL, "err", err)
 			return
 		}
@@ -122,7 +121,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create run: %v", err)
 			slog.Error("create single-repo run: create run failed", "run_id", runID, "err", err)
 			return
 		}
@@ -136,7 +135,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			RepoTargetRef: modRepo.TargetRef,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.ID, "err", err)
 			return
 		}
@@ -144,7 +143,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		// v1 immediate start: Create repo-scoped jobs for the queued repo.
 		// This ensures the run starts execution immediately.
 		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			slog.Error("create single-repo run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return
 		}

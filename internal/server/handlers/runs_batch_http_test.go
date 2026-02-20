@@ -18,6 +18,7 @@ import (
 )
 
 type cancelRunStoreMock struct {
+	store.Store
 	getRunResult store.Run
 	getRunErr    error
 
@@ -44,6 +45,7 @@ func (m *cancelRunStoreMock) CountRunReposByStatus(ctx context.Context, runID do
 }
 
 type addRunRepoStoreMock struct {
+	store.Store
 	getRunResult store.Run
 	getRunErr    error
 
@@ -123,6 +125,7 @@ func (m *addRunRepoStoreMock) CreateJob(ctx context.Context, params store.Create
 }
 
 type listRunReposStoreMock struct {
+	store.Store
 	listRunReposWithURLByRunCalled bool
 	listRunReposWithURLByRunParam  domaintypes.RunID
 	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
@@ -136,6 +139,7 @@ func (m *listRunReposStoreMock) ListRunReposWithURLByRun(ctx context.Context, ru
 }
 
 type cancelRunRepoStoreMock struct {
+	store.Store
 	getRunRepoResults []store.RunRepo
 	getRunRepoErr     error
 	getRunRepoCalls   int
@@ -189,6 +193,7 @@ func (m *cancelRunRepoStoreMock) UpdateJobStatus(ctx context.Context, params sto
 }
 
 type restartRunRepoStoreMock struct {
+	store.Store
 	getRunResult store.Run
 	getRunErr    error
 
@@ -282,6 +287,7 @@ func (m *restartRunRepoStoreMock) GetModRepo(ctx context.Context, id domaintypes
 }
 
 type startRunStoreMock struct {
+	store.Store
 	getRunResult store.Run
 	getRunErr    error
 

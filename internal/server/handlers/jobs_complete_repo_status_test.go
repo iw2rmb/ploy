@@ -1,15 +1,12 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -24,39 +21,25 @@ import (
 func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	repoID := domaintypes.NewModRepoID()
+	f := newJobFixture("mod", 2000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
 
 	// Single job per repo, completing it should mark repo as terminal.
-	job := store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "mod-0",
-		Status:      store.JobStatusRunning,
-		ModType:     "mod",
-		StepIndex:   2000,
-	}
-
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 		// All jobs (1 total) are now Success after completion.
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          jobID,
-				RunID:       runID,
-				RepoID:      repoID,
+				ID:          f.JobID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mod-0",
@@ -73,19 +56,10 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -98,11 +72,11 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	if !st.listJobsByRunRepoAttemptCalled {
 		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
 	}
-	if st.listJobsByRunRepoAttemptParams.RunID != runID {
-		t.Errorf("expected run_id %s, got %s", runID, st.listJobsByRunRepoAttemptParams.RunID)
+	if st.listJobsByRunRepoAttemptParams.RunID != f.RunID {
+		t.Errorf("expected run_id %s, got %s", f.RunID, st.listJobsByRunRepoAttemptParams.RunID)
 	}
-	if st.listJobsByRunRepoAttemptParams.RepoID != repoID {
-		t.Errorf("expected repo_id %s, got %s", repoID, st.listJobsByRunRepoAttemptParams.RepoID)
+	if st.listJobsByRunRepoAttemptParams.RepoID != f.Job.RepoID {
+		t.Errorf("expected repo_id %s, got %s", f.Job.RepoID, st.listJobsByRunRepoAttemptParams.RepoID)
 	}
 
 	// Verify UpdateRunRepoStatus was called to update repo to Success.
@@ -131,38 +105,24 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 func TestCompleteJob_RepoStatusFail(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	repoID := domaintypes.NewModRepoID()
+	f := newJobFixture("mod", 2000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
 
 	// Job that will fail.
-	job := store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "mod-0",
-		Status:      store.JobStatusRunning,
-		ModType:     "mod",
-		StepIndex:   2000,
-	}
-
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          jobID,
-				RunID:       runID,
-				RepoID:      repoID,
+				ID:          f.JobID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mod-0",
@@ -179,19 +139,10 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Fail",
 		"exit_code": 1,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -218,30 +169,18 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	nextJobID := domaintypes.NewJobID()
-	repoID := domaintypes.NewModRepoID()
+	f := newJobFixture("pre_gate", 1000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Name = "pre-gate"
 
 	// Two jobs: first completes, second is still Created.
-	job1 := store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "pre-gate",
-		Status:      store.JobStatusRunning,
-		ModType:     "pre_gate",
-		StepIndex:   1000,
-	}
+	nextJobID := domaintypes.NewJobID()
 	job2 := store.Job{
 		ID:          nextJobID,
-		RunID:       runID,
-		RepoID:      repoID,
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "mod-0",
@@ -252,17 +191,17 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:          job1,
-		listJobsByRunResult:   []store.Job{job1, job2},
+		getJobResult:          f.Job,
+		listJobsByRunResult:   []store.Job{f.Job, job2},
 		scheduleNextJobResult: job2,
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          jobID,
-				RunID:       runID,
-				RepoID:      repoID,
+				ID:          f.JobID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
@@ -272,8 +211,8 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 			},
 			{
 				ID:          nextJobID,
-				RunID:       runID,
-				RepoID:      repoID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mod-0",
@@ -286,19 +225,10 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -329,39 +259,26 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	repoID := domaintypes.NewModRepoID()
+	f := newJobFixture("post_gate", 3000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Name = "post-gate"
 
 	// Complete the last job (post-gate) successfully. Earlier gate failure exists.
-	postGateJob := store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "post-gate",
-		Status:      store.JobStatusRunning,
-		ModType:     "post_gate",
-		StepIndex:   3000,
-	}
-
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:        postGateJob,
-		listJobsByRunResult: []store.Job{postGateJob},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			// Earlier pre-gate failure (healed later).
 			{
 				ID:          domaintypes.NewJobID(),
-				RunID:       runID,
-				RepoID:      repoID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
@@ -371,8 +288,8 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 			},
 			{
 				ID:          domaintypes.NewJobID(),
-				RunID:       runID,
-				RepoID:      repoID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "heal-1-0",
@@ -382,8 +299,8 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 			},
 			{
 				ID:          domaintypes.NewJobID(),
-				RunID:       runID,
-				RepoID:      repoID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "re-gate-1",
@@ -393,8 +310,8 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 			},
 			{
 				ID:          domaintypes.NewJobID(),
-				RunID:       runID,
-				RepoID:      repoID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mod-0",
@@ -404,9 +321,9 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 			},
 			// Last job: post-gate succeeded.
 			{
-				ID:          jobID,
-				RunID:       runID,
-				RepoID:      repoID,
+				ID:          f.JobID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "post-gate",
@@ -422,19 +339,10 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -457,50 +365,28 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	repoID := domaintypes.NewModRepoID()
+	f := newJobFixture("mr", 9000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Name = "mr-0"
 
 	// MR job (auxiliary, should not affect repo/run status).
-	mrJob := store.Job{
-		ID:          jobID,
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "mr-0",
-		Status:      store.JobStatusRunning,
-		ModType:     "mr", // MR job type
-		StepIndex:   9000,
-	}
-
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusFinished, // MR jobs run after run is Finished.
 		},
-		getJobResult:        mrJob,
-		listJobsByRunResult: []store.Job{mrJob},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -530,41 +416,27 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobIDRepoA := domaintypes.NewJobID()
-	repoIDA := domaintypes.NewModRepoID()
+	f := newJobFixture("mod", 2000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
 	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatusResult).
 	_ = domaintypes.NewModRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).
-	jobRepoA := store.Job{
-		ID:          jobIDRepoA,
-		RunID:       runID,
-		RepoID:      repoIDA,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		NodeID:      &nodeID,
-		Name:        "mod-0",
-		Status:      store.JobStatusRunning,
-		ModType:     "mod",
-		StepIndex:   2000,
-	}
-
 	st := &mockStore{
 		getRunResult: store.Run{
-			ID:     runID,
+			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:        jobRepoA,
-		listJobsByRunResult: []store.Job{jobRepoA},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 		// Repo A is now terminal (all jobs Success).
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:          jobIDRepoA,
-				RunID:       runID,
-				RepoID:      repoIDA,
+				ID:          f.JobID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mod-0",
@@ -582,19 +454,10 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{
+	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobIDRepoA.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobIDRepoA.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -622,23 +485,12 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
 	// v0 status "succeeded" should be rejected in favor of v1 "Success".
-	body, _ := json.Marshal(map[string]any{"status": "succeeded"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
+	req := f.completeJobReq(map[string]any{"status": "succeeded"})
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -658,23 +510,12 @@ func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
 	// v0 status "failed" should be rejected in favor of v1 "Fail".
-	body, _ := json.Marshal(map[string]any{"status": "failed"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
+	req := f.completeJobReq(map[string]any{"status": "failed"})
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -694,23 +535,12 @@ func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusCanceled(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
 	// v0 status "canceled" (American spelling) should be rejected in favor of v1 "Cancelled".
-	body, _ := json.Marshal(map[string]any{"status": "canceled"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
+	req := f.completeJobReq(map[string]any{"status": "canceled"})
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)

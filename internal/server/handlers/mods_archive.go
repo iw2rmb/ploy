@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +24,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -33,10 +32,10 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("archive mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
@@ -63,18 +62,18 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		// Check for running jobs in this mod's runs
 		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to check jobs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
 			slog.Error("archive mod: check jobs failed", "mod_id", modID, "err", err)
 			return
 		}
 		if hasRunningJobs {
-			http.Error(w, "cannot archive mod with running jobs", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot archive mod with running jobs")
 			return
 		}
 
 		// Archive the mod
 		if err := st.ArchiveMod(r.Context(), modID); err != nil {
-			http.Error(w, fmt.Sprintf("failed to archive mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to archive mod: %v", err)
 			slog.Error("archive mod: database error", "mod_id", modID, "err", err)
 			return
 		}
@@ -135,7 +134,7 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -143,10 +142,10 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("unarchive mod: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
@@ -172,7 +171,7 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 
 		// Unarchive the mod
 		if err := st.UnarchiveMod(r.Context(), modID); err != nil {
-			http.Error(w, fmt.Sprintf("failed to unarchive mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to unarchive mod: %v", err)
 			slog.Error("unarchive mod: database error", "mod_id", modID, "err", err)
 			return
 		}

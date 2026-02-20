@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -65,7 +64,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 		// The store query handles NULL/empty filter internally to return all repos.
 		repos, err := st.ListDistinctRepos(r.Context(), filter)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list repos: %v", err)
 			slog.Error("list repos: fetch failed", "err", err, "filter", filter)
 			return
 		}
@@ -125,7 +124,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -136,7 +135,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		if l := r.URL.Query().Get("limit"); l != "" {
 			parsed, err := strconv.ParseInt(l, 10, 32)
 			if err != nil || parsed < 1 {
-				http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
 				return
 			}
 			limit = int32(parsed)
@@ -149,7 +148,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		if o := r.URL.Query().Get("offset"); o != "" {
 			parsed, err := strconv.ParseInt(o, 10, 32)
 			if err != nil || parsed < 0 {
-				http.Error(w, "invalid offset parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
 				return
 			}
 			offset = int32(parsed)
@@ -162,7 +161,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			Offset: offset,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list runs for repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list runs for repo: %v", err)
 			slog.Error("list runs for repo: fetch failed", "err", err, "repo_id", repoID)
 			return
 		}

@@ -54,7 +54,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Get cluster ID from environment.
 		clusterID := os.Getenv("PLOY_CLUSTER_ID")
 		if clusterID == "" {
-			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
 			slog.Error("create bootstrap token: PLOY_CLUSTER_ID not set")
 			return
 		}
@@ -64,7 +64,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		expiresAt := now.Add(time.Duration(req.ExpiresInMinutes) * time.Minute)
 		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, nodeID, expiresAt)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to generate token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to generate token: %v", err)
 			slog.Error("create bootstrap token: generation failed", "err", err)
 			return
 		}
@@ -72,7 +72,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Parse token to extract token ID.
 		claims, err := auth.ValidateToken(token, tokenSecret)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to validate generated token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to validate generated token: %v", err)
 			slog.Error("create bootstrap token: validation failed", "err", err)
 			return
 		}
@@ -98,7 +98,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			IssuedBy:  issuedBy,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to store token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to store token: %v", err)
 			slog.Error("create bootstrap token: database insert failed", "err", err)
 			return
 		}
@@ -140,7 +140,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		// Extract and validate bootstrap token from Authorization header.
 		authHeader := r.Header.Get("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "missing or invalid Authorization header", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "missing or invalid Authorization header")
 			return
 		}
 
@@ -149,34 +149,34 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		// Validate token.
 		claims, err := auth.ValidateToken(tokenString, tokenSecret)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid token: %v", err), http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "invalid token: %v", err)
 			slog.Warn("bootstrap certificate: invalid token", "err", err)
 			return
 		}
 
 		// Verify token is a bootstrap token.
 		if claims.TokenType != auth.TokenTypeBootstrap {
-			http.Error(w, "invalid token type: expected bootstrap token", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "invalid token type: expected bootstrap token")
 			return
 		}
 
 		// Verify token is not expired.
 		if time.Now().After(claims.ExpiresAt.Time) {
-			http.Error(w, "token expired", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "token expired")
 			return
 		}
 
 		// Check if token is revoked.
 		revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
 		if err == nil && revoked.Valid {
-			http.Error(w, "token revoked", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "token revoked")
 			return
 		}
 
 		// Get bootstrap token info from database.
 		tokenInfo, err := st.GetBootstrapToken(r.Context(), claims.ID)
 		if err != nil {
-			http.Error(w, "token not found or invalid", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "token not found or invalid")
 			slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID, "err", err)
 			return
 		}
@@ -185,7 +185,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		if tokenInfo.UsedAt.Valid {
 			// If cert was already issued, this is idempotent retry - we could allow it
 			// For now, reject to enforce single-use
-			http.Error(w, "token already used", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "token already used")
 			slog.Warn("bootstrap certificate: token already used", "token_id", claims.ID)
 			return
 		}
@@ -201,32 +201,32 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		// Validate CSR is not empty.
 		if strings.TrimSpace(req.CSR) == "" {
-			http.Error(w, "csr field is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "csr field is required")
 			return
 		}
 
 		// Parse and validate CSR CN matches token's node_id.
 		block, _ := pem.Decode([]byte(req.CSR))
 		if block == nil || block.Type != "CERTIFICATE REQUEST" {
-			http.Error(w, "invalid CSR PEM", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid CSR PEM")
 			return
 		}
 
 		parsedCSR, err := x509.ParseCertificateRequest(block.Bytes)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("parse CSR: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "parse CSR: %v", err)
 			return
 		}
 
 		if err := parsedCSR.CheckSignature(); err != nil {
-			http.Error(w, fmt.Sprintf("verify CSR signature: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "verify CSR signature: %v", err)
 			return
 		}
 
 		// Verify CSR CN matches token's node_id.
 		expectedCN := "node:" + claims.NodeID.String()
 		if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
-			http.Error(w, "CSR subject common name must match node_id from token", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "CSR subject common name must match node_id from token")
 			slog.Warn("bootstrap certificate: CN mismatch",
 				"expected", expectedCN,
 				"actual", parsedCSR.Subject.CommonName,
@@ -238,9 +238,9 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		ca, rawCACert, err := loadClusterCA()
 		if err != nil {
 			if errors.Is(err, errCANotConfigured) {
-				http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
+				httpErr(w, http.StatusServiceUnavailable, "PKI not configured")
 			} else {
-				http.Error(w, "failed to load CA", http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to load CA")
 			}
 			slog.Error("bootstrap certificate: load CA failed", "err", err)
 			return
@@ -249,7 +249,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		// Sign the CSR.
 		cert, err := pki.SignNodeCSR(ca, []byte(req.CSR), time.Now())
 		if err != nil {
-			http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "sign failed: %v", err)
 			slog.Warn("bootstrap certificate: sign CSR failed", "node_id", claims.NodeID, "err", err)
 			return
 		}
@@ -258,7 +258,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		// Use the node_id from the bootstrap token and default values for other fields.
 		nodeID := claims.NodeID
 		if nodeID.IsZero() {
-			http.Error(w, "invalid node_id in token", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "invalid node_id in token")
 			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID.String())
 			return
 		}
@@ -277,7 +277,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 				Concurrency: 1,                         // Default concurrency
 			})
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to register node: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to register node: %v", err)
 				slog.Error("bootstrap certificate: failed to register node", "node_id", claims.NodeID.String(), "err", err)
 				return
 			}
@@ -302,14 +302,14 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		// The certificate is for the node's own HTTPS server; the bearer token is for control plane auth.
 		tokenSecret := os.Getenv("PLOY_AUTH_SECRET")
 		if tokenSecret == "" {
-			http.Error(w, "server misconfigured: PLOY_AUTH_SECRET not set", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_AUTH_SECRET not set")
 			slog.Error("bootstrap certificate: PLOY_AUTH_SECRET not set")
 			return
 		}
 
 		clusterID := os.Getenv("PLOY_CLUSTER_ID")
 		if clusterID == "" {
-			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
 			slog.Error("bootstrap certificate: PLOY_CLUSTER_ID not set")
 			return
 		}
@@ -318,7 +318,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		tokenExpiry := time.Now().AddDate(1, 0, 0)
 		workerToken, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(auth.RoleWorker), tokenExpiry)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to generate worker token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to generate worker token: %v", err)
 			slog.Error("bootstrap certificate: generate worker token failed", "err", err)
 			return
 		}

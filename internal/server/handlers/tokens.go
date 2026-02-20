@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -37,7 +36,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		// Validate role.
 		normalizedRole := auth.NormalizeRole(req.Role)
 		if normalizedRole == "" {
-			http.Error(w, "invalid role: must be one of cli-admin, control-plane, or worker", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid role: must be one of cli-admin, control-plane, or worker")
 			return
 		}
 
@@ -49,7 +48,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		// Get cluster ID from environment.
 		clusterID := os.Getenv("PLOY_CLUSTER_ID")
 		if clusterID == "" {
-			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
 			slog.Error("create api token: PLOY_CLUSTER_ID not set")
 			return
 		}
@@ -59,7 +58,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		expiresAt := now.AddDate(0, 0, req.ExpiresInDays)
 		token, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(normalizedRole), expiresAt)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to generate token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to generate token: %v", err)
 			slog.Error("create api token: generation failed", "err", err)
 			return
 		}
@@ -67,7 +66,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		// Parse token to extract token ID.
 		claims, err := auth.ValidateToken(token, tokenSecret)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to validate generated token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to validate generated token: %v", err)
 			slog.Error("create api token: validation failed", "err", err)
 			return
 		}
@@ -99,7 +98,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			CreatedBy:   createdBy,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to store token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to store token: %v", err)
 			slog.Error("create api token: database insert failed", "err", err)
 			return
 		}
@@ -144,7 +143,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 		// Get cluster ID from environment.
 		clusterID := os.Getenv("PLOY_CLUSTER_ID")
 		if clusterID == "" {
-			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
 			slog.Error("list api tokens: PLOY_CLUSTER_ID not set")
 			return
 		}
@@ -152,7 +151,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 		// Query tokens from database.
 		tokens, err := st.ListAPITokens(r.Context(), &clusterID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list tokens: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list tokens: %v", err)
 			slog.Error("list api tokens: database query failed", "err", err)
 			return
 		}
@@ -217,14 +216,14 @@ func revokeAPITokenHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenID, err := requiredPathParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Revoke the token.
 		err = st.RevokeAPIToken(r.Context(), tokenID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to revoke token: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to revoke token: %v", err)
 			slog.Error("revoke api token: database update failed", "token_id", tokenID, "err", err)
 			return
 		}

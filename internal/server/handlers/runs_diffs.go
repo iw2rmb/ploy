@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -27,12 +26,12 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		if r.ContentLength > maxBodySize {
-			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -46,11 +45,11 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			return
 		}
 		if len(req.Patch) == 0 {
-			http.Error(w, "patch is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "patch is required")
 			return
 		}
 		if len(req.Patch) > maxPatchSize {
-			http.Error(w, "diff size exceeds 10 MiB cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
 			return
 		}
 
@@ -60,15 +59,15 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			job, err := st.GetJob(r.Context(), *req.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					http.Error(w, "job not found", http.StatusNotFound)
+					httpErr(w, http.StatusNotFound, "job not found")
 					return
 				}
-				http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to check job: %v", err)
 				slog.Error("run diff: job check failed", "job_id", req.JobID.String(), "err", err)
 				return
 			}
 			if job.RunID != runID {
-				http.Error(w, "job does not belong to run", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "job does not belong to run")
 				return
 			}
 			jobID = &job.ID
@@ -77,17 +76,17 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// Ensure the run exists.
 		if _, err := st.GetRun(r.Context(), runID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check run: %v", err)
 			slog.Error("run diff: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
 		summaryBytes, err := json.Marshal(req.Summary)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to marshal summary: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "failed to marshal summary: %v", err)
 			return
 		}
 		params := store.CreateDiffParams{
@@ -99,7 +98,7 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// Persist diff metadata to database and upload blob to object storage.
 		diff, err := bp.CreateDiff(r.Context(), params, req.Patch)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create diff: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create diff: %v", err)
 			slog.Error("run diff: create failed", "run_id", runID.String(), "err", err)
 			return
 		}

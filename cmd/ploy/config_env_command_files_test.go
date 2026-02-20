@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -35,22 +34,15 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvList(nil, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvList(nil, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvList error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	// Verify header and entries are displayed.
 	if !strings.Contains(output, "KEY") {
 		t.Fatalf("expected header in output, got: %q", output)
@@ -85,22 +77,15 @@ func TestHandleConfigEnvListEmpty(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvList(nil, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvList(nil, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvList error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "No global environment variables configured") {
 		t.Fatalf("expected empty message, got: %q", output)
 	}
@@ -128,22 +113,15 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvShow([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvShow([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvShow error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "Key:    CA_CERTS_PEM_BUNDLE") {
 		t.Fatalf("expected key in output, got: %q", output)
 	}
@@ -178,22 +156,15 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvShow error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	// With --raw, the full value should be shown.
 	if !strings.Contains(output, "super-secret-value-12345") {
 		t.Fatalf("expected full value with --raw, got: %q", output)
@@ -242,16 +213,10 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
@@ -277,7 +242,6 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 		t.Fatalf("expected secret true (default), got: %v", gotBody["secret"])
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "updated successfully") {
 		t.Fatalf("expected success message, got: %q", output)
 	}
@@ -312,16 +276,10 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvSet([]string{"--key", "CA_CERTS_PEM_BUNDLE", "--file", filePath, "--scope", "all"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	captureStdout(t, func() {
+		err = handleConfigEnvSet([]string{"--key", "CA_CERTS_PEM_BUNDLE", "--file", filePath, "--scope", "all"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
@@ -352,19 +310,14 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvSet([]string{
-		"--key", "CODEX_AUTH_JSON",
-		"--value", "{}",
-		"--scope", "mods",
-	}, buf)
-
-	_ = w.Close()
-	_, _ = io.Copy(io.Discard, r)
+	var err error
+	captureStdout(t, func() {
+		err = handleConfigEnvSet([]string{
+			"--key", "CODEX_AUTH_JSON",
+			"--value", "{}",
+			"--scope", "mods",
+		}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
@@ -394,20 +347,15 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvSet([]string{
-		"--key", "DEBUG_MODE",
-		"--value", "true",
-		"--scope", "gate",
-		"--secret=false",
-	}, buf)
-
-	_ = w.Close()
-	_, _ = io.Copy(io.Discard, r)
+	var err error
+	captureStdout(t, func() {
+		err = handleConfigEnvSet([]string{
+			"--key", "DEBUG_MODE",
+			"--value", "true",
+			"--scope", "gate",
+			"--secret=false",
+		}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
@@ -451,16 +399,10 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvUnset([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvUnset([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvUnset error: %v", err)
@@ -473,7 +415,6 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 		t.Fatalf("expected /v1/config/env/CA_CERTS_PEM_BUNDLE, got %s", gotPath)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "deleted successfully") {
 		t.Fatalf("expected success message, got: %q", output)
 	}
@@ -489,23 +430,16 @@ func TestHandleConfigEnvUnsetNotFound(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
+	})
 
 	// Should not error; 404 is acceptable for delete (idempotent).
 	if err != nil {
 		t.Fatalf("handleConfigEnvUnset error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "not found") {
 		t.Fatalf("expected 'not found' message, got: %q", output)
 	}
@@ -584,22 +518,15 @@ func TestHandleConfigEnvShowRedactsShortSecrets(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigEnvShow([]string{"--key", "SHORT"}, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigEnvShow([]string{"--key", "SHORT"}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvShow error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	// Short secrets should show *** instead of partial value.
 	if strings.Contains(output, "abc") {
 		t.Fatalf("short secret should be fully redacted, got: %q", output)

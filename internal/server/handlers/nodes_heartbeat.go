@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
@@ -22,7 +21,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		// Extract node id from path parameter.
 		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -43,31 +42,31 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 
 		// Validate fit-range and invariants.
 		if req.CPUFreeMillis < 0 || req.CPUTotalMillis < 0 {
-			http.Error(w, "invalid request: cpu millis must be non-negative", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: cpu millis must be non-negative")
 			return
 		}
 		if req.CPUFreeMillis > req.CPUTotalMillis {
-			http.Error(w, "invalid request: cpu_free_millis must be <= cpu_total_millis", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: cpu_free_millis must be <= cpu_total_millis")
 			return
 		}
 		if req.CPUFreeMillis > math.MaxInt32 || req.CPUTotalMillis > math.MaxInt32 {
-			http.Error(w, "invalid request: cpu millis out of range", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: cpu millis out of range")
 			return
 		}
 		if req.MemFreeBytes < 0 || req.MemTotalBytes < 0 {
-			http.Error(w, "invalid request: mem bytes must be non-negative", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: mem bytes must be non-negative")
 			return
 		}
 		if req.MemFreeBytes > req.MemTotalBytes {
-			http.Error(w, "invalid request: mem_free_bytes must be <= mem_total_bytes", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: mem_free_bytes must be <= mem_total_bytes")
 			return
 		}
 		if req.DiskFreeBytes < 0 || req.DiskTotalBytes < 0 {
-			http.Error(w, "invalid request: disk bytes must be non-negative", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: disk bytes must be non-negative")
 			return
 		}
 		if req.DiskFreeBytes > req.DiskTotalBytes {
-			http.Error(w, "invalid request: disk_free_bytes must be <= disk_total_bytes", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid request: disk_free_bytes must be <= disk_total_bytes")
 			return
 		}
 
@@ -75,10 +74,10 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "node not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "node not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("heartbeat: check failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -99,7 +98,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			Version:        strings.TrimSpace(req.Version),
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to update heartbeat: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to update heartbeat: %v", err)
 			slog.Error("heartbeat: update failed", "node_id", nodeID, "err", err)
 			return
 		}

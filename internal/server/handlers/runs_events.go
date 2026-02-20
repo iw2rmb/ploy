@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -37,13 +36,13 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 		// Extract run id from path parameter using domain type helper.
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
-			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -60,11 +59,11 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 		}
 
 		if len(req.Data) == 0 {
-			http.Error(w, "data is required and must not be empty", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "data is required and must not be empty")
 			return
 		}
 		if len(req.Data) > maxChunkSize {
-			http.Error(w, fmt.Sprintf("data exceeds 10 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}
 
@@ -78,7 +77,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 		// Persist log metadata to database and upload blob to object storage.
 		logRow, err := bp.CreateLog(r.Context(), params, req.Data)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create log: %v", err)
 			slog.Error("run logs: create failed", "run_id", runID, "chunk_no", req.ChunkNo, "err", err)
 			return
 		}

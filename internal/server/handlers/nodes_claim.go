@@ -40,7 +40,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		// Extract node id from path parameter using domain type helper.
 		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -48,10 +48,10 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "node not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "node not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("claim: node check failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -65,21 +65,21 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 				slog.Debug("claim: no work available", "node_id", nodeID)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to claim job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to claim job: %v", err)
 			slog.Error("claim: database error", "node_id", nodeID, "err", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), job.RunID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run for claimed job: %v", err)
 			slog.Error("claim: get run failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
 			return
 		}
 
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: job.RunID, RepoID: job.RepoID})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to get run repo for claimed job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run repo for claimed job: %v", err)
 			slog.Error("claim: get run repo failed for job", "node_id", nodeID, "job_id", job.ID, "err", err)
 			return
 		}
@@ -101,14 +101,14 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 
 		modRepo, err := st.GetModRepo(r.Context(), job.RepoID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to get repo for claimed job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get repo for claimed job: %v", err)
 			slog.Error("claim: get mod repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
 			return
 		}
 
 		spec, err := st.GetSpec(r.Context(), run.SpecID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to get spec for claimed job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get spec for claimed job: %v", err)
 			slog.Error("claim: get spec failed for job", "node_id", nodeID, "job_id", job.ID, "spec_id", run.SpecID, "err", err)
 			return
 		}
@@ -116,7 +116,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		// Build and send response with job and run information.
 		if err := buildAndSendJobClaimResponse(w, r, configHolder, run, spec.Spec, rr, modRepo, job); err != nil {
 			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
-			http.Error(w, fmt.Sprintf("failed to build claim response: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to build claim response: %v", err)
 			return
 		}
 		slog.Info("job claimed",

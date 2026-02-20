@@ -442,27 +442,20 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 
 	const wantBugSummary = "javac: cannot find symbol FooBar"
 
-	mockContainer := &mockContainerRuntime{
-		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-			if strings.Contains(spec.Image, "router") {
-				for _, m := range spec.Mounts {
-					if m.Target == "/out" {
-						_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"),
-							[]byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
-					}
+	mc := noopContainer()
+	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+		if strings.Contains(spec.Image, "router") {
+			for _, m := range spec.Mounts {
+				if m.Target == "/out" {
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"),
+						[]byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
 				}
 			}
-			return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
-		},
-		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
-		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
-			return step.ContainerResult{ExitCode: 0}, nil
-		},
-		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return nil, nil },
-		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		}
+		return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
 	}
 
-	runner := step.Runner{Containers: mockContainer}
+	runner := step.Runner{Containers: mc}
 
 	req := StartRunRequest{
 		RunID:   types.RunID("run-router-gate"),

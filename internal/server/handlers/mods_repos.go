@@ -33,7 +33,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -49,22 +49,22 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Validate required fields.
 		if req.RepoURL == "" {
-			http.Error(w, "repo_url is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 		if req.BaseRef == "" {
-			http.Error(w, "base_ref is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "base_ref is required")
 			return
 		}
 		if req.TargetRef == "" {
-			http.Error(w, "target_ref is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "target_ref is required")
 			return
 		}
 
 		// Normalize and validate repo URL (strips trailing slashes and .git suffixes).
 		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
 		if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
 		}
 
@@ -72,15 +72,15 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 		mod, err := st.GetMod(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("add mod repo: get mod failed", "mod_id", modID, "err", err)
 			return
 		}
 		if mod.ArchivedAt.Valid {
-			http.Error(w, "cannot add repo to archived mod", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot add repo to archived mod")
 			return
 		}
 
@@ -97,10 +97,10 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 			// Check for unique constraint violation (duplicate repo_url in mod).
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				http.Error(w, "repo already exists in this mod", http.StatusConflict)
+				httpErr(w, http.StatusConflict, "repo already exists in this mod")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to create mod repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
 			slog.Error("add mod repo: create failed", "mod_id", modID, "repo_url", normalizedURL, "err", err)
 			return
 		}
@@ -142,7 +142,7 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -150,10 +150,10 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetMod(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("list mod repos: get mod failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -161,7 +161,7 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 		// List repos for this mod.
 		repos, err := st.ListModReposByMod(r.Context(), modID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list mod repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
 			slog.Error("list mod repos: list failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -210,13 +210,13 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -224,10 +224,10 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetMod(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("delete mod repo: get mod failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -236,33 +236,33 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 		repo, err := st.GetModRepo(r.Context(), repoID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "repo not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("delete mod repo: get repo failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if repo.ModID != modID {
-			http.Error(w, "repo does not belong to this mod", http.StatusNotFound)
+			httpErr(w, http.StatusNotFound, "repo does not belong to this mod")
 			return
 		}
 
 		// Check if repo has historical executions (run_repos references).
 		hasHistory, err := st.HasModRepoHistory(r.Context(), repoID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to check repo history: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
 			slog.Error("delete mod repo: check history failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if hasHistory {
-			http.Error(w, "cannot delete repo with historical executions", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot delete repo with historical executions")
 			return
 		}
 
 		// Delete the repo.
 		if err := st.DeleteModRepo(r.Context(), repoID); err != nil {
-			http.Error(w, fmt.Sprintf("failed to delete mod repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to delete mod repo: %v", err)
 			slog.Error("delete mod repo: delete failed", "repo_id", repoID, "err", err)
 			return
 		}
@@ -290,7 +290,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -298,22 +298,22 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 		mod, err := st.GetMod(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("bulk upsert mod repos: get mod failed", "mod_id", modID, "err", err)
 			return
 		}
 		if mod.ArchivedAt.Valid {
-			http.Error(w, "cannot modify repos on archived mod", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot modify repos on archived mod")
 			return
 		}
 
 		// Validate Content-Type is text/csv.
 		contentType := r.Header.Get("Content-Type")
 		if !strings.HasPrefix(contentType, "text/csv") {
-			http.Error(w, "Content-Type must be text/csv", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "Content-Type must be text/csv")
 			return
 		}
 
@@ -344,7 +344,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			// Skip header row (first line).
 			if !headerRead {
 				if err != nil {
-					http.Error(w, fmt.Sprintf("CSV parse error in header: %v", err), http.StatusBadRequest)
+					httpErr(w, http.StatusBadRequest, "CSV parse error in header: %v", err)
 					return
 				}
 				headerRead = true
@@ -352,7 +352,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 				if len(record) != 3 || strings.ToLower(strings.TrimSpace(record[0])) != "repo_url" ||
 					strings.ToLower(strings.TrimSpace(record[1])) != "base_ref" ||
 					strings.ToLower(strings.TrimSpace(record[2])) != "target_ref" {
-					http.Error(w, "CSV header must be: repo_url,base_ref,target_ref", http.StatusBadRequest)
+					httpErr(w, http.StatusBadRequest, "CSV header must be: repo_url,base_ref,target_ref")
 					return
 				}
 				continue
@@ -435,7 +435,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if !headerRead {
-			http.Error(w, "CSV file is empty or missing header", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "CSV file is empty or missing header")
 			return
 		}
 

@@ -347,75 +347,6 @@ func TestCopyGitClone(t *testing.T) {
 	}
 }
 
-// --- Test Helpers ---
-
-// initGitRepo initializes a git repository in the specified directory.
-func initGitRepo(t *testing.T, dir string) {
-	t.Helper()
-	cmd := exec.Command("git", "init")
-	cmd.Dir = dir
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git init failed: %v (output: %s)", err, string(output))
-	}
-	// Configure git user for commits.
-	configUser := exec.Command("git", "config", "user.name", "Test User")
-	configUser.Dir = dir
-	if output, err := configUser.CombinedOutput(); err != nil {
-		t.Fatalf("git config user.name failed: %v (output: %s)", err, string(output))
-	}
-	configEmail := exec.Command("git", "config", "user.email", "test@example.com")
-	configEmail.Dir = dir
-	if output, err := configEmail.CombinedOutput(); err != nil {
-		t.Fatalf("git config user.email failed: %v (output: %s)", err, string(output))
-	}
-}
-
-// writeFile writes content to a file, creating parent directories as needed.
-func writeFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir for %s failed: %v", path, err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write file %s failed: %v", path, err)
-	}
-}
-
-// gitCommit stages all changes and creates a commit.
-func gitCommit(t *testing.T, dir, message string) {
-	t.Helper()
-	add := exec.Command("git", "add", ".")
-	add.Dir = dir
-	if output, err := add.CombinedOutput(); err != nil {
-		t.Fatalf("git add failed: %v (output: %s)", err, string(output))
-	}
-	commit := exec.Command("git", "commit", "-m", message)
-	commit.Dir = dir
-	if output, err := commit.CombinedOutput(); err != nil {
-		t.Fatalf("git commit failed: %v (output: %s)", err, string(output))
-	}
-}
-
-// assertFileContent verifies file content matches expected value.
-func assertFileContent(t *testing.T, path, expected string) {
-	t.Helper()
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read file %s failed: %v", path, err)
-	}
-	if string(content) != expected {
-		t.Errorf("file %s content = %q, want %q", path, string(content), expected)
-	}
-}
-
-// assertGitRepo verifies the directory is a valid git repository.
-func assertGitRepo(t *testing.T, dir string) {
-	t.Helper()
-	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		t.Errorf("directory %s is not a git repo: %v", dir, err)
-	}
-}
-
 // TestEnsureBaselineCommitForRehydration verifies baseline commit creation after rehydration.
 func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 	t.Parallel()
@@ -547,7 +478,7 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		writeFile(t, filepath.Join(step0Workspace, "counter.txt"), "1\n")
 
 		// Generate diff for step 0 using "git diff HEAD".
-		diff0 := generateGitDiffHelper(t, step0Workspace)
+		diff0 := generateGitDiff(t, step0Workspace)
 		generatedDiffs = append(generatedDiffs, diff0)
 
 		// Verify diff 0 contains incremental changes (0 -> 1).
@@ -578,7 +509,7 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		writeFile(t, filepath.Join(step1Workspace, "counter.txt"), "2\n")
 
 		// Generate diff for step 1 using "git diff HEAD".
-		diff1 := generateGitDiffHelper(t, step1Workspace)
+		diff1 := generateGitDiff(t, step1Workspace)
 		generatedDiffs = append(generatedDiffs, diff1)
 
 		// Verify diff 1 contains ONLY incremental changes (1 -> 2), NOT cumulative (0 -> 2).
@@ -625,7 +556,7 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		}
 
 		// Generate diff for step 2 using "git diff HEAD".
-		diff2 := generateGitDiffHelper(t, step2Workspace)
+		diff2 := generateGitDiff(t, step2Workspace)
 		generatedDiffs = append(generatedDiffs, diff2)
 
 		// Verify diff 2 contains ONLY incremental changes (2 -> 3 + added.txt).
@@ -670,20 +601,4 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		assertFileContent(t, filepath.Join(finalWorkspace, "counter.txt"), "3\n")
 		assertFileContent(t, filepath.Join(finalWorkspace, "added.txt"), "hello from step 2\n")
 	}
-}
-
-// generateGitDiffHelper generates a unified diff for the workspace using "git diff HEAD".
-// This helper simulates the diff generation logic from runtime/step/stub.go.
-func generateGitDiffHelper(t *testing.T, workspace string) []byte {
-	t.Helper()
-	cmd := exec.Command("git", "diff", "HEAD")
-	cmd.Dir = workspace
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// git diff returns 0 even when there are diffs, so only fail on actual errors.
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
-			t.Fatalf("git diff failed: %v (output: %s)", err, string(output))
-		}
-	}
-	return output
 }

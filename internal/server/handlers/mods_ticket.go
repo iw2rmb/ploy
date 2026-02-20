@@ -49,7 +49,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		// Run IDs are KSUID strings; treated as opaque identifiers.
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -57,10 +57,10 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("get run status: fetch run failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -76,7 +76,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		)
 		runRepos, err := st.ListRunReposByRun(r.Context(), run.ID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("get run status: list run repos failed", "run_id", run.ID, "err", err)
 			return
 		}
@@ -87,7 +87,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 			mr, err := st.GetModRepo(r.Context(), rr.RepoID)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 				slog.Error("get run status: get repo failed", "run_id", run.ID, "repo_id", rr.RepoID, "err", err)
 				return
 			}
@@ -144,7 +144,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		// Load jobs and their artifacts using string run ID.
 		jobs, err := st.ListJobsByRun(r.Context(), run.ID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
 			slog.Error("get run status: list jobs failed", "run_id", run.ID, "err", err)
 			return
 		}
@@ -155,7 +155,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			artMap := make(map[string]string)
 			bundles, err := st.ListArtifactBundlesMetaByRunAndJob(r.Context(), store.ListArtifactBundlesMetaByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to list artifacts: %v", err)
 				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", jobIDStr, "err", err)
 				return
 			}
@@ -173,7 +173,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			// Validate that step_index is finite (reject NaN/Inf).
 			stepIndex := job.StepIndex
 			if !stepIndex.Valid() {
-				http.Error(w, fmt.Sprintf("invalid step_index for job %s", jobIDStr), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "invalid step_index for job %s", jobIDStr)
 				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", jobIDStr, "step_index", float64(job.StepIndex))
 				return
 			}

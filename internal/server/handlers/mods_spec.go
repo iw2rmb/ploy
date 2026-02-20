@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -27,7 +26,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -43,13 +42,13 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 
 		// Validate spec is present and non-empty.
 		if len(req.Spec) == 0 {
-			http.Error(w, "spec is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "spec is required")
 			return
 		}
 
 		// Validate spec structure (same validation as in createModHandler).
 		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
-			http.Error(w, fmt.Sprintf("spec: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}
 
@@ -57,10 +56,10 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 		mod, err := resolveModByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("set mod spec: get mod failed", "mod_ref", modRef, "err", err)
 			return
 		}
@@ -68,7 +67,7 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 
 		// Check if mod is archived — cannot update spec on archived mods.
 		if mod.ArchivedAt.Valid {
-			http.Error(w, "cannot set spec on archived mod", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot set spec on archived mod")
 			return
 		}
 
@@ -81,14 +80,14 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create spec: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
 			slog.Error("set mod spec: create spec failed", "mod_id", modID, "err", err)
 			return
 		}
 
 		// Update mods.spec_id to point at the new spec.
 		if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update mod spec: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to update mod spec: %v", err)
 			slog.Error("set mod spec: update mod failed", "mod_id", modID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
