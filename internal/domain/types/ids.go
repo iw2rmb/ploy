@@ -16,36 +16,93 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// IDValidator is implemented by tag types that define format validation for an ID.
+type IDValidator interface {
+	ValidateID(string) error
+}
+
+// StringID is a generic string identifier type. The tag type T determines
+// validation behavior: if T implements IDValidator, its ValidateID method
+// is used during text marshaling/unmarshaling; otherwise no validation is applied.
+type StringID[T any] string
+
+func (v StringID[T]) String() string { return string(v) }
+func (v StringID[T]) IsZero() bool   { return IsEmpty(string(v)) }
+
+func (v StringID[T]) MarshalText() ([]byte, error) {
+	return marshalIDTextValidated(v, idValidator[T]())
+}
+
+func (v *StringID[T]) UnmarshalText(b []byte) error {
+	return unmarshalIDTextValidated(v, b, idValidator[T]())
+}
+
+func (v StringID[T]) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
+func (v *StringID[T]) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
+
+var _ interface {
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+	json.Marshaler
+	json.Unmarshaler
+} = (*StringID[struct{}])(nil)
+
+// idValidator returns the validation function for tag type T, or nil if T
+// does not implement IDValidator.
+func idValidator[T any]() func(string) error {
+	var tag T
+	if v, ok := any(tag).(IDValidator); ok {
+		return v.ValidateID
+	}
+	return nil
+}
+
+// Tag types for each string ID. Types with format validation implement IDValidator.
+type (
+	runIDTag     struct{}
+	stepIDTag    struct{}
+	jobIDTag     struct{}
+	clusterIDTag struct{}
+	nodeIDTag    struct{}
+	modIDTag     struct{}
+	specIDTag    struct{}
+	modRepoIDTag struct{}
+)
+
+func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
+func (jobIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidJobID) }
+func (nodeIDTag) ValidateID(s string) error    { return validateNanoID(s, 6, ErrInvalidNodeID) }
+func (modIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidModID) }
+func (specIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidSpecID) }
+func (modRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidModRepoID) }
+
 // RunID identifies a run instance (workflow execution).
-// This is the canonical identifier for workflow runs in the Mods system.
-type RunID string
+type RunID = StringID[runIDTag]
 
 // StepID identifies a step within a stage.
-type StepID string
+type StepID = StringID[stepIDTag]
 
 // JobID identifies a job within the execution context.
 // Jobs are the unit of work assignment to nodes (claim, execute, complete).
-type JobID string
+type JobID = StringID[jobIDTag]
 
 // ClusterID identifies a CLI/server cluster descriptor.
-type ClusterID string
+type ClusterID = StringID[clusterIDTag]
 
 // NodeID identifies a worker node in the cluster.
-type NodeID string
+type NodeID = StringID[nodeIDTag]
 
 // ModID identifies a mod project.
 // Uses NanoID(6) for compact, URL-safe identifiers suitable for CLI usage and display.
-type ModID string
+type ModID = StringID[modIDTag]
 
 // SpecID identifies a spec instance in the specs table.
 // Uses NanoID(8) for spec identifiers in the append-only specs table.
-type SpecID string
+type SpecID = StringID[specIDTag]
 
 // ModRepoID identifies a repo entry within a mod project.
 // Uses NanoID(8) for per-mod repository identifiers.
-// Note: In CLI flags and some legacy naming, this may be called "mod_repo_id".
-// Prefer "repo_id" in API contexts.
-type ModRepoID string
+type ModRepoID = StringID[modRepoIDTag]
 
 // ModRef is a reference that can be either a mod ID or a mod name.
 // Used for endpoints that accept "mod id OR name" in the path.
@@ -53,73 +110,10 @@ type ModRepoID string
 // Values must be non-empty and URL-safe (no whitespace, no / or ? characters).
 type ModRef string
 
-// StepIndex identifies a job's ordering value within a run execution sequence.
-// It is stored/transported as a float64 (historically `jobs.step_index`) where
-// values encode ordering (e.g., 1000, 2000) and fractional values are used to
-// insert healing/re-gate jobs between existing jobs (e.g., 1500.5, 1750.75).
-type StepIndex float64
-
-var _ interface {
-	json.Marshaler
-	json.Unmarshaler
-} = (*StepIndex)(nil)
-
-// String returns the underlying string value.
-func (v RunID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v RunID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v StepID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v StepID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v JobID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v JobID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v ClusterID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v ClusterID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v NodeID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v NodeID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v ModID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v ModID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v SpecID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v SpecID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
-func (v ModRepoID) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v ModRepoID) IsZero() bool { return IsEmpty(string(v)) }
-
-// String returns the underlying string value.
 func (v ModRef) String() string { return string(v) }
-
-// IsZero reports whether the value is empty (after trimming spaces).
-func (v ModRef) IsZero() bool { return IsEmpty(string(v)) }
+func (v ModRef) IsZero() bool   { return IsEmpty(string(v)) }
 
 // Validate checks that the ModRef is non-empty and URL-safe.
-// URL-safe means no whitespace and no / or ? characters.
 func (v ModRef) Validate() error {
 	s := Normalize(string(v))
 	if s == "" {
@@ -133,26 +127,41 @@ func (v ModRef) Validate() error {
 	return nil
 }
 
-// Float64 returns the underlying float64 value.
-func (v StepIndex) Float64() float64 { return float64(v) }
+func (v ModRef) MarshalText() ([]byte, error) {
+	if err := v.Validate(); err != nil {
+		return nil, err
+	}
+	return []byte(Normalize(string(v))), nil
+}
 
-// IsZero reports whether the step index is zero.
-func (v StepIndex) IsZero() bool { return v == 0 }
+func (v *ModRef) UnmarshalText(b []byte) error {
+	s := Normalize(string(b))
+	ref := ModRef(s)
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+	*v = ref
+	return nil
+}
+
+func (v ModRef) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
+func (v *ModRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
+
+// StepIndex identifies a job's ordering value within a run execution sequence.
+type StepIndex float64
+
+var _ interface {
+	json.Marshaler
+	json.Unmarshaler
+} = (*StepIndex)(nil)
+
+func (v StepIndex) Float64() float64 { return float64(v) }
+func (v StepIndex) IsZero() bool     { return v == 0 }
 
 // Valid reports whether the StepIndex represents a valid step ordering value.
-// A valid StepIndex must:
-//   - Not be NaN or Inf (rejects special floating-point values)
-//
-// This centralizes invariants for step indices, ensuring they represent
-// stable ordering values used across the system. Fractional values are valid
-// and are used to insert healing/re-gate jobs between existing jobs.
 func (v StepIndex) Valid() bool {
 	f := float64(v)
-	// Reject NaN and Inf.
-	if math.IsNaN(f) || math.IsInf(f, 0) {
-		return false
-	}
-	return true
+	return !math.IsNaN(f) && !math.IsInf(f, 0)
 }
 
 func (v StepIndex) MarshalJSON() ([]byte, error) {
@@ -178,10 +187,7 @@ func (v *StepIndex) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// The following methods implement encoding.TextMarshaler/TextUnmarshaler and
-// JSON helpers for each ID type. Using small helpers avoids duplication while
-// keeping explicit method sets for clarity and future extension.
-
+// Validation errors for ID types.
 var (
 	ErrInvalidRunID     = errors.New("invalid run id")
 	ErrInvalidJobID     = errors.New("invalid job id")
@@ -222,6 +228,10 @@ func marshalIDText[S ~string](v S) ([]byte, error) {
 	return marshalIDTextValidated(v, nil)
 }
 
+func unmarshalIDText[S ~string](dst *S, b []byte) error {
+	return unmarshalIDTextValidated(dst, b, nil)
+}
+
 func marshalIDTextValidated[S ~string](v S, validate func(string) error) ([]byte, error) {
 	s := Normalize(string(v))
 	if IsEmpty(s) {
@@ -233,10 +243,6 @@ func marshalIDTextValidated[S ~string](v S, validate func(string) error) ([]byte
 		}
 	}
 	return []byte(s), nil
-}
-
-func unmarshalIDText[S ~string](dst *S, b []byte) error {
-	return unmarshalIDTextValidated(dst, b, nil)
 }
 
 func unmarshalIDTextValidated[S ~string](dst *S, b []byte, validate func(string) error) error {
@@ -253,164 +259,19 @@ func unmarshalIDTextValidated[S ~string](dst *S, b []byte, validate func(string)
 	return nil
 }
 
-// RunID implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (normalizes and rejects empty values).
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*RunID)(nil)
-
-func validateRunID(s string) error { return validateKSUID(s, ErrInvalidRunID) }
-
-func (v RunID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateRunID) }
-func (v *RunID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateRunID) }
-func (v RunID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *RunID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*StepID)(nil)
-
-func (v StepID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *StepID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
-func (v StepID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *StepID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*JobID)(nil)
-
-func validateJobID(s string) error { return validateKSUID(s, ErrInvalidJobID) }
-
-func (v JobID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateJobID) }
-func (v *JobID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateJobID) }
-func (v JobID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *JobID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*ClusterID)(nil)
-
-func (v ClusterID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
-func (v *ClusterID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
-func (v ClusterID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *ClusterID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*NodeID)(nil)
-
-func validateNodeID(s string) error { return validateNanoID(s, 6, ErrInvalidNodeID) }
-
-func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateNodeID) }
-func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateNodeID) }
-func (v NodeID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *NodeID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// ModID implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (normalizes and rejects empty values).
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*ModID)(nil)
-
-func validateModID(s string) error { return validateNanoID(s, 6, ErrInvalidModID) }
-
-func (v ModID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateModID) }
-func (v *ModID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateModID) }
-func (v ModID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *ModID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// SpecID implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (normalizes and rejects empty values).
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*SpecID)(nil)
-
-func validateSpecID(s string) error { return validateNanoID(s, 8, ErrInvalidSpecID) }
-
-func (v SpecID) MarshalText() ([]byte, error)  { return marshalIDTextValidated(v, validateSpecID) }
-func (v *SpecID) UnmarshalText(b []byte) error { return unmarshalIDTextValidated(v, b, validateSpecID) }
-func (v SpecID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *SpecID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// ModRepoID implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (normalizes and rejects empty values).
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*ModRepoID)(nil)
-
-func validateModRepoID(s string) error { return validateNanoID(s, 8, ErrInvalidModRepoID) }
-
-func (v ModRepoID) MarshalText() ([]byte, error) { return marshalIDTextValidated(v, validateModRepoID) }
-func (v *ModRepoID) UnmarshalText(b []byte) error {
-	return unmarshalIDTextValidated(v, b, validateModRepoID)
-}
-func (v ModRepoID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *ModRepoID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// ModRef implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (normalizes and validates URL-safety).
-var _ interface {
-	encoding.TextMarshaler
-	encoding.TextUnmarshaler
-} = (*ModRef)(nil)
-
-func (v ModRef) MarshalText() ([]byte, error) {
-	if err := v.Validate(); err != nil {
-		return nil, err
-	}
-	return []byte(Normalize(string(v))), nil
-}
-
-func (v *ModRef) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
-	ref := ModRef(s)
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-	*v = ref
-	return nil
-}
-
-func (v ModRef) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *ModRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// StepIndex uses standard float64 JSON marshaling (not text-based like string IDs).
-
 // EventID identifies an SSE event in a stream for resumption semantics.
-// The value must be non-negative; zero is a valid ID representing "from the beginning".
-// Negative values are invalid and should be rejected at boundaries (e.g., header parsing).
 type EventID int64
 
-// Int64 returns the underlying int64 value.
-func (v EventID) Int64() int64 { return int64(v) }
-
-// IsZero reports whether the event ID is zero.
-func (v EventID) IsZero() bool { return v == 0 }
-
-// Valid reports whether the EventID represents a valid SSE cursor.
-// A valid EventID must be non-negative (>= 0).
-func (v EventID) Valid() bool { return v >= 0 }
-
-// String returns the decimal string representation of the event ID.
+func (v EventID) Int64() int64   { return int64(v) }
+func (v EventID) IsZero() bool   { return v == 0 }
+func (v EventID) Valid() bool    { return v >= 0 }
 func (v EventID) String() string { return strconv.FormatInt(int64(v), 10) }
 
-// EventID implements encoding.TextMarshaler and encoding.TextUnmarshaler
-// for text-based serialization (Last-Event-ID header, etc.).
 var _ interface {
 	encoding.TextMarshaler
 	encoding.TextUnmarshaler
 } = (*EventID)(nil)
 
-// MarshalText encodes the EventID as a decimal string.
-// Returns an error if the value is invalid (negative).
 func (v EventID) MarshalText() ([]byte, error) {
 	if !v.Valid() {
 		return nil, errors.New("types: invalid EventID (negative)")
@@ -418,8 +279,6 @@ func (v EventID) MarshalText() ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
-// UnmarshalText decodes a decimal string into an EventID.
-// Returns an error if the string is empty, not a valid integer, or negative.
 func (v *EventID) UnmarshalText(b []byte) error {
 	s := strings.TrimSpace(string(b))
 	if s == "" {
@@ -436,7 +295,6 @@ func (v *EventID) UnmarshalText(b []byte) error {
 	return nil
 }
 
-// MarshalJSON encodes the EventID as a JSON number.
 func (v EventID) MarshalJSON() ([]byte, error) {
 	if !v.Valid() {
 		return nil, errors.New("types: invalid EventID (negative)")
@@ -444,7 +302,6 @@ func (v EventID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(int64(v))
 }
 
-// UnmarshalJSON decodes a JSON number into an EventID.
 func (v *EventID) UnmarshalJSON(b []byte) error {
 	if strings.TrimSpace(string(b)) == "null" {
 		return errors.New("types: invalid EventID JSON null")

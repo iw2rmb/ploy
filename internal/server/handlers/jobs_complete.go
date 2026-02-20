@@ -210,14 +210,14 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Extract job_id from URL path parameter using domain type helper.
 		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Extract caller identity from context (set by auth middleware).
 		_, ok := auth.IdentityFromContext(ctx)
 		if !ok {
-			http.Error(w, "unauthorized: no identity in context", http.StatusUnauthorized)
+			httpErr(w, http.StatusUnauthorized, "unauthorized: no identity in context")
 			return
 		}
 
@@ -230,12 +230,12 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// Validate and convert status to canonical JobStatus type.
 		// v1 uses capitalized job status values: Success, Fail, Cancelled.
 		if strings.TrimSpace(req.Status) == "" {
-			http.Error(w, "status is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "status is required")
 			return
 		}
 		normalizedStatus, err := store.ConvertToJobStatus(strings.TrimSpace(req.Status))
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid status: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid status: %v", err)
 			return
 		}
 
@@ -243,7 +243,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		if normalizedStatus != store.JobStatusSuccess &&
 			normalizedStatus != store.JobStatusFail &&
 			normalizedStatus != store.JobStatusCancelled {
-			http.Error(w, fmt.Sprintf("status must be Success, Fail, or Cancelled, got %s", req.Status), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "status must be Success, Fail, or Cancelled, got %s", req.Status)
 			return
 		}
 
@@ -255,7 +255,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		if len(req.Stats) > 0 {
 			// First, validate that stats is valid JSON.
 			if !json.Valid(req.Stats) {
-				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "stats field must be valid JSON")
 				return
 			}
 
@@ -263,20 +263,20 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			// We do a quick type check before unmarshaling into the typed struct.
 			var rawCheck json.RawMessage
 			if err := json.Unmarshal(req.Stats, &rawCheck); err != nil {
-				http.Error(w, "invalid stats JSON", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid stats JSON")
 				return
 			}
 			// Trim whitespace and check first character for object delimiter.
 			trimmed := strings.TrimSpace(string(rawCheck))
 			if len(trimmed) == 0 || trimmed[0] != '{' {
-				http.Error(w, "stats must be a JSON object", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "stats must be a JSON object")
 				return
 			}
 
 			// Unmarshal into typed JobStatsPayload struct.
 			// Unknown fields are silently ignored (forward compatibility).
 			if err := json.Unmarshal(req.Stats, &statsPayload); err != nil {
-				http.Error(w, fmt.Sprintf("invalid stats payload: %v", err), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid stats payload: %v", err)
 				return
 			}
 			statsBytes = req.Stats
@@ -285,7 +285,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			// This ensures structured metadata conforms to the JobMeta schema
 			// before persisting to jobs.meta JSONB.
 			if err := statsPayload.ValidateJobMeta(); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "%s", err)
 				return
 			}
 		}
@@ -294,10 +294,10 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		job, err := st.GetJob(ctx, jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "job not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "job not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get job: %v", err)
 			slog.Error("complete job: get job failed", "job_id", jobID, "err", err)
 			return
 		}
@@ -310,25 +310,25 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// check and uses the value for job ownership validation.
 		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeaderStr == "" {
-			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
 			return
 		}
 		var nodeIDHeader domaintypes.NodeID
 		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
 			return
 		}
 
 		// Verify the job is assigned to the calling node.
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			http.Error(w, "job not assigned to this node", http.StatusForbidden)
+			httpErr(w, http.StatusForbidden, "job not assigned to this node")
 			return
 		}
 
 		// Verify the job is in 'Running' status before transitioning to terminal state.
 		// v1 uses capitalized status values.
 		if job.Status != store.JobStatusRunning {
-			http.Error(w, fmt.Sprintf("job status is %s, expected Running", job.Status), http.StatusConflict)
+			httpErr(w, http.StatusConflict, "job status is %s, expected Running", job.Status)
 			return
 		}
 
@@ -354,7 +354,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			})
 		}
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to complete job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to complete job: %v", err)
 			slog.Error("complete job: update failed",
 				"job_id", jobID,
 				"step_index", job.StepIndex,

@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -41,13 +40,13 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
-			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -67,19 +66,19 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 
 		// Validate run_id is present using domain type's IsZero method.
 		if req.RunID.IsZero() {
-			http.Error(w, "run_id is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "run_id is required")
 			return
 		}
 
 		// Validate data is not empty.
 		if len(req.Data) == 0 {
-			http.Error(w, "data is required and must not be empty", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "data is required and must not be empty")
 			return
 		}
 
 		// Enforce 10 MiB cap on decoded gzipped data bytes.
 		if len(req.Data) > maxChunkSize {
-			http.Error(w, fmt.Sprintf("data exceeds 10 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}
 
@@ -87,10 +86,10 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "node not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "node not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("node logs: check failed", "node_id", nodeID.String(), "err", err)
 			return
 		}
@@ -111,7 +110,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 		// Persist log metadata to database and upload blob to object storage.
 		log, err := bp.CreateLog(r.Context(), params, req.Data)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create log: %v", err)
 			slog.Error("node logs: create failed", "node_id", nodeID.String(), "run_id", req.RunID.String(), "chunk_no", req.ChunkNo, "err", err)
 			return
 		}

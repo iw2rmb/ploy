@@ -20,63 +20,26 @@ import (
 // This endpoint simplifies the node → server contract by addressing jobs directly.
 
 // TestCompleteJob_Success verifies a job is completed successfully with valid payload.
-// Node identity is derived from mTLS context; job_id is in the URL path.
 func TestCompleteJob_Success(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	// Set up mock to return job via GetJob.
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Name:      "mod-0",
-		Status:    store.JobStatusRunning,
-		ModType:   "mod",
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	// Request body only contains status (no run_id, job_id, or step_index needed).
-	body, _ := json.Marshal(map[string]any{
-		"status": "Success",
-	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	// Inject node identity into context (simulates mTLS authentication).
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-	// Verify GetJob was called to look up the job.
 	if !st.getJobCalled {
 		t.Fatal("expected GetJob to be called")
 	}
-	// Verify UpdateJobCompletion was called.
 	if !st.updateJobCompletionCalled {
 		t.Fatal("expected UpdateJobCompletion to be called")
 	}
@@ -86,59 +49,29 @@ func TestCompleteJob_Success(t *testing.T) {
 func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Name:      "mod-0",
-		Status:    store.JobStatusRunning,
-		ModType:   "mod",
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	exitCode := int32(0)
-	body, _ := json.Marshal(map[string]any{
-		"status":    "Success",
-		"exit_code": exitCode,
-		"stats":     map[string]any{"duration_ms": 1234},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Success",
+		"exit_code": int32(0),
+		"stats":     map[string]any{"duration_ms": 1234},
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-	// Verify exit_code was passed to UpdateJobCompletion.
 	if st.updateJobCompletionParams.ExitCode == nil {
 		t.Fatal("expected exit_code to be set")
 	}
-	if *st.updateJobCompletionParams.ExitCode != exitCode {
-		t.Fatalf("expected exit_code %d, got %d", exitCode, *st.updateJobCompletionParams.ExitCode)
+	if *st.updateJobCompletionParams.ExitCode != 0 {
+		t.Fatalf("expected exit_code 0, got %d", *st.updateJobCompletionParams.ExitCode)
 	}
 }
 
@@ -148,66 +81,34 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 9000,
-		ModType:   "mr",
-	}
-
+	f := newJobFixture("mr", 9000)
 	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
 
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusFinished,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusFinished},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	body, _ := json.Marshal(map[string]any{
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"duration_ms": 500,
-			"metadata": map[string]any{
-				"mr_url": mrURL,
-			},
+			"metadata":    map[string]any{"mr_url": mrURL},
 		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-
 	if !st.updateRunStatsMRURLCalled {
 		t.Fatal("expected UpdateRunStatsMRURL to be called")
 	}
-	if st.updateRunStatsMRURLParams.ID != runID {
-		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", runID, st.updateRunStatsMRURLParams.ID)
+	if st.updateRunStatsMRURLParams.ID != f.RunID {
+		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", f.RunID, st.updateRunStatsMRURLParams.ID)
 	}
 	if st.updateRunStatsMRURLParams.MrUrl != mrURL {
 		t.Fatalf("expected UpdateRunStatsMRURL mr_url %q, got %q", mrURL, st.updateRunStatsMRURLParams.MrUrl)
@@ -219,32 +120,16 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	// Embed JobMeta-shaped payload under stats.job_meta.
-	body, _ := json.Marshal(map[string]any{
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
@@ -256,25 +141,11 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 				},
 			},
 		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-
-	// When job_meta is present, handler should prefer UpdateJobCompletionWithMeta.
 	if !st.updateJobCompletionWithMetaCalled {
 		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
 	}
@@ -282,7 +153,6 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
 	}
 
-	// Validate that persisted meta JSON contains the expected kind.
 	var meta map[string]any
 	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
 		t.Fatalf("failed to unmarshal persisted meta: %v", err)
@@ -293,44 +163,28 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 }
 
 // TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
-// job_meta object (even if it contains whitespace like "{ }") is treated as absent
-// and does not cause a 400 nor trigger jobs.meta persistence.
+// job_meta object (even if it contains whitespace like "{ }") is treated as absent.
 func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
 
 	// NOTE: Do not use json.Marshal here; we need whitespace inside job_meta ("{ }").
-	body := `{"status":"Success","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
+	rawBody := `{"status":"Success","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader([]byte(body)))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader([]byte(rawBody)))
+	req.SetPathValue("job_id", f.JobID.String())
+	req.Header.Set(nodeUUIDHeader, f.NodeIDStr)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
+		CommonName: f.NodeIDStr,
 	})
 	req = req.WithContext(ctx)
 
@@ -349,24 +203,20 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 }
 
 // ===== Input Validation & Error Cases =====
-// These tests verify the handler rejects invalid requests with appropriate HTTP status codes.
 
 // TestCompleteJob_MissingJobID returns 400 when job_id is not in the path.
 func TestCompleteJob_MissingJobID(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NewNodeKey()
-	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(&mockStore{}, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", "") // Empty job_id
+	req.SetPathValue("job_id", "")
 	req.Header.Set(nodeUUIDHeader, nodeID)
-
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		Role: auth.RoleWorker, CommonName: nodeID,
 	})
 	req = req.WithContext(ctx)
 
@@ -379,22 +229,18 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 }
 
 // TestCompleteJob_EmptyJobID returns 400 for empty job_id.
-// Job IDs are KSUID strings; empty/whitespace IDs are rejected.
 func TestCompleteJob_EmptyJobID(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NewNodeKey()
-	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(&mockStore{}, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", "   ") // Whitespace ID
+	req.SetPathValue("job_id", "   ")
 	req.Header.Set(nodeUUIDHeader, nodeID)
-
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
+		Role: auth.RoleWorker, CommonName: nodeID,
 	})
 	req = req.WithContext(ctx)
 
@@ -411,13 +257,11 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(&mockStore{}, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	// No identity injected into context.
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -428,42 +272,24 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 }
 
 // TestCompleteJob_EmptyNodeHeader returns 400 when PLOY_NODE_UUID header is empty.
-// Node IDs are NanoID(6) strings; empty/whitespace IDs are rejected.
 func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, "   ") // Whitespace header
-
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", f.JobID.String())
+	req.Header.Set(nodeUUIDHeader, "   ")
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: "ignored",
+		Role: auth.RoleWorker, CommonName: "ignored",
 	})
 	req = req.WithContext(ctx)
 
@@ -481,38 +307,21 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", f.JobID.String())
 	req.Header.Set(nodeUUIDHeader, "not-a-nanoid")
-
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: "ignored",
+		Role: auth.RoleWorker, CommonName: "ignored",
 	})
 	req = req.WithContext(ctx)
 
@@ -531,38 +340,22 @@ func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("job_id", f.JobID.String())
 
-	// Simulate bearer-token identity: CommonName is a non-UUID token id.
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
 		Role:       auth.RoleWorker,
-		CommonName: "tok_abcdef123456", // not a UUID, no "node:" prefix
+		CommonName: "tok_abcdef123456",
 	})
 	req = req.WithContext(ctx)
 
@@ -581,17 +374,15 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 func TestCompleteJob_WrongNode(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	otherNode := domaintypes.NewNodeKey()
+	callerNodeID := domaintypes.NewNodeKey()
+	ownerNodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	otherNodeID := domaintypes.NodeID(otherNode)
 
-	// Job is assigned to a different node (otherNode).
 	job := store.Job{
 		ID:        jobID,
 		RunID:     runID,
-		NodeID:    &otherNodeID,
+		NodeID:    &ownerNodeID,
 		Status:    store.JobStatusRunning,
 		StepIndex: 1000,
 	}
@@ -606,11 +397,9 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
+	req.Header.Set(nodeUUIDHeader, callerNodeID)
 	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID, // Different from job's node
+		Role: auth.RoleWorker, CommonName: callerNodeID,
 	})
 	req = req.WithContext(ctx)
 
@@ -629,40 +418,17 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 func TestCompleteJob_NotRunning(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	// Job is in 'pending' status (not 'running').
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusCreated, // Not 'running'
-		StepIndex: 1000,
-	}
+	f := newJobFixture("mod", 1000)
+	f.Job.Status = store.JobStatusCreated
 
 	st := &mockStore{
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	body, _ := json.Marshal(map[string]any{"status": "Fail"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("expected status 409, got %d", rr.Code)
@@ -676,31 +442,13 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 func TestCompleteJob_InvalidStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
-	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
-
-	body, _ := json.Marshal(map[string]any{"status": "running"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
-
+	f := newJobFixture("mod", 1000)
+	handler := completeJobHandler(&mockStore{}, nil)
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "running"}))
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rr.Code)
-	}
-	if st.updateJobCompletionCalled {
-		t.Fatal("did not expect UpdateJobCompletion to be called")
 	}
 }
 
@@ -708,25 +456,10 @@ func TestCompleteJob_InvalidStatus(t *testing.T) {
 func TestCompleteJob_MissingStatus(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
-	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
-
-	body, _ := json.Marshal(map[string]any{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
-
+	f := newJobFixture("mod", 1000)
+	handler := completeJobHandler(&mockStore{}, nil)
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{}))
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rr.Code)
@@ -737,43 +470,18 @@ func TestCompleteJob_MissingStatus(t *testing.T) {
 func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &nodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
-	}
-
+	f := newJobFixture("mod", 1000)
 	st := &mockStore{
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	// stats provided as a string, which is valid JSON but not an object.
-	body, _ := json.Marshal(map[string]any{
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status": "Fail",
 		"stats":  "oops",
-	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	}))
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rr.Code)
@@ -787,28 +495,12 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 func TestCompleteJob_JobNotFound(t *testing.T) {
 	t.Parallel()
 
-	nodeID := domaintypes.NewNodeKey()
-	jobID := domaintypes.NewJobID()
-
-	st := &mockStore{
-		getJobErr: pgx.ErrNoRows,
-	}
+	f := newJobFixture("mod", 1000)
+	st := &mockStore{getJobErr: pgx.ErrNoRows}
 
 	handler := completeJobHandler(st, nil)
-
-	body, _ := json.Marshal(map[string]any{"status": "Fail"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeID)
-
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeID,
-	})
-	req = req.WithContext(ctx)
-
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rr.Code)
@@ -820,36 +512,18 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
-	jobID := domaintypes.NewJobID()
-
-	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		RepoID:    repoID,
-		NodeID:    &nodeID,
-		Name:      "pre-gate",
-		Status:    store.JobStatusRunning,
-		ModType:   "pre_gate",
-		StepIndex: 1000,
-	}
+	f := newJobFixture("pre_gate", 1000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
 
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     runID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        job,
-		listJobsByRunResult: []store.Job{job},
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
 	}
 
 	handler := completeJobHandler(st, nil)
-
-	// Build Stack Gate mismatch metadata
-	body, _ := json.Marshal(map[string]any{
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Fail",
 		"exit_code": 1,
 		"stats": map[string]any{
@@ -881,68 +555,29 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 				},
 			},
 		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, nodeIDStr)
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role:       auth.RoleWorker,
-		CommonName: nodeIDStr,
-	})
-	req = req.WithContext(ctx)
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify UpdateRunRepoError was called
 	if !st.updateRunRepoErrorCalled {
 		t.Fatal("expected UpdateRunRepoError to be called")
 	}
-
-	// Verify params
-	if st.updateRunRepoErrorParams.RunID != runID {
-		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoErrorParams.RunID)
+	if st.updateRunRepoErrorParams.RunID != f.RunID {
+		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
 	}
-	if st.updateRunRepoErrorParams.RepoID != repoID {
-		t.Fatalf("expected RepoID %s, got %s", repoID, st.updateRunRepoErrorParams.RepoID)
+	if st.updateRunRepoErrorParams.RepoID != f.Job.RepoID {
+		t.Fatalf("expected RepoID %s, got %s", f.Job.RepoID, st.updateRunRepoErrorParams.RepoID)
 	}
 	if st.updateRunRepoErrorParams.LastError == nil {
 		t.Fatal("expected LastError to be set")
 	}
 
 	errMsg := *st.updateRunRepoErrorParams.LastError
-
-	// Verify output contains phase
-	if !strings.Contains(errMsg, "inbound") {
-		t.Errorf("expected error to contain 'inbound', got: %s", errMsg)
-	}
-
-	// Verify output contains expected/detected
-	if !strings.Contains(errMsg, "Expected:") {
-		t.Errorf("expected error to contain 'Expected:', got: %s", errMsg)
-	}
-	if !strings.Contains(errMsg, "Detected:") {
-		t.Errorf("expected error to contain 'Detected:', got: %s", errMsg)
-	}
-
-	// Verify output contains release info
-	if !strings.Contains(errMsg, `release: "17"`) {
-		t.Errorf("expected error to contain expected release '17', got: %s", errMsg)
-	}
-	if !strings.Contains(errMsg, `release: "11"`) {
-		t.Errorf("expected error to contain detected release '11', got: %s", errMsg)
-	}
-
-	// Verify output contains evidence (paths/keys, not file contents)
-	if !strings.Contains(errMsg, "Evidence:") {
-		t.Errorf("expected error to contain 'Evidence:', got: %s", errMsg)
-	}
-	if !strings.Contains(errMsg, "pom.xml") {
-		t.Errorf("expected error to contain evidence path 'pom.xml', got: %s", errMsg)
+	for _, want := range []string{"inbound", "Expected:", "Detected:", `release: "17"`, `release: "11"`, "Evidence:", "pom.xml"} {
+		if !strings.Contains(errMsg, want) {
+			t.Errorf("expected error to contain %q, got: %s", want, errMsg)
+		}
 	}
 }

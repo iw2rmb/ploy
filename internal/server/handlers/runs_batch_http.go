@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -17,76 +15,27 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-type cancelRunStore interface {
-	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
-	CancelRunV1(ctx context.Context, runID domaintypes.RunID) error
-	CountRunReposByStatus(ctx context.Context, runID domaintypes.RunID) ([]store.CountRunReposByStatusRow, error)
-}
-
-type addRunRepoStore interface {
-	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
-	CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error)
-	CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error)
-	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
-	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
-}
-
-type listRunReposStore interface {
-	ListRunReposWithURLByRun(ctx context.Context, runID domaintypes.RunID) ([]store.ListRunReposWithURLByRunRow, error)
-}
-
-type cancelRunRepoStore interface {
-	GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error)
-	GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error)
-	UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error
-	ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error)
-	UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error
-}
-
-type restartRunRepoStore interface {
-	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
-	GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error)
-	UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error
-	UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error
-	UpdateModRepoRefs(ctx context.Context, params store.UpdateModRepoRefsParams) error
-	IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error
-	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
-	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
-	GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error)
-}
-
-type startRunStore interface {
-	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
-	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
-	ListRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
-	ListQueuedRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
-	ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error)
-	UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error
-	ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error)
-	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
-}
-
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
 // POST /v1/runs/{id}/cancel (v1 API) — Performs transactional cancellation of a run.
 // This handler delegates cancellation to store.CancelRunV1, which atomically:
 // - Sets runs.status=Cancelled (for non-terminal runs)
 // - Cancels all repos with status Queued or Running → Cancelled
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
-func cancelRunHandlerV1(st cancelRunStore) http.HandlerFunc {
+func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("cancel run: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -104,7 +53,7 @@ func cancelRunHandlerV1(st cancelRunStore) http.HandlerFunc {
 		}
 
 		if err := st.CancelRunV1(r.Context(), runID); err != nil {
-			http.Error(w, fmt.Sprintf("failed to cancel run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to cancel run: %v", err)
 			slog.Error("cancel run: transactional cancel failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -123,26 +72,26 @@ func cancelRunHandlerV1(st cancelRunStore) http.HandlerFunc {
 
 // addRunRepoHandler adds a repo to an existing run (and to the mod repo set).
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
-func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
+func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("add run repo: get run failed", "run_id", runID.String(), "err", err)
 			return
 		}
 		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
-			http.Error(w, "cannot add repos to a terminal run", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot add repos to a terminal run")
 			return
 		}
 
@@ -155,15 +104,15 @@ func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 			return
 		}
 		if err := req.RepoURL.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
 		}
 		if err := req.BaseRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
 			return
 		}
 		if err := req.TargetRef.Validate(); err != nil {
-			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
 			return
 		}
 
@@ -178,10 +127,10 @@ func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				http.Error(w, "repo already exists for mod", http.StatusConflict)
+				httpErr(w, http.StatusConflict, "repo already exists for mod")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to create mod repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
 			slog.Error("add run repo: create mod repo failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -194,7 +143,7 @@ func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 			RepoTargetRef: modRepo.TargetRef,
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create run repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", modRepo.ID, "err", err)
 			return
 		}
@@ -202,12 +151,12 @@ func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 		// v1 immediate start: create repo-scoped jobs for the new queued repo.
 		spec, err := st.GetSpec(r.Context(), run.SpecID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to load spec: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to load spec: %v", err)
 			slog.Error("add run repo: get spec failed", "run_id", runID.String(), "spec_id", run.SpecID, "err", err)
 			return
 		}
 		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			slog.Error("add run repo: create jobs failed", "run_id", runID.String(), "repo_id", runRepo.RepoID, "err", err)
 			return
 		}
@@ -220,17 +169,17 @@ func addRunRepoHandler(st addRunRepoStore) http.HandlerFunc {
 
 // listRunReposHandler lists repos for a run.
 // GET /v1/runs/{id}/repos
-func listRunReposHandler(st listRunReposStore) http.HandlerFunc {
+func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		repos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("list run repos: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -264,26 +213,26 @@ func listRunReposHandler(st listRunReposStore) http.HandlerFunc {
 
 // cancelRunRepoHandlerV1 cancels a repo execution within a run (v1 API).
 // POST /v1/runs/{run_id}/repos/{repo_id}/cancel
-func cancelRunRepoHandlerV1(st cancelRunRepoStore) http.HandlerFunc {
+func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "repo not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("cancel run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
@@ -337,26 +286,26 @@ func cancelRunRepoHandlerV1(st cancelRunRepoStore) http.HandlerFunc {
 
 // restartRunRepoHandler restarts a repo execution by incrementing attempt and creating new repo-scoped jobs.
 // POST /v1/runs/{id}/repos/{repo_id}/restart
-func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
+func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("restart run repo: get run failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -364,10 +313,10 @@ func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
 		runRepo, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "repo not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("restart run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
@@ -382,13 +331,13 @@ func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
 			}
 			if req.BaseRef != nil {
 				if err := req.BaseRef.Validate(); err != nil {
-					http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
+					httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
 					return
 				}
 			}
 			if req.TargetRef != nil {
 				if err := req.TargetRef.Validate(); err != nil {
-					http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
+					httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
 					return
 				}
 			}
@@ -397,7 +346,7 @@ func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
 		// If the run is terminal, reopen it to Started for the restart attempt.
 		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: store.RunStatusStarted}); err != nil {
-				http.Error(w, fmt.Sprintf("failed to reopen run: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
 				return
 			}
 		}
@@ -416,24 +365,24 @@ func restartRunRepoHandler(st restartRunRepoStore) http.HandlerFunc {
 		}
 
 		if err := st.IncrementRunRepoAttempt(r.Context(), store.IncrementRunRepoAttemptParams{RunID: runID, RepoID: repoID}); err != nil {
-			http.Error(w, fmt.Sprintf("failed to restart repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to restart repo: %v", err)
 			slog.Error("restart run repo: increment attempt failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
 
 		runRepo, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to reload repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
 			return
 		}
 
 		spec, err := st.GetSpec(r.Context(), run.SpecID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to load spec: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to load spec: %v", err)
 			return
 		}
 		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			return
 		}
 
@@ -458,35 +407,35 @@ type StartRunResponse struct {
 
 // startRunHandler delegates to BatchRepoStarter.StartPendingRepos (shared with the background scheduler).
 // POST /v1/runs/{id}/start
-func startRunHandler(st startRunStore) http.HandlerFunc {
+func startRunHandler(st store.Store) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("start run: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
 		if isTerminalRunStatus(run.Status) {
-			http.Error(w, "cannot start repos in a terminal run", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "cannot start repos in a terminal run")
 			return
 		}
 
 		result, err := starter.StartPendingRepos(r.Context(), runID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to start queued repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to start queued repos: %v", err)
 			slog.Error("start run: start queued repos failed", "run_id", runID.String(), "err", err)
 			return
 		}

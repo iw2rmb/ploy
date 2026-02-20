@@ -1,10 +1,30 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"testing"
 
 	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 )
+
+// captureStdout runs fn and captures everything it writes to os.Stdout.
+// Returns the captured output as a string.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+
+	fn()
+
+	_ = w.Close()
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
+}
 
 // useServerDescriptor configures a temporary default cluster descriptor that points
 // to the provided base URL. Tests should call this instead of setting legacy

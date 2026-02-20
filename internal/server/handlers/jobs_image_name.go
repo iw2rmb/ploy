@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -34,52 +33,52 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 
 		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeaderStr == "" {
-			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
 			return
 		}
 		var nodeIDHeader domaintypes.NodeID
 		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
 			return
 		}
 
 		var req request
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid JSON body")
 			return
 		}
 		image := strings.TrimSpace(req.Image)
 		if image == "" {
-			http.Error(w, "image is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "image is required")
 			return
 		}
 
 		job, err := st.GetJob(ctx, jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "job not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "job not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get job: %v", err)
 			slog.Error("save job image name: get job failed", "job_id", jobID, "err", err)
 			return
 		}
 
 		// Verify ownership: only the assigned node may persist the runtime image name.
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			http.Error(w, "job not assigned to this node", http.StatusForbidden)
+			httpErr(w, http.StatusForbidden, "job not assigned to this node")
 			return
 		}
 
 		// Enforce "before execution starts" semantics: only allow while Running.
 		if job.Status != store.JobStatusRunning {
-			http.Error(w, fmt.Sprintf("job status is %s, expected Running", job.Status), http.StatusConflict)
+			httpErr(w, http.StatusConflict, "job status is %s, expected Running", job.Status)
 			return
 		}
 
@@ -89,12 +88,12 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 			domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
 			// allowed
 		default:
-			http.Error(w, fmt.Sprintf("job mod_type is %s, expected mod/heal/gate", job.ModType), http.StatusConflict)
+			httpErr(w, http.StatusConflict, "job mod_type is %s, expected mod/heal/gate", job.ModType)
 			return
 		}
 
 		if err := st.UpdateJobImageName(ctx, store.UpdateJobImageNameParams{ID: jobID, ModImage: image}); err != nil {
-			http.Error(w, fmt.Sprintf("failed to save job image: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to save job image: %v", err)
 			slog.Error("save job image name: update failed", "job_id", jobID, "node_id", nodeIDHeader, "err", err)
 			return
 		}

@@ -395,16 +395,7 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 		return
 	}
 
-	// Prefer trimmed LogFindings view when available; fall back to full LogsText.
-	logPayload := meta.LogsText
-	if len(meta.LogFindings) > 0 {
-		if trimmed := strings.TrimSpace(meta.LogFindings[0].Message); trimmed != "" {
-			logPayload = trimmed
-			if !strings.HasSuffix(logPayload, "\n") {
-				logPayload += "\n"
-			}
-		}
-	}
+	logPayload := gateLogPayloadFromMetadata(meta)
 	if strings.TrimSpace(logPayload) == "" {
 		return
 	}

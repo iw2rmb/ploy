@@ -14,7 +14,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -76,7 +75,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Extract run_id from path.
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -88,7 +87,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Validate repo_url is provided.
 		if req.RepoURL == "" {
-			http.Error(w, "repo_url is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 
@@ -99,10 +98,10 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("pull run repo: get run failed", "run_id", runID, "err", err)
 			return
 		}
@@ -111,7 +110,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// We need to iterate and compare normalized URLs to find matches.
 		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list run repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("pull run repo: list run repos failed", "run_id", runID, "err", err)
 			return
 		}
@@ -126,12 +125,12 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Handle match results.
 		if len(matches) == 0 {
-			http.Error(w, "no matching repo found in run", http.StatusNotFound)
+			httpErr(w, http.StatusNotFound, "no matching repo found in run")
 			return
 		}
 		if len(matches) > 1 {
 			// Multiple repos match the same normalized URL — this is ambiguous.
-			http.Error(w, "multiple repos match the given repo_url", http.StatusConflict)
+			httpErr(w, http.StatusConflict, "multiple repos match the given repo_url")
 			slog.Warn("pull run repo: multiple matches",
 				"run_id", runID,
 				"repo_url", req.RepoURL,
@@ -182,7 +181,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		// Extract mod_id from path.
 		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -194,7 +193,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Validate repo_url is provided.
 		if req.RepoURL == "" {
-			http.Error(w, "repo_url is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 
@@ -215,7 +214,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		case "last-failed":
 			targetStatus = store.RunRepoStatusFail
 		default:
-			http.Error(w, fmt.Sprintf("invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode)
 			return
 		}
 
@@ -223,10 +222,10 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetMod(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "mod not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
 			slog.Error("pull mod repo: get mod failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -234,7 +233,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		// List all repos for this mod to find matching repo by normalized URL.
 		modRepos, err := st.ListModReposByMod(r.Context(), modID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list mod repos: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
 			slog.Error("pull mod repo: list mod repos failed", "mod_id", modID, "err", err)
 			return
 		}
@@ -249,7 +248,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if matchedRepoID.IsZero() {
-			http.Error(w, "no matching repo found in mod", http.StatusNotFound)
+			httpErr(w, http.StatusNotFound, "no matching repo found in mod")
 			return
 		}
 
@@ -262,10 +261,10 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, fmt.Sprintf("no run with status %q found for this repo", mode), http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "no run with status %q found for this repo", mode)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run repo: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
 			slog.Error("pull mod repo: get latest run repo failed",
 				"mod_id", modID,
 				"repo_id", matchedRepoID,

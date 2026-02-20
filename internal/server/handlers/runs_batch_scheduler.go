@@ -18,25 +18,14 @@ import (
 // allowing BatchRepoStarter to implement the batchscheduler.RepoStarter interface.
 type StartPendingReposResult = batchscheduler.StartPendingReposResult
 
-type batchRepoStarterStore interface {
-	GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error)
-	GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error)
-	ListRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
-	ListQueuedRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error)
-	ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error)
-	UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error
-	ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error)
-	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
-}
-
 // BatchRepoStarter starts execution for pending repos in batch runs.
 // It implements the batchscheduler.RepoStarter interface.
 type BatchRepoStarter struct {
-	store batchRepoStarterStore
+	store store.Store
 }
 
 // NewBatchRepoStarter creates a new BatchRepoStarter with the given store.
-func NewBatchRepoStarter(st batchRepoStarterStore) *BatchRepoStarter {
+func NewBatchRepoStarter(st store.Store) *BatchRepoStarter {
 	return &BatchRepoStarter{store: st}
 }
 

@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -23,26 +22,26 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 		// Uses domain type helpers for validation at the boundary.
 		var runID domaintypes.RunID
 		if idPtr, err := domaintypes.OptionalRunIDParam(r, "id"); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		} else if idPtr != nil {
 			runID = *idPtr
 		} else if qID, err := domaintypes.OptionalRunIDQuery(r, "id"); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		} else if qID != nil {
 			runID = *qID
 		} else {
-			http.Error(w, "id query parameter is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "id query parameter is required")
 			return
 		}
 		timing, err := st.GetRunTiming(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run timing: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run timing: %v", err)
 			slog.Error("get run timing: database error", "run_id", runID, "err", err)
 			return
 		}
@@ -77,7 +76,7 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 		// Extract id from path parameter using domain type helper.
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -85,10 +84,10 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check run: %v", err)
 			slog.Error("delete run: check failed", "run_id", runID, "err", err)
 			return
 		}
@@ -96,7 +95,7 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 		// Delete the run using string ID directly.
 		err = st.DeleteRun(r.Context(), runID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to delete run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to delete run: %v", err)
 			slog.Error("delete run: database error", "run_id", runID, "err", err)
 			return
 		}

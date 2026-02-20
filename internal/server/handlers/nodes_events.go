@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -24,13 +23,13 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		// Extract node id from path parameter.
 		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxRequestSize {
-			http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds 1 MiB size cap")
 			return
 		}
 
@@ -53,13 +52,13 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 		// Validate run_id is present using domain type's IsZero method.
 		if req.RunID.IsZero() {
-			http.Error(w, "run_id is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "run_id is required")
 			return
 		}
 
 		// Validate events array is not empty.
 		if len(req.Events) == 0 {
-			http.Error(w, "events array is required and must not be empty", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "events array is required and must not be empty")
 			return
 		}
 
@@ -67,10 +66,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "node not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "node not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("node events: check failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -80,11 +79,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		for i, evt := range req.Events {
 			// Validate required fields.
 			if strings.TrimSpace(evt.Level) == "" {
-				http.Error(w, fmt.Sprintf("events[%d]: level is required", i), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "events[%d]: level is required", i)
 				return
 			}
 			if strings.TrimSpace(evt.Message) == "" {
-				http.Error(w, fmt.Sprintf("events[%d]: message is required", i), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "events[%d]: message is required", i)
 				return
 			}
 
@@ -99,7 +98,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			if evt.Time != nil && strings.TrimSpace(*evt.Time) != "" {
 				parsedTime, err := time.Parse(time.RFC3339, strings.TrimSpace(*evt.Time))
 				if err != nil {
-					http.Error(w, fmt.Sprintf("events[%d]: invalid time format: %v", i, err), http.StatusBadRequest)
+					httpErr(w, http.StatusBadRequest, "events[%d]: invalid time format: %v", i, err)
 					return
 				}
 				eventTime = parsedTime.UTC()
@@ -114,7 +113,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			// Marshal meta to JSON.
 			metaBytes, err := json.Marshal(meta)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("events[%d]: failed to marshal meta: %v", i, err), http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "events[%d]: failed to marshal meta: %v", i, err)
 				return
 			}
 
@@ -137,7 +136,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			// Persist event to DB and fan out to SSE.
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to create event: %v", err), http.StatusInternalServerError)
+				httpErr(w, http.StatusInternalServerError, "failed to create event: %v", err)
 				slog.Error("node events: create failed", "node_id", nodeID.String(), "run_id", req.RunID.String(), "index", i, "err", err)
 				return
 			}

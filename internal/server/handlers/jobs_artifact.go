@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -32,19 +31,19 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
-			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -61,13 +60,13 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 
 		// Validate bundle is present.
 		if len(req.Bundle) == 0 {
-			http.Error(w, "bundle is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "bundle is required")
 			return
 		}
 
 		// Enforce decoded bundle size cap (≤ 10 MiB gzipped, base64-decoded here).
 		if len(req.Bundle) > maxBundleSize {
-			http.Error(w, "artifact bundle size exceeds 10 MiB cap", http.StatusRequestEntityTooLarge)
+			httpErr(w, http.StatusRequestEntityTooLarge, "artifact bundle size exceeds 10 MiB cap")
 			return
 		}
 
@@ -75,10 +74,10 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check run: %v", err)
 			slog.Error("artifact: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -87,17 +86,17 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "job not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "job not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to check job: %v", err)
 			slog.Error("artifact: job check failed", "job_id", jobID.String(), "err", err)
 			return
 		}
 
 		// Ensure the job belongs to the provided run.
 		if job.RunID != runID {
-			http.Error(w, "job does not belong to run", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "job does not belong to run")
 			return
 		}
 
@@ -105,16 +104,16 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		// PLOY_NODE_UUID header, which is required for worker requests.
 		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeaderStr == "" {
-			http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
 			return
 		}
 		var nodeIDHeader domaintypes.NodeID
 		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			http.Error(w, "invalid PLOY_NODE_UUID header", http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
 			return
 		}
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			http.Error(w, "job not assigned to this node", http.StatusForbidden)
+			httpErr(w, http.StatusForbidden, "job not assigned to this node")
 			return
 		}
 
@@ -133,7 +132,7 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 		// Persist artifact bundle metadata to database and upload blob to object storage.
 		artifact, err := bp.CreateArtifactBundle(r.Context(), params, req.Bundle)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create artifact bundle: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to create artifact bundle: %v", err)
 			slog.Error("artifact: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}

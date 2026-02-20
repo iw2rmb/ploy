@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -22,7 +21,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 		if l := r.URL.Query().Get("limit"); l != "" {
 			parsed, err := strconv.ParseInt(l, 10, 32)
 			if err != nil || parsed < 1 {
-				http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
 				return
 			}
 			limit = int32(parsed)
@@ -33,7 +32,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 		if o := r.URL.Query().Get("offset"); o != "" {
 			parsed, err := strconv.ParseInt(o, 10, 32)
 			if err != nil || parsed < 0 {
-				http.Error(w, "invalid offset parameter", http.StatusBadRequest)
+				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
 				return
 			}
 			offset = int32(parsed)
@@ -41,7 +40,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 		runs, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: limit, Offset: offset})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list runs: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to list runs: %v", err)
 			slog.Error("list runs: fetch failed", "err", err)
 			return
 		}
@@ -65,17 +64,17 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := domaintypes.ParseRunIDParam(r, "id")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "run not found", http.StatusNotFound)
+				httpErr(w, http.StatusNotFound, "run not found")
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("get run: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}

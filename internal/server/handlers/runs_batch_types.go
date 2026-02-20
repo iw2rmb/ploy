@@ -8,10 +8,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-type runRepoCounter interface {
-	CountRunReposByStatus(ctx context.Context, runID domaintypes.RunID) ([]store.CountRunReposByStatusRow, error)
-}
-
 // NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
 
@@ -62,7 +58,7 @@ func runToSummary(run store.Run) RunSummary {
 
 // getRunRepoCounts fetches and aggregates repo counts by status for a run.
 // runID is now a KSUID-backed domain type.
-func getRunRepoCounts(ctx context.Context, st runRepoCounter, runID domaintypes.RunID) (*RunRepoCounts, error) {
+func getRunRepoCounts(ctx context.Context, st store.RunStore, runID domaintypes.RunID) (*RunRepoCounts, error) {
 	rows, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
 		return nil, err

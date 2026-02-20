@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,28 +30,18 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Use a temporary default descriptor pointing to the test server.
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	// Redirect stdout to capture output.
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigGitLabShow(nil, buf)
-
-	// Close write end and read captured output.
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigGitLabShow(nil, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigGitLabShow error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "Domain: https://gitlab.example.com") {
 		t.Fatalf("expected domain in output, got: %q", output)
 	}
@@ -68,7 +57,6 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 // TestHandleConfigGitLabShowRedactsShortToken ensures that even short tokens
 // are fully redacted in the output.
 func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
-	// Arrange a fake config endpoint with a short token.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" || r.URL.Path != "/v1/config/gitlab" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
@@ -84,21 +72,14 @@ func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigGitLabShow(nil, buf)
-
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	out := captureStdout(t, func() {
+		err = handleConfigGitLabShow(nil, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigGitLabShow error: %v", err)
 	}
-	out := capturedOutput.String()
 	if strings.Contains(out, "short") {
 		t.Fatalf("token must be redacted for short tokens, got: %q", out)
 	}
@@ -139,18 +120,10 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	// Redirect stdout to capture output.
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)
-
-	// Close write end and read captured output.
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigGitLabSet([]string{"--file", configPath}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigGitLabSet error: %v", err)
@@ -170,7 +143,6 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 		t.Fatalf("unexpected body: %+v", gotBody)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "GitLab configuration updated successfully") {
 		t.Fatalf("expected success message, got: %q", output)
 	}
@@ -237,24 +209,15 @@ func TestHandleConfigGitLabValidateSuccess(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	// Redirect stdout to capture output.
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	defer func() { os.Stdout = oldStdout }()
-
-	err := handleConfigGitLabValidate([]string{"--file", configPath}, buf)
-
-	// Close write end and read captured output.
-	_ = w.Close()
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
+	var err error
+	output := captureStdout(t, func() {
+		err = handleConfigGitLabValidate([]string{"--file", configPath}, buf)
+	})
 
 	if err != nil {
 		t.Fatalf("handleConfigGitLabValidate error: %v", err)
 	}
 
-	output := capturedOutput.String()
 	if !strings.Contains(output, "GitLab configuration is valid") {
 		t.Fatalf("expected validation success message, got: %q", output)
 	}
