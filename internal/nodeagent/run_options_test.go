@@ -153,11 +153,11 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	}
 }
 
-func TestHealingCommand_ToSlice(t *testing.T) {
+func TestCommand_ToSlice(t *testing.T) {
 	t.Parallel()
 
 	t.Run("shell command", func(t *testing.T) {
-		cmd := HealingCommand{Shell: "echo test"}
+		cmd := Command{Shell: "echo test"}
 		result := cmd.ToSlice()
 		want := []string{"/bin/sh", "-c", "echo test"}
 		if len(result) != len(want) {
@@ -171,7 +171,7 @@ func TestHealingCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("exec array", func(t *testing.T) {
-		cmd := HealingCommand{Exec: []string{"/bin/ls", "-la"}}
+		cmd := Command{Exec: []string{"/bin/ls", "-la"}}
 		result := cmd.ToSlice()
 		want := []string{"/bin/ls", "-la"}
 		if len(result) != len(want) {
@@ -185,7 +185,7 @@ func TestHealingCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("empty command", func(t *testing.T) {
-		cmd := HealingCommand{}
+		cmd := Command{}
 		result := cmd.ToSlice()
 		if result != nil {
 			t.Errorf("expected nil for empty command, got %v", result)
@@ -193,53 +193,13 @@ func TestHealingCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("exec takes precedence over shell", func(t *testing.T) {
-		cmd := HealingCommand{
+		cmd := Command{
 			Shell: "echo shell",
 			Exec:  []string{"/bin/exec"},
 		}
 		result := cmd.ToSlice()
 		if len(result) != 1 || result[0] != "/bin/exec" {
 			t.Errorf("expected exec to take precedence, got %v", result)
-		}
-	})
-}
-
-func TestExecutionCommand_ToSlice(t *testing.T) {
-	t.Parallel()
-
-	t.Run("shell command", func(t *testing.T) {
-		cmd := ExecutionCommand{Shell: "echo test"}
-		result := cmd.ToSlice()
-		want := []string{"/bin/sh", "-c", "echo test"}
-		if len(result) != len(want) {
-			t.Fatalf("expected length=%d, got %d", len(want), len(result))
-		}
-		for i, v := range want {
-			if result[i] != v {
-				t.Errorf("expected result[%d]=%q, got %q", i, v, result[i])
-			}
-		}
-	})
-
-	t.Run("exec array", func(t *testing.T) {
-		cmd := ExecutionCommand{Exec: []string{"/bin/ls", "-la"}}
-		result := cmd.ToSlice()
-		want := []string{"/bin/ls", "-la"}
-		if len(result) != len(want) {
-			t.Fatalf("expected length=%d, got %d", len(want), len(result))
-		}
-		for i, v := range want {
-			if result[i] != v {
-				t.Errorf("expected result[%d]=%q, got %q", i, v, result[i])
-			}
-		}
-	})
-
-	t.Run("empty command", func(t *testing.T) {
-		cmd := ExecutionCommand{}
-		result := cmd.ToSlice()
-		if result != nil {
-			t.Errorf("expected nil for empty command, got %v", result)
 		}
 	})
 }

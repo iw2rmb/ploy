@@ -1,14 +1,3 @@
-// execution_orchestrator_helpers.go contains shared scaffolding helpers for mod/heal job execution.
-//
-// These helpers extract common patterns from executeModJob and executeHealingJob to:
-//   - Reduce code duplication and risk of divergent behavior
-//   - Make future changes cheaper by having a single implementation
-//   - Keep job-specific behavior (e.g., /in hydration for heal) in respective functions
-//
-// Extracted patterns:
-//   - jobExecutionContext: runtime init + logStreamer lifecycle
-//   - withTempDir: temp directory creation + cleanup
-//   - snapshotWorkspaceForNoIndexDiff: baseline snapshot for diff generation
 package nodeagent
 
 import (
@@ -27,44 +16,14 @@ import (
 )
 
 // jobExecutionContext holds runtime components initialized for a mod/heal job.
-// It bundles the runner, diff generator, and log streamer lifecycle together
-// so callers can initialize once and defer cleanup consistently.
-//
-// Usage pattern:
-//
-//	ctx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
-//	if err != nil { /* handle error */ }
-//	defer cleanup()
-//	// use ctx.runner, ctx.diffGenerator
 type jobExecutionContext struct {
-	// runner is the step.Runner configured with workspace, container, diff, and gate components.
-	runner step.Runner
-
-	// diffGenerator generates diffs between workspace states. May be nil if unavailable.
+	runner        step.Runner
 	diffGenerator step.DiffGenerator
-
-	// logStreamer streams logs to the server. Caller must call cleanup to close it.
-	logStreamer *LogStreamer
+	logStreamer   *LogStreamer
 }
 
-// initJobExecutionContext initializes runtime components for job execution and returns
-// a cleanup function that must be deferred by the caller.
-//
-// This extracts the common init + defer pattern from executeModJob/executeHealingJob:
-//
-//	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
-//	if err != nil { ... }
-//	defer func() { _ = logStreamer.Close() }()
-//
-// Parameters:
-//   - ctx: context for initialization operations
-//   - runID: run identifier for logging and telemetry
-//   - jobID: job identifier for associating log chunks with specific jobs
-//
-// Returns:
-//   - ctx: jobExecutionContext with runner, diffGenerator, logStreamer
-//   - cleanup: function to close logStreamer (must be deferred)
-//   - err: non-nil if runtime initialization fails
+// initJobExecutionContext initializes runtime components and returns a cleanup function
+// that closes the logStreamer (must be deferred).
 func (r *runController) initJobExecutionContext(ctx context.Context, runID types.RunID, jobID types.JobID) (jobExecutionContext, func(), error) {
 	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, runID, jobID)
 	if err != nil {
@@ -77,7 +36,6 @@ func (r *runController) initJobExecutionContext(ctx context.Context, runID types
 		logStreamer:   logStreamer,
 	}
 
-	// Cleanup function closes logStreamer.
 	cleanup := func() {
 		if err := logStreamer.Close(); err != nil {
 			slog.Warn("failed to close log streamer", "run_id", runID, "job_id", jobID, "error", err)
@@ -87,21 +45,7 @@ func (r *runController) initJobExecutionContext(ctx context.Context, runID types
 	return execCtx, cleanup, nil
 }
 
-// withTempDir creates a temporary directory with the given prefix and calls fn with its path.
-// The directory is automatically removed after fn returns (regardless of success/failure).
-//
-// This extracts the common pattern for /out directory handling:
-//
-//	outDir, err := os.MkdirTemp("", prefix)
-//	if err != nil { /* handle */ }
-//	defer func() { _ = os.RemoveAll(outDir) }()
-//	// use outDir
-//
-// Parameters:
-//   - prefix: temp directory prefix (e.g., "ploy-mod-out-*", "ploy-heal-out-*")
-//   - fn: function to execute with the temp directory path
-//
-// Returns error from MkdirTemp or from fn; cleanup happens in either case.
+// withTempDir creates a temporary directory, calls fn, then removes the directory.
 func withTempDir(prefix string, fn func(path string) error) error {
 	dir, err := os.MkdirTemp("", prefix)
 	if err != nil {
@@ -116,41 +60,14 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	return fn(dir)
 }
 
-// snapshotResult holds the result of snapshotWorkspaceForNoIndexDiff.
+// snapshotResult holds a workspace snapshot path and its cleanup function.
 type snapshotResult struct {
-	// dir is the path to the snapshot directory containing the workspace copy.
-	// Empty string if snapshotting failed or was skipped.
-	dir string
-
-	// cleanup removes the snapshot directory. Safe to call even if dir is empty.
+	dir     string
 	cleanup func()
 }
 
 // snapshotWorkspaceForNoIndexDiff creates a snapshot of the workspace for baseline comparison.
-// This enables "git diff --no-index" semantics via GenerateBetween, which captures untracked
-// files in the diff (unlike HEAD-based git diff).
-//
-// This extracts the common pre-mod/pre-heal baseline snapshot pattern:
-//
-//	var baselineDir string
-//	if diffGenerator != nil {
-//	    snapshotDir, snapErr := os.MkdirTemp("", prefix)
-//	    if snapErr != nil { /* warn */ }
-//	    else if err := copyGitClone(workspace, snapshotDir); err != nil { /* warn, cleanup */ }
-//	    else { baselineDir = snapshotDir; defer os.RemoveAll }
-//	}
-//
-// Parameters:
-//   - runID: run identifier for logging
-//   - jobID: job identifier for logging
-//   - diffType: DiffModTypeMod or DiffModTypeHealing for log message context
-//   - workspace: source workspace to snapshot
-//
-// Returns snapshotResult with:
-//   - dir: path to snapshot, or empty if failed/skipped
-//   - cleanup: function to remove snapshot (safe to call even if empty)
-//
-// Note: Caller must defer cleanup() to avoid leaking temp directories.
+// This enables "git diff --no-index" semantics via GenerateBetween, which captures untracked files.
 func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType DiffModType, workspace string) snapshotResult {
 	jobTypeStr := diffType.String()
 	prefix := fmt.Sprintf("ploy-%s-base-*", jobTypeStr)
@@ -180,29 +97,13 @@ func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffT
 	}
 }
 
-// workspaceRehydrationResult holds the result of workspace rehydration.
+// workspaceRehydrationResult holds a rehydrated workspace path and its cleanup function.
 type workspaceRehydrationResult struct {
-	// workspace is the path to the rehydrated workspace.
 	workspace string
-
-	// cleanup removes the workspace directory. Safe to call even if workspace is empty.
-	cleanup func()
+	cleanup   func()
 }
 
-// rehydrateWorkspaceWithCleanup is a wrapper around rehydrateWorkspaceForStep that bundles
-// the workspace path with its cleanup function.
-//
-// This extracts the common pattern:
-//
-//	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, stepIndex)
-//	if err != nil { /* handle */ }
-//	defer func() { _ = os.RemoveAll(workspace) }()
-//
-// Returns workspaceRehydrationResult with:
-//   - workspace: path to rehydrated workspace
-//   - cleanup: function to remove workspace (must be deferred)
-//
-// Note: Caller must defer cleanup() to avoid leaking workspaces.
+// rehydrateWorkspaceWithCleanup wraps rehydrateWorkspaceForStep with automatic cleanup.
 func (r *runController) rehydrateWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,
@@ -224,19 +125,7 @@ func (r *runController) rehydrateWorkspaceWithCleanup(
 	}, nil
 }
 
-// clearManifestHydration removes hydration config from manifest inputs.
-// This is used when workspace is already hydrated, to prevent double-hydration.
-//
-// This extracts the common pattern from executeModJob/executeHealingJob:
-//
-//	if len(manifest.Inputs) > 0 {
-//	    inputs := make([]contracts.StepInput, len(manifest.Inputs))
-//	    copy(inputs, manifest.Inputs)
-//	    for i := range inputs {
-//	        inputs[i].Hydration = nil
-//	    }
-//	    manifest.Inputs = inputs
-//	}
+// clearManifestHydration removes hydration config from manifest inputs to prevent double-hydration.
 func clearManifestHydration(manifest *contracts.StepManifest) {
 	if len(manifest.Inputs) == 0 {
 		return
@@ -250,57 +139,38 @@ func clearManifestHydration(manifest *contracts.StepManifest) {
 }
 
 // disableManifestGate sets Gate.Enabled=false on the manifest.
-// Mod and healing jobs don't run gates; gates are handled by dedicated gate jobs.
 func disableManifestGate(manifest *contracts.StepManifest) {
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
 }
 
 // standardJobConfig configures the execution of a standard container job (mod/heal).
 type standardJobConfig struct {
-	// Manifest is the step manifest to execute.
-	Manifest contracts.StepManifest
-	// DiffType specifies the type of diff to generate (Mod/Heal).
-	DiffType DiffModType
-	// OutDirPattern is the pattern for the temporary /out directory (e.g., "ploy-mod-out-*").
+	Manifest      contracts.StepManifest
+	DiffType      DiffModType
 	OutDirPattern string
-	// InDirPattern is the pattern for the temporary /in directory. Optional.
-	InDirPattern string
+	InDirPattern  string
 
-	// PopulateInDir is an optional hook to populate the /in directory.
 	PopulateInDir func(inDir string) error
-	// InjectEnv is an optional hook to inject environment variables into the manifest.
-	InjectEnv func(manifest *contracts.StepManifest, workspace string)
-	// MountCerts is an optional hook to mount TLS certificates.
-	MountCerts func(manifest *contracts.StepManifest)
+	InjectEnv     func(manifest *contracts.StepManifest, workspace string)
+	MountCerts    func(manifest *contracts.StepManifest)
 
-	// CheckWorkspaceNoChange enables pre/post execution workspace status checks.
-	// Used by healing jobs to detect "no change" failures.
-	CheckWorkspaceNoChange bool
-	// UploadConfiguredArtifacts enables uploading artifacts defined in RunOptions.
+	CheckWorkspaceNoChange    bool
 	UploadConfiguredArtifacts bool
 
-	// UploadDiff is the strategy for uploading diffs.
-	UploadDiff func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result, stepIndex types.StepIndex)
-
-	// BuildJobMeta is an optional callback to produce job_meta for the completion payload.
-	// Called after container execution with the /out directory path.
-	// Returns nil if no job_meta should be attached.
+	UploadDiff   func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result, stepIndex types.StepIndex)
 	BuildJobMeta func(outDir string) json.RawMessage
 
-	// StartTime is the time when the job execution started (including manifest build).
-	// If zero, defaults to time.Now() inside executeStandardJob.
 	StartTime time.Time
 }
 
-// executeStandardJob orchestrates the common lifecycle of a container job (mod/heal).
-// It handles runtime init, rehydration, snapshots, directory prep, execution, and uploading.
+// executeStandardJob orchestrates the common lifecycle of a container job (mod/heal):
+// runtime init, rehydration, snapshots, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	startTime := cfg.StartTime
 	if startTime.IsZero() {
 		startTime = time.Now()
 	}
 
-	// Initialize runtime components using shared helper.
 	execCtx, cleanup, err := r.initJobExecutionContext(ctx, req.RunID, req.JobID)
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
@@ -309,7 +179,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 	}
 	defer cleanup()
 
-	// Rehydrate workspace.
 	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, cfg.Manifest, req.StepIndex)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
@@ -319,7 +188,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 	defer wsResult.cleanup()
 	workspace := wsResult.workspace
 
-	// Snapshot baseline for diffs.
 	var baselineDir string
 	if execCtx.diffGenerator != nil {
 		snapshot := snapshotWorkspaceForNoIndexDiff(req.RunID, req.JobID, cfg.DiffType, workspace)
@@ -327,14 +195,11 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		baselineDir = snapshot.dir
 	}
 
-	// Define the execution body to be wrapped in temp dir context.
 	executeBody := func(outDir, inDir string) error {
-		// Prepare manifest copy for this execution.
 		manifest := cfg.Manifest
 		disableManifestGate(&manifest)
 		clearManifestHydration(&manifest)
 
-		// Apply hooks.
 		if cfg.InjectEnv != nil {
 			cfg.InjectEnv(&manifest, workspace)
 		}
@@ -350,7 +215,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			return fmt.Errorf("save job image name: %w", err)
 		}
 
-		// Pre-run workspace status check (for healing no-change detection).
 		var preStatus string
 		var preStatusErr error
 		if cfg.CheckWorkspaceNoChange {
@@ -360,7 +224,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			}
 		}
 
-		// Run container.
 		result, runErr := execCtx.runner.Run(ctx, step.Request{
 			RunID:     req.RunID,
 			Manifest:  manifest,
@@ -370,32 +233,26 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		})
 		duration := time.Since(startTime)
 
-		// Upload diff.
 		if cfg.UploadDiff != nil {
 			cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result, req.StepIndex)
 		}
 
-		// Upload /out artifacts.
 		if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
 			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex, "error", err)
 		}
 
-		// Upload configured artifacts (Mod only).
 		if cfg.UploadConfiguredArtifacts {
 			r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace)
 		}
 
-		// Post-run workspace status check (for healing).
 		if cfg.CheckWorkspaceNoChange && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
 			postStatus, postErr := workspaceStatus(ctx, workspace)
 			if postErr == nil && postStatus == preStatus {
-				// No change failure.
 				r.uploadHealingNoWorkspaceChangesFailure(ctx, req, types.NewRunStatsBuilder().ExitCode(1).DurationMs(duration.Milliseconds()).HealingWarning("no_workspace_changes").MustBuild(), duration)
 				return nil
 			}
 		}
 
-		// Build stats.
 		statsBuilder := types.NewRunStatsBuilder().
 			ExitCode(result.ExitCode).
 			DurationMs(duration.Milliseconds()).
@@ -406,7 +263,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				time.Duration(result.Timings.TotalDuration).Milliseconds(),
 			)
 
-		// Attach job_meta if provided (e.g., action_summary for healing jobs).
 		if cfg.BuildJobMeta != nil {
 			if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
 				statsBuilder.JobMeta(meta)
@@ -415,7 +271,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 		stats := statsBuilder.MustBuild()
 
-		// Handle terminal status.
 		if runErr != nil {
 			status := JobStatusFail
 			var exitCode *int32
@@ -449,7 +304,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		return nil
 	}
 
-	// Wrapper logic for optional nested temp dirs.
 	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
 		if cfg.InDirPattern != "" {
 			return withTempDir(cfg.InDirPattern, func(inDir string) error {

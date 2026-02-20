@@ -280,7 +280,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		// Refresh logPayload from the re-gate result so the next iteration's
 		// build-gate-iteration-N.log and healing-log.md reflect the latest failure.
 		logPayload = gateLogPayloadFromMetadata(reGateMetadata)
-		persistUpdatedBuildGateLog(in.inDir, logPayload, in.req.RunID)
+		persistBuildGateLog(in.inDir, logPayload, in.req.RunID)
 	}
 
 	// Retries exhausted; return the gate failure.

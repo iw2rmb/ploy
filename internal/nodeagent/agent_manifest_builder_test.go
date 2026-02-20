@@ -166,7 +166,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:        types.RunID("run-123"),
 			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-			TypedOptions: RunOptions{Execution: ExecutionOptions{Command: ExecutionCommand{Shell: "echo hi"}}},
+			TypedOptions: RunOptions{Execution: ExecutionOptions{Command: Command{Shell: "echo hi"}}},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
@@ -318,12 +318,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				Steps: []StepMod{
 					{
 						Image:   contracts.ModImage{Universal: "mods-orw:latest"},
-						Command: ExecutionCommand{Exec: []string{"--apply", "--dir", "/workspace"}},
+						Command: Command{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
 					},
 					{
 						Image:   contracts.ModImage{Universal: "mods-fmt:latest"},
-						Command: ExecutionCommand{Shell: "fmt --check"},
+						Command: Command{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
 					},
 				},
@@ -448,7 +448,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TypedOptions: RunOptions{
 				Execution: ExecutionOptions{
 					Image:   contracts.ModImage{Universal: "single-mod:latest"},
-					Command: ExecutionCommand{Shell: "run-single"},
+					Command: Command{Shell: "run-single"},
 				},
 			},
 		}

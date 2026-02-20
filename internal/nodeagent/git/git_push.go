@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/nodeagent/redact"
 )
 
 // PushOptions holds configuration for pushing a git branch.
@@ -46,18 +44,18 @@ func NewPusher() Pusher {
 // The PAT is never persisted to disk or embedded in the remote URL.
 func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 	if err := validatePushOptions(opts); err != nil {
-		return redact.Error(fmt.Errorf("invalid push options: %w", err), opts.PAT)
+		return RedactError(fmt.Errorf("invalid push options: %w", err), opts.PAT)
 	}
 
 	// Configure git user identity.
 	if err := p.configureGitUser(ctx, opts.RepoDir, opts.UserName, opts.UserEmail); err != nil {
-		return redact.Error(fmt.Errorf("configure git user: %w", err), opts.PAT)
+		return RedactError(fmt.Errorf("configure git user: %w", err), opts.PAT)
 	}
 
 	// Push the branch using HTTP extra header for authentication to avoid prompts and
 	// prevent writing secrets to disk. We pass the header via environment only.
 	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, opts.PAT, opts.RemoteURL); err != nil {
-		return redact.Error(err, opts.PAT)
+		return RedactError(err, opts.PAT)
 	}
 
 	return nil
@@ -107,7 +105,7 @@ func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat, remote
 	// Equivalent to: git push https://oauth2:<token>@host/path.git HEAD:refs/heads/<targetRef>
 	refspec := "HEAD:refs/heads/" + targetRef
 	if err := runGitCommand(ctx, repoDir, nil, "push", u.String(), refspec); err != nil {
-		return redact.Error(fmt.Errorf("git push %s: %w", u.Host, err), pat)
+		return RedactError(fmt.Errorf("git push %s: %w", u.Host, err), pat)
 	}
 	return nil
 }
@@ -136,7 +134,7 @@ func runGitCommand(ctx context.Context, dir string, env []string, args ...string
 			}
 		}
 		baseErr := fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))
-		return redact.Error(baseErr, pat)
+		return RedactError(baseErr, pat)
 	}
 
 	return nil
