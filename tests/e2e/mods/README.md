@@ -6,7 +6,7 @@
 
 **Prereqs**
 
-- Local Docker cluster deployed via `scripts/deploy-locally.sh`.
+- Local Docker cluster deployed via `scripts/local-docker.sh`.
 - CLI configured for the local cluster:
   - `export PLOY_CONFIG_HOME="$PWD/local/cli"`
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).

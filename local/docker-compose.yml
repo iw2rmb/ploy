@@ -1,38 +1,18 @@
 services:
-  db:
-    build:
-      context: ..
-      dockerfile: docker/db/Dockerfile
-    image: ploy-db:local
-    platform: linux/amd64
-    environment:
-      - POSTGRES_DB=ploy
-      - POSTGRES_USER=ploy
-      - POSTGRES_PASSWORD=ploy
-    ports:
-      - "${PLOY_DB_HOST_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ploy -d ploy"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   server:
     build:
       context: ..
-      dockerfile: docker/server/Dockerfile
+      dockerfile: docker/server/Dockerfile.local
     image: ploy-server:local
     platform: linux/amd64
     depends_on:
-      db:
-        condition: service_healthy
       garage:
         condition: service_healthy
       garage-init:
         condition: service_completed_successfully
     restart: unless-stopped
     environment:
-      - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
+      - PLOY_POSTGRES_DSN=${PLOY_LOCAL_PG_DSN:?set PLOY_LOCAL_PG_DSN to a host postgres DSN}
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
       - PLOY_CLUSTER_ID=local
       - PLOY_OBJECTSTORE_ENDPOINT=http://garage:3900
@@ -42,12 +22,12 @@ services:
       - PLOY_OBJECTSTORE_SECURE=false
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
+      - ../dist/ployd-linux:/usr/local/bin/ployd:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
       - "8080:8080"
       - "9100:9100"
     healthcheck:
-      # Use /health endpoint (plain HTTP with bearer token auth)
       test:
         [
           "CMD-SHELL",
@@ -60,7 +40,7 @@ services:
   node:
     build:
       context: ..
-      dockerfile: docker/node/Dockerfile
+      dockerfile: docker/node/Dockerfile.local
     image: ploy-node:local
     platform: linux/amd64
     user: "0:0"
@@ -74,7 +54,8 @@ services:
       - TMPDIR=/private/tmp
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ../dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
+      - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - /private/tmp:/private/tmp
     command:
       ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]

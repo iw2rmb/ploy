@@ -21,9 +21,12 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_EXTRA_CA_CERTS_PATH` — Optional host filesystem path to a PEM-encoded CA bundle used by `scripts/deploy-locally.sh`.
-  When set, the script injects the bundle into the trust store of the locally built `ploy-server:local` and `ploy-node:local`
-  images via a Docker BuildKit secret (`id=ploy_extra_ca`). Intended for corporate TLS MITM or private registries during local development.
+- `PLOY_LOCAL_PG_DSN` — Required by `scripts/local-docker.sh` and `scripts/local-podman.sh`.
+  DSN used by the local server container and host-side setup SQL (DB create/drop,
+  token insert, node seed). Example:
+  `postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
+- `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
+  `node` container at `/var/run/docker.sock`. Defaults to `/var/run/docker.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
   default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
