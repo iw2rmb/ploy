@@ -11,50 +11,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// mockGateRuntimeMinimal implements the subset of ContainerRuntime used by
-// dockerGateExecutor plus Remove, so we can verify cleanup behavior without
-// depending on the real Docker client or runner mocks.
-type mockGateRuntimeMinimal struct {
-	createCalled bool
-	startCalled  bool
-	waitCalled   bool
-	logsCalled   bool
-	removeCalled bool
-	lastSpec     ContainerSpec
-	beforeCreate func()
-}
-
-func (m *mockGateRuntimeMinimal) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
-	if m.beforeCreate != nil {
-		m.beforeCreate()
-	}
-	m.createCalled = true
-	m.lastSpec = spec
-	return ContainerHandle{ID: "mock-id"}, nil
-}
-
-func (m *mockGateRuntimeMinimal) Start(ctx context.Context, h ContainerHandle) error {
-	m.startCalled = true
-	return nil
-}
-
-func (m *mockGateRuntimeMinimal) Wait(ctx context.Context, h ContainerHandle) (ContainerResult, error) {
-	m.waitCalled = true
-	return ContainerResult{ExitCode: 0}, nil
-}
-
-func (m *mockGateRuntimeMinimal) Logs(ctx context.Context, h ContainerHandle) ([]byte, error) {
-	m.logsCalled = true
-	return []byte("ok"), nil
-}
-
-func (m *mockGateRuntimeMinimal) Remove(ctx context.Context, h ContainerHandle) error {
-	m.removeCalled = true
-	return nil
-}
-
 func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	workspace := createMavenWorkspace(t, "17")
@@ -84,11 +42,12 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 		observedImage  string
 	)
 
-	rt := &mockGateRuntimeMinimal{
-		beforeCreate: func() {
+	rt := &testContainerRuntime{
+		createFn: func(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
 			if !observerCalled {
 				t.Fatalf("expected runtime image observer to be called before container Create")
 			}
+			return ContainerHandle{ID: "mock"}, nil
 		},
 	}
 	executor := NewDockerGateExecutor(rt)
@@ -120,7 +79,7 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	t.Parallel()
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	workspace := createMavenWorkspace(t, "17")
@@ -144,33 +103,33 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Verify all env vars from spec.Env are passed to the container spec.
-	if rt.lastSpec.Env == nil {
+	if rt.captured.Env == nil {
 		t.Fatal("expected ContainerSpec.Env to be set, got nil")
 	}
-	if len(rt.lastSpec.Env) != 3 {
-		t.Fatalf("expected 3 env vars, got %d: %v", len(rt.lastSpec.Env), rt.lastSpec.Env)
+	if len(rt.captured.Env) != 3 {
+		t.Fatalf("expected 3 env vars, got %d: %v", len(rt.captured.Env), rt.captured.Env)
 	}
 
 	// Check each expected key.
 	expectedKeys := []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "CUSTOM_VAR"}
 	for _, key := range expectedKeys {
-		if _, ok := rt.lastSpec.Env[key]; !ok {
+		if _, ok := rt.captured.Env[key]; !ok {
 			t.Errorf("expected env var %q to be present, but it's missing", key)
 		}
 	}
 
 	// Verify values are correct.
-	if rt.lastSpec.Env["CA_CERTS_PEM_BUNDLE"] != spec.Env["CA_CERTS_PEM_BUNDLE"] {
+	if rt.captured.Env["CA_CERTS_PEM_BUNDLE"] != spec.Env["CA_CERTS_PEM_BUNDLE"] {
 		t.Errorf("CA_CERTS_PEM_BUNDLE mismatch: got %q, want %q",
-			rt.lastSpec.Env["CA_CERTS_PEM_BUNDLE"], spec.Env["CA_CERTS_PEM_BUNDLE"])
+			rt.captured.Env["CA_CERTS_PEM_BUNDLE"], spec.Env["CA_CERTS_PEM_BUNDLE"])
 	}
-	if rt.lastSpec.Env["CODEX_AUTH_JSON"] != spec.Env["CODEX_AUTH_JSON"] {
+	if rt.captured.Env["CODEX_AUTH_JSON"] != spec.Env["CODEX_AUTH_JSON"] {
 		t.Errorf("CODEX_AUTH_JSON mismatch: got %q, want %q",
-			rt.lastSpec.Env["CODEX_AUTH_JSON"], spec.Env["CODEX_AUTH_JSON"])
+			rt.captured.Env["CODEX_AUTH_JSON"], spec.Env["CODEX_AUTH_JSON"])
 	}
-	if rt.lastSpec.Env["CUSTOM_VAR"] != spec.Env["CUSTOM_VAR"] {
+	if rt.captured.Env["CUSTOM_VAR"] != spec.Env["CUSTOM_VAR"] {
 		t.Errorf("CUSTOM_VAR mismatch: got %q, want %q",
-			rt.lastSpec.Env["CUSTOM_VAR"], spec.Env["CUSTOM_VAR"])
+			rt.captured.Env["CUSTOM_VAR"], spec.Env["CUSTOM_VAR"])
 	}
 }
 
@@ -192,7 +151,7 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := &mockGateRuntimeMinimal{}
+			rt := &testContainerRuntime{}
 			executor := NewDockerGateExecutor(rt)
 
 			spec := &contracts.StepGateSpec{
@@ -211,15 +170,15 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 			}
 
 			// For nil/empty input, the container spec env should be nil or empty.
-			if len(rt.lastSpec.Env) != 0 {
-				t.Errorf("expected empty env for %s, got %v", tc.name, rt.lastSpec.Env)
+			if len(rt.captured.Env) != 0 {
+				t.Errorf("expected empty env for %s, got %v", tc.name, rt.captured.Env)
 			}
 		})
 	}
 }
 
 func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	tmpDir := createGradleWorkspace(t, "17")
@@ -235,11 +194,11 @@ func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
 	if !rt.createCalled {
 		t.Fatal("expected Create to be called")
 	}
-	if len(rt.lastSpec.Command) != 3 {
-		t.Fatalf("expected 3-element command, got %v", rt.lastSpec.Command)
+	if len(rt.captured.Command) != 3 {
+		t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
 	}
 
-	cmd := rt.lastSpec.Command[2]
+	cmd := rt.captured.Command[2]
 	if !strings.Contains(cmd, "gradle -q --stacktrace --build-cache") {
 		t.Fatalf("expected gradle command with -q --stacktrace --build-cache, got %q", cmd)
 	}
@@ -309,7 +268,7 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := &mockGateRuntimeMinimal{}
+			rt := &testContainerRuntime{}
 			executor := NewDockerGateExecutor(rt)
 
 			tmpDir := tc.workspace(t)
@@ -322,11 +281,11 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 			if !rt.createCalled {
 				t.Fatal("expected Create to be called")
 			}
-			if len(rt.lastSpec.Command) != 3 {
-				t.Fatalf("expected 3-element command, got %v", rt.lastSpec.Command)
+			if len(rt.captured.Command) != 3 {
+				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
 			}
 
-			cmd := rt.lastSpec.Command[2]
+			cmd := rt.captured.Command[2]
 
 			// Verify CA preamble is present.
 			if !strings.Contains(cmd, "CA_CERTS_PEM_BUNDLE") {
@@ -490,7 +449,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 
 	workspace := createMavenWorkspace(t, "17")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -553,7 +512,7 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 	// Create workspace with Java 11, but expect Java 17.
 	workspace := createMavenWorkspace(t, "11")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -641,7 +600,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 		t.Fatalf("failed to create build.gradle: %v", err)
 	}
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -706,7 +665,7 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	// Empty workspace.
 	tmpDir := t.TempDir()
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -755,7 +714,7 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 
 	workspace := createMavenWorkspace(t, "17")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -780,8 +739,8 @@ func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	}
 
 	// Verify correct image was used.
-	if rt.lastSpec.Image != "custom-maven:java17" {
-		t.Errorf("Image = %q, want %q", rt.lastSpec.Image, "custom-maven:java17")
+	if rt.captured.Image != "custom-maven:java17" {
+		t.Errorf("Image = %q, want %q", rt.captured.Image, "custom-maven:java17")
 	}
 
 	// Verify RuntimeImage is set in metadata.
@@ -803,7 +762,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 
 	workspace := createPythonWorkspace(t, "3.11")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -855,7 +814,7 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 
 	workspace := createMavenWorkspace(t, "17")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -875,8 +834,8 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if rt.lastSpec.Image != "maven:3-eclipse-temurin-17" {
-		t.Errorf("Image = %q, want %q", rt.lastSpec.Image, "maven:3-eclipse-temurin-17")
+	if rt.captured.Image != "maven:3-eclipse-temurin-17" {
+		t.Errorf("Image = %q, want %q", rt.captured.Image, "maven:3-eclipse-temurin-17")
 	}
 	if meta.StackGate == nil || meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
 		t.Fatalf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
@@ -892,7 +851,7 @@ func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
 
 	t.Setenv("PLOY_BUILDGATE_IMAGE", "override:latest")
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -916,8 +875,8 @@ func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if rt.lastSpec.Image != "override:latest" {
-		t.Errorf("Image = %q, want %q", rt.lastSpec.Image, "override:latest")
+	if rt.captured.Image != "override:latest" {
+		t.Errorf("Image = %q, want %q", rt.captured.Image, "override:latest")
 	}
 
 	// Verify RuntimeImage in metadata.
@@ -931,7 +890,7 @@ func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{
@@ -958,8 +917,8 @@ func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing
 	if !rt.createCalled {
 		t.Fatal("expected container Create to be called")
 	}
-	if rt.lastSpec.Image != "custom-maven:java17" {
-		t.Fatalf("Image = %q, want %q", rt.lastSpec.Image, "custom-maven:java17")
+	if rt.captured.Image != "custom-maven:java17" {
+		t.Fatalf("Image = %q, want %q", rt.captured.Image, "custom-maven:java17")
 	}
 	if meta == nil || len(meta.StaticChecks) == 0 {
 		t.Fatal("expected non-empty metadata")
@@ -974,7 +933,7 @@ func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testin
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	rt := &mockGateRuntimeMinimal{}
+	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
 	spec := &contracts.StepGateSpec{

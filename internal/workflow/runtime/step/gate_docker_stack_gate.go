@@ -157,42 +157,14 @@ func resolveStackGateExecutionPlan(
 
 		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *spec.StackGate.Expect, true)
 		if err != nil {
-			var mappingErr *buildGateImageMappingError
-			if errors.As(err, &mappingErr) {
-				sgResult.Result = "unknown"
-				sgResult.Reason = fmt.Sprintf("image mapping error: %s", mappingErr.Error())
-				return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-					StackGate: sgResult,
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     "stack-gate",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
-						Message:  sgResult.Reason,
-					}},
-				}}
+			code := "STACK_GATE_IMAGE_MAPPING_ERROR"
+			prefix := "image mapping error"
+			if errors.Is(err, errBuildGateImageRuleMatch) {
+				code = "STACK_GATE_NO_IMAGE_RULE"
+				prefix = "no matching image rule"
 			}
-			var ruleErr *buildGateImageRuleMatchError
-			if errors.As(err, &ruleErr) {
-				sgResult.Result = "unknown"
-				sgResult.Reason = fmt.Sprintf("no matching image rule: %s", ruleErr.Error())
-				return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-					StackGate: sgResult,
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     "stack-gate",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "STACK_GATE_NO_IMAGE_RULE",
-						Message:  sgResult.Reason,
-					}},
-				}}
-			}
+			sgResult.Result = "unknown"
+			sgResult.Reason = fmt.Sprintf("%s: %s", prefix, err.Error())
 			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
 				StackGate: sgResult,
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -202,8 +174,8 @@ func resolveStackGateExecutionPlan(
 				}},
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
-					Code:     "STACK_GATE_IMAGE_MAPPING_ERROR",
-					Message:  err.Error(),
+					Code:     code,
+					Message:  sgResult.Reason,
 				}},
 			}}
 		}
@@ -409,20 +381,9 @@ func resolveDetectedStackExecutionPlan(
 	if image == "" {
 		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *exp, true)
 		if err != nil {
-			var mappingErr *buildGateImageMappingError
-			if errors.As(err, &mappingErr) {
-				return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: language,
-						Tool:     tool,
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_IMAGE_MAPPING_ERROR",
-						Message:  mappingErr.Error(),
-					}},
-				}}
+			code := "BUILD_GATE_IMAGE_MAPPING_ERROR"
+			if errors.Is(err, errBuildGateImageRuleMatch) {
+				code = "BUILD_GATE_NO_IMAGE_RULE"
 			}
 			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{{
@@ -432,7 +393,7 @@ func resolveDetectedStackExecutionPlan(
 				}},
 				LogFindings: []contracts.BuildGateLogFinding{{
 					Severity: "error",
-					Code:     "BUILD_GATE_NO_IMAGE_RULE",
+					Code:     code,
 					Message:  err.Error(),
 				}},
 			}}
@@ -462,81 +423,4 @@ func resolveDetectedStackExecutionPlan(
 		language: language,
 		tool:     tool,
 	}, nil
-}
-
-// observationToStackExpectation converts a stackdetect.Observation to a StackExpectation.
-func observationToStackExpectation(obs *stackdetect.Observation) *contracts.StackExpectation {
-	if obs == nil {
-		return nil
-	}
-	exp := &contracts.StackExpectation{
-		Language: obs.Language,
-		Tool:     obs.Tool,
-	}
-	if obs.Release != nil {
-		exp.Release = *obs.Release
-	}
-	return exp
-}
-
-// stackMatchesExpectation compares a detected observation against expected values.
-// Returns true if all non-empty expected fields match the observation.
-func stackMatchesExpectation(obs *stackdetect.Observation, expect *contracts.StackExpectation) bool {
-	if expect == nil {
-		return true
-	}
-	if expect.Language != "" && obs.Language != expect.Language {
-		return false
-	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
-		return false
-	}
-	if expect.Release != "" {
-		if obs.Release == nil || *obs.Release != expect.Release {
-			return false
-		}
-	}
-	return true
-}
-
-// formatMismatchReason generates a human-readable explanation of stack mismatches.
-func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackExpectation) string {
-	var mismatches []string
-	if expect.Language != "" && obs.Language != expect.Language {
-		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
-	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
-		mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expect.Tool, obs.Tool))
-	}
-	if expect.Release != "" {
-		detected := "<nil>"
-		if obs.Release != nil {
-			detected = *obs.Release
-		}
-		if obs.Release == nil || *obs.Release != expect.Release {
-			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
-		}
-	}
-	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
-
-	// Append evidence for debugging.
-	if len(obs.Evidence) > 0 {
-		msg += "\nevidence:"
-		for _, e := range obs.Evidence {
-			msg += fmt.Sprintf("\n  - %s: %s = %q", e.Path, e.Key, e.Value)
-		}
-	}
-	return msg
-}
-
-// formatEvidenceForLog formats evidence items for the LogFinding.Evidence field.
-func formatEvidenceForLog(evidence []stackdetect.EvidenceItem) string {
-	if len(evidence) == 0 {
-		return ""
-	}
-	var lines []string
-	for _, e := range evidence {
-		lines = append(lines, fmt.Sprintf("%s: %s = %q", e.Path, e.Key, e.Value))
-	}
-	return strings.Join(lines, "\n")
 }

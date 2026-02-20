@@ -17,13 +17,13 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 	gateDelay := 5 * time.Millisecond
 
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{
+		Workspace: &testWorkspaceHydrator{
 			hydrateFn: func(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
 				time.Sleep(hydrationDelay)
 				return nil
 			},
 		},
-		Gate: &mockGateExecutor{
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				time.Sleep(gateDelay)
 				return &contracts.BuildGateStageMetadata{

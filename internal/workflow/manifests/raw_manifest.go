@@ -18,49 +18,49 @@ type rawManifest struct {
 	Lanes           rawLanes      `toml:"lanes"`
 	Services        []rawService  `toml:"services"`
 	Edges           []rawEdge     `toml:"edges"`
-	Exposures       []rawExposure `toml:"exposures"`
+	Exposures       []rawExposure `toml:"exposures,omitempty"`
 }
 
 type rawTopology struct {
 	Description string    `toml:"description"`
-	Allow       []rawFlow `toml:"allow"`
-	Deny        []rawFlow `toml:"deny"`
+	Allow       []rawFlow `toml:"allow,omitempty"`
+	Deny        []rawFlow `toml:"deny,omitempty"`
 }
 
 type rawFlow struct {
 	From   string `toml:"from"`
 	To     string `toml:"to"`
-	Reason string `toml:"reason"`
+	Reason string `toml:"reason,omitempty"`
 }
 
 type rawFixtures struct {
 	Required []rawFixture `toml:"required"`
-	Optional []rawFixture `toml:"optional"`
+	Optional []rawFixture `toml:"optional,omitempty"`
 }
 
 type rawFixture struct {
 	Name      string `toml:"name"`
 	Reference string `toml:"reference"`
-	Reason    string `toml:"reason"`
+	Reason    string `toml:"reason,omitempty"`
 }
 
 type rawLanes struct {
 	Required []rawLane `toml:"required"`
-	Allowed  []rawLane `toml:"allowed"`
+	Allowed  []rawLane `toml:"allowed,omitempty"`
 }
 
 type rawLane struct {
 	Name   string `toml:"name"`
-	Reason string `toml:"reason"`
+	Reason string `toml:"reason,omitempty"`
 }
 
 type rawService struct {
 	Name     string                  `toml:"name"`
 	Kind     string                  `toml:"kind"`
-	Optional bool                    `toml:"optional"`
+	Optional bool                    `toml:"optional,omitempty"`
 	Identity rawServiceIdentity      `toml:"identity"`
 	Ports    []rawServicePort        `toml:"ports"`
-	Requires []rawServiceRequirement `toml:"requires"`
+	Requires []rawServiceRequirement `toml:"requires,omitempty"`
 }
 
 type rawServiceIdentity struct {

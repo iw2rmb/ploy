@@ -8,46 +8,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// Mock implementations for testing.
-
-type mockWorkspaceHydrator struct {
-	hydrateFn func(ctx context.Context, manifest contracts.StepManifest, workspace string) error
-}
-
-func (m *mockWorkspaceHydrator) Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
-	if m.hydrateFn != nil {
-		return m.hydrateFn(ctx, manifest, workspace)
-	}
-	return nil
-}
-
-type mockGateExecutor struct {
-	executeFn func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
-}
-
-func (m *mockGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
-	if m.executeFn != nil {
-		return m.executeFn(ctx, spec, workspace)
-	}
-	// Default: return a passing gate check
-	return &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{
-				Tool:   "default",
-				Passed: true,
-			},
-		},
-		LogFindings: []contracts.BuildGateLogFinding{},
-	}, nil
-}
-
 // TestRunner_Run_BasicExecution verifies that a basic step execution completes
 // successfully with proper exit code and timing capture when using minimal
 // configuration with repo-based hydration.
 func TestRunner_Run_BasicExecution(t *testing.T) {
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate:      &mockGateExecutor{},
+		Workspace: &testWorkspaceHydrator{},
+		Gate:      &testGateExecutor{},
 	}
 
 	manifest := contracts.StepManifest{
@@ -101,7 +68,6 @@ func TestRunner_Run_BasicExecution(t *testing.T) {
 // nil workspace and gate components without panicking, while still capturing
 // basic timing information.
 func TestRunner_Run_NilComponents(t *testing.T) {
-	// Runner with nil workspace and gate should still work
 	runner := Runner{
 		Workspace: nil,
 		Gate:      nil,
@@ -135,7 +101,6 @@ func TestRunner_Run_NilComponents(t *testing.T) {
 		t.Errorf("Run() ExitCode = %d, want 0", result.ExitCode)
 	}
 
-	// Timing should still be captured even with nil components
 	if result.Timings.TotalDuration == 0 {
 		t.Errorf("Run() TotalDuration not captured with nil components")
 	}

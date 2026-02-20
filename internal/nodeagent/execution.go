@@ -48,7 +48,7 @@ func (r *runController) createContainerRuntime() (step.ContainerRuntime, error) 
 
 // createDiffGenerator initializes a filesystem diff generator.
 func (r *runController) createDiffGenerator() step.DiffGenerator {
-	return step.NewFilesystemDiffGenerator(step.FilesystemDiffGeneratorOptions{})
+	return step.NewFilesystemDiffGenerator()
 }
 
 // RehydrateWorkspaceFromBaseAndDiffs builds a fresh workspace by copying the base clone

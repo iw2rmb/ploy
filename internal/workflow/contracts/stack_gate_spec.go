@@ -23,6 +23,8 @@
 //	        expect: { language: java, tool: maven, release: "17" }
 package contracts
 
+import "encoding/json"
+
 // StackExpectation describes expected stack characteristics.
 // All fields are optional; omitted fields indicate "any" for that dimension.
 type StackExpectation struct {
@@ -89,6 +91,16 @@ type StackGateSpec struct {
 	// Outbound configures post-mod stack validation.
 	// Validates that the mod produced the expected stack transformation.
 	Outbound *StackGatePhaseSpec `json:"outbound,omitempty" yaml:"outbound,omitempty"`
+}
+
+// MarshalJSON returns nil for empty StackGateSpec so that parent structs with
+// omitempty will omit the field entirely.
+func (s StackGateSpec) MarshalJSON() ([]byte, error) {
+	if s.IsEmpty() {
+		return []byte("null"), nil
+	}
+	type alias StackGateSpec
+	return json.Marshal(alias(s))
 }
 
 // IsEmpty returns true if no stack gate configuration is present.

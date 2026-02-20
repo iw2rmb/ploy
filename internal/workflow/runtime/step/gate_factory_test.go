@@ -10,7 +10,7 @@ import (
 func TestNewDockerGateExecutor_DefaultLocalDocker(t *testing.T) {
 	t.Parallel()
 
-	mockRT := &mockContainerRuntime{}
+	mockRT := &testContainerRuntime{}
 
 	executor := NewDockerGateExecutor(mockRT)
 
@@ -49,28 +49,4 @@ func TestNewDockerGateExecutor_NilRuntime(t *testing.T) {
 	if result == nil {
 		t.Error("expected non-nil result (empty metadata) with nil runtime")
 	}
-}
-
-// mockContainerRuntime is a minimal mock for testing factory mode selection.
-// It satisfies ContainerRuntime interface for local-docker mode tests.
-type mockContainerRuntime struct{}
-
-func (m *mockContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
-	return ContainerHandle{ID: "mock"}, nil
-}
-
-func (m *mockContainerRuntime) Start(ctx context.Context, handle ContainerHandle) error {
-	return nil
-}
-
-func (m *mockContainerRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
-	return ContainerResult{ExitCode: 0}, nil
-}
-
-func (m *mockContainerRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
-	return nil
 }

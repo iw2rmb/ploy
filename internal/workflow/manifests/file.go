@@ -29,178 +29,95 @@ func LoadFile(path string) (Compilation, error) {
 
 // EncodeCompilationToTOML renders the compilation back into the canonical v2 manifest TOML.
 func EncodeCompilationToTOML(comp Compilation) ([]byte, error) {
-	manifest := tomlManifest{
+	manifest := rawManifest{
 		ManifestVersion: comp.ManifestVersion,
 		Name:            comp.Manifest.Name,
 		Version:         comp.Manifest.Version,
 		Summary:         comp.Manifest.Summary,
-		Topology: tomlTopology{
+		Topology: rawTopology{
 			Description: comp.Topology.Description,
 		},
-		Fixtures: tomlFixtures{
-			Required: toTomlFixtures(comp.Fixtures.Required),
-			Optional: toTomlFixtures(comp.Fixtures.Optional),
+		Fixtures: rawFixtures{
+			Required: compilationFixturesToRaw(comp.Fixtures.Required),
+			Optional: compilationFixturesToRaw(comp.Fixtures.Optional),
 		},
-		Lanes: tomlLanes{
-			Required: toTomlLanes(comp.Lanes.Required),
-			Allowed:  toTomlLanes(comp.Lanes.Allowed),
+		Lanes: rawLanes{
+			Required: compilationLanesToRaw(comp.Lanes.Required),
+			Allowed:  compilationLanesToRaw(comp.Lanes.Allowed),
 		},
-		Services:  toTomlServices(comp.Services),
-		Edges:     toTomlEdges(comp.Edges),
-		Exposures: toTomlExposures(comp.Exposures),
+		Services:  compilationServicesToRaw(comp.Services),
+		Edges:     compilationEdgesToRaw(comp.Edges),
+		Exposures: compilationExposuresToRaw(comp.Exposures),
 	}
 
 	if len(comp.Topology.Allow) > 0 {
-		manifest.Topology.Allow = toTomlFlows(comp.Topology.Allow)
+		manifest.Topology.Allow = compilationFlowsToRaw(comp.Topology.Allow)
 	}
 	if len(comp.Topology.Deny) > 0 {
-		manifest.Topology.Deny = toTomlFlows(comp.Topology.Deny)
+		manifest.Topology.Deny = compilationFlowsToRaw(comp.Topology.Deny)
 	}
 
 	return toml.Marshal(manifest)
 }
 
-type tomlManifest struct {
-	ManifestVersion string         `toml:"manifest_version"`
-	Name            string         `toml:"name"`
-	Version         string         `toml:"version"`
-	Summary         string         `toml:"summary"`
-	Topology        tomlTopology   `toml:"topology"`
-	Fixtures        tomlFixtures   `toml:"fixtures"`
-	Lanes           tomlLanes      `toml:"lanes"`
-	Services        []tomlService  `toml:"services"`
-	Edges           []tomlEdge     `toml:"edges"`
-	Exposures       []tomlExposure `toml:"exposures,omitempty"`
-}
-
-type tomlTopology struct {
-	Description string     `toml:"description"`
-	Allow       []tomlFlow `toml:"allow,omitempty"`
-	Deny        []tomlFlow `toml:"deny,omitempty"`
-}
-
-type tomlFlow struct {
-	From   string `toml:"from"`
-	To     string `toml:"to"`
-	Reason string `toml:"reason,omitempty"`
-}
-
-type tomlFixtures struct {
-	Required []tomlFixture `toml:"required"`
-	Optional []tomlFixture `toml:"optional,omitempty"`
-}
-
-type tomlFixture struct {
-	Name      string `toml:"name"`
-	Reference string `toml:"reference"`
-	Reason    string `toml:"reason,omitempty"`
-}
-
-type tomlLanes struct {
-	Required []tomlLane `toml:"required"`
-	Allowed  []tomlLane `toml:"allowed,omitempty"`
-}
-
-type tomlLane struct {
-	Name   string `toml:"name"`
-	Reason string `toml:"reason,omitempty"`
-}
-
-type tomlService struct {
-	Name     string               `toml:"name"`
-	Kind     string               `toml:"kind"`
-	Optional bool                 `toml:"optional,omitempty"`
-	Identity tomlServiceIdentity  `toml:"identity"`
-	Ports    []tomlServicePort    `toml:"ports"`
-	Requires []tomlServiceRequire `toml:"requires,omitempty"`
-}
-
-type tomlServiceIdentity struct {
-	DNS string `toml:"dns"`
-}
-
-type tomlServicePort struct {
-	Name     string `toml:"name"`
-	Port     int    `toml:"port"`
-	Protocol string `toml:"protocol"`
-}
-
-type tomlServiceRequire struct {
-	Target string `toml:"target"`
-	Edge   string `toml:"edge"`
-}
-
-type tomlEdge struct {
-	Source    string   `toml:"source"`
-	Target    string   `toml:"target"`
-	Ports     []string `toml:"ports"`
-	Protocols []string `toml:"protocols"`
-}
-
-type tomlExposure struct {
-	Service string `toml:"service"`
-	Port    string `toml:"port"`
-	Mode    string `toml:"mode"`
-}
-
-func toTomlFlows(flows []Flow) []tomlFlow {
+func compilationFlowsToRaw(flows []Flow) []rawFlow {
 	if len(flows) == 0 {
 		return nil
 	}
-	result := make([]tomlFlow, len(flows))
+	result := make([]rawFlow, len(flows))
 	for i, flow := range flows {
-		result[i] = tomlFlow(flow)
+		result[i] = rawFlow(flow)
 	}
 	return result
 }
 
-func toTomlFixtures(fixtures []Fixture) []tomlFixture {
+func compilationFixturesToRaw(fixtures []Fixture) []rawFixture {
 	if len(fixtures) == 0 {
 		return nil
 	}
-	result := make([]tomlFixture, len(fixtures))
+	result := make([]rawFixture, len(fixtures))
 	for i, fixture := range fixtures {
-		result[i] = tomlFixture(fixture)
+		result[i] = rawFixture(fixture)
 	}
 	return result
 }
 
-func toTomlLanes(lanes []Lane) []tomlLane {
+func compilationLanesToRaw(lanes []Lane) []rawLane {
 	if len(lanes) == 0 {
 		return nil
 	}
-	result := make([]tomlLane, len(lanes))
+	result := make([]rawLane, len(lanes))
 	for i, lane := range lanes {
-		result[i] = tomlLane(lane)
+		result[i] = rawLane(lane)
 	}
 	return result
 }
 
-func toTomlServices(services []Service) []tomlService {
+func compilationServicesToRaw(services []Service) []rawService {
 	if len(services) == 0 {
 		return nil
 	}
-	result := make([]tomlService, len(services))
+	result := make([]rawService, len(services))
 	for i, svc := range services {
-		result[i] = tomlService{
+		result[i] = rawService{
 			Name:     svc.Name,
 			Kind:     svc.Kind,
 			Optional: svc.Optional,
-			Identity: tomlServiceIdentity{DNS: svc.Identity.DNS},
-			Ports:    toTomlServicePorts(svc.Ports),
-			Requires: toTomlServiceRequires(svc.Requires),
+			Identity: rawServiceIdentity{DNS: svc.Identity.DNS},
+			Ports:    compilationServicePortsToRaw(svc.Ports),
+			Requires: compilationServiceRequiresToRaw(svc.Requires),
 		}
 	}
 	return result
 }
 
-func toTomlServicePorts(ports []ServicePort) []tomlServicePort {
+func compilationServicePortsToRaw(ports []ServicePort) []rawServicePort {
 	if len(ports) == 0 {
 		return nil
 	}
-	result := make([]tomlServicePort, len(ports))
+	result := make([]rawServicePort, len(ports))
 	for i, port := range ports {
-		result[i] = tomlServicePort{
+		result[i] = rawServicePort{
 			Name:     port.Name,
 			Port:     port.Port,
 			Protocol: port.Protocol.String(),
@@ -209,24 +126,24 @@ func toTomlServicePorts(ports []ServicePort) []tomlServicePort {
 	return result
 }
 
-func toTomlServiceRequires(requires []ServiceRequirement) []tomlServiceRequire {
+func compilationServiceRequiresToRaw(requires []ServiceRequirement) []rawServiceRequirement {
 	if len(requires) == 0 {
 		return nil
 	}
-	result := make([]tomlServiceRequire, len(requires))
+	result := make([]rawServiceRequirement, len(requires))
 	for i, req := range requires {
-		result[i] = tomlServiceRequire(req)
+		result[i] = rawServiceRequirement(req)
 	}
 	return result
 }
 
-func toTomlEdges(edges []Edge) []tomlEdge {
+func compilationEdgesToRaw(edges []Edge) []rawEdge {
 	if len(edges) == 0 {
 		return nil
 	}
-	result := make([]tomlEdge, len(edges))
+	result := make([]rawEdge, len(edges))
 	for i, edge := range edges {
-		result[i] = tomlEdge{
+		result[i] = rawEdge{
 			Source:    edge.Source,
 			Target:    edge.Target,
 			Ports:     edge.Ports,
@@ -236,13 +153,13 @@ func toTomlEdges(edges []Edge) []tomlEdge {
 	return result
 }
 
-func toTomlExposures(exposures []Exposure) []tomlExposure {
+func compilationExposuresToRaw(exposures []Exposure) []rawExposure {
 	if len(exposures) == 0 {
 		return nil
 	}
-	result := make([]tomlExposure, len(exposures))
+	result := make([]rawExposure, len(exposures))
 	for i, exposure := range exposures {
-		result[i] = tomlExposure(exposure)
+		result[i] = rawExposure(exposure)
 	}
 	return result
 }

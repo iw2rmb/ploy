@@ -16,8 +16,8 @@ import (
 func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 	gateExecuted := false
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				gateExecuted = true
 				return &contracts.BuildGateStageMetadata{
@@ -79,8 +79,8 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 	gateExecuted := false
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				gateExecuted = true
 				return nil, nil
@@ -131,8 +131,8 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 	expectedErr := errors.New("gate execution failed")
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				return nil, expectedErr
 			},
@@ -176,8 +176,8 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 // build-gate sentinel error without executing the mod step.
 func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				// Simulate gate failure
 				return &contracts.BuildGateStageMetadata{
@@ -261,8 +261,8 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 	gateDelay := 5 * time.Millisecond
 
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				time.Sleep(gateDelay)
 				return &contracts.BuildGateStageMetadata{
@@ -316,11 +316,11 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 // any container runtime methods.
 func TestRunGateOnly_Enabled(t *testing.T) {
 	gateExecuted := false
-	containerCreated := false
+	crt := &testContainerRuntime{}
 
 	runner := &Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				gateExecuted = true
 				return &contracts.BuildGateStageMetadata{
@@ -333,10 +333,7 @@ func TestRunGateOnly_Enabled(t *testing.T) {
 				}, nil
 			},
 		},
-		// Use a mock container runtime to detect if it's ever called.
-		Containers: &mockContainerRuntimeForGateOnly{
-			createFn: func() { containerCreated = true },
-		},
+		Containers: crt,
 	}
 
 	manifest := contracts.StepManifest{
@@ -372,7 +369,7 @@ func TestRunGateOnly_Enabled(t *testing.T) {
 	}
 
 	// Verify container runtime was NOT invoked.
-	if containerCreated {
+	if crt.createCalled {
 		t.Errorf("RunGateOnly() should not create containers")
 	}
 
@@ -402,19 +399,17 @@ func TestRunGateOnly_Enabled(t *testing.T) {
 // runtime methods are invoked.
 func TestRunGateOnly_Disabled(t *testing.T) {
 	gateExecuted := false
-	containerCreated := false
+	crt := &testContainerRuntime{}
 
 	runner := &Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				gateExecuted = true
 				return nil, nil
 			},
 		},
-		Containers: &mockContainerRuntimeForGateOnly{
-			createFn: func() { containerCreated = true },
-		},
+		Containers: crt,
 	}
 
 	manifest := contracts.StepManifest{
@@ -450,7 +445,7 @@ func TestRunGateOnly_Disabled(t *testing.T) {
 	}
 
 	// Verify container runtime was NOT invoked.
-	if containerCreated {
+	if crt.createCalled {
 		t.Errorf("RunGateOnly() should not create containers")
 	}
 
@@ -469,8 +464,8 @@ func TestRunGateOnly_Disabled(t *testing.T) {
 // when the gate validation fails, allowing callers to trigger healing.
 func TestRunGateOnly_GateFailure(t *testing.T) {
 	runner := &Runner{
-		Workspace: &mockWorkspaceHydrator{},
-		Gate: &mockGateExecutor{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				// Simulate gate failure.
 				return &contracts.BuildGateStageMetadata{
@@ -540,7 +535,7 @@ func TestRunGateOnly_GateFailure(t *testing.T) {
 // when no gate executor is configured.
 func TestRunGateOnly_NilGate(t *testing.T) {
 	runner := &Runner{
-		Workspace: &mockWorkspaceHydrator{},
+		Workspace: &testWorkspaceHydrator{},
 		Gate:      nil, // No gate executor configured.
 	}
 
@@ -575,33 +570,4 @@ func TestRunGateOnly_NilGate(t *testing.T) {
 	if result.BuildGate != nil {
 		t.Errorf("RunGateOnly() BuildGate should be nil when gate executor is nil")
 	}
-}
-
-// mockContainerRuntimeForGateOnly is a minimal mock to detect if container
-// methods are invoked by RunGateOnly (they should not be).
-type mockContainerRuntimeForGateOnly struct {
-	createFn func()
-}
-
-func (m *mockContainerRuntimeForGateOnly) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
-	if m.createFn != nil {
-		m.createFn()
-	}
-	return ContainerHandle{ID: "mock-container"}, nil
-}
-
-func (m *mockContainerRuntimeForGateOnly) Start(ctx context.Context, handle ContainerHandle) error {
-	return nil
-}
-
-func (m *mockContainerRuntimeForGateOnly) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
-	return ContainerResult{ExitCode: 0}, nil
-}
-
-func (m *mockContainerRuntimeForGateOnly) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockContainerRuntimeForGateOnly) Remove(ctx context.Context, handle ContainerHandle) error {
-	return nil
 }

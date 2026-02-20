@@ -30,11 +30,11 @@ import (
 type BuildGateImageRule struct {
 	// Stack holds the stack expectation to match against.
 	// Language and Release are required; Tool is optional (empty = any tool).
-	Stack StackExpectation
+	Stack StackExpectation `json:"stack,omitempty" yaml:"stack,omitempty"`
 
 	// Image is the container image URL to use when this rule matches.
 	// Required field.
-	Image string
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
 }
 
 // Specificity returns the matching priority of this rule.

@@ -104,62 +104,6 @@ type Exposure struct {
 
 // compile constructs the normalized compilation payload for the manifest.
 func compile(raw rawManifest) Compilation {
-	summary := strings.TrimSpace(raw.Summary)
-	topology := Topology{
-		Description: strings.TrimSpace(raw.Topology.Description),
-		Allow:       make([]Flow, len(raw.Topology.Allow)),
-		Deny:        make([]Flow, len(raw.Topology.Deny)),
-	}
-	for i, flow := range raw.Topology.Allow {
-		topology.Allow[i] = Flow{
-			From: strings.TrimSpace(flow.From),
-			To:   strings.TrimSpace(flow.To),
-		}
-	}
-	for i, flow := range raw.Topology.Deny {
-		topology.Deny[i] = Flow{
-			From:   strings.TrimSpace(flow.From),
-			To:     strings.TrimSpace(flow.To),
-			Reason: strings.TrimSpace(flow.Reason),
-		}
-	}
-
-	fixtures := FixtureSet{
-		Required: make([]Fixture, len(raw.Fixtures.Required)),
-		Optional: make([]Fixture, len(raw.Fixtures.Optional)),
-	}
-	for i, fx := range raw.Fixtures.Required {
-		fixtures.Required[i] = Fixture{
-			Name:      strings.TrimSpace(fx.Name),
-			Reference: strings.TrimSpace(fx.Reference),
-			Reason:    strings.TrimSpace(fx.Reason),
-		}
-	}
-	for i, fx := range raw.Fixtures.Optional {
-		fixtures.Optional[i] = Fixture{
-			Name:      strings.TrimSpace(fx.Name),
-			Reference: strings.TrimSpace(fx.Reference),
-			Reason:    strings.TrimSpace(fx.Reason),
-		}
-	}
-
-	lanes := LaneSet{
-		Required: make([]Lane, len(raw.Lanes.Required)),
-		Allowed:  make([]Lane, len(raw.Lanes.Allowed)),
-	}
-	for i, lane := range raw.Lanes.Required {
-		lanes.Required[i] = Lane{
-			Name:   strings.TrimSpace(lane.Name),
-			Reason: strings.TrimSpace(lane.Reason),
-		}
-	}
-	for i, lane := range raw.Lanes.Allowed {
-		lanes.Allowed[i] = Lane{
-			Name:   strings.TrimSpace(lane.Name),
-			Reason: strings.TrimSpace(lane.Reason),
-		}
-	}
-
 	manifestVersion := strings.TrimSpace(raw.ManifestVersion)
 	if manifestVersion == "" {
 		manifestVersion = "v2"
@@ -169,16 +113,50 @@ func compile(raw rawManifest) Compilation {
 		Manifest: Metadata{
 			Name:    strings.TrimSpace(raw.Name),
 			Version: strings.TrimSpace(raw.Version),
-			Summary: summary,
+			Summary: strings.TrimSpace(raw.Summary),
 		},
 		ManifestVersion: manifestVersion,
-		Topology:        topology,
-		Services:        normalizeServices(raw.Services),
-		Edges:           normalizeEdges(raw.Edges),
-		Exposures:       normalizeExposures(raw.Exposures),
-		Fixtures:        fixtures,
-		Lanes:           lanes,
+		Topology: Topology{
+			Description: strings.TrimSpace(raw.Topology.Description),
+			Allow:       convertFlows(raw.Topology.Allow),
+			Deny:        convertFlows(raw.Topology.Deny),
+		},
+		Services:  normalizeServices(raw.Services),
+		Edges:     normalizeEdges(raw.Edges),
+		Exposures: normalizeExposures(raw.Exposures),
+		Fixtures: FixtureSet{
+			Required: convertFixtures(raw.Fixtures.Required),
+			Optional: convertFixtures(raw.Fixtures.Optional),
+		},
+		Lanes: LaneSet{
+			Required: convertLanes(raw.Lanes.Required),
+			Allowed:  convertLanes(raw.Lanes.Allowed),
+		},
 	}
+}
+
+func convertFlows(raw []rawFlow) []Flow {
+	result := make([]Flow, len(raw))
+	for i, f := range raw {
+		result[i] = Flow{From: strings.TrimSpace(f.From), To: strings.TrimSpace(f.To), Reason: strings.TrimSpace(f.Reason)}
+	}
+	return result
+}
+
+func convertFixtures(raw []rawFixture) []Fixture {
+	result := make([]Fixture, len(raw))
+	for i, f := range raw {
+		result[i] = Fixture{Name: strings.TrimSpace(f.Name), Reference: strings.TrimSpace(f.Reference), Reason: strings.TrimSpace(f.Reason)}
+	}
+	return result
+}
+
+func convertLanes(raw []rawLane) []Lane {
+	result := make([]Lane, len(raw))
+	for i, l := range raw {
+		result[i] = Lane{Name: strings.TrimSpace(l.Name), Reason: strings.TrimSpace(l.Reason)}
+	}
+	return result
 }
 
 // JSON marshals the compilation payload for downstream consumers.
