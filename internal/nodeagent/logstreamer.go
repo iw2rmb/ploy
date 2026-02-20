@@ -27,6 +27,19 @@ const (
 	softChunkSize = SoftUploadSize
 )
 
+// LogHook defines an interface for processing log data before it is
+// compressed and sent to the server.
+type LogHook interface {
+	Process(p []byte) ([]byte, error)
+}
+
+// NoOpLogHook is a placeholder hook that returns input unchanged.
+type NoOpLogHook struct{}
+
+func (h *NoOpLogHook) Process(p []byte) ([]byte, error) {
+	return p, nil
+}
+
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
 type LogStreamer struct {
 	cfg        Config

@@ -10,11 +10,11 @@
 //
 // Key files:
 //   - execution_orchestrator.go — high level run lifecycle and status upload.
-//   - execution_healing.go — Build Gate healing orchestration entrypoints.
+//   - execution_healing.go — Build Gate healing orchestration, /in persistence, and session helpers.
 //   - execution_healing_loop.go — Healing loop state machine (gate → heal → re-gate).
-//   - execution_healing_indir.go — /in artifacts and build-gate log persistence helpers.
-//   - execution_healing_session.go — session propagation helpers (`codex-session.txt`).
 //   - execution_upload.go — centralized diff/status/artifact upload helpers.
-//   - execution.go — runtime factories and GitLab MR wiring helpers.
+//   - execution.go — runtime factories, rehydration helpers, workspace/file utilities.
 //   - manifest.go — request→manifest translation and helpers for healing manifests.
+//   - job.go — job status types, image name persistence.
+//   - http.go — base HTTP client, URL builders, compression helpers.
 package nodeagent

@@ -5,26 +5,36 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 )
+
+// WorkspaceStatus returns the output of `git status --porcelain` for the given directory.
+func WorkspaceStatus(ctx context.Context, repoDir string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	cmd.Dir = repoDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("git status --porcelain failed: %w (stderr=%s)", err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), nil
+}
 
 // EnsureCommit stages and commits all changes in the repository when any exist.
 // Returns true when a commit was created.
 func EnsureCommit(ctx context.Context, repoDir, userName, userEmail, message string) (bool, error) {
-	// Quick check: is there anything to commit?
-	changed, err := hasWorkspaceChanges(ctx, repoDir)
+	status, err := WorkspaceStatus(ctx, repoDir)
 	if err != nil {
 		return false, err
 	}
-	if !changed {
+	if len(status) == 0 {
 		return false, nil
 	}
 
-	// Configure identity (best effort; ignore errors and let commit surface them).
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.name", userName)
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.email", userEmail)
 
-	// Stage all changes except build outputs like Maven 'target/'.
-	// Use pathspec excludes so we don't rely on repo .gitignore.
 	if err := runGitCommand(ctx, repoDir, nil, "add", "-A", "--", ".",
 		":(exclude)**/target/**", ":(exclude)target/"); err != nil {
 		return false, fmt.Errorf("git add: %w", err)
@@ -33,15 +43,4 @@ func EnsureCommit(ctx context.Context, repoDir, userName, userEmail, message str
 		return false, fmt.Errorf("git commit: %w", err)
 	}
 	return true, nil
-}
-
-func hasWorkspaceChanges(ctx context.Context, repoDir string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
-	cmd.Dir = repoDir
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("git status: %w", err)
-	}
-	return out.Len() > 0, nil
 }

@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/nodeagent/redact"
 )
 
 func TestPushOptions_Validation(t *testing.T) {
@@ -176,7 +174,7 @@ func TestRedactError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := redact.Error(tt.err, tt.pat)
+			result := RedactError(tt.err, tt.pat)
 			if tt.err == nil {
 				if result != nil {
 					t.Errorf("expected nil, got: %v", result)
@@ -190,7 +188,7 @@ func TestRedactError(t *testing.T) {
 			}
 
 			if result.Error() != tt.wantMsg {
-				t.Errorf("redact.Error() = %q, want %q", result.Error(), tt.wantMsg)
+				t.Errorf("RedactError() = %q, want %q", result.Error(), tt.wantMsg)
 			}
 		})
 	}

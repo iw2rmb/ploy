@@ -470,17 +470,14 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 			},
 		},
 		{
-			name: "handles workspace with no changes (error expected)",
+			name: "handles workspace with no changes (no-op)",
 			setupWorkspace: func(t *testing.T, dir string) {
-				// Workspace with no uncommitted changes.
-				// This scenario should not occur in practice since rehydration should always
-				// produce changes when applying prior diffs. However, testing error handling.
 				initGitRepo(t, dir)
 				writeFile(t, filepath.Join(dir, "base.txt"), "base content\n")
 				gitCommit(t, dir, "base commit")
 			},
 			stepIndex:     1,
-			wantErr:       true, // git commit fails with "nothing to commit".
+			wantErr:       false, // EnsureCommit returns (false, nil) when nothing to commit.
 			validateAfter: nil,
 		},
 	}

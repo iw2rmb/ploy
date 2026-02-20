@@ -1,30 +1,5 @@
 // run_options.go defines typed option structs for nodeagent execution.
-//
-// This file introduces small, focused option structs that clarify which spec/options
-// keys are understood by the nodeagent. These types replace untyped map[string]any
-// lookups throughout the package while preserving raw JSON where needed for
-// wire-level compatibility. The typed options align with the roadmap goal of
-// reducing map[string]any casts and improving internal type safety.
-//
-// ## Hot-Path Optimization
-//
-// The primary entry point for typed options is modsSpecToRunOptions(), which
-// converts directly from contracts.ModsSpec to RunOptions. This eliminates the
-// intermediate map[string]any bridge and its associated type conversion hazards:
-//   - No float64→int conversion for numeric fields (retries)
-//   - No []any→[]string conversion for slices (artifact_paths, command exec arrays)
-//   - No map[string]any type assertions at access points
-//
-// Typed options are constructed at the nodeagent boundary from the canonical
-// contracts.ModsSpec (see parseSpec in claimer_spec.go). This removes the
-// intermediate map[string]any bridge and its associated type conversion hazards.
-//
-// ## Stack-Aware Image Selection
-//
-// The Image field in StepMod, HealingMod, and ExecutionOptions uses the
-// contracts.ModImage type to support both universal images (string) and
-// stack-specific images (map keyed by stack). Resolution happens at manifest
-// build time using the detected stack from Build Gate.
+// These types replace untyped map[string]any lookups with type-safe accessors.
 package nodeagent
 
 import (
@@ -111,62 +86,38 @@ type HealingConfig struct {
 	Mod HealingMod
 }
 
-// HealingMod describes a single healing mod container specification.
-// Healing mods run after gate failure to attempt workspace fixes before re-gate.
-type HealingMod struct {
-	// Image is the container image for the healing mod (required).
-	// Supports both universal images (string) and stack-specific images (map).
-	// Resolution to a concrete image happens at manifest build time using the
-	// detected stack from Build Gate.
-	Image contracts.ModImage
-
-	// Command is the container command override (optional).
-	// Can be a single shell string or an array of command + args.
-	Command HealingCommand
-
-	// Env holds environment variables to inject into the healing container.
-	Env map[string]string
-
-	// RetainContainer controls whether the healing container is retained for debugging.
+// ContainerSpec describes a container's image, command, env, and retention policy.
+// Used for healing mods, router, and execution options.
+type ContainerSpec struct {
+	Image           contracts.ModImage
+	Command         Command
+	Env             map[string]string
 	RetainContainer bool
 }
 
-// RouterConfig describes the router container configuration.
-// Router runs on gate failure to produce a bug_summary before healing begins.
-type RouterConfig struct {
-	// Image is the container image for the router (required).
-	Image contracts.ModImage
+// HealingMod is a ContainerSpec for healing containers.
+type HealingMod = ContainerSpec
 
-	// Command is the container command override (optional).
-	Command HealingCommand
+// RouterConfig is a ContainerSpec for router containers.
+type RouterConfig = ContainerSpec
 
-	// Env holds environment variables to inject into the router container.
-	Env map[string]string
-
-	// RetainContainer controls whether the router container is retained.
-	RetainContainer bool
-}
-
-// HealingCommand represents a healing mod command as either a shell string or exec array.
-// This type encapsulates the polymorphic command representation in healing mod specs.
-type HealingCommand struct {
+// Command represents a container command as either a shell string or exec array.
+type Command struct {
 	// Shell holds the command when specified as a single shell string.
-	// When non-empty, the command is executed via ["/bin/sh", "-c", Shell].
 	Shell string
 
 	// Exec holds the command when specified as an exec array.
-	// When non-nil, the command is executed directly without a shell.
 	Exec []string
 }
 
 // IsEmpty returns true if no command is specified.
-func (c HealingCommand) IsEmpty() bool {
+func (c Command) IsEmpty() bool {
 	return c.Shell == "" && len(c.Exec) == 0
 }
 
 // ToSlice converts the command to a []string suitable for manifest execution.
 // Returns nil if the command is empty.
-func (c HealingCommand) ToSlice() []string {
+func (c Command) ToSlice() []string {
 	if len(c.Exec) > 0 {
 		return c.Exec
 	}
@@ -193,49 +144,8 @@ type MRWiringOptions struct {
 	MROnFail bool
 }
 
-// ExecutionOptions configures container execution parameters.
-// These options shape how the main mod container is configured and retained.
-type ExecutionOptions struct {
-	// Image is the container image to run (default: "ubuntu:latest").
-	// Supports both universal images (string) and stack-specific images (map).
-	// Resolution to a concrete image happens at manifest build time using the
-	// detected stack from Build Gate.
-	Image contracts.ModImage
-
-	// Command is the container command override (optional).
-	// Can be a shell string or an array of command + args.
-	Command ExecutionCommand
-
-	// RetainContainer controls whether the container is retained after run completion.
-	RetainContainer bool
-}
-
-// ExecutionCommand represents a mod command as either a shell string or exec array.
-// This type mirrors HealingCommand but is used for main mod execution.
-type ExecutionCommand struct {
-	// Shell holds the command when specified as a single shell string.
-	Shell string
-
-	// Exec holds the command when specified as an exec array.
-	Exec []string
-}
-
-// IsEmpty returns true if no command is specified.
-func (c ExecutionCommand) IsEmpty() bool {
-	return c.Shell == "" && len(c.Exec) == 0
-}
-
-// ToSlice converts the command to a []string suitable for manifest execution.
-// Returns nil if the command is empty.
-func (c ExecutionCommand) ToSlice() []string {
-	if len(c.Exec) > 0 {
-		return c.Exec
-	}
-	if c.Shell != "" {
-		return []string{"/bin/sh", "-c", c.Shell}
-	}
-	return nil
-}
+// ExecutionOptions is a ContainerSpec for mod execution containers.
+type ExecutionOptions = ContainerSpec
 
 // ArtifactOptions configures artifact collection and upload.
 // These options specify which workspace files/directories to bundle and upload,
@@ -280,7 +190,7 @@ type StepMod struct {
 	Image contracts.ModImage
 
 	// Command is the container command override for this step (optional).
-	Command ExecutionCommand
+	Command Command
 
 	// Env holds environment variables specific to this step.
 	Env map[string]string
@@ -293,23 +203,8 @@ type StepMod struct {
 	Stack *contracts.StackGateSpec
 }
 
-// modsSpecToRunOptions converts a canonical contracts.ModsSpec directly to RunOptions.
-// This is the preferred hot-path conversion that avoids the intermediate map[string]any
-// bridge and its associated type conversion hazards (float64/int, []any/[]string).
-//
-// Env merge semantics are handled alongside spec parsing (see modsSpecToEnv in
-// claimer_spec.go). This conversion focuses on producing typed option structs.
-//
-// ## Why Direct Conversion?
-//
-// The previous map-bridge pipeline introduced
-// type hazards on the hot path:
-//   - JSON numbers unmarshaled as float64 required int conversion at access points
-//   - String slices passed through []any required element-by-element conversion
-//   - Map values required type assertions at every access point
-//
-// Direct conversion from the typed ModsSpec struct eliminates these hazards by
-// reading strongly-typed fields directly (e.g., spec.BuildGate.Healing.Retries as int).
+// modsSpecToRunOptions converts contracts.ModsSpec directly to RunOptions,
+// avoiding the intermediate map[string]any bridge.
 func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	if spec == nil {
 		return RunOptions{}
@@ -317,8 +212,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 
 	runOpts := RunOptions{}
 
-	// --- Build Gate Options ---
-	// Extract enabled/images from the typed BuildGate struct.
 	if spec.BuildGate != nil {
 		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
 		runOpts.BuildGate.Images = spec.BuildGate.Images
@@ -329,22 +222,17 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
 		}
 
-		// --- Healing Configuration ---
-		// Convert contracts.HealingSpec to nodeagent.HealingConfig directly,
-		// avoiding the map[string]any bridge that required float64→int conversion.
 		if spec.BuildGate.Healing != nil {
 			healing := &HealingConfig{
 				Retries: spec.BuildGate.Healing.Retries,
 			}
-			// Default retries to 1 if not specified (spec parser sets default of 1).
 			if healing.Retries <= 0 {
 				healing.Retries = 1
 			}
 
-			// Convert flattened healing spec fields directly.
 			healing.Mod = HealingMod{
 				Image:           spec.BuildGate.Healing.Image,
-				Command:         commandSpecToHealingCommand(spec.BuildGate.Healing.Command),
+				Command:         commandSpecToCommand(spec.BuildGate.Healing.Command),
 				Env:             copyStringMap(spec.BuildGate.Healing.Env),
 				RetainContainer: spec.BuildGate.Healing.RetainContainer,
 			}
@@ -352,19 +240,16 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 			runOpts.Healing = healing
 		}
 
-		// --- Router Configuration ---
 		if spec.BuildGate.Router != nil {
 			runOpts.Router = &RouterConfig{
 				Image:           spec.BuildGate.Router.Image,
-				Command:         commandSpecToHealingCommand(spec.BuildGate.Router.Command),
+				Command:         commandSpecToCommand(spec.BuildGate.Router.Command),
 				Env:             copyStringMap(spec.BuildGate.Router.Env),
 				RetainContainer: spec.BuildGate.Router.RetainContainer,
 			}
 		}
 	}
 
-	// --- MR Wiring Options ---
-	// Direct field assignment from typed spec fields.
 	runOpts.MRWiring.GitLabPAT = spec.GitLabPAT
 	runOpts.MRWiring.GitLabDomain = spec.GitLabDomain
 	if spec.MROnSuccess != nil {
@@ -376,25 +261,20 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		runOpts.MRFlagsPresent.MROnFailSet = true
 	}
 
-	// --- Execution Options (Single-Step) ---
-	// For single-step specs, extract image/command/retain_container from steps[0].
-	// Multi-step specs populate Steps[] instead.
+	// Single-step: extract from steps[0]. Multi-step: populate Steps[].
 	if len(spec.Steps) == 1 {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
-		runOpts.Execution.Command = commandSpecToExecutionCommand(step.Command)
+		runOpts.Execution.Command = commandSpecToCommand(step.Command)
 		runOpts.Execution.RetainContainer = step.RetainContainer
 	}
 
-	// --- Multi-Step Steps Array ---
-	// For multi-step specs (len > 1), populate Steps[] with typed StepMod entries.
-	// Single-step specs use Execution options instead (Steps remains empty).
 	if len(spec.Steps) > 1 {
 		runOpts.Steps = make([]StepMod, 0, len(spec.Steps))
 		for _, step := range spec.Steps {
 			stepMod := StepMod{
 				Image:           step.Image,
-				Command:         commandSpecToExecutionCommand(step.Command),
+				Command:         commandSpecToCommand(step.Command),
 				Env:             copyStringMap(step.Env),
 				RetainContainer: step.RetainContainer,
 				Stack:           step.Stack,
@@ -403,8 +283,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		}
 	}
 
-	// --- Artifact Options ---
-	// Direct slice copy without []any→[]string conversion.
 	runOpts.Artifacts.Name = spec.ArtifactName
 	if len(spec.ArtifactPaths) > 0 {
 		runOpts.Artifacts.Paths = make([]string, 0, len(spec.ArtifactPaths))
@@ -415,8 +293,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		}
 	}
 
-	// --- Server Metadata ---
-	// Direct assignment from typed spec fields.
 	if !spec.JobID.IsZero() {
 		runOpts.ServerMetadata.JobID = spec.JobID
 	}
@@ -424,19 +300,9 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	return runOpts
 }
 
-// commandSpecToExecutionCommand converts contracts.CommandSpec to ExecutionCommand.
-// Direct field mapping without polymorphic type switching.
-func commandSpecToExecutionCommand(cmd contracts.CommandSpec) ExecutionCommand {
-	return ExecutionCommand{
-		Shell: cmd.Shell,
-		Exec:  cmd.Exec,
-	}
-}
-
-// commandSpecToHealingCommand converts contracts.CommandSpec to HealingCommand.
-// Direct field mapping without polymorphic type switching.
-func commandSpecToHealingCommand(cmd contracts.CommandSpec) HealingCommand {
-	return HealingCommand{
+// commandSpecToCommand converts contracts.CommandSpec to Command.
+func commandSpecToCommand(cmd contracts.CommandSpec) Command {
+	return Command{
 		Shell: cmd.Shell,
 		Exec:  cmd.Exec,
 	}

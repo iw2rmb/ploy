@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/nodeagent/redact"
+	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
@@ -55,7 +55,7 @@ type MRCreateRequest struct {
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 4 attempts).
 func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, error) {
 	if err := validateMRCreateRequest(req); err != nil {
-		return "", redact.Error(fmt.Errorf("invalid request: %w", err), req.PAT)
+		return "", git.RedactError(fmt.Errorf("invalid request: %w", err), req.PAT)
 	}
 
 	// Create GitLab API client using the shared configuration helper.
@@ -67,7 +67,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		HTTPClient: c.httpClient,
 	})
 	if err != nil {
-		return "", redact.Error(fmt.Errorf("create gitlab client: %w", err), req.PAT)
+		return "", git.RedactError(fmt.Errorf("create gitlab client: %w", err), req.PAT)
 	}
 
 	// Decode the URL-encoded project ID since the client-go library will re-encode it.
@@ -75,7 +75,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	// but the library expects unencoded strings (e.g., "org/project") and handles encoding internally.
 	projectID, err := url.PathUnescape(req.ProjectID)
 	if err != nil {
-		return "", redact.Error(fmt.Errorf("invalid project_id: %w", err), req.PAT)
+		return "", git.RedactError(fmt.Errorf("invalid project_id: %w", err), req.PAT)
 	}
 
 	// Build merge request creation options using client-go types.
@@ -152,7 +152,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	})
 
 	if err != nil {
-		return "", redact.Error(err, req.PAT)
+		return "", git.RedactError(err, req.PAT)
 	}
 
 	return webURL, nil
