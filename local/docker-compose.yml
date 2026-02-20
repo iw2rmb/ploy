@@ -17,8 +17,8 @@ services:
       - PLOY_CLUSTER_ID=local
       - PLOY_OBJECTSTORE_ENDPOINT=http://garage:3900
       - PLOY_OBJECTSTORE_BUCKET=ploy
-      - PLOY_OBJECTSTORE_ACCESS_KEY=ploylocal
-      - PLOY_OBJECTSTORE_SECRET_KEY=ploy-unsafe-local
+      - PLOY_OBJECTSTORE_ACCESS_KEY=GK000000000000000000000001
+      - PLOY_OBJECTSTORE_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - PLOY_OBJECTSTORE_SECURE=false
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
@@ -72,12 +72,12 @@ services:
       - "5071:5071"
 
   garage:
-    image: dxflrs/garage:v2.3.0
+    image: dxflrs/garage:v2.2.0
     entrypoint: ["/garage"]
-    command: ["-c", "/etc/garage.toml", "server", "--single-node", "--default-bucket"]
+    command: ["-c", "/etc/garage.toml", "server"]
     environment:
-      - GARAGE_DEFAULT_ACCESS_KEY=ploylocal
-      - GARAGE_DEFAULT_SECRET_KEY=ploy-unsafe-local
+      - GARAGE_DEFAULT_ACCESS_KEY=GK000000000000000000000001
+      - GARAGE_DEFAULT_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - GARAGE_DEFAULT_BUCKET=ploy
     ports:
       - "3900:3900"
@@ -87,20 +87,25 @@ services:
       - garage-meta:/var/lib/garage/meta
       - garage-data:/var/lib/garage/data
     healthcheck:
-      test: ["CMD-SHELL", "/garage -c /etc/garage.toml status >/dev/null 2>&1 || exit 1"]
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   garage-init:
-    image: dxflrs/garage:v2.3.0
+    build:
+      context: ..
+      dockerfile: local/garage/Dockerfile.init
+    image: ploy-garage-init:local
     depends_on:
       garage:
         condition: service_healthy
     environment:
-      - GARAGE_DEFAULT_ACCESS_KEY=ploylocal
-      - GARAGE_DEFAULT_SECRET_KEY=ploy-unsafe-local
+      - GARAGE_DEFAULT_ACCESS_KEY=GK000000000000000000000001
+      - GARAGE_DEFAULT_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - GARAGE_DEFAULT_BUCKET=ploy
+      - GARAGE_DEFAULT_ZONE=local
+      - GARAGE_DEFAULT_CAPACITY=1G
     volumes:
       - ./garage/config.toml:/etc/garage.toml:ro
       - ./garage/setup.sh:/usr/local/bin/garage-setup.sh:ro

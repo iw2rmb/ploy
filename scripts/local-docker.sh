@@ -337,7 +337,7 @@ main() {
   local admin_pg_dsn
   local target_server=0
   local target_node=0
-  local -a runtime_build_services=()
+  local -a runtime_build_services=(garage-init)
   local -a compose_services=(garage garage-init gradle-build-cache)
 
   parse_args "$@"

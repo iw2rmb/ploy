@@ -48,8 +48,8 @@ Local service model:
 - Bootstrap service: `garage-init`
 - Local defaults:
   - bucket: `ploy`
-  - access key: `ploylocal`
-  - secret key: `ploy-unsafe-local`
+  - access key: `GK000000000000000000000001`
+  - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
 
 The server container receives object-store settings via `PLOY_OBJECTSTORE_*` env vars.
 

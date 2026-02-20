@@ -33,7 +33,7 @@ What the script does:
 - Creates database `ploy` if missing.
 - Optional `--drop-db` drops and recreates `ploy`.
 - Builds local binaries (`make build`).
-- Builds runtime images (no Go toolchain in image builds).
+- Builds runtime images (including `garage-init`; no Go toolchain in image builds).
 - Starts compose services.
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
@@ -53,6 +53,9 @@ Defaults:
 - Compose command: `podman-compose -f local/docker-compose.yml`
 - Container engine command: `podman`
 - You can override with `COMPOSE_CMD` and `CONTAINER_ENGINE`.
+- Local Garage S3 credentials are preseeded in compose:
+  - access key: `GK000000000000000000000001`
+  - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
 
 ## Script Flags
 
@@ -74,6 +77,7 @@ No flags means full deploy (server + node + garage services).
 - Runtime images are built from:
   - `docker/server/Dockerfile.local`
   - `docker/node/Dockerfile.local`
+  - `local/garage/Dockerfile.init` (bootstrap helper image with `/garage` + shell)
 - No Go compilation happens in container builds.
 
 ## Verify
