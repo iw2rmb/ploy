@@ -14,12 +14,12 @@ import (
 func TestRunner_Run_HydrationFailure(t *testing.T) {
 	expectedErr := errors.New("hydration failed")
 	runner := Runner{
-		Workspace: &mockWorkspaceHydrator{
+		Workspace: &testWorkspaceHydrator{
 			hydrateFn: func(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
 				return expectedErr
 			},
 		},
-		Gate: &mockGateExecutor{},
+		Gate: &testGateExecutor{},
 	}
 
 	manifest := contracts.StepManifest{

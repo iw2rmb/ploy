@@ -8,30 +8,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// mockRuntime captures the ContainerSpec passed to Create and simulates a run.
-type mockRuntime struct {
-	captured ContainerSpec
-}
-
-func (m *mockRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
-	m.captured = spec
-	return ContainerHandle{ID: "mock"}, nil
-}
-
-func (m *mockRuntime) Start(ctx context.Context, handle ContainerHandle) error { return nil }
-func (m *mockRuntime) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
-	return ContainerResult{ExitCode: 0}, nil
-}
-func (m *mockRuntime) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
-	return nil, nil
-}
-func (m *mockRuntime) Remove(ctx context.Context, handle ContainerHandle) error { return nil }
-
 // TestRunner_Run_SetsRunIDLabel verifies that the container labels include
 // LabelRunID when a RunID is provided in the Request. This enables telemetry
 // and log aggregation systems to correlate containers with workflow runs.
 func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
-	rt := &mockRuntime{}
+	rt := &testContainerRuntime{}
 	runner := Runner{Containers: rt}
 
 	runID := types.RunID("run-123")
@@ -64,7 +45,7 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 // do not include LabelRunID when no RunID is provided in the Request.
 // This avoids empty or misleading labels in telemetry systems.
 func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
-	rt := &mockRuntime{}
+	rt := &testContainerRuntime{}
 	runner := Runner{Containers: rt}
 
 	manifest := contracts.StepManifest{

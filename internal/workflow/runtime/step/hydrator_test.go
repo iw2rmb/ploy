@@ -10,18 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// mockGitFetcher is a test double for GitFetcher.
-type mockGitFetcher struct {
-	fetchFunc func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
-}
-
-func (m *mockGitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
-	if m.fetchFunc != nil {
-		return m.fetchFunc(ctx, repo, dest)
-	}
-	return nil
-}
-
 func TestNewFilesystemWorkspaceHydrator(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -32,7 +20,7 @@ func TestNewFilesystemWorkspaceHydrator(t *testing.T) {
 		{
 			name: "valid options",
 			opts: FilesystemWorkspaceHydratorOptions{
-				RepoFetcher: &mockGitFetcher{},
+				RepoFetcher: &testGitFetcher{},
 			},
 			wantErr: false,
 		},
@@ -66,7 +54,7 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 		name      string
 		manifest  contracts.StepManifest
 		workspace string
-		fetcher   *mockGitFetcher
+		fetcher   *testGitFetcher
 		wantErr   bool
 		errSubstr string
 	}{
@@ -83,7 +71,7 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 				},
 			},
 			workspace: "/tmp/workspace",
-			fetcher:   &mockGitFetcher{},
+			fetcher:   &testGitFetcher{},
 			wantErr:   false,
 		},
 		{
@@ -105,8 +93,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 				},
 			},
 			workspace: "/tmp/workspace",
-			fetcher: &mockGitFetcher{
-				fetchFunc: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
+			fetcher: &testGitFetcher{
+				fetchFn: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
 					if repo.URL != "https://github.com/example/repo.git" {
 						return errors.New("unexpected repo URL")
 					}
@@ -137,8 +125,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 				},
 			},
 			workspace: "/tmp/workspace",
-			fetcher: &mockGitFetcher{
-				fetchFunc: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
+			fetcher: &testGitFetcher{
+				fetchFn: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
 					return errors.New("fetch failed")
 				},
 			},
@@ -182,8 +170,8 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 				},
 			},
 			workspace: "/tmp/workspace",
-			fetcher: &mockGitFetcher{
-				fetchFunc: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
+			fetcher: &testGitFetcher{
+				fetchFn: func(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
 					return nil
 				},
 			},

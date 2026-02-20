@@ -29,6 +29,9 @@ package step
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,8 +40,10 @@ import (
 	"strings"
 
 	units "github.com/docker/go-units"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
+	"github.com/moby/moby/client"
 )
 
 // dockerGateExecutor runs build validation inside language images using the
@@ -318,4 +323,168 @@ func buildCommandForTool(tool string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}
+}
+
+// --- Image selection helpers (merged from gate_docker_image_selection.go) ---
+
+var (
+	errBuildGateImageMapping   = errors.New("build gate image mapping")
+	errBuildGateImageRuleMatch = errors.New("build gate image rule match")
+)
+
+func resolveImageForExpectation(
+	mappingPath string,
+	overrides []contracts.BuildGateImageRule,
+	exp contracts.StackExpectation,
+	required bool,
+) (string, error) {
+	resolver, err := NewBuildGateImageResolver(mappingPath, overrides, required)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errBuildGateImageMapping, err)
+	}
+	resolved, err := resolver.Resolve(exp)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errBuildGateImageRuleMatch, err)
+	}
+	return resolved, nil
+}
+
+func resolveExpectedRuntimeImageForStackGate(
+	envImage string,
+	mappingPath string,
+	overrides []contracts.BuildGateImageRule,
+	expect *contracts.StackExpectation,
+) (string, error) {
+	if envImage != "" {
+		return envImage, nil
+	}
+	if expect == nil || strings.TrimSpace(expect.Release) == "" {
+		return "", fmt.Errorf("stack gate expectation missing release")
+	}
+	return resolveImageForExpectation(mappingPath, overrides, *expect, true)
+}
+
+// --- Metadata helpers (merged from gate_docker_metadata.go) ---
+
+func buildGateExecutionMetadata(
+	workspace string,
+	language string,
+	tool string,
+	image string,
+	res ContainerResult,
+	logs []byte,
+) *contracts.BuildGateStageMetadata {
+	passed := res.ExitCode == 0
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{
+			Language: language,
+			Tool:     tool,
+			Passed:   passed,
+		}},
+		RuntimeImage: image,
+	}
+	if passed && strings.EqualFold(tool, "gradle") {
+		if hits := readGradleBuildCacheHits(workspace); len(hits) > 0 {
+			meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{
+				Severity: "info",
+				Code:     "GRADLE_BUILD_CACHE_HIT",
+				Message:  fmt.Sprintf("gradle build cache hits (%d): %s", len(hits), strings.Join(hits, ", ")),
+			})
+		}
+	}
+	if !passed {
+		trimmed := TrimBuildGateLog(tool, string(logs))
+		msg := strings.TrimSpace(trimmed)
+		if msg == "" {
+			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)
+		}
+		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
+	}
+	attachLogsTextAndDigest(meta, logs)
+	return meta
+}
+
+func attachLogsTextAndDigest(meta *contracts.BuildGateStageMetadata, logs []byte) {
+	const maxLogBytes = 10 << 20 // 10 MiB safety cap in memory
+	if len(logs) > maxLogBytes {
+		logs = logs[:maxLogBytes]
+	}
+	meta.LogsText = string(logs)
+	meta.LogDigest = sha256Digest(logs)
+}
+
+func sha256Digest(b []byte) types.Sha256Digest {
+	h := sha256.Sum256(b)
+	return types.Sha256Digest(fmt.Sprintf("sha256:%x", h[:]))
+}
+
+// --- Resource usage helpers (merged from gate_docker_resources.go) ---
+
+func collectDockerResourceUsage(
+	ctx context.Context,
+	rt ContainerRuntime,
+	h ContainerHandle,
+	spec ContainerSpec,
+) *contracts.BuildGateResourceUsage {
+	d, ok := rt.(*DockerContainerRuntime)
+	if !ok || d == nil || d.client == nil {
+		return nil
+	}
+
+	stats, err := d.client.ContainerStats(ctx, h.ID, dockerStatsOptions())
+	if err != nil || stats.Body == nil {
+		return nil
+	}
+	defer func() { _ = stats.Body.Close() }()
+
+	var sj struct {
+		MemoryStats struct{ Usage, MaxUsage uint64 } `json:"memory_stats"`
+		CPUStats    struct {
+			CPUUsage struct{ TotalUsage uint64 } `json:"cpu_usage"`
+		} `json:"cpu_stats"`
+		BlkioStats struct {
+			IoServiceBytesRecursive []struct {
+				Op    string
+				Value uint64
+			}
+		} `json:"blkio_stats"`
+	}
+	_ = json.NewDecoder(stats.Body).Decode(&sj)
+
+	var readBytes, writeBytes uint64
+	for _, rec := range sj.BlkioStats.IoServiceBytesRecursive {
+		switch strings.ToLower(rec.Op) {
+		case "read":
+			readBytes += rec.Value
+		case "write":
+			writeBytes += rec.Value
+		}
+	}
+
+	var sizeRw *int64
+	if inspect, ierr := d.client.ContainerInspect(ctx, h.ID, dockerInspectOptionsWithSize()); ierr == nil {
+		if inspect.Container.SizeRw != nil {
+			size := *inspect.Container.SizeRw
+			sizeRw = &size
+		}
+	}
+
+	return &contracts.BuildGateResourceUsage{
+		LimitNanoCPUs:    spec.LimitNanoCPUs,
+		LimitMemoryBytes: spec.LimitMemoryBytes,
+		CPUTotalNs:       sj.CPUStats.CPUUsage.TotalUsage,
+		MemUsageBytes:    sj.MemoryStats.Usage,
+		MemMaxBytes:      sj.MemoryStats.MaxUsage,
+		BlkioReadBytes:   readBytes,
+		BlkioWriteBytes:  writeBytes,
+		SizeRwBytes:      sizeRw,
+	}
+}
+
+func dockerStatsOptions() client.ContainerStatsOptions {
+	return client.ContainerStatsOptions{Stream: false}
+}
+
+func dockerInspectOptionsWithSize() client.ContainerInspectOptions {
+	return client.ContainerInspectOptions{Size: true}
 }

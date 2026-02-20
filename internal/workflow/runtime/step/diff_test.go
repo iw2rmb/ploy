@@ -46,7 +46,7 @@ func TestFilesystemDiffGenerator_Generate(t *testing.T) {
 	}
 
 	// Create diff generator and generate diff.
-	generator := NewFilesystemDiffGenerator(FilesystemDiffGeneratorOptions{})
+	generator := NewFilesystemDiffGenerator()
 	ctx := context.Background()
 
 	diffBytes, err := generator.Generate(ctx, tmpDir)
@@ -99,7 +99,7 @@ func TestFilesystemDiffGenerator_Generate_NoDiff(t *testing.T) {
 	}
 
 	// Create diff generator and generate diff (no changes).
-	generator := NewFilesystemDiffGenerator(FilesystemDiffGeneratorOptions{})
+	generator := NewFilesystemDiffGenerator()
 	ctx := context.Background()
 
 	diffBytes, err := generator.Generate(ctx, tmpDir)
@@ -118,7 +118,7 @@ func TestFilesystemDiffGenerator_Generate_NonGitRepo(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create diff generator and attempt to generate diff.
-	generator := NewFilesystemDiffGenerator(FilesystemDiffGeneratorOptions{})
+	generator := NewFilesystemDiffGenerator()
 	ctx := context.Background()
 
 	_, err := generator.Generate(ctx, tmpDir)
@@ -159,7 +159,7 @@ func TestFilesystemDiffGenerator_Generate_ContextCancellation(t *testing.T) {
 	}
 
 	// Create diff generator with cancelled context.
-	generator := NewFilesystemDiffGenerator(FilesystemDiffGeneratorOptions{})
+	generator := NewFilesystemDiffGenerator()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately.
 

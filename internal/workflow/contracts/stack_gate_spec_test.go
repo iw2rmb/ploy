@@ -589,12 +589,16 @@ func TestStackGateWire_EmptyOmitted(t *testing.T) {
 	}
 
 	m := spec.ToMap()
-	stepsRaw, ok := m["steps"].([]map[string]any)
+	stepsRaw, ok := m["steps"].([]any)
 	if !ok {
 		t.Fatal("steps not in expected format")
 	}
 
-	if _, exists := stepsRaw[0]["stack"]; exists {
+	step0, ok := stepsRaw[0].(map[string]any)
+	if !ok {
+		t.Fatal("step[0] not in expected format")
+	}
+	if _, exists := step0["stack"]; exists {
 		t.Error("stack should be omitted when nil")
 	}
 }
@@ -611,13 +615,17 @@ func TestStackGateWire_DisabledOmitted(t *testing.T) {
 	}
 
 	m := spec.ToMap()
-	stepsRaw, ok := m["steps"].([]map[string]any)
+	stepsRaw, ok := m["steps"].([]any)
 	if !ok {
 		t.Fatal("steps not in expected format")
 	}
 
-	// Stack should be omitted entirely when all phases are disabled.
-	if _, exists := stepsRaw[0]["stack"]; exists {
-		t.Error("stack should be omitted when all phases are disabled")
+	step0, ok := stepsRaw[0].(map[string]any)
+	if !ok {
+		t.Fatal("step[0] not in expected format")
+	}
+	// Stack should be omitted or null when all phases are disabled.
+	if v, exists := step0["stack"]; exists && v != nil {
+		t.Errorf("stack should be omitted or null when all phases are disabled, got %v", v)
 	}
 }
