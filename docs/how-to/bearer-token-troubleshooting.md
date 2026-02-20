@@ -390,7 +390,7 @@ resp, _ := client.Do(req)
 ### Update Node Provisioning
 
 In the local Docker cluster, the node authenticates to the control plane using
-the bearer token at `/etc/ploy/bearer-token`. `scripts/deploy-locally.sh` writes
+the bearer token at `/etc/ploy/bearer-token`. `scripts/local-docker.sh` writes
 this file into the node container and restarts it.
 
 ## Related Documentation

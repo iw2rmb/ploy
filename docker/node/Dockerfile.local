@@ -1,0 +1,13 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates bash tzdata curl jq docker-cli git rsync && \
+    adduser -D -H -s /sbin/nologin ploy && \
+    mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
+    chown -R ploy:ploy /etc/ploy /var/lib/ploy
+
+COPY --chown=ploy:ploy etc/ploy/gates/build-gate-images.yaml /etc/ploy/gates/build-gate-images.yaml
+
+USER root
+VOLUME ["/var/run/docker.sock"]
+ENTRYPOINT ["/usr/local/bin/ployd-node"]
+CMD ["--config","/etc/ploy/ployd-node.yaml"]

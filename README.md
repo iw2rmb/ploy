@@ -84,10 +84,11 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `drop_partitions`: when true, drop whole monthly partitions older than `ttl`
 
 **Quick Start (Local Docker)**
-- Deploy the local Docker stack (server + db + node) and write a local CLI descriptor:
+- Deploy the local Docker stack (server + node + garage services) and write a local CLI descriptor:
 
   ```bash
-  ./scripts/deploy-locally.sh
+  export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+  ./scripts/local-docker.sh
   export PLOY_CONFIG_HOME="$PWD/local/cli"
   ```
 
