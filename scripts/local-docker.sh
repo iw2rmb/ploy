@@ -44,7 +44,7 @@ Usage: ./scripts/local-docker.sh [--drop-db] [--ployd] [--nodes]
 Options:
   --drop-db  Drop and recreate the ploy database before deploy
   --ployd    Refresh/deploy server only
-  --nodes    Refresh/deploy node only
+  --nodes    Refresh/deploy node (includes required server dependency)
 
 Environment:
   PLOY_LOCAL_PG_DSN_CONTAINER  Container-reachable postgres DSN (default: PLOY_LOCAL_PG_DSN)
@@ -489,6 +489,11 @@ main() {
     if [[ $REFRESH_NODES -eq 1 ]]; then
       target_node=1
     fi
+  fi
+
+  # Node service depends on server health in compose, so include server when refreshing node.
+  if [[ $target_node -eq 1 ]]; then
+    target_server=1
   fi
 
   if [[ $target_server -eq 1 ]]; then
