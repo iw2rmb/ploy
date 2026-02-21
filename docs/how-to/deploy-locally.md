@@ -70,7 +70,7 @@ Both scripts support:
 ```bash
 --drop-db   # drop + recreate "ploy" before deploy
 --ployd     # refresh/deploy server only
---nodes     # refresh/deploy node only
+--nodes     # refresh/deploy node (+ required server dependency)
 ```
 
 No flags means full deploy (server + node + garage services).
@@ -133,7 +133,9 @@ For a full reset including DB recreation:
 - Node cannot run containers:
   - Ensure socket mount path is valid:
     - Docker script default: `/var/run/docker.sock`
-    - Podman script default: `/run/user/$UID/podman/podman.sock`
+    - Podman script default: auto-detected (`/run/podman/podman.sock` for rootful machines, `/run/user/$UID/podman/podman.sock` for rootless)
+  - Override explicitly if needed: `export PLOY_CONTAINER_SOCKET_PATH=/run/podman/podman.sock`
+  - Local compose sets `security_opt: [label=disable]` for `node` to allow Podman socket access under SELinux.
 - Logs:
   - `docker compose -f local/docker-compose.yml logs -f server`
   - `docker compose -f local/docker-compose.yml logs -f node`

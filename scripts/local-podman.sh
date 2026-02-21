@@ -18,7 +18,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
 PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
 PLOY_LOCAL_PG_DSN_CONTAINER="${PLOY_LOCAL_PG_DSN_CONTAINER:-}"
-PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/run/user/${UID}/podman/podman.sock}"
+PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-}"
 PLOY_LOCAL_SERVER_PORT="${PLOY_LOCAL_SERVER_PORT:-8080}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/local/node/bearer-token}"
 
@@ -44,11 +44,12 @@ Usage: ./scripts/local-podman.sh [--drop-db] [--ployd] [--nodes]
 Options:
   --drop-db  Drop and recreate the ploy database before deploy
   --ployd    Refresh/deploy server only
-  --nodes    Refresh/deploy node only
+  --nodes    Refresh/deploy node (includes required server dependency)
 
 Environment:
   PLOY_LOCAL_PG_DSN_CONTAINER  Container-reachable postgres DSN (default: PLOY_LOCAL_PG_DSN)
   PLOY_LOCAL_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
+  PLOY_CONTAINER_SOCKET_PATH  Podman socket mounted to /var/run/docker.sock (auto-detected by default)
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: local/node/bearer-token)
 USAGE
 }
@@ -77,6 +78,98 @@ parse_args() {
     esac
     shift
   done
+}
+
+detect_socket_from_default_connection() {
+  local uri path
+
+  uri="$(podman system connection list 2>/dev/null | awk 'NR>1 && $4=="true" {print $2; exit}')"
+  if [[ -z "$uri" ]]; then
+    return 1
+  fi
+
+  path="$("$PYTHON_BIN" - "$uri" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+uri = sys.argv[1].strip()
+if not uri:
+    raise SystemExit(1)
+if "://" not in uri:
+    print(uri)
+    raise SystemExit(0)
+
+u = urlsplit(uri)
+if u.path:
+    print(u.path)
+PY
+)"
+  if [[ -z "$path" ]]; then
+    return 1
+  fi
+
+  case "$path" in
+    */run/podman/podman.sock)
+      printf '/run/podman/podman.sock'
+      ;;
+    */run/user/*/podman/podman.sock)
+      printf '%s' "$path"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+detect_socket_from_machine_mode() {
+  local machine_name rootful
+
+  machine_name="${PLOY_PODMAN_MACHINE_NAME:-podman-machine-default}"
+  rootful="$(podman machine inspect "$machine_name" 2>/dev/null | "$PYTHON_BIN" <<'PY'
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+
+if not isinstance(data, list) or not data:
+    raise SystemExit(1)
+
+print("true" if data[0].get("Rootful") else "false")
+PY
+)"
+
+  case "$rootful" in
+    true)
+      printf '/run/podman/podman.sock'
+      ;;
+    false)
+      printf '/run/user/%s/podman/podman.sock' "$UID"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+resolve_container_socket_path() {
+  local detected
+
+  if [[ -n "$PLOY_CONTAINER_SOCKET_PATH" ]]; then
+    return
+  fi
+
+  detected="$(detect_socket_from_default_connection || true)"
+  if [[ -z "$detected" ]]; then
+    detected="$(detect_socket_from_machine_mode || true)"
+  fi
+  if [[ -z "$detected" ]]; then
+    detected="/run/user/${UID}/podman/podman.sock"
+  fi
+
+  PLOY_CONTAINER_SOCKET_PATH="$detected"
 }
 
 derive_admin_pg_dsn() {
@@ -498,6 +591,8 @@ main() {
   need curl
   need psql
   need pg_isready
+  resolve_container_socket_path
+  log "Using container socket path: ${PLOY_CONTAINER_SOCKET_PATH}"
 
   if [[ -z "$PLOY_LOCAL_PG_DSN" ]]; then
     echo "error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
@@ -555,6 +650,11 @@ main() {
     if [[ $REFRESH_NODES -eq 1 ]]; then
       target_node=1
     fi
+  fi
+
+  # Node service depends on server health in compose, so include server when refreshing node.
+  if [[ $target_node -eq 1 ]]; then
+    target_server=1
   fi
 
   if [[ $target_server -eq 1 ]]; then

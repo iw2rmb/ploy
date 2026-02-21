@@ -42,7 +42,11 @@ defaults change, or components adopt additional configuration.
   Default: `local/node/bearer-token` (file path). If this path is a directory, scripts
   replace it with a file automatically.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
-  `node` container at `/var/run/docker.sock`. Defaults to `/var/run/docker.sock`.
+  `node` container at `/var/run/docker.sock`.
+  Docker script default: `/var/run/docker.sock`.
+  Podman script default: auto-detected from Podman connection/machine mode
+  (`/run/podman/podman.sock` for rootful, `/run/user/$UID/podman/podman.sock` for rootless),
+  with fallback to `/run/user/$UID/podman/podman.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
   default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
