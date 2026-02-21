@@ -24,7 +24,7 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	const maxBodySize = 16 << 20  // 16 MiB
 	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := domaintypes.ParseRunIDParam(r, "id")
+		runID, err := ParseRunIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

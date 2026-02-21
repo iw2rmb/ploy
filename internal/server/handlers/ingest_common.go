@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // requiredPathParam extracts and validates a required path parameter from the request.
@@ -88,4 +90,200 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 		return fmt.Errorf("request body must contain exactly one JSON value: %w", err)
 	}
 	return nil
+}
+
+// ParseRunIDParam extracts and validates a RunID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseRunIDParam(r *http.Request, key string) (domaintypes.RunID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// ParseJobIDParam extracts and validates a JobID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseJobIDParam(r *http.Request, key string) (domaintypes.JobID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// ParseNodeIDParam extracts and validates a NodeID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseNodeIDParam(r *http.Request, key string) (domaintypes.NodeID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.NodeID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// ParseModIDParam extracts and validates a ModID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseModIDParam(r *http.Request, key string) (domaintypes.ModID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.ModID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// ParseModRefParam extracts and validates a ModRef from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing, empty, or invalid.
+func ParseModRefParam(r *http.Request, key string) (domaintypes.ModRef, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	ref := domaintypes.ModRef(val)
+	if err := ref.Validate(); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return ref, nil
+}
+
+// ParseModRepoIDParam extracts and validates a ModRepoID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseModRepoIDParam(r *http.Request, key string) (domaintypes.ModRepoID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.ModRepoID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// ParseSpecIDParam extracts and validates a SpecID from a path parameter.
+// Returns 400 Bad Request error if the parameter is missing or empty.
+func ParseSpecIDParam(r *http.Request, key string) (domaintypes.SpecID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return "", fmt.Errorf("%s path parameter is required", key)
+	}
+	var id domaintypes.SpecID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// OptionalRunIDParam extracts an optional RunID from a path parameter.
+// Returns nil if the parameter is missing or empty.
+func OptionalRunIDParam(r *http.Request, key string) (*domaintypes.RunID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return nil, nil
+	}
+	var id domaintypes.RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
+}
+
+// OptionalJobIDParam extracts an optional JobID from a path parameter.
+// Returns nil if the parameter is missing or empty.
+func OptionalJobIDParam(r *http.Request, key string) (*domaintypes.JobID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return nil, nil
+	}
+	var id domaintypes.JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
+}
+
+// OptionalNodeIDParam extracts an optional NodeID from a path parameter.
+// Returns nil if the parameter is missing or empty.
+func OptionalNodeIDParam(r *http.Request, key string) (*domaintypes.NodeID, error) {
+	val := strings.TrimSpace(r.PathValue(key))
+	if val == "" {
+		return nil, nil
+	}
+	var id domaintypes.NodeID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
+}
+
+// ParseRunIDQuery extracts and validates a RunID from a query parameter.
+// Returns error if the parameter is missing or empty.
+func ParseRunIDQuery(r *http.Request, key string) (domaintypes.RunID, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return "", fmt.Errorf("%s query parameter is required", key)
+	}
+	var id domaintypes.RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
+}
+
+// OptionalRunIDQuery extracts an optional RunID from a query parameter.
+// Returns nil if the parameter is missing or empty.
+func OptionalRunIDQuery(r *http.Request, key string) (*domaintypes.RunID, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return nil, nil
+	}
+	var id domaintypes.RunID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
+}
+
+// OptionalJobIDQuery extracts an optional JobID from a query parameter.
+// Returns nil if the parameter is missing or empty.
+func OptionalJobIDQuery(r *http.Request, key string) (*domaintypes.JobID, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return nil, nil
+	}
+	var id domaintypes.JobID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return nil, fmt.Errorf("%s: %w", key, err)
+	}
+	return &id, nil
+}
+
+// ParseDiffIDQuery extracts and validates a DiffID from a query parameter.
+// Returns error if the parameter is missing or empty.
+func ParseDiffIDQuery(r *http.Request, key string) (domaintypes.DiffID, error) {
+	val := strings.TrimSpace(r.URL.Query().Get(key))
+	if val == "" {
+		return "", fmt.Errorf("%s query parameter is required", key)
+	}
+	var id domaintypes.DiffID
+	if err := id.UnmarshalText([]byte(val)); err != nil {
+		return "", fmt.Errorf("%s: %w", key, err)
+	}
+	return id, nil
 }

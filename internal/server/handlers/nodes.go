@@ -9,14 +9,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
+		nodeID, err := ParseNodeIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -56,7 +55,7 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
+		nodeID, err := ParseNodeIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

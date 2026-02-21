@@ -23,7 +23,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // Config holds follow engine configuration.
@@ -237,7 +236,7 @@ func (e *Engine) refreshRepos(ctx context.Context) error {
 		if repoURL == "" {
 			repoURL = repo.RepoID.String()
 		} else {
-			repoURL = vcs.NormalizeRepoURLSchemless(repoURL)
+			repoURL = domaintypes.NormalizeRepoURLSchemless(repoURL)
 		}
 		e.repoURLs[repo.RepoID] = repoURL
 		e.repoErrors[repo.RepoID] = repo.LastError

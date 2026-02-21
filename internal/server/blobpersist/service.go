@@ -38,101 +38,83 @@ func (s *Service) validate() error {
 	return nil
 }
 
-// CreateLog creates a log entry in the database and uploads the data to object storage.
-// Returns the created log metadata.
-func (s *Service) CreateLog(ctx context.Context, params store.CreateLogParams, data []byte) (store.Log, error) {
+// persistBlob is the shared insert→upload→rollback helper.
+func persistBlob[T any](
+	ctx context.Context,
+	s *Service,
+	data []byte,
+	setSize func(int64),
+	insert func(context.Context) (T, error),
+	objectKey func(T) *string,
+	entityID func(T) any,
+	entityName string,
+	deleteFn func(context.Context, T) error,
+) (T, error) {
+	var zero T
 	if err := s.validate(); err != nil {
-		return store.Log{}, err
+		return zero, err
 	}
 
-	// Set the data size from the actual data length.
-	params.DataSize = int64(len(data))
+	setSize(int64(len(data)))
 
-	// Insert metadata row to DB (returns row with generated object_key).
-	log, err := s.store.CreateLog(ctx, params)
+	row, err := insert(ctx)
 	if err != nil {
-		return store.Log{}, fmt.Errorf("blobpersist: create log metadata: %w", err)
+		return zero, fmt.Errorf("blobpersist: create %s metadata: %w", entityName, err)
 	}
 
-	// Upload bytes to S3-compatible object storage at object_key.
-	if log.ObjectKey == nil || *log.ObjectKey == "" {
-		return store.Log{}, fmt.Errorf("blobpersist: log %d has no object_key", log.ID)
+	key := objectKey(row)
+	if key == nil || *key == "" {
+		return zero, fmt.Errorf("blobpersist: %s %v has no object_key", entityName, entityID(row))
 	}
 
-	_, err = s.blobstore.Put(ctx, *log.ObjectKey, "application/gzip", data)
+	_, err = s.blobstore.Put(ctx, *key, "application/gzip", data)
 	if err != nil {
-		rollbackErr := s.store.DeleteLog(ctx, log.ID)
+		rollbackErr := deleteFn(ctx, row)
 		if rollbackErr != nil {
-			return store.Log{}, fmt.Errorf("blobpersist: upload log %d: %w (rollback failed: %v)", log.ID, err, rollbackErr)
+			return zero, fmt.Errorf("blobpersist: upload %s %v: %w (rollback failed: %v)", entityName, entityID(row), err, rollbackErr)
 		}
-		return store.Log{}, fmt.Errorf("blobpersist: upload log %d: %w", log.ID, err)
+		return zero, fmt.Errorf("blobpersist: upload %s %v: %w", entityName, entityID(row), err)
 	}
 
-	return log, nil
+	return row, nil
+}
+
+// CreateLog creates a log entry in the database and uploads the data to object storage.
+func (s *Service) CreateLog(ctx context.Context, params store.CreateLogParams, data []byte) (store.Log, error) {
+	return persistBlob(ctx, s, data,
+		func(size int64) { params.DataSize = size },
+		func(ctx context.Context) (store.Log, error) { return s.store.CreateLog(ctx, params) },
+		func(row store.Log) *string { return row.ObjectKey },
+		func(row store.Log) any { return row.ID },
+		"log",
+		func(ctx context.Context, row store.Log) error { return s.store.DeleteLog(ctx, row.ID) },
+	)
 }
 
 // CreateDiff creates a diff entry in the database and uploads the patch to object storage.
-// Returns the created diff metadata.
 func (s *Service) CreateDiff(ctx context.Context, params store.CreateDiffParams, patch []byte) (store.Diff, error) {
-	if err := s.validate(); err != nil {
-		return store.Diff{}, err
-	}
-
-	// Set the patch size from the actual data length.
-	params.PatchSize = int64(len(patch))
-
-	// Insert metadata row to DB (returns row with generated object_key).
-	diff, err := s.store.CreateDiff(ctx, params)
-	if err != nil {
-		return store.Diff{}, fmt.Errorf("blobpersist: create diff metadata: %w", err)
-	}
-
-	// Upload bytes to S3-compatible object storage at object_key.
-	if diff.ObjectKey == nil || *diff.ObjectKey == "" {
-		return store.Diff{}, fmt.Errorf("blobpersist: diff %v has no object_key", diff.ID)
-	}
-
-	_, err = s.blobstore.Put(ctx, *diff.ObjectKey, "application/gzip", patch)
-	if err != nil {
-		rollbackErr := s.store.DeleteDiff(ctx, diff.ID)
-		if rollbackErr != nil {
-			return store.Diff{}, fmt.Errorf("blobpersist: upload diff %v: %w (rollback failed: %v)", diff.ID, err, rollbackErr)
-		}
-		return store.Diff{}, fmt.Errorf("blobpersist: upload diff %v: %w", diff.ID, err)
-	}
-
-	return diff, nil
+	return persistBlob(ctx, s, patch,
+		func(size int64) { params.PatchSize = size },
+		func(ctx context.Context) (store.Diff, error) { return s.store.CreateDiff(ctx, params) },
+		func(row store.Diff) *string { return row.ObjectKey },
+		func(row store.Diff) any { return row.ID },
+		"diff",
+		func(ctx context.Context, row store.Diff) error { return s.store.DeleteDiff(ctx, row.ID) },
+	)
 }
 
 // CreateArtifactBundle creates an artifact bundle entry in the database and uploads the bundle to object storage.
-// Returns the created artifact bundle metadata.
 func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams, bundle []byte) (store.ArtifactBundle, error) {
-	if err := s.validate(); err != nil {
-		return store.ArtifactBundle{}, err
-	}
-
-	// Set the bundle size from the actual data length.
-	params.BundleSize = int64(len(bundle))
-
-	// Insert metadata row to DB (returns row with generated object_key).
-	artifact, err := s.store.CreateArtifactBundle(ctx, params)
-	if err != nil {
-		return store.ArtifactBundle{}, fmt.Errorf("blobpersist: create artifact bundle metadata: %w", err)
-	}
-
-	// Upload bytes to S3-compatible object storage at object_key.
-	if artifact.ObjectKey == nil || *artifact.ObjectKey == "" {
-		return store.ArtifactBundle{}, fmt.Errorf("blobpersist: artifact bundle %v has no object_key", artifact.ID)
-	}
-
-	_, err = s.blobstore.Put(ctx, *artifact.ObjectKey, "application/gzip", bundle)
-	if err != nil {
-		rollbackErr := s.store.DeleteArtifactBundle(ctx, artifact.ID)
-		if rollbackErr != nil {
-			return store.ArtifactBundle{}, fmt.Errorf("blobpersist: upload artifact bundle %v: %w (rollback failed: %v)", artifact.ID, err, rollbackErr)
-		}
-		return store.ArtifactBundle{}, fmt.Errorf("blobpersist: upload artifact bundle %v: %w", artifact.ID, err)
-	}
-
-	return artifact, nil
+	return persistBlob(ctx, s, bundle,
+		func(size int64) { params.BundleSize = size },
+		func(ctx context.Context) (store.ArtifactBundle, error) {
+			return s.store.CreateArtifactBundle(ctx, params)
+		},
+		func(row store.ArtifactBundle) *string { return row.ObjectKey },
+		func(row store.ArtifactBundle) any { return row.ID },
+		"artifact bundle",
+		func(ctx context.Context, row store.ArtifactBundle) error {
+			return s.store.DeleteArtifactBundle(ctx, row.ID)
+		},
+	)
 }

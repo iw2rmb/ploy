@@ -12,7 +12,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // createModRunHandler creates a batch run from the mod + spec + selected repos and immediately starts it.
@@ -32,7 +31,7 @@ import (
 func createModRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse mod_id from URL path.
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -226,16 +225,16 @@ func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.Mo
 
 	case "explicit":
 		// Build a set of normalized URLs for matching.
-		// Use vcs.NormalizeRepoURL for URL comparison.
+		// Use domaintypes.NormalizeRepoURL for URL comparison.
 		normalizedURLs := make(map[string]bool, len(repoURLs))
 		for _, url := range repoURLs {
-			normalizedURLs[vcs.NormalizeRepoURL(url)] = true
+			normalizedURLs[domaintypes.NormalizeRepoURL(url)] = true
 		}
 
 		// Filter allRepos to only include those with matching URLs.
 		var explicitRepos []store.ModRepo
 		for _, repo := range allRepos {
-			if normalizedURLs[vcs.NormalizeRepoURL(repo.RepoUrl)] {
+			if normalizedURLs[domaintypes.NormalizeRepoURL(repo.RepoUrl)] {
 				explicitRepos = append(explicitRepos, repo)
 			}
 		}

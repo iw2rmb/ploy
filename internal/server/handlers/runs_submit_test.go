@@ -152,7 +152,7 @@ func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 }
 
 // TestRunsCreateSingleRepo_RepoURLNormalized verifies repo URLs are normalized.
-// Uses vcs.NormalizeRepoURL for URL normalization.
+// Uses types.NormalizeRepoURL for URL normalization.
 func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()
@@ -186,7 +186,7 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	if !st.createModRepoCalled {
 		t.Fatal("store.CreateModRepo was not called")
 	}
-	// vcs.NormalizeRepoURL trims trailing "/" and ".git".
+	// types.NormalizeRepoURL trims trailing "/" and ".git".
 	expectedURL := "https://github.com/org/repo"
 	if st.createModRepoParams.RepoUrl != expectedURL {
 		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createModRepoParams.RepoUrl, expectedURL)

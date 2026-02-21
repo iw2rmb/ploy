@@ -63,3 +63,9 @@ func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
 	}
 	return d.UnmarshalText([]byte(n.Value))
 }
+
+// StdDuration converts a domain Duration to a time.Duration.
+func StdDuration(d Duration) time.Duration { return time.Duration(d) }
+
+// FromStdDuration converts a time.Duration to a domain Duration.
+func FromStdDuration(d time.Duration) Duration { return Duration(d) }

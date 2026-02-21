@@ -21,7 +21,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
+		nodeID, err := ParseNodeIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

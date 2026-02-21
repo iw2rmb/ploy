@@ -38,7 +38,7 @@ func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsServic
 	const maxBodySize = 16 << 20  // 16 MiB
 	const maxChunkSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := domaintypes.ParseNodeIDParam(r, "id")
+		nodeID, err := ParseNodeIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

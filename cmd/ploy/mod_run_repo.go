@@ -27,7 +27,6 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // handleModRunRepo routes `mod run repo <action>` subcommands.
@@ -139,7 +138,7 @@ func handleModRunRepoAdd(args []string, stderr io.Writer) error {
 	}
 
 	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
-	_, _ = fmt.Fprintf(stderr, "Repo added: %s (repo_id: %s, status: %s)\n", vcs.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
+	_, _ = fmt.Fprintf(stderr, "Repo added: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
 
@@ -183,7 +182,7 @@ func handleModRunRepoRemove(args []string, stderr io.Writer) error {
 	}
 
 	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
-	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (repo_id: %s, status: %s)\n", vcs.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
+	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
 
@@ -238,7 +237,7 @@ func handleModRunRepoRestart(args []string, stderr io.Writer) error {
 	}
 
 	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
-	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (repo_id: %s, attempt: %d, status: %s)\n", vcs.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Attempt, resp.Status)
+	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (repo_id: %s, attempt: %d, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Attempt, resp.Status)
 	return nil
 }
 
@@ -293,7 +292,7 @@ func handleModRunRepoStatus(args []string, stderr io.Writer) error {
 			lastErr = errStr
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
-			r.RepoID, vcs.NormalizeRepoURLSchemless(r.RepoURL), r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
+			r.RepoID, domaintypes.NormalizeRepoURLSchemless(r.RepoURL), r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
 	}
 	_ = tw.Flush()
 	return nil

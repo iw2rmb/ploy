@@ -43,3 +43,24 @@ func UnmarshalJSONToText(data []byte, v encoding.TextUnmarshaler) error {
 	}
 	return v.UnmarshalText([]byte(s))
 }
+
+// Strings converts a slice of string-like domain values to a slice of strings.
+func Strings[T ~string](in []T) []string {
+	if in == nil {
+		return nil
+	}
+	out := make([]string, len(in))
+	for i, v := range in {
+		out[i] = string(v)
+	}
+	return out
+}
+
+// StringPtr returns a pointer to the underlying string, or nil for an empty value.
+func StringPtr[T ~string](v T) *string {
+	s := Normalize(string(v))
+	if IsEmpty(s) {
+		return nil
+	}
+	return &s
+}

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -14,6 +16,22 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// nodeUUIDHeader is the HTTP header key that carries the worker node's ID
+// (NanoID 6-character string) on mutating requests to the control plane.
+const nodeUUIDHeader = "PLOY_NODE_UUID"
+
+// computeArtifactCIDAndDigest computes a content identifier and SHA256 digest for an artifact bundle.
+// CID uses a simple "bafy" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
+// Digest is the full SHA256 hex string with "sha256:" prefix.
+func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
+	hash := sha256.Sum256(bundle)
+	hexHash := hex.EncodeToString(hash[:])
+	// Use bafy prefix (like IPFS CIDv1) followed by first 32 chars of hash for readability
+	cid = "bafy" + hexHash[:32]
+	digest = "sha256:" + hexHash
+	return cid, digest
+}
 
 // createJobArtifactHandler stores gzipped artifact bundle in object storage and metadata in artifact_bundles table (≤10 MiB), rejects oversize.
 // Route: POST /v1/runs/{run_id}/jobs/{job_id}/artifact
@@ -29,13 +47,13 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 	const maxBodySize = 16 << 20   // 16 MiB
 	const maxBundleSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
+		runID, err := ParseRunIDParam(r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
+		jobID, err := ParseJobIDParam(r, "job_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

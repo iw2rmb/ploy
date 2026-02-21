@@ -59,14 +59,14 @@ type diffListResponse struct {
 func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter using the shared helper.
-		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
+		runID, err := ParseRunIDParam(r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
+		repoID, err := ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -74,7 +74,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 
 		// Optional download mode: serve the gzipped patch for a specific diff.
 		if r.URL.Query().Get("download") == "true" {
-			diffID, err := domaintypes.ParseDiffIDQuery(r, "diff_id")
+			diffID, err := ParseDiffIDQuery(r, "diff_id")
 			if err != nil {
 				httpErr(w, http.StatusBadRequest, "%s", err)
 				return

@@ -1,21 +1,22 @@
-package types
+package store
 
 import (
 	"testing"
 
 	"github.com/google/uuid"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestUUIDBridge_Roundtrip(t *testing.T) {
 	t.Run("RunID", func(t *testing.T) {
 		u := uuid.New()
-		in := RunID(u.String())
+		in := domaintypes.RunID(u.String())
 		pu := ToPGUUID(in)
 		if !pu.Valid {
 			t.Fatalf("expected valid pgtype UUID")
 		}
-		out := FromPGUUID[RunID](pu)
+		out := FromPGUUID[domaintypes.RunID](pu)
 		if out != in {
 			t.Fatalf("roundtrip mismatch: got %q want %q", out, in)
 		}
@@ -23,8 +24,8 @@ func TestUUIDBridge_Roundtrip(t *testing.T) {
 
 	t.Run("StepID", func(t *testing.T) {
 		u := uuid.New()
-		in := StepID(u.String())
-		out := FromPGUUID[StepID](ToPGUUID(in))
+		in := domaintypes.StepID(u.String())
+		out := FromPGUUID[domaintypes.StepID](ToPGUUID(in))
 		if out != in {
 			t.Fatalf("roundtrip mismatch: got %q want %q", out, in)
 		}
@@ -43,7 +44,7 @@ func TestUUIDBridge_InvalidInputs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ToPGUUID(RunID(tt.in))
+			got := ToPGUUID(domaintypes.RunID(tt.in))
 			if got != (pgtype.UUID{}) {
 				t.Fatalf("expected zero-value pgtype.UUID, got %#v", got)
 			}
@@ -52,7 +53,7 @@ func TestUUIDBridge_InvalidInputs(t *testing.T) {
 
 	t.Run("from zero pgtype", func(t *testing.T) {
 		var z pgtype.UUID
-		out := FromPGUUID[RunID](z)
+		out := FromPGUUID[domaintypes.RunID](z)
 		if out != "" {
 			t.Fatalf("expected empty ID, got %q", string(out))
 		}

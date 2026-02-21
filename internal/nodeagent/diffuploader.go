@@ -1,11 +1,9 @@
 package nodeagent
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -30,50 +28,21 @@ func NewDiffUploader(cfg Config) (*DiffUploader, error) {
 }
 
 // UploadDiff compresses and uploads a diff to the server.
-// The diff is associated with a specific job via the job_id parameter.
-// Step ordering is determined by the job's step_index in the database.
 func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
-	// Gzip and validate size using shared compression helper.
 	gzippedDiff, err := gzipCompress(diffBytes, "gzipped diff")
 	if err != nil {
 		return err
 	}
-
-	// Build request payload.
-	// run_id and job_id are in the URL path, not the body.
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"patch":   gzippedDiff,
 		"summary": summary,
 	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
-	}
-
-	// Construct URL using job-scoped endpoint.
 	apiPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/diff", runID.String(), jobID.String())
-	url := MustBuildURL(u.cfg.ServerURL, apiPath)
-
-	// Create HTTP request.
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload diff")
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send request.
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Check response status.
-	if err := httpError(resp, http.StatusCreated, "upload diff"); err != nil {
 		return err
 	}
-
+	_ = resp.Body.Close()
 	return nil
 }
 
