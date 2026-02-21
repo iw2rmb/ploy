@@ -17,7 +17,10 @@ AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
 PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
+PLOY_LOCAL_PG_DSN_CONTAINER="${PLOY_LOCAL_PG_DSN_CONTAINER:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
+PLOY_LOCAL_SERVER_PORT="${PLOY_LOCAL_SERVER_PORT:-8080}"
+WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/local/node/bearer-token}"
 
 DROP_DB=0
 REFRESH_PLOYD=0
@@ -42,6 +45,11 @@ Options:
   --drop-db  Drop and recreate the ploy database before deploy
   --ployd    Refresh/deploy server only
   --nodes    Refresh/deploy node only
+
+Environment:
+  PLOY_LOCAL_PG_DSN_CONTAINER  Container-reachable postgres DSN (default: PLOY_LOCAL_PG_DSN)
+  PLOY_LOCAL_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
+  WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: local/node/bearer-token)
 USAGE
 }
 
@@ -92,6 +100,79 @@ if u.path.strip("/") != "ploy":
 
 admin = urlunsplit((u.scheme, u.netloc, "/postgres", u.query, u.fragment))
 print(admin)
+PY
+}
+
+normalize_container_pg_dsn() {
+  PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN_CONTAINER" \
+  PLOY_LOCAL_PG_DSN="$PLOY_LOCAL_PG_DSN" \
+  USER="${USER:-}" \
+  "$PYTHON_BIN" <<'PY'
+import os
+from urllib.parse import quote, urlsplit, urlunsplit
+
+def parse_dsn(name: str):
+    dsn = os.environ[name].strip()
+    if not dsn:
+        raise SystemExit(f"error: {name} is required")
+    if "://" not in dsn:
+        raise SystemExit(f"error: {name} must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+
+    u = urlsplit(dsn)
+    if u.scheme not in ("postgres", "postgresql"):
+        raise SystemExit(f"error: {name} must use postgres:// or postgresql://")
+    if u.path.strip("/") != "ploy":
+        raise SystemExit(f"error: {name} must target database ploy")
+    return u
+
+container_u = parse_dsn("PLOY_LOCAL_PG_DSN_CONTAINER")
+host_u = parse_dsn("PLOY_LOCAL_PG_DSN")
+
+username = container_u.username or host_u.username or os.environ.get("USER", "").strip()
+if not username:
+    raise SystemExit("error: unable to infer postgres username; include username in PLOY_LOCAL_PG_DSN_CONTAINER or set USER")
+
+password = container_u.password
+if password is None and container_u.username is None:
+    password = host_u.password
+
+host = container_u.hostname or ""
+if ":" in host and not host.startswith("["):
+    host = f"[{host}]"
+
+userinfo = quote(username, safe="")
+if password is not None:
+    userinfo += ":" + quote(password, safe="")
+
+port = f":{container_u.port}" if container_u.port else ""
+netloc = f"{userinfo}@{host}{port}"
+normalized = urlunsplit((container_u.scheme, netloc, container_u.path, container_u.query, container_u.fragment))
+print(normalized)
+PY
+}
+
+validate_container_pg_dsn() {
+  PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN_CONTAINER" "$PYTHON_BIN" <<'PY'
+import os
+from urllib.parse import urlsplit
+
+dsn = os.environ["PLOY_LOCAL_PG_DSN_CONTAINER"].strip()
+if not dsn:
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER is required")
+if "://" not in dsn:
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+
+u = urlsplit(dsn)
+if u.scheme not in ("postgres", "postgresql"):
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must use postgres:// or postgresql://")
+if u.path.strip("/") != "ploy":
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must target database ploy")
+
+host = (u.hostname or "").lower()
+if not host:
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must include a TCP hostname reachable from containers")
+if host in ("localhost", "127.0.0.1", "::1"):
+    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must not use localhost/loopback; use host.containers.internal or another host reachable from containers")
 PY
 }
 
@@ -224,9 +305,10 @@ PY
 }
 
 wait_for_server_health() {
-  log "Waiting for server health on http://localhost:8080/health..."
+  local server_url="http://localhost:${PLOY_LOCAL_SERVER_PORT}"
+  log "Waiting for server health on ${server_url}/health..."
   for i in {1..60}; do
-    if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+    if curl -fsS "${server_url}/health" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -269,20 +351,19 @@ seed_tokens() {
 }
 
 provision_worker_token_into_node() {
-  local node_container_id tmp_token_file
+  local token_dir tmp_token_file
 
-  log "Provisioning worker bearer token into node container..."
-  node_container_id="$($COMPOSE_CMD ps -q node)"
-  if [[ -z "$node_container_id" ]]; then
-    echo "error: could not resolve node container id" >&2
-    exit 1
+  log "Writing worker bearer token to ${WORKER_TOKEN_PATH}..."
+  token_dir="$(dirname "$WORKER_TOKEN_PATH")"
+  mkdir -p "$token_dir"
+  if [[ -d "$WORKER_TOKEN_PATH" ]]; then
+    rm -rf "$WORKER_TOKEN_PATH"
   fi
 
   tmp_token_file="$(mktemp)"
   printf '%s' "$WORKER_TOKEN" > "$tmp_token_file"
   chmod 600 "$tmp_token_file"
-  $CONTAINER_ENGINE cp "$tmp_token_file" "$node_container_id:/etc/ploy/bearer-token"
-  rm -f "$tmp_token_file"
+  mv "$tmp_token_file" "$WORKER_TOKEN_PATH"
 }
 
 seed_node_record() {
@@ -303,12 +384,13 @@ seed_node_record() {
 }
 
 wire_local_cli_descriptor() {
+  local server_url="http://localhost:${PLOY_LOCAL_SERVER_PORT}"
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
   cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
 {
   "cluster_id": "${CLUSTER_ID}",
-  "address": "http://localhost:8080",
+  "address": "${server_url}",
   "token": "${ADMIN_TOKEN}"
 }
 JSON
@@ -355,6 +437,12 @@ main() {
     echo "error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
+  if [[ -z "$PLOY_LOCAL_PG_DSN_CONTAINER" ]]; then
+    PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN"
+  fi
+
+  PLOY_LOCAL_PG_DSN_CONTAINER="$(normalize_container_pg_dsn)"
+  validate_container_pg_dsn
 
   admin_pg_dsn="$(derive_admin_pg_dsn)"
 
@@ -387,7 +475,9 @@ main() {
   PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
   export CLUSTER_ID
   export PLOY_LOCAL_PG_DSN
+  export PLOY_LOCAL_PG_DSN_CONTAINER
   export PLOY_CONTAINER_SOCKET_PATH
+  export PLOY_LOCAL_SERVER_PORT
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1
@@ -410,6 +500,14 @@ main() {
     compose_services+=(node)
   fi
 
+  log "Generating admin and worker JWT tokens..."
+  # shellcheck disable=SC2046
+  eval "$(generate_tokens)"
+
+  if [[ $target_node -eq 1 ]]; then
+    provision_worker_token_into_node
+  fi
+
   build_runtime_images "${runtime_build_services[@]}"
 
   log "Starting local docker stack with: $COMPOSE_CMD up -d --no-build ${compose_services[*]}"
@@ -418,18 +516,10 @@ main() {
   wait_for_garage_bootstrap
   wait_for_server_health
 
-  log "Generating admin and worker JWT tokens..."
-  # shellcheck disable=SC2046
-  eval "$(generate_tokens)"
-
   seed_tokens
 
   if [[ $target_node -eq 1 ]]; then
-    provision_worker_token_into_node
     seed_node_record
-
-    log "Restarting node service to pick up bearer token..."
-    $COMPOSE_CMD restart node
   fi
 
   wire_local_cli_descriptor

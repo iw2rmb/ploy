@@ -11,7 +11,7 @@ Verify your request is using bearer token authentication:
 ```bash
 # Correct format
 curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-     http://localhost:8080/health
+     "http://localhost:${PLOY_LOCAL_SERVER_PORT:-8080}/health"
 
 # Incorrect formats (will fail)
 curl -H "Authorization: eyJ..."  # Missing "Bearer " prefix
