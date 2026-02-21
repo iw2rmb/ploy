@@ -21,7 +21,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // -------------------------------------------------------------------------
@@ -67,13 +66,13 @@ type pullResponse struct {
 // v1 contract:
 //   - Server matches the repo by joining run_repos to mod_repos by repo_id,
 //     filtering by run_id, and comparing normalized repo_url.
-//   - Uses vcs.NormalizeRepoURL for URL comparison.
+//   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If multiple repos match: 409 error (ambiguous).
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path.
-		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
+		runID, err := ParseRunIDParam(r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -92,7 +91,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Normalize the incoming repo_url for comparison.
-		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
+		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
 
 		// Verify the run exists before querying repos.
 		_, err = st.GetRun(r.Context(), runID)
@@ -118,7 +117,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// Find matching repos by normalized URL.
 		var matches []store.ListRunReposWithURLByRunRow
 		for _, rr := range runRepos {
-			if vcs.NormalizeRepoURL(rr.RepoUrl) == normalizedURL {
+			if domaintypes.NormalizeRepoURL(rr.RepoUrl) == normalizedURL {
 				matches = append(matches, rr)
 			}
 		}
@@ -173,13 +172,13 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 //   - Mode values:
 //   - "last-succeeded" (default): newest run_repos with status=Success
 //   - "last-failed": newest run_repos with status=Fail
-//   - Uses vcs.NormalizeRepoURL for URL comparison.
+//   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If no run with matching status found: 404 error.
 func pullModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract mod_id from path.
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -198,7 +197,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Normalize the incoming repo_url for comparison.
-		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
+		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
 
 		// Determine the target status based on mode.
 		// Default is "last-succeeded".
@@ -241,7 +240,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		// Find the repo_id matching the normalized URL.
 		var matchedRepoID domaintypes.ModRepoID
 		for _, mr := range modRepos {
-			if vcs.NormalizeRepoURL(mr.RepoUrl) == normalizedURL {
+			if domaintypes.NormalizeRepoURL(mr.RepoUrl) == normalizedURL {
 				matchedRepoID = mr.ID
 				break
 			}

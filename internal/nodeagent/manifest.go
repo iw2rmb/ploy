@@ -208,7 +208,7 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 	sanitized := typedOpts
 	sanitized.Steps = nil
 	sanitized.Execution.Image = contracts.ModImage{}
-	sanitized.Execution.Command = Command{}
+	sanitized.Execution.Command = contracts.CommandSpec{}
 
 	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)
 	if err != nil {

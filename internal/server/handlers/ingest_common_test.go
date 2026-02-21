@@ -1,35 +1,40 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestRequiredPathParam validates the requiredPathParam helper returns correct
-// values and errors for various path parameter scenarios.
-func TestRequiredPathParam(t *testing.T) {
+func TestParseRunIDParam(t *testing.T) {
+	t.Parallel()
+
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
 	tests := []struct {
 		name      string
 		pathKey   string
 		pathValue string
-		wantVal   string
+		wantID    domaintypes.RunID
 		wantErr   bool
 		errMsg    string
+		wantErrIs error
 	}{
 		{
 			name:      "valid value",
 			pathKey:   "id",
-			pathValue: "abc123",
-			wantVal:   "abc123",
+			pathValue: validRunID,
+			wantID:    domaintypes.RunID(validRunID),
 			wantErr:   false,
 		},
 		{
 			name:      "value with leading/trailing whitespace is trimmed",
 			pathKey:   "id",
-			pathValue: "  abc123  ",
-			wantVal:   "abc123",
+			pathValue: "  " + validRunID + "  ",
+			wantID:    domaintypes.RunID(validRunID),
 			wantErr:   false,
 		},
 		{
@@ -48,41 +53,42 @@ func TestRequiredPathParam(t *testing.T) {
 		},
 		{
 			name:      "different key name in error message",
-			pathKey:   "repo_id",
+			pathKey:   "run_id",
 			pathValue: "",
 			wantErr:   true,
-			errMsg:    "repo_id path parameter is required",
+			errMsg:    "run_id path parameter is required",
 		},
 		{
-			name:      "KSUID-like value",
+			name:      "invalid format returns error",
 			pathKey:   "id",
-			pathValue: "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-			wantVal:   "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-			wantErr:   false,
-		},
-		{
-			name:      "NanoID-like value",
-			pathKey:   "repo_id",
-			pathValue: "abc12345",
-			wantVal:   "abc12345",
-			wantErr:   false,
+			pathValue: "abc123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidRunID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test request with the path value set.
+			t.Parallel()
+
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			req.SetPathValue(tt.pathKey, tt.pathValue)
 
-			val, err := requiredPathParam(req, tt.pathKey)
+			id, err := ParseRunIDParam(req, tt.pathKey)
 
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error but got nil")
 					return
 				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
 				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
 					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
@@ -92,66 +98,498 @@ func TestRequiredPathParam(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			if val != tt.wantVal {
-				t.Errorf("value = %q, want %q", val, tt.wantVal)
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
 			}
 		})
 	}
 }
 
-// TestOptionalPathParam validates the optionalPathParam helper returns correct
-// values for various path parameter scenarios.
-func TestOptionalPathParam(t *testing.T) {
+func TestParseJobIDParam(t *testing.T) {
+	t.Parallel()
+
+	validJobID := domaintypes.NewJobID().String()
+
 	tests := []struct {
 		name      string
 		pathKey   string
 		pathValue string
+		wantID    domaintypes.JobID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
+	}{
+		{
+			name:      "valid value",
+			pathKey:   "job_id",
+			pathValue: validJobID,
+			wantID:    domaintypes.JobID(validJobID),
+			wantErr:   false,
+		},
+		{
+			name:      "empty value returns error",
+			pathKey:   "job_id",
+			pathValue: "",
+			wantErr:   true,
+			errMsg:    "job_id path parameter is required",
+		},
+		{
+			name:      "whitespace-only value returns error",
+			pathKey:   "job_id",
+			pathValue: "   ",
+			wantErr:   true,
+			errMsg:    "job_id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "job_id",
+			pathValue: "job123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidJobID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			id, err := ParseJobIDParam(req, tt.pathKey)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
+				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
+					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
+			}
+		})
+	}
+}
+
+func TestParseNodeIDParam(t *testing.T) {
+	t.Parallel()
+
+	validNodeID := domaintypes.NewNodeKey()
+
+	tests := []struct {
+		name      string
+		pathKey   string
+		pathValue string
+		wantID    domaintypes.NodeID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
+	}{
+		{
+			name:      "valid value",
+			pathKey:   "id",
+			pathValue: validNodeID,
+			wantID:    domaintypes.NodeID(validNodeID),
+			wantErr:   false,
+		},
+		{
+			name:      "empty value returns error",
+			pathKey:   "id",
+			pathValue: "",
+			wantErr:   true,
+			errMsg:    "id path parameter is required",
+		},
+		{
+			name:      "whitespace-only value returns error",
+			pathKey:   "id",
+			pathValue: "   ",
+			wantErr:   true,
+			errMsg:    "id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "id",
+			pathValue: "node123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidNodeID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			id, err := ParseNodeIDParam(req, tt.pathKey)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
+				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
+					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
+			}
+		})
+	}
+}
+
+func TestParseModIDParam(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		pathKey   string
+		pathValue string
+		wantID    domaintypes.ModID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
+	}{
+		{
+			name:      "valid value",
+			pathKey:   "mod_id",
+			pathValue: "mod123",
+			wantID:    domaintypes.ModID("mod123"),
+			wantErr:   false,
+		},
+		{
+			name:      "empty value returns error",
+			pathKey:   "mod_id",
+			pathValue: "",
+			wantErr:   true,
+			errMsg:    "mod_id path parameter is required",
+		},
+		{
+			name:      "whitespace-only value returns error",
+			pathKey:   "mod_id",
+			pathValue: "   ",
+			wantErr:   true,
+			errMsg:    "mod_id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "mod_id",
+			pathValue: "mod12",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidModID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			id, err := ParseModIDParam(req, tt.pathKey)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
+				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
+					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
+			}
+		})
+	}
+}
+
+func TestParseModRefParam(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		pathKey   string
+		pathValue string
+		wantRef   domaintypes.ModRef
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name:      "valid mod name",
+			pathKey:   "mod_ref",
+			pathValue: "my-mod",
+			wantRef:   domaintypes.ModRef("my-mod"),
+			wantErr:   false,
+		},
+		{
+			name:      "valid mod id",
+			pathKey:   "mod_ref",
+			pathValue: "abc123",
+			wantRef:   domaintypes.ModRef("abc123"),
+			wantErr:   false,
+		},
+		{
+			name:      "empty value returns error",
+			pathKey:   "mod_ref",
+			pathValue: "",
+			wantErr:   true,
+			errSubstr: "mod_ref path parameter is required",
+		},
+		{
+			name:      "whitespace-only value returns error",
+			pathKey:   "mod_ref",
+			pathValue: "   ",
+			wantErr:   true,
+			errSubstr: "mod_ref path parameter is required",
+		},
+		{
+			name:      "invalid chars (slash) returns error",
+			pathKey:   "mod_ref",
+			pathValue: "my/mod",
+			wantErr:   true,
+			errSubstr: "invalid mod ref",
+		},
+		{
+			name:      "invalid chars (question mark) returns error",
+			pathKey:   "mod_ref",
+			pathValue: "mod?name",
+			wantErr:   true,
+			errSubstr: "invalid mod ref",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			ref, err := ParseModRefParam(req, tt.pathKey)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.errSubstr != "" && !strContains(err.Error(), tt.errSubstr) {
+					t.Errorf("error message = %q, want to contain %q", err.Error(), tt.errSubstr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if ref != tt.wantRef {
+				t.Errorf("ref = %q, want %q", ref, tt.wantRef)
+			}
+		})
+	}
+}
+
+func TestParseModRepoIDParam(t *testing.T) {
+	t.Parallel()
+
+	validRepoID := domaintypes.NewModRepoID().String()
+
+	tests := []struct {
+		name      string
+		pathKey   string
+		pathValue string
+		wantID    domaintypes.ModRepoID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
+	}{
+		{
+			name:      "valid value",
+			pathKey:   "repo_id",
+			pathValue: validRepoID,
+			wantID:    domaintypes.ModRepoID(validRepoID),
+			wantErr:   false,
+		},
+		{
+			name:      "empty value returns error",
+			pathKey:   "repo_id",
+			pathValue: "",
+			wantErr:   true,
+			errMsg:    "repo_id path parameter is required",
+		},
+		{
+			name:      "whitespace-only value returns error",
+			pathKey:   "repo_id",
+			pathValue: "   ",
+			wantErr:   true,
+			errMsg:    "repo_id path parameter is required",
+		},
+		{
+			name:      "invalid format returns error",
+			pathKey:   "repo_id",
+			pathValue: "repo123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidModRepoID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			id, err := ParseModRepoIDParam(req, tt.pathKey)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					return
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
+				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
+					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
+			}
+		})
+	}
+}
+
+func TestOptionalRunIDParam(t *testing.T) {
+	t.Parallel()
+
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
+
+	tests := []struct {
+		name      string
+		pathKey   string
+		pathValue string
+		wantErr   bool
+		wantErrIs error
 		wantNil   bool
-		wantVal   string
+		wantID    domaintypes.RunID
 	}{
 		{
 			name:      "valid value returns pointer",
 			pathKey:   "id",
-			pathValue: "abc123",
+			pathValue: validRunID,
+			wantErr:   false,
 			wantNil:   false,
-			wantVal:   "abc123",
+			wantID:    domaintypes.RunID(validRunID),
 		},
 		{
 			name:      "value with whitespace is trimmed",
 			pathKey:   "id",
-			pathValue: "  abc123  ",
+			pathValue: "  " + validRunID + "  ",
+			wantErr:   false,
 			wantNil:   false,
-			wantVal:   "abc123",
+			wantID:    domaintypes.RunID(validRunID),
 		},
 		{
 			name:      "empty value returns nil",
 			pathKey:   "id",
 			pathValue: "",
+			wantErr:   false,
 			wantNil:   true,
 		},
 		{
 			name:      "whitespace-only value returns nil",
 			pathKey:   "id",
 			pathValue: "   ",
+			wantErr:   false,
 			wantNil:   true,
 		},
 		{
-			name:      "missing key returns nil",
-			pathKey:   "nonexistent",
-			pathValue: "",
-			wantNil:   true,
+			name:      "invalid format returns error",
+			pathKey:   "id",
+			pathValue: "abc123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidRunID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test request with the path value set.
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			if tt.pathValue != "" || tt.pathKey == "id" {
-				req.SetPathValue(tt.pathKey, tt.pathValue)
-			}
+			t.Parallel()
 
-			result := optionalPathParam(req, tt.pathKey)
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.SetPathValue(tt.pathKey, tt.pathValue)
+
+			result, err := OptionalRunIDParam(req, tt.pathKey)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Fatalf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			if tt.wantNil {
 				if result != nil {
@@ -164,173 +602,203 @@ func TestOptionalPathParam(t *testing.T) {
 				t.Errorf("expected non-nil pointer")
 				return
 			}
-			if *result != tt.wantVal {
-				t.Errorf("value = %q, want %q", *result, tt.wantVal)
+			if *result != tt.wantID {
+				t.Errorf("id = %q, want %q", *result, tt.wantID)
 			}
 		})
 	}
 }
 
-// TestDecodeRejectsUnknownFields validates that DecodeJSON rejects requests
-// containing unknown JSON fields, returning 400 Bad Request.
-func TestDecodeRejectsUnknownFields(t *testing.T) {
-	type testRequest struct {
-		Name  string `json:"name"`
-		Value int    `json:"value"`
-	}
+func TestParseRunIDQuery(t *testing.T) {
+	t.Parallel()
+
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
 
 	tests := []struct {
-		name       string
-		body       string
-		wantStatus int
-		wantErr    bool // true if DecodeJSON returns error
+		name      string
+		queryKey  string
+		query     string
+		wantID    domaintypes.RunID
+		wantErr   bool
+		errMsg    string
+		wantErrIs error
 	}{
 		{
-			name:       "valid request with known fields",
-			body:       `{"name": "test", "value": 42}`,
-			wantStatus: http.StatusOK, // no error response
-			wantErr:    false,
+			name:     "valid value",
+			queryKey: "id",
+			query:    "id=" + validRunID,
+			wantID:   domaintypes.RunID(validRunID),
+			wantErr:  false,
 		},
 		{
-			name:       "request with unknown field",
-			body:       `{"name": "test", "value": 42, "unknown_field": "bad"}`,
-			wantStatus: http.StatusBadRequest,
-			wantErr:    true,
+			name:     "value with whitespace is trimmed",
+			queryKey: "id",
+			query:    "id=%20" + validRunID + "%20",
+			wantID:   domaintypes.RunID(validRunID),
+			wantErr:  false,
 		},
 		{
-			name:       "request with only unknown field",
-			body:       `{"unknown_field": "bad"}`,
-			wantStatus: http.StatusBadRequest,
-			wantErr:    true,
+			name:     "missing query param returns error",
+			queryKey: "id",
+			query:    "",
+			wantErr:  true,
+			errMsg:   "id query parameter is required",
 		},
 		{
-			name:       "empty object is valid",
-			body:       `{}`,
-			wantStatus: http.StatusOK,
-			wantErr:    false,
+			name:     "empty query value returns error",
+			queryKey: "id",
+			query:    "id=",
+			wantErr:  true,
+			errMsg:   "id query parameter is required",
 		},
 		{
-			name:       "malformed JSON",
-			body:       `{"name": "test"`,
-			wantStatus: http.StatusBadRequest,
-			wantErr:    true,
+			name:      "invalid format returns error",
+			queryKey:  "id",
+			query:     "id=abc123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidRunID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			rr := httptest.NewRecorder()
+			t.Parallel()
 
-			var dest testRequest
-			err := DecodeJSON(rr, req, &dest, DefaultMaxBodySize)
+			url := "/test"
+			if tt.query != "" {
+				url = "/test?" + tt.query
+			}
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+
+			id, err := ParseRunIDQuery(req, tt.queryKey)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got nil")
+					t.Errorf("expected error but got nil")
+					return
 				}
-				if rr.Code != tt.wantStatus {
-					t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Errorf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+					return
+				}
+				if err.Error() != tt.errMsg {
+					if tt.errMsg == "" {
+						return
+					}
+					t.Errorf("error message = %q, want %q", err.Error(), tt.errMsg)
 				}
 				return
 			}
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if id != tt.wantID {
+				t.Errorf("id = %q, want %q", id, tt.wantID)
 			}
 		})
 	}
 }
 
-// TestDecodeRejectsLargeBody validates that DecodeJSON rejects requests
-// exceeding the maxBytes limit, returning 413 Request Entity Too Large.
-func TestDecodeRejectsLargeBody(t *testing.T) {
-	type testRequest struct {
-		Data string `json:"data"`
-	}
+func TestOptionalRunIDQuery(t *testing.T) {
+	t.Parallel()
 
-	// Create a body that exceeds 1 KiB limit.
-	largeData := strings.Repeat("x", 2048)
-	body := `{"data": "` + largeData + `"}`
-
-	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	var dest testRequest
-	err := DecodeJSON(rr, req, &dest, 1024) // 1 KiB limit
-
-	if err == nil {
-		t.Error("expected error for oversized body")
-	}
-	if rr.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("status = %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
-	}
-}
-
-// TestDecodeRequiresExactlyOneJSONValue validates that DecodeJSON accepts exactly
-// one JSON value and rejects trailing non-whitespace or additional JSON values.
-func TestDecodeRequiresExactlyOneJSONValue(t *testing.T) {
-	type testRequest struct {
-		Name  string `json:"name"`
-		Value int    `json:"value"`
-	}
+	validRunID := "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"
 
 	tests := []struct {
-		name       string
-		body       string
-		wantStatus int
-		wantErr    bool
+		name      string
+		queryKey  string
+		query     string
+		wantErr   bool
+		wantErrIs error
+		wantNil   bool
+		wantID    domaintypes.RunID
 	}{
 		{
-			name:       "single json value is valid",
-			body:       `{"name":"test","value":42}`,
-			wantStatus: http.StatusOK,
-			wantErr:    false,
+			name:     "valid value returns pointer",
+			queryKey: "id",
+			query:    "id=" + validRunID,
+			wantErr:  false,
+			wantNil:  false,
+			wantID:   domaintypes.RunID(validRunID),
 		},
 		{
-			name:       "single json value with trailing whitespace is valid",
-			body:       "{\"name\":\"test\",\"value\":42}\n\t  ",
-			wantStatus: http.StatusOK,
-			wantErr:    false,
+			name:     "missing query param returns nil",
+			queryKey: "id",
+			query:    "",
+			wantErr:  false,
+			wantNil:  true,
 		},
 		{
-			name:       "trailing non-whitespace is rejected",
-			body:       `{"name":"test","value":42} trailing`,
-			wantStatus: http.StatusBadRequest,
-			wantErr:    true,
+			name:     "empty query value returns nil",
+			queryKey: "id",
+			query:    "id=",
+			wantErr:  false,
+			wantNil:  true,
 		},
 		{
-			name:       "multiple json values are rejected",
-			body:       `{"name":"test","value":42} {"name":"next","value":7}`,
-			wantStatus: http.StatusBadRequest,
-			wantErr:    true,
+			name:      "invalid format returns error",
+			queryKey:  "id",
+			query:     "id=abc123",
+			wantErr:   true,
+			wantErrIs: domaintypes.ErrInvalidRunID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			rr := httptest.NewRecorder()
+			t.Parallel()
 
-			var dest testRequest
-			err := DecodeJSON(rr, req, &dest, DefaultMaxBodySize)
+			url := "/test"
+			if tt.query != "" {
+				url = "/test?" + tt.query
+			}
+			req := httptest.NewRequest(http.MethodGet, url, nil)
 
+			result, err := OptionalRunIDQuery(req, tt.queryKey)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatal("expected error but got nil")
+					t.Fatalf("expected error, got nil")
 				}
-				if rr.Code != tt.wantStatus {
-					t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
+				if tt.wantErrIs != nil && !errors.Is(err, tt.wantErrIs) {
+					t.Fatalf("error = %v, want errors.Is(%v)", err, tt.wantErrIs)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil but got %q", *result)
 				}
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if result == nil {
+				t.Errorf("expected non-nil pointer")
+				return
+			}
+			if *result != tt.wantID {
+				t.Errorf("id = %q, want %q", *result, tt.wantID)
 			}
 		})
 	}
+}
+
+// strContains checks if s strContains substr.
+func strContains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstr(s, substr)))
+}
+
+func findSubstr(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

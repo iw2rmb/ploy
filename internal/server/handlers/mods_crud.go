@@ -14,7 +14,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/vcs"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -195,7 +194,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 
 		repoURLFilter := strings.TrimSpace(r.URL.Query().Get("repo_url"))
 		if repoURLFilter != "" {
-			repoURLFilter = vcs.NormalizeRepoURL(repoURLFilter)
+			repoURLFilter = domaintypes.NormalizeRepoURL(repoURLFilter)
 			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
 				httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 				return
@@ -232,7 +231,7 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 						return
 					}
 					for _, mr := range repos {
-						if vcs.NormalizeRepoURL(mr.RepoUrl) == repoURLFilter {
+						if domaintypes.NormalizeRepoURL(mr.RepoUrl) == repoURLFilter {
 							filtered = append(filtered, mod)
 							break
 						}
@@ -317,7 +316,7 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 // - Refuses deletion if any runs exist for the mod.
 func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := domaintypes.ParseModRefParam(r, "mod_ref")
+		modRef, err := ParseModRefParam(r, "mod_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

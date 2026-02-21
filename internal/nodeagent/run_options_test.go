@@ -157,7 +157,7 @@ func TestCommand_ToSlice(t *testing.T) {
 	t.Parallel()
 
 	t.Run("shell command", func(t *testing.T) {
-		cmd := Command{Shell: "echo test"}
+		cmd := contracts.CommandSpec{Shell: "echo test"}
 		result := cmd.ToSlice()
 		want := []string{"/bin/sh", "-c", "echo test"}
 		if len(result) != len(want) {
@@ -171,7 +171,7 @@ func TestCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("exec array", func(t *testing.T) {
-		cmd := Command{Exec: []string{"/bin/ls", "-la"}}
+		cmd := contracts.CommandSpec{Exec: []string{"/bin/ls", "-la"}}
 		result := cmd.ToSlice()
 		want := []string{"/bin/ls", "-la"}
 		if len(result) != len(want) {
@@ -185,7 +185,7 @@ func TestCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("empty command", func(t *testing.T) {
-		cmd := Command{}
+		cmd := contracts.CommandSpec{}
 		result := cmd.ToSlice()
 		if result != nil {
 			t.Errorf("expected nil for empty command, got %v", result)
@@ -193,7 +193,7 @@ func TestCommand_ToSlice(t *testing.T) {
 	})
 
 	t.Run("exec takes precedence over shell", func(t *testing.T) {
-		cmd := Command{
+		cmd := contracts.CommandSpec{
 			Shell: "echo shell",
 			Exec:  []string{"/bin/exec"},
 		}

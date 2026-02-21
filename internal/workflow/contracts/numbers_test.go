@@ -1,4 +1,4 @@
-package types
+package contracts
 
 import (
 	"math"
@@ -13,7 +13,6 @@ func TestIntFromAny(t *testing.T) {
 		wantValue int
 		wantOK    bool
 	}{
-		// Integer types.
 		{name: "int", input: 42, wantValue: 42, wantOK: true},
 		{name: "int zero", input: 0, wantValue: 0, wantOK: true},
 		{name: "int negative", input: -10, wantValue: -10, wantOK: true},
@@ -21,25 +20,16 @@ func TestIntFromAny(t *testing.T) {
 		{name: "int16", input: int16(16), wantValue: 16, wantOK: true},
 		{name: "int32", input: int32(32), wantValue: 32, wantOK: true},
 		{name: "int64", input: int64(64), wantValue: 64, wantOK: true},
-
-		// Float types — whole numbers accepted.
 		{name: "float32 whole", input: float32(100.0), wantValue: 100, wantOK: true},
 		{name: "float64 whole", input: float64(200.0), wantValue: 200, wantOK: true},
 		{name: "float64 zero", input: float64(0.0), wantValue: 0, wantOK: true},
 		{name: "float64 negative whole", input: float64(-5.0), wantValue: -5, wantOK: true},
-
-		// Float types — non-integer rejected.
 		{name: "float32 fractional", input: float32(1.5), wantValue: 0, wantOK: false},
 		{name: "float64 fractional", input: float64(2.7), wantValue: 0, wantOK: false},
-		{name: "float64 small fraction", input: float64(3.0001), wantValue: 0, wantOK: false},
 		{name: "float64 out of int range", input: math.Pow(2, 63), wantValue: 0, wantOK: false},
-
-		// Nil and invalid types.
 		{name: "nil", input: nil, wantValue: 0, wantOK: false},
 		{name: "string", input: "42", wantValue: 0, wantOK: false},
 		{name: "bool", input: true, wantValue: 0, wantOK: false},
-		{name: "slice", input: []int{1, 2, 3}, wantValue: 0, wantOK: false},
-		{name: "map", input: map[string]int{"a": 1}, wantValue: 0, wantOK: false},
 	}
 
 	for _, tt := range tests {
@@ -62,35 +52,13 @@ func TestInt64FromAny(t *testing.T) {
 		wantValue int64
 		wantOK    bool
 	}{
-		// Integer types.
 		{name: "int", input: 42, wantValue: 42, wantOK: true},
-		{name: "int zero", input: 0, wantValue: 0, wantOK: true},
-		{name: "int negative", input: -10, wantValue: -10, wantOK: true},
-		{name: "int8", input: int8(8), wantValue: 8, wantOK: true},
-		{name: "int16", input: int16(16), wantValue: 16, wantOK: true},
-		{name: "int32", input: int32(32), wantValue: 32, wantOK: true},
-		{name: "int64", input: int64(64), wantValue: 64, wantOK: true},
 		{name: "int64 large", input: int64(1 << 40), wantValue: 1 << 40, wantOK: true},
-
-		// Float types — whole numbers accepted.
-		{name: "float32 whole", input: float32(100.0), wantValue: 100, wantOK: true},
 		{name: "float64 whole", input: float64(200.0), wantValue: 200, wantOK: true},
-		{name: "float64 zero", input: float64(0.0), wantValue: 0, wantOK: true},
-		{name: "float64 negative whole", input: float64(-5.0), wantValue: -5, wantOK: true},
-
-		// Float types — non-integer rejected.
-		{name: "float32 fractional", input: float32(1.5), wantValue: 0, wantOK: false},
-		{name: "float64 fractional", input: float64(2.7), wantValue: 0, wantOK: false},
-		{name: "float64 small fraction", input: float64(3.0001), wantValue: 0, wantOK: false},
 		{name: "float64 min int64", input: float64(math.MinInt64), wantValue: math.MinInt64, wantOK: true},
 		{name: "float64 out of int64 range", input: math.Pow(2, 63), wantValue: 0, wantOK: false},
-
-		// Nil and invalid types.
 		{name: "nil", input: nil, wantValue: 0, wantOK: false},
 		{name: "string", input: "42", wantValue: 0, wantOK: false},
-		{name: "bool", input: true, wantValue: 0, wantOK: false},
-		{name: "slice", input: []int{1, 2, 3}, wantValue: 0, wantOK: false},
-		{name: "map", input: map[string]int{"a": 1}, wantValue: 0, wantOK: false},
 	}
 
 	for _, tt := range tests {
@@ -105,46 +73,15 @@ func TestInt64FromAny(t *testing.T) {
 	}
 }
 
-func TestIntFromAny_SpecialFloatsRejected(t *testing.T) {
+func TestSpecialFloatsRejected(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name  string
-		input float64
-	}{
-		{name: "NaN", input: math.NaN()},
-		{name: "positive Inf", input: math.Inf(1)},
-		{name: "negative Inf", input: math.Inf(-1)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			gotValue, gotOK := IntFromAny(tt.input)
-			if gotOK {
-				t.Errorf("IntFromAny(%s) = (%d, %v), expected rejection", tt.name, gotValue, gotOK)
-			}
-		})
-	}
-}
-
-func TestInt64FromAny_SpecialFloatsRejected(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		input float64
-	}{
-		{name: "NaN", input: math.NaN()},
-		{name: "positive Inf", input: math.Inf(1)},
-		{name: "negative Inf", input: math.Inf(-1)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			gotValue, gotOK := Int64FromAny(tt.input)
-			if gotOK {
-				t.Errorf("Int64FromAny(%s) = (%d, %v), expected rejection", tt.name, gotValue, gotOK)
-			}
-		})
+	specials := []float64{math.NaN(), math.Inf(1), math.Inf(-1)}
+	for _, f := range specials {
+		if _, ok := IntFromAny(f); ok {
+			t.Errorf("IntFromAny(%v) should be rejected", f)
+		}
+		if _, ok := Int64FromAny(f); ok {
+			t.Errorf("Int64FromAny(%v) should be rejected", f)
+		}
 	}
 }

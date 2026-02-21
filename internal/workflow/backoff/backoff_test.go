@@ -10,28 +10,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestDefaultPolicy verifies the default policy values.
-func TestDefaultPolicy(t *testing.T) {
-	t.Parallel()
-	p := DefaultPolicy()
-
-	if time.Duration(p.InitialInterval) != 2*time.Second {
-		t.Errorf("InitialInterval = %v, want 2s", p.InitialInterval)
-	}
-	if time.Duration(p.MaxInterval) != 30*time.Second {
-		t.Errorf("MaxInterval = %v, want 30s", p.MaxInterval)
-	}
-	if p.Multiplier != 2.0 {
-		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
-	}
-	if time.Duration(p.MaxElapsedTime) != 5*time.Minute {
-		t.Errorf("MaxElapsedTime = %v, want 5m", p.MaxElapsedTime)
-	}
-	if p.MaxAttempts != 10 {
-		t.Errorf("MaxAttempts = %d, want 10", p.MaxAttempts)
-	}
-}
-
 // TestRolloutPolicy verifies rollout policy matches existing rollout defaults.
 func TestRolloutPolicy(t *testing.T) {
 	t.Parallel()

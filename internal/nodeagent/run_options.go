@@ -90,7 +90,7 @@ type HealingConfig struct {
 // Used for healing mods, router, and execution options.
 type ContainerSpec struct {
 	Image           contracts.ModImage
-	Command         Command
+	Command         contracts.CommandSpec
 	Env             map[string]string
 	RetainContainer bool
 }
@@ -100,32 +100,6 @@ type HealingMod = ContainerSpec
 
 // RouterConfig is a ContainerSpec for router containers.
 type RouterConfig = ContainerSpec
-
-// Command represents a container command as either a shell string or exec array.
-type Command struct {
-	// Shell holds the command when specified as a single shell string.
-	Shell string
-
-	// Exec holds the command when specified as an exec array.
-	Exec []string
-}
-
-// IsEmpty returns true if no command is specified.
-func (c Command) IsEmpty() bool {
-	return c.Shell == "" && len(c.Exec) == 0
-}
-
-// ToSlice converts the command to a []string suitable for manifest execution.
-// Returns nil if the command is empty.
-func (c Command) ToSlice() []string {
-	if len(c.Exec) > 0 {
-		return c.Exec
-	}
-	if c.Shell != "" {
-		return []string{"/bin/sh", "-c", c.Shell}
-	}
-	return nil
-}
 
 // MRWiringOptions configures GitLab merge request creation for run outcomes.
 // These options control when MRs are created and how to authenticate with GitLab.
@@ -190,7 +164,7 @@ type StepMod struct {
 	Image contracts.ModImage
 
 	// Command is the container command override for this step (optional).
-	Command Command
+	Command contracts.CommandSpec
 
 	// Env holds environment variables specific to this step.
 	Env map[string]string
@@ -232,7 +206,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 
 			healing.Mod = HealingMod{
 				Image:           spec.BuildGate.Healing.Image,
-				Command:         commandSpecToCommand(spec.BuildGate.Healing.Command),
+				Command:         spec.BuildGate.Healing.Command,
 				Env:             copyStringMap(spec.BuildGate.Healing.Env),
 				RetainContainer: spec.BuildGate.Healing.RetainContainer,
 			}
@@ -243,7 +217,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		if spec.BuildGate.Router != nil {
 			runOpts.Router = &RouterConfig{
 				Image:           spec.BuildGate.Router.Image,
-				Command:         commandSpecToCommand(spec.BuildGate.Router.Command),
+				Command:         spec.BuildGate.Router.Command,
 				Env:             copyStringMap(spec.BuildGate.Router.Env),
 				RetainContainer: spec.BuildGate.Router.RetainContainer,
 			}
@@ -265,7 +239,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	if len(spec.Steps) == 1 {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
-		runOpts.Execution.Command = commandSpecToCommand(step.Command)
+		runOpts.Execution.Command = step.Command
 		runOpts.Execution.RetainContainer = step.RetainContainer
 	}
 
@@ -274,7 +248,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		for _, step := range spec.Steps {
 			stepMod := StepMod{
 				Image:           step.Image,
-				Command:         commandSpecToCommand(step.Command),
+				Command:         step.Command,
 				Env:             copyStringMap(step.Env),
 				RetainContainer: step.RetainContainer,
 				Stack:           step.Stack,
@@ -298,14 +272,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	}
 
 	return runOpts
-}
-
-// commandSpecToCommand converts contracts.CommandSpec to Command.
-func commandSpecToCommand(cmd contracts.CommandSpec) Command {
-	return Command{
-		Shell: cmd.Shell,
-		Exec:  cmd.Exec,
-	}
 }
 
 // copyStringMap creates a shallow copy of a string map.

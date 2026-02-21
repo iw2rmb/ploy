@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/vcs"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -178,8 +178,8 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 // collision-resistant identifiers that remain stable across runs.
 func computeCacheKey(url, baseRef, commitSHA string) string {
 	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
-	// Uses the shared vcs.NormalizeRepoURL helper for canonical URL form.
-	normalized := vcs.NormalizeRepoURL(url)
+	// Uses the shared domaintypes.NormalizeRepoURL helper for canonical URL form.
+	normalized := domaintypes.NormalizeRepoURL(url)
 
 	// Include base_ref and commit_sha in the key for cache isolation.
 	// Different base_ref or commit_sha values result in different cache entries.
@@ -203,7 +203,7 @@ func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
 		return false
 	}
 	remoteURL := strings.TrimSpace(string(output))
-	return vcs.NormalizeRepoURL(remoteURL) == vcs.NormalizeRepoURL(expectedURL)
+	return domaintypes.NormalizeRepoURL(remoteURL) == domaintypes.NormalizeRepoURL(expectedURL)
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.

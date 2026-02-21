@@ -1,6 +1,8 @@
-package types
+package store
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -8,8 +10,8 @@ import (
 // ToPGUUID converts a string-like domain identifier to pgtype.UUID.
 // Empty or invalid UUID text returns the zero-value (Valid=false).
 func ToPGUUID[S ~string](id S) pgtype.UUID {
-	s := Normalize(string(id))
-	if IsEmpty(s) {
+	s := strings.TrimSpace(string(id))
+	if s == "" {
 		return pgtype.UUID{}
 	}
 	u, err := uuid.Parse(s)

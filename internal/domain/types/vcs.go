@@ -140,3 +140,54 @@ func (v CommitSHA) Validate() error {
 	}
 	return nil
 }
+
+// NormalizeRepoURL normalizes a git repository URL for comparison and matching.
+//
+// The normalization applies the following transformations:
+//   - Trims leading and trailing whitespace
+//   - Removes trailing "/" (trailing slash)
+//   - Removes trailing ".git" suffix
+func NormalizeRepoURL(raw string) string {
+	normalized := strings.TrimSpace(raw)
+	normalized = strings.TrimSuffix(normalized, "/")
+	normalized = strings.TrimSuffix(normalized, ".git")
+	return normalized
+}
+
+// NormalizeRepoURLSchemless returns a scheme-less, display-oriented form of a repository URL.
+//
+// It is intended for human-facing CLI output (stdout/stderr). It is NOT a wire format,
+// and should not be used for API requests or identity comparisons.
+func NormalizeRepoURLSchemless(raw string) string {
+	normalized := NormalizeRepoURL(raw)
+	if normalized == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(normalized)
+
+	switch {
+	case strings.HasPrefix(lower, "https://"):
+		normalized = normalized[len("https://"):]
+	case strings.HasPrefix(lower, "ssh://"):
+		normalized = normalized[len("ssh://"):]
+	case strings.HasPrefix(lower, "file://"):
+		return normalized[len("file://"):]
+	}
+
+	if at := strings.IndexByte(normalized, '@'); at >= 0 {
+		normalized = normalized[at+1:]
+	}
+
+	colon := strings.IndexByte(normalized, ':')
+	if colon >= 0 {
+		slash := strings.IndexByte(normalized, '/')
+		if slash == -1 || colon < slash {
+			if colon+1 < len(normalized) && (normalized[colon+1] < '0' || normalized[colon+1] > '9') {
+				normalized = normalized[:colon] + "/" + normalized[colon+1:]
+			}
+		}
+	}
+
+	return normalized
+}

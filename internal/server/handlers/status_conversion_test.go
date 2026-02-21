@@ -1,8 +1,9 @@
-package api
+package handlers
 
 import (
 	"testing"
 
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -14,15 +15,15 @@ func TestStageStatusFromStore(t *testing.T) {
 	tests := []struct {
 		name  string
 		input store.JobStatus
-		want  StageState
+		want  modsapi.StageState
 	}{
-		{name: "created->pending", input: store.JobStatusCreated, want: StageStatePending},
-		{name: "queued->pending", input: store.JobStatusQueued, want: StageStatePending},
-		{name: "running", input: store.JobStatusRunning, want: StageStateRunning},
-		{name: "success", input: store.JobStatusSuccess, want: StageStateSucceeded},
-		{name: "fail", input: store.JobStatusFail, want: StageStateFailed},
-		{name: "cancelled", input: store.JobStatusCancelled, want: StageStateCancelled},
-		{name: "unknown->pending", input: store.JobStatus("unknown"), want: StageStatePending},
+		{name: "created->pending", input: store.JobStatusCreated, want: modsapi.StageStatePending},
+		{name: "queued->pending", input: store.JobStatusQueued, want: modsapi.StageStatePending},
+		{name: "running", input: store.JobStatusRunning, want: modsapi.StageStateRunning},
+		{name: "success", input: store.JobStatusSuccess, want: modsapi.StageStateSucceeded},
+		{name: "fail", input: store.JobStatusFail, want: modsapi.StageStateFailed},
+		{name: "cancelled", input: store.JobStatusCancelled, want: modsapi.StageStateCancelled},
+		{name: "unknown->pending", input: store.JobStatus("unknown"), want: modsapi.StageStatePending},
 	}
 
 	for _, tt := range tests {
@@ -44,12 +45,12 @@ func TestRunStatusFromStore(t *testing.T) {
 	tests := []struct {
 		name  string
 		input store.RunStatus
-		want  RunState
+		want  modsapi.RunState
 	}{
-		{name: "started->running", input: store.RunStatusStarted, want: RunStateRunning},
-		{name: "finished->succeeded", input: store.RunStatusFinished, want: RunStateSucceeded},
-		{name: "cancelled", input: store.RunStatusCancelled, want: RunStateCancelled},
-		{name: "unknown->running", input: store.RunStatus("unknown"), want: RunStateRunning},
+		{name: "started->running", input: store.RunStatusStarted, want: modsapi.RunStateRunning},
+		{name: "finished->succeeded", input: store.RunStatusFinished, want: modsapi.RunStateSucceeded},
+		{name: "cancelled", input: store.RunStatusCancelled, want: modsapi.RunStateCancelled},
+		{name: "unknown->running", input: store.RunStatus("unknown"), want: modsapi.RunStateRunning},
 	}
 
 	for _, tt := range tests {
@@ -70,17 +71,17 @@ func TestStageStatusToStore(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		input StageState
+		input modsapi.StageState
 		want  store.JobStatus
 	}{
-		{name: "pending->created", input: StageStatePending, want: store.JobStatusCreated},
-		{name: "queued->created", input: StageStateQueued, want: store.JobStatusCreated},
-		{name: "running", input: StageStateRunning, want: store.JobStatusRunning},
-		{name: "succeeded", input: StageStateSucceeded, want: store.JobStatusSuccess},
-		{name: "failed", input: StageStateFailed, want: store.JobStatusFail},
-		{name: "cancelling->cancelled", input: StageStateCancelling, want: store.JobStatusCancelled},
-		{name: "cancelled", input: StageStateCancelled, want: store.JobStatusCancelled},
-		{name: "unknown->created", input: StageState("unknown"), want: store.JobStatusCreated},
+		{name: "pending->created", input: modsapi.StageStatePending, want: store.JobStatusCreated},
+		{name: "queued->created", input: modsapi.StageStateQueued, want: store.JobStatusCreated},
+		{name: "running", input: modsapi.StageStateRunning, want: store.JobStatusRunning},
+		{name: "succeeded", input: modsapi.StageStateSucceeded, want: store.JobStatusSuccess},
+		{name: "failed", input: modsapi.StageStateFailed, want: store.JobStatusFail},
+		{name: "cancelling->cancelled", input: modsapi.StageStateCancelling, want: store.JobStatusCancelled},
+		{name: "cancelled", input: modsapi.StageStateCancelled, want: store.JobStatusCancelled},
+		{name: "unknown->created", input: modsapi.StageState("unknown"), want: store.JobStatusCreated},
 	}
 
 	for _, tt := range tests {
@@ -101,16 +102,16 @@ func TestRunStatusToStore(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		input RunState
+		input modsapi.RunState
 		want  store.RunStatus
 	}{
-		{name: "pending->started", input: RunStatePending, want: store.RunStatusStarted},
-		{name: "running->started", input: RunStateRunning, want: store.RunStatusStarted},
-		{name: "succeeded->finished", input: RunStateSucceeded, want: store.RunStatusFinished},
-		{name: "failed->finished", input: RunStateFailed, want: store.RunStatusFinished},
-		{name: "cancelling->cancelled", input: RunStateCancelling, want: store.RunStatusCancelled},
-		{name: "cancelled", input: RunStateCancelled, want: store.RunStatusCancelled},
-		{name: "unknown->started", input: RunState("unknown"), want: store.RunStatusStarted},
+		{name: "pending->started", input: modsapi.RunStatePending, want: store.RunStatusStarted},
+		{name: "running->started", input: modsapi.RunStateRunning, want: store.RunStatusStarted},
+		{name: "succeeded->finished", input: modsapi.RunStateSucceeded, want: store.RunStatusFinished},
+		{name: "failed->finished", input: modsapi.RunStateFailed, want: store.RunStatusFinished},
+		{name: "cancelling->cancelled", input: modsapi.RunStateCancelling, want: store.RunStatusCancelled},
+		{name: "cancelled", input: modsapi.RunStateCancelled, want: store.RunStatusCancelled},
+		{name: "unknown->started", input: modsapi.RunState("unknown"), want: store.RunStatusStarted},
 	}
 
 	for _, tt := range tests {
@@ -177,7 +178,7 @@ func TestRoundTripConversion(t *testing.T) {
 		for _, orig := range storeStatuses {
 			apiState := StageStatusFromStore(orig)
 			backToStore := StageStatusToStore(apiState)
-			if apiState == StageStatePending {
+			if apiState == modsapi.StageStatePending {
 				if backToStore != store.JobStatusCreated {
 					t.Errorf("Stage status pending round trip failed: %v -> %v -> %v", orig, apiState, backToStore)
 				}

@@ -1,10 +1,11 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -21,21 +22,21 @@ import (
 //   - store.JobStatusCancelled -> StageStateCancelled
 //
 // Note: "skipped" status is not used; jobs are never skipped, only cancelled or failed.
-func StageStatusFromStore(status store.JobStatus) StageState {
+func StageStatusFromStore(status store.JobStatus) modsapi.StageState {
 	switch status {
 	case store.JobStatusCreated, store.JobStatusQueued:
-		return StageStatePending
+		return modsapi.StageStatePending
 	case store.JobStatusRunning:
-		return StageStateRunning
+		return modsapi.StageStateRunning
 	case store.JobStatusSuccess:
-		return StageStateSucceeded
+		return modsapi.StageStateSucceeded
 	case store.JobStatusFail:
-		return StageStateFailed
+		return modsapi.StageStateFailed
 	case store.JobStatusCancelled:
-		return StageStateCancelled
+		return modsapi.StageStateCancelled
 	default:
 		// Default to pending for unknown states (defensive).
-		return StageStatePending
+		return modsapi.StageStatePending
 	}
 }
 
@@ -49,20 +50,20 @@ func StageStatusFromStore(status store.JobStatus) StageState {
 //   - store.RunStatusFinished -> RunStateSucceeded (finished runs are treated as succeeded by default)
 //
 // Run statuses are simplified to Started, Finished, and Cancelled.
-func RunStatusFromStore(status store.RunStatus) RunState {
+func RunStatusFromStore(status store.RunStatus) modsapi.RunState {
 	switch status {
 	case store.RunStatusStarted:
 		// v1 Started means the run is active; map to Running for API.
-		return RunStateRunning
+		return modsapi.RunStateRunning
 	case store.RunStatusFinished:
 		// v1 Finished is terminal; map to Succeeded for API.
 		// NOTE: Future work may inspect repo-level outcomes to distinguish success/failure.
-		return RunStateSucceeded
+		return modsapi.RunStateSucceeded
 	case store.RunStatusCancelled:
-		return RunStateCancelled
+		return modsapi.RunStateCancelled
 	default:
 		// Default to running for unknown states (defensive).
-		return RunStateRunning
+		return modsapi.RunStateRunning
 	}
 }
 
@@ -76,17 +77,17 @@ func RunStatusFromStore(status store.RunStatus) RunState {
 //   - StageStateSucceeded -> store.JobStatusSuccess
 //   - StageStateFailed -> store.JobStatusFail
 //   - StageStateCancelling/StageStateCancelled -> store.JobStatusCancelled
-func StageStatusToStore(state StageState) store.JobStatus {
+func StageStatusToStore(state modsapi.StageState) store.JobStatus {
 	switch state {
-	case StageStatePending, StageStateQueued:
+	case modsapi.StageStatePending, modsapi.StageStateQueued:
 		return store.JobStatusCreated
-	case StageStateRunning:
+	case modsapi.StageStateRunning:
 		return store.JobStatusRunning
-	case StageStateSucceeded:
+	case modsapi.StageStateSucceeded:
 		return store.JobStatusSuccess
-	case StageStateFailed:
+	case modsapi.StageStateFailed:
 		return store.JobStatusFail
-	case StageStateCancelling, StageStateCancelled:
+	case modsapi.StageStateCancelling, modsapi.StageStateCancelled:
 		return store.JobStatusCancelled
 	default:
 		// Default to created for unknown states (defensive).
@@ -104,15 +105,15 @@ func StageStatusToStore(state StageState) store.JobStatus {
 //   - RunStateSucceeded -> store.RunStatusFinished
 //   - RunStateFailed -> store.RunStatusFinished
 //   - RunStateCancelling/RunStateCancelled -> store.RunStatusCancelled
-func RunStatusToStore(state RunState) store.RunStatus {
+func RunStatusToStore(state modsapi.RunState) store.RunStatus {
 	switch state {
-	case RunStatePending, RunStateRunning:
+	case modsapi.RunStatePending, modsapi.RunStateRunning:
 		// v1 has no pending/running distinction; both map to Started.
 		return store.RunStatusStarted
-	case RunStateSucceeded, RunStateFailed:
+	case modsapi.RunStateSucceeded, modsapi.RunStateFailed:
 		// v1 Finished is the terminal state for both success and failure.
 		return store.RunStatusFinished
-	case RunStateCancelling, RunStateCancelled:
+	case modsapi.RunStateCancelling, modsapi.RunStateCancelled:
 		return store.RunStatusCancelled
 	default:
 		// Default to started for unknown states (defensive).
@@ -131,7 +132,7 @@ func IsGateJob(meta []byte) bool {
 	if len(meta) == 0 {
 		return false
 	}
-	var sm StageMetadata
+	var sm modsapi.StageMetadata
 	if err := json.Unmarshal(meta, &sm); err != nil {
 		return false
 	}

@@ -47,7 +47,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runID, err := domaintypes.ParseRunIDParam(r, "id")
+		runID, err := ParseRunIDParam(r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -67,7 +67,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 		// Build RunSummary response with Stages and Artifacts.
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
-		runState := modsapi.RunStatusFromStore(run.Status)
+		runState := RunStatusFromStore(run.Status)
 
 		var (
 			repoURL    string
@@ -151,7 +151,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		for _, job := range jobs {
 			jobIDStr := job.ID.String()
 			// Use conversion helper to map store.JobStatus -> modsapi.StageState
-			s := modsapi.StageStatusFromStore(job.Status)
+			s := StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
 			bundles, err := st.ListArtifactBundlesMetaByRunAndJob(r.Context(), store.ListArtifactBundlesMetaByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {

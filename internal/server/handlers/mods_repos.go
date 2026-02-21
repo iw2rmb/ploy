@@ -17,7 +17,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/iw2rmb/ploy/internal/vcs"
 )
 
 // addModRepoHandler adds a repo to a mod's repo set.
@@ -31,7 +30,7 @@ import (
 // - Returns id (repo_id) and stored fields.
 func addModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -62,7 +61,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Normalize and validate repo URL (strips trailing slashes and .git suffixes).
-		normalizedURL := vcs.NormalizeRepoURL(req.RepoURL)
+		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
 		if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
 			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
@@ -140,7 +139,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 // - Lists repos: ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 func listModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -208,13 +207,13 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 // - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
 func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		repoID, err := domaintypes.ParseModRepoIDParam(r, "repo_id")
+		repoID, err := ParseModRepoIDParam(r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -288,7 +287,7 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 //   - within quoted fields, " is escaped as ""
 func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := domaintypes.ParseModIDParam(r, "mod_id")
+		modID, err := ParseModIDParam(r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -394,7 +393,7 @@ func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 			}
 
 			// Normalize and validate repo URL.
-			normalizedURL := vcs.NormalizeRepoURL(repoURL)
+			normalizedURL := domaintypes.NormalizeRepoURL(repoURL)
 			if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
 				failed++
 				errs = append(errs, lineError{Line: lineNum, Message: fmt.Sprintf("invalid repo_url: %v", err)})

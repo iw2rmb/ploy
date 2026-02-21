@@ -3,11 +3,17 @@ package nodeagent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+
+	"github.com/cenkalti/backoff/v5"
+	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // --- Base uploader (from httpuploader.go) ---
@@ -24,6 +30,69 @@ func newBaseUploader(cfg Config) (*baseUploader, error) {
 		return nil, err
 	}
 	return &baseUploader{cfg: cfg, client: client}, nil
+}
+
+// postJSON sends a JSON POST request and checks the expected status code.
+// On success, the caller is responsible for closing resp.Body.
+func (b *baseUploader) postJSON(ctx context.Context, apiPath string, payload any, expectedStatus int, action string) (*http.Response, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	u := MustBuildURL(b.cfg.ServerURL, apiPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	if err := httpError(resp, expectedStatus, action); err != nil {
+		_ = resp.Body.Close()
+		return nil, err
+	}
+	return resp, nil
+}
+
+// postJSONWithRetry sends a JSON POST request with exponential backoff.
+// Accepts 200 and 204 as success, retries on 5xx, fails permanently on 4xx.
+func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, payload any, action string) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	u := MustBuildURL(b.cfg.ServerURL, apiPath)
+	policy := wfbackoff.StatusUploaderPolicy()
+	logger := slog.Default()
+	attempt := 0
+
+	uploadOp := func() error {
+		attempt++
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+		if err != nil {
+			return backoff.Permanent(fmt.Errorf("create request: %w", err))
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := b.client.Do(req)
+		if err != nil {
+			logger.Warn(action+" request failed, retrying", "attempt", attempt, "error", err)
+			return fmt.Errorf("send request: %w", err)
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+			return nil
+		}
+		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+			logger.Warn(action+" received 5xx, retrying", "attempt", attempt, "status_code", resp.StatusCode)
+			return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, string(respBody))
+		}
+		return backoff.Permanent(fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, string(respBody)))
+	}
+
+	return wfbackoff.RunWithBackoff(ctx, policy, logger, uploadOp)
 }
 
 // --- HTTP error helpers (from httperror.go) ---

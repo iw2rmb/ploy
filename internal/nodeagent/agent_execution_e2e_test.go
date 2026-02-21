@@ -103,7 +103,7 @@ func TestEndToEndFlow(t *testing.T) {
 			TypedOptions: RunOptions{
 				Execution: ExecutionOptions{
 					Image:   contracts.ModImage{Universal: "alpine:latest"},
-					Command: Command{Shell: "echo 'test execution'"},
+					Command: contracts.CommandSpec{Shell: "echo 'test execution'"},
 				},
 			},
 		}

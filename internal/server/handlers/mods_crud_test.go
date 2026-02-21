@@ -409,7 +409,7 @@ func TestMods_List_InvalidArchived(t *testing.T) {
 }
 
 // TestMods_List_WithRepoURLFilter_Normalizes verifies GET /v1/mods repo_url filter
-// uses vcs.NormalizeRepoURL for matching.
+// uses types.NormalizeRepoURL for matching.
 func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{

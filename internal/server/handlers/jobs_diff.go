@@ -26,13 +26,13 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	const maxBodySize = 16 << 20  // 16 MiB
 	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := domaintypes.ParseRunIDParam(r, "run_id")
+		runID, err := ParseRunIDParam(r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		jobID, err := domaintypes.ParseJobIDParam(r, "job_id")
+		jobID, err := ParseJobIDParam(r, "job_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

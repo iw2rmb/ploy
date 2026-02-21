@@ -32,61 +32,27 @@ func NewArtifactUploader(cfg Config) (*ArtifactUploader, error) {
 }
 
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-// The artifact is associated with a specific job via the job_id parameter.
 func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
 	if len(paths) == 0 {
-		return "", "", nil // Nothing to upload.
+		return "", "", nil
 	}
-
-	// Create tar.gz bundle from the specified paths.
 	bundleBytes, err := createTarGzBundle(paths)
 	if err != nil {
 		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
-
-	// Check size cap using shared constant.
 	if err := validateUploadSize(bundleBytes, "gzipped artifact bundle"); err != nil {
 		return "", "", err
 	}
-
-	// Build request payload.
-	// run_id and job_id are in the URL path, not the body.
-	payload := map[string]interface{}{
-		"bundle": bundleBytes,
-	}
+	payload := map[string]any{"bundle": bundleBytes}
 	if name != "" {
 		payload["name"] = name
 	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	// Construct URL using job-scoped endpoint.
 	apiPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID.String(), jobID.String())
-	url := MustBuildURL(u.cfg.ServerURL, apiPath)
-
-	// Create HTTP request.
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload artifact")
 	if err != nil {
-		return "", "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send request.
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Check response status.
-	if err := httpError(resp, http.StatusCreated, "upload artifact"); err != nil {
 		return "", "", err
 	}
-
-	// Decode response and validate required fields.
+	defer func() { _ = resp.Body.Close() }()
 	var out struct {
 		ArtifactBundleID string `json:"artifact_bundle_id"`
 		CID              string `json:"cid"`
