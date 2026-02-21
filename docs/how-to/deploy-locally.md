@@ -24,6 +24,9 @@ From repo root:
 
 ```bash
 export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+# Optional when host-side tools use localhost but containers must use host alias:
+# export PLOY_LOCAL_PG_DSN_CONTAINER='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+export PLOY_LOCAL_SERVER_PORT=18080   # optional; default 8080
 ./scripts/local-docker.sh
 export PLOY_CONFIG_HOME="$PWD/local/cli"
 ```
@@ -45,6 +48,9 @@ From repo root:
 
 ```bash
 export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+# Optional when host-side tools use localhost but containers must use host alias:
+# export PLOY_LOCAL_PG_DSN_CONTAINER='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+export PLOY_LOCAL_SERVER_PORT=18080   # optional; default 8080
 ./scripts/local-podman.sh
 export PLOY_CONFIG_HOME="$PWD/local/cli"
 ```
@@ -85,7 +91,7 @@ No flags means full deploy (server + node + garage services).
 - Server health:
 
 ```bash
-curl -fsS http://localhost:8080/health
+curl -fsS "http://localhost:${PLOY_LOCAL_SERVER_PORT:-8080}/health"
 ```
 
 - Metrics:
@@ -116,8 +122,11 @@ For a full reset including DB recreation:
 
 - `PLOY_LOCAL_PG_DSN` missing:
   - Set it before running scripts.
+- Port `8080` already in use:
+  - Set `PLOY_LOCAL_SERVER_PORT` (example: `18080`) before running scripts.
 - DB unreachable:
   - Verify host PostgreSQL is running.
+  - Do not use `localhost` in container DSN. Set `PLOY_LOCAL_PG_DSN_CONTAINER` to a container-reachable host (for example `host.containers.internal`).
   - Verify DSN host is reachable from containers (`host.containers.internal` on macOS).
 - Missing binaries:
   - Ensure `dist/ployd-linux` and `dist/ployd-node-linux` exist after `make build`.

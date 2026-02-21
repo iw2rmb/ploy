@@ -25,6 +25,22 @@ defaults change, or components adopt additional configuration.
   DSN used by the local server container and host-side setup SQL (DB create/drop,
   token insert, node seed). Example:
   `postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
+- `PLOY_LOCAL_PG_DSN_CONTAINER` — Optional DSN injected into the server container as
+  `PLOY_POSTGRES_DSN`. Default: `PLOY_LOCAL_PG_DSN`. Must be reachable from inside
+  containers and must not use loopback (`localhost`, `127.0.0.1`, `::1`).
+  If username is omitted, local scripts infer it from `PLOY_LOCAL_PG_DSN` username,
+  then from `USER`.
+  Use this when host-side DB access uses localhost:
+  `PLOY_LOCAL_PG_DSN=postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`
+  and
+  `PLOY_LOCAL_PG_DSN_CONTAINER=postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
+- `PLOY_LOCAL_SERVER_PORT` — Optional host port mapped to the server container's internal
+  port `8080` in `local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
+  is already occupied (example: `PLOY_LOCAL_SERVER_PORT=18080`).
+- `WORKER_TOKEN_PATH` — Optional host path used by local scripts to persist the worker bearer
+  token and mounted into the node container at `/etc/ploy/bearer-token`.
+  Default: `local/node/bearer-token` (file path). If this path is a directory, scripts
+  replace it with a file automatically.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`. Defaults to `/var/run/docker.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
