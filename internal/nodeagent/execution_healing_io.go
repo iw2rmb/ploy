@@ -1,22 +1,17 @@
-// execution_healing_io.go contains file I/O helpers, parsers, env injection,
-// and diff upload for the healing subsystem.
+// execution_healing_io.go contains file I/O helpers and parsers for the healing subsystem.
 package nodeagent
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 // parseBugSummary reads /out/codex-last.txt and extracts the "bug_summary" field
@@ -90,65 +85,6 @@ func parseCodexLastField(outDir, field string) string {
 	}
 
 	return ""
-}
-
-func workspaceStatus(ctx context.Context, workspace string) (string, error) {
-	return gitpkg.WorkspaceStatus(ctx, workspace)
-}
-
-// uploadHealingJobDiff generates and uploads a diff for a discrete healing job.
-func (r *runController) uploadHealingJobDiff(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	jobName string,
-	diffGenerator step.DiffGenerator,
-	baseDir string,
-	workspace string,
-	result step.Result,
-	stepIndex types.StepIndex,
-) {
-	if diffGenerator == nil {
-		return
-	}
-	if strings.TrimSpace(baseDir) == "" {
-		return
-	}
-
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
-	if err != nil {
-		slog.Error("failed to generate healing job diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	if len(diffBytes) == 0 {
-		slog.Info("no diff to upload for healing job (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
-		return
-	}
-
-	summary := types.NewDiffSummaryBuilder().
-		StepIndex(stepIndex).
-		ModType(DiffModTypeMod.String()).
-		ExitCode(result.ExitCode).
-		Timings(
-			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
-			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-			time.Duration(result.Timings.DiffDuration).Milliseconds(),
-			time.Duration(result.Timings.TotalDuration).Milliseconds(),
-		).
-		MustBuild()
-
-	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
-		return
-	}
-
-	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
 }
 
 func ensureHealingInDir(inDir *string, runID types.RunID) error {
@@ -263,38 +199,4 @@ func persistHealingSessionToInDir(inDir, session string, runID types.RunID) {
 	if writeErr := os.WriteFile(sessionPath, []byte(session), 0o644); writeErr != nil {
 		slog.Warn("healing: failed to persist codex-session.txt into /in", "run_id", runID, "error", writeErr)
 	}
-}
-
-// injectHealingEnvVars adds healing-specific environment variables to the manifest.
-func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, workspace string) {
-	if manifest.Env == nil {
-		manifest.Env = map[string]string{}
-	}
-	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
-	manifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
-	manifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
-	manifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
-
-	if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
-		manifest.Env["PLOY_API_TOKEN"] = token
-	} else if !r.cfg.HTTP.TLS.Enabled {
-		if data, err := os.ReadFile(bearerTokenPath()); err == nil {
-			if token := strings.TrimSpace(string(data)); token != "" {
-				manifest.Env["PLOY_API_TOKEN"] = token
-			}
-		} else {
-			slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
-		}
-	}
-}
-
-// mountHealingTLSCerts configures TLS certificate paths in manifest options.
-func (r *runController) mountHealingTLSCerts(manifest *contracts.StepManifest) {
-	if manifest.Options == nil {
-		manifest.Options = make(map[string]any)
-	}
-	manifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
-	manifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
-	manifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
 }

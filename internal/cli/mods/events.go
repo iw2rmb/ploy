@@ -16,19 +16,13 @@ import (
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
-// EventsPrinter renders run and stage updates.
-type EventsPrinter interface {
-	Run(modsapi.RunSummary)
-	Stage(stage modsapi.StageStatus)
-}
-
-// SimplePrinter prints a short human-readable summary.
+// SimplePrinter prints a short human-readable summary of run and stage updates.
 type SimplePrinter struct{ out io.Writer }
 
-func (p SimplePrinter) Run(t modsapi.RunSummary) {
+func (p *SimplePrinter) Run(t modsapi.RunSummary) {
 	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.RunID)), strings.ToLower(string(t.State)))
 }
-func (p SimplePrinter) Stage(s modsapi.StageStatus) {
+func (p *SimplePrinter) Stage(s modsapi.StageStatus) {
 	label := strings.TrimSpace(string(s.CurrentJobID))
 	if label == "" {
 		label = "<stage>"
@@ -55,7 +49,7 @@ type EventsCommand struct {
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed)
 	Output  io.Writer
-	Printer EventsPrinter
+	Printer *SimplePrinter
 
 	// LogPrinter is an optional log printer for handling "log" events.
 	// When nil, EventsCommand creates a default structured logs.Printer that
@@ -86,7 +80,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	// Default run/stage printer.
 	printer := c.Printer
 	if printer == nil {
-		printer = SimplePrinter{out: out}
+		printer = &SimplePrinter{out: out}
 	}
 
 	// Ensure log events are always rendered: when LogPrinter is nil, create a

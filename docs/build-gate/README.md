@@ -60,10 +60,10 @@ Gate validation is orchestrated by the node agent as part of the Mods run lifecy
 
 ## Gate Executor
 
-The `GateExecutor` interface (`internal/workflow/runtime/step`) provides a unified
+The `GateExecutor` interface (`internal/workflow/step`) provides a unified
 abstraction for gate validation. The only implementation is the Docker-based executor:
 
-**Code path:** `internal/workflow/runtime/step/gate_docker.go`
+**Code path:** `internal/workflow/step/gate_docker.go`
 
 **Characteristics:**
 - Workspace is local to the node; no network transfer of code.
@@ -206,7 +206,7 @@ See `docs/envs/README.md` for the complete environment variable reference.
 
 ## Implementation References
 
-- Gate executor: `internal/workflow/runtime/step/gate_docker.go`
+- Gate executor: `internal/workflow/step/gate_docker.go`
 - Gate+healing orchestration: `internal/nodeagent/execution_healing.go`
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go`
 - Job claiming: `internal/store/queries/jobs.sql` (`ClaimJob` query)

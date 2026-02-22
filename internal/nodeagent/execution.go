@@ -15,7 +15,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // createGitFetcher initializes a git fetcher for repository operations.

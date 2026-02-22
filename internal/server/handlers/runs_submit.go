@@ -164,7 +164,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			// (matching the event structure expected by eventsService.PublishRun)
 			summary := modsapi.RunSummary{
 				RunID:      run.ID,
-				State:      RunStatusFromStore(run.Status),
+				State:      modsapi.RunStatusFromStore(run.Status),
 				Submitter:  "",
 				Repository: modRepo.RepoUrl,
 				Metadata: map[string]string{

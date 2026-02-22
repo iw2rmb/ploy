@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // Healing retry and edge-path tests focused on the gate-heal-regate loop.

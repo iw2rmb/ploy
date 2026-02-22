@@ -11,7 +11,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // Verify gate stats shape includes an explicit final_gate key when only a final
