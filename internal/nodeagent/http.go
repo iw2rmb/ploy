@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,14 +13,16 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
-// --- Base uploader (from httpuploader.go) ---
-
-// baseUploader provides common HTTP client functionality for all uploaders.
+// baseUploader provides common HTTP client functionality for uploaders and fetchers.
 type baseUploader struct {
 	cfg    Config
 	client *http.Client
@@ -95,7 +99,17 @@ func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, pa
 	return wfbackoff.RunWithBackoff(ctx, policy, logger, uploadOp)
 }
 
-// --- HTTP error helpers (from httperror.go) ---
+// UploadJobStatus uploads terminal status and stats to the job-level endpoint.
+func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats) error {
+	payload := map[string]any{"status": status}
+	if exitCode != nil {
+		payload["exit_code"] = *exitCode
+	}
+	if stats != nil {
+		payload["stats"] = stats
+	}
+	return b.postJSONWithRetry(ctx, fmt.Sprintf("/v1/jobs/%s/complete", jobID), payload, "upload job status")
+}
 
 func drainAndClose(resp *http.Response) {
 	if resp == nil || resp.Body == nil {
@@ -119,8 +133,6 @@ func httpError(resp *http.Response, expected int, action string) error {
 	}
 	return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, readErrorBody(resp))
 }
-
-// --- URL helpers (from httputil.go) ---
 
 // BuildURL resolves a base URL and a path-only reference, preserving scheme/host.
 func BuildURL(base, p string) (string, error) {
@@ -147,13 +159,8 @@ func MustBuildURL(base, p string) string {
 	return u
 }
 
-// --- Compression helpers (from compression.go) ---
-
 const (
-	// MaxUploadSize is the maximum size for gzipped uploads (10 MiB).
-	MaxUploadSize = 10 << 20
-
-	// SoftUploadSize provides headroom for gzip footer.
+	MaxUploadSize  = 10 << 20 // 10 MiB
 	SoftUploadSize = MaxUploadSize - 64
 )
 
@@ -185,4 +192,69 @@ func gzipCompress(data []byte, dataType string) ([]byte, error) {
 	}
 
 	return compressed, nil
+}
+
+// createHTTPClient creates an HTTP client with bearer token authentication.
+func createHTTPClient(cfg Config) (*http.Client, error) {
+	transport := &http.Transport{
+		MaxIdleConns:        10,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	if cfg.HTTP.TLS.Enabled {
+		cert, err := tls.LoadX509KeyPair(cfg.HTTP.TLS.CertPath, cfg.HTTP.TLS.KeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("load client cert: %w", err)
+		}
+
+		caCert, err := os.ReadFile(cfg.HTTP.TLS.CAPath)
+		if err != nil {
+			return nil, fmt.Errorf("read ca cert: %w", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("append ca cert failed")
+		}
+
+		transport.TLSClientConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      caCertPool,
+			MinVersion:   tls.VersionTLS13,
+		}
+	}
+
+	tokenFile := bearerTokenPath()
+	bearerTokenBytes, err := os.ReadFile(tokenFile)
+	if err != nil {
+		return nil, fmt.Errorf("read bearer token: %w", err)
+	}
+	bearerToken := strings.TrimSpace(string(bearerTokenBytes))
+
+	authenticatedTransport := &bearerTokenTransport{
+		base:   transport,
+		token:  bearerToken,
+		nodeID: cfg.NodeID,
+	}
+
+	return &http.Client{
+		Transport: authenticatedTransport,
+		Timeout:   30 * time.Second,
+	}, nil
+}
+
+// bearerTokenTransport wraps an http.RoundTripper and adds Authorization and
+// PLOY_NODE_UUID headers to all requests.
+type bearerTokenTransport struct {
+	base   http.RoundTripper
+	token  string
+	nodeID types.NodeID
+}
+
+func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "Bearer "+t.token)
+	req.Header.Set("PLOY_NODE_UUID", t.nodeID.String())
+	return t.base.RoundTrip(req)
 }

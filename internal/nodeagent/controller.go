@@ -24,7 +24,7 @@ type runController struct {
 
 	diffUploader      *DiffUploader
 	artifactUploader  *ArtifactUploader
-	statusUploader    *StatusUploader
+	statusUploader    *baseUploader
 	jobImageNameSaver *JobImageNameSaver
 }
 
@@ -119,7 +119,7 @@ func (r *runController) ensureUploaders() error {
 	}
 
 	if r.statusUploader == nil {
-		r.statusUploader, err = NewStatusUploader(r.cfg)
+		r.statusUploader, err = newBaseUploader(r.cfg)
 		if err != nil {
 			return fmt.Errorf("create status uploader: %w", err)
 		}
