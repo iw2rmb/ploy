@@ -847,7 +847,7 @@ value is a `StageStatus` object describing that job's execution state.
 | `max_attempts`  | int                 | Maximum allowed attempts.                           |
 | `current_job_id`| string (optional)   | Execution job ID (may differ in retry scenarios).   |
 | `artifacts`     | map[string]string   | Artifact logical names → bundle CIDs.               |
-| `last_error`    | string (optional)   | Error message from the most recent failed attempt.  |
+| `last_error`    | string (optional)   | Error message from the most recent failed attempt. Includes explicit `exit code 137` OOM-kill hints for killed mod jobs. |
 | `step_index`    | number              | Float index from `jobs.step_index` for ordering (may be fractional). |
 
 **step_index values:**
@@ -1117,6 +1117,7 @@ Mods container images are standard OCI images with the following expectations:
   - Exit code `0` signals success. Non-zero exit code is treated as failure and
     surfaces in:
     -  run `state=failed`,
+    - `run_repos.last_error` (for `exit_code=137`, includes a "killed; likely out of memory" message),
     - `metadata["reason"]` where available,
     - Build Gate summary (if the failure happened in the gate).
 

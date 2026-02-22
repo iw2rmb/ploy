@@ -186,6 +186,21 @@ func formatStackGateError(modType domaintypes.ModType, jobMeta json.RawMessage) 
 	return &result
 }
 
+// formatExit137Error formats a deterministic run_repos.last_error message for
+// jobs that exited with code 137 (typically SIGKILL/OOM kill).
+func formatExit137Error(jobName string, exitCode *int32) *string {
+	if exitCode == nil || *exitCode != 137 {
+		return nil
+	}
+	name := strings.TrimSpace(jobName)
+	if name == "" {
+		msg := "job failed with exit code 137 (killed; likely out of memory)"
+		return &msg
+	}
+	msg := fmt.Sprintf("job %s failed with exit code 137 (killed; likely out of memory)", name)
+	return &msg
+}
+
 // completeJobHandler marks a job as completed with terminal status and stats.
 // This endpoint simplifies the node → server contract by addressing jobs directly
 // via the URL path (/v1/jobs/{job_id}/complete) rather than requiring run_id and
@@ -387,6 +402,20 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		//   can reach a terminal state instead of leaving jobs stranded.
 		// v1 uses Fail instead of failed.
 		if jobStatus == store.JobStatusFail && err == nil {
+			if errMsg := formatExit137Error(job.Name, req.ExitCode); errMsg != nil {
+				if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
+					RunID:     job.RunID,
+					RepoID:    job.RepoID,
+					LastError: errMsg,
+				}); updateErr != nil {
+					slog.Error("complete job: failed to set repo last_error for exit code 137",
+						"job_id", jobID,
+						"repo_id", job.RepoID,
+						"err", updateErr,
+					)
+				}
+			}
+
 			modType := domaintypes.ModType(job.ModType)
 			if err := modType.Validate(); err != nil {
 				slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
