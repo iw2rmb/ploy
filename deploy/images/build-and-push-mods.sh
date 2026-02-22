@@ -9,12 +9,6 @@ PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}        # seconds (default 15m)
 PUSH_RETRIES=${PUSH_RETRIES:-1}          # number of retries on failure
 IMAGE_PREFIX="ghcr.io/iw2rmb"
 
-discover_images() {
-  local root="docker/mods"
-  [[ -d "$root" ]] || return 0
-  find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
-}
-
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 
@@ -32,7 +26,7 @@ with_timeout() {
 }
 
 discover_images() {
-  local root="docker/mods"
+  local root="deploy/images/mods"
   [[ -d "$root" ]] || return 0
   find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
 }
@@ -61,14 +55,14 @@ for name in "${images[@]}"; do
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
   # Build context rules:
-  # - Default: use "docker/mods/<dir>"
+  # - Default: use "deploy/images/mods/<dir>"
   # - Special-case mod-codex: Dockerfile expects repo-root context (COPY go.mod, internal/ ...)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "-t" "$ref" "--push")
   if [[ "$name" == "mod-codex" ]]; then
     context="."
-    build_args+=("-f" "docker/mods/mod-codex/Dockerfile" "$context")
+    build_args+=("-f" "deploy/images/mods/mod-codex/Dockerfile" "$context")
   else
-    context="docker/mods/${name}"
+    context="deploy/images/mods/${name}"
     build_args+=("$context")
   fi
 

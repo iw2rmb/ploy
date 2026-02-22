@@ -4,7 +4,7 @@
 # rewrite-maven-plugin. It expects pom.xml in /workspace and recipe
 # coordinates via environment variables.
 #
-# See docker/mods/README.md for the Mods runtime contract.
+# See deploy/images/mods/README.md for the Mods runtime contract.
 
 FROM --platform=$TARGETOS/$TARGETARCH maven:3.9.11-eclipse-temurin-17
 

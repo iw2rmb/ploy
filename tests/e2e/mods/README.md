@@ -6,24 +6,24 @@
 
 **Prereqs**
 
-- Local Docker cluster deployed via `scripts/local-docker.sh`.
+- Local Docker cluster deployed via `deploy/local/run.sh`.
 - CLI configured for the local cluster:
-  - `export PLOY_CONFIG_HOME="$PWD/local/cli"`
+  - `export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"`
   - Scenario scripts auto-rebuild/repair `clusters/default` and validate the bearer token before run submission.
-  - Repair first tries `local/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
-  - If both descriptor and token seed are missing, rerun `scripts/local-docker.sh`.
+  - Repair first tries `deploy/local/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
+  - If both descriptor and token seed are missing, rerun `deploy/local/run.sh`.
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
 **Build + Publish Mods Images (Docker Hub)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t mods-orw-maven:e2e docker/mods/orw-maven`
-  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t mods-orw-gradle:e2e docker/mods/orw-gradle`
-  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f docker/mods/mod-codex/Dockerfile -t mods-codex:e2e .`
+  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t mods-orw-maven:e2e deploy/images/mods/orw-maven`
+  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t mods-orw-gradle:e2e deploy/images/mods/orw-gradle`
+  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f deploy/images/mods/mod-codex/Dockerfile -t mods-codex:e2e .`
   - Optional: `mods-llm`, `mods-plan` as needed.
 - Push to Docker Hub using the helper script:
-  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/docker/build-and-push-mods.sh`
+  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** deploy/images/build-and-push-mods.sh`
   - The script special‑cases `mod-codex` to use repo‑root context automatically.
   - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 

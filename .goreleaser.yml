@@ -191,11 +191,6 @@ release:
     brew install iw2rmb/ploy/ploy
     ```
 
-    ### Install Script
-    ```bash
-    curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
-    ```
-
     ### Direct Download
     Download the appropriate binary for your platform from the assets below.
 

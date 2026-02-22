@@ -40,8 +40,8 @@ Deterministic key prefixes (DB-generated object keys):
 ## Local Garage Profile
 
 Local stack source of truth:
-- Compose: `local/docker-compose.yml`
-- Bootstrap/readiness automation: `scripts/local-docker.sh`
+- Compose: `deploy/local/docker-compose.yml`
+- Bootstrap/readiness automation: `deploy/local/run.sh`
 
 Local service model:
 - Garage S3 API endpoint: `http://garage:3900`

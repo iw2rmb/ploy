@@ -4,7 +4,7 @@
 # OpenRewrite Gradle plugin. It expects build.gradle or build.gradle.kts
 # in /workspace and recipe coordinates via environment variables.
 #
-# See docker/mods/README.md for the Mods runtime contract.
+# See deploy/images/mods/README.md for the Mods runtime contract.
 
 FROM --platform=$TARGETOS/$TARGETARCH eclipse-temurin:17-jdk
 

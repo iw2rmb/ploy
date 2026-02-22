@@ -22,8 +22,8 @@ From repo root:
 ```bash
 export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
 export PLOY_SERVER_PORT=18080   # optional; default 8080
-./scripts/local-docker.sh
-export PLOY_CONFIG_HOME="$PWD/local/cli"
+./deploy/local/run.sh
+export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
 ```
 
 What the script does:
@@ -35,7 +35,7 @@ What the script does:
 - Starts compose services.
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
-- Writes local CLI descriptor in `local/cli/clusters/local.json`.
+- Writes local CLI descriptor in `deploy/local/cli/clusters/local.json`.
 - Local Garage S3 credentials are preseeded in compose:
   - access key: `GK000000000000000000000001`
   - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
@@ -43,7 +43,7 @@ What the script does:
 
 ## Script Flags
 
-`./scripts/local-docker.sh` supports:
+`./deploy/local/run.sh` supports:
 
 ```bash
 --drop-db   # drop + recreate "ploy" before deploy
@@ -59,9 +59,9 @@ No flags means full deploy (server + node + garage services).
   - `dist/ployd-linux -> /usr/local/bin/ployd`
   - `dist/ployd-node-linux -> /usr/local/bin/ployd-node`
 - Runtime images are built from:
-  - `docker/server/Dockerfile.local`
-  - `docker/node/Dockerfile.local`
-  - `local/garage/Dockerfile.init` (bootstrap helper image with `/garage` + shell)
+  - `deploy/images/server/Dockerfile.local`
+  - `deploy/images/node/Dockerfile.local`
+  - `deploy/local/garage/Dockerfile.init` (bootstrap helper image with `/garage` + shell)
 - No Go compilation happens in container builds.
 
 ## Verify
@@ -81,19 +81,19 @@ curl -fsS http://localhost:9100/metrics | head
 - Token list (uses local descriptor):
 
 ```bash
-PLOY_CONFIG_HOME="$PWD/local/cli" ./dist/ploy cluster token list
+PLOY_CONFIG_HOME="$PWD/deploy/local/cli" ./dist/ploy cluster token list
 ```
 
 ## Stop / Clean
 
 ```bash
-docker compose -f local/docker-compose.yml down -v
+docker compose -f deploy/local/docker-compose.yml down -v
 ```
 
 For a full reset including DB recreation:
 
 ```bash
-./scripts/local-docker.sh --drop-db
+./deploy/local/run.sh --drop-db
 ```
 
 ## Troubleshooting
@@ -113,9 +113,9 @@ For a full reset including DB recreation:
     - Docker script default: `/var/run/docker.sock`
   - Override explicitly if needed: `export PLOY_CONTAINER_SOCKET_PATH=/var/run/docker.sock`
 - Logs:
-  - `docker compose -f local/docker-compose.yml logs -f server`
-  - `docker compose -f local/docker-compose.yml logs -f node`
-  - `docker compose -f local/docker-compose.yml logs -f garage`
+  - `docker compose -f deploy/local/docker-compose.yml logs -f server`
+  - `docker compose -f deploy/local/docker-compose.yml logs -f node`
+  - `docker compose -f deploy/local/docker-compose.yml logs -f garage`
 
 ## Related
 

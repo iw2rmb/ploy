@@ -7,8 +7,8 @@ set -Eeuo pipefail
 #   PLATFORM - Optional: comma list of platforms (default linux/amd64)
 #
 # Examples:
-#   scripts/docker/build-and-push-core-ghcr.sh
-#   PLATFORM=linux/amd64,linux/arm64 scripts/docker/build-and-push-core-ghcr.sh
+#   deploy/images/build-and-push-core.sh
+#   PLATFORM=linux/amd64,linux/arm64 deploy/images/build-and-push-core.sh
 
 PLATFORM=${PLATFORM:-linux/amd64}
 IMAGE_PREFIX="ghcr.io/iw2rmb"
@@ -36,12 +36,12 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT"
 
 # server
-build_push ploy-server docker/server/Dockerfile .
+build_push ploy-server deploy/images/server/Dockerfile .
 
 # node
-build_push ploy-node docker/node/Dockerfile .
+build_push ploy-node deploy/images/node/Dockerfile .
 
 # db
-build_push ploy-db docker/db/Dockerfile .
+build_push ploy-db deploy/images/db/Dockerfile .
 
 echo "All core images pushed under ${IMAGE_PREFIX}"

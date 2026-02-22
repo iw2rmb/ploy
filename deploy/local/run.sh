@@ -6,20 +6,20 @@ set -euo pipefail
 # - Uses host PostgreSQL (no db service in compose)
 # - Mounts host binaries into containers via volumes
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
+COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f deploy/local/docker-compose.yml}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
-AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
+AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-$ROOT_DIR/deploy/local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
+PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/deploy/local/cli}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
-WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/local/node/bearer-token}"
+WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/local/node/bearer-token}"
 
 DROP_DB=0
 REFRESH_PLOYD=0
@@ -38,7 +38,7 @@ need() {
 
 usage() {
   cat <<'USAGE'
-Usage: ./scripts/local-docker.sh [--drop-db] [--ployd] [--nodes]
+Usage: ./deploy/local/run.sh [--drop-db] [--ployd] [--nodes]
 
 Options:
   --drop-db  Drop and recreate the ploy database before deploy
@@ -48,7 +48,7 @@ Options:
 Environment:
   PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
-  WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: local/node/bearer-token)
+  WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
 }
 

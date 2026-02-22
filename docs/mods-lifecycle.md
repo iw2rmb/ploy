@@ -429,10 +429,10 @@ mods:
   - name: generate-rewrite-config
     image: docker.io/user/mods-shell:latest
     env:
-      MOD_SHELL_SCRIPT: scripts/generate-rewrite.sh
+      MOD_SHELL_SCRIPT: ./generate-rewrite.sh
 ```
 
-`scripts/generate-rewrite.sh` runs inside `/workspace` and writes a complete
+`./generate-rewrite.sh` runs inside `/workspace` and writes a complete
 `rewrite.yml` to the repo root, for example:
 
 ```yaml
@@ -450,7 +450,7 @@ mods:
   - name: generate-rewrite-config
     image: docker.io/user/mods-shell:latest
     env:
-      MOD_SHELL_SCRIPT: scripts/generate-rewrite.sh
+      MOD_SHELL_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
       java-maven: docker.io/user/mods-orw-maven:latest

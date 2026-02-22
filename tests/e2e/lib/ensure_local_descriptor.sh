@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ensure_local_descriptor recreates the local default cluster descriptor when it
-# is missing or broken. It uses local/generated-tokens.env produced by
-# scripts/local-docker.sh.
+# is missing or broken. It uses deploy/local/generated-tokens.env produced by
+# deploy/local/run.sh.
 ensure_local_descriptor() {
   local repo_root="${1:?repo_root is required}"
   local config_home="${2:?config_home is required}"
@@ -33,7 +33,7 @@ ensure_local_descriptor() {
     server_url="${PLOY_SERVER_URL:-http://localhost:${PLOY_SERVER_PORT:-8080}}"
   fi
 
-  generated_tokens="${repo_root}/local/generated-tokens.env"
+  generated_tokens="${repo_root}/deploy/local/generated-tokens.env"
   if [[ -f "$generated_tokens" ]]; then
     # shellcheck disable=SC1090
     source "$generated_tokens"
@@ -52,7 +52,7 @@ ensure_local_descriptor() {
   fi
 
   echo "error: failed to prepare a valid local descriptor at ${marker}" >&2
-  echo "hint: run ./scripts/local-docker.sh to reprovision local cluster credentials" >&2
+  echo "hint: run ./deploy/local/run.sh to reprovision local cluster credentials" >&2
   return 1
 }
 
@@ -176,8 +176,8 @@ mint_valid_local_admin_token() {
   if [[ -n "${PLOY_AUTH_SECRET:-}" ]]; then
     secrets+=("${PLOY_AUTH_SECRET}")
   fi
-  if [[ -f "${repo_root}/local/auth-secret.txt" ]]; then
-    secrets+=("$(cat "${repo_root}/local/auth-secret.txt")")
+  if [[ -f "${repo_root}/deploy/local/auth-secret.txt" ]]; then
+    secrets+=("$(cat "${repo_root}/deploy/local/auth-secret.txt")")
   fi
 
   local container_secret=""

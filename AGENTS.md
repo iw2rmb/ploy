@@ -35,8 +35,8 @@ Unless otherwise specified, the following policies apply when planning changes:
 ### TDD Framework (CRITICAL)
 
 - Unit tests and CLI builds (RED/GREEN phases) run locally.
-- E2E tests run against the local Docker cluster (see `scripts/local-docker.sh`).
-  - Default CLI config: `PLOY_CONFIG_HOME=$PWD/local/cli`.
+- E2E tests run against the local Docker cluster (see `deploy/local/run.sh`).
+  - Default CLI config: `PLOY_CONFIG_HOME=$PWD/deploy/local/cli`.
 - Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
 - Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise E2E when needed).
 - For Mods E2E details, consult `tests/e2e/mods/README.md`.

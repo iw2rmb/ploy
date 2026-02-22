@@ -4,8 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
-COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f deploy/local/docker-compose.yml}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/deploy/local/cli}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
@@ -136,7 +136,7 @@ if [[ -z "$PLOY_DB_DSN" ]]; then
 fi
 
 log "Deploying local stack"
-"$REPO_ROOT/scripts/local-docker.sh"
+"$REPO_ROOT/deploy/local/run.sh"
 
 MOD_CMD=$(cat <<EOC
 sh -lc 'echo "[garage-smoke] start"; cd /workspace; target="\$(git ls-files | head -n 1)"; if [ -z "\$target" ]; then echo "no tracked files" >&2; exit 1; fi; echo "garage-smoke-${TS}" >> "\$target"; mkdir -p /out; echo "garage-smoke-artifact-${TS}" > /out/garage-smoke.txt; echo "[garage-smoke] done"'

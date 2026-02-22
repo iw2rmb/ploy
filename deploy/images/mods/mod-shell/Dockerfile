@@ -4,7 +4,7 @@
 # Git workspace. It is intended for lightweight preprocessing steps
 # such as generating rewrite.yml or other derived configs.
 #
-# See docker/mods/README.md for the Mods runtime contract.
+# See deploy/images/mods/README.md for the Mods runtime contract.
 
 FROM --platform=$TARGETOS/$TARGETARCH bash:5.2
 
