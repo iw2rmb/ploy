@@ -1,4 +1,4 @@
-# Deploy Ploy Locally (Docker and Podman)
+# Deploy Ploy Locally (Docker)
 
 This guide brings up the local Ploy stack using host PostgreSQL plus containers for:
 - Garage object store (`garage`) and bootstrap (`garage-init`)
@@ -13,10 +13,7 @@ The local stack no longer runs a PostgreSQL container. The server uses your host
 - Go 1.25+ (`make build` produces local binaries).
 - Local PostgreSQL running and reachable from containers.
 - `psql` and `pg_isready` available on the host.
-- Docker path:
-  - Docker Desktop / Docker Engine with Compose v2.
-- Podman path:
-  - `podman` and `podman-compose`.
+- Docker Desktop / Docker Engine with Compose v2.
 
 ## Quickstart (Docker)
 
@@ -39,22 +36,6 @@ What the script does:
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
 - Writes local CLI descriptor in `local/cli/clusters/local.json`.
-
-## Quickstart (Podman)
-
-From repo root:
-
-```bash
-export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-export PLOY_SERVER_PORT=18080   # optional; default 8080
-./scripts/local-podman.sh
-export PLOY_CONFIG_HOME="$PWD/local/cli"
-```
-
-Defaults:
-- Compose command: `podman-compose -f local/docker-compose.yml`
-- Container engine command: `podman`
-- You can override with `COMPOSE_CMD` and `CONTAINER_ENGINE`.
 - Local Garage S3 credentials are preseeded in compose:
   - access key: `GK000000000000000000000001`
   - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
@@ -62,7 +43,7 @@ Defaults:
 
 ## Script Flags
 
-Both scripts support:
+`./scripts/local-docker.sh` supports:
 
 ```bash
 --drop-db   # drop + recreate "ploy" before deploy
@@ -130,9 +111,7 @@ For a full reset including DB recreation:
 - Node cannot run containers:
   - Ensure socket mount path is valid:
     - Docker script default: `/var/run/docker.sock`
-    - Podman script default: auto-detected (`/run/podman/podman.sock` for rootful machines, `/run/user/$UID/podman/podman.sock` for rootless)
-  - Override explicitly if needed: `export PLOY_CONTAINER_SOCKET_PATH=/run/podman/podman.sock`
-  - Local compose sets `security_opt: [label=disable]` for `node` to allow Podman socket access under SELinux.
+  - Override explicitly if needed: `export PLOY_CONTAINER_SOCKET_PATH=/var/run/docker.sock`
 - Logs:
   - `docker compose -f local/docker-compose.yml logs -f server`
   - `docker compose -f local/docker-compose.yml logs -f node`

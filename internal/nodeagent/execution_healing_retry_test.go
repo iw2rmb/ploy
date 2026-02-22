@@ -212,7 +212,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 		t.Fatalf("PLOY_HOST_WORKSPACE=%q, want %q", got, ws)
 	}
 
-	// Assert docker socket mount present when host socket exists.
+	// Assert docker socket mount present when host socket path exists and is mountable.
 	wantSock := false
 	for _, m := range capturedMounts {
 		if m.Target == "/var/run/docker.sock" && m.Source == "/var/run/docker.sock" {
@@ -220,9 +220,9 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 			break
 		}
 	}
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+	if fi, err := os.Stat("/var/run/docker.sock"); err == nil && !fi.IsDir() {
 		if !wantSock {
-			t.Fatalf("docker.sock mount not found in healing container spec")
+			t.Fatalf("docker.sock mount not found in healing container spec: mounts=%+v", capturedMounts)
 		}
 	}
 }
