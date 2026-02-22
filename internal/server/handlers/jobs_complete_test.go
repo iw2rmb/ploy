@@ -507,6 +507,50 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 	}
 }
 
+// TestCompleteJob_Exit137SetsLastError verifies that failed jobs with exit code
+// 137 persist a deterministic run_repos.last_error message.
+func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mod", 2000)
+	f.Job.RepoID = domaintypes.NewModRepoID()
+
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Fail",
+		"exit_code": 137,
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunRepoErrorCalled {
+		t.Fatal("expected UpdateRunRepoError to be called")
+	}
+	if st.updateRunRepoErrorParams.RunID != f.RunID {
+		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
+	}
+	if st.updateRunRepoErrorParams.RepoID != f.Job.RepoID {
+		t.Fatalf("expected RepoID %s, got %s", f.Job.RepoID, st.updateRunRepoErrorParams.RepoID)
+	}
+	if st.updateRunRepoErrorParams.LastError == nil {
+		t.Fatal("expected LastError to be set")
+	}
+	msg := *st.updateRunRepoErrorParams.LastError
+	for _, want := range []string{"mod-0", "exit code 137", "out of memory"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected error to contain %q, got: %s", want, msg)
+		}
+	}
+}
+
 // TestCompleteJob_GateFailureSetsLastError verifies that when a gate job fails
 // with Stack Gate mismatch metadata, the handler sets run_repos.last_error.
 func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
