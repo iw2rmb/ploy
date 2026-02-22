@@ -131,9 +131,6 @@ jobs:
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# Homebrew (macOS/Linux)" >> $GITHUB_STEP_SUMMARY
           echo "brew install iw2rmb/ploy/ploy" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# Install script" >> $GITHUB_STEP_SUMMARY
-          echo "curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release URL" >> $GITHUB_STEP_SUMMARY

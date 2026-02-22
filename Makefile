@@ -120,10 +120,6 @@ experiment-role-sep: ## Run role-separated TDD experiment (stub fails, impl pass
 	echo "[Phase B] Expect passing HT under impl build" && \
 	go test -tags "experiment experiment_impl" ./tests/guards ./tests/experiments/role_sep -run '^TestHT_' -cover
 
-.PHONY: codex-experiment-role-sep
-codex-experiment-role-sep: ## Run experiment via Codex CLI (non-interactive)
-	@CODEX_BIN=$${CODEX_BIN:-codex} scripts/codex/role_sep_experiment.sh both
-
 .PHONY: clean
 clean: ## Remove build artifacts
 	rm -rf $(BUILD_DIR)

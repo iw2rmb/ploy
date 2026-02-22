@@ -12,7 +12,7 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/docker/mods/mod-codex/mod-codex.sh"
+SCRIPT="$ROOT_DIR/deploy/images/mods/mod-codex/mod-codex.sh"
 
 # Create a wrapper script that patches mod-codex.sh to use $HOME/.codex instead
 # of hardcoded /root/.codex. This allows tests to run outside Docker containers.

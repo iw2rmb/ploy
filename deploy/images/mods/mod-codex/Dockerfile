@@ -33,7 +33,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
 # to prevent Codex from running the gate inside the container. Build Gate
 # verification is performed externally by Ploy (docker gate) or the
 # Build Gate HTTP API.
-COPY docker/mods/mod-codex/mod-codex.sh /usr/local/bin/mod-codex
+COPY deploy/images/mods/mod-codex/mod-codex.sh /usr/local/bin/mod-codex
 RUN chmod +x /usr/local/bin/mod-codex && \
     ln -s /usr/local/bin/mod-codex /usr/local/bin/mods-codex
 

@@ -165,10 +165,6 @@ Once the workflow completes:
    brew upgrade iw2rmb/ploy/ploy
    ploy version  # Should show vX.Y.Z
 
-   # Test install script
-   curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
-   ploy version
-
    # Test direct download
    # Download a binary from the release page and verify it runs
    ```

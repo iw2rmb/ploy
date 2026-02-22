@@ -40,16 +40,6 @@ For end users, install the Ploy CLI using one of these methods:
 brew install iw2rmb/ploy/ploy
 ```
 
-**Install Script (macOS/Linux/Windows)**
-```bash
-curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
-```
-
-You can customize the installation directory:
-```bash
-INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
-```
-
 **Direct Download**
 
 Download pre-built binaries from the [latest release](https://github.com/iw2rmb/ploy/releases/latest):
@@ -88,8 +78,8 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 
   ```bash
   export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-  ./scripts/local-docker.sh
-  export PLOY_CONFIG_HOME="$PWD/local/cli"
+  ./deploy/local/run.sh
+  export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
   ```
 
 - Submit a Mods run and follow events:
@@ -124,7 +114,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Full reference: `docs/envs/README.md`
 - Key variables:
   - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server.
-  - `PLOY_CONFIG_HOME` — CLI config home; local Docker uses `./local/cli`.
+  - `PLOY_CONFIG_HOME` — CLI config home; local Docker uses `./deploy/local/cli`.
   - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
 
 **Contributing**

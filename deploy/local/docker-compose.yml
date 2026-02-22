@@ -1,8 +1,8 @@
 services:
   server:
     build:
-      context: ..
-      dockerfile: docker/server/Dockerfile.local
+      context: ../..
+      dockerfile: deploy/images/server/Dockerfile.local
     image: ploy-server:local
     platform: linux/amd64
     depends_on:
@@ -23,7 +23,7 @@ services:
       - PLOY_OBJECTSTORE_REGION=garage
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
-      - ../dist/ployd-linux:/usr/local/bin/ployd:ro
+      - ../../dist/ployd-linux:/usr/local/bin/ployd:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
       - "${PLOY_SERVER_PORT:-8080}:8080"
@@ -40,8 +40,8 @@ services:
 
   node:
     build:
-      context: ..
-      dockerfile: docker/node/Dockerfile.local
+      context: ../..
+      dockerfile: deploy/images/node/Dockerfile.local
     image: ploy-node:local
     platform: linux/amd64
     user: "0:0"
@@ -58,7 +58,7 @@ services:
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - ./node/bearer-token:/etc/ploy/bearer-token:ro
-      - ../dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
+      - ../../dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
       - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - /private/tmp:/private/tmp
     command:
@@ -98,8 +98,8 @@ services:
 
   garage-init:
     build:
-      context: ..
-      dockerfile: local/garage/Dockerfile.init
+      context: ../..
+      dockerfile: deploy/local/garage/Dockerfile.init
     image: ploy-garage-init:local
     depends_on:
       garage:

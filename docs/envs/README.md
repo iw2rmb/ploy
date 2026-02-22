@@ -21,7 +21,7 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_DB_DSN` — Required by `scripts/local-docker.sh`.
+- `PLOY_DB_DSN` — Required by `deploy/local/run.sh`.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
   and injected into the server container as `PLOY_POSTGRES_DSN`.
   Must be reachable from inside containers and must not use loopback
@@ -29,11 +29,11 @@ defaults change, or components adopt additional configuration.
   Example:
   `postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
-  port `8080` in `local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
+  port `8080` in `deploy/local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
   is already occupied (example: `PLOY_SERVER_PORT=18080`).
 - `WORKER_TOKEN_PATH` — Optional host path used by local scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
-  Default: `local/node/bearer-token` (file path). If this path is a directory, scripts
+  Default: `deploy/local/node/bearer-token` (file path). If this path is a directory, scripts
   replace it with a file automatically.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
@@ -371,7 +371,7 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
 
-For local development, these are configured in `local/docker-compose.yml`. The local stack includes
+For local development, these are configured in `deploy/local/docker-compose.yml`. The local stack includes
 a Garage service with automatic bucket/access-key bootstrap via `garage-init`.
 
 Alternatively, you can specify these in the server config file under `object_store.*`. Environment

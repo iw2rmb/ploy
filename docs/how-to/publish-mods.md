@@ -1,7 +1,7 @@
 Publish Mods Images to Docker Hub
 
 Overview
-- Mods images live under `docker/mods/`:
+- Mods images live under `deploy/images/mods/`:
   - `orw-maven` — OpenRewrite apply for Maven-only workspaces → `mods-orw-maven`
     - Requires `pom.xml` in the workspace; runs the Rewrite Maven plugin.
     - Coordinates are passed via environment: `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
@@ -34,7 +34,7 @@ Prerequisites
 
 Publish all Mods images
 ```bash
-scripts/docker/build-and-push-mods.sh
+deploy/images/build-and-push-mods.sh
 # Discovers mods subfolders, builds for linux/amd64, and pushes :latest to Docker Hub.
 # Special-cases mod-codex to use repo-root context automatically.
 ```
@@ -43,7 +43,7 @@ Publish a single Mods image (example: orw-maven)
 ```bash
 name=orw-maven
 IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-orw-maven:latest" --push docker/mods/${name}
+  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-orw-maven:latest" --push deploy/images/mods/${name}
 ```
 
 Publish mods-codex (manual one-off)
@@ -51,7 +51,7 @@ Publish mods-codex (manual one-off)
 IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY"
 docker buildx build \
   --platform linux/amd64 \
-  -f docker/mods/mod-codex/Dockerfile \
+  -f deploy/images/mods/mod-codex/Dockerfile \
   -t "${IMAGE_PREFIX}/mods-codex:latest" \
   --push .
 ```
@@ -74,7 +74,7 @@ Multi‑arch (Mac + Linux) push
   ```
 - Build and push both amd64 and arm64 for all Mods via the script by overriding `PLATFORM`:
   ```bash
-  PLATFORM=linux/amd64,linux/arm64 scripts/docker/build-and-push-mods.sh
+  PLATFORM=linux/amd64,linux/arm64 deploy/images/build-and-push-mods.sh
   ```
 - Or build a single image:
   ```bash
@@ -82,7 +82,7 @@ Multi‑arch (Mac + Linux) push
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -t "${IMAGE_PREFIX}/mods-plan:latest" \
-    --push docker/mods/mod-plan
+    --push deploy/images/mods/mod-plan
   ```
 - Verify manifests list both platforms:
   ```bash

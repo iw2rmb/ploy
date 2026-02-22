@@ -30,9 +30,9 @@
 
 set -euo pipefail
 
-# Default to the local Docker cluster descriptor written by scripts/local-docker.sh.
+# Default to the local Docker cluster descriptor written by deploy/local/run.sh.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/deploy/local/cli}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
@@ -239,8 +239,8 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   fi
 
   echo "Next steps:"
-  echo "  - Review control plane logs: docker compose -f local/docker-compose.yml logs -f server"
-  echo "  - Review node logs: docker compose -f local/docker-compose.yml logs -f node"
+  echo "  - Review control plane logs: docker compose -f deploy/local/docker-compose.yml logs -f server"
+  echo "  - Review node logs: docker compose -f deploy/local/docker-compose.yml logs -f node"
   echo "  - Check run status: PLOY_CONFIG_HOME=$PLOY_CONFIG_HOME dist/ploy run status <run-id>"
   echo ""
 fi

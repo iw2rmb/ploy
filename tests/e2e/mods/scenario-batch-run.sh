@@ -23,9 +23,9 @@ set -euo pipefail
 #   PLOY_E2E_BATCH_RUN_DRY=1   - Dry run (print commands without executing)
 # =========================================================================
 
-# Default to the local Docker cluster descriptor written by scripts/local-docker.sh.
+# Default to the local Docker cluster descriptor written by deploy/local/run.sh.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/deploy/local/cli}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
