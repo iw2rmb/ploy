@@ -5,6 +5,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
+ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}

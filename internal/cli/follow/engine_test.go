@@ -74,7 +74,7 @@ func TestEngine_refreshRepos_DecodesRunRepoResponseShape(t *testing.T) {
 	}
 }
 
-func TestEngine_render_UsesImageAndNodeIDColumns(t *testing.T) {
+func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -108,10 +108,19 @@ func TestEngine_render_UsesImageAndNodeIDColumns(t *testing.T) {
 	if strings.Contains(s, "mod-0") {
 		t.Fatalf("render output included job name, output=%q", s)
 	}
-	if !strings.Contains(s, "Repo") || !strings.Contains(s, "Image") || !strings.Contains(s, "NodeID") {
+	if !strings.Contains(s, "Repos: 1") {
+		t.Fatalf("render output missing repo count, output=%q", s)
+	}
+	if !strings.Contains(s, "Repo 1/1: example.com/org/repo") {
+		t.Fatalf("render output missing repo block header, output=%q", s)
+	}
+	if !strings.Contains(s, "Step") || !strings.Contains(s, "Image") || !strings.Contains(s, "Node") {
 		t.Fatalf("render output missing expected header, output=%q", s)
 	}
-	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("example.com/org/repo") + `\s+2000\s+mod\s+` + regexp.QuoteMeta(jobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
+	if strings.Contains(s, "Index") || strings.Contains(s, "NodeID") || strings.Contains(s, "Status") {
+		t.Fatalf("render output included legacy header columns, output=%q", s)
+	}
+	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("⣾") + `\s+mod\s+` + regexp.QuoteMeta(jobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
 	if !want.MatchString(s) {
 		t.Fatalf("render output missing expected job row, output=%q", s)
 	}
@@ -155,28 +164,16 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 
 	e.render()
 
-	s := stripANSI(out.String())
+	raw := out.String()
+	s := stripANSI(raw)
 
-	// Verify output contains error details
-	if !strings.Contains(s, "Stack Gate [inbound]: mismatch") {
+	// Verify output contains one-line error details directly under a failed row.
+	if !strings.Contains(s, "└ Stack Gate [inbound]: mismatch Expected: {language: java, tool: maven, release: \"17\"} Detected: {language: java, tool: maven, release: \"11\"} Evidence: - pom.xml: maven.compiler.release=11") {
 		t.Errorf("expected output to contain Stack Gate failure, got: %q", s)
 	}
 
-	// Verify output includes expected/detected
-	if !strings.Contains(s, "Expected:") {
-		t.Errorf("expected output to contain 'Expected:', got: %q", s)
-	}
-	if !strings.Contains(s, "Detected:") {
-		t.Errorf("expected output to contain 'Detected:', got: %q", s)
-	}
-
-	// Verify output includes evidence paths/keys
-	if !strings.Contains(s, "pom.xml") {
-		t.Errorf("expected output to contain evidence path 'pom.xml', got: %q", s)
-	}
-
-	// Verify the error marker is present
-	if !strings.Contains(s, "✗") {
-		t.Errorf("expected output to contain error marker '✗', got: %q", s)
+	// Verify ANSI red color is applied to the error one-liner.
+	if !strings.Contains(raw, "\x1b[31m") || !strings.Contains(raw, "\x1b[0m") {
+		t.Errorf("expected output to contain red ANSI color for error line, got: %q", raw)
 	}
 }

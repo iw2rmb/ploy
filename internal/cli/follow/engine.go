@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -73,6 +72,11 @@ type refreshKind int
 const (
 	refreshJobs refreshKind = iota
 	refreshReposAndJobs
+)
+
+const (
+	ansiRed   = "\x1b[31m"
+	ansiReset = "\x1b[0m"
 )
 
 // NewEngine creates a follow engine.
@@ -285,22 +289,19 @@ func (e *Engine) render() {
 	var buf bytes.Buffer
 	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', 0)
 
-	_, _ = fmt.Fprintln(tw, "Repo\tIndex\tModType\tJob ID\tNodeID\tImage\tSpin\tDuration\tStatus")
+	_, _ = fmt.Fprintf(tw, "  Repos: %d\n", len(e.repoOrder))
 
-	for _, repoID := range e.repoOrder {
+	for i, repoID := range e.repoOrder {
 		repoURL := e.repoURLs[repoID]
 		jobs := e.repoJobs[repoID]
+		repoErr := formatErrorOneLiner(e.repoErrors[repoID])
+		repoErrRendered := false
 
-		if len(jobs) == 0 {
-			fmt.Fprintf(tw, "%s\t\t\t\t\t\t\t\t\n", repoURL)
-			continue
-		}
+		_, _ = fmt.Fprintln(tw)
+		_, _ = fmt.Fprintf(tw, "  Repo %d/%d: %s\n", i+1, len(e.repoOrder), repoURL)
+		_, _ = fmt.Fprintln(tw, "\tStep\tJob ID\tNode\tImage\tDuration")
 
-		for i, job := range jobs {
-			repoCol := ""
-			if i == 0 {
-				repoCol = repoURL
-			}
+		for _, job := range jobs {
 
 			nodeID := "-"
 			if job.NodeID != nil && !job.NodeID.IsZero() {
@@ -313,28 +314,24 @@ func (e *Engine) render() {
 
 			glyph := statusGlyph(string(job.Status), e.spinnerFrame)
 			duration := formatDuration(job)
-			status := strings.ToLower(string(job.Status))
 
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				repoCol,
-				formatStepIndex(job.StepIndex),
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+				glyph,
 				job.ModType,
 				job.JobID.String(),
 				nodeID,
 				image,
-				glyph,
 				duration,
-				status,
 			)
-		}
-		// Display last_error if present
-		if lastErr := e.repoErrors[repoID]; lastErr != nil && *lastErr != "" {
-			fmt.Fprintf(tw, "\t\t\t\t\t\t\t\t\n")
-			for _, line := range strings.Split(*lastErr, "\n") {
-				fmt.Fprintf(tw, "\t✗ %s\t\t\t\t\t\t\t\n", line)
+
+			if !repoErrRendered && repoErr != "" && strings.EqualFold(string(job.Status), string(store.JobStatusFail)) {
+				fmt.Fprintf(tw, "%s%s%s\t\t\t\t\t\n", ansiRed, "└ "+repoErr, ansiReset)
+				repoErrRendered = true
 			}
 		}
-		_, _ = fmt.Fprintln(tw)
+		if !repoErrRendered && repoErr != "" {
+			fmt.Fprintf(tw, "%s%s%s\t\t\t\t\t\n", ansiRed, "└ "+repoErr, ansiReset)
+		}
 	}
 
 	_ = tw.Flush()
@@ -392,8 +389,15 @@ func statusGlyph(status string, spinnerFrame int) string {
 	}
 }
 
-func formatStepIndex(v domaintypes.StepIndex) string {
-	return strconv.FormatFloat(float64(v), 'f', -1, 64)
+func formatErrorOneLiner(lastErr *string) string {
+	if lastErr == nil {
+		return ""
+	}
+	fields := strings.Fields(*lastErr)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.Join(fields, " ")
 }
 
 func formatDuration(job runs.RepoJobEntry) string {

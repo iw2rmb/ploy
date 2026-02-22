@@ -78,7 +78,7 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 		t.Fatalf("expected non-empty spec payload")
 	}
 	output := buf.String()
-	if !strings.Contains(output, "Mods run "+runID+" submitted") {
+	if !strings.Contains(output, "  Run: "+runID+" submitted") {
 		t.Fatalf("unexpected output: %s", output)
 	}
 }

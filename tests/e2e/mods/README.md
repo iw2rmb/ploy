@@ -9,6 +9,9 @@
 - Local Docker cluster deployed via `scripts/local-docker.sh`.
 - CLI configured for the local cluster:
   - `export PLOY_CONFIG_HOME="$PWD/local/cli"`
+  - Scenario scripts auto-rebuild/repair `clusters/default` and validate the bearer token before run submission.
+  - Repair first tries `local/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
+  - If both descriptor and token seed are missing, rerun `scripts/local-docker.sh`.
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
@@ -190,7 +193,8 @@ What to expect with the provided E2E images:
 
 The CLI `--follow` flag displays a summarized per-repo job graph that refreshes until
 the run reaches a terminal state. The job graph shows:
-- Step index, job type, job ID, display name, status glyph, duration, and status
+- Repo count, per-repo blocks, and step rows with status glyph, step, job ID, node, image, and duration.
+- For failures, a one-line error is shown directly under the failed step row.
 
 **Note:** `--follow` does not stream container stdout/stderr. Use `ploy run logs <run-id>`
 for log streaming.

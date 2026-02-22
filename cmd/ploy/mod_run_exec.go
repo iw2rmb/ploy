@@ -137,7 +137,7 @@ func submitRun(ctx context.Context, base *url.URL, httpClient *http.Client, requ
 
 // followRunEvents displays a job graph per repo until the run reaches a terminal state or timeout.
 // Returns the final run state and any errors encountered during the follow loop.
-// The job graph shows step index, job type, job ID, display name, status glyph, duration, and status.
+// The job graph shows step, job ID, node, image, status glyph, and duration grouped per repo.
 func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client, runID string, flags *modRunFlags, stderr io.Writer) (modsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
