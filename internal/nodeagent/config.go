@@ -31,19 +31,7 @@ type Config struct {
 	// Heartbeat configuration.
 	Heartbeat HeartbeatConfig `yaml:"heartbeat"`
 
-	// Gates configures gate-specific settings at the cluster level.
-	Gates GatesConfig `yaml:"gates"`
-}
-
-// GatesConfig holds cluster-level gate configuration.
-type GatesConfig struct {
-	// BuildGate configures Build Gate settings for this node/cluster.
-	BuildGate BuildGateGatesConfig `yaml:"build_gate"`
-}
-
-// BuildGateGatesConfig holds Build Gate specific configuration.
-type BuildGateGatesConfig struct {
-	// Intentionally empty: Build Gate image selection is configured via:
+	// Note: Build Gate image selection is configured via:
 	//  1) default mapping file, 2) PLOY_BUILDGATE_IMAGE, 3) mod YAML overrides.
 }
 

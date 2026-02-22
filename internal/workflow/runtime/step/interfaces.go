@@ -3,17 +3,13 @@ package step
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// GitFetcher is the interface for fetching git repositories.
-type GitFetcher interface {
-	Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
-}
-
 // FilesystemWorkspaceHydratorOptions holds configuration for workspace hydrator.
 type FilesystemWorkspaceHydratorOptions struct {
-	RepoFetcher GitFetcher
+	RepoFetcher hydration.GitFetcher
 }
 
 // WorkspaceHydrator prepares a workspace for execution.

@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // EventsPrinter renders run and stage updates.
@@ -124,7 +125,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		case "log":
 			// Handle log events using the shared log printer for unified log streaming.
 			if logPrinter != nil && len(evt.Data) > 0 {
-				var rec logs.LogRecord
+				var rec logstream.LogRecord
 				if err := json.Unmarshal(evt.Data, &rec); err != nil {
 					return fmt.Errorf("mods events: decode log: %w", err)
 				}
@@ -134,7 +135,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 			// Handle retention hints; retention metadata is recorded for summary output
 			// at stream completion.
 			if logPrinter != nil && len(evt.Data) > 0 {
-				var hint logs.RetentionHint
+				var hint logstream.RetentionHint
 				if err := json.Unmarshal(evt.Data, &hint); err != nil {
 					return fmt.Errorf("mods events: decode retention: %w", err)
 				}

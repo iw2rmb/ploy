@@ -43,7 +43,7 @@ func parseLastEventID(header string) domaintypes.EventID {
 // database layer enforces existence.
 func getRunLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -120,12 +120,12 @@ func (v *optionalJobID) UnmarshalJSON(b []byte) error {
 // GET /v1/runs/{run_id}/repos/{repo_id}/logs
 func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "run_id")
+		runID, err := parseParam[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

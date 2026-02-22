@@ -31,7 +31,7 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		jobID, err := ParseJobIDParam(r, "job_id")
+		jobID, err := parseParam[domaintypes.JobID](r, "job_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

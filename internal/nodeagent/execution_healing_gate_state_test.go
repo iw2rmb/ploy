@@ -121,7 +121,7 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod: HealingMod{
+				Mod: ModContainerSpec{
 					Image: contracts.ModImage{Universal: "test/healer-final-gate:latest"},
 				},
 			},
@@ -293,7 +293,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 3,
-				Mod: HealingMod{
+				Mod: ModContainerSpec{
 					Image: contracts.ModImage{Universal: "healer:latest"},
 				},
 			},

@@ -43,12 +43,12 @@ type ListRunRepoJobsResponse struct {
 // Query params: ?attempt=N (optional, defaults to current attempt)
 func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "run_id")
+		runID, err := parseParam[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

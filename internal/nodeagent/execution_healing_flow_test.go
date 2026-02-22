@@ -11,7 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
-// TestExecuteWithHealing_GatePassesAfterHealingMod verifies that when the initial gate fails
+// TestExecuteWithHealing_GatePassesAfterModContainerSpec verifies that when the initial gate fails
 // but healing is configured, the healing mod executes and the gate is re-run.
 func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	// Track call sequence to ensure proper orchestration.
@@ -106,7 +106,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod: HealingMod{
+				Mod: ModContainerSpec{
 					Image: contracts.ModImage{Universal: "test/healer:latest"},
 					Env: map[string]string{
 						"HEAL_TASK": "fix-build",
@@ -257,7 +257,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod: HealingMod{
+				Mod: ModContainerSpec{
 					Image: contracts.ModImage{Universal: "test/healer:latest"},
 				},
 			},

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 type filesystemWorkspaceHydrator struct {
-	fetcher GitFetcher
+	fetcher hydration.GitFetcher
 }
 
 // NewFilesystemWorkspaceHydrator creates a new workspace hydrator.

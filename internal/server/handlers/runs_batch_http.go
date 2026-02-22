@@ -23,7 +23,7 @@ import (
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -74,7 +74,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -171,7 +171,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 // GET /v1/runs/{id}/repos
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -215,12 +215,12 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{run_id}/repos/{repo_id}/cancel
 func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "run_id")
+		runID, err := parseParam[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -288,12 +288,12 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos/{repo_id}/restart
 func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -411,7 +411,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

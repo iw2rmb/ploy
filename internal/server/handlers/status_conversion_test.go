@@ -125,39 +125,6 @@ func TestRunStatusToStore(t *testing.T) {
 	}
 }
 
-// TestIsGateJob verifies that gate jobs are correctly identified by mod_type.
-func TestIsGateJob(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		meta []byte
-		want bool
-	}{
-		{name: "pre_gate is gate", meta: []byte(`{"mod_type":"pre_gate"}`), want: true},
-		{name: "post_gate is gate", meta: []byte(`{"mod_type":"post_gate"}`), want: true},
-		{name: "re_gate is gate", meta: []byte(`{"mod_type":"re_gate"}`), want: true},
-		{name: "mod is not gate", meta: []byte(`{"mod_type":"mod"}`), want: false},
-		{name: "heal is not gate", meta: []byte(`{"mod_type":"heal"}`), want: false},
-		{name: "empty mod_type is not gate", meta: []byte(`{"mod_type":""}`), want: false},
-		{name: "missing mod_type is not gate", meta: []byte(`{}`), want: false},
-		{name: "empty meta is not gate", meta: []byte{}, want: false},
-		{name: "nil meta is not gate", meta: nil, want: false},
-		{name: "invalid json is not gate", meta: []byte(`{invalid`), want: false},
-		{name: "extra fields ignored", meta: []byte(`{"mod_type":"pre_gate","other":"val"}`), want: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := IsGateJob(tt.meta)
-			if got != tt.want {
-				t.Errorf("IsGateJob(%q) = %v, want %v", string(tt.meta), got, tt.want)
-			}
-		})
-	}
-}
-
 // TestRoundTripConversion verifies that converting from store types to API types
 // and back produces expected results.
 func TestRoundTripConversion(t *testing.T) {

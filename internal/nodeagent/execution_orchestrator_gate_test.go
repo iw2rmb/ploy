@@ -466,11 +466,11 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	typedOpts := RunOptions{
 		Healing: &HealingConfig{
 			Retries: 1,
-			Mod: HealingMod{
+			Mod: ModContainerSpec{
 				Image: contracts.ModImage{Universal: "test/healer:latest"},
 			},
 		},
-		Router: &RouterConfig{
+		Router: &ModContainerSpec{
 			Image: contracts.ModImage{Universal: "test/router:latest"},
 		},
 	}

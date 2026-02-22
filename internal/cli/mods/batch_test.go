@@ -32,7 +32,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 		name        string
 		limit       int32
 		offset      int32
-		serverResp  []BatchSummary
+		serverResp  []domaintypes.RunSummary
 		wantCount   int
 		wantErr     bool
 		wantErrText string
@@ -41,14 +41,14 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			name:   "list batches with results",
 			limit:  50,
 			offset: 0,
-			serverResp: []BatchSummary{
+			serverResp: []domaintypes.RunSummary{
 				{
 					ID:        runID1,
 					Status:    "Started",
 					ModID:     modID1,
 					SpecID:    specID1,
 					CreatedAt: time.Now(),
-					Counts: &RunRepoCounts{
+					Counts: &domaintypes.RunRepoCounts{
 						Total:         5,
 						Queued:        2,
 						Running:       1,
@@ -70,14 +70,14 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			name:       "empty list",
 			limit:      50,
 			offset:     0,
-			serverResp: []BatchSummary{},
+			serverResp: []domaintypes.RunSummary{},
 			wantCount:  0,
 		},
 		{
 			name:   "with pagination",
 			limit:  10,
 			offset: 5,
-			serverResp: []BatchSummary{
+			serverResp: []domaintypes.RunSummary{
 				{ID: runIDPage, Status: "Started", ModID: modIDPage, SpecID: specIDPage},
 			},
 			wantCount: 1,
@@ -107,7 +107,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 				}
 
 				resp := struct {
-					Runs []BatchSummary `json:"runs"`
+					Runs []domaintypes.RunSummary `json:"runs"`
 				}{Runs: tc.serverResp}
 
 				w.Header().Set("Content-Type", "application/json")
@@ -235,7 +235,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 		baseRef     string
 		targetRef   string
 		batchName   *string
-		runSummary  BatchSummary
+		runSummary  domaintypes.RunSummary
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -246,7 +246,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "feature-branch",
 			batchName:  strPtr("test-batch"),
-			runSummary: BatchSummary{ID: runID, Status: "Started", ModID: modID1, SpecID: specID1, CreatedAt: time.Now()},
+			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", ModID: modID1, SpecID: specID1, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -255,7 +255,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "hotfix",
 			batchName:  nil,
-			runSummary: BatchSummary{ID: runID, Status: "Started", ModID: modID2, SpecID: specID2, CreatedAt: time.Now()},
+			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", ModID: modID2, SpecID: specID2, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{

@@ -151,15 +151,15 @@ func TestDeriveBatchStatus(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		counts *RunRepoCounts
+		counts *domaintypes.RunRepoCounts
 		want   string
 	}{
-		{name: "empty batch", counts: &RunRepoCounts{Total: 0}, want: DerivedStatusPending},
-		{name: "queued only", counts: &RunRepoCounts{Total: 2, Queued: 2}, want: DerivedStatusPending},
-		{name: "running", counts: &RunRepoCounts{Total: 2, Running: 1, Queued: 1}, want: DerivedStatusRunning},
-		{name: "cancelled", counts: &RunRepoCounts{Total: 2, Cancelled: 1, Running: 1}, want: DerivedStatusCancelled},
-		{name: "failed", counts: &RunRepoCounts{Total: 2, Fail: 1, Success: 1}, want: DerivedStatusFailed},
-		{name: "completed", counts: &RunRepoCounts{Total: 2, Success: 2}, want: DerivedStatusCompleted},
+		{name: "empty batch", counts: &domaintypes.RunRepoCounts{Total: 0}, want: DerivedStatusPending},
+		{name: "queued only", counts: &domaintypes.RunRepoCounts{Total: 2, Queued: 2}, want: DerivedStatusPending},
+		{name: "running", counts: &domaintypes.RunRepoCounts{Total: 2, Running: 1, Queued: 1}, want: DerivedStatusRunning},
+		{name: "cancelled", counts: &domaintypes.RunRepoCounts{Total: 2, Cancelled: 1, Running: 1}, want: DerivedStatusCancelled},
+		{name: "failed", counts: &domaintypes.RunRepoCounts{Total: 2, Fail: 1, Success: 1}, want: DerivedStatusFailed},
+		{name: "completed", counts: &domaintypes.RunRepoCounts{Total: 2, Success: 2}, want: DerivedStatusCompleted},
 	}
 
 	for _, tc := range tests {

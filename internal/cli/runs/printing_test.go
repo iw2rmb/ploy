@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // TestPrintLogFormats verifies log formatting via the shared printer.
 func TestPrintLogFormats(t *testing.T) {
 	t.Parallel()
 
-	rec := logs.LogRecord{Timestamp: "2025-01-01T00:00:00Z", Stream: "stderr", Line: "hello\n"}
+	rec := logstream.LogRecord{Timestamp: "2025-01-01T00:00:00Z", Stream: "stderr", Line: "hello\n"}
 
 	// Raw format: message only — use canonical logs.FormatRaw directly.
 	var b bytes.Buffer
@@ -32,7 +33,7 @@ func TestPrintLogFormats(t *testing.T) {
 
 	// Missing timestamp/stream falls back to defaults and trims CRLF.
 	b.Reset()
-	printer.PrintLog(logs.LogRecord{Line: "hi\r\n"})
+	printer.PrintLog(logstream.LogRecord{Line: "hi\r\n"})
 	if got := b.String(); got == "" {
 		t.Fatalf("expected non-empty structured default output")
 	}
@@ -54,7 +55,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 	// Retained with all fields
 	b.Reset()
 	printer = logs.NewPrinter(logs.FormatStructured, &b)
-	printer.RecordRetention(logs.RetentionHint{Retained: true, TTL: "24h", Expires: "2025-01-02", Bundle: "cid"})
+	printer.RecordRetention(logstream.RetentionHint{Retained: true, TTL: "24h", Expires: "2025-01-02", Bundle: "cid"})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
 		t.Fatalf("expected output for retained with ttl+expires")
@@ -63,7 +64,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 	// Retained with ttl only
 	b.Reset()
 	printer = logs.NewPrinter(logs.FormatStructured, &b)
-	printer.RecordRetention(logs.RetentionHint{Retained: true, TTL: "24h"})
+	printer.RecordRetention(logstream.RetentionHint{Retained: true, TTL: "24h"})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
 		t.Fatalf("expected output for retained with ttl")
@@ -72,7 +73,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 	// Retained minimal
 	b.Reset()
 	printer = logs.NewPrinter(logs.FormatStructured, &b)
-	printer.RecordRetention(logs.RetentionHint{Retained: true})
+	printer.RecordRetention(logstream.RetentionHint{Retained: true})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
 		t.Fatalf("expected output for retained minimal")
@@ -81,7 +82,7 @@ func TestPrintRetentionSummary(t *testing.T) {
 	// Not retained
 	b.Reset()
 	printer = logs.NewPrinter(logs.FormatStructured, &b)
-	printer.RecordRetention(logs.RetentionHint{})
+	printer.RecordRetention(logstream.RetentionHint{})
 	printer.PrintRetentionSummary()
 	if b.Len() == 0 {
 		t.Fatalf("expected output for not retained")

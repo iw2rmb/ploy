@@ -289,10 +289,8 @@ func TestNewGitFetcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "with PublishSnapshot enabled",
-			opts: GitFetcherOptions{
-				PublishSnapshot: true,
-			},
+			name:    "with CacheDir set",
+			opts:    GitFetcherOptions{CacheDir: "/tmp/cache"},
 			wantErr: false,
 		},
 	}

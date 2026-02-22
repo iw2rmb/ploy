@@ -25,7 +25,7 @@ func TestStopCommand_Run(t *testing.T) {
 	tests := []struct {
 		name        string
 		runID       domaintypes.RunID
-		serverResp  Summary
+		serverResp  domaintypes.RunSummary
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -33,7 +33,7 @@ func TestStopCommand_Run(t *testing.T) {
 		{
 			name:  "successful stop",
 			runID: okRunID,
-			serverResp: Summary{
+			serverResp: domaintypes.RunSummary{
 				ID:        okRunID,
 				Status:    "Cancelled",
 				ModID:     modID,

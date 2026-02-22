@@ -208,7 +208,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		ctx := r.Context()
 
 		// Extract job_id from URL path parameter using domain type helper.
-		jobID, err := ParseJobIDParam(r, "job_id")
+		jobID, err := parseParam[domaintypes.JobID](r, "job_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

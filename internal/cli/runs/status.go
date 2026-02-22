@@ -18,37 +18,37 @@ type GetStatusCommand struct {
 	RunID   domaintypes.RunID
 }
 
-// Run executes GET /v1/runs/{id} and returns the run Summary.
-func (c GetStatusCommand) Run(ctx context.Context) (Summary, error) {
+// Run executes GET /v1/runs/{id} and returns the run domaintypes.RunSummary.
+func (c GetStatusCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
 	if c.Client == nil {
-		return Summary{}, fmt.Errorf("run status: http client required")
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: http client required")
 	}
 	if c.BaseURL == nil {
-		return Summary{}, fmt.Errorf("run status: base url required")
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: base url required")
 	}
 	if c.RunID.IsZero() {
-		return Summary{}, fmt.Errorf("run status: run id required")
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: run id required")
 	}
 
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return Summary{}, fmt.Errorf("run status: build request: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return Summary{}, fmt.Errorf("run status: http request failed: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return Summary{}, httpx.WrapError("run status", resp.Status, resp.Body)
+		return domaintypes.RunSummary{}, httpx.WrapError("run status", resp.Status, resp.Body)
 	}
 
-	var summary Summary
+	var summary domaintypes.RunSummary
 	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
-		return Summary{}, fmt.Errorf("run status: decode response: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: decode response: %w", err)
 	}
 
 	return summary, nil

@@ -166,7 +166,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:        types.RunID("run-123"),
 			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-			TypedOptions: RunOptions{Execution: ExecutionOptions{Command: contracts.CommandSpec{Shell: "echo hi"}}},
+			TypedOptions: RunOptions{Execution: ModContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}}},
 		}
 
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
@@ -193,7 +193,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:        types.RunID("run-123"),
 			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-			TypedOptions: RunOptions{Execution: ExecutionOptions{Image: contracts.ModImage{Universal: "docker.io/example/mods-openrewrite:latest"}}},
+			TypedOptions: RunOptions{Execution: ModContainerSpec{Image: contracts.ModImage{Universal: "docker.io/example/mods-openrewrite:latest"}}},
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
@@ -247,7 +247,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 					MROnSuccessSet: true,
 					MROnFailSet:    true,
 				},
-				Execution: ExecutionOptions{
+				Execution: ModContainerSpec{
 					RetainContainer: true,
 				},
 			},
@@ -316,16 +316,16 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			Env:     map[string]string{"BASE_VAR": "base_value"},
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
-					{
+					{ModContainerSpec: ModContainerSpec{
 						Image:   contracts.ModImage{Universal: "mods-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
-					},
-					{
+					}},
+					{ModContainerSpec: ModContainerSpec{
 						Image:   contracts.ModImage{Universal: "mods-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
-					},
+					}},
 				},
 			},
 		}
@@ -394,10 +394,10 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			Env:     map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"},
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
-					{
+					{ModContainerSpec: ModContainerSpec{
 						Image: contracts.ModImage{Universal: "mods-step:latest"},
 						Env:   map[string]string{"SHARED_VAR": "step_override"},
-					},
+					}},
 				},
 			},
 		}
@@ -424,7 +424,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
-					{Image: contracts.ModImage{Universal: "mods-step:latest"}},
+					{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "mods-step:latest"}}},
 				},
 			},
 		}
@@ -446,7 +446,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			JobID:   types.JobID("job-single-123"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
-				Execution: ExecutionOptions{
+				Execution: ModContainerSpec{
 					Image:   contracts.ModImage{Universal: "single-mod:latest"},
 					Command: contracts.CommandSpec{Shell: "run-single"},
 				},
@@ -676,14 +676,14 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 		TypedOptions: RunOptions{
 			BuildGate: BuildGateOptions{Enabled: true},
 			Steps: []StepMod{
-				{
+				{ModContainerSpec: ModContainerSpec{
 					Image: contracts.ModImage{
 						ByStack: map[contracts.ModStack]string{
 							contracts.ModStackJavaMaven:  "docker.io/example/mods-orw-maven:latest",
 							contracts.ModStackJavaGradle: "docker.io/example/mods-orw-gradle:latest",
 						},
 					},
-				},
+				}},
 			},
 		},
 	}

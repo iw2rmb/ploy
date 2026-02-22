@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -18,7 +19,7 @@ import (
 func heartbeatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := ParseNodeIDParam(r, "id")
+		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

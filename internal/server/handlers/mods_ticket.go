@@ -47,7 +47,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter.
 		// Run IDs are KSUID strings; treated as opaque identifiers.
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

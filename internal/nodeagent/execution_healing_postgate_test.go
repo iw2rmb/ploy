@@ -226,7 +226,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     HealingMod{Image: contracts.ModImage{Universal: "healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "healer:latest"}},
 			},
 		},
 	}

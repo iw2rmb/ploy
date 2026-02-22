@@ -19,15 +19,14 @@ import (
 )
 
 // createGitFetcher initializes a git fetcher for repository operations.
-func (r *runController) createGitFetcher() (step.GitFetcher, error) {
+func (r *runController) createGitFetcher() (hydration.GitFetcher, error) {
 	cacheDir := os.Getenv("PLOYD_CACHE_HOME")
 	return hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		PublishSnapshot: false,
-		CacheDir:        cacheDir,
+		CacheDir: cacheDir,
 	})
 }
 
-func (r *runController) createWorkspaceHydrator(fetcher step.GitFetcher) (step.WorkspaceHydrator, error) {
+func (r *runController) createWorkspaceHydrator(fetcher hydration.GitFetcher) (step.WorkspaceHydrator, error) {
 	return step.NewFilesystemWorkspaceHydrator(step.FilesystemWorkspaceHydratorOptions{
 		RepoFetcher: fetcher,
 	})
