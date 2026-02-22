@@ -186,7 +186,7 @@ mint_valid_local_admin_token() {
     secrets+=("$container_secret")
   fi
 
-  # Docker/Podman compose default when PLOY_AUTH_SECRET is unset.
+  # Local Docker compose default when PLOY_AUTH_SECRET is unset.
   secrets+=("changeme-insecure-local-secret")
 
   for secret in "${secrets[@]}"; do
@@ -202,13 +202,6 @@ mint_valid_local_admin_token() {
 }
 
 running_server_secret() {
-  if command -v podman >/dev/null 2>&1; then
-    podman inspect local_server_1 --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-      | sed -n 's/^PLOY_AUTH_SECRET=//p' \
-      | head -n 1
-    return 0
-  fi
-
   if command -v docker >/dev/null 2>&1; then
     docker inspect local_server_1 --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
       | sed -n 's/^PLOY_AUTH_SECRET=//p' \

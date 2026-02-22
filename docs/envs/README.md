@@ -21,7 +21,7 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_DB_DSN` — Required by `scripts/local-docker.sh` and `scripts/local-podman.sh`.
+- `PLOY_DB_DSN` — Required by `scripts/local-docker.sh`.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
   and injected into the server container as `PLOY_POSTGRES_DSN`.
   Must be reachable from inside containers and must not use loopback
@@ -38,9 +38,6 @@ defaults change, or components adopt additional configuration.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
-  Podman script default: auto-detected from Podman connection/machine mode
-  (`/run/podman/podman.sock` for rootful, `/run/user/$UID/podman/podman.sock` for rootless),
-  with fallback to `/run/user/$UID/podman/podman.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
   default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
