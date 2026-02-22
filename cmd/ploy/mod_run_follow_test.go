@@ -299,6 +299,18 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 	}
 
 	// Verify job graph output contains repo URL (scheme-less normalized) and job info.
+	if !strings.Contains(out, "Repos: 1") {
+		t.Errorf("expected repo count line in output, got: %s", out)
+	}
+	if !strings.Contains(out, "Repo 1/1: example.com/repo") {
+		t.Errorf("expected repo block header in output, got: %s", out)
+	}
+	if !strings.Contains(out, "Step") || !strings.Contains(out, "Node") {
+		t.Errorf("expected new follow header columns in output, got: %s", out)
+	}
+	if strings.Contains(out, "Index") || strings.Contains(out, "Status") || strings.Contains(out, "NodeID") {
+		t.Errorf("expected legacy follow columns to be removed, got: %s", out)
+	}
 	if !strings.Contains(out, "example.com/repo") {
 		t.Errorf("expected repo URL in output, got: %s", out)
 	}

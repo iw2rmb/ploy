@@ -59,7 +59,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stderr, "Mods run %s submitted (state: %s)\n", summary.RunID, summary.State)
+	_, _ = fmt.Fprintf(stderr, "  Run: %s submitted\n", summary.RunID)
 
 	// Track states for JSON output.
 	initialState := strings.ToLower(string(summary.State))

@@ -6,6 +6,8 @@ cd "$REPO_ROOT"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
+ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
 REPO_URL="${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
