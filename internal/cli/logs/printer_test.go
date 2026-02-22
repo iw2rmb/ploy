@@ -3,6 +3,8 @@ package logs
 import (
 	"bytes"
 	"testing"
+
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // TestPrintLog_StructuredBasic verifies structured output without enriched fields.
@@ -11,12 +13,12 @@ func TestPrintLog_StructuredBasic(t *testing.T) {
 
 	tests := []struct {
 		name string
-		rec  LogRecord
+		rec  logstream.LogRecord
 		want string
 	}{
 		{
 			name: "stdout with timestamp",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:00Z",
 				Stream:    "stdout",
 				Line:      "Step started",
@@ -25,7 +27,7 @@ func TestPrintLog_StructuredBasic(t *testing.T) {
 		},
 		{
 			name: "stderr with timestamp",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:01Z",
 				Stream:    "stderr",
 				Line:      "warning: slow retry",
@@ -34,7 +36,7 @@ func TestPrintLog_StructuredBasic(t *testing.T) {
 		},
 		{
 			name: "empty stream defaults to stdout",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:02Z",
 				Stream:    "",
 				Line:      "no stream",
@@ -43,7 +45,7 @@ func TestPrintLog_StructuredBasic(t *testing.T) {
 		},
 		{
 			name: "trailing newline stripped",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:03Z",
 				Stream:    "stdout",
 				Line:      "trailing newline\n",
@@ -52,7 +54,7 @@ func TestPrintLog_StructuredBasic(t *testing.T) {
 		},
 		{
 			name: "trailing CRLF stripped",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:04Z",
 				Stream:    "stdout",
 				Line:      "crlf ending\r\n",
@@ -80,12 +82,12 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 
 	tests := []struct {
 		name string
-		rec  LogRecord
+		rec  logstream.LogRecord
 		want string
 	}{
 		{
 			name: "all enriched fields present",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:00Z",
 				Stream:    "stdout",
 				Line:      "Step started",
@@ -98,7 +100,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 		},
 		{
 			name: "node_id only",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:01Z",
 				Stream:    "stdout",
 				Line:      "partial context",
@@ -108,7 +110,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 		},
 		{
 			name: "mod_type and job_id only",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:02Z",
 				Stream:    "stderr",
 				Line:      "gate failure",
@@ -119,7 +121,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 		},
 		{
 			name: "step_index zero omitted",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:03Z",
 				Stream:    "stdout",
 				Line:      "step index zero",
@@ -130,7 +132,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 		},
 		{
 			name: "step_index one included",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:04Z",
 				Stream:    "stdout",
 				Line:      "step index one",
@@ -159,12 +161,12 @@ func TestPrintLog_Raw(t *testing.T) {
 
 	tests := []struct {
 		name string
-		rec  LogRecord
+		rec  logstream.LogRecord
 		want string
 	}{
 		{
 			name: "basic line",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:00Z",
 				Stream:    "stdout",
 				Line:      "ready",
@@ -173,7 +175,7 @@ func TestPrintLog_Raw(t *testing.T) {
 		},
 		{
 			name: "enriched fields ignored",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:01Z",
 				Stream:    "stderr",
 				Line:      "warn",
@@ -186,7 +188,7 @@ func TestPrintLog_Raw(t *testing.T) {
 		},
 		{
 			name: "trailing newline stripped",
-			rec: LogRecord{
+			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:02Z",
 				Stream:    "stdout",
 				Line:      "done\n",
@@ -214,7 +216,7 @@ func TestRetentionSummary(t *testing.T) {
 
 	tests := []struct {
 		name string
-		hint *RetentionHint
+		hint *logstream.RetentionHint
 		want string
 	}{
 		{
@@ -224,7 +226,7 @@ func TestRetentionSummary(t *testing.T) {
 		},
 		{
 			name: "retained with ttl and expires",
-			hint: &RetentionHint{
+			hint: &logstream.RetentionHint{
 				Retained: true,
 				TTL:      "72h",
 				Expires:  "2025-10-25T10:00:00Z",
@@ -234,7 +236,7 @@ func TestRetentionSummary(t *testing.T) {
 		},
 		{
 			name: "retained with ttl only",
-			hint: &RetentionHint{
+			hint: &logstream.RetentionHint{
 				Retained: true,
 				TTL:      "48h",
 				Bundle:   "bafy-ttl",
@@ -243,7 +245,7 @@ func TestRetentionSummary(t *testing.T) {
 		},
 		{
 			name: "retained without ttl",
-			hint: &RetentionHint{
+			hint: &logstream.RetentionHint{
 				Retained: true,
 				Bundle:   "bafy-plain",
 			},
@@ -251,7 +253,7 @@ func TestRetentionSummary(t *testing.T) {
 		},
 		{
 			name: "not retained",
-			hint: &RetentionHint{
+			hint: &logstream.RetentionHint{
 				Retained: false,
 			},
 			want: "Retention: not retained (bundle expires per default policy)\n",
@@ -290,8 +292,8 @@ func TestNewPrinter_Defaults(t *testing.T) {
 		t.Parallel()
 		p := NewPrinter(FormatStructured, nil)
 		// Should not panic when printing to nil (discarded).
-		p.PrintLog(LogRecord{Line: "test"})
-		p.RecordRetention(RetentionHint{Retained: true})
+		p.PrintLog(logstream.LogRecord{Line: "test"})
+		p.RecordRetention(logstream.RetentionHint{Retained: true})
 		p.PrintRetentionSummary()
 	})
 }
@@ -303,17 +305,17 @@ func TestMultipleLogs(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrinter(FormatStructured, buf)
 
-	p.PrintLog(LogRecord{
+	p.PrintLog(logstream.LogRecord{
 		Timestamp: "2025-10-22T10:00:00Z",
 		Stream:    "stdout",
 		Line:      "Step started",
 	})
-	p.PrintLog(LogRecord{
+	p.PrintLog(logstream.LogRecord{
 		Timestamp: "2025-10-22T10:00:01Z",
 		Stream:    "stderr",
 		Line:      "warning: slow retry",
 	})
-	p.RecordRetention(RetentionHint{
+	p.RecordRetention(logstream.RetentionHint{
 		Retained: true,
 		TTL:      "72h",
 		Expires:  "2025-10-25T10:00:00Z",
@@ -339,7 +341,7 @@ func TestLogRecord_PrinterStructuredRendersEnrichedFields(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrinter(FormatStructured, buf)
 
-	p.PrintLog(LogRecord{
+	p.PrintLog(logstream.LogRecord{
 		Timestamp: "2025-10-22T10:00:00Z",
 		Stream:    "stdout",
 		Line:      "hello",

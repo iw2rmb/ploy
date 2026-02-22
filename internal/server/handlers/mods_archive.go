@@ -22,7 +22,7 @@ import (
 // - Cannot archive a mod with running jobs.
 func archiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := ParseModRefParam(r, "mod_ref")
+		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -132,7 +132,7 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 // - Unarchives a mod (allows execution again).
 func unarchiveModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := ParseModRefParam(r, "mod_ref")
+		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

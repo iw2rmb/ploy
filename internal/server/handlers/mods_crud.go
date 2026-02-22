@@ -316,7 +316,7 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 // - Refuses deletion if any runs exist for the mod.
 func deleteModHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := ParseModRefParam(r, "mod_ref")
+		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

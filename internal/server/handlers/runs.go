@@ -20,12 +20,6 @@ import (
 // NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
 
-// RunSummary aliases the canonical domain RunSummary for server handlers.
-type RunSummary = domaintypes.RunSummary
-
-// RunRepoCounts aliases the canonical domain RunRepoCounts for server handlers.
-type RunRepoCounts = domaintypes.RunRepoCounts
-
 // Derived batch status constants exposed for API consumers.
 // These represent the batch-level state computed from repo statuses.
 const (
@@ -44,8 +38,8 @@ const (
 // runToSummary converts a store.Run to a RunSummary.
 // Wraps raw store strings in domain types for type-safe API output.
 // run.ID is now a string (KSUID), so no UUID conversion is needed.
-func runToSummary(run store.Run) RunSummary {
-	summary := RunSummary{
+func runToSummary(run store.Run) domaintypes.RunSummary {
+	summary := domaintypes.RunSummary{
 		// run.ID is now a string (KSUID); cast directly to domain type.
 		ID:        run.ID,
 		Status:    string(run.Status),
@@ -67,13 +61,13 @@ func runToSummary(run store.Run) RunSummary {
 
 // getRunRepoCounts fetches and aggregates repo counts by status for a run.
 // runID is now a KSUID-backed domain type.
-func getRunRepoCounts(ctx context.Context, st store.RunStore, runID domaintypes.RunID) (*RunRepoCounts, error) {
+func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.RunID) (*domaintypes.RunRepoCounts, error) {
 	rows, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
 
-	counts := &RunRepoCounts{}
+	counts := &domaintypes.RunRepoCounts{}
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
@@ -103,7 +97,7 @@ func getRunRepoCounts(ctx context.Context, st store.RunStore, runID domaintypes.
 //  3. failed — if none running, and at least one repo failed.
 //  4. completed — if all repos are in terminal states (success/cancelled) with no failures.
 //  5. pending — if no repos have started yet (all pending, or no repos).
-func deriveBatchStatus(counts *RunRepoCounts) string {
+func deriveBatchStatus(counts *domaintypes.RunRepoCounts) string {
 	// No repos in batch — treat as pending (batch has no work yet).
 	if counts.Total == 0 {
 		return DerivedStatusPending
@@ -209,12 +203,12 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 		// Accept id from path parameter first, then fallback to query parameter.
 		// Uses domain type helpers for validation at the boundary.
 		var runID domaintypes.RunID
-		if idPtr, err := OptionalRunIDParam(r, "id"); err != nil {
+		if idPtr, err := optionalParam[domaintypes.RunID](r, "id"); err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		} else if idPtr != nil {
 			runID = *idPtr
-		} else if qID, err := OptionalRunIDQuery(r, "id"); err != nil {
+		} else if qID, err := optionalQuery[domaintypes.RunID](r, "id"); err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		} else if qID != nil {
@@ -262,7 +256,7 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 func deleteRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract id from path parameter using domain type helper.
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -344,7 +338,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 
 func getRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

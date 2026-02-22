@@ -41,7 +41,7 @@ import (
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter using domain type helper.
-		nodeID, err := ParseNodeIDParam(r, "id")
+		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

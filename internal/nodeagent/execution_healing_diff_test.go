@@ -108,7 +108,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     HealingMod{Image: contracts.ModImage{Universal: "test/codex-healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/codex-healer:latest"}},
 			},
 		},
 	}

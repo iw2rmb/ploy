@@ -12,6 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // ErrInvalidFormat indicates an unsupported format value.
@@ -59,13 +60,13 @@ func (c LogsCommand) Run(ctx context.Context) error {
 				return nil
 			}
 			// Decode into the shared LogRecord type which supports enriched fields.
-			var payload logs.LogRecord
+			var payload logstream.LogRecord
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
 				return fmt.Errorf("mods: decode log event: %w", err)
 			}
 			printer.PrintLog(payload)
 		case "retention":
-			var hint logs.RetentionHint
+			var hint logstream.RetentionHint
 			if err := json.Unmarshal(evt.Data, &hint); err != nil {
 				return fmt.Errorf("mods: decode retention event: %w", err)
 			}

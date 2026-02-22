@@ -30,22 +30,13 @@ const (
 	FormatRaw Format = "raw"
 )
 
-// LogRecord is an alias to the canonical stream.LogRecord type.
-// This eliminates duplicate struct definitions and ensures CLI and server
-// use the same payload structure with typed fields (ModType, StepIndex).
-type LogRecord = logstream.LogRecord
-
-// RetentionHint is an alias to the canonical stream.RetentionHint type.
-// This ensures CLI and server use the same retention metadata structure.
-type RetentionHint = logstream.RetentionHint
-
 // Printer formats and writes log records to an output stream.
 // Thread-safe for use in SSE event handlers.
 type Printer struct {
 	mu        sync.Mutex
 	format    Format
 	out       io.Writer
-	retention *RetentionHint
+	retention *logstream.RetentionHint
 }
 
 // NewPrinter creates a log printer with the given format and output writer.
@@ -77,7 +68,7 @@ func NewPrinter(format Format, out io.Writer) *Printer {
 // Raw format (message only):
 //
 //	Step started
-func (p *Printer) PrintLog(rec LogRecord) {
+func (p *Printer) PrintLog(rec logstream.LogRecord) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -144,7 +135,7 @@ func (p *Printer) PrintLog(rec LogRecord) {
 
 // RecordRetention stores a retention hint to be printed at stream completion.
 // Only the last recorded hint is printed (calls overwrite previous hints).
-func (p *Printer) RecordRetention(hint RetentionHint) {
+func (p *Printer) RecordRetention(hint logstream.RetentionHint) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

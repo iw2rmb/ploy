@@ -122,7 +122,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

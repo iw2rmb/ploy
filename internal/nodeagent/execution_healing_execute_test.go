@@ -105,7 +105,7 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod: HealingMod{
+				Mod: ModContainerSpec{
 					Image: contracts.ModImage{Universal: "test/healer:latest"},
 				},
 			},

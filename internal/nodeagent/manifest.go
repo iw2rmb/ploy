@@ -227,10 +227,10 @@ func isCodexHealingImage(image string) bool {
 	return strings.Contains(strings.ToLower(image), "codex")
 }
 
-// buildHealingManifest constructs a StepManifest from a typed HealingMod.
+// buildHealingManifest constructs a StepManifest from a typed ModContainerSpec.
 // The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
-func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+func buildHealingManifest(req StartRunRequest, mod ModContainerSpec, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
@@ -283,7 +283,7 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexS
 
 // buildRouterManifest constructs a StepManifest for the router container that
 // produces bug_summary before healing begins.
-func buildRouterManifest(req StartRunRequest, router RouterConfig, stack contracts.ModStack) (contracts.StepManifest, error) {
+func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.ModStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}

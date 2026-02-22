@@ -34,7 +34,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 	const maxChunkSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run id from path parameter using domain type helper.
-		runID, err := ParseRunIDParam(r, "id")
+		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

@@ -72,7 +72,7 @@ type pullResponse struct {
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path.
-		runID, err := ParseRunIDParam(r, "run_id")
+		runID, err := parseParam[domaintypes.RunID](r, "run_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -178,7 +178,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 func pullModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract mod_id from path.
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

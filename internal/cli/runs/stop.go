@@ -10,7 +10,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// StopCommand stops a run and returns its Summary.
+// StopCommand stops a run and returns its domaintypes.RunSummary.
 type StopCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
@@ -18,8 +18,8 @@ type StopCommand struct {
 }
 
 // Run executes POST /v1/runs/{id}/cancel to stop (cancel) the run.
-func (c StopCommand) Run(ctx context.Context) (Summary, error) {
-	var zero Summary
+func (c StopCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
+	var zero domaintypes.RunSummary
 
 	if c.Client == nil {
 		return zero, fmt.Errorf("run stop: http client required")
@@ -47,7 +47,7 @@ func (c StopCommand) Run(ctx context.Context) (Summary, error) {
 		return zero, httpx.WrapError("run stop", resp.Status, resp.Body)
 	}
 
-	var summary Summary
+	var summary domaintypes.RunSummary
 	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return zero, fmt.Errorf("run stop: decode response: %w", err)
 	}

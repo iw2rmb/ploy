@@ -125,8 +125,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}},
-				{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}}},
 			},
 		},
 	}
@@ -324,12 +324,12 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}},
-				{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}}},
 			},
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     HealingMod{Image: contracts.ModImage{Universal: "test/healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/healer:latest"}},
 			},
 		},
 	}

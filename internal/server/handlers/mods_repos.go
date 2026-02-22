@@ -30,7 +30,7 @@ import (
 // - Returns id (repo_id) and stored fields.
 func addModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -139,7 +139,7 @@ func addModRepoHandler(st store.Store) http.HandlerFunc {
 // - Lists repos: ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 func listModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -207,13 +207,13 @@ func listModReposHandler(st store.Store) http.HandlerFunc {
 // - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
 func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		repoID, err := ParseModRepoIDParam(r, "repo_id")
+		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -287,7 +287,7 @@ func deleteModRepoHandler(st store.Store) http.HandlerFunc {
 //   - within quoted fields, " is escaped as ""
 func bulkUpsertModReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

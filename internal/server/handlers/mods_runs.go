@@ -31,7 +31,7 @@ import (
 func createModRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse mod_id from URL path.
-		modID, err := ParseModIDParam(r, "mod_id")
+		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

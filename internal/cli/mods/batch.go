@@ -21,15 +21,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// BatchSummary is an alias for the run-level Summary used by run commands.
-// It mirrors the server's RunSummary type for CLI consumption.
-// Uses domain type (RunID) for type-safe identification.
-type BatchSummary = runs.Summary
-
-// RunRepoCounts aggregates the count of repos by status within a batch.
-// DerivedStatus provides a single batch-level status derived from repo states.
-type RunRepoCounts = runs.RepoCounts
-
 // CreateBatchCommand creates a new batch run with a shared spec.
 // The batch run serves as the parent for multiple repo executions.
 type CreateBatchCommand struct {
@@ -45,28 +36,28 @@ type CreateBatchCommand struct {
 
 // Run executes POST /v1/runs to submit the initial repo for a run.
 // Returns the created batch summary on success.
-func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
+func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
 	if c.Client == nil {
-		return BatchSummary{}, fmt.Errorf("batch create: http client required")
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: http client required")
 	}
 	if c.BaseURL == nil {
-		return BatchSummary{}, fmt.Errorf("batch create: base url required")
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: base url required")
 	}
 
 	repoURL := strings.TrimSpace(c.RepoURL)
 	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: repo_url: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: repo_url: %w", err)
 	}
 	baseRef := strings.TrimSpace(c.BaseRef)
 	if err := domaintypes.GitRef(baseRef).Validate(); err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: base_ref: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: base_ref: %w", err)
 	}
 	targetRef := strings.TrimSpace(c.TargetRef)
 	if err := domaintypes.GitRef(targetRef).Validate(); err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: target_ref: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: target_ref: %w", err)
 	}
 	if len(c.Spec) == 0 {
-		return BatchSummary{}, fmt.Errorf("batch create: spec is required")
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: spec is required")
 	}
 
 	// Build the request payload matching server's expected format.
@@ -87,20 +78,20 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: marshal request: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: marshal request: %w", err)
 	}
 
 	// POST /v1/runs to create the run.
 	endpoint := c.BaseURL.JoinPath("v1", "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: build request: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return BatchSummary{}, fmt.Errorf("batch create: http request failed: %w", err)
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -110,7 +101,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 			RunID domaintypes.RunID `json:"run_id"`
 		}
 		if err := httpx.DecodeJSON(resp.Body, &srvResp, httpx.MaxJSONBodyBytes); err != nil {
-			return BatchSummary{}, fmt.Errorf("batch create: decode response: %w", err)
+			return domaintypes.RunSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 
 		summary, err := runs.GetStatusCommand{
@@ -119,14 +110,14 @@ func (c CreateBatchCommand) Run(ctx context.Context) (BatchSummary, error) {
 			RunID:   srvResp.RunID,
 		}.Run(ctx)
 		if err != nil {
-			return BatchSummary{}, fmt.Errorf("batch create: fetch run summary: %w", err)
+			return domaintypes.RunSummary{}, fmt.Errorf("batch create: fetch run summary: %w", err)
 		}
 
 		return summary, nil
 	}
 
 	// Non-success: read error body and return error.
-	return BatchSummary{}, decodeHTTPError(resp, "batch create")
+	return domaintypes.RunSummary{}, decodeHTTPError(resp, "batch create")
 }
 
 // ListBatchesCommand lists batch runs from the control plane.
@@ -138,7 +129,7 @@ type ListBatchesCommand struct {
 }
 
 // Run executes GET /v1/runs to list batch runs with pagination.
-func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
+func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, error) {
 	if c.Client == nil {
 		return nil, fmt.Errorf("batch list: http client required")
 	}
@@ -174,7 +165,7 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]BatchSummary, error) {
 
 	// Response structure: {"runs": [...]}
 	var result struct {
-		Runs []BatchSummary `json:"runs"`
+		Runs []domaintypes.RunSummary `json:"runs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("batch list: decode response: %w", err)

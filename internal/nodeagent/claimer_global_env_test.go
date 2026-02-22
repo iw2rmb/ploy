@@ -385,7 +385,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	}
 
 	// Healing mod with global env vars pre-merged.
-	healingMod := HealingMod{
+	healingMod := ModContainerSpec{
 		Image: testModImage("mods-codex:latest"),
 		Env: map[string]string{
 			"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",

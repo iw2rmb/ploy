@@ -13,11 +13,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
 )
 
-// StartPendingReposResult is an alias to batchscheduler.StartPendingReposResult.
-// This ensures the handlers package and batchscheduler package use the same type,
-// allowing BatchRepoStarter to implement the batchscheduler.RepoStarter interface.
-type StartPendingReposResult = batchscheduler.StartPendingReposResult
-
 // BatchRepoStarter starts execution for pending repos in batch runs.
 // It implements the batchscheduler.RepoStarter interface.
 type BatchRepoStarter struct {
@@ -31,8 +26,8 @@ func NewBatchRepoStarter(st store.Store) *BatchRepoStarter {
 
 // StartPendingRepos creates (or advances) repo-scoped job queues for queued run_repos rows.
 // v1 removes per-repo execution runs; jobs are created directly for (run_id, repo_id, attempt).
-func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domaintypes.RunID) (StartPendingReposResult, error) {
-	result := StartPendingReposResult{}
+func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domaintypes.RunID) (batchscheduler.StartPendingReposResult, error) {
+	result := batchscheduler.StartPendingReposResult{}
 	runIDStr := runID.String()
 
 	run, err := s.store.GetRun(ctx, runID)

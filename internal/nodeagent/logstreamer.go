@@ -27,18 +27,9 @@ const (
 	softChunkSize = SoftUploadSize
 )
 
-// LogHook defines an interface for processing log data before it is
-// compressed and sent to the server.
-type LogHook interface {
-	Process(p []byte) ([]byte, error)
-}
-
-// NoOpLogHook is a placeholder hook that returns input unchanged.
-type NoOpLogHook struct{}
-
-func (h *NoOpLogHook) Process(p []byte) ([]byte, error) {
-	return p, nil
-}
+// LogHook is a function that processes log data before it is
+// compressed and sent to the server. A nil LogHook is treated as a no-op.
+type LogHook func(p []byte) ([]byte, error)
 
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
 type LogStreamer struct {
@@ -58,7 +49,6 @@ type LogStreamer struct {
 }
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
-// By default, uses NoOpLogHook (no PII scrubbing).
 // Returns an error if HTTP client creation fails (e.g., missing bearer token).
 func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) (*LogStreamer, error) {
 	ls := &LogStreamer{
@@ -68,7 +58,6 @@ func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) (*LogStrea
 		chunkNo:   0,
 		flushDone: make(chan struct{}),
 		stopCh:    make(chan struct{}),
-		hook:      &NoOpLogHook{}, // Default to no-op hook.
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
@@ -102,7 +91,7 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 	processed := p
 	if ls.hook != nil {
 		var hookErr error
-		processed, hookErr = ls.hook.Process(p)
+		processed, hookErr = ls.hook(p)
 		if hookErr != nil {
 			slog.Warn("log hook failed, using original data", "run_id", ls.runID, "error", hookErr)
 			processed = p // Fall back to original on error.
