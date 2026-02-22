@@ -103,7 +103,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 				},
 			}
 
-			uploader, err := NewStatusUploader(cfg)
+			uploader, err := newBaseUploader(cfg)
 			if err != nil {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
@@ -152,7 +152,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewStatusUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewStatusUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewStatusUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		},
 	}
 
-	uploader, err := NewStatusUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}

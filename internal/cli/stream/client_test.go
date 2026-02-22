@@ -11,14 +11,13 @@ import (
 )
 
 func TestClientWaitWithBackoffHonorsContext(t *testing.T) {
-	c := Client{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := c.waitWithBackoff(ctx, 10*time.Millisecond); err == nil {
+	if err := waitWithBackoff(ctx, 10*time.Millisecond); err == nil {
 		t.Fatalf("expected canceled context error from waitWithBackoff")
 	}
 	// Zero duration returns immediately without error.
-	if err := c.waitWithBackoff(context.Background(), 0); err != nil {
+	if err := waitWithBackoff(context.Background(), 0); err != nil {
 		t.Fatalf("unexpected error for zero wait: %v", err)
 	}
 }

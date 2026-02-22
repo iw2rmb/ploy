@@ -15,7 +15,7 @@ import (
 )
 
 func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T) {
-	// uploadStatus -> NewStatusUploader -> createHTTPClient reads the bearer token file.
+	// uploadStatus -> newBaseUploader -> createHTTPClient reads the bearer token file.
 	tokenDir := t.TempDir()
 	tokenPath := filepath.Join(tokenDir, "bearer-token")
 	if err := os.WriteFile(tokenPath, []byte("test-token"), 0o600); err != nil {

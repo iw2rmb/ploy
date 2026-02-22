@@ -45,7 +45,7 @@ func New(cfg Config) (*Agent, error) {
 		return nil, fmt.Errorf("create artifact uploader: %w", err)
 	}
 
-	statusUploader, err := NewStatusUploader(cfg)
+	statusUploader, err := newBaseUploader(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create status uploader: %w", err)
 	}
