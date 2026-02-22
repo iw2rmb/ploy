@@ -160,7 +160,7 @@ setting on typical deployments where Docker runs on the default Unix socket.
 | `DOCKER_CERT_PATH`   | (unset)                          | Directory containing `ca.pem`, `cert.pem`, `key.pem` for TLS |
 | `DOCKER_API_VERSION` | (auto-negotiated)                | Override API version; normally unnecessary with v29+         |
 
-**Implementation**: `internal/workflow/runtime/step/container_docker.go:59-66` constructs the
+**Implementation**: `internal/workflow/step/container_docker.go:59-66` constructs the
 Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 
 **When to set these variables:**

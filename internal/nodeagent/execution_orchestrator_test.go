@@ -8,7 +8,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // TestPopulateHealingInDirCopiesGateLog verifies that populateHealingInDir copies

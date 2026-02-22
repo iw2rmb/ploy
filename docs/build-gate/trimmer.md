@@ -3,7 +3,7 @@
 This document describes the Build Gate log trimming logic used by the workflow
 runtime to keep error output focused while preserving full logs for debugging.
 
-The trimmer runs inside the Build Gate runtime (`internal/workflow/runtime/step`)
+The trimmer runs inside the Build Gate runtime (`internal/workflow/step`)
 and is applied only to **canonical gate logs** produced by the Docker-based
 executor (`gate_docker.go`). It is **stack-aware** for Maven and Gradle and
 acts as a no-op for all other tools.
@@ -21,7 +21,7 @@ acts as a no-op for all other tools.
 
 The trimmer is implemented as:
 
-- `internal/workflow/runtime/step/build_gate_log_trimmer.go`
+- `internal/workflow/step/build_gate_log_trimmer.go`
   - Public entry point:
     - `TrimBuildGateLog(tool, logText string) string`
   - Known `tool` values:
@@ -85,7 +85,7 @@ the original log text unchanged. This ensures:
 
 The trimmer is invoked inside the Docker-based gate executor:
 
-- File: `internal/workflow/runtime/step/gate_docker.go`
+- File: `internal/workflow/step/gate_docker.go`
 - When the gate command exits with a non-zero status:
   - `Tool` is set to the detected build tool (e.g. `"maven"`, `"gradle"`, `"go"`,
     `"cargo"`, `"pip"`, `"poetry"`).
@@ -128,7 +128,7 @@ To add support for new stacks:
 3. Ensure the corresponding `BuildGateStaticCheckReport.Tool` is set in the
    relevant gate adapter (e.g. `"go-vet"`, `"eslint"`).
 4. Add unit tests under
-   `internal/workflow/runtime/step/build_gate_log_trimmer_test.go` that cover
+   `internal/workflow/step/build_gate_log_trimmer_test.go` that cover
    realistic log samples and verify trimming behavior.
 
 The node agent and CLI will automatically benefit from new trimmers via the

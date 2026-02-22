@@ -67,7 +67,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 		// Build RunSummary response with Stages and Artifacts.
 		// Use conversion helper to map store.RunStatus to modsapi.RunState.
-		runState := RunStatusFromStore(run.Status)
+		runState := modsapi.RunStatusFromStore(run.Status)
 
 		var (
 			repoURL    string
@@ -151,7 +151,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		for _, job := range jobs {
 			jobIDStr := job.ID.String()
 			// Use conversion helper to map store.JobStatus -> modsapi.StageState
-			s := StageStatusFromStore(job.Status)
+			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
 			bundles, err := st.ListArtifactBundlesMetaByRunAndJob(r.Context(), store.ListArtifactBundlesMetaByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {

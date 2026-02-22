@@ -8,7 +8,7 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // TestExecuteWithHealing_NoHealingConfigured verifies that when the gate fails and no

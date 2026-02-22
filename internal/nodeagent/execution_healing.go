@@ -2,19 +2,21 @@
 // After healing mods complete, the node agent always re-runs the gate to verify the fix.
 //
 // File layout:
-//   - execution_healing.go      — orchestration (this file): runGateWithHealing, executeWithHealing, types
+//   - execution_healing.go      — orchestration (this file): runGateWithHealing, executeWithHealing, types, env/TLS injection
 //   - execution_healing_loop.go — healing retry loop: healingLoopInput, runHealingLoop
-//   - execution_healing_io.go   — I/O helpers: parsers, file persistence, env injection, diff upload
+//   - execution_healing_io.go   — I/O helpers: parsers, file persistence
 package nodeagent
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // runGateWithHealing executes the build gate with optional healing loop when validation fails.
@@ -242,4 +244,38 @@ type executionResult struct {
 	PreGate       *gateRunMetadata
 	ReGates       []gateRunMetadata
 	ActionSummary string
+}
+
+// injectHealingEnvVars adds healing-specific environment variables to the manifest.
+func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, workspace string) {
+	if manifest.Env == nil {
+		manifest.Env = map[string]string{}
+	}
+	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
+	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+	manifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
+	manifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+	manifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+
+	if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+		manifest.Env["PLOY_API_TOKEN"] = token
+	} else if !r.cfg.HTTP.TLS.Enabled {
+		if data, err := os.ReadFile(bearerTokenPath()); err == nil {
+			if token := strings.TrimSpace(string(data)); token != "" {
+				manifest.Env["PLOY_API_TOKEN"] = token
+			}
+		} else {
+			slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
+		}
+	}
+}
+
+// mountHealingTLSCerts configures TLS certificate paths in manifest options.
+func (r *runController) mountHealingTLSCerts(manifest *contracts.StepManifest) {
+	if manifest.Options == nil {
+		manifest.Options = make(map[string]any)
+	}
+	manifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
+	manifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
+	manifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
 }
