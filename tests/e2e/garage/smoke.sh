@@ -6,14 +6,14 @@ cd "$REPO_ROOT"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
-PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
+PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
 REPO_URL="${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 GARAGE_ENDPOINT="${GARAGE_ENDPOINT:-http://localhost:3900}"
 GARAGE_BUCKET="${GARAGE_BUCKET:-ploy}"
 GARAGE_ACCESS_KEY="${GARAGE_ACCESS_KEY:-GK000000000000000000000001}"
 GARAGE_SECRET_KEY="${GARAGE_SECRET_KEY:-0000000000000000000000000000000000000000000000000000000000000001}"
-GARAGE_REGION="${GARAGE_REGION:-us-east-1}"
+GARAGE_REGION="${GARAGE_REGION:-garage}"
 
 TS="$(date +%y%m%d%H%M%S)"
 ARTIFACT_BASE="${PLOY_E2E_ARTIFACT_BASE:-$REPO_ROOT/tmp/garage-smoke}"
@@ -40,7 +40,7 @@ query_object_key() {
   local table="$1"
   local order_by="$2"
 
-  psql "$PLOY_LOCAL_PG_DSN" -Atq -c "SET search_path TO ploy, public; SELECT object_key FROM ${table} WHERE run_id='${RUN_ID}' AND object_key IS NOT NULL ORDER BY ${order_by} LIMIT 1;"
+  psql "$PLOY_DB_DSN" -Atq -c "SET search_path TO ploy, public; SELECT object_key FROM ${table} WHERE run_id='${RUN_ID}' AND object_key IS NOT NULL ORDER BY ${order_by} LIMIT 1;"
 }
 
 verify_garage_keys() {
@@ -128,8 +128,8 @@ need go
 need rg
 need psql
 
-if [[ -z "$PLOY_LOCAL_PG_DSN" ]]; then
-  echo "error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
+if [[ -z "$PLOY_DB_DSN" ]]; then
+  echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
   exit 1
 fi
 

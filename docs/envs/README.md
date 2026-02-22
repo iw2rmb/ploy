@@ -21,22 +21,16 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_LOCAL_PG_DSN` — Required by `scripts/local-docker.sh` and `scripts/local-podman.sh`.
-  DSN used by the local server container and host-side setup SQL (DB create/drop,
-  token insert, node seed). Example:
+- `PLOY_DB_DSN` — Required by `scripts/local-docker.sh` and `scripts/local-podman.sh`.
+  Used both for host-side setup SQL (DB create/drop, token insert, node seed)
+  and injected into the server container as `PLOY_POSTGRES_DSN`.
+  Must be reachable from inside containers and must not use loopback
+  (`localhost`, `127.0.0.1`, `::1`).
+  Example:
   `postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
-- `PLOY_LOCAL_PG_DSN_CONTAINER` — Optional DSN injected into the server container as
-  `PLOY_POSTGRES_DSN`. Default: `PLOY_LOCAL_PG_DSN`. Must be reachable from inside
-  containers and must not use loopback (`localhost`, `127.0.0.1`, `::1`).
-  If username is omitted, local scripts infer it from `PLOY_LOCAL_PG_DSN` username,
-  then from `USER`.
-  Use this when host-side DB access uses localhost:
-  `PLOY_LOCAL_PG_DSN=postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`
-  and
-  `PLOY_LOCAL_PG_DSN_CONTAINER=postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
-- `PLOY_LOCAL_SERVER_PORT` — Optional host port mapped to the server container's internal
+- `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
   port `8080` in `local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
-  is already occupied (example: `PLOY_LOCAL_SERVER_PORT=18080`).
+  is already occupied (example: `PLOY_SERVER_PORT=18080`).
 - `WORKER_TOKEN_PATH` — Optional host path used by local scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `local/node/bearer-token` (file path). If this path is a directory, scripts
@@ -75,8 +69,8 @@ Role model (bearer token claims):
 - `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
-- `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to
-  `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+- `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
+  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (example: `ghcr.io/iw2rmb`).
 - `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
   on worker nodes during bootstrap. If set on the node, bootstrap performs
   `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
@@ -378,7 +372,7 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_ACCESS_KEY` | Access key ID | - |
 | `PLOY_OBJECTSTORE_SECRET_KEY` | Secret access key | - |
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
-| `PLOY_OBJECTSTORE_REGION` | AWS region (optional) | - |
+| `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
 
 For local development, these are configured in `local/docker-compose.yml`. The local stack includes
 a Garage service with automatic bucket/access-key bootstrap via `garage-init`.

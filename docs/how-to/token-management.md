@@ -109,7 +109,7 @@ ploy cluster token revoke abc123 --confirm
 
 Store your token in the cluster descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
 The local Docker cluster uses `PLOY_CONFIG_HOME="$PWD/local/cli"` and
-`address: "http://localhost:${PLOY_LOCAL_SERVER_PORT:-8080}"`.
+`address: "http://localhost:${PLOY_SERVER_PORT:-8080}"`.
 
 ```json
 {
@@ -119,7 +119,7 @@ The local Docker cluster uses `PLOY_CONFIG_HOME="$PWD/local/cli"` and
 }
 ```
 
-If you set `PLOY_LOCAL_SERVER_PORT` to a non-default value, use that port in `address`.
+If you set `PLOY_SERVER_PORT` to a non-default value, use that port in `address`.
 
 The CLI automatically uses this token for all requests.
 

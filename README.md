@@ -87,7 +87,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Deploy the local Docker stack (server + node + garage services) and write a local CLI descriptor:
 
   ```bash
-  export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+  export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
   ./scripts/local-docker.sh
   export PLOY_CONFIG_HOME="$PWD/local/cli"
   ```

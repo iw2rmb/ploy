@@ -22,7 +22,7 @@
 - Push to Docker Hub using the helper script:
   - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/docker/build-and-push-mods.sh`
   - The script special‑cases `mod-codex` to use repo‑root context automatically.
-  - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+  - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`; `orw-maven` → `mods-orw-maven`; `orw-gradle` → `mods-orw-gradle`.

@@ -16,10 +16,9 @@ NODE_ID="${NODE_ID:-local1}"
 AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
-PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
-PLOY_LOCAL_PG_DSN_CONTAINER="${PLOY_LOCAL_PG_DSN_CONTAINER:-}"
+PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-}"
-PLOY_LOCAL_SERVER_PORT="${PLOY_LOCAL_SERVER_PORT:-8080}"
+PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/local/node/bearer-token}"
 
 DROP_DB=0
@@ -47,8 +46,8 @@ Options:
   --nodes    Refresh/deploy node (includes required server dependency)
 
 Environment:
-  PLOY_LOCAL_PG_DSN_CONTAINER  Container-reachable postgres DSN (default: PLOY_LOCAL_PG_DSN)
-  PLOY_LOCAL_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
+  PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
+  PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
   PLOY_CONTAINER_SOCKET_PATH  Podman socket mounted to /var/run/docker.sock (auto-detected by default)
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: local/node/bearer-token)
 USAGE
@@ -177,19 +176,19 @@ derive_admin_pg_dsn() {
 import os
 from urllib.parse import urlsplit, urlunsplit
 
-dsn = os.environ["PLOY_LOCAL_PG_DSN"].strip()
+dsn = os.environ["PLOY_DB_DSN"].strip()
 if not dsn:
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN is required")
+    raise SystemExit("error: PLOY_DB_DSN is required")
 
 if "://" not in dsn:
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
 
 u = urlsplit(dsn)
 if u.scheme not in ("postgres", "postgresql"):
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN must use postgres:// or postgresql://")
+    raise SystemExit("error: PLOY_DB_DSN must use postgres:// or postgresql://")
 
 if u.path.strip("/") != "ploy":
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN must target database ploy")
+    raise SystemExit("error: PLOY_DB_DSN must target database ploy")
 
 admin = urlunsplit((u.scheme, u.netloc, "/postgres", u.query, u.fragment))
 print(admin)
@@ -197,8 +196,7 @@ PY
 }
 
 normalize_container_pg_dsn() {
-  PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN_CONTAINER" \
-  PLOY_LOCAL_PG_DSN="$PLOY_LOCAL_PG_DSN" \
+  PLOY_DB_DSN="$PLOY_DB_DSN" \
   USER="${USER:-}" \
   "$PYTHON_BIN" <<'PY'
 import os
@@ -218,18 +216,15 @@ def parse_dsn(name: str):
         raise SystemExit(f"error: {name} must target database ploy")
     return u
 
-container_u = parse_dsn("PLOY_LOCAL_PG_DSN_CONTAINER")
-host_u = parse_dsn("PLOY_LOCAL_PG_DSN")
+dsn_u = parse_dsn("PLOY_DB_DSN")
 
-username = container_u.username or host_u.username or os.environ.get("USER", "").strip()
+username = dsn_u.username or os.environ.get("USER", "").strip()
 if not username:
-    raise SystemExit("error: unable to infer postgres username; include username in PLOY_LOCAL_PG_DSN_CONTAINER or set USER")
+    raise SystemExit("error: unable to infer postgres username; include username in PLOY_DB_DSN or set USER")
 
-password = container_u.password
-if password is None and container_u.username is None:
-    password = host_u.password
+password = dsn_u.password
 
-host = container_u.hostname or ""
+host = dsn_u.hostname or ""
 if ":" in host and not host.startswith("["):
     host = f"[{host}]"
 
@@ -237,35 +232,35 @@ userinfo = quote(username, safe="")
 if password is not None:
     userinfo += ":" + quote(password, safe="")
 
-port = f":{container_u.port}" if container_u.port else ""
+port = f":{dsn_u.port}" if dsn_u.port else ""
 netloc = f"{userinfo}@{host}{port}"
-normalized = urlunsplit((container_u.scheme, netloc, container_u.path, container_u.query, container_u.fragment))
+normalized = urlunsplit((dsn_u.scheme, netloc, dsn_u.path, dsn_u.query, dsn_u.fragment))
 print(normalized)
 PY
 }
 
 validate_container_pg_dsn() {
-  PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN_CONTAINER" "$PYTHON_BIN" <<'PY'
+  PLOY_DB_DSN="$PLOY_DB_DSN" "$PYTHON_BIN" <<'PY'
 import os
 from urllib.parse import urlsplit
 
-dsn = os.environ["PLOY_LOCAL_PG_DSN_CONTAINER"].strip()
+dsn = os.environ["PLOY_DB_DSN"].strip()
 if not dsn:
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER is required")
+    raise SystemExit("error: PLOY_DB_DSN is required")
 if "://" not in dsn:
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
 
 u = urlsplit(dsn)
 if u.scheme not in ("postgres", "postgresql"):
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must use postgres:// or postgresql://")
+    raise SystemExit("error: PLOY_DB_DSN must use postgres:// or postgresql://")
 if u.path.strip("/") != "ploy":
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must target database ploy")
+    raise SystemExit("error: PLOY_DB_DSN must target database ploy")
 
 host = (u.hostname or "").lower()
 if not host:
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must include a TCP hostname reachable from containers")
+    raise SystemExit("error: PLOY_DB_DSN must include a TCP hostname reachable from containers")
 if host in ("localhost", "127.0.0.1", "::1"):
-    raise SystemExit("error: PLOY_LOCAL_PG_DSN_CONTAINER must not use localhost/loopback; use host.containers.internal or another host reachable from containers")
+    raise SystemExit("error: PLOY_DB_DSN must not use localhost/loopback; use host.containers.internal or another host reachable from containers")
 PY
 }
 
@@ -463,7 +458,7 @@ PY
 }
 
 wait_for_server_health() {
-  local server_url="http://localhost:${PLOY_LOCAL_SERVER_PORT}"
+  local server_url="http://localhost:${PLOY_SERVER_PORT}"
   log "Waiting for server health on ${server_url}/health..."
   for i in {1..60}; do
     if curl -fsS "${server_url}/health" >/dev/null 2>&1; then
@@ -478,7 +473,7 @@ wait_for_server_health() {
 
 seed_tokens() {
   log "Inserting admin token into api_tokens..."
-  psql "$PLOY_LOCAL_PG_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
     VALUES (
@@ -493,7 +488,7 @@ seed_tokens() {
     ON CONFLICT (token_hash) DO NOTHING;"
 
   log "Inserting worker token into api_tokens..."
-  psql "$PLOY_LOCAL_PG_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
     VALUES (
@@ -534,7 +529,7 @@ seed_node_record() {
   concurrency="${NODE_CONCURRENCY:-1}"
 
   log "Seeding node record in ploy.nodes..."
-  psql "$PLOY_LOCAL_PG_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO nodes (id, name, ip_address, version, concurrency)
     VALUES ('${uuid}', '${name}', '${ip}', '${version}', ${concurrency})
@@ -542,7 +537,7 @@ seed_node_record() {
 }
 
 wire_local_cli_descriptor() {
-  local server_url="http://localhost:${PLOY_LOCAL_SERVER_PORT}"
+  local server_url="http://localhost:${PLOY_SERVER_PORT}"
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
   cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
@@ -594,15 +589,12 @@ main() {
   resolve_container_socket_path
   log "Using container socket path: ${PLOY_CONTAINER_SOCKET_PATH}"
 
-  if [[ -z "$PLOY_LOCAL_PG_DSN" ]]; then
-    echo "error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
+  if [[ -z "$PLOY_DB_DSN" ]]; then
+    echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
-  if [[ -z "$PLOY_LOCAL_PG_DSN_CONTAINER" ]]; then
-    PLOY_LOCAL_PG_DSN_CONTAINER="$PLOY_LOCAL_PG_DSN"
-  fi
 
-  PLOY_LOCAL_PG_DSN_CONTAINER="$(normalize_container_pg_dsn)"
+  PLOY_DB_DSN="$(normalize_container_pg_dsn)"
   validate_container_pg_dsn
 
   admin_pg_dsn="$(derive_admin_pg_dsn)"
@@ -635,10 +627,9 @@ main() {
   export PLOY_AUTH_SECRET
   PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
   export CLUSTER_ID
-  export PLOY_LOCAL_PG_DSN
-  export PLOY_LOCAL_PG_DSN_CONTAINER
+  export PLOY_DB_DSN
   export PLOY_CONTAINER_SOCKET_PATH
-  export PLOY_LOCAL_SERVER_PORT
+  export PLOY_SERVER_PORT
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1
