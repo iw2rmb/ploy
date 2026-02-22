@@ -16,7 +16,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
-PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
+PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
 log() {
   echo "[$(date -u +%H:%M:%S)] $*"
@@ -34,11 +34,11 @@ main() {
   need docker
   need make
 
-  if [[ -z "$PLOY_LOCAL_PG_DSN" ]]; then
-    echo "error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
+  if [[ -z "$PLOY_DB_DSN" ]]; then
+    echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
-  export PLOY_LOCAL_PG_DSN
+  export PLOY_DB_DSN
 
   if [[ "${RUN_TESTS:-}" == "1" ]]; then
     log "Running tests (make test)..."

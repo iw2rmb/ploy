@@ -5,6 +5,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
+: "${PLOY_CONTAINER_REGISTRY:?PLOY_CONTAINER_REGISTRY is required (example: ghcr.io/iw2rmb)}"
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 # Use a known-good remote ref for the passing scenario.
@@ -38,7 +39,7 @@ RUN=("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
-  --mod-image "docker.io/${DOCKERHUB_USERNAME:-}/mods-orw-maven:latest" \
+  --mod-image "${PLOY_CONTAINER_REGISTRY}/mods-orw-maven:latest" \
   --mod-env RECIPE_GROUP="$RECIPE_GROUP" \
   --mod-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
   --mod-env RECIPE_VERSION="$RECIPE_VERSION" \

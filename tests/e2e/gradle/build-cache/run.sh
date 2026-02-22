@@ -16,7 +16,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$REPO_ROOT/local/cli}"
-PLOY_LOCAL_PG_DSN="${PLOY_LOCAL_PG_DSN:-}"
+PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 
 PLOY_BIN=""
 if [[ -x "$REPO_ROOT/dist/ploy" ]]; then
@@ -49,8 +49,8 @@ if [[ -z "${cache_container_id:-}" ]]; then
   exit 1
 fi
 
-if [[ -z "$PLOY_LOCAL_PG_DSN" ]]; then
-  echo "Error: PLOY_LOCAL_PG_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)." >&2
+if [[ -z "$PLOY_DB_DSN" ]]; then
+  echo "Error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)." >&2
   exit 1
 fi
 
@@ -97,13 +97,13 @@ fi
 
 echo "[e2e] Verifying remote cache hit via structured gate metadata (post_gate)..."
 hit_count="$(
-  psql "$PLOY_LOCAL_PG_DSN" -v ON_ERROR_STOP=1 -qXAt \
+  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qXAt \
     -c "SET search_path TO ploy, public; SELECT count(*) FROM jobs WHERE run_id='${RUN_ID}' AND mod_type='post_gate' AND (meta->'gate'->'log_findings') @> '[{\"code\":\"GRADLE_BUILD_CACHE_HIT\"}]'::jsonb;"
 )"
 hit_count="$(echo "$hit_count" | tr -d '[:space:]')"
 if [[ "${hit_count}" != "1" ]]; then
   echo "Error: expected exactly 1 post_gate cache-hit finding (GRADLE_BUILD_CACHE_HIT), got ${hit_count}" >&2
-  psql "$PLOY_LOCAL_PG_DSN" -v ON_ERROR_STOP=1 -qX \
+  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX \
     -c "SET search_path TO ploy, public; SELECT id, mod_type, status, meta FROM jobs WHERE run_id='${RUN_ID}' ORDER BY step_index;" >&2 || true
   exit 1
 fi

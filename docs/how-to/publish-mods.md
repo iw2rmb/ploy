@@ -14,15 +14,15 @@ Overview
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`
   - (Human gate image removed for now.)
-- The runner pulls images from Docker Hub by default: `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+- The runner pulls images from Docker Hub by default: `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Stack-aware images
 - Use the stack-aware `image` map in `mod.yaml` to select `orw-maven` or `orw-gradle` based on the Build Gate detected stack:
   ```yaml
   image:
-    default: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
-    java-maven: docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
-    java-gradle: docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
+    default: $PLOY_CONTAINER_REGISTRY/mods-orw-maven:latest
+    java-maven: $PLOY_CONTAINER_REGISTRY/mods-orw-maven:latest
+    java-gradle: $PLOY_CONTAINER_REGISTRY/mods-orw-gradle:latest
   ```
 - The Build Gate detects `java-maven` when `pom.xml` is present, `java-gradle` when only Gradle files exist.
 
@@ -42,13 +42,13 @@ scripts/docker/build-and-push-mods.sh
 Publish a single Mods image (example: orw-maven)
 ```bash
 name=orw-maven
-IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}" \
+IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
   docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-orw-maven:latest" --push docker/mods/${name}
 ```
 
 Publish mods-codex (manual one-off)
 ```bash
-IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}"
+IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY"
 docker buildx build \
   --platform linux/amd64 \
   -f docker/mods/mod-codex/Dockerfile \
@@ -78,7 +78,7 @@ Multi‑arch (Mac + Linux) push
   ```
 - Or build a single image:
   ```bash
-  IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}"
+  IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY"
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -t "${IMAGE_PREFIX}/mods-plan:latest" \
@@ -86,12 +86,12 @@ Multi‑arch (Mac + Linux) push
   ```
 - Verify manifests list both platforms:
   ```bash
-  docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-plan:latest
+  docker buildx imagetools inspect $PLOY_CONTAINER_REGISTRY/mods-plan:latest
   ```
 
 Verification for required images
 ```bash
-docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-orw-maven:latest
-docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-orw-gradle:latest
-docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-codex:latest
+docker buildx imagetools inspect $PLOY_CONTAINER_REGISTRY/mods-orw-maven:latest
+docker buildx imagetools inspect $PLOY_CONTAINER_REGISTRY/mods-orw-gradle:latest
+docker buildx imagetools inspect $PLOY_CONTAINER_REGISTRY/mods-codex:latest
 ```

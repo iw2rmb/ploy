@@ -6,7 +6,7 @@ This guide brings up the local Ploy stack using host PostgreSQL plus containers 
 - Worker `ployd-node` (`node`)
 - Gradle cache (`gradle-build-cache`)
 
-The local stack no longer runs a PostgreSQL container. The server uses your host PostgreSQL via `PLOY_LOCAL_PG_DSN`.
+The local stack no longer runs a PostgreSQL container. The server uses your host PostgreSQL via `PLOY_DB_DSN`.
 
 ## Prerequisites
 
@@ -23,10 +23,8 @@ The local stack no longer runs a PostgreSQL container. The server uses your host
 From repo root:
 
 ```bash
-export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-# Optional when host-side tools use localhost but containers must use host alias:
-# export PLOY_LOCAL_PG_DSN_CONTAINER='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-export PLOY_LOCAL_SERVER_PORT=18080   # optional; default 8080
+export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+export PLOY_SERVER_PORT=18080   # optional; default 8080
 ./scripts/local-docker.sh
 export PLOY_CONFIG_HOME="$PWD/local/cli"
 ```
@@ -47,10 +45,8 @@ What the script does:
 From repo root:
 
 ```bash
-export PLOY_LOCAL_PG_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-# Optional when host-side tools use localhost but containers must use host alias:
-# export PLOY_LOCAL_PG_DSN_CONTAINER='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-export PLOY_LOCAL_SERVER_PORT=18080   # optional; default 8080
+export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+export PLOY_SERVER_PORT=18080   # optional; default 8080
 ./scripts/local-podman.sh
 export PLOY_CONFIG_HOME="$PWD/local/cli"
 ```
@@ -62,6 +58,7 @@ Defaults:
 - Local Garage S3 credentials are preseeded in compose:
   - access key: `GK000000000000000000000001`
   - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
+  - region: `garage` (wired via `PLOY_OBJECTSTORE_REGION`)
 
 ## Script Flags
 
@@ -91,7 +88,7 @@ No flags means full deploy (server + node + garage services).
 - Server health:
 
 ```bash
-curl -fsS "http://localhost:${PLOY_LOCAL_SERVER_PORT:-8080}/health"
+curl -fsS "http://localhost:${PLOY_SERVER_PORT:-8080}/health"
 ```
 
 - Metrics:
@@ -120,13 +117,13 @@ For a full reset including DB recreation:
 
 ## Troubleshooting
 
-- `PLOY_LOCAL_PG_DSN` missing:
+- `PLOY_DB_DSN` missing:
   - Set it before running scripts.
 - Port `8080` already in use:
-  - Set `PLOY_LOCAL_SERVER_PORT` (example: `18080`) before running scripts.
+  - Set `PLOY_SERVER_PORT` (example: `18080`) before running scripts.
 - DB unreachable:
   - Verify host PostgreSQL is running.
-  - Do not use `localhost` in container DSN. Set `PLOY_LOCAL_PG_DSN_CONTAINER` to a container-reachable host (for example `host.containers.internal`).
+  - Do not use `localhost` in container DSN. Set `PLOY_DB_DSN` to a container-reachable host (for example `host.containers.internal`).
   - Verify DSN host is reachable from containers (`host.containers.internal` on macOS).
 - Missing binaries:
   - Ensure `dist/ployd-linux` and `dist/ployd-node-linux` exist after `make build`.

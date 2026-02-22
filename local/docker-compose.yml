@@ -12,7 +12,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     environment:
-      - PLOY_POSTGRES_DSN=${PLOY_LOCAL_PG_DSN_CONTAINER:?set PLOY_LOCAL_PG_DSN_CONTAINER to a container-reachable postgres DSN}
+      - PLOY_POSTGRES_DSN=${PLOY_DB_DSN:?set PLOY_DB_DSN to a container-reachable postgres DSN}
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
       - PLOY_CLUSTER_ID=local
       - PLOY_OBJECTSTORE_ENDPOINT=http://garage:3900
@@ -20,12 +20,13 @@ services:
       - PLOY_OBJECTSTORE_ACCESS_KEY=GK000000000000000000000001
       - PLOY_OBJECTSTORE_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - PLOY_OBJECTSTORE_SECURE=false
+      - PLOY_OBJECTSTORE_REGION=garage
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
       - ../dist/ployd-linux:/usr/local/bin/ployd:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
-      - "${PLOY_LOCAL_SERVER_PORT:-8080}:8080"
+      - "${PLOY_SERVER_PORT:-8080}:8080"
       - "9100:9100"
     healthcheck:
       test:
