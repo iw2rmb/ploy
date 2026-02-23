@@ -9,7 +9,7 @@ Documentation: `AGENTS.md`; `README.md`; `docs/mods-lifecycle.md`; `docs/api/Ope
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Naming Contract and Guardrails (RED)
-- [ ] Define exact rename matrix and exclusions before touching implementation — prevents accidental renames of unrelated terms (for example DB schema migrations, `go.mod`, and generic "modify").
+- [ ] Define exact rename matrix and exclusions before touching implementation — prevents accidental renames of unrelated terms (for example `go.mod` and generic "modify").
   - Repository: `ploy`
   - Component: Architecture glossary, contributor rules
   - Scope: Add a short mapping section in this roadmap and reference it from `design/` docs used by contributors; mapping must include `mod`->`mig`, `mods`->`migs`, `mod-`->`mig-`, `mods-`->`migs-`, `/v1/mods`->`/v1/migs`, `ploy mod`->`ploy mig`; also document exclusions, including already-migrated `Type`/`Image` job fields from `roadmap/next.md`.
@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
 - [ ] Rename core domain/store identifiers from mod(s) to mig(s) — keeps server internals consistent with the new canonical term.
   - Repository: `ploy`
   - Component: `internal/domain`, `internal/store`, SQL query layer
-  - Scope: Rename files/types/params such as `mods.go`, `modref_*`, `mods.sql`, `mod_repos.sql`, related generated sqlc files, and table/entity references to `migs` naming; remove old symbols.
+  - Scope: Rename files/types/params such as `mods.go`, `modref_*`, `mods.sql`, `mod_repos.sql`, related generated sqlc files, and table/entity references to `migs` naming; remove old symbols. Update DB schema names in `internal/store/schema.sql` as part of the same slice (tables, columns, foreign keys, indexes, and constraints that contain `mod`/`mods` naming), then regenerate and update store/query artifacts accordingly.
   - Snippets: `internal/store/queries/mods.sql` -> `internal/store/queries/migs.sql`; `internal/domain/types/mods.go` -> `internal/domain/types/migs.go`
   - Tests: `make test` with focus on store/domain packages; run coverage to ensure critical runner/store packages stay within targets.
 
