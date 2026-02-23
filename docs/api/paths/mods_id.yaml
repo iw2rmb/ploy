@@ -12,7 +12,7 @@ get:
     - Returns `RunSummary` directly (no wrapper types).
     - Aggregates run state, jobs state (via `stages`), artifacts, and metadata.
     - `stages` is a map keyed by job ID (KSUID string), not job name.
-    - Use `step_index` within each `StageStatus` for ordering jobs.
+    - Use `next_id` within each `StageStatus` to follow successor links.
 
     **Response includes**:
     - `run_id`, `state`: Run identifier and lifecycle state.
@@ -37,11 +37,11 @@ get:
       "stages": {
         "2NQPoBfVkc8dFmGAQqJnUwMu9jS": {
           "state": "succeeded",
-          "step_index": 1000
+          "next_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
         },
         "2NQPoBfVkc8dFmGAQqJnUwMu9jT": {
           "state": "running",
-          "step_index": 2000
+          "next_id": null
         }
       }
     }

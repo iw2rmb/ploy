@@ -8,8 +8,8 @@ get:
     Behavior:
     - Returns jobs for the **current attempt** of the repo execution (default).
     - Optional `?attempt=N` parameter to query a specific attempt.
-    - Jobs are ordered by `(step_index ASC, id ASC)` for stable UI ordering.
-    - Includes `node_id` and `mod_image` from the jobs table for CLI display (`mod_image` is saved by the node before execution).
+    - Jobs include `next_id` successor pointers so clients can reconstruct chain order.
+    - Includes `node_id` and `job_image` from the jobs table for CLI display (`job_image` is saved by the node before execution).
 
     Response shape: `ListRepoJobsResponse`
   parameters:

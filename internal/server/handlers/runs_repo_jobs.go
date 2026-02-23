@@ -17,17 +17,17 @@ import (
 
 // RunRepoJobResponse represents a job within a repo execution.
 type RunRepoJobResponse struct {
-	JobID       domaintypes.JobID     `json:"job_id"`
-	Name        string                `json:"name"`
-	JobType     string                `json:"job_type"`
-	JobImage    string                `json:"job_image"`
-	StepIndex   domaintypes.StepIndex `json:"step_index"`
-	NodeID      *domaintypes.NodeID   `json:"node_id"`
-	Status      store.JobStatus       `json:"status"`
-	StartedAt   *time.Time            `json:"started_at,omitempty"`
-	FinishedAt  *time.Time            `json:"finished_at,omitempty"`
-	DurationMs  int64                 `json:"duration_ms"`
-	DisplayName string                `json:"display_name,omitempty"`
+	JobID       domaintypes.JobID   `json:"job_id"`
+	Name        string              `json:"name"`
+	JobType     string              `json:"job_type"`
+	JobImage    string              `json:"job_image"`
+	NextID      *domaintypes.JobID  `json:"next_id"`
+	NodeID      *domaintypes.NodeID `json:"node_id"`
+	Status      store.JobStatus     `json:"status"`
+	StartedAt   *time.Time          `json:"started_at,omitempty"`
+	FinishedAt  *time.Time          `json:"finished_at,omitempty"`
+	DurationMs  int64               `json:"duration_ms"`
+	DisplayName string              `json:"display_name,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
@@ -101,7 +101,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				Name:       job.Name,
 				JobType:    job.JobType,
 				JobImage:   job.JobImage,
-				StepIndex:  jobStepIndex(job),
+				NextID:     job.NextID,
 				NodeID:     job.NodeID,
 				Status:     job.Status,
 				DurationMs: job.DurationMs,

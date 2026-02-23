@@ -19,7 +19,7 @@ get:
     - Response JSON shape is unchanged from global artifact listing (`GET /v1/artifacts?cid=...`)
     - Filters the returned bundles to jobs belonging to the repo execution
 
-    Artifacts are ordered by job step_index (ascending), then by created_at
+    Artifacts are ordered by execution chain position, then by created_at
     (ascending).
   parameters:
     - in: path

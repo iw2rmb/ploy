@@ -10,7 +10,7 @@ post:
   description: |
     Nodes poll this endpoint to claim the next queued job for execution. The
     server performs an atomic assignment using `FOR UPDATE SKIP LOCKED` over the
-    unified `jobs` queue (FIFO by `step_index`) and returns job + parent run
+    unified `jobs` queue and returns job + parent run
     details when work is available. When no jobs are available, the server
     returns `204 No Content`.
   responses:

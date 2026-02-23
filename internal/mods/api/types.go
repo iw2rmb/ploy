@@ -66,8 +66,8 @@ type RunSummary struct {
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 	// Stages is keyed by job ID (KSUID string from jobs.id). Each entry represents
-	// a row from the `jobs` table. Use StageStatus.StepIndex (mirrors jobs.step_index)
-	// for ordered step sequencing.
+	// a row from the `jobs` table. Use StageStatus.NextID to follow successor links
+	// in the execution chain.
 	Stages map[domaintypes.JobID]StageStatus `json:"stages"`
 }
 
@@ -81,13 +81,9 @@ type StageStatus struct {
 	CurrentJobID domaintypes.JobID `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`
 	LastError    string            `json:"last_error,omitempty"`
-	// StepIndex mirrors jobs.step_index and is used to order jobs in multi-step
-	// Mods runs. Float values (1000, 2000, 3000) allow dynamic insertion of
-	// healing jobs at midpoints (e.g., 1500, 1750). The control plane uses this
-	// to order jobs when rehydrating workspaces with diffs from prior steps.
-	// Diffs are fetched ordered by jobs.step_index for correct rehydration.
-	// Uses types.StepIndex to preserve ordering without lossy int casts.
-	StepIndex domaintypes.StepIndex `json:"step_index,omitempty"`
+	// NextID points to the successor job in the run chain. Nil means this stage
+	// is currently a chain tail.
+	NextID *domaintypes.JobID `json:"next_id,omitempty"`
 }
 
 // StageMetadata captures job-level metadata for Mods runs.
@@ -96,9 +92,7 @@ type StageStatus struct {
 // layout for jobs.meta JSONB.
 //
 // Each execution unit (pre_gate, mod, post_gate, heal, re_gate) has a jobs row
-// with mod_type identifying the phase type. Float step_index on the jobs table
-// provides ordering for execution; metadata does not duplicate step index or
-// total step count.
+// with job_type identifying the phase type.
 type StageMetadata struct {
 	// JobType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
 	JobType domaintypes.ModType `json:"job_type,omitempty"`

@@ -52,7 +52,7 @@ get:
     **Example:**
     ```
     event: run
-    data: {"run_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","state":"running","repository":"https://github.com/org/repo.git","metadata":{"node_id":"aB3xY9"},"created_at":"2025-01-15T10:00:00Z","updated_at":"2025-01-15T10:05:00Z","stages":{"2NQPoBfVkc8dFmGAQqJnUwMu9jS":{"state":"succeeded","step_index":1000}}}
+    data: {"run_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","state":"running","repository":"https://github.com/org/repo.git","metadata":{"node_id":"aB3xY9"},"created_at":"2025-01-15T10:00:00Z","updated_at":"2025-01-15T10:05:00Z","stages":{"2NQPoBfVkc8dFmGAQqJnUwMu9jS":{"state":"succeeded","next_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jT"}}}
     ```
 
     ## `event: log` — Enriched Log Records
@@ -71,13 +71,13 @@ get:
     |--------------|--------|------------------------------------------------------------------|
     | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
     | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
-    | `mod_type`   | string | Job phase: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`     |
-    | `step_index` | number | Float index of the job (e.g., 1000, 2000, 3000; may be fractional) |
+    | `job_type`   | string | Job phase: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`     |
+    | `step_index` | number | Optional step metadata used for log enrichment                     |
 
     **Example:**
     ```
     event: log
-    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","mod_type":"mod","step_index":2000}
+    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","step_index":2000}
     ```
 
     ## `event: retention` — Retention Metadata

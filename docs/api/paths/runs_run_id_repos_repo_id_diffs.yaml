@@ -14,7 +14,7 @@ get:
     - When `download=true` and `diff_id` is provided, the endpoint returns the
       gzipped patch bytes for that diff (only if it belongs to this run+repo).
 
-    Diffs are ordered by step_index (ascending), then by created_at (ascending).
+    Diffs are ordered by execution chain position, then by created_at (ascending).
   parameters:
     - in: path
       name: run_id

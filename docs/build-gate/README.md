@@ -8,7 +8,7 @@ Scope
 
 Build Gate validation runs as part of the **unified jobs pipeline**. Gate jobs are
 stored in the `jobs` table alongside mod and healing jobs, and nodes claim work
-from a single FIFO queue ordered by `step_index`. There is no dedicated Build Gate
+from a single queue with chain progression driven by `next_id`. There is no dedicated Build Gate
 queue or separate worker mode—all nodes pull from the same jobs queue.
 
 **Key characteristics:**
@@ -16,8 +16,8 @@ queue or separate worker mode—all nodes pull from the same jobs queue.
   `jobs` table with the same schema as mod jobs.
 - **Docker-based execution:** Gates execute locally on the claiming node via Docker
   containers. There is no remote HTTP Build Gate mode.
-- **FIFO ordering:** Jobs are claimed in `step_index` order, ensuring sequential
-  execution of pre-gate → mod → post-gate flows.
+- **Chain progression:** Jobs advance through `next_id` successor links, ensuring
+  sequential execution of pre-gate → mod → post-gate flows.
 - **Workspace semantics:** Gate validation runs against the local workspace on the
   node. For re-gates after healing, the workspace already contains accumulated changes.
 
