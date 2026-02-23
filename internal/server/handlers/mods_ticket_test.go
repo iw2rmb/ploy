@@ -141,8 +141,8 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		if got.Name != exp.name {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
-		if got.ModType != exp.modType {
-			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.ModType)
+		if got.JobType != exp.modType {
+			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
@@ -214,14 +214,14 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		if got.Name != exp.name {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
-		if got.ModType != exp.modType {
-			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.ModType)
+		if got.JobType != exp.modType {
+			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
 		}
-		if got.ModImage != exp.modImage {
-			t.Errorf("job %d: expected mod_image %q, got %q", i, exp.modImage, got.ModImage)
+		if got.JobImage != exp.modImage {
+			t.Errorf("job %d: expected mod_image %q, got %q", i, exp.modImage, got.JobImage)
 		}
 
 		// Verify repo_id and repo_base_ref are persisted correctly.
@@ -290,7 +290,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
 			}
 
-			// Verify the first job (lowest step_index) is the one that's Queued.
+			// Verify the first job is the queue head.
 			if st.createJobParams[0].Status != store.JobStatusQueued {
 				t.Errorf("expected first job to be Queued, got %s", st.createJobParams[0].Status)
 			}
@@ -340,7 +340,7 @@ func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
 	}
 }
 
-func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
+func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
@@ -351,22 +351,18 @@ func TestCreateJobsFromSpec_StepIndexOrdering(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify step_index ordering: pre-gate < mod-0 < mod-1 < post-gate.
-	var prevIndex domaintypes.StepIndex
-	for i, p := range st.createJobParams {
-		if p.StepIndex <= prevIndex && i > 0 {
-			t.Errorf("job %d (%s): step_index %.0f is not greater than previous %.0f", i, p.Name, p.StepIndex, prevIndex)
+	// Verify chain ordering: pre-gate -> mod-0 -> mod-1 -> post-gate.
+	for i := 0; i < len(st.createJobParams)-1; i++ {
+		next := st.createJobParams[i].NextID
+		if next == nil {
+			t.Fatalf("job %d (%s): expected next_id to be set", i, st.createJobParams[i].Name)
 		}
-		prevIndex = p.StepIndex
+		if *next != st.createJobParams[i+1].ID {
+			t.Fatalf("job %d (%s): expected next_id=%s, got %s", i, st.createJobParams[i].Name, st.createJobParams[i+1].ID, *next)
+		}
 	}
-
-	// Verify expected step_index values per mods_ticket.go layout:
-	// pre-gate=1000, mod-0=2000, mod-1=3000, post-gate=4000.
-	expectedIndices := []domaintypes.StepIndex{1000, 2000, 3000, 4000}
-	for i, exp := range expectedIndices {
-		if st.createJobParams[i].StepIndex != exp {
-			t.Errorf("job %d: expected step_index %.0f, got %.0f", i, exp, st.createJobParams[i].StepIndex)
-		}
+	if st.createJobParams[len(st.createJobParams)-1].NextID != nil {
+		t.Fatalf("expected tail job next_id=nil, got %s", *st.createJobParams[len(st.createJobParams)-1].NextID)
 	}
 }
 
@@ -593,7 +589,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		},
 		getModRepoResult: store.ModRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
-			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, StepIndex: domaintypes.StepIndex(1000)},
+			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, Meta: withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(1000))},
 		},
 	}
 

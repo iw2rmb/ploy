@@ -234,6 +234,50 @@ RETURNING
   jobs.duration_ms,
   jobs.meta;
 
+-- name: PromoteJobByIDIfUnblocked :one
+-- Atomically promote a specific linked successor job: Created -> Queued.
+-- The candidate is eligible only when every predecessor that points to it is Success.
+WITH candidate AS (
+  SELECT j.id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.status = 'Created'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jobs p
+      WHERE p.next_id = j.id
+        AND p.status != 'Success'
+    )
+  FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status = 'Queued'
+FROM candidate
+WHERE jobs.id = candidate.id
+  AND jobs.status = 'Created'
+RETURNING
+  jobs.id,
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.repo_base_ref,
+  jobs.attempt,
+  jobs.name,
+  jobs.status,
+  jobs.job_type,
+  jobs.job_image,
+  jobs.next_id,
+  jobs.node_id,
+  jobs.exit_code,
+  jobs.started_at,
+  jobs.finished_at,
+  jobs.duration_ms,
+  jobs.meta;
+
+-- name: UpdateJobNextID :exec
+UPDATE jobs
+SET next_id = $2
+WHERE id = $1;
+
 -- name: CountJobsByRun :one
 SELECT COUNT(*) FROM jobs
 WHERE run_id = $1;

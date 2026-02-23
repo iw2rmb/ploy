@@ -65,7 +65,7 @@ type jobTestFixture struct {
 }
 
 // newJobFixture creates a running job fixture with default values.
-// modType defaults to "mod" and stepIndex to 1000.
+// modType defaults to "mod". stepIndex is stored in job meta for legacy surfaces.
 func newJobFixture(modType string, stepIndex domaintypes.StepIndex) jobTestFixture {
 	nodeIDStr := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeIDStr)
@@ -80,13 +80,13 @@ func newJobFixture(modType string, stepIndex domaintypes.StepIndex) jobTestFixtu
 		RunID:     runID,
 		JobID:     jobID,
 		Job: store.Job{
-			ID:        jobID,
-			RunID:     runID,
-			NodeID:    &nodeID,
-			Name:      modType + "-0",
-			Status:    store.JobStatusRunning,
-			ModType:   modType,
-			StepIndex: stepIndex,
+			ID:      jobID,
+			RunID:   runID,
+			NodeID:  &nodeID,
+			Name:    modType + "-0",
+			Status:  store.JobStatusRunning,
+			JobType: modType,
+			Meta:    withStepIndexMeta([]byte(`{}`), stepIndex),
 		},
 	}
 }

@@ -37,21 +37,21 @@ Legend: [ ] todo, [x] done.
   - Tests: Compile + store integration tests with new column names only.
 
 ## Phase 2: Server Scheduling and Dynamic Rewiring
-- [ ] Build initial run job chains using `next_id` pointers.
+- [x] Build initial run job chains using `next_id` pointers.
   - Repository: `ploy`
   - Component: Run submission and ticket creation handlers
   - Scope: When creating jobs (pre-build, step N, post-build), store the chain in `next_id` order and queue only chain head as claimable.
   - Snippets: `internal/server/handlers/mods_ticket.go`, `internal/server/handlers/runs_submit.go`
   - Tests: Run creation tests assert exact `next_id` linkage and single queued head job.
 
-- [ ] Replace midpoint insertion logic with transactional `next_id` rewiring for healing.
+- [x] Replace midpoint insertion logic with transactional `next_id` rewiring for healing.
   - Repository: `ploy`
   - Component: Job completion/orchestration handlers
   - Scope: On gate/build failure requiring healing: read current job `next_id` (`old_next`), create healing step(s), then set `failed.next_id = heal.id` and `last_inserted.next_id = old_next` in one transaction.
   - Snippets: `internal/server/handlers/jobs_complete.go`, `internal/server/handlers/jobs_complete_logic.go`
   - Tests: Orchestration tests for pre-build and post-build healing insertion and recovery path.
 
-- [ ] Update claim logic to follow queue+link semantics instead of `step_index` ordering.
+- [x] Update claim logic to follow queue+link semantics instead of `step_index` ordering.
   - Repository: `ploy`
   - Component: Claim endpoints and scheduler
   - Scope: Claim from queued jobs only; when a job reaches terminal success state, promote `next_id` job to queued if present. Ensure cancellation/failure semantics still stop chain progression as defined.

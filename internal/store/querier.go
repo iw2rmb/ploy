@@ -219,6 +219,9 @@ type Querier interface {
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
+	// Atomically promote a specific linked successor job: Created -> Queued.
+	// The candidate is eligible only when every predecessor that points to it is Success.
+	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
@@ -233,6 +236,7 @@ type Querier interface {
 	// This is set by the node immediately before job execution starts.
 	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
+	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateModRepoRefs(ctx context.Context, arg UpdateModRepoRefsParams) error
 	UpdateModSpec(ctx context.Context, arg UpdateModSpecParams) error

@@ -517,6 +517,70 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 	return items, nil
 }
 
+const promoteJobByIDIfUnblocked = `-- name: PromoteJobByIDIfUnblocked :one
+WITH candidate AS (
+  SELECT j.id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.status = 'Created'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jobs p
+      WHERE p.next_id = j.id
+        AND p.status != 'Success'
+    )
+  FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status = 'Queued'
+FROM candidate
+WHERE jobs.id = candidate.id
+  AND jobs.status = 'Created'
+RETURNING
+  jobs.id,
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.repo_base_ref,
+  jobs.attempt,
+  jobs.name,
+  jobs.status,
+  jobs.job_type,
+  jobs.job_image,
+  jobs.next_id,
+  jobs.node_id,
+  jobs.exit_code,
+  jobs.started_at,
+  jobs.finished_at,
+  jobs.duration_ms,
+  jobs.meta
+`
+
+// Atomically promote a specific linked successor job: Created -> Queued.
+// The candidate is eligible only when every predecessor that points to it is Success.
+func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error) {
+	row := q.db.QueryRow(ctx, promoteJobByIDIfUnblocked, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.RepoID,
+		&i.RepoBaseRef,
+		&i.Attempt,
+		&i.Name,
+		&i.Status,
+		&i.JobType,
+		&i.JobImage,
+		&i.NextID,
+		&i.NodeID,
+		&i.ExitCode,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.Meta,
+	)
+	return i, err
+}
+
 const scheduleNextJob = `-- name: ScheduleNextJob :one
 WITH next_job AS (
   SELECT j.id
@@ -672,6 +736,22 @@ type UpdateJobMetaParams struct {
 
 func (q *Queries) UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error {
 	_, err := q.db.Exec(ctx, updateJobMeta, arg.ID, arg.Meta)
+	return err
+}
+
+const updateJobNextID = `-- name: UpdateJobNextID :exec
+UPDATE jobs
+SET next_id = $2
+WHERE id = $1
+`
+
+type UpdateJobNextIDParams struct {
+	ID     types.JobID  `json:"id"`
+	NextID *types.JobID `json:"next_id"`
+}
+
+func (q *Queries) UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error {
+	_, err := q.db.Exec(ctx, updateJobNextID, arg.ID, arg.NextID)
 	return err
 }
 

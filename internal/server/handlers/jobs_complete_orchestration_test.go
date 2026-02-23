@@ -53,8 +53,8 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 				Attempt:     1,
 				Name:        "mod-0",
 				Status:      store.JobStatusSuccess,
-				ModType:     "mod",
-				StepIndex:   1000,
+				JobType:     "mod",
+				Meta:        withStepIndexMeta([]byte(`{}`), 1000),
 			},
 		},
 		// All repos terminal triggers run completion.
@@ -108,19 +108,19 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_SchedulesNextJob verifies that a successful job completion
-// triggers scheduling of the next job.
-func TestCompleteJob_SchedulesNextJob(t *testing.T) {
+// TestCompleteJob_PromotesLinkedNextJob verifies that a successful completion
+// promotes the linked successor.
+func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("", 1000)
 	nextJobID := domaintypes.NewJobID()
+	f.Job.NextID = &nextJobID
 
 	nextJob := store.Job{
-		ID:        nextJobID,
-		RunID:     f.RunID,
-		Status:    store.JobStatusCreated,
-		StepIndex: 2000,
+		ID:     nextJobID,
+		RunID:  f.RunID,
+		Status: store.JobStatusCreated,
 	}
 
 	st := &mockStore{
@@ -128,9 +128,9 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:          f.Job,
-		listJobsByRunResult:   []store.Job{f.Job, nextJob},
-		scheduleNextJobResult: nextJob,
+		getJobResult:                    f.Job,
+		listJobsByRunResult:             []store.Job{f.Job, nextJob},
+		promoteJobByIDIfUnblockedResult: nextJob,
 	}
 
 	handler := completeJobHandler(st, nil)
@@ -142,9 +142,12 @@ func TestCompleteJob_SchedulesNextJob(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ScheduleNextJob was called.
-	if !st.scheduleNextJobCalled {
-		t.Fatal("expected ScheduleNextJob to be called")
+	// Verify PromoteJobByIDIfUnblocked was called with the linked successor.
+	if !st.promoteJobByIDIfUnblockedCalled {
+		t.Fatal("expected PromoteJobByIDIfUnblocked to be called")
+	}
+	if st.promoteJobByIDIfUnblockedParam != nextJobID {
+		t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblockedParam)
 	}
 }
 
@@ -173,9 +176,9 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ScheduleNextJob was NOT called for failed jobs.
-	if st.scheduleNextJobCalled {
-		t.Fatal("did not expect ScheduleNextJob to be called for failed job")
+	// Verify successor promotion was NOT called for failed jobs.
+	if st.promoteJobByIDIfUnblockedCalled {
+		t.Fatal("did not expect PromoteJobByIDIfUnblocked to be called for failed job")
 	}
 }
 
@@ -204,9 +207,8 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			Attempt:     1,
 			NodeID:      &f.NodeID,
 			Status:      store.JobStatusSuccess,
-			ModType:     domaintypes.ModTypePreGate.String(),
-			StepIndex:   1000,
-			Meta:        []byte(`{}`),
+			JobType:     domaintypes.ModTypePreGate.String(),
+			Meta:        withStepIndexMeta([]byte(`{}`), 1000),
 		},
 		f.Job,
 		{
@@ -216,11 +218,13 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			Status:      store.JobStatusCreated,
-			ModType:     domaintypes.ModTypePostGate.String(),
-			StepIndex:   3000,
-			Meta:        []byte(`{}`),
+			JobType:     domaintypes.ModTypePostGate.String(),
+			Meta:        withStepIndexMeta([]byte(`{}`), 3000),
 		},
 	}
+	f.Job.NextID = &postJobID
+	jobs[0].NextID = &f.Job.ID
+	jobs[1].NextID = &postJobID
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -315,22 +319,22 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Status:      store.JobStatusCreated,
-		ModType:     domaintypes.ModTypeMod.String(),
-		StepIndex:   2000,
+		JobType:     domaintypes.ModTypeMod.String(),
 	}
 	f.Job.RepoID = nextJob.RepoID
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
+	f.Job.NextID = &nextJob.ID
 
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:                   f.Job,
-		listJobsByRunResult:            []store.Job{f.Job, nextJob},
-		listJobsByRunRepoAttemptResult: []store.Job{f.Job, nextJob},
-		scheduleNextJobResult:          nextJob,
+		getJobResult:                    f.Job,
+		listJobsByRunResult:             []store.Job{f.Job, nextJob},
+		listJobsByRunRepoAttemptResult:  []store.Job{f.Job, nextJob},
+		promoteJobByIDIfUnblockedResult: nextJob,
 	}
 
 	handler := completeJobHandler(st, nil)
@@ -344,9 +348,12 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	if st.scheduleNextJobCalled {
 		t.Fatal("expected success completion to avoid step_index scheduler path")
 	}
+	if !st.promoteJobByIDIfUnblockedCalled {
+		t.Fatal("expected linked successor promotion to be called")
+	}
 }
 
-func TestCompleteJob_GateFailure_HealingInsertionDoesNotUseMidpointStepIndices(t *testing.T) {
+func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.ModTypePreGate.String(), 1000)
@@ -383,10 +390,10 @@ func TestCompleteJob_GateFailure_HealingInsertionDoesNotUseMidpointStepIndices(t
 		Attempt:     1,
 		Name:        "mod-0",
 		Status:      store.JobStatusCreated,
-		ModType:     domaintypes.ModTypeMod.String(),
-		StepIndex:   2000,
+		JobType:     domaintypes.ModTypeMod.String(),
 		Meta:        []byte(`{}`),
 	}
+	f.Job.NextID = &successor.ID
 
 	jobs := []store.Job{f.Job, successor}
 	st := &mockStore{
@@ -415,10 +422,21 @@ func TestCompleteJob_GateFailure_HealingInsertionDoesNotUseMidpointStepIndices(t
 	if st.createJobCallCount == 0 {
 		t.Fatal("expected healing insertion to create follow-up jobs")
 	}
-	for _, created := range st.createJobParams {
-		if created.StepIndex > f.Job.StepIndex && created.StepIndex < successor.StepIndex {
-			t.Fatalf("expected no midpoint insertion step_index between %v and %v, got %v for %s",
-				f.Job.StepIndex, successor.StepIndex, created.StepIndex, created.Name)
-		}
+	if st.createJobCallCount != 2 {
+		t.Fatalf("expected 2 healing jobs, got %d", st.createJobCallCount)
+	}
+	heal := st.createJobParams[0]
+	reGate := st.createJobParams[1]
+	if heal.NextID == nil || *heal.NextID != reGate.ID {
+		t.Fatalf("expected heal.NextID to point to re-gate job")
+	}
+	if reGate.NextID == nil || *reGate.NextID != successor.ID {
+		t.Fatalf("expected re-gate.NextID to preserve old successor %s", successor.ID)
+	}
+	if len(st.updateJobNextIDParams) < 2 {
+		t.Fatalf("expected next_id rewiring updates, got %d", len(st.updateJobNextIDParams))
+	}
+	if st.updateJobNextIDParams[0].ID != f.Job.ID || st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != heal.ID {
+		t.Fatalf("expected failed job rewired to heal")
 	}
 }
