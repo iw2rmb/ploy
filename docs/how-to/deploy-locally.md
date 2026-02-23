@@ -20,7 +20,8 @@ The local stack no longer runs a PostgreSQL container. The server uses your host
 From repo root:
 
 ```bash
-export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
+export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
+export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: custom CA for docker.io registry trust
 export PLOY_SERVER_PORT=18080   # optional; default 8080
 ./deploy/local/run.sh
 export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
@@ -104,8 +105,14 @@ For a full reset including DB recreation:
   - Set `PLOY_SERVER_PORT` (example: `18080`) before running scripts.
 - DB unreachable:
   - Verify host PostgreSQL is running.
-  - Do not use `localhost` in container DSN. Set `PLOY_DB_DSN` to a container-reachable host (for example `host.containers.internal`).
-  - Verify DSN host is reachable from containers (`host.containers.internal` on macOS).
+  - Verify the DSN host is reachable from containers.
+  - For loopback DSNs (`localhost`, `127.0.0.1`, `::1`), local deploy rewrites the container DSN host to `host.docker.internal`.
+- Docker Hub TLS verification fails during image build:
+  - Set `PLOY_CA_CERTS` to a PEM bundle path trusted in your environment.
+  - Re-run `./deploy/local/run.sh`; it installs this CA for Docker registry trust (Colima/Linux automation) and injects it into local image build steps (`apk add`).
+- Host `localhost` API path is intercepted/proxied:
+  - `run.sh` health checks use Docker container health state instead of host `curl`.
+  - Global env bootstrap (`PLOY_GRADLE_BUILD_CACHE_*`) falls back to server-container local API calls when host CLI HTTP calls fail.
 - Missing binaries:
   - Ensure `dist/ployd-linux` and `dist/ployd-node-linux` exist after `make build`.
 - Node cannot run containers:

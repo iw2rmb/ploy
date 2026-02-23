@@ -1,6 +1,11 @@
+# syntax=docker/dockerfile:1.7
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates bash tzdata curl jq && \
+RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle \
+    if [ -s /run/secrets/ploy_ca_bundle ]; then \
+      { printf '\n'; cat /run/secrets/ploy_ca_bundle; printf '\n'; } >> /etc/ssl/certs/ca-certificates.crt; \
+    fi && \
+    apk add --no-cache ca-certificates bash tzdata curl jq && \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
