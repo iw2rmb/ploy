@@ -17,6 +17,9 @@ AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-$ROOT_DIR/deploy/local/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/deploy/local/cli}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
+PLOY_DB_DSN_HOST=""
+PLOY_DB_DSN_CONTAINER=""
+PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/local/node/bearer-token}"
@@ -47,6 +50,7 @@ Options:
 
 Environment:
   PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
+  PLOY_CA_CERTS      Optional path to PEM CA bundle for docker.io registry trust
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
@@ -88,7 +92,7 @@ if not dsn:
     raise SystemExit("error: PLOY_DB_DSN is required")
 
 if "://" not in dsn:
-    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)")
 
 u = urlsplit(dsn)
 if u.scheme not in ("postgres", "postgresql"):
@@ -114,7 +118,53 @@ def parse_dsn(name: str):
     if not dsn:
         raise SystemExit(f"error: {name} is required")
     if "://" not in dsn:
-        raise SystemExit(f"error: {name} must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+        raise SystemExit(f"error: {name} must be a URL DSN (example: postgres://ploy:ploy@host.docker.internal:5432/ploy?sslmode=disable)")
+
+    u = urlsplit(dsn)
+    if u.scheme not in ("postgres", "postgresql"):
+        raise SystemExit(f"error: {name} must use postgres:// or postgresql://")
+    if u.path.strip("/") != "ploy":
+        raise SystemExit(f"error: {name} must target database ploy")
+    return u
+
+dsn_u = parse_dsn("PLOY_DB_DSN")
+
+username = dsn_u.username or os.environ.get("USER", "").strip()
+if not username:
+    raise SystemExit("error: unable to infer postgres username; include username in PLOY_DB_DSN or set USER")
+
+password = dsn_u.password
+
+host = (dsn_u.hostname or "").lower()
+if host in ("localhost", "127.0.0.1", "::1"):
+    host = "host.docker.internal"
+if ":" in host and not host.startswith("["):
+    host = f"[{host}]"
+
+userinfo = quote(username, safe="")
+if password is not None:
+    userinfo += ":" + quote(password, safe="")
+
+port = f":{dsn_u.port}" if dsn_u.port else ""
+netloc = f"{userinfo}@{host}{port}"
+normalized = urlunsplit((dsn_u.scheme, netloc, dsn_u.path, dsn_u.query, dsn_u.fragment))
+print(normalized)
+PY
+}
+
+normalize_host_pg_dsn() {
+  PLOY_DB_DSN="$PLOY_DB_DSN" \
+  USER="${USER:-}" \
+  "$PYTHON_BIN" <<'PY'
+import os
+from urllib.parse import quote, urlsplit, urlunsplit
+
+def parse_dsn(name: str):
+    dsn = os.environ[name].strip()
+    if not dsn:
+        raise SystemExit(f"error: {name} is required")
+    if "://" not in dsn:
+        raise SystemExit(f"error: {name} must be a URL DSN (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)")
 
     u = urlsplit(dsn)
     if u.scheme not in ("postgres", "postgresql"):
@@ -155,7 +205,7 @@ dsn = os.environ["PLOY_DB_DSN"].strip()
 if not dsn:
     raise SystemExit("error: PLOY_DB_DSN is required")
 if "://" not in dsn:
-    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)")
+    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN (example: postgres://ploy:ploy@host.docker.internal:5432/ploy?sslmode=disable)")
 
 u = urlsplit(dsn)
 if u.scheme not in ("postgres", "postgresql"):
@@ -166,8 +216,6 @@ if u.path.strip("/") != "ploy":
 host = (u.hostname or "").lower()
 if not host:
     raise SystemExit("error: PLOY_DB_DSN must include a TCP hostname reachable from containers")
-if host in ("localhost", "127.0.0.1", "::1"):
-    raise SystemExit("error: PLOY_DB_DSN must not use localhost/loopback; use host.containers.internal or another host reachable from containers")
 PY
 }
 
@@ -207,6 +255,166 @@ ensure_ploy_db_exists() {
   psql "$admin_dsn" -v ON_ERROR_STOP=1 -qX -c "CREATE DATABASE ploy;" >/dev/null
 }
 
+run_as_root() {
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    "$@"
+    return
+  fi
+
+  if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+
+  return 1
+}
+
+wait_for_docker_engine_ready() {
+  local i
+  for i in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "error: docker engine did not become ready in time after CA installation" >&2
+  exit 1
+}
+
+configure_colima_registry_ca() {
+  local ca_path="$1"
+
+  if ! command -v colima >/dev/null 2>&1; then
+    echo "error: docker context is colima but colima CLI is not installed" >&2
+    exit 1
+  fi
+
+  log "Installing PLOY_CA_CERTS into colima docker registry trust..."
+  colima ssh -- sudo mkdir -p \
+    /etc/docker/certs.d/docker.io \
+    /etc/docker/certs.d/registry-1.docker.io \
+    /etc/docker/certs.d/auth.docker.io \
+    /etc/docker/certs.d/index.docker.io
+  cat "$ca_path" | colima ssh -- sudo tee /etc/docker/certs.d/docker.io/ca.crt >/dev/null
+  cat "$ca_path" | colima ssh -- sudo tee /etc/docker/certs.d/registry-1.docker.io/ca.crt >/dev/null
+  cat "$ca_path" | colima ssh -- sudo tee /etc/docker/certs.d/auth.docker.io/ca.crt >/dev/null
+  cat "$ca_path" | colima ssh -- sudo tee /etc/docker/certs.d/index.docker.io/ca.crt >/dev/null
+  colima ssh -- sudo chmod 0644 \
+    /etc/docker/certs.d/docker.io/ca.crt \
+    /etc/docker/certs.d/registry-1.docker.io/ca.crt \
+    /etc/docker/certs.d/auth.docker.io/ca.crt \
+    /etc/docker/certs.d/index.docker.io/ca.crt
+  colima ssh -- sudo mkdir -p /usr/local/share/ca-certificates/ploy
+  cat "$ca_path" | colima ssh -- sudo tee /usr/local/share/ca-certificates/ploy/ploy-ca.crt >/dev/null
+  colima ssh -- sudo update-ca-certificates >/dev/null
+  colima ssh -- sudo systemctl restart docker
+}
+
+configure_linux_registry_ca() {
+  local ca_path="$1"
+
+  log "Installing PLOY_CA_CERTS into local docker registry trust..."
+  if ! run_as_root mkdir -p \
+    /etc/docker/certs.d/docker.io \
+    /etc/docker/certs.d/registry-1.docker.io \
+    /etc/docker/certs.d/auth.docker.io \
+    /etc/docker/certs.d/index.docker.io; then
+    echo "error: cannot create /etc/docker/certs.d (root privileges are required)" >&2
+    exit 1
+  fi
+  if ! run_as_root install -m 0644 "$ca_path" /etc/docker/certs.d/docker.io/ca.crt; then
+    echo "error: cannot install CA bundle to /etc/docker/certs.d/docker.io/ca.crt" >&2
+    exit 1
+  fi
+  if ! run_as_root install -m 0644 "$ca_path" /etc/docker/certs.d/registry-1.docker.io/ca.crt; then
+    echo "error: cannot install CA bundle to /etc/docker/certs.d/registry-1.docker.io/ca.crt" >&2
+    exit 1
+  fi
+  if ! run_as_root install -m 0644 "$ca_path" /etc/docker/certs.d/auth.docker.io/ca.crt; then
+    echo "error: cannot install CA bundle to /etc/docker/certs.d/auth.docker.io/ca.crt" >&2
+    exit 1
+  fi
+  if ! run_as_root install -m 0644 "$ca_path" /etc/docker/certs.d/index.docker.io/ca.crt; then
+    echo "error: cannot install CA bundle to /etc/docker/certs.d/index.docker.io/ca.crt" >&2
+    exit 1
+  fi
+  if ! run_as_root mkdir -p /usr/local/share/ca-certificates/ploy; then
+    echo "error: cannot create /usr/local/share/ca-certificates/ploy" >&2
+    exit 1
+  fi
+  if ! run_as_root install -m 0644 "$ca_path" /usr/local/share/ca-certificates/ploy/ploy-ca.crt; then
+    echo "error: cannot install CA bundle to /usr/local/share/ca-certificates/ploy/ploy-ca.crt" >&2
+    exit 1
+  fi
+  if command -v update-ca-certificates >/dev/null 2>&1; then
+    if ! run_as_root update-ca-certificates >/dev/null; then
+      echo "error: failed to update system CA trust via update-ca-certificates" >&2
+      exit 1
+    fi
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    if ! run_as_root systemctl restart docker; then
+      echo "error: failed to restart docker via systemctl after CA install" >&2
+      exit 1
+    fi
+    return
+  fi
+  if command -v service >/dev/null 2>&1; then
+    if ! run_as_root service docker restart; then
+      echo "error: failed to restart docker via service after CA install" >&2
+      exit 1
+    fi
+    return
+  fi
+
+  echo "error: installed CA bundle but could not restart docker daemon (no systemctl/service)" >&2
+  exit 1
+}
+
+configure_docker_registry_ca_if_needed() {
+  local ca_path context os_name engine_name
+
+  if [[ -z "$PLOY_CA_CERTS" ]]; then
+    return 0
+  fi
+
+  ca_path="$PLOY_CA_CERTS"
+  if [[ "$ca_path" != /* ]]; then
+    ca_path="$ROOT_DIR/$ca_path"
+  fi
+  if [[ ! -f "$ca_path" ]]; then
+    echo "error: PLOY_CA_CERTS file not found: $ca_path" >&2
+    exit 1
+  fi
+  if [[ ! -s "$ca_path" ]]; then
+    echo "error: PLOY_CA_CERTS file is empty: $ca_path" >&2
+    exit 1
+  fi
+
+  PLOY_CA_CERTS="$ca_path"
+  context="$(docker context show 2>/dev/null || true)"
+  os_name="$(uname -s)"
+  engine_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
+
+  if [[ "$context" == "colima" || "$engine_name" == "colima" ]]; then
+    configure_colima_registry_ca "$PLOY_CA_CERTS"
+    wait_for_docker_engine_ready
+    return
+  fi
+
+  if [[ "$os_name" == "Linux" ]]; then
+    configure_linux_registry_ca "$PLOY_CA_CERTS"
+    wait_for_docker_engine_ready
+    return
+  fi
+
+  echo "error: PLOY_CA_CERTS auto-install is not supported for docker context '${context}' (engine='${engine_name}') on ${os_name}" >&2
+  echo "error: configure docker daemon trust for docker.io manually, then rerun deploy/local/run.sh" >&2
+  exit 1
+}
+
 build_runtime_images() {
   local -a services=("$@")
 
@@ -221,8 +429,8 @@ build_runtime_images() {
 wait_for_garage_bootstrap() {
   local garage_cid garage_init_cid garage_health init_state init_exit
 
-  garage_cid="$($COMPOSE_CMD ps -q garage)"
-  garage_init_cid="$($COMPOSE_CMD ps -q garage-init)"
+  garage_cid="$($COMPOSE_CMD ps -a -q garage)"
+  garage_init_cid="$($COMPOSE_CMD ps -a -q garage-init)"
   if [[ -z "$garage_cid" || -z "$garage_init_cid" ]]; then
     echo "error: could not resolve garage container IDs" >&2
     $COMPOSE_CMD ps || true
@@ -300,22 +508,46 @@ PY
 }
 
 wait_for_server_health() {
-  local server_url="http://localhost:${PLOY_SERVER_PORT}"
-  log "Waiting for server health on ${server_url}/health..."
-  for i in {1..60}; do
-    if curl -fsS "${server_url}/health" >/dev/null 2>&1; then
+  local server_cid server_health server_state server_exit
+
+  server_cid="$($COMPOSE_CMD ps -a -q server)"
+  if [[ -z "$server_cid" ]]; then
+    echo "error: could not resolve server container ID" >&2
+    $COMPOSE_CMD ps || true
+    exit 1
+  fi
+
+  log "Waiting for server container health..."
+  for i in {1..90}; do
+    server_health="$($CONTAINER_ENGINE inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$server_cid" 2>/dev/null || true)"
+    server_state="$($CONTAINER_ENGINE inspect -f '{{.State.Status}}' "$server_cid" 2>/dev/null || true)"
+    server_exit="$($CONTAINER_ENGINE inspect -f '{{.State.ExitCode}}' "$server_cid" 2>/dev/null || true)"
+
+    if [[ "$server_health" == "healthy" ]]; then
       return 0
     fi
+    if [[ "$server_health" == "none" && "$server_state" == "running" ]]; then
+      return 0
+    fi
+    if [[ "$server_state" == "exited" || "$server_state" == "dead" ]]; then
+      echo "error: server container is ${server_state} (exit=${server_exit})" >&2
+      $COMPOSE_CMD ps || true
+      $COMPOSE_CMD logs server || true
+      exit 1
+    fi
+
     sleep 1
   done
 
-  echo "error: server did not become healthy in time" >&2
+  echo "error: server container did not become healthy in time (state=${server_state}, health=${server_health})" >&2
+  $COMPOSE_CMD ps || true
+  $COMPOSE_CMD logs server || true
   exit 1
 }
 
 seed_tokens() {
   log "Inserting admin token into api_tokens..."
-  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN_HOST" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
     VALUES (
@@ -330,7 +562,7 @@ seed_tokens() {
     ON CONFLICT (token_hash) DO NOTHING;"
 
   log "Inserting worker token into api_tokens..."
-  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN_HOST" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
     VALUES (
@@ -371,15 +603,65 @@ seed_node_record() {
   concurrency="${NODE_CONCURRENCY:-1}"
 
   log "Seeding node record in ploy.nodes..."
-  psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX -c "
+  psql "$PLOY_DB_DSN_HOST" -v ON_ERROR_STOP=1 -qX -c "
     SET search_path TO ploy, public;
     INSERT INTO nodes (id, name, ip_address, version, concurrency)
     VALUES ('${uuid}', '${name}', '${ip}', '${version}', ${concurrency})
     ON CONFLICT (id) DO NOTHING;"
 }
 
+set_global_env_with_fallback() {
+  local key="$1"
+  local value="$2"
+  local scope="${3:-all}"
+  local no_proxy_value="${4:-localhost,127.0.0.1,::1}"
+  local payload=""
+  local cli_output=""
+
+  if [[ -x "./dist/ploy" ]]; then
+    if cli_output="$(NO_PROXY="$no_proxy_value" no_proxy="$no_proxy_value" \
+      PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
+        --key "$key" \
+        --value "$value" \
+        --scope "$scope" 2>&1)"; then
+      if [[ -n "$cli_output" ]]; then
+        printf '%s\n' "$cli_output"
+      fi
+      return 0
+    fi
+
+    log "Host CLI request for ${key} failed; retrying via server container API..."
+  fi
+
+  payload="$(GLOBAL_ENV_VALUE="$value" GLOBAL_ENV_SCOPE="$scope" "$PYTHON_BIN" <<'PY'
+import json
+import os
+
+print(json.dumps({
+    "value": os.environ["GLOBAL_ENV_VALUE"],
+    "scope": os.environ["GLOBAL_ENV_SCOPE"],
+    "secret": True,
+}))
+PY
+)"
+
+  if ! $COMPOSE_CMD exec -T \
+    -e PLOY_ADMIN_TOKEN="$ADMIN_TOKEN" \
+    -e PLOY_ENV_KEY="$key" \
+    -e PLOY_ENV_PAYLOAD="$payload" \
+    server sh -lc \
+    "curl -fsS -X PUT \"http://localhost:8080/v1/config/env/\${PLOY_ENV_KEY}\" \
+      -H \"Authorization: Bearer \${PLOY_ADMIN_TOKEN}\" \
+      -H \"Content-Type: application/json\" \
+      --data \"\${PLOY_ENV_PAYLOAD}\" >/dev/null"; then
+    echo "error: failed to set ${key} through server container API fallback" >&2
+    exit 1
+  fi
+}
+
 wire_local_cli_descriptor() {
   local server_url="http://localhost:${PLOY_SERVER_PORT}"
+  local local_no_proxy="localhost,127.0.0.1,::1"
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
   cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
@@ -392,21 +674,28 @@ JSON
   ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
 
   log "Configuring local Gradle Build Cache (scope=all)..."
-  if [[ -x "./dist/ploy" ]]; then
-    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
-      --key PLOY_GRADLE_BUILD_CACHE_URL \
-      --value "http://gradle-build-cache:5071/cache/" \
-      --scope all
-
-    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy config env set \
-      --key PLOY_GRADLE_BUILD_CACHE_PUSH \
-      --value "true" \
-      --scope all
-  fi
+  set_global_env_with_fallback \
+    PLOY_GRADLE_BUILD_CACHE_URL \
+    "http://gradle-build-cache:5071/cache/" \
+    all \
+    "$local_no_proxy"
+  set_global_env_with_fallback \
+    PLOY_GRADLE_BUILD_CACHE_PUSH \
+    "true" \
+    all \
+    "$local_no_proxy"
 
   log "Smoke testing CLI cluster token list (optional)..."
   if [[ -x "./dist/ploy" ]]; then
-    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy cluster token list || true
+    local smoke_output=""
+    if smoke_output="$(NO_PROXY="$local_no_proxy" no_proxy="$local_no_proxy" \
+      PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy cluster token list 2>&1)"; then
+      if [[ -n "$smoke_output" ]]; then
+        printf '%s\n' "$smoke_output"
+      fi
+    else
+      log "Skipping host CLI smoke test: local server URL is not directly reachable from host network path."
+    fi
   fi
 }
 
@@ -424,19 +713,23 @@ main() {
   need "$PYTHON_BIN"
   need openssl
   need make
-  need curl
   need psql
   need pg_isready
 
+  configure_docker_registry_ca_if_needed
+
   if [[ -z "$PLOY_DB_DSN" ]]; then
-    echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable)" >&2
+    echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
 
-  PLOY_DB_DSN="$(normalize_container_pg_dsn)"
+  PLOY_DB_DSN_HOST="$(normalize_host_pg_dsn)"
+  PLOY_DB_DSN="$PLOY_DB_DSN_HOST"
+  PLOY_DB_DSN_CONTAINER="$(normalize_container_pg_dsn)"
+  PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
   validate_container_pg_dsn
 
-  admin_pg_dsn="$(derive_admin_pg_dsn)"
+  admin_pg_dsn="$(PLOY_DB_DSN="$PLOY_DB_DSN_HOST" derive_admin_pg_dsn)"
 
   wait_for_postgres "$admin_pg_dsn"
   if [[ $DROP_DB -eq 1 ]]; then
@@ -467,6 +760,8 @@ main() {
   PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
   export CLUSTER_ID
   export PLOY_DB_DSN
+  PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
+  export PLOY_CA_CERTS
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
 

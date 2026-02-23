@@ -24,10 +24,23 @@ defaults change, or components adopt additional configuration.
 - `PLOY_DB_DSN` — Required by `deploy/local/run.sh`.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
   and injected into the server container as `PLOY_POSTGRES_DSN`.
-  Must be reachable from inside containers and must not use loopback
-  (`localhost`, `127.0.0.1`, `::1`).
+  Host-side DSN may use `localhost`; local deploy rewrites loopback hosts
+  (`localhost`, `127.0.0.1`, `::1`) to `host.docker.internal` for container use.
+  Non-loopback hosts must be reachable from inside containers.
   Example:
-  `postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable`.
+  `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
+- `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
+  `deploy/local/run.sh` to configure Docker daemon trust for Docker Hub
+  endpoints (`docker.io`, `registry-1.docker.io`, `auth.docker.io`,
+  `index.docker.io`).
+  The script also installs the bundle into system CA trust before restarting
+  Docker, so Docker Hub auth/token TLS uses the same root CAs.
+  The same bundle is provided to local `server`/`node` image builds through
+  a BuildKit secret (`ploy_ca_bundle`) so early `apk add` steps can trust
+  your corporate/private CAs without printing certificate content in build logs.
+  Current automation targets:
+  - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
+  - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
   port `8080` in `deploy/local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
   is already occupied (example: `PLOY_SERVER_PORT=18080`).

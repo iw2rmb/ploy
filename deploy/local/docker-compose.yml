@@ -3,6 +3,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/images/server/Dockerfile.local
+      secrets:
+        - ploy_ca_bundle
     image: ploy-server:local
     platform: linux/amd64
     depends_on:
@@ -42,6 +44,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/images/node/Dockerfile.local
+      secrets:
+        - ploy_ca_bundle
     image: ploy-node:local
     platform: linux/amd64
     user: "0:0"
@@ -121,3 +125,7 @@ volumes:
   gradle-build-cache-data:
   garage-meta:
   garage-data:
+
+secrets:
+  ploy_ca_bundle:
+    file: ${PLOY_CA_CERTS:-/dev/null}
