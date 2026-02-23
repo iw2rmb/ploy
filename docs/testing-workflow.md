@@ -167,6 +167,12 @@ Optional:
 
 If all checks pass, you're ready to commit and push.
 
+For migration slices that add guardrails under `tests/guards/`, run:
+
+```bash
+go test ./tests/guards/...
+```
+
 ## E2E Tests — Later Phase
 
 After core functionality is stable and unit-tested:
