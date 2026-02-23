@@ -392,3 +392,75 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		t.Fatalf("expected PER_RUN_ONLY preserved, got %v", env["PER_RUN_ONLY"])
 	}
 }
+
+func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewModRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "mod-0",
+			Status:      store.JobStatusRunning,
+			ModType:     domaintypes.ModTypeMod.String(),
+			StepIndex:   domaintypes.StepIndex(2000),
+			Meta:        []byte(`{}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.ModRepo{
+			ID:      repoID,
+			RepoUrl: "https://github.com/user/repo.git",
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if _, ok := resp["next_id"]; !ok {
+		t.Fatalf("expected claim response to include next_id")
+	}
+	if _, ok := resp["step_index"]; ok {
+		t.Fatalf("expected claim response to omit step_index")
+	}
+}

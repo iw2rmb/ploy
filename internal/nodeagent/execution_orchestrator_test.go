@@ -280,3 +280,26 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	// - The existing execution_healing_test.go tests verify this more directly.
 	t.Log("Gate contract verified: Runner.Run was called (gate execution handled separately)")
 }
+
+func TestModStepIndexFromJobStepIndex_AllowsNonCanonicalIndices(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		stepIndex types.StepIndex
+	}{
+		{name: "canonical_2000", stepIndex: 2000},
+		{name: "non_canonical_2500", stepIndex: 2500},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := modStepIndexFromJobStepIndex(tc.stepIndex); err != nil {
+				t.Fatalf("expected step_index %v to be accepted in chain-based model: %v", tc.stepIndex, err)
+			}
+		})
+	}
+}

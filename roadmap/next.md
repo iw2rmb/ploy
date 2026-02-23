@@ -14,7 +14,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `internal/nodeagent/job.go`, `internal/workflow/contracts/job_meta.go`, `docs/api/components/schemas/controlplane.yaml`
   - Tests: Add/adjust guard checks in `tests/guards` that fail on newly introduced `mod_type`, `mod_image`, and `step_index` in current interfaces after migration.
 
-- [ ] Add RED tests for linked-list orchestration semantics before implementation.
+- [x] Add RED tests for linked-list orchestration semantics before implementation.
   - Repository: `ploy`
   - Component: Server orchestration tests, nodeagent flow tests
   - Scope: Add failing tests for: linear execution via `next_id`, healing insertion rewiring, and claim order driven by chain edges (not numeric sort).
