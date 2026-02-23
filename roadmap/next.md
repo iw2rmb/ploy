@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `docs/mods-lifecycle.md`; `docs/build-gate/README.md
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Contract and RED Gates
-- [ ] Define the new job field contract and enum mapping in design docs before code edits.
+- [x] Define the new job field contract and enum mapping in design docs before code edits.
   - Repository: `ploy`
   - Component: Domain contract, naming glossary
   - Scope: Document canonical rename mapping: `ModType` -> `Type` (`JobType`), `ModImage` -> `Image` (`JobImage`). Define job type values as step phases (`pre_build`, `step`, `post_build`, `heal`, `re_build`, `mr`) and remove old `pre_gate/mod/post_gate/re_gate` names from the new contract.
