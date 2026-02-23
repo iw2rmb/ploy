@@ -88,7 +88,7 @@ pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gat
 
 Pre-gate and re-gate validation runs through the `GateExecutor` adapter as part of
 the unified jobs pipeline. Gate jobs are stored in the `jobs` table alongside mod
-jobs and claimed by nodes in FIFO order by `step_index`:
+jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 
 ```
 ┌─────────────────────┐     ┌────────────────────┐     ┌───────────────────────┐
@@ -114,7 +114,7 @@ jobs and claimed by nodes in FIFO order by `step_index`:
 **Key characteristics:**
 - Single unified queue: gate, mod, and healing jobs all use the same `jobs` table.
 - Local Docker execution: gates run on the node that claims the job.
-- FIFO ordering by `step_index`: ensures sequential pre-gate → mod → post-gate flow.
+- Chain progression via `next_id`: ensures sequential pre-gate → mod → post-gate flow.
 
 See `docs/build-gate/README.md` for gate configuration and execution details.
 
@@ -261,7 +261,7 @@ step k from:
 
 1. **Base clone**: A cached copy of the initial repository state (base_ref).
 2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane,
-   sorted deterministically by `(step_index, created_at, id)` in the node agent, and
+   sorted deterministically by chain position, then `(created_at, id)` in the node agent, and
    applied in order using `git apply`.
 
 After `mod[k]` completes, its changes are present in the same workspace that the
@@ -280,7 +280,7 @@ This decouples step execution from node affinity—step 0 can run on node A, ste
 node B, etc.
 
 Key invariants:
-- Each step uploads its diff (tagged with `step_index`) after successful execution.
+- Each step uploads its diff (tagged with `job_id` and optional summary metadata) after successful execution.
 - `rehydrateWorkspaceForStep` fetches diffs for steps `0..k-1` before executing step `k`.
 - A baseline commit is created after rehydration (via `ensureBaselineCommitForRehydration`)
   so that `git diff HEAD` produces only the changes from step k, not cumulative changes.
@@ -481,9 +481,9 @@ The ORW Mods honor an existing `rewrite.yml` in the workspace:
 
 ## 1.3 Job Order (DAG)
 
-Mods runs form a directed acyclic graph (DAG) of jobs derived from `step_index`
-(float values like 1000, 2000, 3000) and healing logic that can insert
-intermediate steps.
+Mods runs form a directed acyclic graph (DAG) of jobs linked through `next_id`
+successor pointers. Healing updates this chain by rewiring links in a single
+transaction.
 
 ### Node types
 
@@ -502,27 +502,29 @@ A successful single-mod run creates a linear three-node chain:
 ```
 ┌───────────┐       ┌───────────┐       ┌───────────┐
 │ pre-gate  │──────▶│   mod-0   │──────▶│ post-gate │
-│  (1000)   │       │  (2000)   │       │  (3000)   │
 └───────────┘       └───────────┘       └───────────┘
 ```
 
 ### Healing run graph
 
 When a gate fails with healing configured, heal and re-gate jobs are inserted
-at midpoint `step_index` values:
+by rewiring `next_id` links:
 
 ```
 ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
 │ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│   mod-0   │────▶│ post-gate │
-│  (1000)   │     │  (1250)   │     │  (1500)   │     │  (2000)   │     │  (3000)   │
 │  FAILED   │     │           │     │  PASSED   │     │           │     │           │
 └───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
 ```
 
+Rewire example:
+- Before failure handling: `failed.next_id = old_next`
+- After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
+
 ### Parallel healing branches (Phase E)
 
-Multi-strategy healing creates concurrent branches with distinct `step_index`
-windows. The first branch whose re-gate passes wins; losing branches are cancelled:
+Multi-strategy healing creates concurrent branches with independent chain segments.
+The first branch whose re-gate passes wins; losing branches are cancelled:
 
 ```
                            ┌─────────────────────────────────────┐
@@ -531,9 +533,9 @@ windows. The first branch whose re-gate passes wins; losing branches are cancell
                      │ Branch A  │                         │ Branch B  │
                      └─────┬─────┘                         └─────┬─────┘
                            │                                     │
-post-gate  ───────────────▶├─▶ heal-a (1500) → re-gate-a (1600) ─┤
+post-gate  ───────────────▶├─▶ heal-a → re-gate-a ───────────────┤
  FAILED                    │                                     │
-                           └─▶ heal-b (1700) → re-gate-b (1800) ─┘
+                           └─▶ heal-b → re-gate-b ───────────────┘
                                                                  │
                                               (first pass wins) ─┘
 ```
@@ -648,9 +650,9 @@ Each `run_repos` row tracks execution for a single repository within a run:
 
 ### Jobs pipeline within a batch (v1)
 
-Jobs are stored directly in `jobs` and scoped to `(run_id, repo_id, attempt, step_index)`.
+Jobs are stored directly in `jobs` and scoped to `(run_id, repo_id, attempt)`.
 The first job for a repo attempt is `Queued`, and later jobs are `Created`. Healing may
-insert `heal-*` + `re-gate-*` jobs by allocating intermediate `step_index` values.
+insert `heal-*` + `re-gate-*` jobs by rewiring `next_id` links.
 
 ### Batch scheduler (v1)
 
@@ -701,7 +703,7 @@ workflows.
 │                                                                             │
 │  4. Apply diffs                                                              │
 │     ├─ Call GET /v1/runs/{run_id}/repos/{repo_id}/diffs to list diffs        │
-│     ├─ For each diff (ordered by step_index):                               │
+│     ├─ For each diff (ordered by chain position):                           │
 │     │   ├─ Download via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid> │
 │     │   ├─ Stream-decompress gzipped patch                                  │
 │     │   └─ git apply (skip empty patches)                                   │
@@ -725,7 +727,7 @@ workflows.
 | `repo_id`                  | API / `POST /v1/*/pull`         | Identify the repo within the run          |
 | `repo_target_ref`          | API / `POST /v1/*/pull`         | Target branch name snapshot               |
 | `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Base ref snapshot for branch base     |
-| `diffs.summary.step_index` | diffs summary JSON              | Optional step index metadata for display  |
+| `diffs.summary.step_index` | diffs summary JSON              | Optional legacy step metadata for display |
 | `diffs.id`                 | API / `GET /v1/runs/.../diffs`   | UUID used as `diff_id` for download       |
 
 **API endpoints consumed:**
@@ -834,7 +836,7 @@ value is a `StageStatus` object describing that job's execution state.
 **Key semantics:**
 
 - Keys are job IDs (KSUID strings), **not** job names or step indices.
-- Use `step_index` within each `StageStatus` for ordering jobs in multi-step runs.
+- Use `next_id` within each `StageStatus` to follow successor links.
 - Typical entries: `pre-gate`, `mod-0`, `post-gate` jobs, plus dynamically inserted
   `heal-*` and `re-gate` jobs for healing flows.
 
@@ -848,14 +850,7 @@ value is a `StageStatus` object describing that job's execution state.
 | `current_job_id`| string (optional)   | Execution job ID (may differ in retry scenarios).   |
 | `artifacts`     | map[string]string   | Artifact logical names → bundle CIDs.               |
 | `last_error`    | string (optional)   | Error message from the most recent failed attempt. Includes explicit `exit code 137` OOM-kill hints for killed mod jobs. |
-| `step_index`    | number              | Float index from `jobs.step_index` for ordering (may be fractional). |
-
-**step_index values:**
-
-- Pre-gate: 1000
-- First mod: 2000
-- Post-gate: 3000
-- Healing jobs: midpoints (e.g., 1500, 1750)
+| `next_id`       | string (optional)   | Successor job ID from `jobs.next_id`; null for chain tail jobs. |
 
 #### Example response
 
@@ -874,15 +869,15 @@ value is a `StageStatus` object describing that job's execution state.
   "stages": {
     "2NQPoBfVkc8dFmGAQqJnUwMu9jS": {
       "state": "succeeded",
-      "step_index": 1000
+      "next_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jT"
     },
     "2NQPoBfVkc8dFmGAQqJnUwMu9jT": {
       "state": "running",
-      "step_index": 2000
+      "next_id": "2NQPoBfVkc8dFmGAQqJnUwMu9jU"
     },
     "2NQPoBfVkc8dFmGAQqJnUwMu9jU": {
       "state": "pending",
-      "step_index": 3000
+      "next_id": null
     }
   }
 }
@@ -892,42 +887,41 @@ value is a `StageStatus` object describing that job's execution state.
 
 - **Jobs** (`jobs` table)
   - Created by the control plane when a run is submitted via `POST /v1/runs`.
-	- Each job row has:
-	    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
-	    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
-	    - `step_index` — float for ordering (e.g., 1000, 2000, 3000).
-	  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
-	    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
-	    - `node_id` — which node claimed this job.
-	    - `mod_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`, `mr`).
-	    - `mod_image` — container image name for this job (persisted by the node for mod/heal/gate jobs).
-	    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
-  - Float `step_index` enables dynamic job insertion:
-    - Initial jobs: `pre-gate` (1000), `mod-0` (2000), `post-gate` (3000).
-    - Healing jobs inserted at midpoints: `heal-1` (1500), `re-gate` (1750).
-    - `GetAdjacentJobIndices` query computes midpoints for insertion.
+		- Each job row has:
+		    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
+		    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
+	    - `next_id` — successor job ID for chain progression (`null` for tail jobs).
+		  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
+		    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
+		    - `node_id` — which node claimed this job.
+	    - `job_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`, `mr`).
+	    - `job_image` — container image name for this job (persisted by the node for mod/heal/gate jobs).
+		    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
+  - Dynamic insertion rewires explicit successor links:
+    - Initial chain: `pre-gate -> mod-0 -> post-gate`.
+    - Healing insertion updates `failed.next_id` to `heal`, then links healing tail to the former successor.
 
 	- **Server-driven scheduling**
-	  - Jobs are created with status `Created` (not yet claimable) or `Queued`
-	    (ready to claim). The first job (`pre-gate`) is created as `Queued`.
-	  - `ClaimJob` (`internal/store/queries/jobs.sql`) only returns `Queued`
-	    jobs. This ensures nodes cannot claim jobs until the server decides they
-	    are ready.
-	  - When a job completes successfully, `ScheduleNextJob` transitions the first
-	    `Created` job to `Queued`, allowing the next node claim.
-	  - This model enforces sequential execution: `pre-gate` → `mod-0` → `post-gate`.
-	  - Healing jobs follow the same pattern: heal jobs are created with status
-	    `Queued` to be claimed immediately after insertion.
+		  - Jobs are created with status `Created` (not yet claimable) or `Queued`
+		    (ready to claim). The first job (`pre-gate`) is created as `Queued`.
+		  - `ClaimJob` (`internal/store/queries/jobs.sql`) only returns `Queued`
+		    jobs. This ensures nodes cannot claim jobs until the server decides they
+		    are ready.
+		  - When a job completes successfully, the server promotes that job's
+		    `next_id` successor from `Created` to `Queued` (when present).
+		  - This model enforces sequential execution: `pre-gate` → `mod-0` → `post-gate`.
+		  - Healing jobs follow the same pattern: heal jobs are created with status
+		    `Queued` to be claimed immediately after insertion.
 
 - **Diffs**
   - Generated by the workflow runtime (`internal/workflow/step`) and
     uploaded by nodeagents using `/v1/runs/{run_id}/jobs/{job_id}/diff`.
   - Exposed via:
-    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (`internal/server/handlers/diffs.go`)
-      — returns a list of diffs with `job_id` and summary metadata, ordered by
-      the producing job's `step_index` (ascending), then `created_at` (ascending).
-    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — returns the gzipped unified diff.
-  - Diffs are ordered by job `step_index` for rehydration.
+	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (`internal/server/handlers/diffs.go`)
+	      — returns a list of diffs with `job_id` and summary metadata, ordered by
+	      producing job chain position, then `created_at` (ascending).
+	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — returns the gzipped unified diff.
+	  - Diffs are applied in chain order for rehydration.
 
 ### 2.3 Artifacts
 
@@ -966,7 +960,7 @@ value is a `StageStatus` object describing that job's execution state.
 - `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
   - Handler: `getRunLogsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
-    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,mod_type,step_index}` (see § 7.2).
+    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,job_type,step_index}` (see § 7.2).
     - `event:  run`, data: `RunSummary`.
     - `event: retention`, data: `RetentionHint`.
     - `event: done`, data: `Status {status:"done"}` sentinel.
@@ -993,7 +987,7 @@ Nodeagents use `/v1/nodes/*` to execute work:
 
 - `POST /v1/nodes/{id}/heartbeat` — report node liveness.
 - `POST /v1/nodes/{id}/claim` — claim the next queued job from the unified
-  jobs queue (FIFO by `step_index`; returns the claimed job plus run
+  jobs queue (returns the claimed job plus run
   metadata) and marks the repo as `Running` in `run_repos`.
   (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
@@ -1027,7 +1021,7 @@ For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
-   - Creates jobs (pre-gate, mod, post-gate) with float step_index.
+   - Creates jobs (pre-gate, mod, post-gate) as a `next_id`-linked chain.
    - Publishes an initial `RunSummary` over SSE.
 3. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
@@ -1046,11 +1040,12 @@ For a spec with `mods[]`:
 1. CLI preserves the `mods[]` array as-is (`buildSpecPayload` does not rewrite
    or reorder entries).
 2. `POST /v1/runs`:
-   - Creates jobs for pre-gate, each mod, and post-gates with float step_index.
-   - Each job row includes `mod_type` (pre_gate, mod, post_gate, heal, re_gate)
-     and `mod_image` (saved by the executing node before the container starts).
+   - Creates jobs for pre-gate, each mod, and post-gates as a linked chain.
+   - Each job row includes `job_type` (pre_gate, mod, post_gate, heal, re_gate)
+     and `job_image` (saved by the executing node before the container starts).
 3. Scheduler and nodeagents:
-   - ClaimJob returns jobs in step_index order for the unified queue, and the server promotes the next job for a repo attempt only after prior jobs succeed.
+   - ClaimJob returns queued jobs from the unified queue, and the server promotes
+     the claimed job's `next_id` successor only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.
 
 Workspace rehydration is implemented in `internal/nodeagent/execution_orchestrator.go`:
@@ -1058,14 +1053,14 @@ Workspace rehydration is implemented in `internal/nodeagent/execution_orchestrat
 - `rehydrateWorkspaceForStep`:
   - Copies the base clone (base_ref).
   - Applies diffs for prior jobs in order using `git apply`.
-  - Diffs are fetched via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`, ordered by job `step_index`.
+  - Diffs are fetched via `GET /v1/runs/{run_id}/repos/{repo_id}/diffs`, ordered by chain position.
 
 - `ensureBaselineCommitForRehydration`:
   - After applying prior diffs, creates a local commit that becomes the new
     `HEAD`.
   - Ensures that `git diff HEAD` after the job produces an **incremental**
     patch containing only changes from that job.
-  - Control plane stores per-job diffs under the job's `step_index`.
+  - Control plane stores per-job diffs under the job's `job_id`.
 
 This design guarantees that:
 
@@ -1205,22 +1200,21 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 |--------------|--------|------------------------------------------------------------------------|
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
-| `mod_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
-| `step_index` | number | Float index of the job within the pipeline (e.g., 1000, 2000; may be fractional) |
+| `job_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
+| `step_index` | number | Optional step metadata used for log enrichment                          |
 
 **Example SSE frame:**
 
 ```
 event: log
-data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","mod_type":"mod","step_index":2000}
+data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","step_index":2000}
 ```
 
 **Notes:**
 
 - Enriched fields may be empty for events not tied to a specific job (e.g.,
   hub-generated system events) or when context is unavailable.
-- `step_index` uses float values (1000, 2000, 3000) to allow dynamic insertion
-  of healing jobs at midpoints (e.g., 1500 for heal-1).
+- `step_index` in logs is optional metadata and does not drive scheduler ordering.
 - CLI consumers (`ploy run logs`) use the enriched fields
   to display contextual information in structured output format.
 
@@ -1254,7 +1248,7 @@ Code paths most relevant for Mods:
   - `internal/server/events/service.go`
   - `internal/stream/hub.go`, `internal/stream/http.go`
 - Database:
-  - `internal/store/schema.sql` — single source of truth for database schema (jobs table, float step_index)
+  - `internal/store/schema.sql` — single source of truth for database schema (`jobs.next_id` chain model)
   - `internal/store/queries/jobs.sql` — job queries including `ClaimJob` (claims `Queued` jobs) and `ScheduleNextJob` (transitions next `Created` job to `Queued`)
 - Nodeagent:
   - `internal/nodeagent/execution_orchestrator.go`
@@ -1283,8 +1277,8 @@ When changing Mods behaviour, prefer these anchors:
 - Node execution/rehydration:
   - Use `internal/nodeagent/execution_orchestrator.go` plus
     `internal/workflow/step/*`.
-  - Keep `step_index` relationships consistent across jobs and diffs.
+  - Keep `next_id` chain relationships consistent across jobs and diffs.
 - Job scheduling:
   - `ClaimJob` in `internal/store/queries/jobs.sql` only returns `Queued` jobs.
-  - `ScheduleNextJob` transitions the first `Created` job to `Queued` after completion.
-  - This server-driven model ensures jobs execute in `step_index` order.
+  - `ScheduleNextJob` transitions the next chain successor from `Created` to `Queued` after completion.
+  - This server-driven model ensures jobs execute in chain order.

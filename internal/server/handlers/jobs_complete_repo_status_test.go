@@ -45,7 +45,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusSuccess,
 				JobType:     "mod",
-				Meta: withStepIndexMeta([]byte(`{}`), 2000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 			},
 		},
 		// All repos terminal (1 Success), so run becomes Finished.
@@ -128,7 +128,7 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusFail,
 				JobType:     "mod",
-				Meta: withStepIndexMeta([]byte(`{}`), 2000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 			},
 		},
 		// All repos terminal.
@@ -187,7 +187,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		Name:        "mod-0",
 		Status:      store.JobStatusCreated,
 		JobType:     "mod",
-		Meta: withStepIndexMeta([]byte(`{}`), 2000),
+		Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 	}
 
 	st := &mockStore{
@@ -208,7 +208,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 				Name:        "pre-gate",
 				Status:      store.JobStatusSuccess,
 				JobType:     "pre_gate",
-				Meta: withStepIndexMeta([]byte(`{}`), 1000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 1000),
 			},
 			{
 				ID:          nextJobID,
@@ -219,7 +219,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusCreated,
 				JobType:     "mod",
-				Meta: withStepIndexMeta([]byte(`{}`), 2000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 			},
 		},
 	}
@@ -285,7 +285,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     "pre_gate",
-				Meta: withStepIndexMeta([]byte(`{}`), 1000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 1000),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -296,7 +296,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Name:        "heal-1-0",
 				Status:      store.JobStatusSuccess,
 				JobType:     "heal",
-				Meta: withStepIndexMeta([]byte(`{}`), 1500),
+				Meta:        withStepIndexMeta([]byte(`{}`), 1500),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -307,7 +307,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Name:        "re-gate-1",
 				Status:      store.JobStatusSuccess,
 				JobType:     "re_gate",
-				Meta: withStepIndexMeta([]byte(`{}`), 1750),
+				Meta:        withStepIndexMeta([]byte(`{}`), 1750),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -318,7 +318,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusSuccess,
 				JobType:     "mod",
-				Meta: withStepIndexMeta([]byte(`{}`), 2000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 			},
 			// Last job: post-gate succeeded.
 			{
@@ -330,7 +330,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				Name:        "post-gate",
 				Status:      store.JobStatusSuccess,
 				JobType:     "post_gate",
-				Meta: withStepIndexMeta([]byte(`{}`), 3000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 3000),
 			},
 		},
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
@@ -443,7 +443,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusSuccess,
 				JobType:     "mod",
-				Meta: withStepIndexMeta([]byte(`{}`), 2000),
+				Meta:        withStepIndexMeta([]byte(`{}`), 2000),
 			},
 		},
 		// But repo B is still Running, so run should NOT become Finished.

@@ -527,9 +527,8 @@ ModsRunSummary:
         (`jobs.id` from the database) and each value is a StageStatus object
         describing that job's execution state, artifacts, and ordering.
 
-        **Key semantics**: Keys are job IDs (KSUID strings), not job names or
-        step indices. Use `step_index` within each StageStatus for ordering
-        jobs in multi-step runs.
+        **Key semantics**: Keys are job IDs (KSUID strings), not job names.
+        Use `next_id` within each StageStatus to follow successor links.
 
         **Typical entries**: `pre-gate`, `mod-0`, `post-gate` jobs, plus any
         dynamically inserted `heal-*` and `re-gate` jobs for healing flows.
@@ -541,7 +540,7 @@ ModsRunSummary:
 # StageStatus — Job execution state within a RunSummary.stages map
 #
 # Each StageStatus corresponds to a row in the `jobs` table. The parent map
-# key is the job ID (KSUID string); use step_index for ordering jobs.
+# key is the job ID (KSUID string); use next_id links for ordering.
 StageStatus:
   type: object
   description: |
@@ -579,22 +578,18 @@ StageStatus:
       type: string
       nullable: true
       description: Human-readable error message from the most recent failed attempt.
-    step_index:
-      type: number
-      format: double
+    next_id:
+      type: string
+      nullable: true
       description: |
-        Float index from `jobs.step_index` (JSON number; may be fractional).
-        Used to order jobs in multi-step runs:
-        - Pre-gate: 1000
-        - First mod: 2000
-        - Post-gate: 3000
-        - Healing jobs: midpoints (e.g., 1500, 1750)
+        Successor job ID from `jobs.next_id` (KSUID string). `null` marks the
+        current tail in the chain.
   required: [state]
 
 # Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
 # The buildgate_jobs table and related HTTP endpoints have been removed;
-# all gate execution now uses the jobs table with mod_type='pre_gate'|'re_gate'|'post_gate'.
+# all gate execution now uses the jobs table with job_type='pre_gate'|'re_gate'|'post_gate'.
 
 # Response returned by POST /v1/nodes/{id}/claim
 # Schema aligned with claimJobHandler response — exposes job-centric fields.
@@ -618,10 +613,10 @@ NodeClaimResponse:
     job_name:
       type: string
       description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
-    mod_type:
+    job_type:
       type: string
       description: Job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`)
-    mod_image:
+    job_image:
       type: string
       description: Container image for this job (may be empty for non-container jobs)
     repo_url:
@@ -633,10 +628,10 @@ NodeClaimResponse:
     node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
     target_ref: { type: string }
-    step_index:
-      type: number
-      format: double
-      description: Float index used for job ordering; always present for claimed jobs
+    next_id:
+      type: string
+      nullable: true
+      description: Successor job ID from `jobs.next_id`; `null` for chain tail jobs
     started_at: { type: string, format: date-time }
     created_at: { type: string, format: date-time }
     spec:
@@ -658,7 +653,7 @@ NodeClaimResponse:
     - node_id
     - base_ref
     - target_ref
-    - step_index
+    - next_id
     - started_at
     - created_at
 
@@ -746,7 +741,7 @@ DiffItem:
     summary:
       type: object
       additionalProperties: true
-      description: "Diff summary metadata (exit_code, files_changed, mod_type, etc.)"
+      description: "Diff summary metadata (exit_code, files_changed, job_type, etc.)"
   required: [id, job_id, created_at, gzipped_size]
 
 # DiffListResponse is the response for listing diffs.
@@ -887,12 +882,12 @@ WorkflowGraphNode:
       description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
     type:
       type: string
-      description: Job phase type derived from jobs.mod_type
+      description: Job phase type derived from jobs.job_type
       enum: [pre_gate, mod, heal, re_gate, post_gate]
-    step_index:
-      type: number
-      format: double
-      description: Float index used for job ordering (matches jobs.step_index)
+    next_id:
+      type: string
+      nullable: true
+      description: Successor job ID derived from jobs.next_id
     status:
       type: string
       description: Job execution status (matches jobs.status)
@@ -903,13 +898,13 @@ WorkflowGraphNode:
       description: Retry attempt number (1 for current implementation)
     parent_ids:
       type: array
-      description: IDs of predecessor jobs derived from step_index ordering
+      description: IDs of predecessor jobs derived from next_id chain links
       items:
         type: string
         description: Job ID (KSUID string)
     child_ids:
       type: array
-      description: IDs of successor jobs derived from step_index ordering
+      description: IDs of successor jobs derived from next_id chain links
       items:
         type: string
         description: Job ID (KSUID string)
@@ -934,7 +929,7 @@ WorkflowGraphNode:
       format: int32
       nullable: true
       description: Exit code for the job, when available
-  required: [id, name, type, step_index, status, attempt]
+  required: [id, name, type, status, attempt]
 
 WorkflowGraph:
   type: object
@@ -1058,16 +1053,16 @@ RepoJobItem:
     name:
       type: string
       description: Job name (e.g., "mod-0", "pre-gate", "heal")
-    mod_type:
+    job_type:
       type: string
       description: Job phase type (pre_gate, mod, post_gate, heal, re_gate, mr)
-    mod_image:
+    job_image:
       type: string
       description: Container image used for this job (may be empty)
-    step_index:
-      type: number
-      format: float
-      description: Numeric step index for ordering (matches domaintypes.StepIndex)
+    next_id:
+      type: string
+      nullable: true
+      description: Successor job ID from `jobs.next_id`; null for chain tail jobs
     node_id:
       type: string
       nullable: true
@@ -1096,9 +1091,9 @@ RepoJobItem:
   required:
     - job_id
     - name
-    - mod_type
-    - mod_image
-    - step_index
+    - job_type
+    - job_image
+    - next_id
     - status
     - duration_ms
 
@@ -1122,7 +1117,7 @@ ListRepoJobsResponse:
       type: array
       items:
         $ref: '#/RepoJobItem'
-      description: Jobs for this repo execution, ordered by step_index
+      description: Jobs for this repo execution (chain order represented by next_id links)
   required:
     - run_id
     - repo_id

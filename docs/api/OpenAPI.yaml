@@ -122,7 +122,7 @@ paths:
   # Job-level completion endpoint (job-scoped, no node ID) — canonical endpoint for job completion
   /v1/jobs/{job_id}/complete:
     $ref: './paths/jobs_job_id_complete.yaml'
-  # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.mod_image)
+  # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.job_image)
   /v1/jobs/{job_id}/image:
     $ref: './paths/jobs_job_id_image.yaml'
   # Node events endpoint

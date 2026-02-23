@@ -40,7 +40,7 @@ type runJobCreator interface {
 //   - Returns RunSummary directly as JSON root (no envelope or wrapper types).
 //   - HTTP 200 on success; 404 if run not found.
 //   - run_id is a KSUID string (27 characters).
-//   - stages map is keyed by job ID (KSUID), not job name; use step_index for ordering.
+//   - stages map is keyed by job ID (KSUID), not job name; use next_id links for ordering.
 //
 // Run and job IDs are KSUID-backed strings; no UUID parsing is performed.
 func getRunStatusHandler(st store.Store) http.HandlerFunc {
@@ -169,22 +169,14 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
-			// step_index is stored in jobs.meta for now.
-			stepIndex := jobStepIndex(job)
-			if !stepIndex.Valid() {
-				httpErr(w, http.StatusInternalServerError, "invalid step_index for job %s", jobIDStr)
-				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", jobIDStr, "step_index", float64(stepIndex))
-				return
-			}
-
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
-			// update these counters without changing StepIndex semantics.
+			// update these counters without changing chain semantics.
 			summary.Stages[job.ID] = modsapi.StageStatus{
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
 				Artifacts:   artMap,
-				StepIndex:   stepIndex,
+				NextID:      job.NextID,
 			}
 		}
 

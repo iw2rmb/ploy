@@ -576,6 +576,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	runIDStr := runID.String()
 	jobID := domaintypes.NewJobID()
 	jobIDStr := jobID.String()
+	nextJobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
 	st := &mockStore{
@@ -589,7 +590,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		},
 		getModRepoResult: store.ModRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
-			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, Meta: withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(1000))},
+			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, NextID: &nextJobID, Meta: withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(1000))},
 		},
 	}
 
@@ -629,6 +630,9 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	}
 	if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != modsapi.StageStatePending {
 		t.Fatalf("expected stage to be pending, got %s", got)
+	}
+	if got := resp.Stages[domaintypes.JobID(jobIDStr)].NextID; got == nil || *got != nextJobID {
+		t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
 	}
 
 	if !st.getRunCalled || !st.listRunReposByRunCalled || !st.getModRepoCalled || !st.listJobsByRunCalled {

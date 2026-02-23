@@ -14,12 +14,13 @@ func TestJSONRoundTrip(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	stageKey := domaintypes.NewJobID()
 	jobID := domaintypes.NewJobID()
+	nextID := domaintypes.NewJobID()
 
 	in := RunSummary{
 		RunID: runID,
 		State: RunStateRunning,
 		Stages: map[domaintypes.JobID]StageStatus{
-			stageKey: {State: StageStateQueued, CurrentJobID: jobID},
+			stageKey: {State: StageStateQueued, CurrentJobID: jobID, NextID: &nextID},
 		},
 	}
 
@@ -33,6 +34,7 @@ func TestJSONRoundTrip(t *testing.T) {
 	for _, want := range []string{
 		"\"run_id\":\"" + runID.String() + "\"",
 		"\"current_job_id\":\"" + jobID.String() + "\"",
+		"\"next_id\":\"" + nextID.String() + "\"",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("expected json to contain %s; got %s", want, js)
@@ -48,5 +50,8 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 	if out.Stages[stageKey].CurrentJobID != in.Stages[stageKey].CurrentJobID {
 		t.Fatalf("job id roundtrip mismatch: %v vs %v", out.Stages[stageKey].CurrentJobID, in.Stages[stageKey].CurrentJobID)
+	}
+	if out.Stages[stageKey].NextID == nil || in.Stages[stageKey].NextID == nil || *out.Stages[stageKey].NextID != *in.Stages[stageKey].NextID {
+		t.Fatalf("next id roundtrip mismatch: %v vs %v", out.Stages[stageKey].NextID, in.Stages[stageKey].NextID)
 	}
 }

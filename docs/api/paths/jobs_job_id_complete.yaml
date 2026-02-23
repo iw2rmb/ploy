@@ -28,8 +28,8 @@ post:
     5. Checks if all jobs are terminal and, if so, derives run status gate-aware.
 
     This endpoint simplifies the node → server contract by addressing jobs directly
-    via the URL path. The request body no longer needs `run_id`, `step_index`, or
-    `job_id`; those are implied by the job resource itself.
+    via the URL path. The request body no longer needs embedded job/run identifiers;
+    those are implied by the job resource itself.
   requestBody:
     required: true
     content:

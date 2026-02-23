@@ -177,10 +177,10 @@ func buildAndSendJobClaimResponse(
 		Name      *string               `json:"name,omitempty"`
 		RepoID    domaintypes.ModRepoID `json:"repo_id"`
 		Attempt   int32                 `json:"attempt"`
-		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
-		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-		JobType   domaintypes.ModType   `json:"job_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
-		JobImage  string                `json:"job_image"`  // Container image for mod/heal jobs
+		JobID     domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
+		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
+		JobType   domaintypes.ModType   `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
+		JobImage  string                `json:"job_image"` // Container image for mod/heal jobs
 		NextID    *domaintypes.JobID    `json:"next_id"`
 		RepoURL   string                `json:"repo_url"`
 		Status    store.RunStatus       `json:"status"`

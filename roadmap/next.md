@@ -74,14 +74,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Event parsing/stream tests and CLI follow/status tests.
 
 ## Phase 4: API, CLI Output, and Docs
-- [ ] Update OpenAPI and handler contracts to the new field names and chain model.
+- [x] Update OpenAPI and handler contracts to the new field names and chain model.
   - Repository: `ploy`
   - Component: API spec and handler responses
   - Scope: Replace `mod_type`, `mod_image`, and `step_index` in schemas/examples with new job fields and `next_id`/predecessor-successor semantics. Remove all step-index ordering language.
   - Snippets: `docs/api/OpenAPI.yaml`, `docs/api/components/schemas/controlplane.yaml`, `docs/api/verify_openapi_test.go`
   - Tests: `go test ./docs/api/...` and handler response assertions.
 
-- [ ] Rewrite lifecycle/build-gate docs to chain-based execution semantics.
+- [x] Rewrite lifecycle/build-gate docs to chain-based execution semantics.
   - Repository: `ploy`
   - Component: Runtime docs
   - Scope: Replace diagrams/text that describe fractional insertion with `next_id` rewiring examples, including the requested case: failed pre-build job gets `next_id` updated to healing step, and healing points to former successor.
