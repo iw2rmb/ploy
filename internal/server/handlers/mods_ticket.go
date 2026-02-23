@@ -197,82 +197,98 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// createJobsFromSpec parses the run spec and creates jobs for the execution pipeline.
-// It uses the canonical contracts.ParseModsSpecJSON parser for structured validation.
-// Jobs are created with float step_index for ordered execution with dynamic insertion support.
-//
-// Default job layout:
-//   - pre-gate  (step_index=1000): Pre-mod validation/gate
-//   - mod-0     (step_index=2000): First mod execution
-//   - post-gate (step_index=3000): Post-mod validation
-//
-// For multi-step runs (mods[] array), creates one mod job per entry.
-// Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
+type plannedJob struct {
+	ID       domaintypes.JobID
+	Name     string
+	JobType  string
+	JobImage string
+	Status   store.JobStatus
+	StepName string
+	NextID   *domaintypes.JobID
+}
+
+// createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
+// Queue semantics are head-only: the first job is Queued, all successors are Created.
 func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, spec []byte) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse mods spec: %w", err)
 	}
 
+	type draft struct {
+		name     string
+		jobType  string
+		jobImage string
+		stepName string
+	}
+	drafts := []draft{{name: "pre-gate", jobType: "pre_gate"}}
+
 	if modsSpec.IsMultiStep() {
-		// v1 job queueing rules: first job is Queued, rest are Created.
-		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued, ""); err != nil {
-			return fmt.Errorf("create pre-gate job: %w", err)
-		}
-
 		for i, mod := range modsSpec.Steps {
-			modImage := ""
+			jobImage := ""
 			if mod.Image.Universal != "" {
-				modImage = strings.TrimSpace(mod.Image.Universal)
+				jobImage = strings.TrimSpace(mod.Image.Universal)
 			}
-			jobName := fmt.Sprintf("mod-%d", i)
-			stepIndex := domaintypes.StepIndex(2000 + i*1000)
-			// Pass the user-defined step name for CLI display in --follow mode.
-			stepName := mod.Name
-			if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, jobName, "mod", stepIndex, modImage, store.JobStatusCreated, stepName); err != nil {
-				return fmt.Errorf("create mod job %d: %w", i, err)
+			drafts = append(drafts, draft{
+				name:     fmt.Sprintf("mod-%d", i),
+				jobType:  "mod",
+				jobImage: jobImage,
+				stepName: mod.Name,
+			})
+		}
+	} else {
+		modImage := ""
+		stepName := ""
+		if len(modsSpec.Steps) > 0 {
+			if modsSpec.Steps[0].Image.Universal != "" {
+				modImage = strings.TrimSpace(modsSpec.Steps[0].Image.Universal)
 			}
+			stepName = modsSpec.Steps[0].Name
 		}
+		drafts = append(drafts, draft{
+			name:     "mod-0",
+			jobType:  "mod",
+			jobImage: modImage,
+			stepName: stepName,
+		})
+	}
+	drafts = append(drafts, draft{name: "post-gate", jobType: "post_gate"})
 
-		postGateIndex := domaintypes.StepIndex(2000 + len(modsSpec.Steps)*1000)
-		if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated, ""); err != nil {
-			return fmt.Errorf("create post-gate job: %w", err)
+	planned := make([]plannedJob, 0, len(drafts))
+	for i, d := range drafts {
+		status := store.JobStatusCreated
+		if i == 0 {
+			status = store.JobStatusQueued
 		}
-		return nil
+		planned = append(planned, plannedJob{
+			ID:       domaintypes.NewJobID(),
+			Name:     d.name,
+			JobType:  d.jobType,
+			JobImage: d.jobImage,
+			Status:   status,
+			StepName: d.stepName,
+		})
 	}
-
-	modImage := ""
-	stepName := ""
-	if len(modsSpec.Steps) > 0 {
-		if modsSpec.Steps[0].Image.Universal != "" {
-			modImage = strings.TrimSpace(modsSpec.Steps[0].Image.Universal)
+	for i := range planned {
+		if i+1 < len(planned) {
+			nextID := planned[i+1].ID
+			planned[i].NextID = &nextID
 		}
-		stepName = modsSpec.Steps[0].Name
 	}
-	return createSingleModJob(ctx, st, runID, repoID, repoBaseRef, attempt, modImage, stepName)
-}
 
-func createSingleModJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, modImage string, stepName string) error {
-	// v1 job queueing rules: first job is Queued, rest are Created.
-	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "pre-gate", "pre_gate", domaintypes.StepIndex(1000), "", store.JobStatusQueued, ""); err != nil {
-		return fmt.Errorf("create pre-gate job: %w", err)
-	}
-	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "mod-0", "mod", domaintypes.StepIndex(2000), modImage, store.JobStatusCreated, stepName); err != nil {
-		return fmt.Errorf("create mod job: %w", err)
-	}
-	if err := createJobWithIndex(ctx, st, runID, repoID, repoBaseRef, attempt, "post-gate", "post_gate", domaintypes.StepIndex(3000), "", store.JobStatusCreated, ""); err != nil {
-		return fmt.Errorf("create post-gate job: %w", err)
+	for i := range planned {
+		if err := createPlannedJob(ctx, st, runID, repoID, repoBaseRef, attempt, planned[i]); err != nil {
+			return fmt.Errorf("create job %q: %w", planned[i].Name, err)
+		}
 	}
 	return nil
 }
 
-func createJobWithIndex(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, name string, modType string, stepIndex domaintypes.StepIndex, modImage string, status store.JobStatus, modsStepName string) error {
-	jobID := domaintypes.NewJobID()
-
+func createPlannedJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
 	// Build job metadata with step name for mod jobs.
 	var meta *contracts.JobMeta
-	if modsStepName != "" {
-		meta = contracts.NewModJobMetaWithStepName(modsStepName)
+	if planned.StepName != "" {
+		meta = contracts.NewModJobMetaWithStepName(planned.StepName)
 	} else {
 		meta = contracts.NewModJobMeta()
 	}
@@ -280,19 +296,18 @@ func createJobWithIndex(ctx context.Context, st runJobCreator, runID domaintypes
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)
 	}
-	metaBytes = withStepIndexMeta(metaBytes, stepIndex)
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          jobID,
+		ID:          planned.ID,
 		RunID:       runID,
 		RepoID:      repoID,
 		RepoBaseRef: repoBaseRef,
 		Attempt:     attempt,
-		Name:        name,
-		Status:      status,
-		JobType:     modType,
-		JobImage:    modImage,
-		NextID:      nil,
+		Name:        planned.Name,
+		Status:      planned.Status,
+		JobType:     planned.JobType,
+		JobImage:    planned.JobImage,
+		NextID:      planned.NextID,
 		Meta:        metaBytes,
 	})
 	return err

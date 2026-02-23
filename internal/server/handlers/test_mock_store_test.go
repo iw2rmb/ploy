@@ -293,6 +293,17 @@ type mockStore struct {
 	scheduleNextJobResult store.Job
 	scheduleNextJobErr    error
 
+	// PromoteJobByIDIfUnblocked tracking
+	promoteJobByIDIfUnblockedCalled bool
+	promoteJobByIDIfUnblockedParam  types.JobID
+	promoteJobByIDIfUnblockedResult store.Job
+	promoteJobByIDIfUnblockedErr    error
+
+	// UpdateJobNextID tracking
+	updateJobNextIDCalled bool
+	updateJobNextIDParams []store.UpdateJobNextIDParams
+	updateJobNextIDErr    error
+
 	// ListDiffsByRunRepo tracking (v1 repo-scoped diffs listing)
 	listDiffsByRunRepoCalled bool
 	listDiffsByRunRepoParams store.ListDiffsByRunRepoParams
@@ -876,10 +887,14 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 		result.ID = types.NewJobID()
 	}
 	result.RunID = params.RunID
+	result.RepoID = params.RepoID
+	result.RepoBaseRef = params.RepoBaseRef
+	result.Attempt = params.Attempt
 	result.Name = params.Name
 	result.Status = params.Status
-	result.ModType = params.ModType
-	result.ModImage = params.ModImage
+	result.JobType = params.JobType
+	result.JobImage = params.JobImage
+	result.NextID = params.NextID
 	result.Meta = params.Meta
 	return result, m.createJobErr
 }
@@ -988,6 +1003,57 @@ func (m *mockStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJ
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.scheduleNextJobResult, nil
+}
+
+func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (store.Job, error) {
+	m.promoteJobByIDIfUnblockedCalled = true
+	m.promoteJobByIDIfUnblockedParam = id
+	if m.promoteJobByIDIfUnblockedErr != nil {
+		return store.Job{}, m.promoteJobByIDIfUnblockedErr
+	}
+	if !m.promoteJobByIDIfUnblockedResult.ID.IsZero() {
+		return m.promoteJobByIDIfUnblockedResult, nil
+	}
+	for i := range m.listJobsByRunRepoAttemptResult {
+		if m.listJobsByRunRepoAttemptResult[i].ID != id {
+			continue
+		}
+		if m.listJobsByRunRepoAttemptResult[i].Status != store.JobStatusCreated {
+			return store.Job{}, pgx.ErrNoRows
+		}
+		m.listJobsByRunRepoAttemptResult[i].Status = store.JobStatusQueued
+		return m.listJobsByRunRepoAttemptResult[i], nil
+	}
+	for i := range m.listJobsByRunResult {
+		if m.listJobsByRunResult[i].ID != id {
+			continue
+		}
+		if m.listJobsByRunResult[i].Status != store.JobStatusCreated {
+			return store.Job{}, pgx.ErrNoRows
+		}
+		m.listJobsByRunResult[i].Status = store.JobStatusQueued
+		return m.listJobsByRunResult[i], nil
+	}
+	return store.Job{}, pgx.ErrNoRows
+}
+
+func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {
+	m.updateJobNextIDCalled = true
+	m.updateJobNextIDParams = append(m.updateJobNextIDParams, params)
+	if m.updateJobNextIDErr != nil {
+		return m.updateJobNextIDErr
+	}
+	for i := range m.listJobsByRunRepoAttemptResult {
+		if m.listJobsByRunRepoAttemptResult[i].ID == params.ID {
+			m.listJobsByRunRepoAttemptResult[i].NextID = params.NextID
+		}
+	}
+	for i := range m.listJobsByRunResult {
+		if m.listJobsByRunResult[i].ID == params.ID {
+			m.listJobsByRunResult[i].NextID = params.NextID
+		}
+	}
+	return nil
 }
 
 // ListDiffsByRunRepo implements the v1 repo-scoped diffs listing query.

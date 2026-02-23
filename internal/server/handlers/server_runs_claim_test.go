@@ -36,8 +36,7 @@ func TestClaimJob_Success(t *testing.T) {
 			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
-			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   domaintypes.StepIndex(2000),
+			JobType:     domaintypes.ModTypeMod.String(),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -142,8 +141,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
-			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   domaintypes.StepIndex(2000),
+			JobType:     domaintypes.ModTypeMod.String(),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -203,8 +201,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 			NodeID:      &nodeID,
 			Name:        "mr-0",
 			Status:      store.JobStatusRunning,
-			ModType:     domaintypes.ModTypeMR.String(),
-			StepIndex:   domaintypes.StepIndex(2000),
+			JobType:     domaintypes.ModTypeMR.String(),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -324,8 +321,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
-			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   domaintypes.StepIndex(2000),
+			JobType:     domaintypes.ModTypeMod.String(),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{
@@ -415,8 +411,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 			NodeID:      &nodeID,
 			Name:        "mod-0",
 			Status:      store.JobStatusRunning,
-			ModType:     domaintypes.ModTypeMod.String(),
-			StepIndex:   domaintypes.StepIndex(2000),
+			JobType:     domaintypes.ModTypeMod.String(),
 			Meta:        []byte(`{}`),
 		},
 		getRunResult: store.Run{

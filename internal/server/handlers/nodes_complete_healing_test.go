@@ -46,8 +46,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
-				ModType:     domaintypes.ModTypePreGate.String(),
-				StepIndex:   1000,
+				JobType:     domaintypes.ModTypePreGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -58,16 +57,18 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Attempt:     1,
 				Name:        "mod-0",
 				Status:      store.JobStatusCreated,
-				ModType:     domaintypes.ModTypeMod.String(),
-				StepIndex:   2000,
+				JobType:     domaintypes.ModTypeMod.String(),
 				Meta:        []byte(`{}`),
 			},
 		},
 	}
+	successorID := st.listJobsByRunRepoAttemptResult[1].ID
+	st.listJobsByRunRepoAttemptResult[0].NextID = &successorID
 
 	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	failed := st.listJobsByRunRepoAttemptResult[0]
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, repoID, 1, domaintypes.StepIndex(1000)); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -87,11 +88,11 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if healJob.Status != store.JobStatusQueued {
 		t.Fatalf("expected heal-1-0 status=Queued, got %s", healJob.Status)
 	}
-	if healJob.ModImage != "mods-codex:latest" {
-		t.Fatalf("expected heal-1-0 image=mods-codex:latest, got %q", healJob.ModImage)
+	if healJob.JobImage != "mods-codex:latest" {
+		t.Fatalf("expected heal-1-0 image=mods-codex:latest, got %q", healJob.JobImage)
 	}
-	if healJob.StepIndex <= 1000 || healJob.StepIndex >= 2000 {
-		t.Fatalf("heal step_index=%f should be between 1000 and 2000", healJob.StepIndex)
+	if healJob.NextID == nil {
+		t.Fatalf("expected heal-1-0 next_id to be set")
 	}
 
 	reGateJob, ok := jobsByName["re-gate-1"]
@@ -101,8 +102,14 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if reGateJob.Status != store.JobStatusCreated {
 		t.Fatalf("expected re-gate-1 status=Created, got %s", reGateJob.Status)
 	}
-	if reGateJob.StepIndex <= healJob.StepIndex || reGateJob.StepIndex >= 2000 {
-		t.Fatalf("re-gate step_index=%f should be between heal (%f) and 2000", reGateJob.StepIndex, healJob.StepIndex)
+	if healJob.NextID == nil || *healJob.NextID != reGateJob.ID {
+		t.Fatalf("expected heal to point to re-gate")
+	}
+	if reGateJob.NextID == nil || *reGateJob.NextID != successorID {
+		t.Fatalf("expected re-gate to preserve original successor %s", successorID)
+	}
+	if len(st.updateJobNextIDParams) < 2 {
+		t.Fatalf("expected next_id rewiring updates, got %d", len(st.updateJobNextIDParams))
 	}
 }
 
@@ -132,7 +139,6 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 		t.Fatalf("marshal spec: %v", err)
 	}
 
-	reGateStepIndex := 1666.6666666666665
 	st := &mockStore{
 		getSpecResult: store.Spec{ID: specID, Spec: specBytes},
 		listJobsByRunRepoAttemptResult: []store.Job{
@@ -144,8 +150,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
-				ModType:     domaintypes.ModTypePreGate.String(),
-				StepIndex:   1000,
+				JobType:     domaintypes.ModTypePreGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -156,8 +161,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "heal-1-0",
 				Status:      store.JobStatusSuccess,
-				ModType:     domaintypes.ModTypeHeal.String(),
-				StepIndex:   1333.3333333333333,
+				JobType:     domaintypes.ModTypeHeal.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -168,8 +172,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
-				ModType:     domaintypes.ModTypeReGate.String(),
-				StepIndex:   domaintypes.StepIndex(reGateStepIndex),
+				JobType:     domaintypes.ModTypeReGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -180,16 +183,22 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "mod-0",
 				Status:      store.JobStatusCreated,
-				ModType:     domaintypes.ModTypeMod.String(),
-				StepIndex:   2000,
+				JobType:     domaintypes.ModTypeMod.String(),
 				Meta:        []byte(`{}`),
 			},
 		},
 	}
+	heal1ID := st.listJobsByRunRepoAttemptResult[1].ID
+	reGate1ID := st.listJobsByRunRepoAttemptResult[2].ID
+	mod0ID := st.listJobsByRunRepoAttemptResult[3].ID
+	st.listJobsByRunRepoAttemptResult[0].NextID = &heal1ID
+	st.listJobsByRunRepoAttemptResult[1].NextID = &reGate1ID
+	st.listJobsByRunRepoAttemptResult[2].NextID = &mod0ID
 
 	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	failed := st.listJobsByRunRepoAttemptResult[2]
 
-	if err := maybeCreateHealingJobs(ctx, st, run, runID, repoID, 1, domaintypes.StepIndex(reGateStepIndex)); err != nil {
+	if err := maybeCreateHealingJobs(ctx, st, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
@@ -199,14 +208,17 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	if st.createJobParams[0].Name != "heal-2-0" {
 		t.Fatalf("expected first healing job name heal-2-0, got %q", st.createJobParams[0].Name)
 	}
-	if st.createJobParams[0].ModType != domaintypes.ModTypeHeal.String() {
-		t.Fatalf("expected heal job ModType=heal, got %q", st.createJobParams[0].ModType)
+	if st.createJobParams[0].JobType != domaintypes.ModTypeHeal.String() {
+		t.Fatalf("expected heal job JobType=heal, got %q", st.createJobParams[0].JobType)
 	}
 	if st.createJobParams[1].Name != "re-gate-2" {
 		t.Fatalf("expected re-gate job name re-gate-2, got %q", st.createJobParams[1].Name)
 	}
-	if st.createJobParams[1].ModType != domaintypes.ModTypeReGate.String() {
-		t.Fatalf("expected re-gate job ModType=re_gate, got %q", st.createJobParams[1].ModType)
+	if st.createJobParams[1].JobType != domaintypes.ModTypeReGate.String() {
+		t.Fatalf("expected re-gate job JobType=re_gate, got %q", st.createJobParams[1].JobType)
+	}
+	if st.createJobParams[1].NextID == nil || *st.createJobParams[1].NextID != mod0ID {
+		t.Fatalf("expected re-gate-2 to link back to original successor %s", mod0ID)
 	}
 }
 

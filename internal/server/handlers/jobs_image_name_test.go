@@ -25,7 +25,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusRunning,
-		ModType: "mod",
+		JobType: "mod",
 	}
 
 	st := &mockStore{
@@ -54,8 +54,8 @@ func TestSaveJobImageName_Success(t *testing.T) {
 	if st.updateJobImageNameParams.ID != jobID {
 		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageNameParams.ID, jobID)
 	}
-	if st.updateJobImageNameParams.ModImage != "docker.io/example/mods:latest" {
-		t.Fatalf("UpdateJobImageName ModImage = %q, want %q", st.updateJobImageNameParams.ModImage, "docker.io/example/mods:latest")
+	if st.updateJobImageNameParams.JobImage != "docker.io/example/mods:latest" {
+		t.Fatalf("UpdateJobImageName ModImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/mods:latest")
 	}
 }
 
@@ -101,7 +101,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &otherNode,
 		Status:  store.JobStatusRunning,
-		ModType: "mod",
+		JobType: "mod",
 	}
 
 	st := &mockStore{
@@ -140,7 +140,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusQueued,
-		ModType: "mod",
+		JobType: "mod",
 	}
 
 	st := &mockStore{getJobResult: job}
@@ -176,7 +176,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusRunning,
-		ModType: "pre_gate",
+		JobType: "pre_gate",
 	}
 
 	st := &mockStore{getJobResult: job}
@@ -212,7 +212,7 @@ func TestSaveJobImageName_ConflictWrongModType(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusRunning,
-		ModType: "mr",
+		JobType: "mr",
 	}
 
 	st := &mockStore{getJobResult: job}

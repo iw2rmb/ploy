@@ -14,62 +14,41 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// maybeCreateHealingJobs creates a single healing job and a re-gate job when a gate job fails.
-// This is called when a gate job (pre_gate, post_gate, re_gate) completes with reason="build-gate".
-//
-// The function:
-// 1. Finds the failed gate job by step_index
-// 2. Verifies it's a gate job (pre_gate, post_gate, re_gate)
-// 3. Checks if healing is configured in the run spec (requires single-mod schema)
-// 4. Counts existing healing attempts to enforce retry limits
-// 5. Creates one healing job and one re-gate job at intermediate step_index values
-//
-// Note: Legacy multi-strategy forms (strategies[] or mods[] at top level) are
-// no longer supported. Callers must use the canonical single-mod schema for
-// healing configuration.
+// maybeCreateHealingJobs inserts a heal -> re-gate chain after a failed gate job by rewiring next_id links.
 func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
 	run store.Run,
-	runID domaintypes.RunID,
-	repoID domaintypes.ModRepoID,
-	attempt int32,
-	failedStepIndex domaintypes.StepIndex,
+	failedJob store.Job,
 ) error {
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: attempt,
+		RunID:   failedJob.RunID,
+		RepoID:  failedJob.RepoID,
+		Attempt: failedJob.Attempt,
 	})
 	if err != nil {
 		return fmt.Errorf("list jobs for repo attempt: %w", err)
 	}
 
-	// Find the failed gate job by step_index.
-	var failedJob *store.Job
-	for i := range jobs {
-		if jobStepIndex(jobs[i]) == failedStepIndex {
-			failedJob = &jobs[i]
-			break
-		}
-	}
-	if failedJob == nil {
-		slog.Debug("maybeCreateHealingJobs: no job found at step_index",
-			"run_id", runID,
-			"step_index", failedStepIndex,
-		)
-		return nil
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, job := range jobs {
+		jobsByID[job.ID] = job
 	}
 
-	// Only create healing for gate jobs.
-	modType := domaintypes.ModType(failedJob.JobType)
-	if err := modType.Validate(); err != nil {
-		return fmt.Errorf("invalid mod_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
+	// Refresh failed job from storage snapshot if present.
+	if refreshed, ok := jobsByID[failedJob.ID]; ok {
+		failedJob = refreshed
 	}
-	if modType != domaintypes.ModTypePreGate && modType != domaintypes.ModTypePostGate && modType != domaintypes.ModTypeReGate {
+
+	jobType := domaintypes.ModType(failedJob.JobType)
+	if err := jobType.Validate(); err != nil {
+		return fmt.Errorf("invalid job_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
+	}
+	if !isGateJobType(jobType) {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
-			"run_id", runID,
-			"mod_type", modType.String(),
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"job_type", jobType.String(),
 		)
 		return nil
 	}
@@ -83,259 +62,204 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("parse run spec: %w", err)
 	}
 
-	// Check if healing is configured.
 	healing := (*contracts.HealingSpec)(nil)
 	if spec.BuildGate != nil {
 		healing = spec.BuildGate.Healing
 	}
 	if healing == nil || healing.Image.IsEmpty() {
-		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining jobs",
-			"run_id", runID,
+		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
 		)
-		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, repoID, attempt, failedStepIndex); err != nil {
-			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs when no healing configured",
-				"run_id", runID,
-				"failed_step_index", failedStepIndex,
-				"err", err,
-			)
-		}
-		return nil
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	// Get retry limit (default to 1 if not specified).
 	retries := healing.Retries
 	if retries <= 0 {
 		retries = 1
 	}
 
-	// Determine the base gate index used to count healing attempts.
-	// Healing attempts are counted per build gate (pre/post) independently.
-	// For re-gate failures, associate the failure with the nearest preceding
-	// pre_gate/post_gate so that all healing jobs between that gate and the
-	// next non-gate/non-heal job share the same attempt counter.
-	baseGateIndex := failedStepIndex
-	if modType == domaintypes.ModTypeReGate {
-		var (
-			baseFound     bool
-			baseStepIndex float64
-		)
-		for _, job := range jobs {
-			mt := domaintypes.ModType(job.JobType)
-			if err := mt.Validate(); err != nil {
-				return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
-			}
-			if mt != domaintypes.ModTypePreGate && mt != domaintypes.ModTypePostGate {
-				continue
-			}
-			if float64(jobStepIndex(job)) > float64(failedStepIndex) {
-				continue
-			}
-			if !baseFound || float64(jobStepIndex(job)) > baseStepIndex {
-				baseFound = true
-				baseStepIndex = float64(jobStepIndex(job))
-			}
-		}
-		if baseFound {
-			baseGateIndex = domaintypes.StepIndex(baseStepIndex)
-		}
-	}
-
-	windowStart := float64(baseGateIndex)
-
-	// Find the earliest non-healing, non-gate job after the base gate.
-	// This bounds the healing window for this gate so that retries are
-	// counted independently for each build gate.
-	var (
-		windowEnd     float64
-		hasWindowEnd  bool
-		isGateJobType = func(t domaintypes.ModType) bool {
-			return t == domaintypes.ModTypePreGate || t == domaintypes.ModTypePostGate || t == domaintypes.ModTypeReGate
-		}
-	)
-	for _, job := range jobs {
-		if float64(jobStepIndex(job)) <= windowStart {
-			continue
-		}
-		jt := domaintypes.ModType(job.JobType)
-		if err := jt.Validate(); err != nil {
-			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
-		}
-		if jt == domaintypes.ModTypeHeal {
-			continue
-		}
-		if isGateJobType(jt) {
-			// Gate jobs (pre/post/re) live inside the healing window and
-			// must not terminate it.
-			continue
-		}
-		if !hasWindowEnd || float64(jobStepIndex(job)) < windowEnd {
-			hasWindowEnd = true
-			windowEnd = float64(jobStepIndex(job))
-		}
-	}
-
-	// Count existing healing attempts for this gate by counting "heal" jobs
-	// whose step_index lies within (baseGateIndex, windowEnd).
-	healingAttempts := 0
-	for _, job := range jobs {
-		jt := domaintypes.ModType(job.JobType)
-		if err := jt.Validate(); err != nil {
-			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
-		}
-		if jt != domaintypes.ModTypeHeal {
-			continue
-		}
-		if float64(jobStepIndex(job)) <= windowStart {
-			continue
-		}
-		if hasWindowEnd && float64(jobStepIndex(job)) >= windowEnd {
-			continue
-		}
-		healingAttempts++
-	}
-
-	// Check if retries exhausted. Each attempt creates a single heal job and a
-	// single re-gate job for this gate.
-	healingAttemptNumber := healingAttempts + 1 // 1-based attempt number
+	baseGateID := resolveBaseGateID(failedJob, jobsByID)
+	healingAttempts := countExistingHealingAttempts(baseGateID, jobsByID)
+	healingAttemptNumber := healingAttempts + 1
 	if healingAttemptNumber > retries {
 		slog.Info("maybeCreateHealingJobs: healing retries exhausted",
-			"run_id", runID,
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
 			"attempt", healingAttemptNumber,
 			"max_retries", retries,
 		)
-
-		// When healing retries are exhausted and the gate still fails, cancel
-		// all remaining non-terminal jobs for the run so the control plane
-		// can derive a terminal run state and avoid leaving mods/post-gate
-		// jobs stranded in created/pending state.
-		if err := cancelRemainingJobsAfterFailure(ctx, st, runID, repoID, attempt, failedStepIndex); err != nil {
-			slog.Error("maybeCreateHealingJobs: failed to cancel remaining jobs after exhausted healing",
-				"run_id", runID,
-				"failed_step_index", failedStepIndex,
-				"err", err,
-			)
-		}
-		return nil
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	// Find the next job after the failed gate to calculate insertion range.
-	nextStepIndex := float64(failedStepIndex) + 1000 // Default gap
-	for _, job := range jobs {
-		if float64(jobStepIndex(job)) > float64(failedStepIndex) {
-			if float64(jobStepIndex(job)) < nextStepIndex {
-				nextStepIndex = float64(jobStepIndex(job))
-			}
-		}
-	}
-
-	// Calculate step_index allocation for a single healing path:
-	//   - heal job sits midway between failed gate and next mainline job
-	//   - re-gate job sits three-quarters of the way to next mainline job
-	gapSize := nextStepIndex - float64(failedStepIndex)
-	if gapSize <= 0 {
-		gapSize = 1000
-	}
-
-	healStepIndex := float64(failedStepIndex) + gapSize*0.5
-	reGateStepIndex := float64(failedStepIndex) + gapSize*0.75
-
-	slog.Info("maybeCreateHealingJobs: creating linear healing jobs",
-		"run_id", runID,
-		"failed_step_index", failedStepIndex,
-		"next_step_index", nextStepIndex,
-		"heal_step_index", healStepIndex,
-		"re_gate_step_index", reGateStepIndex,
-		"attempt", healingAttemptNumber,
-	)
-
-	modImage := ""
+	healImage := ""
 	if healing.Image.Universal != "" {
-		modImage = strings.TrimSpace(healing.Image.Universal)
+		healImage = strings.TrimSpace(healing.Image.Universal)
 	}
 
-	// Create a single healing job for this attempt.
-	healJobName := fmt.Sprintf("heal-%d-0", healingAttemptNumber)
+	oldNext := failedJob.NextID
+	healID := domaintypes.NewJobID()
+	reGateID := domaintypes.NewJobID()
+
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       runID,
-		RepoID:      repoID,
+		ID:          healID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     attempt,
-		Name:        healJobName,
+		Attempt:     failedJob.Attempt,
+		Name:        fmt.Sprintf("heal-%d-0", healingAttemptNumber),
 		JobType:     domaintypes.ModTypeHeal.String(),
-		JobImage:    modImage,
+		JobImage:    healImage,
 		Status:      store.JobStatusQueued,
-		NextID:      nil,
-		Meta:        withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(healStepIndex)),
+		NextID:      &reGateID,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
-		return fmt.Errorf("create healing job %s: %w", healJobName, err)
+		return fmt.Errorf("create heal job: %w", err)
 	}
 
-	slog.Info("created healing job",
-		"run_id", runID,
-		"job_name", healJobName,
-		"step_index", healStepIndex,
-		"status", store.JobStatusQueued,
-		"image", modImage,
-	)
-
-	// Create a single re-gate job for this attempt.
-	reGateName := fmt.Sprintf("re-gate-%d", healingAttemptNumber)
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          domaintypes.NewJobID(),
-		RunID:       runID,
-		RepoID:      repoID,
+		ID:          reGateID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     attempt,
-		Name:        reGateName,
+		Attempt:     failedJob.Attempt,
+		Name:        fmt.Sprintf("re-gate-%d", healingAttemptNumber),
 		JobType:     domaintypes.ModTypeReGate.String(),
 		JobImage:    "",
 		Status:      store.JobStatusCreated,
-		NextID:      nil,
-		Meta:        withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(reGateStepIndex)),
+		NextID:      oldNext,
+		Meta:        []byte(`{}`),
 	})
 	if err != nil {
-		return fmt.Errorf("create re-gate job %s: %w", reGateName, err)
+		return fmt.Errorf("create re-gate job: %w", err)
 	}
 
-	slog.Info("created re-gate job",
-		"run_id", runID,
-		"job_name", reGateName,
-		"step_index", reGateStepIndex,
-	)
+	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &healID}); err != nil {
+		return fmt.Errorf("rewire failed job next_id: %w", err)
+	}
 
+	// Keep last inserted node's next pointer aligned with the captured old_next.
+	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: reGateID, NextID: oldNext}); err != nil {
+		return fmt.Errorf("rewire healing tail next_id: %w", err)
+	}
+
+	slog.Info("maybeCreateHealingJobs: rewired chain",
+		"run_id", failedJob.RunID,
+		"failed_job_id", failedJob.ID,
+		"heal_job_id", healID,
+		"re_gate_job_id", reGateID,
+		"old_next", oldNext,
+		"attempt", healingAttemptNumber,
+	)
 	return nil
 }
 
-// cancelRemainingJobsAfterFailure cancels all non-terminal jobs with
-// step_index greater than the failed job's step_index. This is used after the
-// system determines that no further progression is possible (e.g., healing
-// retries exhausted, gate failure with no healing configured, or non-gate job
-// failure) to avoid leaving jobs stranded in created/pending state.
+func isGateJobType(jobType domaintypes.ModType) bool {
+	return jobType == domaintypes.ModTypePreGate || jobType == domaintypes.ModTypePostGate || jobType == domaintypes.ModTypeReGate
+}
+
+func predecessorOf(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
+	for _, candidate := range jobsByID {
+		if candidate.NextID != nil && *candidate.NextID == jobID {
+			c := candidate
+			return &c
+		}
+	}
+	return nil
+}
+
+func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {
+	failedType := domaintypes.ModType(failedJob.JobType)
+	if failedType != domaintypes.ModTypeReGate {
+		return failedJob.ID
+	}
+
+	currentID := failedJob.ID
+	for range len(jobsByID) {
+		prev := predecessorOf(currentID, jobsByID)
+		if prev == nil {
+			break
+		}
+		prevType := domaintypes.ModType(prev.JobType)
+		if prevType == domaintypes.ModTypePreGate || prevType == domaintypes.ModTypePostGate {
+			return prev.ID
+		}
+		currentID = prev.ID
+	}
+	return failedJob.ID
+}
+
+func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
+	base, ok := jobsByID[baseGateID]
+	if !ok {
+		return 0
+	}
+
+	attempts := 0
+	seen := map[domaintypes.JobID]struct{}{}
+	nextID := base.NextID
+	for nextID != nil {
+		if _, dup := seen[*nextID]; dup {
+			break
+		}
+		seen[*nextID] = struct{}{}
+
+		job, ok := jobsByID[*nextID]
+		if !ok {
+			break
+		}
+		jobType := domaintypes.ModType(job.JobType)
+		if jobType == domaintypes.ModTypeHeal {
+			attempts++
+		}
+		if jobType != domaintypes.ModTypeHeal && jobType != domaintypes.ModTypeReGate {
+			break
+		}
+		nextID = job.NextID
+	}
+	return attempts
+}
+
+// cancelRemainingJobsAfterFailure cancels non-terminal jobs reachable from the failed job's successor chain.
 func cancelRemainingJobsAfterFailure(
 	ctx context.Context,
 	st store.Store,
-	runID domaintypes.RunID,
-	repoID domaintypes.ModRepoID,
-	attempt int32,
-	failedStepIndex domaintypes.StepIndex,
+	failedJob store.Job,
 ) error {
 	now := time.Now().UTC()
 
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
-		RunID:   runID,
-		RepoID:  repoID,
-		Attempt: attempt,
+		RunID:   failedJob.RunID,
+		RepoID:  failedJob.RepoID,
+		Attempt: failedJob.Attempt,
 	})
 	if err != nil {
 		return fmt.Errorf("list jobs for repo attempt: %w", err)
 	}
 
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
 	for _, job := range jobs {
-		if jobStepIndex(job) <= failedStepIndex {
-			continue
+		jobsByID[job.ID] = job
+	}
+
+	nextID := failedJob.NextID
+	if refreshed, ok := jobsByID[failedJob.ID]; ok {
+		nextID = refreshed.NextID
+	}
+
+	seen := map[domaintypes.JobID]struct{}{}
+	for nextID != nil {
+		if _, dup := seen[*nextID]; dup {
+			break
 		}
+		seen[*nextID] = struct{}{}
+
+		job, ok := jobsByID[*nextID]
+		if !ok {
+			break
+		}
+		nextID = job.NextID
 
 		switch job.Status {
 		case store.JobStatusSuccess, store.JobStatusFail, store.JobStatusCancelled:
@@ -351,11 +275,7 @@ func cancelRemainingJobsAfterFailure(
 			}
 		}
 
-		finishedAt := pgtype.Timestamptz{
-			Time:  now,
-			Valid: true,
-		}
-
+		finishedAt := pgtype.Timestamptz{Time: now, Valid: true}
 		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
 			ID:         job.ID,
 			Status:     store.JobStatusCancelled,
@@ -366,10 +286,10 @@ func cancelRemainingJobsAfterFailure(
 			return fmt.Errorf("cancel job %s: %w", job.ID, err)
 		}
 
-		slog.Info("canceled job after failure",
-			"run_id", runID,
-			"job_id", job.ID, // Job IDs are KSUID strings.
-			"step_index", jobStepIndex(job),
+		slog.Info("canceled linked job after failure",
+			"run_id", failedJob.RunID,
+			"failed_job_id", failedJob.ID,
+			"job_id", job.ID,
 		)
 	}
 

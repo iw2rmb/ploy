@@ -53,8 +53,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			Attempt: 1,
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(1000)},
-			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, StepIndex: domaintypes.StepIndex(2000)},
+			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, Meta: withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(1000))},
+			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, Meta: withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(2000))},
 		},
 		listArtifactBundlesMetaByRunResult: []store.ArtifactBundle{
 			{

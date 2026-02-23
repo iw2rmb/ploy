@@ -380,11 +380,11 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 
 	job := store.Job{
-		ID:        jobID,
-		RunID:     runID,
-		NodeID:    &ownerNodeID,
-		Status:    store.JobStatusRunning,
-		StepIndex: 1000,
+		ID:     jobID,
+		RunID:  runID,
+		NodeID: &ownerNodeID,
+		Status: store.JobStatusRunning,
+		Meta:   withStepIndexMeta([]byte(`{}`), 1000),
 	}
 
 	st := &mockStore{

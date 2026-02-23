@@ -125,7 +125,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			"job_id", job.ID, // Job IDs are KSUID strings.
 			"job_name", job.Name,
 			"run_id", run.ID, // Run IDs are KSUID strings.
-			"step_index", jobStepIndex(job),
+			"next_id", job.NextID,
 			"node_id", nodeID,
 		)
 	}
@@ -145,11 +145,6 @@ func buildAndSendJobClaimResponse(
 	modType := domaintypes.ModType(job.JobType)
 	if err := modType.Validate(); err != nil {
 		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
-	}
-
-	stepIndex := jobStepIndex(job)
-	if !stepIndex.Valid() {
-		return fmt.Errorf("invalid step_index for job_id=%s", job.ID)
 	}
 
 	// Merge job_id into spec for downstream execution.
@@ -184,9 +179,9 @@ func buildAndSendJobClaimResponse(
 		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`     // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-		ModType   domaintypes.ModType   `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
-		ModImage  string                `json:"mod_image"`  // Container image for mod/heal jobs
-		StepIndex domaintypes.StepIndex `json:"step_index"` // Job ordering index
+		JobType   domaintypes.ModType   `json:"job_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
+		JobImage  string                `json:"job_image"`  // Container image for mod/heal jobs
+		NextID    *domaintypes.JobID    `json:"next_id"`
 		RepoURL   string                `json:"repo_url"`
 		Status    store.RunStatus       `json:"status"`
 		NodeID    domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
@@ -202,9 +197,9 @@ func buildAndSendJobClaimResponse(
 		Attempt:   job.Attempt,
 		JobID:     job.ID,
 		JobName:   job.Name,
-		ModType:   modType,
-		ModImage:  job.JobImage,
-		StepIndex: stepIndex,
+		JobType:   modType,
+		JobImage:  job.JobImage,
+		NextID:    job.NextID,
 		RepoURL:   modRepo.RepoUrl,
 		Status:    run.Status,
 		NodeID:    nodeIDPtrOrZero(job.NodeID),
