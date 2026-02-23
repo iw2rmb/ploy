@@ -32,12 +32,13 @@ type ClaimManager struct {
 type ClaimResponse struct {
 	RunID     types.RunID      `json:"id"` // Run ID (KSUID identifying the parent run)
 	Name      *string          `json:"name,omitempty"`
-	RepoID    types.ModRepoID  `json:"repo_id"`    // Repo ID (NanoID identifying the repo execution)
-	JobID     types.JobID      `json:"job_id"`     // Claimed job ID
-	JobName   string           `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-	ModType   types.ModType    `json:"mod_type"`   // Job phase: pre_gate, mod, post_gate, heal, re_gate
-	ModImage  string           `json:"mod_image"`  // Container image for mod/heal jobs
-	StepIndex types.StepIndex  `json:"step_index"` // Job ordering index
+	RepoID    types.ModRepoID  `json:"repo_id"`   // Repo ID (NanoID identifying the repo execution)
+	JobID     types.JobID      `json:"job_id"`    // Claimed job ID
+	JobName   string           `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
+	JobType   types.ModType    `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
+	JobImage  string           `json:"job_image"` // Container image for mod/heal jobs
+	NextID    *types.JobID     `json:"next_id"`
+	StepIndex types.StepIndex  `json:"step_index"` // Optional metadata for diagnostics only
 	RepoURL   types.RepoURL    `json:"repo_url"`
 	Status    string           `json:"status"`
 	NodeID    types.NodeID     `json:"node_id"`

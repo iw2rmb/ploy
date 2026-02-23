@@ -32,7 +32,7 @@ func gzipData(t *testing.T, data string) []byte {
 }
 
 // TestStorage_LogEnrichmentWithJobMetadata verifies that log records are
-// enriched with execution context (node_id, job_id, mod_type, step_index)
+// enriched with execution context (node_id, job_id, job_type, step_index)
 // when job metadata is available. This ensures SSE clients receive correlated
 // log data for diagnostics.
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
@@ -113,8 +113,8 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
-	if rec.ModType != "mod" {
-		t.Errorf("mod_type: got %q, want %q", rec.ModType, "mod")
+	if rec.JobType != "mod" {
+		t.Errorf("job_type: got %q, want %q", rec.JobType, "mod")
 	}
 	if rec.StepIndex != 2000 {
 		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
@@ -184,8 +184,8 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
-	if rec.ModType != domaintypes.ModTypePreGate {
-		t.Errorf("mod_type: got %q, want %q", rec.ModType, domaintypes.ModTypePreGate)
+	if rec.JobType != domaintypes.ModTypePreGate {
+		t.Errorf("job_type: got %q, want %q", rec.JobType, domaintypes.ModTypePreGate)
 	}
 	if rec.StepIndex != 2000 {
 		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
@@ -259,8 +259,8 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	if !rec.JobID.IsZero() {
 		t.Errorf("job_id should be empty, got %q", rec.JobID)
 	}
-	if !rec.ModType.IsZero() {
-		t.Errorf("mod_type should be empty, got %q", rec.ModType)
+	if !rec.JobType.IsZero() {
+		t.Errorf("job_type should be empty, got %q", rec.JobType)
 	}
 	if !rec.StepIndex.IsZero() {
 		t.Errorf("step_index should be 0, got %v", rec.StepIndex)

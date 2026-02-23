@@ -90,8 +90,8 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
 		JobID:       jobID,
 		Name:        "mod-0",
-		ModType:     "mod",
-		ModImage:    "ubuntu:latest",
+		JobType:     "mod",
+		JobImage:    "ubuntu:latest",
 		StepIndex:   2000,
 		NodeID:      &nodeID,
 		Status:      store.JobStatusRunning,
@@ -149,7 +149,7 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
 		JobID:     jobID,
 		Name:      "pre-gate",
-		ModType:   "pre_gate",
+		JobType:   "pre_gate",
 		StepIndex: 1000,
 		Status:    store.JobStatusFail,
 	}}

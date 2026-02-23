@@ -30,9 +30,9 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - Steps: multi-step mods array for sequential execution.
 //
 // StepIndex field:
-//   - Identifies the job's step index for job-level execution tracking.
+//   - Optional metadata for diagnostics and stats payloads.
 //
-// ModType field:
+// JobType field:
 //   - Identifies the job type: "pre_gate", "mod", "post_gate", "heal", "re_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
@@ -46,10 +46,11 @@ type StartRunRequest struct {
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
-	StepIndex types.StepIndex `json:"step_index"`          // Job step index for execution tracking
-	ModType   types.ModType   `json:"mod_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
-	ModImage  string          `json:"mod_image,omitempty"` // Container image for this job (for heal job dispatch)
-	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	StepIndex types.StepIndex `json:"step_index,omitempty"` // Optional step metadata for diagnostics
+	JobType   types.ModType   `json:"job_type,omitempty"`   // Job type: pre_gate, mod, post_gate, heal, re_gate
+	JobImage  string          `json:"job_image,omitempty"`  // Container image for this job (for heal job dispatch)
+	NextID    *types.JobID    `json:"next_id,omitempty"`    // Linked successor in run chain
+	JobName   string          `json:"job_name,omitempty"`   // Job name for branch identification (e.g., "heal-branch-a-1-0")
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions
@@ -176,6 +177,12 @@ func validateStartRunRequest(req StartRunRequest) error {
 	}
 	if req.JobID.IsZero() {
 		return fmt.Errorf("job_id is required")
+	}
+	if req.JobType.IsZero() {
+		return fmt.Errorf("job_type is required")
+	}
+	if err := req.JobType.Validate(); err != nil {
+		return fmt.Errorf("job_type invalid: %w", err)
 	}
 	if strings.TrimSpace(req.RepoURL.String()) == "" {
 		return fmt.Errorf("repo_url is required")

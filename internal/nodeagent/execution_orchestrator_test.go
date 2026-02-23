@@ -281,15 +281,20 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	t.Log("Gate contract verified: Runner.Run was called (gate execution handled separately)")
 }
 
-func TestModStepIndexFromJobStepIndex_AllowsNonCanonicalIndices(t *testing.T) {
+func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		stepIndex types.StepIndex
+		name    string
+		jobName string
+		steps   int
+		want    int
+		wantErr bool
 	}{
-		{name: "canonical_2000", stepIndex: 2000},
-		{name: "non_canonical_2500", stepIndex: 2500},
+		{name: "step0", jobName: "mod-0", steps: 3, want: 0},
+		{name: "step2", jobName: "mod-2", steps: 3, want: 2},
+		{name: "single step non-indexed", jobName: "mod", steps: 1, want: 0},
+		{name: "invalid prefix", jobName: "pre-gate", steps: 2, wantErr: true},
 	}
 
 	for _, tc := range cases {
@@ -297,8 +302,18 @@ func TestModStepIndexFromJobStepIndex_AllowsNonCanonicalIndices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := modStepIndexFromJobStepIndex(tc.stepIndex); err != nil {
-				t.Fatalf("expected step_index %v to be accepted in chain-based model: %v", tc.stepIndex, err)
+			got, err := modStepIndexFromJobName(tc.jobName, tc.steps)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for job_name=%q", tc.jobName)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("modStepIndexFromJobName(%q,%d) returned error: %v", tc.jobName, tc.steps, err)
+			}
+			if got != tc.want {
+				t.Fatalf("modStepIndexFromJobName(%q,%d)=%d want %d", tc.jobName, tc.steps, got, tc.want)
 			}
 		})
 	}

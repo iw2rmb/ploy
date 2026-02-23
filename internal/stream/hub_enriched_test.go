@@ -31,7 +31,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Line:      "hello world",
 				NodeID:    "aB3xY9",
 				JobID:     jobID,
-				ModType:   "mod",
+				JobType:   "mod",
 				StepIndex: 2,
 			},
 			want: map[string]any{
@@ -40,7 +40,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"line":       "hello world",
 				"node_id":    "aB3xY9",
 				"job_id":     jobID.String(),
-				"mod_type":   "mod",
+				"job_type":   "mod",
 				"step_index": float64(2), // JSON numbers decode as float64
 			},
 		},
@@ -55,7 +55,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"timestamp": "2025-10-22T12:00:01Z",
 				"stream":    "stderr",
 				"line":      "minimal record",
-				// node_id, job_id, mod_type, step_index should be absent
+				// node_id, job_id, job_type, step_index should be absent
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"stream":    "stdout",
 				"line":      "partial context",
 				"node_id":   "Z9yX3b",
-				// job_id, mod_type, step_index (0) should be absent
+				// job_id, job_type, step_index (0) should be absent
 			},
 		},
 	}
@@ -109,7 +109,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 			}
 
 			// Verify omitted keys are truly absent.
-			omittedKeys := []string{"node_id", "job_id", "mod_type", "step_index"}
+			omittedKeys := []string{"node_id", "job_id", "job_type", "step_index"}
 			for _, k := range omittedKeys {
 				if _, inWant := tt.want[k]; !inWant {
 					if _, inGot := got[k]; inGot {
@@ -143,7 +143,7 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 		Line:      longLine,
 		NodeID:    nodeID,
 		JobID:     jobID,
-		ModType:   domaintypes.ModTypePreGate,
+		JobType:   domaintypes.ModTypePreGate,
 		StepIndex: 999,
 	}
 

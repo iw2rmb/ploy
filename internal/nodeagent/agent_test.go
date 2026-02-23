@@ -279,6 +279,7 @@ func TestAgentComponentIntegration(t *testing.T) {
 	startReq := map[string]string{
 		"run_id":   runID,
 		"job_id":   jobID,
+		"job_type": "mod",
 		"repo_url": "https://github.com/example/repo.git",
 		"base_ref": "main",
 	}

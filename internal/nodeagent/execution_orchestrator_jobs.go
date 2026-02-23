@@ -37,16 +37,16 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	typedOpts := req.TypedOptions
 	stepIdx := 0
 	if len(typedOpts.Steps) > 0 {
-		idx, err := modStepIndexFromJobStepIndex(req.StepIndex)
+		idx, err := modStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
 		if err != nil {
-			err = fmt.Errorf("derive mod step index from step_index: %w", err)
-			slog.Error("failed to derive mod step index", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex, "error", err)
+			err = fmt.Errorf("derive mod step index from job_name: %w", err)
+			slog.Error("failed to derive mod step index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
 		if idx < 0 || idx >= len(typedOpts.Steps) {
-			err := fmt.Errorf("derived mod step index out of range: step_index=%v derived=%d steps_len=%d", req.StepIndex, idx, len(typedOpts.Steps))
-			slog.Error("derived mod step index out of range", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex, "derived_index", idx, "steps_len", len(typedOpts.Steps))
+			err := fmt.Errorf("derived mod step index out of range: job_name=%q derived=%d steps_len=%d", req.JobName, idx, len(typedOpts.Steps))
+			slog.Error("derived mod step index out of range", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "derived_index", idx, "steps_len", len(typedOpts.Steps))
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
@@ -256,7 +256,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 	}
 	defer cleanup()
 
-	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, cfg.Manifest, req.StepIndex)
+	wsResult, err := r.rehydrateWorkspaceWithCleanup(ctx, req, cfg.Manifest)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -463,9 +463,8 @@ func (r *runController) rehydrateWorkspaceWithCleanup(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
-	stepIndex types.StepIndex,
 ) (workspaceRehydrationResult, error) {
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, stepIndex)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
 		return workspaceRehydrationResult{}, err
 	}

@@ -27,7 +27,6 @@ import (
 //   - ctx: Context for cancellation and deadlines.
 //   - req: StartRunRequest containing repo URL, base_ref, commit_sha, and job_name.
 //   - manifest: StepManifest for this step.
-//   - stepIndex: Job step index for execution tracking.
 //
 // Returns:
 //   - workspacePath: Path to the rehydrated workspace ready for execution.
@@ -36,7 +35,6 @@ func (r *runController) rehydrateWorkspaceForStep(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
-	stepIndex types.StepIndex,
 ) (string, error) {
 	runID := req.RunID.String()
 	repoID := req.RepoID
@@ -106,7 +104,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("create workspace dir: %w", err)
 	}
 
-	slog.Info("rehydrating workspace from base + diffs", "run_id", runID, "step_index", stepIndex)
+	slog.Info("rehydrating workspace from base + diffs", "run_id", runID, "job_id", req.JobID)
 
 	diffFetcher, err := NewDiffFetcher(r.cfg)
 	if err != nil {
@@ -116,18 +114,16 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
-	// C2: Uniform rehydration query for ALL steps.
-	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).
-	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
-	gzippedDiffs, err := diffFetcher.FetchDiffsForStepRepo(ctx, req.RunID, repoID, stepIndex-1)
+	// Fetch prior diffs for this repo execution. Current job diff is excluded.
+	gzippedDiffs, err := diffFetcher.FetchDiffsForJobRepo(ctx, req.RunID, repoID, req.JobID)
 	if err != nil {
 		if removeErr := os.RemoveAll(workspacePath); removeErr != nil {
 			slog.Warn("failed to clean up workspace after error", "path", workspacePath, "error", removeErr)
 		}
-		return "", fmt.Errorf("fetch diffs for step: %w", err)
+		return "", fmt.Errorf("fetch diffs for job: %w", err)
 	}
 
-	slog.Info("fetched diffs for rehydration", "run_id", runID, "step_index", stepIndex, "diff_count", len(gzippedDiffs))
+	slog.Info("fetched diffs for rehydration", "run_id", runID, "job_id", req.JobID, "diff_count", len(gzippedDiffs))
 
 	// Rehydrate workspace from base + diffs using the helper from execution.go.
 	if err := RehydrateWorkspaceFromBaseAndDiffs(ctx, baseClone, workspacePath, gzippedDiffs); err != nil {
@@ -137,20 +133,20 @@ func (r *runController) rehydrateWorkspaceForStep(
 		return "", fmt.Errorf("rehydrate from base and diffs: %w", err)
 	}
 
-	slog.Info("workspace rehydrated successfully", "run_id", runID, "step_index", stepIndex, "workspace", workspacePath)
+	slog.Info("workspace rehydrated successfully", "run_id", runID, "job_id", req.JobID, "workspace", workspacePath)
 
 	// Create baseline commit after rehydration to enable incremental diffs.
 	// C2: Now applies to ALL steps (including step 0) when diffs were applied.
 	// This commit establishes a new HEAD so that "git diff HEAD" generates
 	// only the changes from this step, not cumulative changes from prior steps.
 	if len(gzippedDiffs) > 0 {
-		if err := ensureBaselineCommitForRehydration(ctx, workspacePath, stepIndex); err != nil {
+		if err := ensureBaselineCommitForRehydration(ctx, workspacePath, req.StepIndex); err != nil {
 			if rmErr := os.RemoveAll(workspacePath); rmErr != nil {
 				slog.Warn("failed to remove workspace after baseline commit error", "path", workspacePath, "error", rmErr)
 			}
 			return "", fmt.Errorf("create baseline commit for rehydration: %w", err)
 		}
-		slog.Info("baseline commit created for incremental diff", "run_id", runID, "step_index", stepIndex)
+		slog.Info("baseline commit created for incremental diff", "run_id", runID, "job_id", req.JobID)
 	}
 
 	return workspacePath, nil

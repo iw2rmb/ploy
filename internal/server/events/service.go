@@ -175,7 +175,7 @@ func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID
 }
 
 // publishLogToHubWithBytes converts log data to logstream events and publishes them.
-// It enriches each LogRecord with execution context (node_id, job_id, mod_type,
+// It enriches each LogRecord with execution context (node_id, job_id, job_type,
 // step_index) by looking up the associated job metadata when available.
 func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
@@ -207,7 +207,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 				Line:      line,
 				NodeID:    jobCtx.NodeID,
 				JobID:     jobCtx.JobID,
-				ModType:   jobCtx.ModType,
+				JobType:   jobCtx.JobType,
 				StepIndex: jobCtx.StepIndex,
 			}
 			if err := s.hub.PublishLog(ctx, runID, rec); err != nil {
@@ -222,7 +222,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 				Line:      "[log decode error]",
 				NodeID:    jobCtx.NodeID,
 				JobID:     jobCtx.JobID,
-				ModType:   jobCtx.ModType,
+				JobType:   jobCtx.JobType,
 				StepIndex: jobCtx.StepIndex,
 			}
 			_ = s.hub.PublishLog(ctx, runID, rec)
@@ -236,7 +236,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 		Line:      string(data),
 		NodeID:    jobCtx.NodeID,
 		JobID:     jobCtx.JobID,
-		ModType:   jobCtx.ModType,
+		JobType:   jobCtx.JobType,
 		StepIndex: jobCtx.StepIndex,
 	}
 	return s.hub.PublishLog(ctx, runID, rec)
@@ -248,7 +248,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 type jobContext struct {
 	NodeID    domaintypes.NodeID
 	JobID     domaintypes.JobID
-	ModType   domaintypes.ModType
+	JobType   domaintypes.ModType
 	StepIndex domaintypes.StepIndex
 }
 
@@ -292,7 +292,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 	mt := domaintypes.ModType(domaintypes.Normalize(job.JobType))
 	if !mt.IsZero() {
 		if err := mt.Validate(); err != nil {
-			s.logger.Debug("invalid mod_type for log enrichment",
+			s.logger.Debug("invalid job_type for log enrichment",
 				"job_id", job.ID.String(),
 				"job_type", job.JobType,
 				"error", err,
@@ -321,7 +321,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 	return jobContext{
 		NodeID:    nid,
 		JobID:     jid,
-		ModType:   mt,
+		JobType:   mt,
 		StepIndex: si,
 	}
 }

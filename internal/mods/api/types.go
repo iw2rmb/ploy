@@ -100,8 +100,8 @@ type StageStatus struct {
 // provides ordering for execution; metadata does not duplicate step index or
 // total step count.
 type StageMetadata struct {
-	// ModType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
-	ModType domaintypes.ModType `json:"mod_type,omitempty"`
-	// ModImage is the container image for this job (optional, for diagnostics).
-	ModImage string `json:"mod_image,omitempty"`
+	// JobType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
+	JobType domaintypes.ModType `json:"job_type,omitempty"`
+	// JobImage is the container image for this job (optional, for diagnostics).
+	JobImage string `json:"job_image,omitempty"`
 }
