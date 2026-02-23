@@ -59,7 +59,7 @@ func NewPrinter(format Format, out io.Writer) *Printer {
 //
 // Structured format (when enriched fields are present):
 //
-//	2025-10-22T10:00:00Z stdout node=<node_id> mod=<mod_type> step=<step_index> job=<job_id> Step started
+//	2025-10-22T10:00:00Z stdout node=<node_id> job_type=<job_type> step=<step_index> job=<job_id> Step started
 //
 // Structured format (basic, no enriched fields):
 //
@@ -91,20 +91,20 @@ func (p *Printer) PrintLog(rec logstream.LogRecord) {
 		}
 
 		// Build context string from enriched fields (only include non-empty).
-		// Order: node, mod, step, job — most general to most specific.
+		// Order: node, job_type, step, job — most general to most specific.
 		// Use domain type's IsZero method to check for empty values.
 		var ctx strings.Builder
 		if !rec.NodeID.IsZero() {
 			ctx.WriteString("node=")
 			ctx.WriteString(rec.NodeID.String())
 		}
-		// ModType is now types.ModType; use IsZero() for consistent checking.
-		if !rec.ModType.IsZero() {
+		// JobType uses domaintypes.ModType under the hood; use IsZero() consistently.
+		if !rec.JobType.IsZero() {
 			if ctx.Len() > 0 {
 				ctx.WriteByte(' ')
 			}
-			ctx.WriteString("mod=")
-			ctx.WriteString(rec.ModType.String())
+			ctx.WriteString("job_type=")
+			ctx.WriteString(rec.JobType.String())
 		}
 		// StepIndex is now types.StepIndex (float64-backed); include if > 0.
 		// Use !IsZero() to check for non-zero values consistently.

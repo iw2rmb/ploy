@@ -17,9 +17,8 @@ import (
 // This is the symmetric counterpart to DiffUploader, enabling nodes to download
 // gzipped patches for workspace rehydration during multi-step Mods runs.
 //
-// C2: The fetcher lists all diffs (mod + healing) for a run; rehydration callers
-// then select non-healing diffs (mod_type!=DiffModTypeHealing) with step_index <= k to
-// build the incremental patch chain for step k+1.
+// The fetcher lists all diffs for a run/repo and lets callers apply deterministic
+// ordering rules for rehydration.
 type DiffFetcher struct {
 	*baseUploader
 }
@@ -74,8 +73,54 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, r
 	return result.Diffs, nil
 }
 
+// FetchDiffsForJobRepo fetches all prior gzipped patches for a specific repo within
+// a run, excluding the current job's own diff.
+func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunID, repoID types.ModRepoID, currentJobID types.JobID) ([][]byte, error) {
+	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("list run repo diffs: %w", err)
+	}
+
+	var relevantDiffs []diffListItem
+	for _, d := range diffs {
+		if !currentJobID.IsZero() && d.JobID == currentJobID {
+			continue
+		}
+
+		// Skip legacy healing-tagged diffs; discrete healing jobs are tagged as "mod".
+		if d.Summary.ModType() == DiffModTypeHealing.String() {
+			continue
+		}
+
+		relevantDiffs = append(relevantDiffs, d)
+	}
+
+	// Sort by (created_at, id) for deterministic patch application order without
+	// step_index dependence.
+	sort.SliceStable(relevantDiffs, func(i, j int) bool {
+		if !relevantDiffs[i].CreatedAt.Equal(relevantDiffs[j].CreatedAt) {
+			return relevantDiffs[i].CreatedAt.Before(relevantDiffs[j].CreatedAt)
+		}
+		return relevantDiffs[i].ID < relevantDiffs[j].ID
+	})
+
+	patches := make([][]byte, 0, len(relevantDiffs))
+	for _, d := range relevantDiffs {
+		patch, err := f.FetchRunRepoDiffPatch(ctx, runID, repoID, d.ID)
+		if err != nil {
+			return nil, fmt.Errorf("fetch patch for diff %s: %w", d.ID, err)
+		}
+		patches = append(patches, patch)
+	}
+
+	return patches, nil
+}
+
 // FetchDiffsForStepRepo fetches all gzipped patches for non-healing diffs up to (and including)
 // the specified step index for a specific repo within a run.
+//
+// Deprecated: kept for tests and legacy call-sites; new execution paths should use
+// FetchDiffsForJobRepo to avoid step-index orchestration dependence.
 func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.RunID, repoID types.ModRepoID, stepIndex types.StepIndex) ([][]byte, error) {
 	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)
 	if err != nil {
@@ -91,16 +136,12 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.Run
 		if si > stepIndex {
 			continue
 		}
-
-		// Skip healing diffs — discrete healing jobs use DiffModTypeMod instead.
 		if d.Summary.ModType() == DiffModTypeHealing.String() {
 			continue
 		}
-
 		relevantDiffs = append(relevantDiffs, d)
 	}
 
-	// Sort by (step_index, created_at, id) for deterministic patch application order.
 	sort.SliceStable(relevantDiffs, func(i, j int) bool {
 		siI, _ := relevantDiffs[i].Summary.StepIndex()
 		siJ, _ := relevantDiffs[j].Summary.StepIndex()
@@ -121,7 +162,6 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.Run
 		}
 		patches = append(patches, patch)
 	}
-
 	return patches, nil
 }
 

@@ -160,9 +160,10 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		BaseRef:      claim.BaseRef,
 		TargetRef:    claim.TargetRef,
 		CommitSHA:    derefCommitSHA(claim.CommitSha),
-		StepIndex:    claim.StepIndex, // Job step_index from server
-		ModType:      claim.ModType,
-		ModImage:     claim.ModImage,
+		StepIndex:    claim.StepIndex, // Optional step metadata from server.
+		JobType:      claim.JobType,
+		JobImage:     claim.JobImage,
+		NextID:       claim.NextID,
 		JobName:      claim.JobName, // Job name for branch identification
 		TypedOptions: typedOpts,     // Strongly-typed run options (canonical source of truth)
 		Env:          envFromSpec,

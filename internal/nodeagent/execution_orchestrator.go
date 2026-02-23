@@ -12,21 +12,16 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-const (
-	// Job layout constants (internal contract)
-	jobStepIndexModStart = 2000
-	jobStepIndexInterval = 1000
-)
-
-// executeRun orchestrates job execution based on job type (ModType).
+// executeRun orchestrates job execution based on job type.
 // Dispatches to specialized handlers: gate jobs, mod jobs, or healing jobs.
 //
 // Job types:
@@ -64,46 +59,79 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	slog.Info("starting job execution",
 		"run_id", req.RunID,
 		"job_id", req.JobID,
-		"mod_type", req.ModType,
+		"job_type", req.JobType,
 		"step_index", req.StepIndex,
 	)
 
-	// Dispatch based on job type (ModType).
-	switch req.ModType {
+	jobType := req.JobType
+	if jobType.IsZero() {
+		jobType = inferJobTypeFromJobName(req.JobName)
+		if !jobType.IsZero() {
+			slog.Warn("job_type missing; inferred from job_name", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "job_type", jobType)
+		}
+	}
+
+	// Dispatch based on job type from claim payload.
+	switch jobType {
 	case types.ModTypePreGate, types.ModTypePostGate, types.ModTypeReGate:
+		req.JobType = jobType
 		r.executeGateJob(ctx, req)
 	case types.ModTypeMod:
+		req.JobType = jobType
 		r.executeModJob(ctx, req)
 	case types.ModTypeHeal:
+		req.JobType = jobType
 		r.executeHealingJob(ctx, req)
 	case types.ModTypeMR:
+		req.JobType = jobType
 		r.executeMRJob(ctx, req)
 	default:
-		// Fallback for legacy jobs without ModType - execute as mod job.
-		slog.Warn("unknown mod_type, falling back to mod execution",
-			"run_id", req.RunID,
-			"mod_type", req.ModType,
-		)
-		r.executeModJob(ctx, req)
+		err := fmt.Errorf("invalid job_type %q", jobType)
+		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)
+		r.uploadFailureStatus(ctx, req, err, 0)
 	}
 }
 
-func modStepIndexFromJobStepIndex(stepIndex types.StepIndex) (int, error) {
-	f := stepIndex.Float64()
+func inferJobTypeFromJobName(jobName string) types.ModType {
+	name := strings.TrimSpace(jobName)
+	switch {
+	case strings.EqualFold(name, "pre-gate"):
+		return types.ModTypePreGate
+	case strings.EqualFold(name, "post-gate"):
+		return types.ModTypePostGate
+	case strings.HasPrefix(name, "re-gate-"):
+		return types.ModTypeReGate
+	case strings.HasPrefix(name, "heal-"):
+		return types.ModTypeHeal
+	case strings.HasPrefix(name, "mod-"):
+		return types.ModTypeMod
+	case strings.EqualFold(name, "mr"):
+		return types.ModTypeMR
+	default:
+		return ""
+	}
+}
 
-	// Validate: must be a finite integer >= jobStepIndexModStart and multiple of 1000.
-	if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) {
-		return 0, fmt.Errorf("step_index %v is not a valid integer", f)
+// modStepIndexFromJobName derives the mod step index from server-created job names.
+// Expected shape is "mod-N". For single-step runs without an indexed name, returns 0.
+func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
+	name := strings.TrimSpace(jobName)
+	if stepsLen <= 1 {
+		return 0, nil
 	}
 
-	idx := int64(f)
-	if idx < jobStepIndexModStart || idx%jobStepIndexInterval != 0 {
-		return 0, fmt.Errorf("step_index %v is not a valid mod step (must be >= %d and multiple of %d)",
-			f, jobStepIndexModStart, jobStepIndexInterval)
+	if !strings.HasPrefix(name, "mod-") {
+		return 0, fmt.Errorf("mod job_name must start with mod- for multi-step runs, got %q", name)
 	}
-
-	// Server job layout: mod-N = 2000 + N*1000, so N = (idx/1000) - 2
-	return int(idx/jobStepIndexInterval) - 2, nil
+	raw := strings.TrimPrefix(name, "mod-")
+	idx, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse mod index from job_name %q: %w", name, err)
+	}
+	if idx < 0 || idx >= stepsLen {
+		return 0, fmt.Errorf("mod index out of range for job_name %q: idx=%d steps_len=%d", name, idx, stepsLen)
+	}
+	return idx, nil
 }
 
 // uploadFailureStatus uploads a failure status for early errors.

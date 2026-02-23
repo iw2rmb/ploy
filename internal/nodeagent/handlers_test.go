@@ -30,6 +30,7 @@ func TestHandleRunStart(t *testing.T) {
 				JobID:   jobID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 				BaseRef: types.GitRef("main"),
+				JobType: types.ModTypeMod,
 			},
 			wantStatus:  http.StatusAccepted,
 			wantCalled:  true,
@@ -40,6 +41,7 @@ func TestHandleRunStart(t *testing.T) {
 			name: "missing run_id",
 			request: StartRunRequest{
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+				JobType: types.ModTypeMod,
 			},
 			wantStatus:  http.StatusBadRequest,
 			wantCalled:  false,
@@ -49,8 +51,9 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "missing repo_url",
 			request: StartRunRequest{
-				RunID: runID,
-				JobID: jobID,
+				RunID:   runID,
+				JobID:   jobID,
+				JobType: types.ModTypeMod,
 			},
 			wantStatus:  http.StatusBadRequest,
 			wantCalled:  false,
@@ -62,6 +65,7 @@ func TestHandleRunStart(t *testing.T) {
 			request: StartRunRequest{
 				RunID:   runID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+				JobType: types.ModTypeMod,
 			},
 			wantStatus:  http.StatusBadRequest,
 			wantCalled:  false,
@@ -74,6 +78,7 @@ func TestHandleRunStart(t *testing.T) {
 				RunID:   runID,
 				JobID:   jobID,
 				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+				JobType: types.ModTypeMod,
 			},
 			controllerErr: fmt.Errorf("execution failed"),
 			wantStatus:    http.StatusInternalServerError,

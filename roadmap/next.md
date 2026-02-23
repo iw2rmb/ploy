@@ -59,14 +59,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Claim ordering, cancellation, retries, and multi-repo fairness tests.
 
 ## Phase 3: Nodeagent and Workflow Contracts
-- [ ] Remove `StepIndex` dependence from execution and rehydration paths.
+- [x] Remove `StepIndex` dependence from execution and rehydration paths.
   - Repository: `ploy`
   - Component: Nodeagent orchestrator and diff fetch ordering
   - Scope: Stop deriving behavior from float indices; use claimed job identity and chain progression. Update rehydration ordering to use chain traversal / creation order contract as defined by server API.
   - Snippets: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/nodeagent/difffetcher.go`
   - Tests: Nodeagent orchestration tests and rehydration tests with inserted healing steps.
 
-- [ ] Rename runtime metadata fields from mod-prefixed to job-prefixed names.
+- [x] Rename runtime metadata fields from mod-prefixed to job-prefixed names.
   - Repository: `ploy`
   - Component: Contracts, SSE payloads, log record types
   - Scope: Replace `mod_type`/`mod_image` fields in job metadata, events, and log records with `job_type`/`job_image` (or `type`/`image` where schema requires). Remove old fields and converters.

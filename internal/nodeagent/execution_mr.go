@@ -213,7 +213,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		return
 	}
 
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace for MR job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

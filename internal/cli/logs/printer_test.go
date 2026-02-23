@@ -92,11 +92,11 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Stream:    "stdout",
 				Line:      "Step started",
 				NodeID:    "node-abc",
-				ModType:   "mod",
+				JobType:   "mod",
 				StepIndex: 2000,
 				JobID:     "job-123",
 			},
-			want: "2025-10-22T10:00:00Z stdout node=node-abc mod=mod step=2000 job=job-123 Step started\n",
+			want: "2025-10-22T10:00:00Z stdout node=node-abc job_type=mod step=2000 job=job-123 Step started\n",
 		},
 		{
 			name: "node_id only",
@@ -109,15 +109,15 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 			want: "2025-10-22T10:00:01Z stdout node=node-xyz partial context\n",
 		},
 		{
-			name: "mod_type and job_id only",
+			name: "job_type and job_id only",
 			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:02Z",
 				Stream:    "stderr",
 				Line:      "gate failure",
-				ModType:   "pre_gate",
+				JobType:   "pre_gate",
 				JobID:     "job-456",
 			},
-			want: "2025-10-22T10:00:02Z stderr mod=pre_gate job=job-456 gate failure\n",
+			want: "2025-10-22T10:00:02Z stderr job_type=pre_gate job=job-456 gate failure\n",
 		},
 		{
 			name: "step_index zero omitted",
@@ -180,7 +180,7 @@ func TestPrintLog_Raw(t *testing.T) {
 				Stream:    "stderr",
 				Line:      "warn",
 				NodeID:    "node-ignored",
-				ModType:   "hook",
+				JobType:   "hook",
 				StepIndex: 5,
 				JobID:     "job-ignored",
 			},
@@ -346,12 +346,12 @@ func TestLogRecord_PrinterStructuredRendersEnrichedFields(t *testing.T) {
 		Stream:    "stdout",
 		Line:      "hello",
 		NodeID:    "node-abc",
-		ModType:   "pre_gate",
+		JobType:   "pre_gate",
 		StepIndex: 2000,
 		JobID:     "job-123",
 	})
 
-	want := "2025-10-22T10:00:00Z stdout node=node-abc mod=pre_gate step=2000 job=job-123 hello\n"
+	want := "2025-10-22T10:00:00Z stdout node=node-abc job_type=pre_gate step=2000 job=job-123 hello\n"
 	if got := buf.String(); got != want {
 		t.Errorf("PrintLog() =\n%q\nwant:\n%q", got, want)
 	}

@@ -66,7 +66,7 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			Line:      "Log line " + string(rune('0'+i)),
 			NodeID:    nodeID,
 			JobID:     jobID,
-			ModType:   "mod",
+			JobType:   "mod",
 			StepIndex: domaintypes.StepIndex(i),
 		}
 		// Should not block; slow subscriber should be dropped.

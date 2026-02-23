@@ -16,8 +16,8 @@ import (
 type RepoJobEntry struct {
 	JobID       domaintypes.JobID     `json:"job_id"`
 	Name        string                `json:"name"`
-	ModType     string                `json:"mod_type"`
-	ModImage    string                `json:"mod_image"`
+	JobType     string                `json:"job_type"`
+	JobImage    string                `json:"job_image"`
 	StepIndex   domaintypes.StepIndex `json:"step_index"`
 	NodeID      *domaintypes.NodeID   `json:"node_id"`
 	Status      store.JobStatus       `json:"status"`

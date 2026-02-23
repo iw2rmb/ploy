@@ -36,16 +36,21 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
 	typedOpts := req.TypedOptions
 
-	// Thread Stack Gate expectation based on gate type (pre_gate vs post_gate/re_gate).
-	// Use req.StepIndex to derive the correct step's stack expectations.
-	stepIndex, _ := modStepIndexFromJobStepIndex(req.StepIndex)
-	if len(typedOpts.Steps) > stepIndex && stepIndex >= 0 {
-		step := typedOpts.Steps[stepIndex]
+	// Thread Stack Gate expectation based on gate type without step_index dependence.
+	if len(typedOpts.Steps) > 0 {
+		stepIdx := 0
+		switch req.JobType {
+		case types.ModTypePreGate:
+			stepIdx = 0
+		case types.ModTypePostGate, types.ModTypeReGate:
+			stepIdx = len(typedOpts.Steps) - 1
+		}
+		step := typedOpts.Steps[stepIdx]
 		if step.Stack != nil {
 			// Get mod-level images from BuildGate config for image resolution.
 			modImages := typedOpts.BuildGate.Images
 
-			switch req.ModType {
+			switch req.JobType {
 			case types.ModTypePreGate:
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, modImages)
@@ -70,10 +75,10 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	applyGateStackDetect(&manifest, req.ModType, typedOpts)
+	applyGateStackDetect(&manifest, req.JobType, typedOpts)
 
 	// Rehydrate workspace from base + diffs.
-	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
 	if err != nil {
 		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
@@ -118,7 +123,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		slog.Error("gate execution failed; cancelling repo attempt (no healing)",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
-			"mod_type", req.ModType,
+			"job_type", req.JobType,
 			"duration", duration,
 			"error", errMsg,
 		)
@@ -161,7 +166,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		slog.Info("gate job failed",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
-			"mod_type", req.ModType,
+			"job_type", req.JobType,
 			"duration", duration,
 		)
 		return
@@ -175,7 +180,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	slog.Info("gate job succeeded",
 		"run_id", req.RunID,
 		"job_id", req.JobID,
-		"mod_type", req.ModType,
+		"job_type", req.JobType,
 		"duration", duration,
 	)
 }

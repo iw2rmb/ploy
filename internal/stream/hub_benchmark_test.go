@@ -12,7 +12,7 @@ import (
 // Performance and Resilience Tests for Enriched Logs
 // =============================================================================
 // These tests validate that enriched log payloads (with node_id, job_id,
-// mod_type, step_index) do not regress performance or resilience for
+// job_type, step_index) do not regress performance or resilience for
 // long-running or chatty Mods runs.
 // Stress test: validate performance and resilience with enriched logs.
 
@@ -31,7 +31,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 		Line:      "Build step completed: compiling module org.example.service",
 		NodeID:    "aB3xY9",
 		JobID:     domaintypes.NewJobID(),
-		ModType:   "mod",
+		JobType:   "mod",
 		StepIndex: 2000,
 	}
 
@@ -80,7 +80,7 @@ func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 		Line:      "Concurrent build output from parallel job execution",
 		NodeID:    nodeID,
 		JobID:     jobID,
-		ModType:   "hook",
+		JobType:   "hook",
 		StepIndex: 100,
 	}
 
@@ -164,7 +164,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			Line:      "Compiling module " + string(rune('A'+i%26)),
 			NodeID:    nodeID,
 			JobID:     jobID,
-			ModType:   "mod",
+			JobType:   "mod",
 			StepIndex: domaintypes.StepIndex(i),
 		}
 		if err := hub.PublishLog(ctx, runID, record); err != nil {

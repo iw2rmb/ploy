@@ -307,7 +307,7 @@ func (e *Engine) render() {
 			if job.NodeID != nil && !job.NodeID.IsZero() {
 				nodeID = job.NodeID.String()
 			}
-			image := strings.TrimSpace(job.ModImage)
+			image := strings.TrimSpace(job.JobImage)
 			if image == "" {
 				image = "-"
 			}
@@ -317,7 +317,7 @@ func (e *Engine) render() {
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 				glyph,
-				job.ModType,
+				job.JobType,
 				job.JobID.String(),
 				nodeID,
 				image,
