@@ -7,9 +7,9 @@ SELECT
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   node_id,
   exit_code,
   started_at,
@@ -28,9 +28,9 @@ SELECT
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   node_id,
   exit_code,
   started_at,
@@ -39,7 +39,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1
-ORDER BY repo_id ASC, attempt ASC, step_index ASC, id ASC;
+ORDER BY repo_id ASC, attempt ASC, id ASC;
 
 -- name: ListJobsByRunRepoAttempt :many
 SELECT
@@ -50,9 +50,9 @@ SELECT
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   node_id,
   exit_code,
   started_at,
@@ -61,7 +61,7 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
-ORDER BY step_index ASC, id ASC;
+ORDER BY id ASC;
 
 -- name: CreateJob :one
 -- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -73,9 +73,9 @@ INSERT INTO jobs (
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   meta
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
@@ -88,9 +88,9 @@ RETURNING
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   node_id,
   exit_code,
   started_at,
@@ -133,7 +133,7 @@ WHERE id = $1;
 -- v1:
 -- - claimable jobs have status='Queued'
 -- - normal jobs are claimable only when runs.status='Started'
--- - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+-- - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
 -- - nodeID must be non-empty
 WITH eligible AS (
   SELECT j.id, n.id AS node_id
@@ -145,10 +145,10 @@ WITH eligible AS (
     AND j.status = 'Queued'
     AND j.node_id IS NULL
     AND (
-      (j.mod_type = 'mr' AND r.status = 'Finished') OR
-      (j.mod_type != 'mr' AND r.status = 'Started')
+      (j.job_type = 'mr' AND r.status = 'Finished') OR
+      (j.job_type != 'mr' AND r.status = 'Started')
     )
-  ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.step_index ASC, j.id ASC
+  ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.id ASC
   FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
 )
@@ -159,17 +159,10 @@ WHERE jobs.id = eligible.id
 RETURNING jobs.*;
 
 -- name: GetAdjacentJobIndices :one
--- Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
+-- Transitional: returns current job id and linked successor id.
 SELECT
-  j1.step_index AS prev_index,
-  (
-    SELECT MIN(j2.step_index)
-    FROM jobs j2
-    WHERE j2.run_id = j1.run_id
-      AND j2.repo_id = j1.repo_id
-      AND j2.attempt = j1.attempt
-      AND j2.step_index > j1.step_index
-  ) AS next_index
+  j1.id AS prev_id,
+  j1.next_id AS next_id
 FROM jobs j1
 WHERE j1.id = $1;
 
@@ -182,9 +175,9 @@ SELECT
   attempt,
   name,
   status,
-  mod_type,
-  mod_image,
-  step_index,
+  job_type,
+  job_image,
+  next_id,
   node_id,
   exit_code,
   started_at,
@@ -193,13 +186,11 @@ SELECT
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
-ORDER BY step_index ASC, id ASC;
+ORDER BY id ASC;
 
 -- name: ScheduleNextJob :one
--- Atomically promote the next job in a repo attempt: Created -> Queued.
--- Uses FOR UPDATE SKIP LOCKED to prevent scheduler races:
--- - Concurrent schedulers selecting the same row will skip it if locked
--- - The status predicate ensures we only update rows still in 'Created' state
+-- Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
+-- A created job is unblocked when all predecessor jobs that point to it are Success.
 WITH next_job AS (
   SELECT j.id
   FROM jobs j
@@ -207,7 +198,16 @@ WITH next_job AS (
     AND j.repo_id = $2
     AND j.attempt = $3
     AND j.status = 'Created'
-  ORDER BY j.step_index ASC, j.id ASC
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jobs p
+      WHERE p.run_id = j.run_id
+        AND p.repo_id = j.repo_id
+        AND p.attempt = j.attempt
+        AND p.next_id = j.id
+        AND p.status != 'Success'
+    )
+  ORDER BY j.id ASC
   FOR UPDATE SKIP LOCKED
   LIMIT 1
 )
@@ -224,9 +224,9 @@ RETURNING
   jobs.attempt,
   jobs.name,
   jobs.status,
-  jobs.mod_type,
-  jobs.mod_image,
-  jobs.step_index,
+  jobs.job_type,
+  jobs.job_image,
+  jobs.next_id,
   jobs.node_id,
   jobs.exit_code,
   jobs.started_at,
@@ -256,10 +256,10 @@ SET meta = $2
 WHERE id = $1;
 
 -- name: UpdateJobImageName :exec
--- Persist the container image name used to execute a mod/heal job.
+-- Persist the container image name used to execute a job.
 -- This is set by the node immediately before job execution starts.
 UPDATE jobs
-SET mod_image = $2
+SET job_image = $2
 WHERE id = $1;
 
 -- name: UpdateJobCompletionWithMeta :exec
@@ -274,11 +274,11 @@ WHERE id = $1;
 -- name: CountJobsByRunRepoAttemptGroupByStatus :many
 -- Counts jobs by status for a specific repo attempt, excluding MR jobs.
 -- Used by repo-scoped terminal detection to determine run_repos.status.
--- MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+-- MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 SELECT status, COUNT(*)::int AS count
 FROM jobs
 WHERE run_id = $1
   AND repo_id = $2
   AND attempt = $3
-  AND mod_type != 'mr'
+  AND job_type != 'mr'
 GROUP BY status;

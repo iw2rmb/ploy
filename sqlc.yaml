@@ -90,6 +90,8 @@ sql:
               import: "github.com/iw2rmb/ploy/internal/domain/types"
               type: "NodeID"
               pointer: true
-          # StepIndex (ordering invariant) → types.StepIndex
-          - column: "jobs.step_index"
-            go_type: "github.com/iw2rmb/ploy/internal/domain/types.StepIndex"
+          - column: "jobs.next_id"
+            go_type:
+              import: "github.com/iw2rmb/ploy/internal/domain/types"
+              type: "JobID"
+              pointer: true

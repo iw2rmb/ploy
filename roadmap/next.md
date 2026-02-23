@@ -22,14 +22,14 @@ Legend: [ ] todo, [x] done.
   - Tests: RED expected until schema, claim, and completion flows are migrated.
 
 ## Phase 1: Store Schema and Query Layer
-- [ ] Replace `jobs.step_index` with `jobs.next_id` in schema and generated queries.
+- [x] Replace `jobs.step_index` with `jobs.next_id` in schema and generated queries.
   - Repository: `ploy`
   - Component: `internal/store/schema.sql`, query SQL, sqlc outputs
   - Scope: Drop `step_index` and related ordering/index constraints; add nullable `next_id` with `FOREIGN KEY (next_id) REFERENCES jobs(id)`, plus indexes for chain traversal and promotion.
   - Snippets: `internal/store/schema.sql`, `internal/store/queries/jobs.sql`, `internal/store/jobs.sql.go`
   - Tests: Store query tests for create/claim/promote behavior and FK validity.
 
-- [ ] Rename persisted job fields from `mod_type`/`mod_image` to `job_type`/`job_image` (DB) and `Type`/`Image` (Go).
+- [x] Rename persisted job fields from `mod_type`/`mod_image` to `job_type`/`job_image` (DB) and `Type`/`Image` (Go).
   - Repository: `ploy`
   - Component: Store models/sqlc, domain structs
   - Scope: Rename columns and generated params/rows; replace all callsites using `ModType` and `ModImage` in store APIs; remove old fields.

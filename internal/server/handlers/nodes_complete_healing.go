@@ -48,7 +48,7 @@ func maybeCreateHealingJobs(
 	// Find the failed gate job by step_index.
 	var failedJob *store.Job
 	for i := range jobs {
-		if jobs[i].StepIndex == failedStepIndex {
+		if jobStepIndex(jobs[i]) == failedStepIndex {
 			failedJob = &jobs[i]
 			break
 		}
@@ -62,9 +62,9 @@ func maybeCreateHealingJobs(
 	}
 
 	// Only create healing for gate jobs.
-	modType := domaintypes.ModType(failedJob.ModType)
+	modType := domaintypes.ModType(failedJob.JobType)
 	if err := modType.Validate(); err != nil {
-		return fmt.Errorf("invalid mod_type %q for failed job_id=%s: %w", failedJob.ModType, failedJob.ID, err)
+		return fmt.Errorf("invalid mod_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
 	}
 	if modType != domaintypes.ModTypePreGate && modType != domaintypes.ModTypePostGate && modType != domaintypes.ModTypeReGate {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
@@ -120,19 +120,19 @@ func maybeCreateHealingJobs(
 			baseStepIndex float64
 		)
 		for _, job := range jobs {
-			mt := domaintypes.ModType(job.ModType)
+			mt := domaintypes.ModType(job.JobType)
 			if err := mt.Validate(); err != nil {
-				return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+				return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 			}
 			if mt != domaintypes.ModTypePreGate && mt != domaintypes.ModTypePostGate {
 				continue
 			}
-			if float64(job.StepIndex) > float64(failedStepIndex) {
+			if float64(jobStepIndex(job)) > float64(failedStepIndex) {
 				continue
 			}
-			if !baseFound || float64(job.StepIndex) > baseStepIndex {
+			if !baseFound || float64(jobStepIndex(job)) > baseStepIndex {
 				baseFound = true
-				baseStepIndex = float64(job.StepIndex)
+				baseStepIndex = float64(jobStepIndex(job))
 			}
 		}
 		if baseFound {
@@ -153,12 +153,12 @@ func maybeCreateHealingJobs(
 		}
 	)
 	for _, job := range jobs {
-		if float64(job.StepIndex) <= windowStart {
+		if float64(jobStepIndex(job)) <= windowStart {
 			continue
 		}
-		jt := domaintypes.ModType(job.ModType)
+		jt := domaintypes.ModType(job.JobType)
 		if err := jt.Validate(); err != nil {
-			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 		}
 		if jt == domaintypes.ModTypeHeal {
 			continue
@@ -168,9 +168,9 @@ func maybeCreateHealingJobs(
 			// must not terminate it.
 			continue
 		}
-		if !hasWindowEnd || float64(job.StepIndex) < windowEnd {
+		if !hasWindowEnd || float64(jobStepIndex(job)) < windowEnd {
 			hasWindowEnd = true
-			windowEnd = float64(job.StepIndex)
+			windowEnd = float64(jobStepIndex(job))
 		}
 	}
 
@@ -178,17 +178,17 @@ func maybeCreateHealingJobs(
 	// whose step_index lies within (baseGateIndex, windowEnd).
 	healingAttempts := 0
 	for _, job := range jobs {
-		jt := domaintypes.ModType(job.ModType)
+		jt := domaintypes.ModType(job.JobType)
 		if err := jt.Validate(); err != nil {
-			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+			return fmt.Errorf("invalid mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 		}
 		if jt != domaintypes.ModTypeHeal {
 			continue
 		}
-		if float64(job.StepIndex) <= windowStart {
+		if float64(jobStepIndex(job)) <= windowStart {
 			continue
 		}
-		if hasWindowEnd && float64(job.StepIndex) >= windowEnd {
+		if hasWindowEnd && float64(jobStepIndex(job)) >= windowEnd {
 			continue
 		}
 		healingAttempts++
@@ -221,9 +221,9 @@ func maybeCreateHealingJobs(
 	// Find the next job after the failed gate to calculate insertion range.
 	nextStepIndex := float64(failedStepIndex) + 1000 // Default gap
 	for _, job := range jobs {
-		if float64(job.StepIndex) > float64(failedStepIndex) {
-			if float64(job.StepIndex) < nextStepIndex {
-				nextStepIndex = float64(job.StepIndex)
+		if float64(jobStepIndex(job)) > float64(failedStepIndex) {
+			if float64(jobStepIndex(job)) < nextStepIndex {
+				nextStepIndex = float64(jobStepIndex(job))
 			}
 		}
 	}
@@ -262,11 +262,11 @@ func maybeCreateHealingJobs(
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     attempt,
 		Name:        healJobName,
-		ModType:     domaintypes.ModTypeHeal.String(),
-		ModImage:    modImage,
+		JobType:     domaintypes.ModTypeHeal.String(),
+		JobImage:    modImage,
 		Status:      store.JobStatusQueued,
-		StepIndex:   domaintypes.StepIndex(healStepIndex),
-		Meta:        []byte(`{}`),
+		NextID:      nil,
+		Meta:        withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(healStepIndex)),
 	})
 	if err != nil {
 		return fmt.Errorf("create healing job %s: %w", healJobName, err)
@@ -289,11 +289,11 @@ func maybeCreateHealingJobs(
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     attempt,
 		Name:        reGateName,
-		ModType:     domaintypes.ModTypeReGate.String(),
-		ModImage:    "",
+		JobType:     domaintypes.ModTypeReGate.String(),
+		JobImage:    "",
 		Status:      store.JobStatusCreated,
-		StepIndex:   domaintypes.StepIndex(reGateStepIndex),
-		Meta:        []byte(`{}`),
+		NextID:      nil,
+		Meta:        withStepIndexMeta([]byte(`{}`), domaintypes.StepIndex(reGateStepIndex)),
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job %s: %w", reGateName, err)
@@ -333,7 +333,7 @@ func cancelRemainingJobsAfterFailure(
 	}
 
 	for _, job := range jobs {
-		if job.StepIndex <= failedStepIndex {
+		if jobStepIndex(job) <= failedStepIndex {
 			continue
 		}
 
@@ -369,7 +369,7 @@ func cancelRemainingJobsAfterFailure(
 		slog.Info("canceled job after failure",
 			"run_id", runID,
 			"job_id", job.ID, // Job IDs are KSUID strings.
-			"step_index", job.StepIndex,
+			"step_index", jobStepIndex(job),
 		)
 	}
 

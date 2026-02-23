@@ -169,12 +169,11 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
-			// Use job's step_index directly without lossy int cast.
-			// Validate that step_index is finite (reject NaN/Inf).
-			stepIndex := job.StepIndex
+			// step_index is stored in jobs.meta for now.
+			stepIndex := jobStepIndex(job)
 			if !stepIndex.Valid() {
 				httpErr(w, http.StatusInternalServerError, "invalid step_index for job %s", jobIDStr)
-				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", jobIDStr, "step_index", float64(job.StepIndex))
+				slog.Error("get run status: invalid step_index", "run_id", run.ID, "job_id", jobIDStr, "step_index", float64(stepIndex))
 				return
 			}
 
@@ -281,6 +280,7 @@ func createJobWithIndex(ctx context.Context, st runJobCreator, runID domaintypes
 	if err != nil {
 		return fmt.Errorf("marshal job meta: %w", err)
 	}
+	metaBytes = withStepIndexMeta(metaBytes, stepIndex)
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          jobID,
@@ -290,9 +290,9 @@ func createJobWithIndex(ctx context.Context, st runJobCreator, runID domaintypes
 		Attempt:     attempt,
 		Name:        name,
 		Status:      status,
-		ModType:     modType,
-		ModImage:    modImage,
-		StepIndex:   stepIndex,
+		JobType:     modType,
+		JobImage:    modImage,
+		NextID:      nil,
 		Meta:        metaBytes,
 	})
 	return err

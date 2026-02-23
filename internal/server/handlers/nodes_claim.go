@@ -33,10 +33,9 @@ import (
 // - base_ref: from jobs.repo_base_ref (snapshot at job creation)
 // - target_ref: from run_repos.repo_target_ref (snapshot at run_repos creation)
 //
-// Jobs are claimed from a single unified queue (FIFO by step_index). There is no
+// Jobs are claimed from a single unified queue. There is no
 // separate Build Gate queue or claim path — all job types (pre-gate, mod, heal,
 // re-gate, post-gate) are consumed from the same queue.
-// Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +89,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		// v1 repo status transition: Queued → Running on first claim for repo attempt.
 		// This is idempotent (already Running repos stay Running).
 		// MR jobs must not affect run_repos.status.
-		isMRJob := job.ModType == domaintypes.ModTypeMR.String()
+		isMRJob := job.JobType == domaintypes.ModTypeMR.String()
 		if !isMRJob && rr.Status == store.RunRepoStatusQueued {
 			// The UpdateRunRepoStatus query sets started_at on first transition to Running.
 			if err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
@@ -126,7 +125,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			"job_id", job.ID, // Job IDs are KSUID strings.
 			"job_name", job.Name,
 			"run_id", run.ID, // Run IDs are KSUID strings.
-			"step_index", job.StepIndex,
+			"step_index", jobStepIndex(job),
 			"node_id", nodeID,
 		)
 	}
@@ -143,12 +142,12 @@ func buildAndSendJobClaimResponse(
 	modRepo store.ModRepo,
 	job store.Job,
 ) error {
-	modType := domaintypes.ModType(job.ModType)
+	modType := domaintypes.ModType(job.JobType)
 	if err := modType.Validate(); err != nil {
-		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.ModType, job.ID, err)
+		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
-	stepIndex := domaintypes.StepIndex(job.StepIndex)
+	stepIndex := jobStepIndex(job)
 	if !stepIndex.Valid() {
 		return fmt.Errorf("invalid step_index for job_id=%s", job.ID)
 	}
@@ -204,7 +203,7 @@ func buildAndSendJobClaimResponse(
 		JobID:     job.ID,
 		JobName:   job.Name,
 		ModType:   modType,
-		ModImage:  job.ModImage,
+		ModImage:  job.JobImage,
 		StepIndex: stepIndex,
 		RepoURL:   modRepo.RepoUrl,
 		Status:    run.Status,

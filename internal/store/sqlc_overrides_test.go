@@ -10,13 +10,13 @@ import (
 func assertType[T any](_ T) {}
 
 // TestSQLCOverridesCompile verifies that sqlc-generated code uses domain types
-// for ID columns and StepIndex. This is a compile-time verification test that
+// for ID columns and jobs.next_id. This is a compile-time verification test that
 // ensures the sqlc overrides in sqlc.yaml are correctly applied.
 //
 // The test exercises struct field types to confirm:
 // - Primary key IDs use domain newtypes (RunID, JobID, NodeID, ModID, SpecID, ModRepoID)
 // - Foreign key references use matching domain newtypes
-// - jobs.step_index uses types.StepIndex (not float64)
+// - jobs.next_id uses *types.JobID
 // - any derived run id columns (e.g. runs_timing.id) also use types.RunID
 //
 // If sqlc overrides are removed or misconfigured, this test will fail to compile.
@@ -40,12 +40,12 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	assertType[types.ModID](run.ModID)
 	assertType[types.SpecID](run.SpecID)
 
-	// Verify Job struct field types including StepIndex.
+	// Verify Job struct field types including NextID.
 	var job Job
 	assertType[types.JobID](job.ID)
 	assertType[types.RunID](job.RunID)
 	assertType[types.ModRepoID](job.RepoID)
-	assertType[types.StepIndex](job.StepIndex)
+	assertType[*types.JobID](job.NextID)
 	assertType[*types.NodeID](job.NodeID)
 
 	// Verify Node struct field types.
@@ -99,16 +99,6 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	// Verify BootstrapToken struct field types.
 	var token BootstrapToken
 	assertType[*types.NodeID](token.NodeID)
-
-	// Verify StepIndex validation works (runtime check).
-	si := types.StepIndex(1000)
-	if !si.Valid() {
-		t.Error("StepIndex(1000) should be valid")
-	}
-	si = types.StepIndex(1000.5)
-	if !si.Valid() {
-		t.Error("StepIndex(1000.5) should be valid (fractional)")
-	}
 
 	// Verify derived timing view row types preserve RunID typing.
 	var timing RunsTiming

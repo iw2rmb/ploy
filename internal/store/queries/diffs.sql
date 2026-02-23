@@ -5,17 +5,25 @@ WHERE id = $1;
 
 -- name: ListDiffsBeforeStep :many
 -- Returns all diffs for a run up to (and including) the specified step_index.
--- Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
--- Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
+-- step_index is read from summary metadata when present.
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-INNER JOIN jobs j ON d.job_id = j.id
 WHERE d.run_id = $1
-  AND j.step_index <= $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
+  AND (
+    CASE
+      WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+      ELSE 0
+    END
+  ) <= $2
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC;
 
 -- name: CreateDiff :one
 -- Creates a new diff entry associated with a job. Blob data is stored in object storage.
--- Ordering is determined by the job's step_index.
 INSERT INTO diffs (run_id, job_id, patch_size, summary)
 VALUES ($1, $2, $3, $4)
 RETURNING *;
@@ -32,11 +40,16 @@ WHERE created_at < $1;
 -- Returns diffs for a specific repo execution within a run.
 -- Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 -- This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
--- Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC;
 
 -- name: ListDiffsMetaByRun :many
 -- Returns diff metadata for a run.
@@ -49,4 +62,10 @@ ORDER BY created_at ASC, id ASC;
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC;
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC;

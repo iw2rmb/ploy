@@ -53,9 +53,9 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		jobStepIndex := make(map[string]domaintypes.StepIndex, len(jobs))
+		jobStepByID := make(map[string]domaintypes.StepIndex, len(jobs))
 		for _, job := range jobs {
-			jobStepIndex[job.ID.String()] = job.StepIndex
+			jobStepByID[job.ID.String()] = jobStepIndex(job)
 		}
 
 		// Fetch artifact bundle metadata only (exclude bundle bytes).
@@ -84,7 +84,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			if bundle.JobID == nil || bundle.JobID.IsZero() {
 				continue
 			}
-			stepIndex, ok := jobStepIndex[bundle.JobID.String()]
+			stepIndex, ok := jobStepByID[bundle.JobID.String()]
 			if !ok {
 				continue
 			}

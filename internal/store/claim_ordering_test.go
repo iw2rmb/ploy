@@ -56,10 +56,10 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-tie-" + insertIDs[i].String(),
-			ModType:     "",
-			ModImage:    "",
+			JobType:     "",
+			JobImage:    "",
 			Status:      JobStatusQueued,
-			StepIndex:   sameStepIndex,
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -248,10 +248,10 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 			RepoBaseRef: rr.RepoBaseRef,
 			Attempt:     rr.Attempt,
 			Name:        "job-scoped-" + jobID.String(),
-			ModType:     "",
-			ModImage:    "",
+			JobType:     "",
+			JobImage:    "",
 			Status:      JobStatusQueued,
-			StepIndex:   stepIndex,
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		}); err != nil {
 			t.Fatalf("CreateJob(run_id=%s repo_id=%s) failed: %v", runID, repoID, err)
