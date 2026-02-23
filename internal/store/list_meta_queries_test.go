@@ -115,9 +115,9 @@ func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 		{"ListLogsMetaByRunSince", listLogsMetaByRunSince, "ORDER BY chunk_no ASC, id ASC"},
 		{"ListLogsMetaByRunAndJobSince", listLogsMetaByRunAndJobSince, "ORDER BY chunk_no ASC, id ASC"},
 
-		// diffs.sql - created_at ASC, id ASC (or step_index+created_at+id for repo)
+		// diffs.sql - created_at ASC, id ASC with deterministic tie-breakers
 		{"ListDiffsMetaByRun", listDiffsMetaByRun, "ORDER BY created_at ASC, id ASC"},
-		{"ListDiffsMetaByRunRepo", listDiffsMetaByRunRepo, "ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC"},
+		{"ListDiffsMetaByRunRepo", listDiffsMetaByRunRepo, "d.created_at ASC, d.id ASC"},
 
 		// artifact_bundles.sql - created_at DESC, id DESC
 		{"ListArtifactBundlesMetaByRun", listArtifactBundlesMetaByRun, "ORDER BY created_at DESC, id DESC"},

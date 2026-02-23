@@ -8,7 +8,7 @@ import (
 // TestListQueriesDeterministicOrder ensures all list queries ordering by non-unique columns
 // have deterministic tie-breakers (id, created_at+id, etc.) to prevent nondeterministic
 // ordering on ties.
-// For step_index orderings, the tie-breaker must include a stable secondary key (id).
+// For chain/model-specific orderings, include stable tie-breakers.
 func TestListQueriesDeterministicOrder(t *testing.T) {
 	t.Parallel()
 
@@ -17,10 +17,10 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		sql       string
 		wantOrder string
 	}{
-		// jobs.sql - step_index and multi-column orderings need tie-breakers
-		{"ListJobsByRun", listJobsByRun, "ORDER BY repo_id ASC, attempt ASC, step_index ASC, id ASC"},
-		{"ListJobsByRunRepoAttempt", listJobsByRunRepoAttempt, "ORDER BY step_index ASC, id ASC"},
-		{"ListCreatedJobsByRunRepoAttempt", listCreatedJobsByRunRepoAttempt, "ORDER BY step_index ASC, id ASC"},
+		// jobs.sql - repo/attempt scopes keep deterministic id tie-breakers
+		{"ListJobsByRun", listJobsByRun, "ORDER BY repo_id ASC, attempt ASC, id ASC"},
+		{"ListJobsByRunRepoAttempt", listJobsByRunRepoAttempt, "ORDER BY id ASC"},
+		{"ListCreatedJobsByRunRepoAttempt", listCreatedJobsByRunRepoAttempt, "ORDER BY id ASC"},
 
 		// runs.sql - created_at needs id tie-breaker
 		{"ListRuns", listRuns, "ORDER BY created_at DESC, id DESC"},
@@ -39,9 +39,9 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY mr.repo_url ASC, mr.id ASC"},
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
-		// diffs.sql - step_index+created_at need id tie-breaker
-		{"ListDiffsBeforeStep", listDiffsBeforeStep, "ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC"},
-		{"ListDiffsByRunRepo", listDiffsByRunRepo, "ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC"},
+		// diffs.sql - step metadata + created_at need id tie-breaker
+		{"ListDiffsBeforeStep", listDiffsBeforeStep, "d.created_at ASC, d.id ASC"},
+		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
 
 		// artifact_bundles.sql - created_at needs id tie-breaker
 		{"ListArtifactBundlesByRun", listArtifactBundlesByRun, "ORDER BY created_at DESC, id DESC"},

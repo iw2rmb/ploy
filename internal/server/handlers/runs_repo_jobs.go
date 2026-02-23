@@ -99,9 +99,9 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			jr := RunRepoJobResponse{
 				JobID:      job.ID,
 				Name:       job.Name,
-				ModType:    job.ModType,
-				ModImage:   job.ModImage,
-				StepIndex:  job.StepIndex,
+				ModType:    job.JobType,
+				ModImage:   job.JobImage,
+				StepIndex:  jobStepIndex(job),
 				NodeID:     job.NodeID,
 				Status:     job.Status,
 				DurationMs: job.DurationMs,

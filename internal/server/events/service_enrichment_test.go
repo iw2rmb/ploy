@@ -53,12 +53,12 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
 			}
 			return store.Job{
-				ID:        jobID,
-				RunID:     runID,
-				Name:      "build-step",
-				ModType:   "mod",
-				StepIndex: 2000,
-				NodeID:    &nodeID,
+				ID:      jobID,
+				RunID:   runID,
+				Name:    "build-step",
+				JobType: "mod",
+				Meta:    []byte(`{"step_index":2000}`),
+				NodeID:  &nodeID,
 			}, nil
 		},
 	}
@@ -137,12 +137,12 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	mock := &mockStore{
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{
-				ID:        jobID,
-				RunID:     runID,
-				Name:      "pre-gate",
-				ModType:   "pre_gate",
-				StepIndex: 2000,
-				NodeID:    &nodeID,
+				ID:      jobID,
+				RunID:   runID,
+				Name:    "pre-gate",
+				JobType: "pre_gate",
+				Meta:    []byte(`{"step_index":2000}`),
+				NodeID:  &nodeID,
 			}, nil
 		},
 	}

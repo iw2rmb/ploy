@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -276,8 +277,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 
 	// Normalize and validate job metadata before enrichment.
 	//
-	// job.ID/job.NodeID are typed IDs; job.StepIndex must satisfy StepIndex.Valid();
-	// job.ModType must satisfy ModType.Validate().
+	// job.ID/job.NodeID are typed IDs; job.JobType must satisfy ModType.Validate().
 	//
 	// Invalid values are omitted from enrichment to keep the emitted SSE payload
 	// contract strict.
@@ -289,25 +289,33 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		nid = *job.NodeID
 	}
 
-	mt := domaintypes.ModType(domaintypes.Normalize(job.ModType))
+	mt := domaintypes.ModType(domaintypes.Normalize(job.JobType))
 	if !mt.IsZero() {
 		if err := mt.Validate(); err != nil {
 			s.logger.Debug("invalid mod_type for log enrichment",
 				"job_id", job.ID.String(),
-				"mod_type", job.ModType,
+				"job_type", job.JobType,
 				"error", err,
 			)
 			mt = ""
 		}
 	}
 
-	si := job.StepIndex
-	if !si.IsZero() && !si.Valid() {
-		s.logger.Debug("invalid step_index for log enrichment",
-			"job_id", job.ID.String(),
-			"step_index", float64(job.StepIndex),
-		)
-		si = 0
+	// step_index is no longer persisted on jobs; preserve log enrichment support
+	// by reading optional metadata when present.
+	var si domaintypes.StepIndex
+	var stepMeta struct {
+		StepIndex *float64 `json:"step_index,omitempty"`
+	}
+	if len(job.Meta) > 0 && json.Unmarshal(job.Meta, &stepMeta) == nil && stepMeta.StepIndex != nil {
+		si = domaintypes.StepIndex(*stepMeta.StepIndex)
+		if !si.Valid() {
+			s.logger.Debug("invalid step_index metadata for log enrichment",
+				"job_id", job.ID.String(),
+				"step_index", *stepMeta.StepIndex,
+			)
+			si = 0
+		}
 	}
 
 	return jobContext{

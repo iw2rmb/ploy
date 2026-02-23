@@ -47,7 +47,7 @@ func maybeUpdateRunRepoStatus(
 	for i := range jobs {
 		job := &jobs[i]
 
-		mt := domaintypes.ModType(job.ModType)
+		mt := domaintypes.ModType(job.JobType)
 		if mt.Validate() == nil && mt == domaintypes.ModTypeMR {
 			continue
 		}
@@ -60,11 +60,12 @@ func maybeUpdateRunRepoStatus(
 			return false, nil
 		}
 
-		if !job.StepIndex.Valid() {
-			return false, fmt.Errorf("invalid step_index for job_id=%s step_index=%v", job.ID, float64(job.StepIndex))
+		currentStep := jobStepIndex(*job)
+		if !currentStep.Valid() {
+			return false, fmt.Errorf("invalid step_index for job_id=%s step_index=%v", job.ID, float64(currentStep))
 		}
 
-		if lastJob == nil || job.StepIndex.Float64() > lastJob.StepIndex.Float64() {
+		if lastJob == nil || currentStep.Float64() > jobStepIndex(*lastJob).Float64() {
 			lastJob = job
 		}
 	}

@@ -15,7 +15,7 @@ import (
 
 // saveJobImageNameHandler persists the container image name that the node will use
 // to execute a job. This allows the control plane to surface the exact runtime
-// image (including stack-aware resolution) via jobs.mod_image.
+// image (including stack-aware resolution) via jobs.job_image.
 //
 // Endpoint: POST /v1/jobs/{job_id}/image
 //
@@ -82,17 +82,17 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		modType := domaintypes.ModType(job.ModType)
+		modType := domaintypes.ModType(job.JobType)
 		switch modType {
 		case domaintypes.ModTypeMod, domaintypes.ModTypeHeal,
 			domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
 			// allowed
 		default:
-			httpErr(w, http.StatusConflict, "job mod_type is %s, expected mod/heal/gate", job.ModType)
+			httpErr(w, http.StatusConflict, "job type is %s, expected mod/heal/gate", job.JobType)
 			return
 		}
 
-		if err := st.UpdateJobImageName(ctx, store.UpdateJobImageNameParams{ID: jobID, ModImage: image}); err != nil {
+		if err := st.UpdateJobImageName(ctx, store.UpdateJobImageNameParams{ID: jobID, JobImage: image}); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to save job image: %v", err)
 			slog.Error("save job image name: update failed", "job_id", jobID, "node_id", nodeIDHeader, "err", err)
 			return

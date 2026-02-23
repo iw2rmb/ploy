@@ -25,21 +25,21 @@ const (
 )
 
 func (e *JobStatus) Scan(src interface{}) error {
-	var s string
-	switch v := src.(type) {
+	var parsed JobStatus
+	switch s := src.(type) {
 	case []byte:
-		s = string(v)
+		parsed = JobStatus(s)
 	case string:
-		s = v
+		parsed = JobStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
 	}
-	switch JobStatus(s) {
+	switch parsed {
 	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusCancelled:
-		*e = JobStatus(s)
+		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown JobStatus: %q", s)
+		return fmt.Errorf("unknown JobStatus value: %q", parsed)
 	}
 }
 
@@ -77,21 +77,21 @@ const (
 )
 
 func (e *RunRepoStatus) Scan(src interface{}) error {
-	var s string
-	switch v := src.(type) {
+	var parsed RunRepoStatus
+	switch s := src.(type) {
 	case []byte:
-		s = string(v)
+		parsed = RunRepoStatus(s)
 	case string:
-		s = v
+		parsed = RunRepoStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
 	}
-	switch RunRepoStatus(s) {
+	switch parsed {
 	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled, RunRepoStatusFail, RunRepoStatusSuccess:
-		*e = RunRepoStatus(s)
+		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown RunRepoStatus: %q", s)
+		return fmt.Errorf("unknown RunRepoStatus value: %q", parsed)
 	}
 }
 
@@ -127,21 +127,21 @@ const (
 )
 
 func (e *RunStatus) Scan(src interface{}) error {
-	var s string
-	switch v := src.(type) {
+	var parsed RunStatus
+	switch s := src.(type) {
 	case []byte:
-		s = string(v)
+		parsed = RunStatus(s)
 	case string:
-		s = v
+		parsed = RunStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
 	}
-	switch RunStatus(s) {
+	switch parsed {
 	case RunStatusStarted, RunStatusCancelled, RunStatusFinished:
-		*e = RunStatus(s)
+		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown RunStatus: %q", s)
+		return fmt.Errorf("unknown RunStatus value: %q", parsed)
 	}
 }
 
@@ -245,9 +245,9 @@ type Job struct {
 	Attempt     int32              `json:"attempt"`
 	Name        string             `json:"name"`
 	Status      JobStatus          `json:"status"`
-	ModType     string             `json:"mod_type"`
-	ModImage    string             `json:"mod_image"`
-	StepIndex   types.StepIndex    `json:"step_index"`
+	JobType     string             `json:"job_type"`
+	JobImage    string             `json:"job_image"`
+	NextID      *types.JobID       `json:"next_id"`
 	NodeID      *types.NodeID      `json:"node_id"`
 	ExitCode    *int32             `json:"exit_code"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`

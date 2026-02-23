@@ -51,9 +51,9 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-1",
 			Status:      JobStatusQueued,
-			ModType:     "mod",
-			ModImage:    "test-image",
-			StepIndex:   types.StepIndex(1000),
+			JobType:     "mod",
+			JobImage:    "test-image",
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -105,9 +105,9 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-2",
 			Status:      JobStatusQueued,
-			ModType:     "mod",
-			ModImage:    "test-image",
-			StepIndex:   types.StepIndex(2000),
+			JobType:     "mod",
+			JobImage:    "test-image",
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -159,9 +159,9 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-running-started-at",
 			Status:      JobStatusQueued,
-			ModType:     "mod",
-			ModImage:    "test-image",
-			StepIndex:   types.StepIndex(2500),
+			JobType:     "mod",
+			JobImage:    "test-image",
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -206,9 +206,9 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-3",
 			Status:      JobStatusQueued,
-			ModType:     "mod",
-			ModImage:    "test-image",
-			StepIndex:   types.StepIndex(3000),
+			JobType:     "mod",
+			JobImage:    "test-image",
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {

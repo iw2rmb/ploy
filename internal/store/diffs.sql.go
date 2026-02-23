@@ -26,7 +26,6 @@ type CreateDiffParams struct {
 }
 
 // Creates a new diff entry associated with a job. Blob data is stored in object storage.
-// Ordering is determined by the job's step_index.
 func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
 	row := q.db.QueryRow(ctx, createDiff,
 		arg.RunID,
@@ -90,22 +89,31 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 
 const listDiffsBeforeStep = `-- name: ListDiffsBeforeStep :many
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-INNER JOIN jobs j ON d.job_id = j.id
 WHERE d.run_id = $1
-  AND j.step_index <= $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
+  AND (
+    CASE
+      WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+      ELSE 0
+    END
+  ) <= $2
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC
 `
 
 type ListDiffsBeforeStepParams struct {
-	RunID     types.RunID     `json:"run_id"`
-	StepIndex types.StepIndex `json:"step_index"`
+	RunID   types.RunID `json:"run_id"`
+	Summary []byte      `json:"summary"`
 }
 
 // Returns all diffs for a run up to (and including) the specified step_index.
-// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
-// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
+// step_index is read from summary metadata when present.
 func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.StepIndex)
+	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.Summary)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +144,13 @@ const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC
 `
 
 type ListDiffsByRunRepoParams struct {
@@ -147,7 +161,6 @@ type ListDiffsByRunRepoParams struct {
 // Returns diffs for a specific repo execution within a run.
 // Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 // This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)
 	if err != nil {
@@ -215,7 +228,13 @@ const listDiffsMetaByRunRepo = `-- name: ListDiffsMetaByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY j.step_index ASC, d.created_at ASC, d.id ASC
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC
 `
 
 type ListDiffsMetaByRunRepoParams struct {

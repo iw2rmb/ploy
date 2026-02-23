@@ -369,9 +369,9 @@ func createJobForCancelBulkTest(t *testing.T, ctx context.Context, db Store, run
 		Attempt:     1,
 		Name:        name,
 		Status:      status,
-		ModType:     "mod",
-		ModImage:    "test-image",
-		StepIndex:   stepIndex,
+		JobType:     "mod",
+		JobImage:    "test-image",
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {

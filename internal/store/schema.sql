@@ -166,13 +166,10 @@ CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE statu
 -- Index for repo history queries (list runs per repo).
 CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, created_at);
 
--- Jobs (unified job queue for all execution units: pre-gate, mod, heal, post-gate, gate, build)
--- v1 model: jobs are repo-scoped; repo attribution is via job_id → jobs.repo_id.
--- Float step_index enables inserting healing jobs between existing jobs:
---   pre-gate=1000, mod=2000, post-gate=3000
---   heal-1 inserted at 1500, re-gate at 1750, etc.
--- Server-driven scheduling: first job per repo attempt is 'Queued', rest are 'Created'.
--- When a job completes, server schedules the next 'Created' job for that repo attempt.
+-- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build, mr)
+-- Jobs for a repo attempt form a singly-linked chain through next_id -> jobs.id.
+-- Server-driven scheduling: only chain head starts as 'Queued'; successors remain 'Created'
+-- until their predecessor succeeds and they are promoted.
 -- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
 -- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mod_repos.id.
 --
@@ -193,21 +190,24 @@ CREATE TABLE IF NOT EXISTS jobs (
   attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
   name            TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
-  mod_type        TEXT NOT NULL DEFAULT '',
-  mod_image       TEXT NOT NULL DEFAULT '',
-  step_index      FLOAT NOT NULL DEFAULT 0,  -- float for dynamic insertion between jobs
+  job_type        TEXT NOT NULL DEFAULT '',
+  job_image       TEXT NOT NULL DEFAULT '',
+  next_id         TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.
   exit_code       INT,  -- exit code from job execution (null until completed)
   started_at      TIMESTAMPTZ,
   finished_at     TIMESTAMPTZ,
   duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
-  UNIQUE (run_id, repo_id, attempt, name, step_index)  -- v1 uniqueness: per-repo within a run.
+  UNIQUE (run_id, repo_id, attempt, name)  -- unique job name per repo attempt.
 );
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
-CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, step_index) WHERE status = 'Queued';
+CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, repo_id, attempt, id) WHERE status = 'Queued';
 CREATE INDEX IF NOT EXISTS jobs_node_idx ON jobs(node_id) WHERE node_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NOT NULL;
+-- Predecessor lookup used to detect whether a Created job is unblocked for promotion.
+CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 
@@ -228,9 +228,8 @@ CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
 -- Diffs (per-run, small count)
 -- Each execution job (mod, healing, pre_gate, post_gate) may produce a diff.
--- Diffs store `job_id` and `run_id` for association; summary JSONB contains:
---   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
--- Rehydration applies diffs from jobs ordered by step_index.
+-- Diffs store `job_id` and `run_id` for association; summary JSONB may include
+-- step metadata for ordering and classification (for example: mod_type, step_index).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- Blob data is stored in S3-compatible object storage; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS diffs (

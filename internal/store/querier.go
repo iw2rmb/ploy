@@ -27,21 +27,20 @@ type Querier interface {
 	// v1:
 	// - claimable jobs have status='Queued'
 	// - normal jobs are claimable only when runs.status='Started'
-	// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+	// - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
 	// Used by repo-scoped terminal detection to determine run_repos.status.
-	// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
+	// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
 	// Creates a new artifact bundle metadata. Blob data is stored in object storage.
 	// Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	// Creates a new diff entry associated with a job. Blob data is stored in object storage.
-	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -88,7 +87,7 @@ type Querier interface {
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
-	// Returns prev_index (this job's index) and next_index (the next job within the same repo attempt).
+	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
@@ -142,13 +141,11 @@ type Querier interface {
 	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
-	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
-	// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
+	// step_index is read from summary metadata when present.
 	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-	// Diffs for repo A are excluded from repo B listing via the j.repo_id filter.
 	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
 	// Returns diff metadata for a run.
 	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
@@ -223,10 +220,8 @@ type Querier interface {
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
-	// Atomically promote the next job in a repo attempt: Created -> Queued.
-	// Uses FOR UPDATE SKIP LOCKED to prevent scheduler races:
-	// - Concurrent schedulers selecting the same row will skip it if locked
-	// - The status predicate ensures we only update rows still in 'Created' state
+	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
+	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	// Unarchives a mod by clearing archived_at.
 	UnarchiveMod(ctx context.Context, id types.ModID) error
@@ -234,7 +229,7 @@ type Querier interface {
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
 	UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error
-	// Persist the container image name used to execute a mod/heal job.
+	// Persist the container image name used to execute a job.
 	// This is set by the node immediately before job execution starts.
 	UpdateJobImageName(ctx context.Context, arg UpdateJobImageNameParams) error
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error

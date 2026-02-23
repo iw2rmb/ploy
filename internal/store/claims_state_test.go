@@ -47,10 +47,10 @@ func TestClaimJob_Basic(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   1000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -124,10 +124,10 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   1000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -141,10 +141,10 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   2000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -158,10 +158,10 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   3000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -251,10 +251,10 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-" + strconv.Itoa(i),
-			ModType:     "",
-			ModImage:    "",
+			JobType:     "",
+			JobImage:    "",
 			Status:      JobStatusQueued,
-			StepIndex:   types.StepIndex(1000 + i*100),
+			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
 		if err != nil {
@@ -393,10 +393,10 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   1000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -463,10 +463,10 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   1000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -542,10 +542,10 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   3000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -559,10 +559,10 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   1000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -576,10 +576,10 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
-		ModType:     "",
-		ModImage:    "",
+		JobType:     "",
+		JobImage:    "",
 		Status:      JobStatusQueued,
-		StepIndex:   2000,
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {
@@ -602,7 +602,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Fatalf("ClaimJob() 1 failed: %v", err)
 	}
 	if claimed1.ID != job1.ID {
-		t.Errorf("Expected first claim to get job1 (step_index=1000), got job with step_index=%v", claimed1.StepIndex)
+		t.Errorf("Expected first claim to get job1, got job_id=%s", claimed1.ID)
 	}
 
 	claimed2, err := db.ClaimJob(ctx, node.ID)
@@ -610,7 +610,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Fatalf("ClaimJob() 2 failed: %v", err)
 	}
 	if claimed2.ID != job2.ID {
-		t.Errorf("Expected second claim to get job2 (step_index=2000), got job with step_index=%v", claimed2.StepIndex)
+		t.Errorf("Expected second claim to get job2, got job_id=%s", claimed2.ID)
 	}
 
 	claimed3, err := db.ClaimJob(ctx, node.ID)
@@ -618,7 +618,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Fatalf("ClaimJob() 3 failed: %v", err)
 	}
 	if claimed3.ID != job3.ID {
-		t.Errorf("Expected third claim to get job3 (step_index=3000), got job with step_index=%v", claimed3.StepIndex)
+		t.Errorf("Expected third claim to get job3, got job_id=%s", claimed3.ID)
 	}
 }
 
@@ -649,9 +649,9 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "running-job",
 		Status:      JobStatusRunning,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   1000,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
 	if err != nil {

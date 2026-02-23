@@ -9,10 +9,10 @@ checkpoint notes in the repository.
 - **Run** — A Mods run submitted to the control plane. Runs are stored as
   `runs` rows in PostgreSQL and exposed via the `/v1/runs` API.
 - **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
-  `post-gate`). Jobs are stored as `jobs` rows.
-- **StepIndex** — Float index that orders jobs and ties them to diffs. Jobs use
-  float step_index (e.g., 1000, 2000, 3000) to allow dynamic insertion of
-  healing jobs between existing jobs.
+  `post-gate`). Jobs are stored as `jobs` rows. Persisted job fields are
+  `job_type`, `job_image`, and `next_id` (successor link in the job chain).
+- **StepIndex** — Float index metadata used by parts of the runtime payloads and
+  diagnostics. It is no longer a dedicated `jobs` table column.
 - **Spec** — YAML/JSON file or inline JSON describing container image,
   command, env, Build Gate and optional `mods[]` steps. Parsed by the CLI in
   `cmd/ploy/mod_run_spec.go`.

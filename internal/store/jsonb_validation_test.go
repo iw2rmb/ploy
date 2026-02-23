@@ -58,11 +58,11 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 
 	t.Run("CreateJob/invalid_meta", func(t *testing.T) {
 		_, err := store.CreateJob(ctx, CreateJobParams{
-			ID:        types.NewJobID(),
-			RunID:     types.NewRunID(),
-			RepoID:    types.NewModRepoID(),
-			StepIndex: types.StepIndex(0),
-			Meta:      invalidJSON,
+			ID:     types.NewJobID(),
+			RunID:  types.NewRunID(),
+			RepoID: types.NewModRepoID(),
+			NextID: nil,
+			Meta:   invalidJSON,
 		})
 		if err == nil {
 			t.Fatal("expected error for invalid jobs.meta, got nil")
