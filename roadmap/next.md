@@ -89,14 +89,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Link checks and doc-tested snippets if present.
 
 ## Phase 5: GREEN and REFACTOR
-- [ ] Run full validation on the new model and remove transitional code.
+- [x] Run full validation on the new model and remove transitional code.
   - Repository: `ploy`
   - Component: Whole repository
   - Scope: Execute `make test`, `make coverage`, `make vet`, `make staticcheck`, `make build`; delete temporary adapters, comments, or fallback paths created during migration.
   - Snippets: `make test && make coverage && make vet && make staticcheck && make build`
   - Tests: All suites green with no `step_index`/`mod_type`/`mod_image` usage in active interfaces.
 
-- [ ] Run residue scans and enforce final invariants.
+- [x] Run residue scans and enforce final invariants.
   - Repository: `ploy`
   - Component: Hygiene checks
   - Scope: Verify `next_id` is the only orchestration ordering primitive; verify all job metadata surfaces use new names.

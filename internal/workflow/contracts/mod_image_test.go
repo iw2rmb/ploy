@@ -5,38 +5,38 @@ import (
 	"testing"
 )
 
-// TestModImage_ResolveImage_Universal verifies that universal (string) images
+// TestJobImage_ResolveImage_Universal verifies that universal (string) images
 // are returned regardless of the stack parameter.
-func TestModImage_ResolveImage_Universal(t *testing.T) {
+func TestJobImage_ResolveImage_Universal(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		image ModImage
+		image JobImage
 		stack ModStack
 		want  string
 	}{
 		{
 			name:  "universal image with java-maven stack",
-			image: ModImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
 			stack: ModStackJavaMaven,
 			want:  "docker.io/user/mods-orw:latest",
 		},
 		{
 			name:  "universal image with java-gradle stack",
-			image: ModImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
 			stack: ModStackJavaGradle,
 			want:  "docker.io/user/mods-orw:latest",
 		},
 		{
 			name:  "universal image with unknown stack",
-			image: ModImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
 			stack: ModStackUnknown,
 			want:  "docker.io/user/mods-orw:latest",
 		},
 		{
 			name:  "universal image with empty stack (defaults to unknown)",
-			image: ModImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
 			stack: "",
 			want:  "docker.io/user/mods-orw:latest",
 		},
@@ -56,13 +56,13 @@ func TestModImage_ResolveImage_Universal(t *testing.T) {
 	}
 }
 
-// TestModImage_ResolveImage_StackSpecific verifies that stack-specific maps
+// TestJobImage_ResolveImage_StackSpecific verifies that stack-specific maps
 // resolve to the correct image based on stack matching and default fallback.
-func TestModImage_ResolveImage_StackSpecific(t *testing.T) {
+func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 	t.Parallel()
 
 	// Stack map with exact keys and default.
-	stackMap := ModImage{
+	stackMap := JobImage{
 		ByStack: map[ModStack]string{
 			ModStackDefault:    "docker.io/user/mods-orw:latest",
 			ModStackJavaMaven:  "docker.io/user/mods-orw-maven:latest",
@@ -72,7 +72,7 @@ func TestModImage_ResolveImage_StackSpecific(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		image ModImage
+		image JobImage
 		stack ModStack
 		want  string
 	}{
@@ -128,13 +128,13 @@ func TestModImage_ResolveImage_StackSpecific(t *testing.T) {
 	}
 }
 
-// TestModImage_ResolveImage_NoDefault verifies that resolution fails with an
+// TestJobImage_ResolveImage_NoDefault verifies that resolution fails with an
 // actionable error when no exact match exists and no default is provided.
-func TestModImage_ResolveImage_NoDefault(t *testing.T) {
+func TestJobImage_ResolveImage_NoDefault(t *testing.T) {
 	t.Parallel()
 
 	// Stack map without default key.
-	stackMap := ModImage{
+	stackMap := JobImage{
 		ByStack: map[ModStack]string{
 			ModStackJavaMaven: "docker.io/user/mods-orw-maven:latest",
 		},
@@ -171,23 +171,23 @@ func TestModImage_ResolveImage_NoDefault(t *testing.T) {
 	}
 }
 
-// TestModImage_ResolveImage_Empty verifies that resolving an empty ModImage
+// TestJobImage_ResolveImage_Empty verifies that resolving an empty JobImage
 // returns an error.
-func TestModImage_ResolveImage_Empty(t *testing.T) {
+func TestJobImage_ResolveImage_Empty(t *testing.T) {
 	t.Parallel()
 
-	empty := ModImage{}
+	empty := JobImage{}
 	_, err := empty.ResolveImage(ModStackJavaMaven)
 	if err == nil {
-		t.Fatal("expected error for empty ModImage")
+		t.Fatal("expected error for empty JobImage")
 	}
 	if !strings.Contains(err.Error(), "image not specified") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-// TestParseModImage_String verifies parsing of string (universal) images.
-func TestParseModImage_String(t *testing.T) {
+// TestParseJobImage_String verifies parsing of string (universal) images.
+func TestParseJobImage_String(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -215,22 +215,22 @@ func TestParseModImage_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ParseModImage(tt.input)
+			got, err := ParseJobImage(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if got.Universal != tt.want {
-				t.Errorf("ParseModImage(%v).Universal = %q, want %q", tt.input, got.Universal, tt.want)
+				t.Errorf("ParseJobImage(%v).Universal = %q, want %q", tt.input, got.Universal, tt.want)
 			}
 			if len(got.ByStack) != 0 {
-				t.Errorf("ParseModImage(%v).ByStack should be empty, got %v", tt.input, got.ByStack)
+				t.Errorf("ParseJobImage(%v).ByStack should be empty, got %v", tt.input, got.ByStack)
 			}
 		})
 	}
 }
 
-// TestParseModImage_Map verifies parsing of map (stack-specific) images.
-func TestParseModImage_Map(t *testing.T) {
+// TestParseJobImage_Map verifies parsing of map (stack-specific) images.
+func TestParseJobImage_Map(t *testing.T) {
 	t.Parallel()
 
 	t.Run("map[string]any from JSON/YAML", func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestParseModImage_Map(t *testing.T) {
 			"java-gradle": "docker.io/user/mods-orw-gradle:latest",
 		}
 
-		got, err := ParseModImage(input)
+		got, err := ParseJobImage(input)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -269,7 +269,7 @@ func TestParseModImage_Map(t *testing.T) {
 			"java-maven": "img:maven",
 		}
 
-		got, err := ParseModImage(input)
+		got, err := ParseJobImage(input)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -285,7 +285,7 @@ func TestParseModImage_Map(t *testing.T) {
 		t.Parallel()
 		input := map[string]any{}
 
-		got, err := ParseModImage(input)
+		got, err := ParseJobImage(input)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -295,21 +295,21 @@ func TestParseModImage_Map(t *testing.T) {
 	})
 }
 
-// TestParseModImage_Nil verifies that nil input returns empty ModImage.
-func TestParseModImage_Nil(t *testing.T) {
+// TestParseJobImage_Nil verifies that nil input returns empty JobImage.
+func TestParseJobImage_Nil(t *testing.T) {
 	t.Parallel()
 
-	got, err := ParseModImage(nil)
+	got, err := ParseJobImage(nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !got.IsEmpty() {
-		t.Errorf("expected empty ModImage for nil input, got %v", got)
+		t.Errorf("expected empty JobImage for nil input, got %v", got)
 	}
 }
 
-// TestParseModImage_InvalidType verifies error handling for invalid types.
-func TestParseModImage_InvalidType(t *testing.T) {
+// TestParseJobImage_InvalidType verifies error handling for invalid types.
+func TestParseJobImage_InvalidType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -325,7 +325,7 @@ func TestParseModImage_InvalidType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := ParseModImage(tt.input)
+			_, err := ParseJobImage(tt.input)
 			if err == nil {
 				t.Fatal("expected error for invalid type")
 			}
@@ -336,9 +336,9 @@ func TestParseModImage_InvalidType(t *testing.T) {
 	}
 }
 
-// TestParseModImage_MapWithInvalidValue verifies error handling for maps
+// TestParseJobImage_MapWithInvalidValue verifies error handling for maps
 // containing non-string values.
-func TestParseModImage_MapWithInvalidValue(t *testing.T) {
+func TestParseJobImage_MapWithInvalidValue(t *testing.T) {
 	t.Parallel()
 
 	input := map[string]any{
@@ -346,7 +346,7 @@ func TestParseModImage_MapWithInvalidValue(t *testing.T) {
 		"java-maven": 123, // Invalid: not a string.
 	}
 
-	_, err := ParseModImage(input)
+	_, err := ParseJobImage(input)
 	if err == nil {
 		t.Fatal("expected error for map with non-string value")
 	}
@@ -355,19 +355,19 @@ func TestParseModImage_MapWithInvalidValue(t *testing.T) {
 	}
 }
 
-// TestModImage_IsEmpty verifies the IsEmpty method.
-func TestModImage_IsEmpty(t *testing.T) {
+// TestJobImage_IsEmpty verifies the IsEmpty method.
+func TestJobImage_IsEmpty(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		image ModImage
+		image JobImage
 		want  bool
 	}{
-		{name: "empty", image: ModImage{}, want: true},
-		{name: "universal", image: ModImage{Universal: "img:v1"}, want: false},
-		{name: "stack map", image: ModImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
-		{name: "empty stack map", image: ModImage{ByStack: map[ModStack]string{}}, want: true},
+		{name: "empty", image: JobImage{}, want: true},
+		{name: "universal", image: JobImage{Universal: "img:v1"}, want: false},
+		{name: "stack map", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
+		{name: "empty stack map", image: JobImage{ByStack: map[ModStack]string{}}, want: true},
 	}
 
 	for _, tt := range tests {
@@ -380,20 +380,20 @@ func TestModImage_IsEmpty(t *testing.T) {
 	}
 }
 
-// TestModImage_IsUniversal verifies the IsUniversal method.
-func TestModImage_IsUniversal(t *testing.T) {
+// TestJobImage_IsUniversal verifies the IsUniversal method.
+func TestJobImage_IsUniversal(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		image ModImage
+		image JobImage
 		want  bool
 	}{
-		{name: "universal only", image: ModImage{Universal: "img:v1"}, want: true},
-		{name: "empty", image: ModImage{}, want: false},
-		{name: "stack map only", image: ModImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
+		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: true},
+		{name: "empty", image: JobImage{}, want: false},
+		{name: "stack map only", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
 		// When both are set, ByStack takes precedence (not universal).
-		{name: "both set", image: ModImage{Universal: "img:v1", ByStack: map[ModStack]string{"default": "img:v2"}}, want: false},
+		{name: "both set", image: JobImage{Universal: "img:v1", ByStack: map[ModStack]string{"default": "img:v2"}}, want: false},
 	}
 
 	for _, tt := range tests {
@@ -406,19 +406,19 @@ func TestModImage_IsUniversal(t *testing.T) {
 	}
 }
 
-// TestModImage_IsStackSpecific verifies the IsStackSpecific method.
-func TestModImage_IsStackSpecific(t *testing.T) {
+// TestJobImage_IsStackSpecific verifies the IsStackSpecific method.
+func TestJobImage_IsStackSpecific(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		image ModImage
+		image JobImage
 		want  bool
 	}{
-		{name: "stack map", image: ModImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: true},
-		{name: "empty", image: ModImage{}, want: false},
-		{name: "universal only", image: ModImage{Universal: "img:v1"}, want: false},
-		{name: "empty stack map", image: ModImage{ByStack: map[ModStack]string{}}, want: false},
+		{name: "stack map", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: true},
+		{name: "empty", image: JobImage{}, want: false},
+		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: false},
+		{name: "empty stack map", image: JobImage{ByStack: map[ModStack]string{}}, want: false},
 	}
 
 	for _, tt := range tests {
@@ -431,13 +431,13 @@ func TestModImage_IsStackSpecific(t *testing.T) {
 	}
 }
 
-// TestModImage_String verifies the String() method for debugging output.
-func TestModImage_String(t *testing.T) {
+// TestJobImage_String verifies the String() method for debugging output.
+func TestJobImage_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("universal", func(t *testing.T) {
 		t.Parallel()
-		img := ModImage{Universal: "docker.io/user/mod:latest"}
+		img := JobImage{Universal: "docker.io/user/mod:latest"}
 		got := img.String()
 		if got != "docker.io/user/mod:latest" {
 			t.Errorf("String() = %q, want universal image", got)
@@ -446,7 +446,7 @@ func TestModImage_String(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		img := ModImage{}
+		img := JobImage{}
 		got := img.String()
 		if got != "<empty>" {
 			t.Errorf("String() = %q, want <empty>", got)
@@ -455,7 +455,7 @@ func TestModImage_String(t *testing.T) {
 
 	t.Run("stack map", func(t *testing.T) {
 		t.Parallel()
-		img := ModImage{ByStack: map[ModStack]string{
+		img := JobImage{ByStack: map[ModStack]string{
 			"default": "img:default",
 		}}
 		got := img.String()

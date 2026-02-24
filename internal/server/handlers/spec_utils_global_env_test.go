@@ -11,7 +11,7 @@ import (
 // are provided, the spec is returned unchanged.
 func TestMergeGlobalEnvIntoSpec_EmptyEnv(t *testing.T) {
 	spec := json.RawMessage(`{"foo":"bar"}`)
-	result, err := mergeGlobalEnvIntoSpec(spec, nil, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, nil, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -19,7 +19,7 @@ func TestMergeGlobalEnvIntoSpec_EmptyEnv(t *testing.T) {
 		t.Errorf("expected spec unchanged, got %s", result)
 	}
 
-	result, err = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, domaintypes.ModTypeMod)
+	result, err = mergeGlobalEnvIntoSpec(spec, map[string]GlobalEnvVar{}, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -36,13 +36,13 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 	}
 
 	// Test with nil spec.
-	_, err := mergeGlobalEnvIntoSpec(nil, env, domaintypes.ModTypeMod)
+	_, err := mergeGlobalEnvIntoSpec(nil, env, domaintypes.JobTypeMod)
 	if err == nil {
 		t.Fatalf("expected error for nil spec, got nil")
 	}
 
 	// Test with empty JSON spec.
-	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -71,37 +71,37 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		jobType    domaintypes.ModType
+		jobType    domaintypes.JobType
 		expectKeys []string
 		rejectKeys []string
 	}{
 		{
 			name:       "mod job gets all and mods",
-			jobType:    domaintypes.ModTypeMod,
+			jobType:    domaintypes.JobTypeMod,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY"},
 			rejectKeys: []string{"HEAL_KEY", "GATE_KEY"},
 		},
 		{
 			name:       "heal job gets all and heal",
-			jobType:    domaintypes.ModTypeHeal,
+			jobType:    domaintypes.JobTypeHeal,
 			expectKeys: []string{"ALL_KEY", "HEAL_KEY"},
 			rejectKeys: []string{"MODS_KEY", "GATE_KEY"},
 		},
 		{
 			name:       "pre_gate job gets all and gate",
-			jobType:    domaintypes.ModTypePreGate,
+			jobType:    domaintypes.JobTypePreGate,
 			expectKeys: []string{"ALL_KEY", "GATE_KEY"},
 			rejectKeys: []string{"MODS_KEY", "HEAL_KEY"},
 		},
 		{
 			name:       "re_gate job gets all, heal, and gate",
-			jobType:    domaintypes.ModTypeReGate,
+			jobType:    domaintypes.JobTypeReGate,
 			expectKeys: []string{"ALL_KEY", "HEAL_KEY", "GATE_KEY"},
 			rejectKeys: []string{"MODS_KEY"},
 		},
 		{
 			name:       "post_gate job gets all, mods, and gate",
-			jobType:    domaintypes.ModTypePostGate,
+			jobType:    domaintypes.JobTypePostGate,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY", "GATE_KEY"},
 			rejectKeys: []string{"HEAL_KEY"},
 		},
@@ -147,7 +147,7 @@ func TestMergeGlobalEnvIntoSpec_PerRunEnvPrecedence(t *testing.T) {
 		"NEW_KEY": {Value: "new-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
-	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestMergeGlobalEnvIntoSpec_PreservesOtherSpecFields(t *testing.T) {
 		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
 	}
 
-	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(spec, env, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestMergeGlobalEnvIntoSpec_InvalidJSON(t *testing.T) {
 		"KEY": {Value: "value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	}
 
-	_, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, domaintypes.ModTypeMod)
+	_, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{invalid`), env, domaintypes.JobTypeMod)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -235,7 +235,7 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test mod job should receive all three keys.
-	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypeMod)
+	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	}
 
 	// Test pre_gate job should only receive CA_CERTS_PEM_BUNDLE (scope=all).
-	result, err = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.ModTypePreGate)
+	result, err = mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.JobTypePreGate)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
 	}

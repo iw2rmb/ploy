@@ -24,7 +24,7 @@ import (
 // v1 status rules:
 // - claimable jobs have status='Queued'; claimed jobs transition to 'Running'
 // - normal jobs are claimable only when runs.status='Started'
-// - MR jobs (mod_type='mr') are claimable only when runs.status='Finished'
+// - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
 // - on first claim for a repo attempt, run_repos.status transitions Queued → Running
 // - repo progression is attempt-scoped (run_id, repo_id, attempt)
 //
@@ -89,7 +89,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		// v1 repo status transition: Queued → Running on first claim for repo attempt.
 		// This is idempotent (already Running repos stay Running).
 		// MR jobs must not affect run_repos.status.
-		isMRJob := job.JobType == domaintypes.ModTypeMR.String()
+		isMRJob := job.JobType == domaintypes.JobTypeMR.String()
 		if !isMRJob && rr.Status == store.RunRepoStatusQueued {
 			// The UpdateRunRepoStatus query sets started_at on first transition to Running.
 			if err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{
@@ -142,9 +142,9 @@ func buildAndSendJobClaimResponse(
 	modRepo store.ModRepo,
 	job store.Job,
 ) error {
-	modType := domaintypes.ModType(job.JobType)
+	modType := domaintypes.JobType(job.JobType)
 	if err := modType.Validate(); err != nil {
-		return fmt.Errorf("invalid claimed job mod_type %q for job_id=%s: %w", job.JobType, job.ID, err)
+		return fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
 	// Merge job_id into spec for downstream execution.
@@ -179,7 +179,7 @@ func buildAndSendJobClaimResponse(
 		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
-		JobType   domaintypes.ModType   `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
+		JobType   domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
 		JobImage  string                `json:"job_image"` // Container image for mod/heal jobs
 		NextID    *domaintypes.JobID    `json:"next_id"`
 		RepoURL   string                `json:"repo_url"`
@@ -264,10 +264,10 @@ func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
 // Parameters:
 //   - spec: The job spec JSON, may contain an "env" map
 //   - env: Map of global env vars from ConfigHolder (uses typed GlobalEnvScope)
-//   - modType: The job's mod_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
+//   - modType: The job's job_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
 //
 // Returns the modified spec with global env vars merged into the "env" field.
-func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.ModType) (json.RawMessage, error) {
+func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.JobType) (json.RawMessage, error) {
 	// If no global env vars exist, return spec unchanged.
 	if len(env) == 0 {
 		return spec, nil
@@ -296,7 +296,7 @@ func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, m
 	for k, v := range env {
 		// Check if this global env var's typed scope matches the job type.
 		// The scope matching uses typed enums to prevent typo-class bugs.
-		if !v.Scope.MatchesModType(modType) {
+		if !v.Scope.MatchesJobType(modType) {
 			continue
 		}
 		// Per-run env wins over global; do not overwrite existing keys.

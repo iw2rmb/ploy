@@ -126,8 +126,8 @@ func TestStepIndexNoTruncation(t *testing.T) {
 				t.Fatalf("StepIndex(%v).Valid() = false; want true", idx)
 			}
 
-			// DiffSummary boundary decode must preserve fractional step_index values.
-			summary := DiffSummary([]byte(`{"step_index":` + lit + `}`))
+			// DiffSummary boundary decode must preserve fractional next_id values.
+			summary := DiffSummary([]byte(`{"next_id":` + lit + `}`))
 			got, ok := summary.StepIndex()
 			if !ok {
 				t.Fatalf("DiffSummary.StepIndex() ok=false for %q; want ok=true", lit)
@@ -153,10 +153,10 @@ func TestStepIndexNoTruncation(t *testing.T) {
 			}
 
 			var payload struct {
-				StepIndex StepIndex `json:"step_index"`
+				StepIndex StepIndex `json:"next_id"`
 			}
-			if err := json.Unmarshal([]byte(`{"step_index":`+lit+`}`), &payload); err != nil {
-				t.Fatalf("json.Unmarshal(payload with step_index=%q) error: %v", lit, err)
+			if err := json.Unmarshal([]byte(`{"next_id":`+lit+`}`), &payload); err != nil {
+				t.Fatalf("json.Unmarshal(payload with next_id=%q) error: %v", lit, err)
 			}
 			if payload.StepIndex != idx {
 				t.Fatalf("payload.StepIndex=%v; want %v", payload.StepIndex, idx)

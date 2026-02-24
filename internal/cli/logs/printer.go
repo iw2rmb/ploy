@@ -59,7 +59,7 @@ func NewPrinter(format Format, out io.Writer) *Printer {
 //
 // Structured format (when enriched fields are present):
 //
-//	2025-10-22T10:00:00Z stdout node=<node_id> job_type=<job_type> step=<step_index> job=<job_id> Step started
+//	2025-10-22T10:00:00Z stdout node=<node_id> job_type=<job_type> step=<next_id> job=<job_id> Step started
 //
 // Structured format (basic, no enriched fields):
 //
@@ -98,7 +98,7 @@ func (p *Printer) PrintLog(rec logstream.LogRecord) {
 			ctx.WriteString("node=")
 			ctx.WriteString(rec.NodeID.String())
 		}
-		// JobType uses domaintypes.ModType under the hood; use IsZero() consistently.
+		// JobType uses domaintypes.JobType under the hood; use IsZero() consistently.
 		if !rec.JobType.IsZero() {
 			if ctx.Len() > 0 {
 				ctx.WriteByte(' ')

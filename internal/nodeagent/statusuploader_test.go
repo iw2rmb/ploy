@@ -234,7 +234,7 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 
 	var receivedPayload map[string]interface{}
 
-	// Create a test server that captures the payload and verifies step_index and job_id.
+	// Create a test server that captures the payload and verifies next_id and job_id.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
 			t.Errorf("failed to decode payload: %v", err)
@@ -378,7 +378,7 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 	if _, ok := receivedPayload["job_id"]; ok {
 		t.Error("did not expect job_id in payload; it is encoded in the URL")
 	}
-	if _, ok := receivedPayload["step_index"]; ok {
-		t.Error("did not expect step_index in job-level payload")
+	if _, ok := receivedPayload["next_id"]; ok {
+		t.Error("did not expect next_id in job-level payload")
 	}
 }

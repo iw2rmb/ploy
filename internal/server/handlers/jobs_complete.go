@@ -27,7 +27,7 @@ type completeJobRequest struct {
 // completeJobHandler marks a job as completed with terminal status and stats.
 // This endpoint simplifies the node → server contract by addressing jobs directly
 // via the URL path (/v1/jobs/{job_id}/complete) rather than requiring run_id and
-// step_index in the request body.
+// next_id in the request body.
 //
 // Authentication: Node identity is derived from the mTLS client certificate.
 // The handler verifies that the job is assigned to the calling node.
@@ -239,24 +239,24 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				}
 			}
 
-			modType := domaintypes.ModType(job.JobType)
+			modType := domaintypes.JobType(job.JobType)
 			if err := modType.Validate(); err != nil {
-				slog.Error("complete job: invalid mod_type in job record; treating as non-gate for failure handling",
+				slog.Error("complete job: invalid job_type in job record; treating as non-gate for failure handling",
 					"job_id", jobID,
-					"mod_type", job.JobType,
+					"job_type", job.JobType,
 					"err", err,
 				)
 				modType = ""
 			}
 			switch modType {
-			case domaintypes.ModTypeMR:
+			case domaintypes.JobTypeMR:
 				// MR jobs are best-effort and must not trigger healing or
 				// cancellation of other jobs when they fail.
 				slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
 					"job_id", jobID,
 					"next_id", job.NextID,
 				)
-			case domaintypes.ModTypePreGate, domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
+			case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 				// Set last_error for Stack Gate failures
 				if statsPayload.HasJobMeta() {
 					if errMsg := formatStackGateError(modType, statsPayload.JobMeta); errMsg != nil {
@@ -295,8 +295,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// reaches a terminal state by cancelling remaining jobs after this step.
 		// This is critical for policy-driven cancellations (e.g., stack detection required).
 		if jobStatus == store.JobStatusCancelled && err == nil {
-			modType := domaintypes.ModType(job.JobType)
-			if modType.Validate() == nil && modType == domaintypes.ModTypeMR {
+			modType := domaintypes.JobType(job.JobType)
+			if modType.Validate() == nil && modType == domaintypes.JobTypeMR {
 				// MR jobs are best-effort and must not affect run-level progression.
 			} else {
 				if cerr := cancelRemainingJobsAfterFailure(ctx, st, job); cerr != nil {
@@ -324,9 +324,9 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// v1 repo-scoped progression:
 		// After completing a job, check if the repo attempt has reached a terminal state.
-		// MR jobs (mod_type='mr') are auxiliary and must not affect run_repos.status derivation.
-		jobModType := domaintypes.ModType(job.JobType)
-		isMRJob := jobModType.Validate() == nil && jobModType == domaintypes.ModTypeMR
+		// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
+		jobJobType := domaintypes.JobType(job.JobType)
+		isMRJob := jobJobType.Validate() == nil && jobJobType == domaintypes.JobTypeMR
 		if err == nil && !isMRJob {
 			// Update run_repos.status if all jobs for this repo attempt are terminal.
 			repoUpdated, repoErr := maybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
@@ -357,7 +357,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// expose it via RunStats.MRURL() and CLI commands can display it. This is a
 		// best-effort update and does not affect run status.
 		// We use the typed statsPayload.MRURL() accessor instead of map[string]any casting.
-		// Note: jobModType and isMRJob were already computed above for repo-scoped progression.
+		// Note: jobJobType and isMRJob were already computed above for repo-scoped progression.
 		mrURL := statsPayload.MRURL()
 		if err == nil && mrURL != "" && isMRJob {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{

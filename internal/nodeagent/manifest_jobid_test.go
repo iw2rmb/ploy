@@ -133,7 +133,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 		}
 
 		mod := ModContainerSpec{
-			Image: contracts.ModImage{Universal: "healer:latest"},
+			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
 		manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
@@ -158,7 +158,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 		}
 
 		mod := ModContainerSpec{
-			Image: contracts.ModImage{Universal: "healer:latest"},
+			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
 		_, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
@@ -188,7 +188,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			}
 
 			mod := ModContainerSpec{
-				Image: contracts.ModImage{Universal: "healer:latest"},
+				Image: contracts.JobImage{Universal: "healer:latest"},
 			}
 
 			manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)

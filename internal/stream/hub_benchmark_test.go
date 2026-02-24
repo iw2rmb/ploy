@@ -12,7 +12,7 @@ import (
 // Performance and Resilience Tests for Enriched Logs
 // =============================================================================
 // These tests validate that enriched log payloads (with node_id, job_id,
-// job_type, step_index) do not regress performance or resilience for
+// job_type, next_id) do not regress performance or resilience for
 // long-running or chatty Mods runs.
 // Stress test: validate performance and resilience with enriched logs.
 

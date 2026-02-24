@@ -145,7 +145,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
-		Summary:   []byte(`{"exit_code":0,"mod_type":"mod"}`),
+		Summary:   []byte(`{"exit_code":0,"job_type":"mod"}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
 		PatchSize: 3,
 	}}

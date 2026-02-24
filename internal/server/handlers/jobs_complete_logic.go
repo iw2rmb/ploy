@@ -103,7 +103,7 @@ func (p JobStatsPayload) ValidateJobMeta() error {
 
 // formatStackGateError formats a Stack Gate failure for run_repos.last_error.
 // Returns nil if job meta doesn't contain a stack gate failure.
-func formatStackGateError(modType domaintypes.ModType, jobMeta json.RawMessage) *string {
+func formatStackGateError(modType domaintypes.JobType, jobMeta json.RawMessage) *string {
 	if len(jobMeta) == 0 {
 		return nil
 	}
@@ -116,12 +116,12 @@ func formatStackGateError(modType domaintypes.ModType, jobMeta json.RawMessage) 
 		return nil
 	}
 
-	// Derive phase from mod_type
+	// Derive phase from job_type
 	phase := "unknown"
 	switch modType {
-	case domaintypes.ModTypePreGate:
+	case domaintypes.JobTypePreGate:
 		phase = "inbound"
-	case domaintypes.ModTypePostGate, domaintypes.ModTypeReGate:
+	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 		phase = "outbound"
 	}
 

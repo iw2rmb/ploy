@@ -92,12 +92,7 @@ lint: ## Run golangci-lint
 
 .PHONY: staticcheck
 staticcheck: ## Run staticcheck
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck -checks=all,-SA1019,-ST1003,-ST1000,-U1000 ./...; \
-	else \
-		echo "staticcheck not installed. Run: go install honnef.co/go/tools/cmd/staticcheck@latest"; \
-		exit 1; \
-	fi
+	go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 -checks=all,-SA1019,-ST1003,-ST1000,-U1000 ./...
 
 .PHONY: ci-check
 ci-check: fmt vet staticcheck test test-coverage ## Run core CI checks locally

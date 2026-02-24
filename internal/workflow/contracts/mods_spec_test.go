@@ -436,7 +436,7 @@ func TestModsSpec_ToMap(t *testing.T) {
 	mrOnSuccess := true
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image:           ModImage{Universal: "docker.io/user/mod:latest"},
+			Image:           JobImage{Universal: "docker.io/user/mod:latest"},
 			Command:         CommandSpec{Shell: "echo hello"},
 			Env:             map[string]string{"FOO": "bar"},
 			RetainContainer: true,
@@ -481,8 +481,8 @@ func TestModsSpec_ToMap(t *testing.T) {
 func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 	original := &ModsSpec{
 		Steps: []ModStep{
-			{Name: "step-1", Image: ModImage{Universal: "mod1:latest"}},
-			{Name: "step-2", Image: ModImage{ByStack: map[ModStack]string{
+			{Name: "step-1", Image: JobImage{Universal: "mod1:latest"}},
+			{Name: "step-2", Image: JobImage{ByStack: map[ModStack]string{
 				ModStackDefault:    "mod2:default",
 				ModStackJavaMaven:  "mod2:maven",
 				ModStackJavaGradle: "mod2:gradle",
@@ -491,10 +491,10 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		BuildGate: &BuildGateConfig{
 			Healing: &HealingSpec{
 				Retries: 2,
-				Image:   ModImage{Universal: "codex:latest"},
+				Image:   JobImage{Universal: "codex:latest"},
 			},
 			Router: &RouterSpec{
-				Image: ModImage{Universal: "router:latest"},
+				Image: JobImage{Universal: "router:latest"},
 			},
 		},
 	}

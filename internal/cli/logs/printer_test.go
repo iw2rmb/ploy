@@ -120,7 +120,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 			want: "2025-10-22T10:00:02Z stderr job_type=pre_gate job=job-456 gate failure\n",
 		},
 		{
-			name: "step_index zero omitted",
+			name: "next_id zero omitted",
 			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:03Z",
 				Stream:    "stdout",
@@ -131,7 +131,7 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 			want: "2025-10-22T10:00:03Z stdout node=node-def step index zero\n",
 		},
 		{
-			name: "step_index one included",
+			name: "next_id one included",
 			rec: logstream.LogRecord{
 				Timestamp: "2025-10-22T10:00:04Z",
 				Stream:    "stdout",

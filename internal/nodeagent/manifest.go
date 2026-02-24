@@ -12,9 +12,9 @@ import (
 
 // --- Shared manifest helpers ---
 
-// resolveImage validates and resolves a ModImage to a concrete image string using the
+// resolveImage validates and resolves a JobImage to a concrete image string using the
 // given stack. Returns an error if the image is empty after resolution.
-func resolveImage(img contracts.ModImage, stack contracts.ModStack, label string) (string, error) {
+func resolveImage(img contracts.JobImage, stack contracts.ModStack, label string) (string, error) {
 	if img.IsEmpty() {
 		return "", fmt.Errorf("%s: image required", label)
 	}
@@ -207,7 +207,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
 	sanitized := typedOpts
 	sanitized.Steps = nil
-	sanitized.Execution.Image = contracts.ModImage{}
+	sanitized.Execution.Image = contracts.JobImage{}
 	sanitized.Execution.Command = contracts.CommandSpec{}
 
 	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)

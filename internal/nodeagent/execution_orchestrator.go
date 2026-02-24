@@ -60,7 +60,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"job_type", req.JobType,
-		"step_index", req.StepIndex,
+		"next_id", req.StepIndex,
 	)
 
 	jobType := req.JobType
@@ -73,16 +73,16 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Dispatch based on job type from claim payload.
 	switch jobType {
-	case types.ModTypePreGate, types.ModTypePostGate, types.ModTypeReGate:
+	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
 		req.JobType = jobType
 		r.executeGateJob(ctx, req)
-	case types.ModTypeMod:
+	case types.JobTypeMod:
 		req.JobType = jobType
 		r.executeModJob(ctx, req)
-	case types.ModTypeHeal:
+	case types.JobTypeHeal:
 		req.JobType = jobType
 		r.executeHealingJob(ctx, req)
-	case types.ModTypeMR:
+	case types.JobTypeMR:
 		req.JobType = jobType
 		r.executeMRJob(ctx, req)
 	default:
@@ -92,21 +92,21 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}
 }
 
-func inferJobTypeFromJobName(jobName string) types.ModType {
+func inferJobTypeFromJobName(jobName string) types.JobType {
 	name := strings.TrimSpace(jobName)
 	switch {
 	case strings.EqualFold(name, "pre-gate"):
-		return types.ModTypePreGate
+		return types.JobTypePreGate
 	case strings.EqualFold(name, "post-gate"):
-		return types.ModTypePostGate
+		return types.JobTypePostGate
 	case strings.HasPrefix(name, "re-gate-"):
-		return types.ModTypeReGate
+		return types.JobTypeReGate
 	case strings.HasPrefix(name, "heal-"):
-		return types.ModTypeHeal
+		return types.JobTypeHeal
 	case strings.HasPrefix(name, "mod-"):
-		return types.ModTypeMod
+		return types.JobTypeMod
 	case strings.EqualFold(name, "mr"):
-		return types.ModTypeMR
+		return types.JobTypeMR
 	default:
 		return ""
 	}

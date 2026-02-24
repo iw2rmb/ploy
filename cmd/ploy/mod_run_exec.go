@@ -45,8 +45,8 @@ func buildRunRequest(flags *modRunFlags) (modsapi.RunSubmitRequest, error) {
 		modEnvs = append(modEnvs, (*flags.ModEnvs)...)
 	}
 	modImage := ""
-	if flags.ModImage != nil {
-		modImage = strings.TrimSpace(*flags.ModImage)
+	if flags.JobImage != nil {
+		modImage = strings.TrimSpace(*flags.JobImage)
 	}
 	retain := false
 	if flags.Retain != nil {

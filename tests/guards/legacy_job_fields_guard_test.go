@@ -1,55 +1,59 @@
 package guards
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// TestNoNewLegacyJobFieldTokensInProtectedSurfaces blocks introducing new
-// legacy job-field names in protected interface surfaces while migration is in
-// progress. The baseline counts match the repository state when this guard was
-// added; counts may go down as migration progresses, but must not go up.
-func TestNoNewLegacyJobFieldTokensInProtectedSurfaces(t *testing.T) {
-	type tokenBudget map[string]int
-
-	budgets := map[string]tokenBudget{
-		"internal/nodeagent/job.go": {
-			"mod_type":   1,
-			"mod_image":  0,
-			"step_index": 0,
-			"ModType":    7,
-			"ModImage":   0,
-		},
-		"internal/workflow/contracts/job_meta.go": {
-			"mod_type":   0,
-			"mod_image":  0,
-			"step_index": 0,
-			"ModType":    0,
-			"ModImage":   0,
-		},
-		"docs/api/components/schemas/controlplane.yaml": {
-			"mod_type":   6,
-			"mod_image":  3,
-			"step_index": 14,
-			"ModType":    0,
-			"ModImage":   0,
-		},
+// TestNoLegacyJobFieldTokens enforces repository-wide removal of legacy job
+// field/type tokens after the next_id + job_* migration.
+func TestNoLegacyJobFieldTokens(t *testing.T) {
+	tokens := []string{
+		"step" + "_index",
+		"mod" + "_type",
+		"mod" + "_image",
+		"Mod" + "Type",
+		"Mod" + "Image",
 	}
 
-	for path, budget := range budgets {
-		content, err := os.ReadFile(resolveRepoPath(path))
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		text := string(content)
+	roots := []string{"internal", "cmd", "docs", "tests"}
 
-		for token, maxCount := range budget {
-			got := strings.Count(text, token)
-			if got > maxCount {
-				t.Fatalf("%s: token %q count increased: got=%d max=%d", path, token, got, maxCount)
+	for _, root := range roots {
+		rootPath := resolveRepoPath(root)
+		err := filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
+			if d.IsDir() {
+				return nil
+			}
+
+			content, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			// Skip binary-like files.
+			if bytes.IndexByte(content, 0) >= 0 {
+				return nil
+			}
+
+			text := string(content)
+			for _, token := range tokens {
+				if strings.Contains(text, token) {
+					rel, relErr := filepath.Rel(resolveRepoPath("."), path)
+					if relErr != nil {
+						rel = path
+					}
+					t.Fatalf("legacy token %q found in %s", token, rel)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", root, err)
 		}
 	}
 }

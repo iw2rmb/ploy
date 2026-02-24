@@ -46,7 +46,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
-				JobType:     domaintypes.ModTypePreGate.String(),
+				JobType:     domaintypes.JobTypePreGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -57,7 +57,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Attempt:     1,
 				Name:        "mod-0",
 				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.ModTypeMod.String(),
+				JobType:     domaintypes.JobTypeMod.String(),
 				Meta:        []byte(`{}`),
 			},
 		},
@@ -150,7 +150,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
-				JobType:     domaintypes.ModTypePreGate.String(),
+				JobType:     domaintypes.JobTypePreGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -161,7 +161,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "heal-1-0",
 				Status:      store.JobStatusSuccess,
-				JobType:     domaintypes.ModTypeHeal.String(),
+				JobType:     domaintypes.JobTypeHeal.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -172,7 +172,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
-				JobType:     domaintypes.ModTypeReGate.String(),
+				JobType:     domaintypes.JobTypeReGate.String(),
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -183,7 +183,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Attempt:     1,
 				Name:        "mod-0",
 				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.ModTypeMod.String(),
+				JobType:     domaintypes.JobTypeMod.String(),
 				Meta:        []byte(`{}`),
 			},
 		},
@@ -208,13 +208,13 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	if st.createJobParams[0].Name != "heal-2-0" {
 		t.Fatalf("expected first healing job name heal-2-0, got %q", st.createJobParams[0].Name)
 	}
-	if st.createJobParams[0].JobType != domaintypes.ModTypeHeal.String() {
+	if st.createJobParams[0].JobType != domaintypes.JobTypeHeal.String() {
 		t.Fatalf("expected heal job JobType=heal, got %q", st.createJobParams[0].JobType)
 	}
 	if st.createJobParams[1].Name != "re-gate-2" {
 		t.Fatalf("expected re-gate job name re-gate-2, got %q", st.createJobParams[1].Name)
 	}
-	if st.createJobParams[1].JobType != domaintypes.ModTypeReGate.String() {
+	if st.createJobParams[1].JobType != domaintypes.JobTypeReGate.String() {
 		t.Fatalf("expected re-gate job JobType=re_gate, got %q", st.createJobParams[1].JobType)
 	}
 	if st.createJobParams[1].NextID == nil || *st.createJobParams[1].NextID != mod0ID {

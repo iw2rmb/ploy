@@ -100,13 +100,13 @@ fi
 echo "[e2e] Verifying remote cache hit via structured gate metadata (post_gate)..."
 hit_count="$(
   psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qXAt \
-    -c "SET search_path TO ploy, public; SELECT count(*) FROM jobs WHERE run_id='${RUN_ID}' AND mod_type='post_gate' AND (meta->'gate'->'log_findings') @> '[{\"code\":\"GRADLE_BUILD_CACHE_HIT\"}]'::jsonb;"
+    -c "SET search_path TO ploy, public; SELECT count(*) FROM jobs WHERE run_id='${RUN_ID}' AND job_type='post_gate' AND (meta->'gate'->'log_findings') @> '[{\"code\":\"GRADLE_BUILD_CACHE_HIT\"}]'::jsonb;"
 )"
 hit_count="$(echo "$hit_count" | tr -d '[:space:]')"
 if [[ "${hit_count}" != "1" ]]; then
   echo "Error: expected exactly 1 post_gate cache-hit finding (GRADLE_BUILD_CACHE_HIT), got ${hit_count}" >&2
   psql "$PLOY_DB_DSN" -v ON_ERROR_STOP=1 -qX \
-    -c "SET search_path TO ploy, public; SELECT id, mod_type, status, meta FROM jobs WHERE run_id='${RUN_ID}' ORDER BY step_index;" >&2 || true
+    -c "SET search_path TO ploy, public; SELECT id, job_type, status, meta FROM jobs WHERE run_id='${RUN_ID}' ORDER BY next_id;" >&2 || true
   exit 1
 fi
 

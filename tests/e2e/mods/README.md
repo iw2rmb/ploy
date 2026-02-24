@@ -292,7 +292,7 @@ Configuration:
 - Spec uses stack-aware image map with `default`, `java-maven`, and `java-gradle` keys
 - Build Gate detects "java-maven" stack (pom.xml present) and selects corresponding image
 
-Stack resolution rules (from `internal/workflow/contracts/mod_image.go`):
+Stack resolution rules (from `internal/workflow/contracts/job_image.go`):
 1. **Universal image**: If `image` is a string, use it for all stacks.
 2. **Exact match**: If `image` is a map and contains the detected stack key, use that.
 3. **Default fallback**: If no exact match, use the `default` key when present.

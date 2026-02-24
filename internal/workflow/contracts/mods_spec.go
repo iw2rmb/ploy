@@ -115,7 +115,7 @@ type ModStep struct {
 
 	// Image is the container image for this step (required).
 	// Supports both universal images (string) and stack-specific images (map).
-	Image ModImage `json:"image,omitempty" yaml:"image,omitempty"`
+	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Command is the container command override for this step (optional).
 	// Can be a shell string or an exec array.

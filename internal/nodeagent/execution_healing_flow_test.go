@@ -107,7 +107,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 			Healing: &HealingConfig{
 				Retries: 1,
 				Mod: ModContainerSpec{
-					Image: contracts.ModImage{Universal: "test/healer:latest"},
+					Image: contracts.JobImage{Universal: "test/healer:latest"},
 					Env: map[string]string{
 						"HEAL_TASK": "fix-build",
 					},
@@ -258,7 +258,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 			Healing: &HealingConfig{
 				Retries: 1,
 				Mod: ModContainerSpec{
-					Image: contracts.ModImage{Universal: "test/healer:latest"},
+					Image: contracts.JobImage{Universal: "test/healer:latest"},
 				},
 			},
 		},

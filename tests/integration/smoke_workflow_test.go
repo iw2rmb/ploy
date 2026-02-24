@@ -142,9 +142,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "build-gate",
 		Status:      store.JobStatusRunning,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   0,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"build-gate"}`),
 	})
 	if err != nil {
@@ -161,9 +161,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main",
 		Status:      store.JobStatusCreated,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   1,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"mod","lane":"main"}`),
 	})
 	if err != nil {
@@ -180,9 +180,9 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "post-process",
 		Status:      store.JobStatusCreated,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   2,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"post-process","action":"upload-artifacts"}`),
 	})
 	if err != nil {
@@ -455,10 +455,10 @@ index abc1234..def5678 100644
 	t.Log("✓✓✓ Smoke workflow end-to-end test completed successfully")
 }
 
-// TestSmokeWorkflow_HealingDiffs validates that healing diffs with mod_type and step_index
+// TestSmokeWorkflow_HealingDiffs validates that healing diffs with job_type and next_id
 // are correctly stored and retrieved alongside mod diffs.
 // C2: This test verifies the unified job+diff model where both mod and healing diffs
-// share the same step_index, enabling rehydration to include all diffs for a step.
+// share the same next_id, enabling rehydration to include all diffs for a step.
 //
 // Requires: PLOY_TEST_PG_DSN environment variable.
 func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
@@ -481,7 +481,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	runRepo := fixture.RunRepo
 	t.Logf("✓ Created run: id=%v", run.ID)
 
-	// Create jobs for step 0 and step 1 so ListDiffsBeforeStep can filter by jobs.step_index.
+	// Create jobs for step 0 and step 1 so ListDiffsBeforeStep can filter by jobs.next_id.
 	jobStep0, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
@@ -490,9 +490,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-0",
 		Status:      store.JobStatusRunning,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   0,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"mod"}`),
 	})
 	if err != nil {
@@ -508,9 +508,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-1",
 		Status:      store.JobStatusRunning,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   1,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"mod"}`),
 	})
 	if err != nil {
@@ -518,14 +518,14 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created step 1 job: id=%v", jobStep1.ID)
 
-	// C2: Create diffs with step_index and mod_type in summary.
+	// C2: Create diffs with next_id and job_type in summary.
 	// Step 0: mod diff + healing diff
-	step0ModSummary := []byte(`{"step_index":0,"mod_type":"mod"}`)
-	step0HealSummary := []byte(`{"step_index":0,"mod_type":"healing","healing_attempt":1}`)
+	step0ModSummary := []byte(`{"next_id":0,"job_type":"mod"}`)
+	step0HealSummary := []byte(`{"next_id":0,"job_type":"healing","healing_attempt":1}`)
 	// Step 1: mod diff + 2 healing diffs
-	step1ModSummary := []byte(`{"step_index":1,"mod_type":"mod"}`)
-	step1Heal1Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":1}`)
-	step1Heal2Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":2}`)
+	step1ModSummary := []byte(`{"next_id":1,"job_type":"mod"}`)
+	step1Heal1Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":1}`)
+	step1Heal2Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":2}`)
 
 	// Create step 0 mod diff.
 	step0ModPatch := []byte{0x1f, 0x8b, 0x01} // Placeholder gzip bytes.
@@ -540,7 +540,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created step 0 mod diff: id=%v", step0ModDiff.ID)
 
-	// Create step 0 healing diff with same step_index.
+	// Create step 0 healing diff with same next_id.
 	step0HealPatch := []byte{0x1f, 0x8b, 0x02}
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:     run.ID,
@@ -605,10 +605,10 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ ListDiffsByRunRepo returned %d diffs", len(allDiffs))
 
 	// C2: Verify ListDiffsBeforeStep returns correct subset.
-	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).
+	// Query for next_id <= 0 should return 2 diffs (step 0 mod + heal).
 	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:     run.ID,
-		StepIndex: 0,
+		RunID:  run.ID,
+		NextID: 0,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
@@ -618,10 +618,10 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ ListDiffsBeforeStep(0) returned %d diffs", len(diffsBeforeStep0))
 
-	// Query for step_index <= 1 should return 5 diffs (all).
+	// Query for next_id <= 1 should return 5 diffs (all).
 	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:     run.ID,
-		StepIndex: 1,
+		RunID:  run.ID,
+		NextID: 1,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)
@@ -631,7 +631,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ ListDiffsBeforeStep(1) returned %d diffs", len(diffsBeforeStep1))
 
-	// Verify ordering: diffs are ordered by created_at ASC (step_index is now on jobs, not diffs).
+	// Verify ordering: diffs are ordered by created_at ASC (next_id is now on jobs, not diffs).
 	t.Logf("✓ Verified diff ordering (by created_at)")
 	_ = diffsBeforeStep1 // Silence unused variable warning.
 

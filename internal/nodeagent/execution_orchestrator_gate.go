@@ -36,13 +36,13 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
 	typedOpts := req.TypedOptions
 
-	// Thread Stack Gate expectation based on gate type without step_index dependence.
+	// Thread Stack Gate expectation based on gate type without next_id dependence.
 	if len(typedOpts.Steps) > 0 {
 		stepIdx := 0
 		switch req.JobType {
-		case types.ModTypePreGate:
+		case types.JobTypePreGate:
 			stepIdx = 0
-		case types.ModTypePostGate, types.ModTypeReGate:
+		case types.JobTypePostGate, types.JobTypeReGate:
 			stepIdx = len(typedOpts.Steps) - 1
 		}
 		step := typedOpts.Steps[stepIdx]
@@ -51,16 +51,16 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			modImages := typedOpts.BuildGate.Images
 
 			switch req.JobType {
-			case types.ModTypePreGate:
+			case types.JobTypePreGate:
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, modImages)
 				}
-			case types.ModTypePostGate:
+			case types.JobTypePostGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
 				}
 			// Note: re_gate uses same expectations as post_gate (verifying output after healing)
-			case types.ModTypeReGate:
+			case types.JobTypeReGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
 				}
@@ -277,17 +277,17 @@ func (r *runController) runRouterForGateFailure(
 //   - post_gate may use build_gate.post.stack as a fallback/override.
 //   - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
 //     stackdetect output to select the runtime image/tool.
-func applyGateStackDetect(manifest *contracts.StepManifest, modType types.ModType, typedOpts RunOptions) {
+func applyGateStackDetect(manifest *contracts.StepManifest, modType types.JobType, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
 
 	switch modType {
-	case types.ModTypePreGate:
+	case types.JobTypePreGate:
 		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
 		}
-	case types.ModTypePostGate:
+	case types.JobTypePostGate:
 		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
 		}

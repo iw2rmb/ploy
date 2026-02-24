@@ -3,7 +3,7 @@
 // This file owns the Start method that continuously polls for work (jobs)
 // with exponential backoff. Backoff increases when no work is available or
 // on errors, and resets when work is successfully claimed.
-// Nodes claim from a single unified jobs queue (FIFO by step_index); there
+// Nodes claim from a single unified jobs queue (FIFO by next_id); there
 // is no separate Build Gate queue or claim path. Isolating loop mechanics
 // from claim/execution details simplifies backoff testing.
 package nodeagent
@@ -23,7 +23,7 @@ import (
 // Start begins the claim loop.
 // Continuously polls for work (jobs) using a ticker with exponential backoff.
 // Backoff increases when no work is available or on errors, resets when work is successfully claimed.
-// Nodes claim from a single unified jobs queue (FIFO by step_index).
+// Nodes claim from a single unified jobs queue (FIFO by next_id).
 func (c *ClaimManager) Start(ctx context.Context) error {
 	// Initialize ticker with the initial backoff interval from shared policy.
 	ticker := time.NewTicker(time.Duration(c.backoff.GetDuration()))
@@ -57,7 +57,7 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 }
 
 // claimAndExecute attempts to claim a job from the unified queue and execute it.
-// Jobs are claimed FIFO by step_index from a single queue — there is no separate
+// Jobs are claimed FIFO by next_id from a single queue — there is no separate
 // Build Gate queue or claim path. All job types (pre-gate, mod, heal, re-gate,
 // post-gate) are consumed from the same queue.
 // Returns true if a job was claimed, false if no work is available (204).

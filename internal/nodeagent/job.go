@@ -21,15 +21,15 @@ const (
 
 func (s JobStatus) String() string { return string(s) }
 
-// DiffModType represents the mod_type value used to tag diffs.
-type DiffModType string
+// DiffJobType represents the job_type value used to tag diffs.
+type DiffJobType string
 
 const (
-	DiffModTypeMod     DiffModType = "mod"
-	DiffModTypeHealing DiffModType = "healing"
+	DiffJobTypeMod     DiffJobType = "mod"
+	DiffJobTypeHealing DiffJobType = "healing"
 )
 
-func (t DiffModType) String() string { return string(t) }
+func (t DiffJobType) String() string { return string(t) }
 
 // --- Job image name persistence ---
 

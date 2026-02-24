@@ -110,7 +110,7 @@ func healingRequest(runID, jobID string, retries int, modImage string) StartRunR
 		req.TypedOptions = RunOptions{
 			Healing: &HealingConfig{
 				Retries: retries,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: modImage}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: modImage}},
 			},
 		}
 	} else {

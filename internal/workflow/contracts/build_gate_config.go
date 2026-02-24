@@ -60,7 +60,7 @@ type HealingSpec struct {
 
 	// Image is the container image for the healing mod (required).
 	// Supports both universal images (string) and stack-specific images (map).
-	Image ModImage `json:"image,omitempty" yaml:"image,omitempty"`
+	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Command is the container command override (optional).
 	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
@@ -77,7 +77,7 @@ type HealingSpec struct {
 // RetainContainer) but has no Retries — it runs exactly once per gate failure.
 type RouterSpec struct {
 	// Image is the container image for the router (required).
-	Image ModImage `json:"image,omitempty" yaml:"image,omitempty"`
+	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Command is the container command override (optional).
 	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`

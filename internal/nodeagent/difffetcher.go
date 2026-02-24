@@ -88,7 +88,7 @@ func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunI
 		}
 
 		// Skip legacy healing-tagged diffs; discrete healing jobs are tagged as "mod".
-		if d.Summary.ModType() == DiffModTypeHealing.String() {
+		if d.Summary.JobType() == DiffJobTypeHealing.String() {
 			continue
 		}
 
@@ -96,7 +96,7 @@ func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunI
 	}
 
 	// Sort by (created_at, id) for deterministic patch application order without
-	// step_index dependence.
+	// next_id dependence.
 	sort.SliceStable(relevantDiffs, func(i, j int) bool {
 		if !relevantDiffs[i].CreatedAt.Equal(relevantDiffs[j].CreatedAt) {
 			return relevantDiffs[i].CreatedAt.Before(relevantDiffs[j].CreatedAt)
@@ -136,7 +136,7 @@ func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.Run
 		if si > stepIndex {
 			continue
 		}
-		if d.Summary.ModType() == DiffModTypeHealing.String() {
+		if d.Summary.JobType() == DiffJobTypeHealing.String() {
 			continue
 		}
 		relevantDiffs = append(relevantDiffs, d)

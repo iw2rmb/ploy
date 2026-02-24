@@ -55,7 +55,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageNameParams.ID, jobID)
 	}
 	if st.updateJobImageNameParams.JobImage != "docker.io/example/mods:latest" {
-		t.Fatalf("UpdateJobImageName ModImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/mods:latest")
+		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/mods:latest")
 	}
 }
 
@@ -199,7 +199,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	}
 }
 
-func TestSaveJobImageName_ConflictWrongModType(t *testing.T) {
+func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 	t.Parallel()
 
 	nodeIDStr := domaintypes.NewNodeKey()

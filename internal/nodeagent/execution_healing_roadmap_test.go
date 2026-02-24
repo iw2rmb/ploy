@@ -53,10 +53,10 @@ func TestRouter_FailingGateTriggersRouterAndSetsBugSummary(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
 			},
 			Router: &ModContainerSpec{
-				Image: contracts.ModImage{Universal: "test/router:latest"},
+				Image: contracts.JobImage{Universal: "test/router:latest"},
 			},
 		},
 	}
@@ -109,10 +109,10 @@ func TestRouter_NotRunWhenGatePasses(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
 			},
 			Router: &ModContainerSpec{
-				Image: contracts.ModImage{Universal: "test/router:latest"},
+				Image: contracts.JobImage{Universal: "test/router:latest"},
 			},
 		},
 	}
@@ -365,10 +365,10 @@ func TestHealingLog_BugSummaryIncludedWhenRouterRuns(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
 			},
 			Router: &ModContainerSpec{
-				Image: contracts.ModImage{Universal: "test/router:latest"},
+				Image: contracts.JobImage{Universal: "test/router:latest"},
 			},
 		},
 	}

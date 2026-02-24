@@ -167,7 +167,7 @@ func (v StepIndex) Valid() bool {
 
 func (v StepIndex) MarshalJSON() ([]byte, error) {
 	if !v.Valid() {
-		return nil, fmt.Errorf("invalid step_index")
+		return nil, fmt.Errorf("invalid next_id")
 	}
 	return json.Marshal(float64(v))
 }
@@ -182,7 +182,7 @@ func (v *StepIndex) UnmarshalJSON(b []byte) error {
 	}
 	si := StepIndex(f)
 	if !si.Valid() {
-		return fmt.Errorf("invalid step_index")
+		return fmt.Errorf("invalid next_id")
 	}
 	*v = si
 	return nil

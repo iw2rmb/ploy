@@ -108,7 +108,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		TypedOptions: RunOptions{
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/codex-healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "test/codex-healer:latest"}},
 			},
 		},
 	}
@@ -202,7 +202,7 @@ func (t *trackingDiffGenerator) GenerateBetween(ctx context.Context, baseDir, mo
 }
 
 // TestUploadHealingJobDiff_UsesGenerateBetween verifies that discrete healing jobs
-// use GenerateBetween (repo+diff semantics) and still publish mod_type="mod" diffs.
+// use GenerateBetween (repo+diff semantics) and still publish job_type="mod" diffs.
 func TestUploadHealingJobDiff_UsesGenerateBetween(t *testing.T) {
 	t.Parallel()
 

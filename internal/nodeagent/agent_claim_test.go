@@ -457,12 +457,12 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 }
 
 // TestClaimLoop_StepIndexMapping verifies that when a step-level claim includes
-// step_index, it is correctly mapped into StartRunRequest.StepIndex, enabling
+// next_id, it is correctly mapped into StartRunRequest.StepIndex, enabling
 // single-step execution in multi-node scenarios.
 func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	t.Parallel()
 
-	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
+	stepIndex := types.StepIndex(2000) // Job next_id uses StepIndex type
 	commit := types.CommitSHA("abc123")
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
@@ -481,7 +481,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/multi-step"),
 		CommitSha: &commit,
-		StepIndex: stepIndex, // Job step_index: StepIndex type.
+		StepIndex: stepIndex, // Job next_id: StepIndex type.
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -490,7 +490,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/nodes/" + nodeIDStr + "/claim":
-			// Return step-level claim with step_index.
+			// Return step-level claim with next_id.
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
 		default:

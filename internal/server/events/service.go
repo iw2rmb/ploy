@@ -176,7 +176,7 @@ func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID
 
 // publishLogToHubWithBytes converts log data to logstream events and publishes them.
 // It enriches each LogRecord with execution context (node_id, job_id, job_type,
-// step_index) by looking up the associated job metadata when available.
+// next_id) by looking up the associated job metadata when available.
 func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
@@ -248,7 +248,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 type jobContext struct {
 	NodeID    domaintypes.NodeID
 	JobID     domaintypes.JobID
-	JobType   domaintypes.ModType
+	JobType   domaintypes.JobType
 	StepIndex domaintypes.StepIndex
 }
 
@@ -277,7 +277,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 
 	// Normalize and validate job metadata before enrichment.
 	//
-	// job.ID/job.NodeID are typed IDs; job.JobType must satisfy ModType.Validate().
+	// job.ID/job.NodeID are typed IDs; job.JobType must satisfy JobType.Validate().
 	//
 	// Invalid values are omitted from enrichment to keep the emitted SSE payload
 	// contract strict.
@@ -289,7 +289,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		nid = *job.NodeID
 	}
 
-	mt := domaintypes.ModType(domaintypes.Normalize(job.JobType))
+	mt := domaintypes.JobType(domaintypes.Normalize(job.JobType))
 	if !mt.IsZero() {
 		if err := mt.Validate(); err != nil {
 			s.logger.Debug("invalid job_type for log enrichment",
@@ -301,18 +301,18 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		}
 	}
 
-	// step_index is no longer persisted on jobs; preserve log enrichment support
+	// next_id is no longer persisted on jobs; preserve log enrichment support
 	// by reading optional metadata when present.
 	var si domaintypes.StepIndex
 	var stepMeta struct {
-		StepIndex *float64 `json:"step_index,omitempty"`
+		StepIndex *float64 `json:"next_id,omitempty"`
 	}
 	if len(job.Meta) > 0 && json.Unmarshal(job.Meta, &stepMeta) == nil && stepMeta.StepIndex != nil {
 		si = domaintypes.StepIndex(*stepMeta.StepIndex)
 		if !si.Valid() {
-			s.logger.Debug("invalid step_index metadata for log enrichment",
+			s.logger.Debug("invalid next_id metadata for log enrichment",
 				"job_id", job.ID.String(),
-				"step_index", *stepMeta.StepIndex,
+				"next_id", *stepMeta.StepIndex,
 			)
 			si = 0
 		}

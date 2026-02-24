@@ -1,6 +1,6 @@
-// mod_image.go provides stack-aware image resolution for Mods specs.
+// job_image.go provides stack-aware image resolution for Mods specs.
 //
-// This file implements the ModImage type that supports two canonical forms:
+// This file implements the JobImage type that supports two canonical forms:
 //   - Universal image (string): A single image used for all build stacks.
 //   - Stack-specific image (map): Different images per detected build stack.
 //
@@ -13,8 +13,8 @@
 // ## Stack Resolution Rules
 //
 // When resolving an image for a given stack:
-//  1. If ModImage is a string, return that string (universal image).
-//  2. If ModImage is a map:
+//  1. If JobImage is a string, return that string (universal image).
+//  2. If JobImage is a map:
 //     a. Prefer an exact stack key match (e.g., "java-maven", "java-gradle").
 //     b. Fall back to "default" when present and no exact match exists.
 //     c. Return an error when neither a matching key nor "default" is present.
@@ -55,7 +55,7 @@ const (
 	ModStackDefault ModStack = "default"
 )
 
-// ModImage represents a mod container image specification supporting two
+// JobImage represents a mod container image specification supporting two
 // canonical forms: universal images (single string) and stack-specific images
 // (map by stack). Both forms are first-class schema options.
 //
@@ -69,7 +69,7 @@ const (
 //	  default: docker.io/user/mods-openrewrite:latest
 //	  java-maven: docker.io/user/mods-orw-maven:latest
 //	  java-gradle: docker.io/user/mods-orw-gradle:latest
-type ModImage struct {
+type JobImage struct {
 	// Universal holds the image when specified as a single string.
 	// When non-empty, this image is used regardless of detected stack.
 	Universal string
@@ -81,30 +81,30 @@ type ModImage struct {
 }
 
 // IsEmpty returns true if no image is specified in either form.
-func (m ModImage) IsEmpty() bool {
+func (m JobImage) IsEmpty() bool {
 	return m.Universal == "" && len(m.ByStack) == 0
 }
 
 // IsUniversal returns true if the image is specified as a universal string.
-func (m ModImage) IsUniversal() bool {
+func (m JobImage) IsUniversal() bool {
 	return m.Universal != "" && len(m.ByStack) == 0
 }
 
 // IsStackSpecific returns true if the image is specified as a stack map.
-func (m ModImage) IsStackSpecific() bool {
+func (m JobImage) IsStackSpecific() bool {
 	return len(m.ByStack) > 0
 }
 
 // ResolveImage resolves the image for the given stack using resolution rules:
-//  1. If ModImage is a universal string, return that string.
-//  2. If ModImage is a stack map:
+//  1. If JobImage is a universal string, return that string.
+//  2. If JobImage is a stack map:
 //     a. Prefer an exact stack key match.
 //     b. Fall back to "default" when present.
 //     c. Return an error when neither exists.
 //
 // The stack parameter should come from Build Gate detection (e.g., "java-maven").
-// An empty ModImage returns an error. An empty stack uses "unknown" as default.
-func (m ModImage) ResolveImage(stack ModStack) (string, error) {
+// An empty JobImage returns an error. An empty stack uses "unknown" as default.
+func (m JobImage) ResolveImage(stack ModStack) (string, error) {
 	// Normalize empty stack to "unknown".
 	if stack == "" {
 		stack = ModStackUnknown
@@ -138,20 +138,20 @@ func (m ModImage) ResolveImage(stack ModStack) (string, error) {
 	)
 }
 
-// ParseModImage parses an image specification from an untyped value.
+// ParseJobImage parses an image specification from an untyped value.
 // Both canonical forms are accepted:
 //   - string: Parsed as a universal image (used for all stacks).
 //   - map[string]any or map[string]string: Parsed as stack-specific images.
 //
-// Returns an empty ModImage for nil input without error.
-func ParseModImage(v any) (ModImage, error) {
+// Returns an empty JobImage for nil input without error.
+func ParseJobImage(v any) (JobImage, error) {
 	if v == nil {
-		return ModImage{}, nil
+		return JobImage{}, nil
 	}
 
 	// Case 1: String - universal image.
 	if s, ok := v.(string); ok {
-		return ModImage{Universal: strings.TrimSpace(s)}, nil
+		return JobImage{Universal: strings.TrimSpace(s)}, nil
 	}
 
 	// Case 2: Map - stack-specific images.
@@ -162,30 +162,30 @@ func ParseModImage(v any) (ModImage, error) {
 		for k, val := range m {
 			img, ok := val.(string)
 			if !ok {
-				return ModImage{}, fmt.Errorf(
+				return JobImage{}, fmt.Errorf(
 					"image[%q]: expected string, got %T", k, val,
 				)
 			}
 			byStack[ModStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
 		}
-		return ModImage{ByStack: byStack}, nil
+		return JobImage{ByStack: byStack}, nil
 
 	case map[string]string:
 		byStack := make(map[ModStack]string, len(m))
 		for k, img := range m {
 			byStack[ModStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
 		}
-		return ModImage{ByStack: byStack}, nil
+		return JobImage{ByStack: byStack}, nil
 
 	default:
-		return ModImage{}, fmt.Errorf(
+		return JobImage{}, fmt.Errorf(
 			"image: expected string or map, got %T", v,
 		)
 	}
 }
 
 // String returns a human-readable representation for debugging.
-func (m ModImage) String() string {
+func (m JobImage) String() string {
 	if m.Universal != "" {
 		return m.Universal
 	}
@@ -200,9 +200,9 @@ func (m ModImage) String() string {
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
 
-// MarshalJSON implements json.Marshaler for ModImage.
+// MarshalJSON implements json.Marshaler for JobImage.
 // Serializes as a string when Universal is set, or as a map when ByStack is set.
-func (m ModImage) MarshalJSON() ([]byte, error) {
+func (m JobImage) MarshalJSON() ([]byte, error) {
 	if m.Universal != "" {
 		return json.Marshal(m.Universal)
 	}
@@ -216,9 +216,9 @@ func (m ModImage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(nil)
 }
 
-// UnmarshalJSON implements json.Unmarshaler for ModImage.
+// UnmarshalJSON implements json.Unmarshaler for JobImage.
 // Accepts both string and map forms from JSON.
-func (m *ModImage) UnmarshalJSON(data []byte) error {
+func (m *JobImage) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}

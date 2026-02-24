@@ -99,7 +99,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 }
 
-// TestClaimJob_FIFO tests that jobs are claimed in FIFO order by step_index.
+// TestClaimJob_FIFO tests that jobs are claimed in FIFO order by next_id.
 func TestClaimJob_FIFO(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
@@ -116,7 +116,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/fifo", "main", "feature", []byte(`{"type":"fifo"}`))
 	run := fx.Run
 
-	// Create three pending jobs with different step_index values.
+	// Create three pending jobs with different next_id values.
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
@@ -196,7 +196,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
-	// Claim jobs and verify they are claimed in step_index order.
+	// Claim jobs and verify they are claimed in next_id order.
 	claimed1, err := db.ClaimJob(ctx, node1.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() for node1 failed: %v", err)
@@ -516,7 +516,7 @@ func ipForTest(subnet, host int) string {
 	return "192.168." + strconv.Itoa(subnet) + "." + strconv.Itoa(host)
 }
 
-// TestClaimJob_OrdersByStepIndex tests that ClaimJob claims jobs in step_index order
+// TestClaimJob_OrdersByStepIndex tests that ClaimJob claims jobs in next_id order
 // regardless of creation order.
 func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
@@ -534,7 +534,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/step-order", "main", "feature", []byte(`{"type":"step-order"}`))
 	run := fx.Run
 
-	// Create jobs in reverse step_index order to verify ordering.
+	// Create jobs in reverse next_id order to verify ordering.
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
@@ -596,7 +596,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
-	// Claim jobs and verify they come in step_index order (1000, 2000, 3000).
+	// Claim jobs and verify they come in next_id order (1000, 2000, 3000).
 	claimed1, err := db.ClaimJob(ctx, node.ID)
 	if err != nil {
 		t.Fatalf("ClaimJob() 1 failed: %v", err)

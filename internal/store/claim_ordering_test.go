@@ -9,11 +9,11 @@ import (
 )
 
 // TestClaimJobOrderingDeterministic verifies that ClaimJob ordering is deterministic
-// when multiple jobs have the same step_index. Ties should resolve by job id (ASC).
+// when multiple jobs have the same next_id. Ties should resolve by job id (ASC).
 //
 // The implementation scopes ordering to the correct domain and adds a stable
-// tie-breaker (… ORDER BY run_id, repo_id, attempt, step_index, id) so claim
-// behavior cannot vary when step_index ties.
+// tie-breaker (… ORDER BY run_id, repo_id, attempt, next_id, id) so claim
+// behavior cannot vary when next_id ties.
 //
 // Requires PLOY_TEST_PG_DSN to be set with a test database.
 func TestClaimJobOrderingDeterministic(t *testing.T) {
@@ -32,7 +32,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/deterministic-order", "main", "feature", []byte(`{"type":"deterministic"}`))
 	run := fx.Run
 
-	// Create jobs with the SAME step_index to test tie-breaking by id.
+	// Create jobs with the SAME next_id to test tie-breaking by id.
 	const sameStepIndex = types.StepIndex(5000)
 	const numJobs = 5
 
@@ -259,10 +259,10 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		return jobID
 	}
 
-	// Force conflicts so ordering must respect run_id/repo_id before step_index:
-	// - run_low + repo_low gets the largest step_index
-	// - run_low + repo_high gets a smaller step_index
-	// - run_high + repo_low gets the smallest step_index
+	// Force conflicts so ordering must respect run_id/repo_id before next_id:
+	// - run_low + repo_low gets the largest next_id
+	// - run_low + repo_high gets a smaller next_id
+	// - run_high + repo_low gets the smallest next_id
 	jobRunLowRepoLow := createJob(runLow, repoLow, types.StepIndex(2000))
 	jobRunLowRepoHigh := createJob(runLow, repoHigh, types.StepIndex(1000))
 	jobRunHighRepoLow := createJob(runHigh, repoLow, types.StepIndex(500))

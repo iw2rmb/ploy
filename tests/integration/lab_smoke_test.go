@@ -104,9 +104,9 @@ func TestLabSmoke(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "build",
 		Status:      store.JobStatusRunning,
-		ModType:     "",
-		ModImage:    "",
-		StepIndex:   0,
+		JobType:     "",
+		JobImage:    "",
+		NextID:      nil,
 		Meta:        []byte(`{"type":"build","tool":"make"}`),
 	})
 	if err != nil {

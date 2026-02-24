@@ -225,7 +225,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		}
 	}()
 
-	slog.Info("starting MR job execution", "run_id", req.RunID, "job_id", req.JobID, "step_index", req.StepIndex)
+	slog.Info("starting MR job execution", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex)
 
 	mrURL, mrErr := r.createMR(ctx, req, manifest, workspace)
 	duration := time.Since(startTime)

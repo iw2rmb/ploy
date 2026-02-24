@@ -80,7 +80,7 @@ func TestSnapshotWorkspaceForNoIndexDiff_CreatesSnapshot(t *testing.T) {
 	runID := types.RunID("test-run")
 	jobID := types.JobID("test-job")
 
-	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffModTypeMod, workspace)
+	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffJobTypeMod, workspace)
 	defer result.cleanup()
 
 	// Verify the snapshot was created.
@@ -112,7 +112,7 @@ func TestSnapshotWorkspaceForNoIndexDiff_CleanupWorks(t *testing.T) {
 	runID := types.RunID("test-run")
 	jobID := types.JobID("test-job")
 
-	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffModTypeHealing, workspace)
+	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffJobTypeHealing, workspace)
 
 	// Capture the snapshot directory path.
 	snapshotDir := result.dir
@@ -138,7 +138,7 @@ func TestSnapshotWorkspaceForNoIndexDiff_NoGitRepo_ReturnsEmpty(t *testing.T) {
 	runID := types.RunID("test-run")
 	jobID := types.JobID("test-job")
 
-	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffModTypeMod, workspace)
+	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffJobTypeMod, workspace)
 	defer result.cleanup() // Should be safe to call even with empty dir.
 
 	// Verify the snapshot failed (empty dir).
