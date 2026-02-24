@@ -178,7 +178,7 @@ mr_on_fail: true
 ################################################################################
 # NOTES
 ################################################################################
-# - This YAML is submitted via: `ploy mod run --spec mod.yaml` along with
+# - This YAML is submitted via: `ploy mig run --spec mod.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
 #
 # - The agent honors: image, command, env, retain_container,

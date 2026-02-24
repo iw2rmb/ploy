@@ -56,12 +56,12 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	}
 
 	// Subcommands: wire existing handlers into cobra commands.
-	// Commands are structured via dedicated builder functions (newModCmd, newClusterCmd, etc.)
+	// Commands are structured via dedicated builder functions (newMigCmd, newClusterCmd, etc.)
 	// that encapsulate command hierarchy and preserve existing business logic.
 	// Each builder function creates a cobra command tree with proper subcommand structure.
 
 	// Mods workflow commands
-	root.AddCommand(newModCmd(stderr))  // ploy mod (run, fetch, cancel, inspect, artifacts, diffs)
+	root.AddCommand(newMigCmd(stderr))  // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
 	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
@@ -97,8 +97,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 			} else {
 				// Dispatch to existing help handlers for subcommands.
 				switch args[0] {
-				case "mod":
-					printModUsage(stderr)
+				case "mig":
+					printMigUsage(stderr)
 				case "run":
 					printRunUsage(stderr)
 				case "pull":

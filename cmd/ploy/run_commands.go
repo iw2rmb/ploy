@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
-	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/migs"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -90,7 +90,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Rich summary output (previously used by `ploy mod run status`).
+	// Rich summary output (previously used by `ploy mig run status`).
 	_, _ = fmt.Fprintf(stderr, "Run: %s\n", summary.ID)
 	_, _ = fmt.Fprintf(stderr, "Status: %s\n", summary.Status)
 	_, _ = fmt.Fprintf(stderr, "Mod ID: %s\n", summary.MigID)
@@ -159,7 +159,7 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	cmd := mods.LogsCommand{
+	cmd := migs.LogsCommand{
 		RunID:  domaintypes.RunID(runID),
 		Format: logs.Format(strings.ToLower(strings.TrimSpace(*format))),
 		Output: stderr,
@@ -171,7 +171,7 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 		BaseURL: base,
 	}
 	if err := cmd.Run(ctx); err != nil {
-		if errors.Is(err, mods.ErrInvalidFormat) {
+		if errors.Is(err, migs.ErrInvalidFormat) {
 			printRunUsage(stderr)
 		}
 		return err

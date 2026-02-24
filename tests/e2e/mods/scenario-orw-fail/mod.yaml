@@ -1,6 +1,6 @@
 # Minimal spec for the failing Build Gate → router summary → Codex heal → re-gate → ORW apply scenario.
 # Submit with:
-#   dist/ploy mod run \
+#   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
 #     --repo-base-ref e2e/fail-missing-symbol \
 #     --repo-target-ref mods-upgrade-java17-heal \

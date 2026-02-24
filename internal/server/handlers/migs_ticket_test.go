@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )

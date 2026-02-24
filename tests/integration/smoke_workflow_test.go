@@ -14,8 +14,8 @@ import (
 
 type v1RunFixture struct {
 	Spec    store.Spec
-	Mod     store.Mod
-	ModRepo store.ModRepo
+	Mod     store.Mig
+	ModRepo store.MigRepo
 	Run     store.Run
 	RunRepo store.RunRepo
 }

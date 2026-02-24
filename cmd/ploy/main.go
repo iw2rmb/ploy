@@ -43,7 +43,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  ploy <command> [<args>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Core Commands:")
-	_, _ = fmt.Fprintln(w, "  mod              Plan and run Mods workflows")
+	_, _ = fmt.Fprintln(w, "  mig              Plan and run Migs workflows")
 	_, _ = fmt.Fprintln(w, "  run              Inspect runs and stream events")
 	_, _ = fmt.Fprintln(w, "  pull             Pull Mods diffs for current repo HEAD")
 	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, rollout, tokens)")

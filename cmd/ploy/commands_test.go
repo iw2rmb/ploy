@@ -10,7 +10,7 @@ import (
 
 // TestCommandsWiredIntoRoot verifies that all command builders are properly
 // wired into the root cobra command tree. This test ensures that the refactored
-// command structure (using newModCmd, newClusterCmd, etc.) properly integrates
+// command structure (using newMigCmd, newClusterCmd, etc.) properly integrates
 // with the root command.
 func TestCommandsWiredIntoRoot(t *testing.T) {
 	// Create root command with stderr buffer to capture output.
@@ -23,7 +23,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 	// Token operations are now accessible only via `ploy cluster token`.
 	expectedCommands := []string{
 		"version",  // Built-in version command
-		"mod",      // newModCmd
+		"mig",      // newMigCmd
 		"run",      // newRunCmd
 		"pull",     // newPullCmd
 		"cluster",  // newClusterCmd (includes token, node, rollout, deploy)
@@ -69,7 +69,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		name    string
 		builder func(w *bytes.Buffer) *cobra.Command
 	}{
-		{"newModCmd", func(w *bytes.Buffer) *cobra.Command { return newModCmd(w) }},
+		{"newMigCmd", func(w *bytes.Buffer) *cobra.Command { return newMigCmd(w) }},
 		{"newRunCmd", func(w *bytes.Buffer) *cobra.Command { return newRunCmd(w) }},
 		{"newPullCmd", func(w *bytes.Buffer) *cobra.Command { return newPullCmd(w) }},
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},
@@ -153,7 +153,7 @@ func TestRootCmdPreservesExistingBehavior(t *testing.T) {
 // documentation examples stay accurate when the CLI structure changes.
 //
 // The test validates:
-// - Root help includes all expected commands (mod, cluster, etc.)
+// - Root help includes all expected commands (mig, cluster, etc.)
 // - The completion command is documented and functional
 // - Help format matches cobra conventions
 // - Key commands have proper Short descriptions
@@ -177,7 +177,7 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 			expectedInHelp: []string{
 				"Ploy CLI v2",
 				"Core Commands:",
-				"mod",
+				"mig",
 				"cluster",
 				"config",
 				"manifest",
@@ -200,16 +200,16 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 			description:    "completion bash must generate bash completion script",
 		},
 		{
-			name: "mod command shows subcommands",
-			args: []string{"mod", "--help"},
+			name: "mig command shows subcommands",
+			args: []string{"mig", "--help"},
 			expectedInHelp: []string{
-				"mod",
+				"mig",
 				"run",
 				"run repo",
 				"artifacts",
 			},
 			mustContainAll: true,
-			description:    "mod --help must list all subcommands",
+			description:    "mig --help must list all subcommands",
 		},
 	}
 

@@ -58,14 +58,14 @@ Exclusions (do not rename these in bulk scans):
   - Tests: Handler unit tests updated to `/v1/migs/...`; integration tests for run creation, spec/repo operations, and pull resolution.
 
 ## Phase 2: CLI and Client Surface Rename
-- [ ] Replace CLI command group `mod` with `mig` end-to-end — users should have only one command vocabulary.
+- [x] Replace CLI command group `mod` with `mig` end-to-end — users should have only one command vocabulary.
   - Repository: `ploy`
   - Component: `cmd/ploy`, `internal/cli/*`
-  - Scope: Rename command files (`mod_*.go` -> `mig_*.go`), command registration/help text (`ploy mod` -> `ploy mig`), and all flags/messages/docs strings (`--mod-image` style flags to `--mig-image`, etc.) without aliases.
+  - Scope: Rename command files (`mod_*.go` -> `mig_*.go`), command registration/help text (`ploy mod` -> `ploy mig`), and all flags/messages/docs strings (`--mod-image` style flags to `--job-image`, etc.) without aliases.
   - Snippets: `cmd/ploy/mod_command.go`, `cmd/ploy/mod_run_flags.go`, `internal/cli/mods/*`
   - Tests: CLI command tests + smoke checks updated to `ploy mig`; rebuild help golden files.
 
-- [ ] Rename internal package/module paths from `mods` to `migs` — removes mixed imports and inconsistent package names.
+- [x] Rename internal package/module paths from `mods` to `migs` — removes mixed imports and inconsistent package names.
   - Repository: `ploy`
   - Component: `internal/mods`, `internal/cli/mods`, imports across repository
   - Scope: Move package directories and update import paths (`internal/mods/api` -> `internal/migs/api`, `internal/cli/mods` -> `internal/cli/migs`), then update all call sites.

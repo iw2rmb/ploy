@@ -19,8 +19,8 @@ Common command patterns:
 
 ```bash
 ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->  # submit a single-repo run
-ploy mod run <mod-id|name> [--repo <url> ...] [--failed]                   # execute a mod project over its repo set
-ploy mod run \
+ploy mig run <mod-id|name> [--repo <url> ...] [--failed]                   # execute a mod project over its repo set
+ploy mig run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
@@ -32,12 +32,12 @@ Run IDs (`<run-id>`) are KSUID-backed strings.
 Treat them as opaque identifiers when passing them between commands or scripts.
 
 Note on `--json` output:
-- When `--json` is supplied (e.g., `ploy mod run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, optional `artifact_dir`, `mr_url`).
+- When `--json` is supplied (e.g., `ploy mig run --json`), stdout emits a compact JSON summary (fields include `run_id`, `final_state`, optional `artifact_dir`, `mr_url`).
 - Human‑readable progress continues to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
 
 Quick capture example:
 ```bash
-TICKET=$(ploy mod run --json \
+TICKET=$(ploy mig run --json \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade \
@@ -74,31 +74,31 @@ Mod projects are long-lived containers with a unique name, a current spec, and a
 
 ```bash
 # Create a mod project.
-ploy mod add --name my-mod --spec mod.yaml
+ploy mig add --name my-mod --spec mod.yaml
 
 # Update the mod's current spec.
-ploy mod spec set my-mod mod.yaml
+ploy mig spec set my-mod mod.yaml
 
 # Manage the mod's repo set.
-ploy mod repo add my-mod --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
-ploy mod repo add my-mod --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
-ploy mod repo list my-mod
+ploy mig repo add my-mod --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
+ploy mig repo add my-mod --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
+ploy mig repo list my-mod
 
 # Execute the mod project (all repos by default).
-ploy mod run my-mod
+ploy mig run my-mod
 
 # Execute only specific repos (repeatable).
-ploy mod run my-mod --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
+ploy mig run my-mod --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
 
 # Re-run only repos whose last terminal state is Fail.
-ploy mod run my-mod --failed
+ploy mig run my-mod --failed
 ```
 
 ## Batched Mod Runs
 
 `mod run` supports two usage patterns: **single-repo runs** and **batch runs** that
-operate over multiple repositories under a shared run spec. In a batch, `ploy mod run`
-submits the spec once, then `ploy mod run repo add` attaches multiple repositories
+operate over multiple repositories under a shared run spec. In a batch, `ploy mig run`
+submits the spec once, then `ploy mig run repo add` attaches multiple repositories
 under the same run via `run_repos`.
 
 ### Single-Repo Run (Default)
@@ -108,7 +108,7 @@ The run executes immediately against that repository:
 
 ```bash
 # Single repository run — executes mods against one repo and follows job graph.
-ploy mod run --spec mod.yaml \
+ploy mig run --spec mod.yaml \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
   --repo-target-ref feature-branch \
@@ -125,16 +125,16 @@ incrementally:
 
 ```bash
 # Step 1: Create a named batch run (no repository attached yet).
-ploy mod run --spec mod.yaml --name my-batch
+ploy mig run --spec mod.yaml --name my-batch
 
 # Step 2: Add repositories to the batch.
-ploy mod run repo add \
+ploy mig run repo add \
   --repo-url https://github.com/org/repo-a.git \
   --base-ref main \
   --target-ref upgrade-deps \
   my-batch
 
-ploy mod run repo add \
+ploy mig run repo add \
   --repo-url https://github.com/org/repo-b.git \
   --base-ref main \
   --target-ref upgrade-deps \
@@ -156,7 +156,7 @@ If a repository job fails or needs reprocessing with a different branch, use
 ```bash
 # Restart repo-a with a hotfix branch (use repo-id from `mod run repo status`).
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mod run repo restart \
+ploy mig run repo restart \
   --repo-id <repo-id> \
   --target-ref hotfix \
   my-batch
@@ -170,7 +170,7 @@ To remove a repository from an in-progress batch (e.g., if it was added by mista
 
 ```bash
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mod run repo remove \
+ploy mig run repo remove \
   --repo-id <repo-id> \
   my-batch
 ```
@@ -192,7 +192,7 @@ See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and
 ### Pull Mods Changes Locally
 
 After a run completes, you can pull the Mods-generated changes into your local
-repository using either `ploy run pull <run-id>` (run-based) or `ploy mod pull` (mod-based).
+repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mod-based).
 These commands reconstruct the Mods branch locally by fetching stored diffs from the
 control plane and applying them to a new branch.
 
@@ -204,20 +204,20 @@ cd service-a
 ploy run pull <run-id>
 
 # Mod-based pull (default: last succeeded):
-ploy mod pull <mod-id|name>
+ploy mig pull <mod-id|name>
 ```
 
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/mods/{mod_id}/pull` for mod-based pull).
+3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mod_id}/pull` for mod-based pull).
 4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
 5. Creates a new branch at the fetched commit using the run's `target_ref`.
 6. Downloads and applies all stored Mods diffs via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
-- `[<mod-id|name>]` — Mod ID or name (optional), for `ploy mod pull`.
+- `[<mod-id|name>]` — Mod ID or name (optional), for `ploy mig pull`.
 
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
@@ -238,10 +238,10 @@ ploy run pull --dry-run <run-id>
 ploy run pull --origin upstream <run-id>
 
 # Pull changes from the latest successful run for a mod.
-ploy mod pull <mod-id|name>
+ploy mig pull <mod-id|name>
 
 # Pull changes from the latest failed run for a mod.
-ploy mod pull --last-failed <mod-id|name>
+ploy mig pull --last-failed <mod-id|name>
 ```
 
 **Requirements:**
@@ -365,7 +365,7 @@ ploy completion <shell> --help
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
 - `--spec` — Path to a YAML/JSON spec file defining mod parameters, Build Gate settings,
-  and healing configuration for `mod run`. CLI flags (e.g., `--mod-image`, `--gitlab-pat`)
+  and healing configuration for `mod run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical shapes:
   top-level fields for single-step runs (`image`, `command`, `env`, `retain_container`)
   and `mods[]` for multi-step runs. The spec supports inline environment variables (`env`),
@@ -642,7 +642,7 @@ The `GET /v1/runs/{id}/status` endpoint returns `RunSummary` with:
 - `metadata["gate_summary"]` — Human-readable gate result
 - `metadata["mr_url"]` — Merge request URL if created
 
-See `internal/mods/api/types.go` for the full schema.
+See `internal/migs/api/types.go` for the full schema.
 
 ## Exit Codes
 

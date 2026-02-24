@@ -4,7 +4,7 @@ Usage:
   ploy <command> [<args>]
 
 Core Commands:
-  mod              Plan and run Mods workflows
+  mig              Plan and run Migs workflows
   run              Inspect runs and stream events
   pull             Pull Mods diffs for current repo HEAD
   cluster          Manage clusters (deploy, nodes, rollout, tokens)

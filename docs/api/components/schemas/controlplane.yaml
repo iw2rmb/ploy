@@ -469,7 +469,7 @@ ModArchiveResponse:
 #
 # Wire contract guarantees:
 # - No wrapper types — RunSummary is returned directly as the JSON root.
-# - Field names are stable and match internal/mods/api/types.go exactly.
+# - Field names are stable and match internal/migs/api/types.go exactly.
 # - All IDs use KSUID format (27 characters, lexicographically sortable).
 #
 # See docs/mods-lifecycle.md § 2.1 for the complete data model reference.

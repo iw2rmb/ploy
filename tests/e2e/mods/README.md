@@ -64,7 +64,7 @@ The `--spec` flag accepts a YAML or JSON file defining:
 
 CLI flags override spec values when both are present. For example:
 ```bash
-ploy mod run --spec mod.yaml --mod-image custom:tag --gitlab-pat "$TOKEN"
+ploy mig run --spec mod.yaml --job-image custom:tag --gitlab-pat "$TOKEN"
 ```
 This uses `mod.yaml` as the base but overrides the image and PAT.
 
@@ -311,7 +311,7 @@ mod:
 
 To test the error path (missing stack key without default):
 ```bash
-dist/ploy mod run \
+dist/ploy mig run \
   --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
   --repo-base-ref main \
   --repo-target-ref e2e/stack-aware-error \

@@ -24,7 +24,7 @@
 # - GitLab PAT for MR creation (optional)
 #
 # Submit with:
-#   dist/ploy mod run \
+#   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
 #     --repo-base-ref e2e/fail-missing-symbol \
 #     --repo-target-ref mods-e2e-post-mod-heal-test \

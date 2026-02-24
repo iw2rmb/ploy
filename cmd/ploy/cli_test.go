@@ -16,7 +16,7 @@ import (
 // Usage:
 //
 //	buf := &bytes.Buffer{}
-//	err := executeCmd([]string{"mod", "run", "status", "batch-123"}, buf)
+//	err := executeCmd([]string{"mig", "run", "status", "batch-123"}, buf)
 //
 // The stderr parameter receives all CLI output (both success and error messages).
 func executeCmd(args []string, stderr io.Writer) error {
@@ -45,19 +45,19 @@ func TestExecuteHelpMatchesGolden(t *testing.T) {
 	}
 }
 
-// TestExecuteHelpForModMatchesGolden verifies that "ploy help mod" produces the expected golden output.
-func TestExecuteHelpForModMatchesGolden(t *testing.T) {
+// TestExecuteHelpForMigMatchesGolden verifies that "ploy help mig" produces the expected golden output.
+func TestExecuteHelpForMigMatchesGolden(t *testing.T) {
 	t.Helper()
 	buf := &bytes.Buffer{}
 	rootCmd := newRootCmd(buf)
-	rootCmd.SetArgs([]string{"help", "mod"})
+	rootCmd.SetArgs([]string{"help", "mig"})
 	err := rootCmd.Execute()
 	if err != nil {
-		t.Fatalf("execute help mod: %v", err)
+		t.Fatalf("execute help mig: %v", err)
 	}
-	expect := loadGolden(t, "help_mod.txt")
+	expect := loadGolden(t, "help_mig.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
-		t.Fatalf("help mod output mismatch:\n%s", diff)
+		t.Fatalf("help mig output mismatch:\n%s", diff)
 	}
 }
 

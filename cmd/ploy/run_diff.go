@@ -12,7 +12,7 @@ import (
 )
 
 // handleRunDiff lists diffs for a run or downloads the newest patch.
-// It replaces the legacy `ploy mod diffs` command with a run-scoped surface:
+// It replaces the legacy `ploy mig diffs` command with a run-scoped surface:
 //
 //	ploy run diffs [--download] [--output <file>] <run-id>
 func handleRunDiff(args []string, stderr io.Writer) error {

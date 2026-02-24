@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // FuzzPublishRunRoundTrip ensures arbitrary run payloads marshal/unmarshal without panicking

@@ -88,7 +88,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	// Diff download requires repo-scoped addressing. The legacy global diff download
 	// endpoint (`GET /v1/diffs/{id}`) is removed, and this command does not have a
 	// repo_id to scope the download.
-	return errors.New("run diffs: download is not supported; use `ploy run pull <run-id>` or `ploy mod pull`")
+	return errors.New("run diffs: download is not supported; use `ploy run pull <run-id>` or `ploy mig pull`")
 }
 
 // RepoDiffsCommand lists diffs for a specific repo execution within a run and

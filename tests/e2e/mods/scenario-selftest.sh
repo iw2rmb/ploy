@@ -19,8 +19,8 @@ CMD='echo "[selftest] hello"; uname -a; sleep 3; echo "[selftest] done"'
   --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
   --repo-base-ref main \
   --repo-target-ref e2e/selftest-${TS} \
-  --mod-image alpine:3.20 \
-  --mod-command "$CMD" \
+  --job-image alpine:3.20 \
+  --job-command "$CMD" \
   --retain-container \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" || true

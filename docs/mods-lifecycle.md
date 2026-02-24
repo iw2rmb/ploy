@@ -595,7 +595,7 @@ artifacts) remain job-addressed via `job_id`.
 ### Single-repo vs batch runs
 
 Single-repo submission via `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
-(or via `ploy mod run --repo-url ... --spec ...`) is
+(or via `ploy mig run --repo-url ... --spec ...`) is
 internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
 
@@ -670,7 +670,7 @@ repo attempt. It does not create per-repo child runs.
 
 ### Pulling Diffs Locally (`run pull` / `mod pull`)
 
-The `ploy run pull <run-id>` and `ploy mod pull` commands enable developers to reconstruct
+The `ploy run pull <run-id>` and `ploy mig pull` commands enable developers to reconstruct
 Mods-generated changes in their local git repository. This is useful for reviewing,
 testing, or continuing work on changes produced by a run without relying on MR-based
 workflows.
@@ -685,8 +685,8 @@ workflows.
 │  1. Resolve repo context                                                    │
 │     ├─ Get origin URL from `git remote get-url <origin>`                    │
 │     ├─ (run pull) Call POST /v1/runs/{run_id}/pull with repo_url             │
-│     └─ (mod pull) Optionally infer mod via GET /v1/mods?repo_url=...         │
-│               then call POST /v1/mods/{mod_id}/pull with repo_url + mode     │
+│     └─ (mod pull) Optionally infer mod via GET /v1/migs?repo_url=...         │
+│               then call POST /v1/migs/{mod_id}/pull with repo_url + mode     │
 │                                                                             │
 │  2. Fetch base snapshot                                                      │
 │     ├─ Call GET /v1/runs/{run_id}/repos and find repo_id                     │
@@ -731,7 +731,7 @@ workflows.
 **API endpoints consumed:**
 
 - `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` + `repo_target_ref` for the current repo within the run.
-- `POST /v1/mods/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
+- `POST /v1/migs/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
 - `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — Download gzipped patch content.
@@ -766,7 +766,7 @@ cd /path/to/service-a
 ploy run pull <run-id>
 
 # Mod-based pull:
-ploy mod pull <mod-id|name>
+ploy mig pull <mod-id|name>
 
 # Preview without making changes:
 ploy run pull --dry-run <run-id>
@@ -787,7 +787,7 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 
 ## 2. Data Model
 
-### 2.1 Run summary (`internal/mods/api`)
+### 2.1 Run summary (`internal/migs/api`)
 
 `RunSummary` is the **canonical wire type** for Mods run status. It is the single
 response schema for:
@@ -798,7 +798,7 @@ response schema for:
 **Wire contract guarantees:**
 
 - No wrapper types — `RunSummary` is returned directly as the JSON root.
-- Field names are stable and match `internal/mods/api/types.go` exactly.
+- Field names are stable and match `internal/migs/api/types.go` exactly.
 - All IDs use KSUID format (27 characters, lexicographically sortable).
 
 **OpenAPI reference:** See `docs/api/components/schemas/controlplane.yaml#/RunSummary`
@@ -1015,7 +1015,7 @@ artifacts/diffs to the correct node.
 
 For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
 
-1. CLI (`ploy mod run`) builds a `RunSubmitRequest` in
+1. CLI (`ploy mig run`) builds a `RunSubmitRequest` in
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
@@ -1124,19 +1124,19 @@ Mods container images are standard OCI images with the following expectations:
 
 The CLI entry points for Mods are implemented in `cmd/ploy`:
 
-- `ploy mod run`:
+- `ploy mig run`:
   - Parses flags in `cmd/ploy/mod_run_flags.go`.
   - Builds the spec payload in `cmd/ploy/mod_run_spec.go` (handles `env` and
     `env_from_file`).
   - Constructs `RunSubmitRequest` with stage definitions in
     `cmd/ploy/mod_run_exec.go`.
-  - Submits via `internal/cli/mods.SubmitCommand`.
+  - Submits via `internal/cli/migs.SubmitCommand`.
   - Optional `--follow` displays a summarized per-repo job graph until completion,
     implemented via `internal/cli/follow.Engine`. The job graph refreshes on
     SSE events from `/v1/runs/{id}/logs` but does not stream container logs.
     Use `ploy run logs <run-id>` to stream logs.
 
-- `ploy mod run <mod-id|name>`:
+- `ploy mig run <mod-id|name>`:
   - Creates a run from a mod project via `cmd/ploy/mod_run_project.go`.
   - Supports `--repo`, `--failed` for repo selection.
   - Optional `--follow` displays the job graph until completion.
@@ -1150,7 +1150,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 
 - `ploy run logs <run-id>`:
   - Streams logs/events from `/v1/runs/{id}/logs`, focusing on `log` and
-    `retention` events (see `internal/cli/mods/logs.go`).
+    `retention` events (see `internal/cli/migs/logs.go`).
   - This is the canonical surface for streaming container stdout/stderr.
 
 - Run summaries (gate/MR/job graph) are exposed via:
@@ -1220,7 +1220,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 
 - `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
   retry streams.
-- `internal/cli/mods.EventsCommand` handles `"run"` and `"stage"` events
+- `internal/cli/migs.EventsCommand` handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
 - `internal/cli/runs.FollowCommand` and `ploy run logs` focus on `"log"` and
@@ -1236,9 +1236,9 @@ Code paths most relevant for Mods:
   - `cmd/ploy/mod_run_exec.go`
   - `cmd/ploy/mod_run_spec.go`
   - `cmd/ploy/mod_controlplane_commands.go`
-  - `internal/cli/mods/*`
+  - `internal/cli/migs/*`
 - Control plane:
-  - `internal/mods/api/*`
+  - `internal/migs/api/*`
   - `internal/server/handlers/handlers_mods_ run.go`
   - `internal/server/handlers/handlers_diffs.go`
   - `internal/server/handlers/jobs_complete.go` — job completion (via /v1/jobs/{job_id}/complete)
@@ -1266,12 +1266,12 @@ For concrete end-to-end scenarios and sample specs see:
 When changing Mods behaviour, prefer these anchors:
 
 - Run/status model:
-  - Update `internal/mods/api/types.go` ( run/job types).
+  - Update `internal/migs/api/types.go` ( run/job types).
   - Wire server handlers in `internal/server/handlers/handlers_mods_*.go`.
   - Keep `docs/mods-lifecycle.md` and `tests/e2e/mods/README.md` in sync.
 - SSE/event flow:
   - Use `internal/server/events/service.go` and `internal/stream/*` for hub/SSE.
-  - Adjust CLI consumers under `internal/cli/mods` and `internal/cli/runs`.
+  - Adjust CLI consumers under `internal/cli/migs` and `internal/cli/runs`.
 - Node execution/rehydration:
   - Use `internal/nodeagent/execution_orchestrator.go` plus
     `internal/workflow/step/*`.
