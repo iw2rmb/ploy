@@ -18,17 +18,17 @@
 **Build + Publish Mods Images (Docker Hub)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t mods-orw-maven:e2e deploy/images/mods/orw-maven`
-  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t mods-orw-gradle:e2e deploy/images/mods/orw-gradle`
-  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f deploy/images/mods/mod-codex/Dockerfile -t mods-codex:e2e .`
-  - Optional: `mods-llm`, `mods-plan` as needed.
+  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t migs-orw-maven:e2e deploy/images/migs/orw-maven`
+  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t migs-orw-gradle:e2e deploy/images/migs/orw-gradle`
+  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f deploy/images/migs/mig-codex/Dockerfile -t migs-codex:e2e .`
+  - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to Docker Hub using the helper script:
-  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** deploy/images/build-and-push-mods.sh`
-  - The script special‑cases `mod-codex` to use repo‑root context automatically.
+  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** deploy/images/build-and-push-migs.sh`
+  - The script special‑cases `mig-codex` to use repo‑root context automatically.
   - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Notes:
-- Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`; `orw-maven` → `mods-orw-maven`; `orw-gradle` → `mods-orw-gradle`.
+- Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-maven` → `migs-orw-maven`; `orw-gradle` → `migs-orw-gradle`.
 - OpenRewrite coordinates are passed via environment: set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 - The Codex healer now uses a **workspace diff handshake**: Codex edits the workspace and exits when done. The node agent then inspects the workspace via `git status --porcelain` and only re-runs the Build Gate externally when changes are present. Codex no longer invokes Build Gate tooling directly from inside the container.
@@ -150,7 +150,7 @@ Example healing spec block (Codex workspace diff handshake, single mod):
 build_gate_healing:
   retries: 1
   mod:
-    image: docker.io/you/mods-codex:latest
+    image: docker.io/you/migs-codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
@@ -176,18 +176,18 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `migs-codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
+When `migs-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
 - `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
 
 What to expect with the provided E2E images:
-- Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
+- Spec-driven healing runs with `migs-codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
 
 **Follow Mode (`--follow`) and Job Graph**
 
@@ -238,7 +238,7 @@ This makes gate health visible without requiring raw artifact inspection.
 - Git access / MR creation:
   - Export `PLOY_GITLAB_PAT` and confirm the control plane has connectivity to GitLab. The sample repo is public for read; MRs require auth for branch writes.
 - Build Gate keeps failing in Scenario B:
-  - Confirm the `mods-llm` image version the cluster pulls includes the healer stub. Re-publish if needed.
+  - Confirm the `migs-llm` image version the cluster pulls includes the healer stub. Re-publish if needed.
 - Monitoring runs:
   - Use `--follow` to display the job graph until completion.
   - Use `ploy run logs <run-id>` to stream container stdout/stderr.
@@ -302,9 +302,9 @@ Example stack-aware spec:
 ```yaml
 mod:
   image:
-    default: docker.io/user/mods-orw-maven:latest
-    java-maven: docker.io/user/mods-orw-maven:latest
-    java-gradle: docker.io/user/mods-orw-gradle:latest
+    default: docker.io/user/migs-orw-maven:latest
+    java-maven: docker.io/user/migs-orw-maven:latest
+    java-gradle: docker.io/user/migs-orw-gradle:latest
   env:
     RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```

@@ -172,15 +172,15 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
 
   # ────────────────────────────────────────────────────────────────────────────
   # Extract Codex healing /out bundle(s) into $ARTIFACT_DIR.
-  # Nodeagent uploads /out as a tar.gz bundle named "mod-out", and the CLI
-  # downloads it as "*_mod-out.bin" files alongside manifest.json.
+  # Nodeagent uploads /out as a tar.gz bundle named "mig-out", and the CLI
+  # downloads it as "*_mig-out.bin" files alongside manifest.json.
   # ────────────────────────────────────────────────────────────────────────────
-  echo "Extracting Codex mod-out artifact bundles (if present)..."
+  echo "Extracting Codex mig-out artifact bundles (if present)..."
   shopt -s nullglob
-  mod_out_bundles=("${ARTIFACT_DIR}"/*_mod-out.bin)
+  mod_out_bundles=("${ARTIFACT_DIR}"/*_mig-out.bin)
   shopt -u nullglob
   if ((${#mod_out_bundles[@]} == 0)); then
-    echo "  - no mod-out bundles found in ${ARTIFACT_DIR} (Codex artifacts may be missing)"
+    echo "  - no mig-out bundles found in ${ARTIFACT_DIR} (Codex artifacts may be missing)"
   else
     for bundle in "${mod_out_bundles[@]}"; do
       echo "  extracting $(basename "$bundle")"

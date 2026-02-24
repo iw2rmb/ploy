@@ -91,7 +91,7 @@ func ensureHealingInDir(inDir *string, runID types.RunID) error {
 	if *inDir != "" {
 		return nil
 	}
-	tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
+	tmpInDir, dirErr := os.MkdirTemp("", "ploy-mig-in-*")
 	if dirErr != nil {
 		slog.Error("failed to create /in directory for healing", "run_id", runID, "error", dirErr)
 		return dirErr

@@ -288,9 +288,9 @@ func TestIsCodexHealingImage(t *testing.T) {
 		want  bool
 	}{
 		// Positive cases: images containing "codex".
-		{"mods-codex", true},
-		{"mods-codex:latest", true},
-		{"registry.io/mods-codex:v1", true},
+		{"migs-codex", true},
+		{"migs-codex:latest", true},
+		{"registry.io/migs-codex:v1", true},
 		{"my-codex-healer", true},
 		{"codex-fixer", true},
 		{"MODS-CODEX", true}, // case insensitive
@@ -332,13 +332,13 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	}{
 		{
 			name:         "codex image with session sets CODEX_RESUME=1",
-			mod:          ModContainerSpec{Image: testJobImage("mods-codex:latest")},
+			mod:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "session-abc-123",
 			wantResume:   true,
 		},
 		{
 			name:         "codex image without session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testJobImage("mods-codex:latest")},
+			mod:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "",
 			wantResume:   false,
 		},
@@ -356,7 +356,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 		},
 		{
 			name:         "registry prefixed codex image with session",
-			mod:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/mods-codex:v2")},
+			mod:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/migs-codex:v2")},
 			codexSession: "session-def-789",
 			wantResume:   true,
 		},
@@ -412,7 +412,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 	}
 
 	mod := ModContainerSpec{
-		Image: testJobImage("mods-codex:latest"),
+		Image: testJobImage("migs-codex:latest"),
 		Env: map[string]string{
 			"CUSTOM_VAR": "custom_value",
 			"ANOTHER":    "another_value",

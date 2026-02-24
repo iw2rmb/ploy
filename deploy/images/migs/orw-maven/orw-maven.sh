@@ -17,7 +17,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mods-orw-maven --apply [--dir <workspace>] [--out <dir>]
+migs-orw-maven --apply [--dir <workspace>] [--out <dir>]
 
 Environment (required):
   RECIPE_GROUP       e.g., org.openrewrite.recipe

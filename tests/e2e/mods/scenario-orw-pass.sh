@@ -41,7 +41,7 @@ RUN=("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
-  --job-image "${PLOY_CONTAINER_REGISTRY}/mods-orw-maven:latest" \
+  --job-image "${PLOY_CONTAINER_REGISTRY}/migs-orw-maven:latest" \
   --job-env RECIPE_GROUP="$RECIPE_GROUP" \
   --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
   --job-env RECIPE_VERSION="$RECIPE_VERSION" \

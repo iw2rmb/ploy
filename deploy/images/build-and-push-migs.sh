@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Build and push Mods Docker images to Docker Hub.
+# Build and push Migs Docker images to Docker Hub.
 # Requires: docker buildx
 
 PLATFORM=${PLATFORM:-linux/amd64}
@@ -26,14 +26,14 @@ with_timeout() {
 }
 
 discover_images() {
-  local root="deploy/images/mods"
+  local root="deploy/images/migs"
   [[ -d "$root" ]] || return 0
   find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
 }
 
 images=( $(discover_images) )
 if [[ ${#images[@]} -eq 0 ]]; then
-  echo "no images discovered under mods" >&2
+  echo "no images discovered under migs" >&2
   exit 1
 fi
 
@@ -42,27 +42,27 @@ for name in "${images[@]}"; do
   image_name="$name"
   case "$name" in
     orw-maven)
-      image_name="mods-orw-maven"
+      image_name="migs-orw-maven"
       ;;
     orw-gradle)
-      image_name="mods-orw-gradle"
+      image_name="migs-orw-gradle"
       ;;
-    mod-*)
-      image_name="mods-${name#mod-}"
+    mig-*)
+      image_name="migs-${name#mig-}"
       ;;
   esac
 
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
   # Build context rules:
-  # - Default: use "deploy/images/mods/<dir>"
-  # - Special-case mod-codex: Dockerfile expects repo-root context (COPY go.mod, internal/ ...)
+  # - Default: use "deploy/images/migs/<dir>"
+  # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.mod, internal/ ...)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "-t" "$ref" "--push")
-  if [[ "$name" == "mod-codex" ]]; then
+  if [[ "$name" == "mig-codex" ]]; then
     context="."
-    build_args+=("-f" "deploy/images/mods/mod-codex/Dockerfile" "$context")
+    build_args+=("-f" "deploy/images/migs/mig-codex/Dockerfile" "$context")
   else
-    context="deploy/images/mods/${name}"
+    context="deploy/images/migs/${name}"
     build_args+=("$context")
   fi
 
@@ -84,4 +84,4 @@ for name in "${images[@]}"; do
   done
 done
 
-echo "All Mods images pushed to ${IMAGE_PREFIX}"
+echo "All Migs images pushed to ${IMAGE_PREFIX}"

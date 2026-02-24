@@ -1,6 +1,6 @@
-Mods Contract
+Migs Contract
 
-This directory contains example Mods images (container build contexts). Ploy does not know what a mod does; it only runs your container with a mounted Git workspace and collects outputs you choose to emit. Containers must follow a small, stable runtime contract described here.
+This directory contains example Migs images (container build contexts). Ploy does not know what a mig does; it only runs your container with a mounted Git workspace and collects outputs you choose to emit. Containers must follow a small, stable runtime contract described here.
 
 Contract
 
@@ -11,7 +11,7 @@ Contract
 
 - Input artifacts (optional)
   - Mount path: `/in` (read-only) when present.
-  - Contents: any auxiliary inputs (plans, configs) that orchestration chooses to provide. Not all runs have inputs; your mod must tolerate `/in` being empty or absent.
+  - Contents: any auxiliary inputs (plans, configs) that orchestration chooses to provide. Not all runs have inputs; your mig must tolerate `/in` being empty or absent.
 
 - Output artifacts (optional)
   - Mount path: `/out` (read–write, empty directory for each run).

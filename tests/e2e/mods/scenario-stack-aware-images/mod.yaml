@@ -26,9 +26,9 @@ steps:
     # the appropriate image. For Maven projects, java-maven is selected.
     # For Gradle projects, java-gradle is selected. Other stacks use default.
     image:
-      default: ghcr.io/iw2rmb/mods-orw-maven:latest
-      java-maven: ghcr.io/iw2rmb/mods-orw-maven:latest
-      java-gradle: ghcr.io/iw2rmb/mods-orw-gradle:latest
+      default: ghcr.io/iw2rmb/migs-orw-maven:latest
+      java-maven: ghcr.io/iw2rmb/migs-orw-maven:latest
+      java-gradle: ghcr.io/iw2rmb/migs-orw-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

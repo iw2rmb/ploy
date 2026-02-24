@@ -3,8 +3,8 @@ ARG NODE_IMAGE=node:20-alpine
 # --- final image ---
 FROM ${NODE_IMAGE}
 
-LABEL org.opencontainers.image.title="mod-codex" \
-    org.opencontainers.image.description="Ploy Mods: Codex CLI wrapper" \
+LABEL org.opencontainers.image.title="mig-codex" \
+    org.opencontainers.image.description="Ploy Migs: Codex CLI wrapper" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
 
@@ -29,13 +29,13 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-# Copy only the mod-codex entrypoint; no Build Gate helper binary is included
+# Copy only the mig-codex entrypoint; no Build Gate helper binary is included
 # to prevent Codex from running the gate inside the container. Build Gate
 # verification is performed externally by Ploy (docker gate) or the
 # Build Gate HTTP API.
-COPY deploy/images/mods/mod-codex/mod-codex.sh /usr/local/bin/mod-codex
-RUN chmod +x /usr/local/bin/mod-codex && \
-    ln -s /usr/local/bin/mod-codex /usr/local/bin/mods-codex
+COPY deploy/images/migs/mig-codex/mig-codex.sh /usr/local/bin/mig-codex
+RUN chmod +x /usr/local/bin/mig-codex && \
+    ln -s /usr/local/bin/mig-codex /usr/local/bin/migs-codex
 
 WORKDIR /workspace
-ENTRYPOINT ["mod-codex"]
+ENTRYPOINT ["mig-codex"]

@@ -70,7 +70,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	cfg := standardJobConfig{
 		Manifest:                  manifest,
 		DiffType:                  DiffJobTypeMod,
-		OutDirPattern:             "ploy-mod-out-*",
+		OutDirPattern:             "ploy-mig-out-*",
 		UploadConfiguredArtifacts: true,
 		UploadDiff:                r.uploadModDiffWithBaseline,
 		StartTime:                 startTime,
@@ -551,7 +551,7 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return fmt.Errorf("initialize uploaders: %w", err)
 	}
 
-	if _, _, err := r.artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mod-out"); err != nil {
+	if _, _, err := r.artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mig-out"); err != nil {
 		return fmt.Errorf("upload /out bundle: %w", err)
 	}
 
