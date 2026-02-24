@@ -21,20 +21,20 @@ import (
 // =============================================================================
 
 // TestModRuns_Create_AllRepos verifies POST /v1/migs/{mig_id}/runs with mode="all"
-// creates a run with all repos from the mod's repo set.
+// creates a run with all repos from the mig's repo set.
 // Tests multi-repo run creation with repo_selector mode.
 func TestModRuns_Create_AllRepos(t *testing.T) {
 	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -101,13 +101,13 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -171,13 +171,13 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -233,13 +233,13 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -279,13 +279,13 @@ func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -388,7 +388,7 @@ func TestModRuns_Create_ExplicitEmptyRepos(t *testing.T) {
 	}
 }
 
-// TestModRuns_Create_ModNotFound verifies POST /v1/migs/{mig_id}/runs returns 404 for missing mod.
+// TestModRuns_Create_ModNotFound verifies POST /v1/migs/{mig_id}/runs returns 404 for missing mig.
 func TestModRuns_Create_ModNotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -422,7 +422,7 @@ func TestModRuns_Create_ArchivedMod(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Archived.
 		},
@@ -454,7 +454,7 @@ func TestModRuns_Create_NoSpec(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     nil, // No spec.
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
@@ -487,13 +487,13 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -575,7 +575,7 @@ func TestModRuns_Create_GetSpecError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
@@ -608,13 +608,13 @@ func TestModRuns_Create_ListModReposError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModErr: errors.New("database connection failed"),
 	}
@@ -645,13 +645,13 @@ func TestModRuns_Create_CreateRunError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -685,13 +685,13 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -725,13 +725,13 @@ func TestModRuns_Create_CreateJobError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
@@ -765,13 +765,13 @@ func TestModRuns_Create_ListFailedReposError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		getSpecResult: store.Spec{
 			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mod:latest"}]}`),
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},

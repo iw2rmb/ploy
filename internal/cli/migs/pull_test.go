@@ -54,7 +54,7 @@ func TestRunPullCommand_Success(t *testing.T) {
 		resp := PullResolution{
 			RunID:         runID,
 			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("mods/" + runID.String() + "/feature"),
+			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -82,8 +82,8 @@ func TestRunPullCommand_Success(t *testing.T) {
 	if result.RepoID != repoID {
 		t.Errorf("expected RepoID %q, got %q", repoID.String(), result.RepoID.String())
 	}
-	if result.RepoTargetRef.String() != "mods/"+runID.String()+"/feature" {
-		t.Errorf("expected RepoTargetRef %q, got %q", "mods/"+runID.String()+"/feature", result.RepoTargetRef.String())
+	if result.RepoTargetRef.String() != "migs/"+runID.String()+"/feature" {
+		t.Errorf("expected RepoTargetRef %q, got %q", "migs/"+runID.String()+"/feature", result.RepoTargetRef.String())
 	}
 }
 
@@ -181,7 +181,7 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 // ModPullCommand Tests
 // =============================================================================
 
-// TestModPullCommand_Success verifies successful pull resolution for a mod.
+// TestModPullCommand_Success verifies successful pull resolution for a mig.
 func TestModPullCommand_Success(t *testing.T) {
 	t.Parallel()
 
@@ -214,7 +214,7 @@ func TestModPullCommand_Success(t *testing.T) {
 		resp := PullResolution{
 			RunID:         runID,
 			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("mods/" + runID.String() + "/feature"),
+			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -227,7 +227,7 @@ func TestModPullCommand_Success(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		MigRef:  domaintypes.MigRef("my-mod"),
+		MigRef:  domaintypes.MigRef("my-mig"),
 		RepoURL: "https://github.com/example/repo.git",
 		Mode:    PullModeLastSucceeded,
 	}
@@ -272,7 +272,7 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 		resp := PullResolution{
 			RunID:         runID,
 			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("mods/" + runID.String() + "/fix"),
+			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/fix"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -285,7 +285,7 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		MigRef:  domaintypes.MigRef("my-mod"),
+		MigRef:  domaintypes.MigRef("my-mig"),
 		RepoURL: "https://github.com/example/repo.git",
 		Mode:    PullModeLastFailed,
 	}
@@ -326,7 +326,7 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 		resp := PullResolution{
 			RunID:         runID,
 			RepoID:        repoID,
-			RepoTargetRef: domaintypes.GitRef("mods/" + runID.String() + "/feature"),
+			RepoTargetRef: domaintypes.GitRef("migs/" + runID.String() + "/feature"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -339,7 +339,7 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 	cmd := ModPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
-		MigRef:  domaintypes.MigRef("my-mod"),
+		MigRef:  domaintypes.MigRef("my-mig"),
 		RepoURL: "https://github.com/example/repo.git",
 		// Mode is intentionally not set to test default behavior.
 	}
@@ -361,33 +361,33 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "nil client",
-			cmd:     ModPullCommand{MigRef: domaintypes.MigRef("my-mod"), RepoURL: "https://example.com"},
+			cmd:     ModPullCommand{MigRef: domaintypes.MigRef("my-mig"), RepoURL: "https://example.com"},
 			wantErr: "http client required",
 		},
 		{
 			name: "nil base url",
 			cmd: ModPullCommand{
 				Client:  http.DefaultClient,
-				MigRef:  domaintypes.MigRef("my-mod"),
+				MigRef:  domaintypes.MigRef("my-mig"),
 				RepoURL: "https://example.com",
 			},
 			wantErr: "base url required",
 		},
 		{
-			name: "empty mod id",
+			name: "empty mig id",
 			cmd: ModPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
 				RepoURL: "https://example.com",
 			},
-			wantErr: "mod id required",
+			wantErr: "mig id required",
 		},
 		{
 			name: "empty repo url",
 			cmd: ModPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
-				MigRef:  domaintypes.MigRef("my-mod"),
+				MigRef:  domaintypes.MigRef("my-mig"),
 			},
 			wantErr: "repo url required",
 		},
@@ -413,7 +413,7 @@ func TestModPullCommand_NotFound(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "mod not found", http.StatusNotFound)
+		http.Error(w, "mig not found", http.StatusNotFound)
 	}))
 	defer server.Close()
 
@@ -430,8 +430,8 @@ func TestModPullCommand_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
-	if !strings.Contains(err.Error(), "mod pull") {
-		t.Errorf("error should contain 'mod pull', got: %v", err)
+	if !strings.Contains(err.Error(), "mig pull") {
+		t.Errorf("error should contain 'mig pull', got: %v", err)
 	}
 }
 

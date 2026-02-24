@@ -70,7 +70,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	}
 }
 
-// addRunRepoHandler adds a repo to an existing run (and to the mod repo set).
+// addRunRepoHandler adds a repo to an existing run (and to the mig repo set).
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,11 +127,11 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				httpErr(w, http.StatusConflict, "repo already exists for mod")
+				httpErr(w, http.StatusConflict, "repo already exists for mig")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
-			slog.Error("add run repo: create mod repo failed", "run_id", runID.String(), "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
+			slog.Error("add run repo: create mig repo failed", "run_id", runID.String(), "err", err)
 			return
 		}
 

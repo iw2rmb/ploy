@@ -1,5 +1,5 @@
 // execution_healing_loop.go contains the retry-based healing loop that
-// alternates between healing mod execution and gate re-validation.
+// alternates between healing mig execution and gate re-validation.
 package nodeagent
 
 import (
@@ -45,11 +45,11 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 
 	// Attempt healing loop.
 	// Note: This is a domain-specific healing retry loop (not a transient error retry).
-	// It executes a single healing mod between gate validation attempts based on user-configured retries.
+	// It executes a single healing mig between gate validation attempts based on user-configured retries.
 	// We intentionally do not use internal/workflow/backoff here because:
-	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running a healing mod).
+	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running a healing mig).
 	//  2. The retry count is user-configured (manifest-specified retries parameter).
-	//  3. No exponential backoff is needed; each healing attempt runs immediately after the healing mod completes.
+	//  3. No exponential backoff is needed; each healing attempt runs immediately after the healing mig completes.
 	// healingLogBuf accumulates the /in/healing-log.md content across iterations.
 	var healingLogBuf strings.Builder
 
@@ -125,7 +125,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 			}()
 		}
 
-		// Capture workspace status before running the healing mod so we can detect
+		// Capture workspace status before running the healing mig so we can detect
 		// whether this healing attempt produced any net changes.
 		preStatus, preStatusErr := workspaceStatus(ctx, in.workspace)
 		if preStatusErr != nil {
@@ -137,8 +137,8 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 			)
 		}
 
-		// Build healing manifest from the single configured healing mod.
-		mod := in.healingCfg.Mod
+		// Build healing manifest from the single configured healing mig.
+		mig := in.healingCfg.Mod
 		const healingIndex = 0
 
 		// Pass healingSession through so agent-specific session env (for example,
@@ -147,13 +147,13 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		// Stack is unknown during inline healing loops since the gate result
 		// that detected the stack is the one that just failed. Use stackForAttempt
 		// (derived from that gate metadata) for deterministic stack-aware image selection.
-		healManifest, buildErr := buildHealingManifest(in.req, mod, healingIndex, healingSession, stackForAttempt)
+		healManifest, buildErr := buildHealingManifest(in.req, mig, healingIndex, healingSession, stackForAttempt)
 		if buildErr != nil {
 			slog.Error("failed to build healing manifest", "run_id", in.req.RunID, "healing_index", healingIndex, "error", buildErr)
 			return reGates, lastActionSummary, fmt.Errorf("build healing manifest[%d]: %w", healingIndex, buildErr)
 		}
 
-		slog.Info("executing healing mod", "run_id", in.req.RunID, "attempt", attempt, "healing_index", healingIndex, "image", healManifest.Image, "phase", in.gatePhase)
+		slog.Info("executing healing mig", "run_id", in.req.RunID, "attempt", attempt, "healing_index", healingIndex, "image", healManifest.Image, "phase", in.gatePhase)
 
 		// Inject healing-specific environment variables and TLS certificate mounts.
 		// Uses shared helpers (injectHealingEnvVars, mountHealingTLSCerts) to ensure
@@ -162,7 +162,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		r.injectHealingEnvVars(&healManifest, in.workspace)
 		r.mountHealingTLSCerts(&healManifest)
 
-		// Run the healing mod container.
+		// Run the healing mig container.
 		// Pass RunID directly for consistent labeling and telemetry.
 		healResult, healErr := in.runner.Run(ctx, step.Request{
 			RunID:     in.req.RunID,
@@ -173,18 +173,18 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		})
 
 		if healErr != nil {
-			slog.Error("healing mod execution failed", "run_id", in.req.RunID, "healing_index", healingIndex, "error", healErr)
-			return reGates, lastActionSummary, fmt.Errorf("healing mod[%d] failed: %w", healingIndex, healErr)
+			slog.Error("healing mig execution failed", "run_id", in.req.RunID, "healing_index", healingIndex, "error", healErr)
+			return reGates, lastActionSummary, fmt.Errorf("healing mig[%d] failed: %w", healingIndex, healErr)
 		}
 
 		if healResult.ExitCode != 0 {
-			slog.Warn("healing mod exited with non-zero code", "run_id", in.req.RunID, "healing_index", healingIndex, "exit_code", healResult.ExitCode)
+			slog.Warn("healing mig exited with non-zero code", "run_id", in.req.RunID, "healing_index", healingIndex, "exit_code", healResult.ExitCode)
 			// Continue; re-gate will still run so callers see gate status.
 		}
 
-		// Upload /out artifacts for this healing mod if present.
+		// Upload /out artifacts for this healing mig if present.
 		if uploadErr := r.uploadOutDir(ctx, in.req.RunID, in.req.JobID, in.outDir); uploadErr != nil {
-			slog.Warn("failed to upload /out for healing mod", "run_id", in.req.RunID, "job_id", in.req.JobID, "healing_index", healingIndex, "error", uploadErr)
+			slog.Warn("failed to upload /out for healing mig", "run_id", in.req.RunID, "job_id", in.req.JobID, "healing_index", healingIndex, "error", uploadErr)
 		}
 
 		// Read session artifacts from /out for propagation across retries.
@@ -214,7 +214,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		// Write healing-log.md after each iteration so it's available even if we bail out early.
 		persistHealingLog(in.inDir, &healingLogBuf, in.req.RunID)
 
-		// Capture workspace status after the healing mod completes and compare with
+		// Capture workspace status after the healing mig completes and compare with
 		// the pre-healing status. If both are available and identical, then this
 		// healing attempt produced no net workspace changes and there is no point
 		// in re-running the gate. Treat this as a terminal build gate failure.
@@ -238,7 +238,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 			return reGates, lastActionSummary, fmt.Errorf("%w: healing produced no workspace changes", step.ErrBuildGateFailed)
 		}
 
-		// Re-run the gate after the healing mod completes.
+		// Re-run the gate after the healing mig completes.
 		// The node agent ALWAYS re-runs the gate via runner.Gate.Execute to verify
 		// that healing modifications have resolved the validation failure.
 		slog.Info("re-running build gate after healing", "run_id", in.req.RunID, "attempt", attempt, "phase", in.gatePhase)

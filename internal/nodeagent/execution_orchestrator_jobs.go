@@ -1,4 +1,4 @@
-// execution_orchestrator_jobs.go contains mod and healing job implementations,
+// execution_orchestrator_jobs.go contains mig and healing job implementations,
 // the shared standard job executor, and workspace lifecycle helpers.
 package nodeagent
 
@@ -19,11 +19,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-// executeModJob runs a mod container job.
+// executeModJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
 //
 // Stack-aware image selection: The job loads the persisted stack from the
-// pre-gate phase and uses it for manifest building. This ensures mod steps
+// pre-gate phase and uses it for manifest building. This ensures mig steps
 // use stack-specific images (e.g., java-maven, java-gradle) when configured.
 func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
@@ -39,14 +39,14 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	if len(typedOpts.Steps) > 0 {
 		idx, err := modStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
 		if err != nil {
-			err = fmt.Errorf("derive mod step index from job_name: %w", err)
-			slog.Error("failed to derive mod step index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
+			err = fmt.Errorf("derive mig step index from job_name: %w", err)
+			slog.Error("failed to derive mig step index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
 		if idx < 0 || idx >= len(typedOpts.Steps) {
-			err := fmt.Errorf("derived mod step index out of range: job_name=%q derived=%d steps_len=%d", req.JobName, idx, len(typedOpts.Steps))
-			slog.Error("derived mod step index out of range", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "derived_index", idx, "steps_len", len(typedOpts.Steps))
+			err := fmt.Errorf("derived mig step index out of range: job_name=%q derived=%d steps_len=%d", req.JobName, idx, len(typedOpts.Steps))
+			slog.Error("derived mig step index out of range", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "derived_index", idx, "steps_len", len(typedOpts.Steps))
 			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 			return
 		}
@@ -60,7 +60,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	}
 
 	// Log the stack-aware image selection for observability.
-	slog.Info("mod job using stack-aware image",
+	slog.Info("mig job using stack-aware image",
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"detected_stack", stack,
@@ -84,7 +84,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 //
 // Stack-aware image selection: The job loads the persisted stack from the
 // pre-gate phase and uses it for manifest building. This ensures healing
-// mods use stack-specific images (e.g., java-maven, java-gradle) when configured.
+// migs use stack-specific images (e.g., java-maven, java-gradle) when configured.
 func (r *runController) executeHealingJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
@@ -164,7 +164,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 // uploadHealingNoWorkspaceChangesFailure uploads a terminal failure status when a healing job
 // exits 0 but produces no workspace changes.
 func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Context, req StartRunRequest, baseStats types.RunStats, duration time.Duration) {
-	// This is considered a failure: the healing mod promised to fix the issue but
+	// This is considered a failure: the healing mig promised to fix the issue but
 	// didn't actually change anything. Upload a failed status with exit code 1 and
 	// a stable stats marker so downstream observers can distinguish this from other
 	// failure modes.
@@ -220,7 +220,7 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 	return nil
 }
 
-// standardJobConfig configures the execution of a standard container job (mod/heal).
+// standardJobConfig configures the execution of a standard container job (mig/heal).
 type standardJobConfig struct {
 	Manifest      contracts.StepManifest
 	DiffType      DiffJobType
@@ -240,7 +240,7 @@ type standardJobConfig struct {
 	StartTime time.Time
 }
 
-// executeStandardJob orchestrates the common lifecycle of a container job (mod/heal):
+// executeStandardJob orchestrates the common lifecycle of a container job (mig/heal):
 // runtime init, rehydration, snapshots, directory prep, execution, and uploading.
 func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequest, cfg standardJobConfig) {
 	startTime := cfg.StartTime

@@ -447,7 +447,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
 				Execution: ModContainerSpec{
-					Image:   contracts.JobImage{Universal: "single-mod:latest"},
+					Image:   contracts.JobImage{Universal: "single-mig:latest"},
 					Command: contracts.CommandSpec{Shell: "run-single"},
 				},
 			},
@@ -465,8 +465,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		if manifest.Image != "single-mod:latest" {
-			t.Errorf("expected image single-mod:latest, got %q", manifest.Image)
+		if manifest.Image != "single-mig:latest" {
+			t.Errorf("expected image single-mig:latest, got %q", manifest.Image)
 		}
 		wantCmd := []string{"/bin/sh", "-c", "run-single"}
 		if len(manifest.Command) != len(wantCmd) {

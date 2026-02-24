@@ -16,7 +16,7 @@ import (
 )
 
 // ErrInvalidFormat indicates an unsupported format value.
-var ErrInvalidFormat = errors.New("mods: invalid format")
+var ErrInvalidFormat = errors.New("migs: invalid format")
 
 // LogsCommand streams logs for a single Mods run over SSE.
 type LogsCommand struct {
@@ -38,10 +38,10 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		return ErrInvalidFormat
 	}
 	if c.RunID.IsZero() {
-		return errors.New("mods: run id required")
+		return errors.New("migs: run id required")
 	}
 	if c.BaseURL == nil {
-		return errors.New("mods: base url required")
+		return errors.New("migs: base url required")
 	}
 	writer := c.Output
 	if writer == nil {
@@ -62,13 +62,13 @@ func (c LogsCommand) Run(ctx context.Context) error {
 			// Decode into the shared LogRecord type which supports enriched fields.
 			var payload logstream.LogRecord
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
-				return fmt.Errorf("mods: decode log event: %w", err)
+				return fmt.Errorf("migs: decode log event: %w", err)
 			}
 			printer.PrintLog(payload)
 		case "retention":
 			var hint logstream.RetentionHint
 			if err := json.Unmarshal(evt.Data, &hint); err != nil {
-				return fmt.Errorf("mods: decode retention event: %w", err)
+				return fmt.Errorf("migs: decode retention event: %w", err)
 			}
 			printer.RecordRetention(hint)
 		case "done", "complete", "completed":

@@ -56,7 +56,7 @@ type ModsSpec struct {
 	// JobID is the claimed job ID injected into the spec at claim time.
 	JobID types.JobID `json:"job_id,omitempty" yaml:"job_id,omitempty"`
 
-	// APIVersion is an optional schema version identifier (e.g., "ploy.mod/v1alpha1").
+	// APIVersion is an optional schema version identifier (e.g., "ploy.mig/v1alpha1").
 	// Informational only; the control plane forwards specs as opaque JSON.
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 
@@ -66,7 +66,7 @@ type ModsSpec struct {
 
 	// --- Steps (required) ---
 
-	// Steps holds the ordered list of mod steps.
+	// Steps holds the ordered list of mig steps.
 	// A spec must contain at least one step.
 	Steps []ModStep `json:"steps,omitempty" yaml:"steps,omitempty"`
 
@@ -106,9 +106,9 @@ type ModsSpec struct {
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 }
 
-// ModStep describes a single mod step in a run (steps[] array).
+// ModStep describes a single mig step in a run (steps[] array).
 // Each step has its own image, command, and environment configuration.
-// Steps execute sequentially with shared workspace, each running gate+mod.
+// Steps execute sequentially with shared workspace, each running gate+mig.
 type ModStep struct {
 	// Name is an optional human-readable name for this step.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
@@ -128,7 +128,7 @@ type ModStep struct {
 	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
 
 	// Stack configures Stack Gate validation for this step.
-	// Inbound validates pre-mod expectations; Outbound validates post-mod expectations.
+	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
@@ -156,13 +156,13 @@ func (s ModsSpec) Validate() error {
 	if len(s.Steps) == 0 {
 		return fmt.Errorf("steps: required")
 	}
-	for i, mod := range s.Steps {
-		if mod.Image.IsEmpty() {
+	for i, mig := range s.Steps {
+		if mig.Image.IsEmpty() {
 			return fmt.Errorf("steps[%d].image: required", i)
 		}
 		// Validate Stack Gate configuration.
-		if mod.Stack != nil {
-			if err := validateStackGateSpec(mod.Stack, fmt.Sprintf("steps[%d].stack", i)); err != nil {
+		if mig.Stack != nil {
+			if err := validateStackGateSpec(mig.Stack, fmt.Sprintf("steps[%d].stack", i)); err != nil {
 				return err
 			}
 		}

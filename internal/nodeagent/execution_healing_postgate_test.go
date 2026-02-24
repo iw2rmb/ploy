@@ -15,15 +15,15 @@ func testLogDigest(n int) types.Sha256Digest {
 	return types.Sha256Digest(fmt.Sprintf("sha256:%064x", n))
 }
 
-// TestExecuteWithHealing_PostGate_PassesWithoutHealing verifies the post-mod gate path when:
-// - Pre-mod gate passes immediately (no healing)
-// - Main mod executes and exits 0
-// - Post-mod gate passes immediately (no healing)
+// TestExecuteWithHealing_PostGate_PassesWithoutHealing verifies the post-mig gate path when:
+// - Pre-mig gate passes immediately (no healing)
+// - Main mig executes and exits 0
+// - Post-mig gate passes immediately (no healing)
 //
 // This test validates that runGateWithHealing is invoked with gatePhase="post" and
-// the post-mod gate metadata is correctly appended to ReGates and stored in BuildGate.
+// the post-mig gate metadata is correctly appended to ReGates and stored in BuildGate.
 func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
-	// Track gate calls to distinguish pre-mod vs post-mod gates.
+	// Track gate calls to distinguish pre-mig vs post-mig gates.
 	var gateCalls []string
 	gateCallCount := 0
 
@@ -31,7 +31,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 	mockGate := &mockGateExecutor{
 		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 			gateCallCount++
-			// Gate is called twice by runner.Run (pre-mod) and once by post-mod gate.
+			// Gate is called twice by runner.Run (pre-mig) and once by post-mig gate.
 			// runner.Run calls gate internally when Gate.Enabled=true.
 			gateCalls = append(gateCalls, fmt.Sprintf("gate-%d", gateCallCount))
 			return &contracts.BuildGateStageMetadata{
@@ -44,7 +44,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		},
 	}
 
-	// Track container execution to verify main mod runs.
+	// Track container execution to verify main mig runs.
 	containerCallCount := 0
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
@@ -82,7 +82,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.RunID),
-		Name:  "Main mod",
+		Name:  "Main mig",
 		Image: "main:latest",
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
@@ -97,12 +97,12 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
 	}
 
-	// Main mod should exit 0.
+	// Main mig should exit 0.
 	if execResult.ExitCode != 0 {
 		t.Errorf("ExitCode = %d, want 0", execResult.ExitCode)
 	}
 
-	// PreGate should capture the initial pre-mod gate (from runner.Run).
+	// PreGate should capture the initial pre-mig gate (from runner.Run).
 	if execResult.PreGate == nil {
 		t.Fatal("PreGate should be captured")
 	}
@@ -110,55 +110,55 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 		t.Error("PreGate should have passed")
 	}
 
-	// ReGates should contain exactly one entry: the post-mod gate.
-	// (Pre-mod gate passes immediately, so no pre-mod re-gates.)
+	// ReGates should contain exactly one entry: the post-mig gate.
+	// (Pre-mig gate passes immediately, so no pre-mig re-gates.)
 	if len(execResult.ReGates) != 1 {
-		t.Fatalf("len(ReGates) = %d, want 1 (post-mod gate only)", len(execResult.ReGates))
+		t.Fatalf("len(ReGates) = %d, want 1 (post-mig gate only)", len(execResult.ReGates))
 	}
 
-	// Verify the post-mod gate metadata.
+	// Verify the post-mig gate metadata.
 	postGate := execResult.ReGates[0]
 	if postGate.Metadata == nil {
-		t.Fatal("post-mod gate metadata should not be nil")
+		t.Fatal("post-mig gate metadata should not be nil")
 	}
 	if !postGate.Metadata.StaticChecks[0].Passed {
-		t.Error("post-mod gate should have passed")
+		t.Error("post-mig gate should have passed")
 	}
 
-	// result.BuildGate should be updated to the post-mod gate result.
+	// result.BuildGate should be updated to the post-mig gate result.
 	if execResult.BuildGate == nil {
-		t.Fatal("BuildGate should be set to post-mod gate result")
+		t.Fatal("BuildGate should be set to post-mig gate result")
 	}
-	// The post-mod gate is the second gate call (after pre-mod from runner.Run).
+	// The post-mig gate is the second gate call (after pre-mig from runner.Run).
 	if execResult.BuildGate.LogDigest != testLogDigest(2) {
-		t.Errorf("BuildGate.LogDigest = %q, want %q (post-mod gate)", execResult.BuildGate.LogDigest, testLogDigest(2))
+		t.Errorf("BuildGate.LogDigest = %q, want %q (post-mig gate)", execResult.BuildGate.LogDigest, testLogDigest(2))
 	}
 
-	// Verify gate call count: 1 pre-mod (from runner.Run) + 1 post-mod = 2.
+	// Verify gate call count: 1 pre-mig (from runner.Run) + 1 post-mig = 2.
 	if gateCallCount != 2 {
 		t.Errorf("gate call count = %d, want 2", gateCallCount)
 	}
 
-	// Verify main mod container ran.
+	// Verify main mig container ran.
 	if containerCallCount != 1 {
-		t.Errorf("container call count = %d, want 1 (main mod only)", containerCallCount)
+		t.Errorf("container call count = %d, want 1 (main mig only)", containerCallCount)
 	}
 }
 
-// TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses verifies the post-mod gate path when:
-// - Pre-mod gate passes immediately (no healing)
-// - Main mod executes and exits 0
-// - Post-mod gate fails on first check
-// - Healing mod executes
-// - Post-mod re-gate passes
+// TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses verifies the post-mig gate path when:
+// - Pre-mig gate passes immediately (no healing)
+// - Main mig executes and exits 0
+// - Post-mig gate fails on first check
+// - Healing mig executes
+// - Post-mig re-gate passes
 //
-// This test validates that post-mod gates use runGateWithHealing for consistent healing behavior.
+// This test validates that post-mig gates use runGateWithHealing for consistent healing behavior.
 func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	// Track call sequence to verify orchestration order.
 	var callSequence []string
 	gateCallCount := 0
 
-	// Mock gate: pre-mod passes, first post-mod fails, second post-mod (re-gate) passes.
+	// Mock gate: pre-mig passes, first post-mig fails, second post-mig (re-gate) passes.
 	mockGate := &mockGateExecutor{
 		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 			gateCallCount++
@@ -166,31 +166,31 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 			switch gateCallCount {
 			case 1:
-				// Pre-mod gate passes (from runner.Run).
+				// Pre-mig gate passes (from runner.Run).
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
-					LogsText:     "[INFO] Pre-mod success\n",
+					LogsText:     "[INFO] Pre-mig success\n",
 					LogDigest:    testLogDigest(1),
 				}, nil
 			case 2:
-				// Post-mod gate fails (triggers healing).
+				// Post-mig gate fails (triggers healing).
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
-					LogsText:     "[ERROR] Post-mod failure\n",
+					LogsText:     "[ERROR] Post-mig failure\n",
 					LogDigest:    testLogDigest(2),
 				}, nil
 			default:
-				// Post-mod re-gate passes after healing.
+				// Post-mig re-gate passes after healing.
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
-					LogsText:     "[INFO] Post-mod success after healing\n",
+					LogsText:     "[INFO] Post-mig success after healing\n",
 					LogDigest:    testLogDigest(3),
 				}, nil
 			}
 		},
 	}
 
-	// Track container execution: main mod + healing mod.
+	// Track container execution: main mig + healing mig.
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			callSequence = append(callSequence, "container:"+spec.Image)
@@ -233,7 +233,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
+		Name:  "Main mig",
 		Image: "main:latest",
 		Inputs: []contracts.StepInput{
 			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
@@ -243,22 +243,22 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 
 	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
 
-	// Should succeed after post-mod healing.
+	// Should succeed after post-mig healing.
 	if err != nil {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
 	}
 
-	// Main mod should exit 0.
+	// Main mig should exit 0.
 	if execResult.ExitCode != 0 {
 		t.Errorf("ExitCode = %d, want 0", execResult.ExitCode)
 	}
 
 	// Verify call sequence:
-	// 1. gate-1 (pre-mod, passes)
-	// 2. container:main:latest (main mod)
-	// 3. gate-2 (post-mod, fails)
-	// 4. container:healer:latest (healing mod)
-	// 5. gate-3 (post-mod re-gate, passes)
+	// 1. gate-1 (pre-mig, passes)
+	// 2. container:main:latest (main mig)
+	// 3. gate-2 (post-mig, fails)
+	// 4. container:healer:latest (healing mig)
+	// 5. gate-3 (post-mig re-gate, passes)
 	expectedSequence := []string{
 		"gate-1",
 		"container:main:latest",
@@ -275,7 +275,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		}
 	}
 
-	// PreGate should capture the pre-mod gate.
+	// PreGate should capture the pre-mig gate.
 	if execResult.PreGate == nil {
 		t.Fatal("PreGate should be captured")
 	}
@@ -283,12 +283,12 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		t.Errorf("PreGate.LogDigest = %q, want %q", execResult.PreGate.Metadata.LogDigest, testLogDigest(1))
 	}
 
-	// ReGates should contain 2 entries: initial post-mod gate (failed) + post-mod re-gate (passed).
+	// ReGates should contain 2 entries: initial post-mig gate (failed) + post-mig re-gate (passed).
 	if len(execResult.ReGates) != 2 {
-		t.Fatalf("len(ReGates) = %d, want 2 (post-mod + post-mod re-gate)", len(execResult.ReGates))
+		t.Fatalf("len(ReGates) = %d, want 2 (post-mig + post-mig re-gate)", len(execResult.ReGates))
 	}
 
-	// First entry: initial post-mod gate (failed).
+	// First entry: initial post-mig gate (failed).
 	if execResult.ReGates[0].Metadata.LogDigest != testLogDigest(2) {
 		t.Errorf("ReGates[0].LogDigest = %q, want %q", execResult.ReGates[0].Metadata.LogDigest, testLogDigest(2))
 	}
@@ -296,7 +296,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		t.Error("ReGates[0] should have failed")
 	}
 
-	// Second entry: post-mod re-gate (passed after healing).
+	// Second entry: post-mig re-gate (passed after healing).
 	if execResult.ReGates[1].Metadata.LogDigest != testLogDigest(3) {
 		t.Errorf("ReGates[1].LogDigest = %q, want %q", execResult.ReGates[1].Metadata.LogDigest, testLogDigest(3))
 	}
@@ -304,7 +304,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		t.Error("ReGates[1] should have passed")
 	}
 
-	// result.BuildGate should be updated to the final post-mod re-gate result.
+	// result.BuildGate should be updated to the final post-mig re-gate result.
 	if execResult.BuildGate == nil {
 		t.Fatal("BuildGate should be set")
 	}
@@ -312,7 +312,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 		t.Errorf("BuildGate.LogDigest = %q, want %q", execResult.BuildGate.LogDigest, testLogDigest(3))
 	}
 
-	// Gate call count: 1 pre-mod + 1 post-mod + 1 post-mod re-gate = 3.
+	// Gate call count: 1 pre-mig + 1 post-mig + 1 post-mig re-gate = 3.
 	if gateCallCount != 3 {
 		t.Errorf("gate call count = %d, want 3", gateCallCount)
 	}

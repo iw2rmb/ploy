@@ -7,7 +7,7 @@ set -euo pipefail
 # - docker compose -f deploy/local/docker-compose.yml up -d
 # - gradle-build-cache service reachable as http://gradle-build-cache:5071/cache/ from gate containers
 #
-# It clears the cache node data, runs a no-op mod run that triggers:
+# It clears the cache node data, runs a no-op mig run that triggers:
 # - pre_gate (Gradle build, pushes cache)
 # - post_gate (Gradle build, hits cache in a fresh container)
 #
@@ -38,7 +38,7 @@ REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-gradle-build-cache.git}"
 # cached clones for moving refs. Use a stable tag for deterministic E2E runs.
 REPO_BASE_REF="${REPO_BASE_REF:-e2e/build-cache}"
 REPO_TARGET_REF="${REPO_TARGET_REF:-e2e/build-cache}"
-SPEC_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mod.yaml"
+SPEC_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mig.yaml"
 
 TS=$(date +%y%m%d%H%M%S)
 OUT_BASE=${PLOY_E2E_OUT_BASE:-./tmp/gradle/build-cache}
@@ -83,7 +83,7 @@ echo "[e2e] Ensuring gate env config for Gradle build cache..."
 "$PLOY_BIN" config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH --value "true" --scope gate >/dev/null
 
 echo "[e2e] Submitting run (repo=${REPO_URL}, base=${REPO_BASE_REF}, target=${REPO_TARGET_REF})..."
-RUN_JSON="$("$PLOY_BIN" mod run --json \
+RUN_JSON="$("$PLOY_BIN" mig run --json \
   --repo-url "$REPO_URL" \
   --repo-base-ref "$REPO_BASE_REF" \
   --repo-target-ref "$REPO_TARGET_REF" \

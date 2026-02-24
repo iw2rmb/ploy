@@ -21,7 +21,7 @@ import (
 // v1 contract:
 // - Specs are append-only: each call inserts a new specs row.
 // - migs.spec_id is updated to point at the newly created spec.
-// - This is the canonical way to "set" or "update" a mod's spec.
+// - This is the canonical way to "set" or "update" a mig's spec.
 func setMigSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
@@ -52,22 +52,22 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Resolve mod by ID-or-name.
-		mod, err := resolveMigByRef(r.Context(), st, modRef)
+		// Resolve mig by ID-or-name.
+		mig, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("set mod spec: get mod failed", "mig_ref", modRef, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("set mig spec: get mig failed", "mig_ref", modRef, "err", err)
 			return
 		}
-		modID := mod.ID
+		modID := mig.ID
 
-		// Check if mod is archived — cannot update spec on archived migs.
-		if mod.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot set spec on archived mod")
+		// Check if mig is archived — cannot update spec on archived migs.
+		if mig.ArchivedAt.Valid {
+			httpErr(w, http.StatusConflict, "cannot set spec on archived mig")
 			return
 		}
 
@@ -81,14 +81,14 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-			slog.Error("set mod spec: create spec failed", "mig_id", modID, "err", err)
+			slog.Error("set mig spec: create spec failed", "mig_id", modID, "err", err)
 			return
 		}
 
 		// Update migs.spec_id to point at the new spec.
 		if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to update mod spec: %v", err)
-			slog.Error("set mod spec: update mod failed", "mig_id", modID, "spec_id", createdSpec.ID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
+			slog.Error("set mig spec: update mig failed", "mig_id", modID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
 
@@ -104,9 +104,9 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("set mod spec: encode response failed", "err", err)
+			slog.Error("set mig spec: encode response failed", "err", err)
 		}
 
-		slog.Info("mod spec set", "mig_id", modID, "spec_id", createdSpec.ID.String())
+		slog.Info("mig spec set", "mig_id", modID, "spec_id", createdSpec.ID.String())
 	}
 }

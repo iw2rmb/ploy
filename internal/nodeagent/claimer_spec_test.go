@@ -12,7 +12,7 @@ import (
 // can honor the configured heal → re-gate loop.
 func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	specJSON := `{
-	        "steps": [{"image": "docker.io/test/mod:latest"}],
+	        "steps": [{"image": "docker.io/test/mig:latest"}],
 	        "build_gate": {
 	            "healing": {
 	                "retries": 2,
@@ -43,7 +43,7 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	specJSON := `{
         "steps": [{
-            "image": "docker.io/test/mod:latest",
+            "image": "docker.io/test/mig:latest",
             "retain_container": true,
             "command": ["/bin/sh","-c","echo hi"]
         }],
@@ -58,8 +58,8 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected image resolve error: %v", err)
 	}
-	if img != "docker.io/test/mod:latest" {
-		t.Fatalf("Execution.Image = %q, want docker.io/test/mod:latest", img)
+	if img != "docker.io/test/mig:latest" {
+		t.Fatalf("Execution.Image = %q, want docker.io/test/mig:latest", img)
 	}
 	if !typedOpts.Execution.RetainContainer {
 		t.Fatalf("Execution.RetainContainer not extracted")
@@ -91,7 +91,7 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
             "command": "echo from steps",
             "env": {"A":"1","B":"2"}
         }],
-        "mod": {
+        "mig": {
             "image": "docker.io/test/ignored:latest",
             "retain_container": true,
             "env": {"A":"999","C":"should-not-merge"},
@@ -102,7 +102,7 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	env, typedOpts, _ := parseSpec(raw)
 
-	// steps[0] should drive single-step extraction; unknown top-level "mod" is ignored.
+	// steps[0] should drive single-step extraction; unknown top-level "mig" is ignored.
 	img, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected image resolve error: %v", err)
@@ -117,12 +117,12 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
 		t.Fatalf("expected env from steps[0] to be merged, got: %+v", env)
 	}
 	if _, ok := env["C"]; ok {
-		t.Fatalf("expected env from top-level mod to be ignored, got: %+v", env)
+		t.Fatalf("expected env from top-level mig to be ignored, got: %+v", env)
 	}
 }
 
 // TestParseSpec_PreservesStepsArray verifies that parseSpec preserves the steps[]
-// array for multi-step runs without modification. The mods[] array represents
+// array for multi-step runs without modification. The migs[] array represents
 // sequential transformation steps that share global gate/healing policy.
 func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	t.Parallel()
@@ -131,17 +131,17 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	specJSON := `{
 		"steps": [
 			{
-				"image": "docker.io/test/mod-step1:latest",
+				"image": "docker.io/test/mig-step1:latest",
 				"env": {"STEP": "1", "TARGET": "java8"},
 				"retain_container": false
 			},
 			{
-				"image": "docker.io/test/mod-step2:latest",
+				"image": "docker.io/test/mig-step2:latest",
 				"command": ["migrate.sh", "--verbose"],
 				"env": {"STEP": "2", "TARGET": "java11"}
 			},
 			{
-				"image": "docker.io/test/mod-step3:latest",
+				"image": "docker.io/test/mig-step3:latest",
 				"command": "finalize.sh",
 				"env": {"STEP": "3"}
 			}
@@ -170,8 +170,8 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected steps[0] image resolve error: %v", err)
 	}
-	if step0Img != "docker.io/test/mod-step1:latest" {
-		t.Errorf("expected steps[0].image=docker.io/test/mod-step1:latest, got %q", step0Img)
+	if step0Img != "docker.io/test/mig-step1:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mig-step1:latest, got %q", step0Img)
 	}
 	if typedOpts.Steps[0].Env["STEP"] != "1" {
 		t.Errorf("expected steps[0].env.STEP=1, got %q", typedOpts.Steps[0].Env["STEP"])
@@ -180,13 +180,13 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		t.Errorf("expected steps[0].env.TARGET=java8, got %q", typedOpts.Steps[0].Env["TARGET"])
 	}
 
-	// Verify second mod entry has command array preserved.
+	// Verify second mig entry has command array preserved.
 	step1Img, err := typedOpts.Steps[1].Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected steps[1] image resolve error: %v", err)
 	}
-	if step1Img != "docker.io/test/mod-step2:latest" {
-		t.Errorf("expected steps[1].image=docker.io/test/mod-step2:latest, got %q", step1Img)
+	if step1Img != "docker.io/test/mig-step2:latest" {
+		t.Errorf("expected steps[1].image=docker.io/test/mig-step2:latest, got %q", step1Img)
 	}
 	wantStep1Cmd := []string{"migrate.sh", "--verbose"}
 	gotStep1Cmd := typedOpts.Steps[1].Command.ToSlice()
@@ -199,13 +199,13 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		}
 	}
 
-	// Verify third mod entry has shell command preserved.
+	// Verify third mig entry has shell command preserved.
 	step2Img, err := typedOpts.Steps[2].Image.ResolveImage(contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected steps[2] image resolve error: %v", err)
 	}
-	if step2Img != "docker.io/test/mod-step3:latest" {
-		t.Errorf("expected steps[2].image=docker.io/test/mod-step3:latest, got %q", step2Img)
+	if step2Img != "docker.io/test/mig-step3:latest" {
+		t.Errorf("expected steps[2].image=docker.io/test/mig-step3:latest, got %q", step2Img)
 	}
 	if typedOpts.Steps[2].Command.Shell != "finalize.sh" {
 		t.Errorf("expected steps[2].command=finalize.sh, got %q", typedOpts.Steps[2].Command.Shell)
@@ -238,7 +238,7 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 		{
 			name: "single_mod_healing",
 			specJSON: `{
-				"steps": [{"image": "docker.io/test/mod:latest"}],
+				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"build_gate": {
 					"healing": {
 						"retries": 3,
@@ -272,19 +272,19 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 			}
 
 			if typedOpts.Healing.Mod.Image.Universal != tc.wantImage {
-				t.Errorf("Healing mod image: got %q, want %q", typedOpts.Healing.Mod.Image.Universal, tc.wantImage)
+				t.Errorf("Healing mig image: got %q, want %q", typedOpts.Healing.Mod.Image.Universal, tc.wantImage)
 			}
 		})
 	}
 }
 
-// TestParseHealingMod_ModFields verifies that healing mod parsing correctly
-// extracts mod fields including image, command, env, and retain_container.
+// TestParseHealingMod_ModFields verifies that healing mig parsing correctly
+// extracts mig fields including image, command, env, and retain_container.
 func TestParseHealingMod_ModFields(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
-		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"build_gate": {
 			"healing": {
 				"retries": 1,
@@ -309,28 +309,28 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		t.Fatal("expected healing config to be parsed")
 	}
 
-	mod := typedOpts.Healing.Mod
+	mig := typedOpts.Healing.Mod
 
 	// Verify image.
-	if mod.Image.Universal != "docker.io/test/healer:v1" {
-		t.Errorf("Mod image: got %q, want %q", mod.Image.Universal, "docker.io/test/healer:v1")
+	if mig.Image.Universal != "docker.io/test/healer:v1" {
+		t.Errorf("Mod image: got %q, want %q", mig.Image.Universal, "docker.io/test/healer:v1")
 	}
 
 	// Verify command (shell form).
-	if mod.Command.Shell != "heal.sh --fix" {
-		t.Errorf("Mod command: got %q, want %q", mod.Command.Shell, "heal.sh --fix")
+	if mig.Command.Shell != "heal.sh --fix" {
+		t.Errorf("Mod command: got %q, want %q", mig.Command.Shell, "heal.sh --fix")
 	}
 
 	// Verify env.
-	if mod.Env["MODE"] != "aggressive" {
-		t.Errorf("Mod env MODE: got %q, want %q", mod.Env["MODE"], "aggressive")
+	if mig.Env["MODE"] != "aggressive" {
+		t.Errorf("Mod env MODE: got %q, want %q", mig.Env["MODE"], "aggressive")
 	}
-	if mod.Env["DEBUG"] != "true" {
-		t.Errorf("Mod env DEBUG: got %q, want %q", mod.Env["DEBUG"], "true")
+	if mig.Env["DEBUG"] != "true" {
+		t.Errorf("Mod env DEBUG: got %q, want %q", mig.Env["DEBUG"], "true")
 	}
 
 	// Verify retain_container.
-	if !mod.RetainContainer {
+	if !mig.RetainContainer {
 		t.Error("Mod retain_container: got false, want true")
 	}
 }
@@ -349,7 +349,7 @@ func TestParseSpec_ProducesTypedOptions_SingleStepExecArray(t *testing.T) {
 	// This is the canonical format that was previously broken.
 	specJSON := `{
 		"steps": [{
-			"image": "docker.io/test/mod:latest",
+			"image": "docker.io/test/mig:latest",
 			"command": ["echo", "hello", "world"]
 		}]
 	}`

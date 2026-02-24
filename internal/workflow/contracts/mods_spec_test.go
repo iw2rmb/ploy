@@ -10,7 +10,7 @@ import (
 func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mod:latest",
+			"image": "docker.io/user/mig:latest",
 			"command": "echo hello",
 			"env": {"FOO": "bar", "BAZ": "qux"},
 			"retain_container": true
@@ -51,8 +51,8 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 	}
 
 	// Verify image (universal form).
-	if step.Image.Universal != "docker.io/user/mod:latest" {
-		t.Errorf("image = %q, want %q", step.Image.Universal, "docker.io/user/mod:latest")
+	if step.Image.Universal != "docker.io/user/mig:latest" {
+		t.Errorf("image = %q, want %q", step.Image.Universal, "docker.io/user/mig:latest")
 	}
 
 	// Verify env.
@@ -182,7 +182,7 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mod:latest"
+			"image": "docker.io/user/mig:latest"
 		}],
 		"build_gate": {
 			"enabled": true,
@@ -253,7 +253,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "enabled without language",
 			input: `{
-				"steps": [{"image": "docker.io/user/mod:latest"}],
+				"steps": [{"image": "docker.io/user/mig:latest"}],
 				"build_gate": {"pre": {"stack": {"enabled": true, "release": "11"}}}
 			}`,
 			wantErr: "build_gate.pre.stack.language: required",
@@ -261,7 +261,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "enabled without release",
 			input: `{
-				"steps": [{"image": "docker.io/user/mod:latest"}],
+				"steps": [{"image": "docker.io/user/mig:latest"}],
 				"build_gate": {"post": {"stack": {"enabled": true, "language": "java"}}}
 			}`,
 			wantErr: "build_gate.post.stack.release: required",
@@ -269,7 +269,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "disabled with fields is ambiguous",
 			input: `{
-				"steps": [{"image": "docker.io/user/mod:latest"}],
+				"steps": [{"image": "docker.io/user/mig:latest"}],
 				"build_gate": {"pre": {"stack": {"enabled": false, "language": "java", "release": "11"}}}
 			}`,
 			wantErr: "build_gate.pre.stack: enabled=false with stack fields is ambiguous",
@@ -294,9 +294,9 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": {
-				"default": "docker.io/user/mod:default",
-				"java-maven": "docker.io/user/mod:maven",
-				"java-gradle": "docker.io/user/mod:gradle"
+				"default": "docker.io/user/mig:default",
+				"java-maven": "docker.io/user/mig:maven",
+				"java-gradle": "docker.io/user/mig:gradle"
 			}
 		}]
 	}`
@@ -318,8 +318,8 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveImage(java-maven) failed: %v", err)
 	}
-	if img != "docker.io/user/mod:maven" {
-		t.Errorf("ResolveImage(java-maven) = %q, want %q", img, "docker.io/user/mod:maven")
+	if img != "docker.io/user/mig:maven" {
+		t.Errorf("ResolveImage(java-maven) = %q, want %q", img, "docker.io/user/mig:maven")
 	}
 
 	// Verify default fallback.
@@ -327,8 +327,8 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveImage(unknown) failed: %v", err)
 	}
-	if img != "docker.io/user/mod:default" {
-		t.Errorf("ResolveImage(unknown) = %q, want %q", img, "docker.io/user/mod:default")
+	if img != "docker.io/user/mig:default" {
+		t.Errorf("ResolveImage(unknown) = %q, want %q", img, "docker.io/user/mig:default")
 	}
 }
 
@@ -336,10 +336,10 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 // These fields are informational (typically from YAML manifests converted to JSON).
 func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	input := `{
-		"apiVersion": "ploy.mod/v1alpha1",
+		"apiVersion": "ploy.mig/v1alpha1",
 		"kind": "ModRunSpec",
 		"steps": [{
-			"image": "docker.io/user/mod:latest",
+			"image": "docker.io/user/mig:latest",
 			"command": "echo hello",
 			"env": {"FOO": "bar"}
 		}],
@@ -351,14 +351,14 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
-	if spec.APIVersion != "ploy.mod/v1alpha1" {
-		t.Errorf("apiVersion = %q, want %q", spec.APIVersion, "ploy.mod/v1alpha1")
+	if spec.APIVersion != "ploy.mig/v1alpha1" {
+		t.Errorf("apiVersion = %q, want %q", spec.APIVersion, "ploy.mig/v1alpha1")
 	}
 	if spec.Kind != "ModRunSpec" {
 		t.Errorf("kind = %q, want %q", spec.Kind, "ModRunSpec")
 	}
-	if spec.Steps[0].Image.Universal != "docker.io/user/mod:latest" {
-		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "docker.io/user/mod:latest")
+	if spec.Steps[0].Image.Universal != "docker.io/user/mig:latest" {
+		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "docker.io/user/mig:latest")
 	}
 	if spec.Steps[0].Command.Shell != "echo hello" {
 		t.Errorf("command = %q, want %q", spec.Steps[0].Command.Shell, "echo hello")
@@ -377,7 +377,7 @@ func TestParseModsSpecJSON_Empty(t *testing.T) {
 }
 
 func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
-	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mod:latest"}]}`
+	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mig:latest"}]}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected error for mod_index")
@@ -393,7 +393,7 @@ func TestParseModsSpecJSON_ValidationError(t *testing.T) {
 	input := `{"steps": [{"name": "test"}]}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
-		t.Fatal("expected validation error for mod without image")
+		t.Fatal("expected validation error for mig without image")
 	}
 	if want := "steps[0].image: required"; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
@@ -436,7 +436,7 @@ func TestModsSpec_ToMap(t *testing.T) {
 	mrOnSuccess := true
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image:           JobImage{Universal: "docker.io/user/mod:latest"},
+			Image:           JobImage{Universal: "docker.io/user/mig:latest"},
 			Command:         CommandSpec{Shell: "echo hello"},
 			Env:             map[string]string{"FOO": "bar"},
 			RetainContainer: true,
@@ -670,8 +670,8 @@ func TestModsSpec_ArtifactFields(t *testing.T) {
 
 func TestParseModsSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	input := `{
-		"mod": {
-			"image": "docker.io/user/mod:latest",
+		"mig": {
+			"image": "docker.io/user/mig:latest",
 			"command": "echo hello"
 		}
 	}`

@@ -1,4 +1,4 @@
-# Multi-step mod spec demonstrating sequential transformation steps with
+# Multi-step mig spec demonstrating sequential transformation steps with
 # global build gate and healing policy. This example shows a three-step Java
 # migration workflow: Java 8 → Java 11 → Java 17, with each step producing
 # a diff that enables per-step rehydration and multi-node execution.
@@ -7,18 +7,18 @@
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/example/my-java-project.git \
 #     --repo-base-ref main \
-#     --repo-target-ref mods-multi-step-java-upgrade \
+#     --repo-target-ref migs-multi-step-java-upgrade \
 #     --spec tests/e2e/migs/scenario-multi-step/mig.yaml \
 #     --follow
 
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
 # MULTI-STEP MODS
 ################################################################################
 # Sequential transformation steps: Java 8 → Java 11 → Java 17
-# Each mod executes in array order, sharing the same repository and global
+# Each mig executes in array order, sharing the same repository and global
 # build gate/healing policy. The diff from each step is captured before the
 # next step begins.
 steps:
@@ -55,7 +55,7 @@ steps:
 ################################################################################
 # GLOBAL BUILD GATE AND HEALING POLICY
 ################################################################################
-# Build gate runs after each mod step. For multi-step runs, the gate validates
+# Build gate runs after each mig step. For multi-step runs, the gate validates
 # the accumulated changes from all prior steps.
 build_gate:
   enabled: true
@@ -65,7 +65,7 @@ build_gate:
   # proceeding to the next step.
   healing:
     retries: 1
-    mod:
+    mig:
       # Codex healing container using the workspace diff handshake.
       # Codex edits the workspace and exits when done; the node agent inspects
       # the workspace for diffs and re-runs the Build Gate externally when changes exist.

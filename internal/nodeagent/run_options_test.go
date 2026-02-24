@@ -12,7 +12,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 
 	specJSON := `{
 		"steps": [{
-			"image": "docker.io/test/mod:latest",
+			"image": "docker.io/test/mig:latest",
 			"command": "run-test.sh",
 			"retain_container": true
 		}],
@@ -33,8 +33,8 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving image: %v", err)
 	}
-	if resolved != "docker.io/test/mod:latest" {
-		t.Errorf("expected typed image=docker.io/test/mod:latest, got %q", resolved)
+	if resolved != "docker.io/test/mig:latest" {
+		t.Errorf("expected typed image=docker.io/test/mig:latest, got %q", resolved)
 	}
 	if typedOpts.Execution.Command.Shell != "run-test.sh" {
 		t.Errorf("expected typed command.shell=run-test.sh, got %q", typedOpts.Execution.Command.Shell)
@@ -217,7 +217,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			JobID: "job-direct-test-123",
 			Steps: []contracts.ModStep{
 				{
-					Image:           contracts.JobImage{Universal: "docker.io/test/mod:v1"},
+					Image:           contracts.JobImage{Universal: "docker.io/test/mig:v1"},
 					Command:         contracts.CommandSpec{Exec: []string{"echo", "hello"}},
 					Env:             map[string]string{"KEY": "value"},
 					RetainContainer: true,
@@ -251,8 +251,8 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected image resolve error: %v", err)
 		}
-		if execImg != "docker.io/test/mod:v1" {
-			t.Errorf("Execution.Image: got %q, want %q", execImg, "docker.io/test/mod:v1")
+		if execImg != "docker.io/test/mig:v1" {
+			t.Errorf("Execution.Image: got %q, want %q", execImg, "docker.io/test/mig:v1")
 		}
 		wantExec := []string{"echo", "hello"}
 		if len(runOpts.Execution.Command.Exec) != len(wantExec) {

@@ -92,10 +92,10 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Stream:    "stdout",
 				Line:      "Step started",
 				NodeID:    "node-abc",
-				JobType:   "mod",
+				JobType:   "mig",
 				JobID:     "job-123",
 			},
-			want: "2025-10-22T10:00:00Z stdout node=node-abc job_type=mod job=job-123 Step started\n",
+			want: "2025-10-22T10:00:00Z stdout node=node-abc job_type=mig job=job-123 Step started\n",
 		},
 		{
 			name: "node_id only",

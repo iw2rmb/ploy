@@ -57,10 +57,10 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			wantErrText: "mutually exclusive",
 		},
 		{
-			name:        "missing mod id",
+			name:        "missing mig id",
 			modID:       "",
 			wantErr:     true,
-			wantErrText: "mod id is required",
+			wantErrText: "mig id is required",
 		},
 	}
 

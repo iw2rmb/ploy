@@ -2,7 +2,7 @@
 //
 // These commands call the server endpoints:
 //   - POST /v1/runs/{run_id}/pull (resolve repo for a run)
-//   - POST /v1/migs/{mod_id}/pull (resolve repo for a mod)
+//   - POST /v1/migs/{mod_id}/pull (resolve repo for a mig)
 //
 // These endpoints help CLI clients resolve repo execution identifiers needed to
 // pull diffs from the server.
@@ -115,7 +115,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 // Mod Pull Resolution Command
 // =============================================================================
 
-// PullMode specifies which run to select for mod pull resolution.
+// PullMode specifies which run to select for mig pull resolution.
 type PullMode string
 
 const (
@@ -125,7 +125,7 @@ const (
 	PullModeLastFailed PullMode = "last-failed"
 )
 
-// ModPullCommand resolves a repo_url to execution identifiers for a mod.
+// ModPullCommand resolves a repo_url to execution identifiers for a mig.
 // Endpoint: POST /v1/migs/{mod_id}/pull
 //
 // Server performs the lookup using mod_id + repo_url to find mod_repos.id,
@@ -148,20 +148,20 @@ type ModPullCommand struct {
 // Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
 func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if c.Client == nil {
-		return nil, fmt.Errorf("mod pull: http client required")
+		return nil, fmt.Errorf("mig pull: http client required")
 	}
 	if c.BaseURL == nil {
-		return nil, fmt.Errorf("mod pull: base url required")
+		return nil, fmt.Errorf("mig pull: base url required")
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return nil, fmt.Errorf("mod pull: mod id required")
+		return nil, fmt.Errorf("mig pull: mig id required")
 	}
 	repoURL := strings.TrimSpace(c.RepoURL)
 	if repoURL == "" {
-		return nil, fmt.Errorf("mod pull: repo url required")
+		return nil, fmt.Errorf("mig pull: repo url required")
 	}
 	if err := domaintypes.RepoURL(repoURL).Validate(); err != nil {
-		return nil, fmt.Errorf("mod pull: repo url must be a valid repo url")
+		return nil, fmt.Errorf("mig pull: repo url must be a valid repo url")
 	}
 
 	// Default mode is "last-succeeded".
@@ -183,28 +183,28 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("mod pull: marshal request: %w", err)
+		return nil, fmt.Errorf("mig pull: marshal request: %w", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("mod pull: build request: %w", err)
+		return nil, fmt.Errorf("mig pull: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("mod pull: http request failed: %w", err)
+		return nil, fmt.Errorf("mig pull: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "mod pull")
+		return nil, decodeHTTPError(resp, "mig pull")
 	}
 
 	var result PullResolution
 	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("mod pull: decode response: %w", err)
+		return nil, fmt.Errorf("mig pull: decode response: %w", err)
 	}
 
 	return &result, nil

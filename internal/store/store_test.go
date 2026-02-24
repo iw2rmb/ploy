@@ -123,7 +123,7 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	modID := types.NewMigID()
 	_, err = db.CreateMig(ctx, CreateMigParams{
 		ID:        modID,
-		Name:      "test-mod-" + modID.String(),
+		Name:      "test-mig-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -194,7 +194,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 		t.Fatalf("CreateRunRepo() attempt=%d, want 1", fx.RunRepo.Attempt)
 	}
 
-	// Add a second repo for the mod and run.
+	// Add a second repo for the mig and run.
 	modRepo2ID := types.NewMigRepoID()
 	_, err = db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,

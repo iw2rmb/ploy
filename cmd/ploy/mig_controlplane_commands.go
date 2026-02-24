@@ -12,7 +12,7 @@ import (
 )
 
 func handleMigArtifacts(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod artifacts", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig artifacts", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	if err := fs.Parse(args); err != nil {
 		printMigUsage(stderr)

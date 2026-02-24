@@ -10,7 +10,7 @@ ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}
-TARGET_REF=${PLOY_E2E_TARGET_REF:-mods-upgrade-java17-heal}
+TARGET_REF=${PLOY_E2E_TARGET_REF:-migs-upgrade-java17-heal}
 
 # Artifacts directory: default to ./tmp/migs/scenario-orw-fail/<YYMMDDHHmmss>/
 TS=$(date +%y%m%d%H%M%S)

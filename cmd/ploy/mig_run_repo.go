@@ -29,12 +29,12 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleMigRunRepo routes `mod run repo <action>` subcommands.
-// Called when args[0] == "repo" in the mod run context.
+// handleMigRunRepo routes `mig run repo <action>` subcommands.
+// Called when args[0] == "repo" in the mig run context.
 func handleMigRunRepo(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
 		printMigRunRepoUsage(stderr)
-		return errors.New("mod run repo action required")
+		return errors.New("mig run repo action required")
 	}
 
 	// Dispatch to the appropriate subcommand handler.
@@ -49,11 +49,11 @@ func handleMigRunRepo(args []string, stderr io.Writer) error {
 		return handleMigRunRepoStatus(args[1:], stderr)
 	default:
 		printMigRunRepoUsage(stderr)
-		return fmt.Errorf("unknown mod run repo action %q", args[0])
+		return fmt.Errorf("unknown mig run repo action %q", args[0])
 	}
 }
 
-// printMigRunRepoUsage renders help for mod run repo subcommands.
+// printMigRunRepoUsage renders help for mig run repo subcommands.
 func printMigRunRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mig run repo <action> [flags] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
@@ -74,7 +74,7 @@ func printMigRunRepoUsage(w io.Writer) {
 // handleMigRunRepoAdd implements `ploy mig run repo add <run-id> --repo-url <url> --base-ref <ref> --target-ref <ref>`.
 // Adds a new repo entry to a batch run with status=Queued and immediately creates repo-scoped jobs.
 func handleMigRunRepoAdd(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run repo add", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig run repo add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	repoURL := fs.String("repo-url", "", "Git repository URL")
 	baseRef := fs.String("base-ref", "", "Git base ref (branch or commit)")
@@ -137,7 +137,7 @@ func handleMigRunRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo added: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
@@ -145,7 +145,7 @@ func handleMigRunRepoAdd(args []string, stderr io.Writer) error {
 // handleMigRunRepoRemove implements `ploy mig run repo remove <run-id> --repo-id <id>`.
 // Cancels a repo within a run (Queued/Running → Cancelled) and cancels active jobs for the current attempt.
 func handleMigRunRepoRemove(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run repo remove", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig run repo remove", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	// Repo IDs are NanoID(8) strings; use neutral "identifier" wording.
 	repoID := fs.String("repo-id", "", "Repo identifier to remove")
@@ -181,7 +181,7 @@ func handleMigRunRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
@@ -189,7 +189,7 @@ func handleMigRunRepoRemove(args []string, stderr io.Writer) error {
 // handleMigRunRepoRestart implements `ploy mig run repo restart <run-id> --repo-id <id> [--base-ref <ref>] [--target-ref <ref>]`.
 // Resets repo status to Queued, increments attempt, optionally updates refs.
 func handleMigRunRepoRestart(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run repo restart", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig run repo restart", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	// Repo IDs are NanoID(8) strings; use neutral "identifier" wording.
 	repoID := fs.String("repo-id", "", "Repo identifier to restart")
@@ -236,7 +236,7 @@ func handleMigRunRepoRestart(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mod.
+	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (repo_id: %s, attempt: %d, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Attempt, resp.Status)
 	return nil
 }
@@ -244,7 +244,7 @@ func handleMigRunRepoRestart(args []string, stderr io.Writer) error {
 // handleMigRunRepoStatus implements `ploy mig run repo status <run-id>`.
 // Lists all repos within a batch with their status, attempt count, and timing.
 func handleMigRunRepoStatus(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run repo status", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig run repo status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	if err := fs.Parse(args); err != nil {
@@ -318,7 +318,7 @@ type runRepoRestartRequest struct {
 // runRepoResponse mirrors the server's RunRepoResponse for CLI consumption.
 // runRepoResponse represents a single repo within a batch for CLI responses.
 // v1 model: run_repos uses composite PK (run_id, repo_id), not a standalone id field.
-// RepoID refers to mod_repos.id (the repository identifier within a mod project).
+// RepoID refers to mod_repos.id (the repository identifier within a mig project).
 type runRepoResponse struct {
 	RunID      domaintypes.RunID     `json:"run_id"`
 	RepoID     domaintypes.MigRepoID `json:"repo_id"` // mod_repos.id (NanoID, 8 chars)

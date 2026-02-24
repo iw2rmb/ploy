@@ -37,7 +37,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	}
 
 	modID := domaintypes.NewMigID()
-	mod, err := db.CreateMig(ctx, store.CreateMigParams{
+	mig, err := db.CreateMig(ctx, store.CreateMigParams{
 		ID:        modID,
 		Name:      "smoke-" + modID.String(),
 		SpecID:    &spec.ID,
@@ -83,7 +83,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	return v1RunFixture{
 		Spec:    spec,
-		Mod:     mod,
+		Mod:     mig,
 		ModRepo: modRepo,
 		Run:     run,
 		RunRepo: runRepo,
@@ -117,11 +117,11 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a v1 run representing a mod execution workflow.
+	// Step 1: Create a v1 run representing a mig execution workflow.
 	modSpec := []byte(`{
 		"type": "smoke-workflow",
-		"image": "docker.io/example/mod-test:latest",
-		"command": ["mod-test", "--input", "/workspace"],
+		"image": "docker.io/example/mig-test:latest",
+		"command": ["mig-test", "--input", "/workspace"],
 		"build_gate": {
 			"enabled": true
 		}
@@ -152,7 +152,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	t.Logf("✓ Created job: id=%v, name=%s", jobBuildGate.ID, jobBuildGate.Name)
 
-	// Stage 2: Main mod execution
+	// Stage 2: Main mig execution
 	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
@@ -164,7 +164,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
-		Meta:        []byte(`{"type":"mod","lane":"main"}`),
+		Meta:        []byte(`{"type":"mig","lane":"main"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(main) failed: %v", err)
@@ -205,7 +205,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	t.Logf("✓ Created log chunk 0: %d bytes", log1.DataSize)
 
 	// Main job logs
-	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
+	mainLog := []byte("INFO: Executing mig\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
 		RunID:    run.ID,
 		JobID:    &jobMain.ID,
@@ -292,7 +292,7 @@ index abc1234..def5678 100644
 	}
 	t.Logf("✓ Created event: id=%d, message=%s", event2.ID, event2.Message)
 
-	// Event 3: Main mod completed
+	// Event 3: Main mig completed
 	event3, err := db.CreateEvent(ctx, store.CreateEventParams{
 		RunID: run.ID,
 		Time: pgtype.Timestamptz{
@@ -456,8 +456,8 @@ index abc1234..def5678 100644
 }
 
 // TestSmokeWorkflow_HealingDiffs validates that healing diffs with job_type and next_id
-// are correctly stored and retrieved alongside mod diffs.
-// C2: This test verifies the unified job+diff model where both mod and healing diffs
+// are correctly stored and retrieved alongside mig diffs.
+// C2: This test verifies the unified job+diff model where both mig and healing diffs
 // share the same next_id, enabling rehydration to include all diffs for a step.
 //
 // Requires: PLOY_TEST_PG_DSN environment variable.
@@ -493,7 +493,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
-		Meta:        []byte(`{"type":"mod"}`),
+		Meta:        []byte(`{"type":"mig"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob() failed: %v", err)
@@ -511,7 +511,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
-		Meta:        []byte(`{"type":"mod"}`),
+		Meta:        []byte(`{"type":"mig"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateJob(step 1) failed: %v", err)
@@ -519,15 +519,15 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 1 job: id=%v", jobStep1.ID)
 
 	// C2: Create diffs with next_id and job_type in summary.
-	// Step 0: mod diff + healing diff
-	step0ModSummary := []byte(`{"next_id":0,"job_type":"mod"}`)
+	// Step 0: mig diff + healing diff
+	step0ModSummary := []byte(`{"next_id":0,"job_type":"mig"}`)
 	step0HealSummary := []byte(`{"next_id":0,"job_type":"healing","healing_attempt":1}`)
-	// Step 1: mod diff + 2 healing diffs
-	step1ModSummary := []byte(`{"next_id":1,"job_type":"mod"}`)
+	// Step 1: mig diff + 2 healing diffs
+	step1ModSummary := []byte(`{"next_id":1,"job_type":"mig"}`)
 	step1Heal1Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":1}`)
 	step1Heal2Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":2}`)
 
-	// Create step 0 mod diff.
+	// Create step 0 mig diff.
 	step0ModPatch := []byte{0x1f, 0x8b, 0x01} // Placeholder gzip bytes.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:     run.ID,
@@ -536,9 +536,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Summary:   step0ModSummary,
 	})
 	if err != nil {
-		t.Fatalf("CreateDiff(step0-mod) failed: %v", err)
+		t.Fatalf("CreateDiff(step0-mig) failed: %v", err)
 	}
-	t.Logf("✓ Created step 0 mod diff: id=%v", step0ModDiff.ID)
+	t.Logf("✓ Created step 0 mig diff: id=%v", step0ModDiff.ID)
 
 	// Create step 0 healing diff with same next_id.
 	step0HealPatch := []byte{0x1f, 0x8b, 0x02}
@@ -553,7 +553,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created step 0 healing diff: id=%v", step0HealDiff.ID)
 
-	// Create step 1 mod diff.
+	// Create step 1 mig diff.
 	step1ModPatch := []byte{0x1f, 0x8b, 0x03}
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:     run.ID,
@@ -562,9 +562,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Summary:   step1ModSummary,
 	})
 	if err != nil {
-		t.Fatalf("CreateDiff(step1-mod) failed: %v", err)
+		t.Fatalf("CreateDiff(step1-mig) failed: %v", err)
 	}
-	t.Logf("✓ Created step 1 mod diff: id=%v", step1ModDiff.ID)
+	t.Logf("✓ Created step 1 mig diff: id=%v", step1ModDiff.ID)
 
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Patch := []byte{0x1f, 0x8b, 0x04}

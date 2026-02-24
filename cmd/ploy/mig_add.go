@@ -1,8 +1,8 @@
 // mod_add.go implements the 'ploy mig add' command handler.
 //
-// This command creates a mod project:
+// This command creates a mig project:
 // - ploy mig add --name <name> [--spec <path|->]
-// - Creates a mod with unique name.
+// - Creates a mig with unique name.
 // - If --spec is provided, creates initial spec row and sets migs.spec_id.
 // - Prints mod_id and name; if --spec is provided, also prints spec_id.
 package main
@@ -26,10 +26,10 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 	}
 
 	// Parse flags.
-	fs := flag.NewFlagSet("mod add", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	name := fs.String("name", "", "Unique name for the mod (required)")
+	name := fs.String("name", "", "Unique name for the mig (required)")
 	specFile := fs.String("spec", "", "Path to YAML/JSON spec file (use '-' for stdin)")
 
 	if err := fs.Parse(args); err != nil {
@@ -61,7 +61,7 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod add command.
+	// Execute mig add command.
 	cmd := migs.AddModCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -84,11 +84,11 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printMigAddUsage prints usage for the mod add command.
+// printMigAddUsage prints usage for the mig add command.
 func printMigAddUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mig add --name <name> [--spec <path|->]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
-	_, _ = fmt.Fprintln(w, "  --name <name>    Unique name for the mod (required)")
+	_, _ = fmt.Fprintln(w, "  --name <name>    Unique name for the mig (required)")
 	_, _ = fmt.Fprintln(w, "  --spec <path|->  Path to YAML/JSON spec file (use '-' for stdin)")
 }

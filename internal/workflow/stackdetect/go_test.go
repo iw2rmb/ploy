@@ -9,7 +9,7 @@ import (
 func TestDetectGoMod_Go122(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "go", "go122")
-	goModPath := filepath.Join(workspace, "go.mod")
+	goModPath := filepath.Join(workspace, goModuleFile)
 
 	obs, err := detectGo(ctx, workspace, goModPath)
 	if err != nil {
@@ -23,7 +23,7 @@ func TestDetectGoMod_Go122(t *testing.T) {
 func TestDetectGoMod_Go122Toolchain(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "go", "go122-toolchain")
-	goModPath := filepath.Join(workspace, "go.mod")
+	goModPath := filepath.Join(workspace, goModuleFile)
 
 	obs, err := detectGo(ctx, workspace, goModPath)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestDetectGoMod_Go122Toolchain(t *testing.T) {
 func TestDetectGoMod_NoGoDirective(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "go", "no-go-directive")
-	goModPath := filepath.Join(workspace, "go.mod")
+	goModPath := filepath.Join(workspace, goModuleFile)
 
 	_, err := detectGo(ctx, workspace, goModPath)
 	if err == nil {

@@ -34,7 +34,7 @@ func TestClaimJob_Success(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &nodeID,
-			Name:        "mod-0",
+			Name:        "mig-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeMod.String(),
 			Meta:        []byte(`{}`),
@@ -139,7 +139,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &nodeID,
-			Name:        "mod-0",
+			Name:        "mig-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeMod.String(),
 			Meta:        []byte(`{}`),
@@ -319,7 +319,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &nodeID,
-			Name:        "mod-0",
+			Name:        "mig-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeMod.String(),
 			Meta:        []byte(`{}`),
@@ -382,7 +382,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		t.Fatalf("expected CODEX_AUTH_JSON to be injected, got %v", env["CODEX_AUTH_JSON"])
 	}
 	if _, ok := env["HEAL_ONLY"]; ok {
-		t.Fatalf("expected HEAL_ONLY not to be injected for mod job")
+		t.Fatalf("expected HEAL_ONLY not to be injected for mig job")
 	}
 	if env["PER_RUN_ONLY"] != "value" {
 		t.Fatalf("expected PER_RUN_ONLY preserved, got %v", env["PER_RUN_ONLY"])
@@ -409,7 +409,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &nodeID,
-			Name:        "mod-0",
+			Name:        "mig-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeMod.String(),
 			Meta:        []byte(`{}`),

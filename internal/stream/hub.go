@@ -43,7 +43,7 @@ type LogRecord struct {
 	// Empty for events not tied to a specific job.
 	JobID domaintypes.JobID `json:"job_id,omitempty"`
 
-	// JobType indicates the job phase type (e.g., "pre_gate", "mod", "post_gate", "heal", "re_gate").
+	// JobType indicates the job phase type (e.g., "pre_gate", "mig", "post_gate", "heal", "re_gate").
 	// Empty when not applicable or unknown. Uses domain type for type-safe identification.
 	JobType domaintypes.JobType `json:"job_type,omitempty"`
 }

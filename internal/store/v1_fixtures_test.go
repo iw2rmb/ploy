@@ -32,9 +32,9 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	modID := types.NewMigID()
-	mod, err := db.CreateMig(ctx, CreateMigParams{
+	mig, err := db.CreateMig(ctx, CreateMigParams{
 		ID:        modID,
-		Name:      "test-mod-" + modID.String(),
+		Name:      "test-mig-" + modID.String(),
 		SpecID:    &specID,
 		CreatedBy: &createdBy,
 	})
@@ -77,7 +77,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	return v1Fixture{
-		Mig:     mod,
+		Mig:     mig,
 		Spec:    spec,
 		MigRepo: modRepo,
 		Run:     run,

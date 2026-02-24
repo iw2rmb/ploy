@@ -390,7 +390,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 	}
 }
 
-// Note: uploadDiff and associated mod diff metadata tests were removed along
+// Note: uploadDiff and associated mig diff metadata tests were removed along
 // with legacy HEAD-based diff generation. Mods now use baseline-aware
 // GenerateBetween semantics via dedicated helpers.
 

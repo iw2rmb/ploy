@@ -307,16 +307,16 @@ func savePullState(path string, state pullState) error {
 	return nil
 }
 
-// initiatePullRun creates a mod-project run for the current repo.
-// Infers the mod from the repo URL and creates a run scoped to only this repo.
+// initiatePullRun creates a mig-project run for the current repo.
+// Infers the mig from the repo URL and creates a run scoped to only this repo.
 func initiatePullRun(ctx context.Context, httpClient *http.Client, baseURL *url.URL, repoURL string, stderr io.Writer) (domaintypes.RunID, error) {
-	// Infer mod from repo.
+	// Infer mig from repo.
 	modID, err := inferModFromRepo(ctx, httpClient, baseURL, repoURL, stderr)
 	if err != nil {
 		return "", fmt.Errorf("pull: %w", err)
 	}
 
-	// Create mod-project run scoped to this repo.
+	// Create mig-project run scoped to this repo.
 	cmd := climods.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  baseURL,

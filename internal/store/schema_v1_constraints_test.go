@@ -12,7 +12,7 @@ import (
 )
 
 // TestV1Schema_ModsNameUniqueness verifies the UNIQUE constraint on migs.name.
-// The migs table has a unique index on name to prevent duplicate mod names.
+// The migs table has a unique index on name to prevent duplicate mig names.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_ModsNameUniqueness(t *testing.T) {
@@ -36,24 +36,24 @@ func TestV1Schema_ModsNameUniqueness(t *testing.T) {
 		}
 	}()
 
-	// Insert first mod with name "test-mod-uniqueness".
+	// Insert first mig with name "test-mig-uniqueness".
 	modID1 := domaintypes.NewMigID()
 	testModIDs = append(testModIDs, modID1.String())
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID1.String(), "test-mod-uniqueness", "test-user")
+		`, modID1.String(), "test-mig-uniqueness", "test-user")
 	if err != nil {
-		t.Fatalf("first mod insert failed: %v", err)
+		t.Fatalf("first mig insert failed: %v", err)
 	}
 
-	// Attempt to insert second mod with the same name.
+	// Attempt to insert second mig with the same name.
 	modID2 := domaintypes.NewMigID()
 	testModIDs = append(testModIDs, modID2.String())
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID2.String(), "test-mod-uniqueness", "test-user")
+		`, modID2.String(), "test-mig-uniqueness", "test-user")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -70,7 +70,7 @@ func TestV1Schema_ModsNameUniqueness(t *testing.T) {
 }
 
 // TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_url).
-// The mig_repos table has UNIQUE (mig_id, repo_url) to prevent duplicate repo URLs per mod.
+// The mig_repos table has UNIQUE (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_ModReposUniqueness(t *testing.T) {
@@ -86,7 +86,7 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mod.
+	// Create a test mig.
 	modID := domaintypes.NewMigID()
 	defer func() {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
@@ -95,9 +95,9 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID.String(), "test-mod-repos-uniq-"+modID.String(), "test-user")
+		`, modID.String(), "test-mig-repos-uniq-"+modID.String(), "test-user")
 	if err != nil {
-		t.Fatalf("mod insert failed: %v", err)
+		t.Fatalf("mig insert failed: %v", err)
 	}
 
 	// Insert first mig_repos row.
@@ -147,7 +147,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mod, spec, mod_repo, and run.
+	// Create a test mig, spec, mod_repo, and run.
 	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
@@ -160,13 +160,13 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
 	}()
 
-	// Insert mod.
+	// Insert mig.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
 		`, modID.String(), "test-run-repos-pk-"+modID.String(), "test-user")
 	if err != nil {
-		t.Fatalf("mod insert failed: %v", err)
+		t.Fatalf("mig insert failed: %v", err)
 	}
 
 	// Insert spec.
@@ -242,7 +242,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mod, spec, mod_repo, run, and run_repo.
+	// Create a test mig, spec, mod_repo, run, and run_repo.
 	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
@@ -260,13 +260,13 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
 	}()
 
-	// Insert mod.
+	// Insert mig.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
 		`, modID.String(), "test-jobs-uniq-"+modID.String(), "test-user")
 	if err != nil {
-		t.Fatalf("mod insert failed: %v", err)
+		t.Fatalf("mig insert failed: %v", err)
 	}
 
 	// Insert spec.
@@ -310,7 +310,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID1.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
+		`, jobID1.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mig", "test-image")
 	if err != nil {
 		t.Fatalf("first job insert failed: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID2.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
+		`, jobID2.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mig", "test-image")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -342,7 +342,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID3.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 2000.0, "mod", "test-image")
+		`, jobID3.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 2000.0, "mig", "test-image")
 	if err != nil {
 		t.Fatalf("job insert with different next_id should succeed, but failed: %v", err)
 	}

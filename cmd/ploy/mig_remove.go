@@ -1,8 +1,8 @@
 // mod_remove.go implements the 'ploy mig remove' command handler.
 //
-// This command deletes a mod project:
-// - ploy mig remove <mod-id|name>
-// - Refuses if the mod has any runs.
+// This command deletes a mig project:
+// - ploy mig remove <mig-id|name>
+// - Refuses if the mig has any runs.
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleMigRemove implements 'ploy mig remove <mod-id|name>'.
+// handleMigRemove implements 'ploy mig remove <mig-id|name>'.
 func handleMigRemove(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -22,10 +22,10 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Require mod ID or name as positional arg.
+	// Require mig ID or name as positional arg.
 	if len(args) == 0 {
 		printMigRemoveUsage(stderr)
-		return fmt.Errorf("mod id or name required")
+		return fmt.Errorf("mig id or name required")
 	}
 	modRef := args[0]
 
@@ -36,7 +36,7 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod remove command.
+	// Execute mig remove command.
 	cmd := migs.RemoveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -51,9 +51,9 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printMigRemoveUsage prints usage for the mod remove command.
+// printMigRemoveUsage prints usage for the mig remove command.
 func printMigRemoveUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig remove <mod-id|name>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig remove <mig-id|name>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Deletes a mod project. Refuses if the mod has any runs.")
+	_, _ = fmt.Fprintln(w, "Deletes a mig project. Refuses if the mig has any runs.")
 }

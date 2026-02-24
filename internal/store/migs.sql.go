@@ -17,8 +17,8 @@ SET archived_at = now()
 WHERE id = $1 AND archived_at IS NULL
 `
 
-// Archives a mod by setting archived_at to now().
-// Archiving must be refused when the mod has any jobs in a running state.
+// Archives a mig by setting archived_at to now().
+// Archiving must be refused when the mig has any jobs in a running state.
 // This query only sets the timestamp; validation logic must be in the caller.
 func (q *Queries) ArchiveMig(ctx context.Context, id types.MigID) error {
 	_, err := q.db.Exec(ctx, archiveMig, id)
@@ -62,7 +62,7 @@ DELETE FROM migs
 WHERE id = $1
 `
 
-// Deletes a mod. Use with caution; should only be called when safe to remove.
+// Deletes a mig. Use with caution; should only be called when safe to remove.
 func (q *Queries) DeleteMig(ctx context.Context, id types.MigID) error {
 	_, err := q.db.Exec(ctx, deleteMig, id)
 	return err
@@ -167,7 +167,7 @@ SET archived_at = NULL
 WHERE id = $1 AND archived_at IS NOT NULL
 `
 
-// Unarchives a mod by clearing archived_at.
+// Unarchives a mig by clearing archived_at.
 func (q *Queries) UnarchiveMig(ctx context.Context, id types.MigID) error {
 	_, err := q.db.Exec(ctx, unarchiveMig, id)
 	return err

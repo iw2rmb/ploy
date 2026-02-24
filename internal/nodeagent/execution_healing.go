@@ -1,5 +1,5 @@
 // execution_healing.go implements gate-heal-regate orchestration.
-// After healing mods complete, the node agent always re-runs the gate to verify the fix.
+// After healing migs complete, the node agent always re-runs the gate to verify the fix.
 //
 // File layout:
 //   - execution_healing.go      — orchestration (this file): runGateWithHealing, executeWithHealing, types, env/TLS injection
@@ -63,7 +63,7 @@ func (r *runController) runGateWithHealing(
 	// Gate failed. Check if healing is configured using typed options from request.
 	typedOpts := req.TypedOptions
 	if typedOpts.Healing == nil || typedOpts.Healing.Mod.Image.IsEmpty() {
-		// No healing configured (or healing configured without a mod); return the gate failure.
+		// No healing configured (or healing configured without a mig); return the gate failure.
 		slog.Info("gate failed, no healing configured", "run_id", req.RunID, "phase", gatePhase)
 		return initialGate, nil, "", step.ErrBuildGateFailed
 	}
@@ -96,7 +96,7 @@ func (r *runController) runGateWithHealing(
 }
 
 // executeWithHealing runs the main step with optional healing loop when the build gate fails.
-// Flow: pre-gate → main mod (gate disabled) → post-gate (if ExitCode==0).
+// Flow: pre-gate → main mig (gate disabled) → post-gate (if ExitCode==0).
 // Returns execution result with full gate history.
 func (r *runController) executeWithHealing(
 	ctx context.Context,
@@ -108,7 +108,7 @@ func (r *runController) executeWithHealing(
 	inDir *string,
 	stepIndex int,
 ) (executionResult, error) {
-	// Phase G: Run pre-mod gate via runGateWithHealing (not via Runner.Run).
+	// Phase G: Run pre-mig gate via runGateWithHealing (not via Runner.Run).
 	// This centralizes all gate execution in runGateWithHealing, ensuring gate failures
 	// are handled uniformly with healing support. Runner.Run is reserved for container execution.
 	// Pass stepIndex so gate history and stats remain aligned with the Mods step index.
@@ -116,11 +116,11 @@ func (r *runController) executeWithHealing(
 		ctx, runner, req, manifest, workspace, outDir, inDir, "pre", stepIndex,
 	)
 
-	// Build the initial ReGates slice from any pre-mod healing attempts.
+	// Build the initial ReGates slice from any pre-mig healing attempts.
 	var reGates []gateRunMetadata
 	reGates = append(reGates, preReGates...)
 
-	// If pre-mod gate failed (with or without healing), return the failure.
+	// If pre-mig gate failed (with or without healing), return the failure.
 	if preGateErr != nil {
 		// Construct a minimal Result to hold gate metadata for downstream stats.
 		result := step.Result{}
@@ -135,7 +135,7 @@ func (r *runController) executeWithHealing(
 		}, preGateErr
 	}
 
-	// Pre-mod gate passed. Clone manifest for main mod execution with gate disabled.
+	// Pre-mig gate passed. Clone manifest for main mig execution with gate disabled.
 	// Set Gate.Enabled=false and clear Inputs[i].Hydration entries so Runner.Run performs
 	// container execution only.
 	manifestForMainMod := manifest
@@ -151,7 +151,7 @@ func (r *runController) executeWithHealing(
 		manifestForMainMod.Inputs = inputs
 	}
 
-	// Execute main mod container via Runner.Run. Gate is disabled, so this call
+	// Execute main mig container via Runner.Run. Gate is disabled, so this call
 	// will not produce ErrBuildGateFailed — it only runs the container.
 	// Pass RunID directly for consistent labeling and telemetry.
 	result, err := runner.Run(ctx, step.Request{
@@ -162,7 +162,7 @@ func (r *runController) executeWithHealing(
 		InDir:     *inDir,
 	})
 
-	// Propagate the final pre-mod gate result into result.BuildGate for downstream stats.
+	// Propagate the final pre-mig gate result into result.BuildGate for downstream stats.
 	// When healing occurred, the final gate is the last successful re-gate (preReGates).
 	// When no healing occurred, the final gate is the initial pre-gate (preGate).
 	if result.BuildGate == nil {
@@ -185,10 +185,10 @@ func (r *runController) executeWithHealing(
 		}, err
 	}
 
-	// Run post-mod gate only if main mod succeeded (ExitCode == 0).
+	// Run post-mig gate only if main mig succeeded (ExitCode == 0).
 	// This validates the workspace after modifications using the same healing behavior
-	// as pre-mod gates, keeping gate orchestration consistent.
-	// Pass stepIndex so post-mod gate history and stats remain aligned with the Mods step index.
+	// as pre-mig gates, keeping gate orchestration consistent.
+	// Pass stepIndex so post-mig gate history and stats remain aligned with the Mods step index.
 	if result.ExitCode == 0 {
 		postGate, postReGates, postActionSummary, postErr := r.runGateWithHealing(
 			ctx, runner, req, manifest, workspace, outDir, inDir, "post", stepIndex,
@@ -197,10 +197,10 @@ func (r *runController) executeWithHealing(
 		if postGate != nil {
 			reGates = append(reGates, *postGate)
 		}
-		// Append any post-mod healing re-gates to history.
+		// Append any post-mig healing re-gates to history.
 		reGates = append(reGates, postReGates...)
 
-		// Update result.BuildGate to reflect the final post-mod gate outcome.
+		// Update result.BuildGate to reflect the final post-mig gate outcome.
 		// This provides downstream telemetry with the canonical gate result.
 		if len(postReGates) > 0 {
 			// Use the last re-gate result (final healing attempt).
@@ -223,7 +223,7 @@ func (r *runController) executeWithHealing(
 		}, postErr
 	}
 
-	// Main mod exited with non-zero code; no post-gate runs.
+	// Main mig exited with non-zero code; no post-gate runs.
 	return executionResult{
 		Result:        result,
 		PreGate:       preGate,

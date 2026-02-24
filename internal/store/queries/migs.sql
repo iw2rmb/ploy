@@ -32,20 +32,20 @@ SET spec_id = $2
 WHERE id = $1;
 
 -- name: ArchiveMig :exec
--- Archives a mod by setting archived_at to now().
--- Archiving must be refused when the mod has any jobs in a running state.
+-- Archives a mig by setting archived_at to now().
+-- Archiving must be refused when the mig has any jobs in a running state.
 -- This query only sets the timestamp; validation logic must be in the caller.
 UPDATE migs
 SET archived_at = now()
 WHERE id = $1 AND archived_at IS NULL;
 
 -- name: UnarchiveMig :exec
--- Unarchives a mod by clearing archived_at.
+-- Unarchives a mig by clearing archived_at.
 UPDATE migs
 SET archived_at = NULL
 WHERE id = $1 AND archived_at IS NOT NULL;
 
 -- name: DeleteMig :exec
--- Deletes a mod. Use with caution; should only be called when safe to remove.
+-- Deletes a mig. Use with caution; should only be called when safe to remove.
 DELETE FROM migs
 WHERE id = $1;

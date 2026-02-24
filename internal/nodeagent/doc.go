@@ -2,7 +2,7 @@
 //
 // Responsibilities:
 //   - Accept run requests from the control plane and orchestrate execution.
-//   - Hydrate workspaces from Git, run Build Gate validation, execute mod containers,
+//   - Hydrate workspaces from Git, run Build Gate validation, execute mig containers,
 //     and collect/upload artifacts, diffs, and terminal status.
 //   - Implement gate-heal-regate orchestration. The healing flow is split across
 //     focused files so the main orchestrator remains focused on lifecycle wiring

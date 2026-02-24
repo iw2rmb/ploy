@@ -6,7 +6,7 @@
 //
 // Both forms are intentionally supported as first-class citizens of the Mods
 // spec schema. The dual-form design enables:
-//   - Simple configurations using a single image string for stack-agnostic mods.
+//   - Simple configurations using a single image string for stack-agnostic migs.
 //   - Optimized configurations using stack-specific images for tools like Maven
 //     or Gradle that benefit from dedicated container environments.
 //
@@ -55,20 +55,20 @@ const (
 	ModStackDefault ModStack = "default"
 )
 
-// JobImage represents a mod container image specification supporting two
+// JobImage represents a mig container image specification supporting two
 // canonical forms: universal images (single string) and stack-specific images
 // (map by stack). Both forms are first-class schema options.
 //
 // YAML/JSON Examples:
 //
 //	# Universal image (string form) — used for all stacks:
-//	image: docker.io/user/mods-openrewrite:latest
+//	image: docker.io/user/migs-openrewrite:latest
 //
 //	# Stack-specific images (map form) — per-stack optimization:
 //	image:
-//	  default: docker.io/user/mods-openrewrite:latest
-//	  java-maven: docker.io/user/mods-orw-maven:latest
-//	  java-gradle: docker.io/user/mods-orw-gradle:latest
+//	  default: docker.io/user/migs-openrewrite:latest
+//	  java-maven: docker.io/user/migs-orw-maven:latest
+//	  java-gradle: docker.io/user/migs-orw-gradle:latest
 type JobImage struct {
 	// Universal holds the image when specified as a single string.
 	// When non-empty, this image is used regardless of detected stack.

@@ -1,7 +1,7 @@
 // mod_unarchive.go implements the 'ploy mig unarchive' command handler.
 //
-// This command unarchives a mod project:
-// - ploy mig unarchive <mod-id|name>
+// This command unarchives a mig project:
+// - ploy mig unarchive <mig-id|name>
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleMigUnarchive implements 'ploy mig unarchive <mod-id|name>'.
+// handleMigUnarchive implements 'ploy mig unarchive <mig-id|name>'.
 func handleMigUnarchive(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -21,10 +21,10 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Require mod ID or name as positional arg.
+	// Require mig ID or name as positional arg.
 	if len(args) == 0 {
 		printMigUnarchiveUsage(stderr)
-		return fmt.Errorf("mod id or name required")
+		return fmt.Errorf("mig id or name required")
 	}
 	modRef := args[0]
 
@@ -35,7 +35,7 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod unarchive command.
+	// Execute mig unarchive command.
 	cmd := migs.UnarchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -51,9 +51,9 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printMigUnarchiveUsage prints usage for the mod unarchive command.
+// printMigUnarchiveUsage prints usage for the mig unarchive command.
 func printMigUnarchiveUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig unarchive <mod-id|name>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig unarchive <mig-id|name>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Unarchives a mod project.")
+	_, _ = fmt.Fprintln(w, "Unarchives a mig project.")
 }

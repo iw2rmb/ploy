@@ -28,7 +28,7 @@ post:
     is not started.
 
     Ownership is enforced: only the node that claimed the job may update the image, and
-    only while the job is in `Running` status. Only `mod`, `heal`, and gate jobs
+    only while the job is in `Running` status. Only `mig`, `heal`, and gate jobs
     (`pre_gate`, `post_gate`, `re_gate`) are accepted.
   requestBody:
     required: true
@@ -52,6 +52,6 @@ post:
       description: Job not found (invalid job ID)
     '409':
       description: |
-        Conflict — job not in `Running` status or job is not a mod/heal job.
+        Conflict — job not in `Running` status or job is not a mig/heal job.
     '500':
       description: Internal server error

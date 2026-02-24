@@ -30,12 +30,12 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 				RunID:    runID,
 				RepoID:   repoID,
 				Attempt:  1,
-				Name:     "mod-0",
-				JobType:  "mod",
-				JobImage: "docker.io/example/mod:latest",
+				Name:     "mig-0",
+				JobType:  "mig",
+				JobImage: "docker.io/example/mig:latest",
 				NextID:   &nextID,
 				Status:   store.JobStatusQueued,
-				Meta:     []byte(`{"kind":"mod","mods_step_name":"hello"}`),
+				Meta:     []byte(`{"kind":"mig","mods_step_name":"hello"}`),
 			},
 		},
 	}
@@ -68,11 +68,11 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	if !ok {
 		t.Fatalf("job payload type = %T, want object", jobs[0])
 	}
-	if got := job["job_type"]; got != "mod" {
-		t.Fatalf("job_type = %v, want %q", got, "mod")
+	if got := job["job_type"]; got != "mig" {
+		t.Fatalf("job_type = %v, want %q", got, "mig")
 	}
-	if got := job["job_image"]; got != "docker.io/example/mod:latest" {
-		t.Fatalf("job_image = %v, want %q", got, "docker.io/example/mod:latest")
+	if got := job["job_image"]; got != "docker.io/example/mig:latest" {
+		t.Fatalf("job_image = %v, want %q", got, "docker.io/example/mig:latest")
 	}
 	if got := job["next_id"]; got != nextID.String() {
 		t.Fatalf("next_id = %v, want %q", got, nextID.String())

@@ -21,7 +21,7 @@ import (
 )
 
 // CommandSpec represents a container command as either a shell string or exec array.
-// This type encapsulates the polymorphic command representation in mod specs.
+// This type encapsulates the polymorphic command representation in mig specs.
 //
 // JSON/YAML Examples:
 //

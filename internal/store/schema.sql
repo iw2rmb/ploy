@@ -74,8 +74,8 @@ CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
 -- Specs (dictionary of all Migs specs; append-only)
--- Migs do not "own" specs; a mod just points at a single current spec via migs.spec_id.
--- Setting/updating a mod spec means: insert a new specs row and update migs.spec_id.
+-- Migs do not "own" specs; a mig just points at a single current spec via migs.spec_id.
+-- Setting/updating a mig spec means: insert a new specs row and update migs.spec_id.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for stable run references over time.
 -- Application code generates IDs via types.NewSpecID() before insertion.
 CREATE TABLE IF NOT EXISTS specs (
@@ -89,23 +89,23 @@ CREATE TABLE IF NOT EXISTS specs (
 CREATE INDEX IF NOT EXISTS specs_created_idx ON specs(created_at);
 
 -- Migs (code modification projects)
--- A mod is a long-lived project with a unique name that references a spec and manages a repo set.
--- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly mod identifiers.
+-- A mig is a long-lived project with a unique name that references a spec and manages a repo set.
+-- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly mig identifiers.
 -- Application code generates IDs via types.NewMigID() before insertion.
 CREATE TABLE IF NOT EXISTS migs (
   id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (6 chars); no default, app-generated via NewMigID().
-  name         TEXT NOT NULL UNIQUE,  -- Human-readable unique name for the mod project.
+  name         TEXT NOT NULL UNIQUE,  -- Human-readable unique name for the mig project.
   spec_id      TEXT REFERENCES specs(id) ON DELETE SET NULL,  -- Current spec; NULL if no spec set yet.
   created_by   TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  archived_at  TIMESTAMPTZ NULL  -- When non-NULL, creating new runs for this mod must fail.
+  archived_at  TIMESTAMPTZ NULL  -- When non-NULL, creating new runs for this mig must fail.
 );
 CREATE INDEX IF NOT EXISTS migs_name_idx ON migs(name);
 -- Optional partial index on active migs for efficient filtering.
 CREATE INDEX IF NOT EXISTS migs_active_idx ON migs(id) WHERE archived_at IS NULL;
 
--- ModRepos (managed repo set for a mod project)
--- Each row represents a repo participating in a mod, with mutable refs.
+-- ModRepos (managed repo set for a mig project)
+-- Each row represents a repo participating in a mig, with mutable refs.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
 -- Application code generates IDs via types.NewMigRepoID() before insertion.
 CREATE TABLE IF NOT EXISTS mig_repos (
@@ -116,12 +116,12 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Enforce uniqueness: one repo_url per mod.
+-- Enforce uniqueness: one repo_url per mig.
 CREATE UNIQUE INDEX IF NOT EXISTS mig_repos_mig_repo_uniq ON mig_repos(mig_id, repo_url);
 CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
 
 -- Runs (execution of one spec_id over a specific set of repos)
--- v1 model: A run represents the execution of a mod's spec over its repo set.
+-- v1 model: A run represents the execution of a mig's spec over its repo set.
 -- No repo-level fields here; repo attribution comes from run_repos and jobs.repo_id.
 -- Note: id is TEXT (KSUID-backed) rather than UUID; application code generates IDs
 -- via types.NewRunID() before insertion.
@@ -176,7 +176,7 @@ CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, crea
 -- The `meta` column stores structured job metadata as JSONB. The schema is
 -- defined by internal/workflow/contracts.JobMeta with the following shape:
 --   {
---     "kind": "mod"|"gate"|"build",
+--     "kind": "mig"|"gate"|"build",
 --     "gate": { ... BuildGateStageMetadata ... },   // present when kind="gate"
 --     "build": { "tool": "...", "command": "...", "metrics": {...} }  // present when kind="build"
 --   }
@@ -227,7 +227,7 @@ CREATE INDEX IF NOT EXISTS events_run_time_idx ON events USING BRIN (time) WITH 
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
 -- Diffs (per-run, small count)
--- Each execution job (mod, healing, pre_gate, post_gate) may produce a diff.
+-- Each execution job (mig, healing, pre_gate, post_gate) may produce a diff.
 -- Diffs store `job_id` and `run_id` for association; summary JSONB may include
 -- step metadata for ordering and classification (for example: job_type, next_id).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.

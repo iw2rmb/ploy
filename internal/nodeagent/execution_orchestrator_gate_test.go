@@ -33,13 +33,13 @@ func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
 	}
 }
 
-// TestMergeExecutionResults_PreservesPreModGate verifies that when a pre-mod gate
+// TestMergeExecutionResults_PreservesPreModGate verifies that when a pre-mig gate
 // has already been recorded in the accumulator, merging a per-step execution
 // result keeps the original PreGate and appends new ReGates in order.
 func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
 	preModMeta := &contracts.BuildGateStageMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "pre-mod", Passed: true},
+			{Tool: "pre-mig", Passed: true},
 		},
 	}
 	preModGate := &gateRunMetadata{
@@ -85,9 +85,9 @@ func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
 
 	merged := mergeExecutionResults(acc, next)
 
-	// PreGate should remain the pre-mod gate from the accumulator.
+	// PreGate should remain the pre-mig gate from the accumulator.
 	if merged.PreGate != preModGate {
-		t.Fatalf("merged.PreGate = %#v, want accumulator pre-mod gate %#v", merged.PreGate, preModGate)
+		t.Fatalf("merged.PreGate = %#v, want accumulator pre-mig gate %#v", merged.PreGate, preModGate)
 	}
 
 	// ReGates should contain accumulator re-gates followed by next re-gates.
@@ -107,14 +107,14 @@ func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
 	}
 }
 
-// TestBuildGateStats_PreGateFallbackToFinalGate verifies that when no post-mod gate
-// (result.BuildGate) exists but a pre-mod gate was recorded, buildGateStats populates
-// final_gate from the pre-mod gate. This ensures CLI/API gate summaries always have
-// a final_gate to report on, even when no mods executed.
+// TestBuildGateStats_PreGateFallbackToFinalGate verifies that when no post-mig gate
+// (result.BuildGate) exists but a pre-mig gate was recorded, buildGateStats populates
+// final_gate from the pre-mig gate. This ensures CLI/API gate summaries always have
+// a final_gate to report on, even when no migs executed.
 func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 
-	// Pre-mod gate only — simulates a run that terminated before any mod execution.
+	// Pre-mig gate only — simulates a run that terminated before any mig execution.
 	preGateMeta := &contracts.BuildGateStageMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{
 			{Tool: "maven", Passed: true},
@@ -127,7 +127,7 @@ func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
 		},
 	}
 
-	// No BuildGate in result (no mods executed).
+	// No BuildGate in result (no migs executed).
 	result := step.Result{}
 
 	got := rc.buildGateStats(types.RunID("run-fallback"), types.JobID("stage-fallback"), result, execRes)
@@ -138,10 +138,10 @@ func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
 		t.Fatalf("expected pre_gate in gate stats")
 	}
 	if got.FinalGate == nil {
-		t.Fatalf("expected final_gate to be populated from pre-mod gate fallback")
+		t.Fatalf("expected final_gate to be populated from pre-mig gate fallback")
 	}
 
-	// Verify final_gate content matches pre-mod gate.
+	// Verify final_gate content matches pre-mig gate.
 	if got.FinalGate.Passed != true {
 		t.Errorf("final_gate passed=%v, want true", got.FinalGate.Passed)
 	}
@@ -150,13 +150,13 @@ func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
 	}
 }
 
-// TestBuildGateStats_PostGateTakesPrecedence verifies that when both pre-mod gate
-// and post-mod gate (result.BuildGate) exist, final_gate uses the post-mod gate,
-// not the pre-mod gate fallback.
+// TestBuildGateStats_PostGateTakesPrecedence verifies that when both pre-mig gate
+// and post-mig gate (result.BuildGate) exist, final_gate uses the post-mig gate,
+// not the pre-mig gate fallback.
 func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 
-	// Both pre-mod and post-mod gates present.
+	// Both pre-mig and post-mig gates present.
 	preGateMeta := &contracts.BuildGateStageMetadata{
 		StaticChecks: []contracts.BuildGateStaticCheckReport{
 			{Tool: "maven", Passed: true},
@@ -182,17 +182,17 @@ func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
 
 	got := rc.buildGateStats(types.RunID("run-precedence"), types.JobID("stage-precedence"), result, execRes)
 
-	// Verify final_gate uses the post-mod gate (result.BuildGate), not the pre-mod fallback.
+	// Verify final_gate uses the post-mig gate (result.BuildGate), not the pre-mig fallback.
 	if got == nil || got.FinalGate == nil {
 		t.Fatalf("expected final_gate in gate stats")
 	}
 
-	// Post-mod gate had passed=false, duration=700ms.
+	// Post-mig gate had passed=false, duration=700ms.
 	if got.FinalGate.Passed != false {
-		t.Errorf("final_gate passed=%v, want false (from post-mod gate)", got.FinalGate.Passed)
+		t.Errorf("final_gate passed=%v, want false (from post-mig gate)", got.FinalGate.Passed)
 	}
 	if got.FinalGate.DurationMs != int64(700) {
-		t.Errorf("final_gate duration_ms=%d, want 700 (from post-mod gate)", got.FinalGate.DurationMs)
+		t.Errorf("final_gate duration_ms=%d, want 700 (from post-mig gate)", got.FinalGate.DurationMs)
 	}
 }
 
@@ -235,7 +235,7 @@ func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
 }
 
 // TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator verifies that when
-// there is no pre-mod gate recorded yet, mergeExecutionResults falls back to
+// there is no pre-mig gate recorded yet, mergeExecutionResults falls back to
 // the next execution's PreGate.
 func TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator(t *testing.T) {
 	nextPreGate := &gateRunMetadata{
@@ -372,7 +372,7 @@ func TestLoadPersistedStack_DefaultsToUnknown(t *testing.T) {
 }
 
 // TestPersistAndLoadGateStack_RoundTrip verifies the complete flow of persisting
-// a stack during gate execution and loading it for mod/healing execution.
+// a stack during gate execution and loading it for mig/healing execution.
 func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
@@ -390,7 +390,7 @@ func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
 	// Persist during gate job.
 	rc.persistGateStack(runID, meta)
 
-	// Load during mod/healing job.
+	// Load during mig/healing job.
 	got := rc.loadPersistedStack(runID)
 	if got != contracts.ModStackJavaGradle {
 		t.Errorf("round-trip stack = %q, want %q", got, contracts.ModStackJavaGradle)

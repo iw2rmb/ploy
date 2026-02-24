@@ -15,7 +15,7 @@ import (
 
 // Healing retry and edge-path tests focused on the gate-heal-regate loop.
 
-// TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort ensures a healing mod returning
+// TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort ensures a healing mig returning
 // a non-zero exit code does not abort the loop; the gate is still re-run.
 func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	gateCallCount := 0
@@ -25,7 +25,7 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 		return &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "java", Passed: passed}}, LogsText: "gate"}, nil
 	}}
 
-	// Healing container exits with non-zero; main mod exits with zero.
+	// Healing container exits with non-zero; main mig exits with zero.
 	mockContainer := &mockContainerRuntime{
 		createFn: func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			id := "main"
@@ -57,9 +57,9 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
 	}
 	if res.ExitCode != 0 {
-		t.Fatalf("main mod not executed successfully: exit=%d", res.ExitCode)
+		t.Fatalf("main mig not executed successfully: exit=%d", res.ExitCode)
 	}
-	// With post-mod gate enabled, we now have 3 gate calls: pre-gate, pre-mod re-gate, post-mod gate.
+	// With post-mig gate enabled, we now have 3 gate calls: pre-gate, pre-mig re-gate, post-mig gate.
 	if gateCallCount != 3 {
 		t.Fatalf("expected 3 gate calls (pre + re + post), got %d", gateCallCount)
 	}
@@ -101,11 +101,11 @@ func TestExecuteWithHealing_RetriesValueHonored(t *testing.T) {
 }
 
 // TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing verifies that when
-// build_gate_healing is present but no mod is configured, healing is treated
+// build_gate_healing is present but no mig is configured, healing is treated
 // as disabled (return pre-gate failure immediately).
 func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 	mockContainer := &mockContainerRuntime{createFn: func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
-		t.Fatalf("no container should be created when no healing mod is configured")
+		t.Fatalf("no container should be created when no healing mig is configured")
 		return step.ContainerHandle{ID: "x"}, nil
 	}}
 
@@ -176,7 +176,7 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		t.Errorf("executeWithHealing() error = %q, want 'build gate failed: healing retries exhausted'", err.Error())
 	}
 	if containerCreates != 2 {
-		t.Errorf("healing containers created = %d, want 2 (main mod must be skipped)", containerCreates)
+		t.Errorf("healing containers created = %d, want 2 (main mig must be skipped)", containerCreates)
 	}
 }
 
@@ -353,7 +353,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 }
 
 // TestExecuteWithHealing_NonSessionAwareHealerNoResume verifies that healing
-// mods that are not marked as session-aware do not receive CODEX_RESUME even
+// migs that are not marked as session-aware do not receive CODEX_RESUME even
 // when a session file is available.
 func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 	var healerSpecs []step.ContainerSpec

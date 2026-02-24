@@ -87,7 +87,7 @@ func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunI
 			continue
 		}
 
-		// Skip legacy healing-tagged diffs; discrete healing jobs are tagged as "mod".
+		// Skip legacy healing-tagged diffs; discrete healing jobs are tagged as "mig".
 		if d.Summary.JobType() == DiffJobTypeHealing.String() {
 			continue
 		}

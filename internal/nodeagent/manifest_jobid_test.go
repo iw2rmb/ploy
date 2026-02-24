@@ -9,7 +9,7 @@ import (
 
 // TestBuildManifestFromRequest_StepIDUsesJobID verifies that manifest.ID uses
 // JobID when available to ensure uniqueness across jobs within the same run.
-// This prevents collisions when multiple jobs (pre_gate, mod, post_gate, heal)
+// This prevents collisions when multiple jobs (pre_gate, mig, post_gate, heal)
 // exist for a single run.
 func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 	t.Parallel()
@@ -58,10 +58,10 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 		t.Parallel()
 		runID := types.RunID("run-multi-job-001")
 
-		// Simulate multiple jobs within the same run (e.g., pre_gate, mod, post_gate).
+		// Simulate multiple jobs within the same run (e.g., pre_gate, mig, post_gate).
 		jobs := []types.JobID{
 			types.JobID("job-pre-gate-001"),
-			types.JobID("job-mod-001"),
+			types.JobID("job-mig-001"),
 			types.JobID("job-post-gate-001"),
 		}
 
@@ -132,11 +132,11 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			BaseRef: types.GitRef("main"),
 		}
 
-		mod := ModContainerSpec{
+		mig := ModContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
-		manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest error: %v", err)
 		}
@@ -157,11 +157,11 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			// JobID intentionally omitted.
 		}
 
-		mod := ModContainerSpec{
+		mig := ModContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
-		_, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+		_, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
 		if err == nil {
 			t.Fatalf("expected error when JobID is missing")
 		}
@@ -187,11 +187,11 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 				BaseRef: types.GitRef("main"),
 			}
 
-			mod := ModContainerSpec{
+			mig := ModContainerSpec{
 				Image: contracts.JobImage{Universal: "healer:latest"},
 			}
 
-			manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+			manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest error for job %s: %v", jobID, err)
 			}

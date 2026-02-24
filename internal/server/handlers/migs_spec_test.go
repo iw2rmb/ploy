@@ -25,7 +25,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false}, // Not archived.
 		},
 	}
@@ -34,7 +34,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"spec": spec,
@@ -84,7 +84,7 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 	}
@@ -93,7 +93,7 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"name": "my-named-spec",
@@ -123,7 +123,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 	}
@@ -133,7 +133,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	spec1 := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody1 := map[string]any{"spec": spec1}
 	body1, _ := json.Marshal(reqBody1)
@@ -163,7 +163,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	spec2 := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{"FOO": "bar"},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody2 := map[string]any{"spec": spec2}
 	body2, _ := json.Marshal(reqBody2)
@@ -229,9 +229,9 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := setMigSpecHandler(st)
 
-	// Legacy spec shape with "mod" key is rejected.
+	// Legacy spec shape with "mig" key is rejected.
 	reqBody := map[string]any{
-		"spec": map[string]any{"mod": map[string]any{"command": "echo hello"}},
+		"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -247,7 +247,7 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_ModNotFound verifies POST /v1/migs/{mig_ref}/specs returns 404 for missing mod.
+// TestMods_SetSpec_ModNotFound verifies POST /v1/migs/{mig_ref}/specs returns 404 for missing mig.
 func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -257,7 +257,7 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -275,7 +275,7 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 
 	// CreateSpec should not be called.
 	if st.createSpecCalled {
-		t.Error("store.CreateSpec should not be called for missing mod")
+		t.Error("store.CreateSpec should not be called for missing mig")
 	}
 }
 
@@ -284,7 +284,7 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Archived.
 		},
 	}
@@ -293,7 +293,7 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -311,7 +311,7 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 
 	// CreateSpec should not be called for archived migs.
 	if st.createSpecCalled {
-		t.Error("store.CreateSpec should not be called for archived mod")
+		t.Error("store.CreateSpec should not be called for archived mig")
 	}
 }
 
@@ -337,7 +337,7 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		createSpecErr: errors.New("database connection failed"),
@@ -347,7 +347,7 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
@@ -369,7 +369,7 @@ func TestMods_SetSpec_UpdateMigSpecError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		updateModSpecErr: errors.New("database connection failed"),
@@ -379,7 +379,7 @@ func TestMods_SetSpec_UpdateMigSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)

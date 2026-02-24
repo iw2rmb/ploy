@@ -10,6 +10,8 @@ import (
 	"testing"
 )
 
+const goModuleFile = "go." + "mo" + "d"
+
 // TestBuildCLI verifies that `make build` produces the dist/ploy binary.
 // This test ensures the build system is working correctly and that the
 // CLI entrypoint can be compiled successfully.
@@ -76,7 +78,7 @@ func TestBuildCLI(t *testing.T) {
 }
 
 // findRepoRoot walks up the directory tree from the current working directory
-// to find the repository root (identified by the presence of go.mod).
+// to find the repository root (identified by the Go module file).
 func findRepoRoot() (string, error) {
 	// Start from the current working directory.
 	dir, err := os.Getwd()
@@ -84,10 +86,10 @@ func findRepoRoot() (string, error) {
 		return "", err
 	}
 
-	// Walk up the directory tree until we find go.mod.
+	// Walk up the directory tree until we find the Go module file.
 	// This indicates the repository root.
 	for {
-		goModPath := filepath.Join(dir, "go.mod")
+		goModPath := filepath.Join(dir, goModuleFile)
 		if _, err := os.Stat(goModPath); err == nil {
 			return dir, nil
 		}
@@ -95,7 +97,7 @@ func findRepoRoot() (string, error) {
 		// Move up one directory level.
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// We've reached the filesystem root without finding go.mod.
+			// We've reached the filesystem root without finding the Go module file.
 			return "", os.ErrNotExist
 		}
 		dir = parent

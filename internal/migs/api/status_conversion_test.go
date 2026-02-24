@@ -7,7 +7,7 @@ import (
 )
 
 // TestStageStatusFromStore verifies that store.JobStatus values are correctly
-// converted to mods API StageState values.
+// converted to migs API StageState values.
 func TestStageStatusFromStore(t *testing.T) {
 	t.Parallel()
 
@@ -37,7 +37,7 @@ func TestStageStatusFromStore(t *testing.T) {
 }
 
 // TestRunStatusFromStore verifies that store.RunStatus values are correctly
-// converted to mods API RunState values.
+// converted to migs API RunState values.
 func TestRunStatusFromStore(t *testing.T) {
 	t.Parallel()
 
@@ -63,7 +63,7 @@ func TestRunStatusFromStore(t *testing.T) {
 	}
 }
 
-// TestStageStatusToStore verifies that mods API StageState values are correctly
+// TestStageStatusToStore verifies that migs API StageState values are correctly
 // converted to store.JobStatus values.
 func TestStageStatusToStore(t *testing.T) {
 	t.Parallel()
@@ -94,7 +94,7 @@ func TestStageStatusToStore(t *testing.T) {
 	}
 }
 
-// TestRunStatusToStore verifies that mods API RunState values are correctly
+// TestRunStatusToStore verifies that migs API RunState values are correctly
 // converted to store.RunStatus values.
 func TestRunStatusToStore(t *testing.T) {
 	t.Parallel()

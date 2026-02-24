@@ -10,7 +10,7 @@ import (
 
 // RunGateOnly executes only the gate validation phase without container execution.
 // This helper allows the node agent orchestration layer to reuse gate logic for
-// post-mod gates without invoking a mod container.
+// post-mig gates without invoking a mig container.
 //
 // Execution stages:
 //  1. Hydration — Prepare the workspace via WorkspaceHydrator when configured.
@@ -44,7 +44,7 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 
 	// Stage 2: Build Gate validation.
 	// Run static validation on the workspace. This is the primary purpose of
-	// RunGateOnly — validate code without running a mod container.
+	// RunGateOnly — validate code without running a mig container.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
@@ -71,7 +71,7 @@ func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
 	result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
 
 	// No container execution or diff generation — exit immediately.
-	// ExitCode remains 0 since no mod was executed.
+	// ExitCode remains 0 since no mig was executed.
 	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
 }

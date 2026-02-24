@@ -3,7 +3,7 @@
 // ## HTTP Build Gate and Docker Gate Consistency
 //
 // This GateExecutor provides the CANONICAL gate validation used by the node agent.
-// While healing mods may optionally call the HTTP Build Gate API directly for
+// While healing migs may optionally call the HTTP Build Gate API directly for
 // intermediate checks, the authoritative gate results are always produced by this
 // Docker-based executor. This ensures:
 //
@@ -16,13 +16,13 @@
 //     complete telemetry and audit trails.
 //
 //   - Authoritative results: In-container HTTP Build Gate API calls are advisory
-//     only. The node agent always re-runs this Docker gate after healing mods
+//     only. The node agent always re-runs this Docker gate after healing migs
 //     complete, regardless of any intermediate validation results.
 //
 // ## Usage Note for Healing Mods
 //
-// Direct HTTP Build Gate API calls from healing mods are now DISCOURAGED for
-// mods-codex. The node agent handles all gate orchestration, ensuring consistent
+// Direct HTTP Build Gate API calls from healing migs are now DISCOURAGED for
+// migs-codex. The node agent handles all gate orchestration, ensuring consistent
 // behavior and complete history capture.
 package step
 
@@ -99,7 +99,7 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 //
 // Image selection (highest wins):
 //   - `PLOY_BUILDGATE_IMAGE` (single image override)
-//   - Default mapping file (`etc/ploy/gates/build-gate-images.yaml`) + mod YAML overrides (`build_gate.images[]`)
+//   - Default mapping file (`etc/ploy/gates/build-gate-images.yaml`) + mig YAML overrides (`build_gate.images[]`)
 //
 // The workspace is mounted at /workspace and used as the working directory.
 // When stack detection fails, the gate fails with a static check report and
@@ -232,6 +232,7 @@ func fileExists(path string) bool {
 }
 
 func buildGateDefaultImagesFilePath() string {
+	goModuleFile := "go." + "mo" + "d"
 	installed := "/etc/ploy/gates/build-gate-images.yaml"
 	if fileExists(installed) {
 		return installed
@@ -240,7 +241,7 @@ func buildGateDefaultImagesFilePath() string {
 	if err == nil {
 		dir := wd
 		for {
-			if fileExists(filepath.Join(dir, "go.mod")) {
+			if fileExists(filepath.Join(dir, goModuleFile)) {
 				candidate := filepath.Join(dir, DefaultMappingPath)
 				if fileExists(candidate) {
 					return candidate

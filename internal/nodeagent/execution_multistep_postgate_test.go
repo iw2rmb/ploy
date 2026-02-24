@@ -1,5 +1,5 @@
-// execution_multistep_postgate_test.go contains tests for multi-step post-mod gate
-// behavior in executeRun, specifically verifying that a failing post-mod gate
+// execution_multistep_postgate_test.go contains tests for multi-step post-mig gate
+// behavior in executeRun, specifically verifying that a failing post-mig gate
 // terminates execution of subsequent steps.
 package nodeagent
 
@@ -14,54 +14,54 @@ import (
 )
 
 // TestExecuteRun_PostGateStopsFurtherMods verifies that when a multi-step run has
-// a post-mod gate failure on step N, subsequent steps (N+1, N+2, ...) do not execute.
+// a post-mig gate failure on step N, subsequent steps (N+1, N+2, ...) do not execute.
 //
 // Scenario:
-//   - Two-step run: mods[0] and mods[1]
-//   - Step 0: mod container executes successfully, post-mod gate passes
-//   - Step 1: mod container executes successfully, but post-mod gate fails and cannot be healed
+//   - Two-step run: migs[0] and migs[1]
+//   - Step 0: mig container executes successfully, post-mig gate passes
+//   - Step 1: mig container executes successfully, but post-mig gate fails and cannot be healed
 //
 // Expected behavior:
-//   - Step 0 mod container runs (success)
+//   - Step 0 mig container runs (success)
 //   - Step 0 post-gate runs (passes)
-//   - Step 1 mod container runs (success)
+//   - Step 1 mig container runs (success)
 //   - Step 1 post-gate runs (fails, healing fails)
 //   - Run terminates with ErrBuildGateFailed from step 1 post-gate
 //   - If there were more steps (e.g., step 2), they would NOT execute
 //
 // This test validates the executeRun step loop break logic:
-// when executeWithHealing returns ErrBuildGateFailed from a post-mod gate,
-// finalExecErr is set and the loop breaks, preventing further mods from running.
+// when executeWithHealing returns ErrBuildGateFailed from a post-mig gate,
+// finalExecErr is set and the loop breaks, preventing further migs from running.
 func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 	// Track execution order to verify only step 0 and step 1 containers run,
 	// and step 1's post-gate failure stops further execution.
 	var executionOrder []string
 
-	// Track gate calls: pre-mod gates from runner.Run + post-mod gates from executeWithHealing.
+	// Track gate calls: pre-mig gates from runner.Run + post-mig gates from executeWithHealing.
 	gateCallCount := 0
 	stepIndexOfFailingPostGate := 1 // Post-gate for step 1 will fail
 
 	// mockGateExecutor simulates gate behavior:
-	// - Pre-mod gates always pass (called by runner.Run)
-	// - Post-mod gates: pass for step 0, fail for step 1
+	// - Pre-mig gates always pass (called by runner.Run)
+	// - Post-mig gates: pass for step 0, fail for step 1
 	mockGate := &mockGateExecutor{
 		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 			gateCallCount++
 			executionOrder = append(executionOrder, "gate")
 
-			// Determine if this is a post-mod gate for step 1 based on call count.
+			// Determine if this is a post-mig gate for step 1 based on call count.
 			// For a 2-step run with gates enabled:
-			// Call 1: pre-mod gate step 0 (from runner.Run)
-			// Call 2: post-mod gate step 0
-			// Call 3: pre-mod gate step 1 (from runner.Run)
-			// Call 4: post-mod gate step 1 (should fail)
+			// Call 1: pre-mig gate step 0 (from runner.Run)
+			// Call 2: post-mig gate step 0
+			// Call 3: pre-mig gate step 1 (from runner.Run)
+			// Call 4: post-mig gate step 1 (should fail)
 			if gateCallCount == 4 {
-				// Post-mod gate for step 1 fails
+				// Post-mig gate for step 1 fails
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
 						{Tool: "maven", Passed: false},
 					},
-					LogsText:  "[ERROR] Post-mod gate failure on step 1\n",
+					LogsText:  "[ERROR] Post-mig gate failure on step 1\n",
 					LogDigest: "step1-postgate-fail",
 				}, nil
 			}
@@ -125,8 +125,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step0:latest"}}},
-				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step1:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mig-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mig-step1:latest"}}},
 			},
 		},
 	}
@@ -187,24 +187,24 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		t.Fatal("expected error from post-gate failure, got nil")
 	}
 
-	// 2. Verify the error is ErrBuildGateFailed (from post-mod gate).
+	// 2. Verify the error is ErrBuildGateFailed (from post-mig gate).
 	if !errors.Is(finalExecErr, step.ErrBuildGateFailed) {
 		t.Errorf("expected ErrBuildGateFailed, got: %v", finalExecErr)
 	}
 
 	// 3. Verify container execution count: 2 containers should have been created
-	// (step 0 main mod + step 1 main mod). If there were more steps, they would NOT run.
+	// (step 0 main mig + step 1 main mig). If there were more steps, they would NOT run.
 	if containerCreateCount != 2 {
-		t.Errorf("container create count = %d, want 2 (step 0 and step 1 mods)", containerCreateCount)
+		t.Errorf("container create count = %d, want 2 (step 0 and step 1 migs)", containerCreateCount)
 	}
 
 	// 4. Verify gate call count: 4 gates should have been called.
-	// Call 1: pre-mod gate step 0
-	// Call 2: post-mod gate step 0 (passes)
-	// Call 3: pre-mod gate step 1
-	// Call 4: post-mod gate step 1 (fails)
+	// Call 1: pre-mig gate step 0
+	// Call 2: post-mig gate step 0 (passes)
+	// Call 3: pre-mig gate step 1
+	// Call 4: post-mig gate step 1 (fails)
 	if gateCallCount != 4 {
-		t.Errorf("gate call count = %d, want 4 (2 pre-mod + 2 post-mod gates)", gateCallCount)
+		t.Errorf("gate call count = %d, want 4 (2 pre-mig + 2 post-mig gates)", gateCallCount)
 	}
 
 	// 5. Verify the execution order shows both containers ran before post-gate failure.
@@ -213,27 +213,27 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 	step0ModRan := false
 	step1ModRan := false
 	for _, event := range executionOrder {
-		if event == "container:test/mod-step0:latest" {
+		if event == "container:test/mig-step0:latest" {
 			step0ModRan = true
 		}
-		if event == "container:test/mod-step1:latest" {
+		if event == "container:test/mig-step1:latest" {
 			step1ModRan = true
 		}
 	}
 
 	if !step0ModRan {
-		t.Error("step 0 mod container did not run")
+		t.Error("step 0 mig container did not run")
 	}
 	if !step1ModRan {
-		t.Error("step 1 mod container did not run")
+		t.Error("step 1 mig container did not run")
 	}
 
 	// 6. Log the test scenario for clarity.
-	t.Logf("Post-gate failure on step %d correctly stopped further mods", stepIndexOfFailingPostGate)
+	t.Logf("Post-gate failure on step %d correctly stopped further migs", stepIndexOfFailingPostGate)
 	t.Logf("Execution order: %v", executionOrder)
 }
 
-// TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted verifies that when a post-mod gate
+// TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted verifies that when a post-mig gate
 // fails and healing retries are exhausted, subsequent steps do not execute.
 //
 // This variant adds healing configuration but ensures healing also fails, resulting in
@@ -244,31 +244,31 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 
 	gateCallCount := 0
 
-	// Mock gate: pre-mod gates pass, post-mod gate for step 1 always fails (even after healing).
+	// Mock gate: pre-mig gates pass, post-mig gate for step 1 always fails (even after healing).
 	mockGate := &mockGateExecutor{
 		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 			gateCallCount++
 			executionOrder = append(executionOrder, "gate")
 
 			// Gate call sequence for 2-step run with healing (1 retry):
-			// Call 1: pre-mod gate step 0 (pass)
-			// Call 2: post-mod gate step 0 (pass)
-			// Call 3: pre-mod gate step 1 (pass)
-			// Call 4: post-mod gate step 1 (fail, triggers healing)
-			// Call 5: post-mod re-gate step 1 after healing (still fail)
+			// Call 1: pre-mig gate step 0 (pass)
+			// Call 2: post-mig gate step 0 (pass)
+			// Call 3: pre-mig gate step 1 (pass)
+			// Call 4: post-mig gate step 1 (fail, triggers healing)
+			// Call 5: post-mig re-gate step 1 after healing (still fail)
 			// No step 2 because we break on post-gate failure.
 			if gateCallCount >= 4 {
-				// Post-mod gate for step 1 always fails (before and after healing).
+				// Post-mig gate for step 1 always fails (before and after healing).
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
 						{Tool: "maven", Passed: false},
 					},
-					LogsText:  "[ERROR] Post-mod gate step 1 still failing\n",
+					LogsText:  "[ERROR] Post-mig gate step 1 still failing\n",
 					LogDigest: "step1-postgate-fail-exhausted",
 				}, nil
 			}
 
-			// Pre-mod and step 0 post-mod gates pass.
+			// Pre-mig and step 0 post-mig gates pass.
 			return &contracts.BuildGateStageMetadata{
 				StaticChecks: []contracts.BuildGateStaticCheckReport{
 					{Tool: "maven", Passed: true},
@@ -279,7 +279,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		},
 	}
 
-	// Track containers created (main mods + healing mods).
+	// Track containers created (main migs + healing migs).
 	containerImages := []string{}
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
@@ -324,8 +324,8 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step0:latest"}}},
-				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step1:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mig-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mig-step1:latest"}}},
 			},
 			Healing: &HealingConfig{
 				Retries: 1,
@@ -384,7 +384,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		t.Errorf("expected ErrBuildGateFailed, got: %v", finalExecErr)
 	}
 
-	// 2. Verify healing mod ran (for step 1 post-gate).
+	// 2. Verify healing mig ran (for step 1 post-gate).
 	healerRan := false
 	for _, img := range containerImages {
 		if img == "test/healer:latest" {
@@ -393,34 +393,34 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		}
 	}
 	if !healerRan {
-		t.Error("healing mod did not run for post-gate failure")
+		t.Error("healing mig did not run for post-gate failure")
 	}
 
 	// 3. Verify gate call count includes re-gate after healing.
-	// Expected: 5 gate calls (2 pre-mod + 2 post-mod + 1 re-gate after healing).
+	// Expected: 5 gate calls (2 pre-mig + 2 post-mig + 1 re-gate after healing).
 	if gateCallCount != 5 {
-		t.Errorf("gate call count = %d, want 5 (2 pre-mod + 2 post-mod + 1 re-gate)", gateCallCount)
+		t.Errorf("gate call count = %d, want 5 (2 pre-mig + 2 post-mig + 1 re-gate)", gateCallCount)
 	}
 
-	// 4. Verify both step mods ran but healing couldn't fix post-gate.
+	// 4. Verify both step migs ran but healing couldn't fix post-gate.
 	step0Ran := false
 	step1Ran := false
 	for _, img := range containerImages {
-		if img == "test/mod-step0:latest" {
+		if img == "test/mig-step0:latest" {
 			step0Ran = true
 		}
-		if img == "test/mod-step1:latest" {
+		if img == "test/mig-step1:latest" {
 			step1Ran = true
 		}
 	}
 
 	if !step0Ran {
-		t.Error("step 0 mod did not run")
+		t.Error("step 0 mig did not run")
 	}
 	if !step1Ran {
-		t.Error("step 1 mod did not run")
+		t.Error("step 1 mig did not run")
 	}
 
-	t.Logf("Post-gate healing exhausted on step 1 correctly stopped further mods")
+	t.Logf("Post-gate healing exhausted on step 1 correctly stopped further migs")
 	t.Logf("Container images executed: %v", containerImages)
 }

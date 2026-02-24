@@ -25,7 +25,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusRunning,
-		JobType: "mod",
+		JobType: "mig",
 	}
 
 	st := &mockStore{
@@ -101,7 +101,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &otherNode,
 		Status:  store.JobStatusRunning,
-		JobType: "mod",
+		JobType: "mig",
 	}
 
 	st := &mockStore{
@@ -140,7 +140,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  store.JobStatusQueued,
-		JobType: "mod",
+		JobType: "mig",
 	}
 
 	st := &mockStore{getJobResult: job}

@@ -349,7 +349,7 @@ func TestDetect_AmbiguousJavaGo(t *testing.T) {
 		if e.Path == "pom.xml" && e.Key == "build.file" {
 			hasPom = true
 		}
-		if e.Path == "go.mod" && e.Key == "build.file" {
+		if e.Path == goModuleFile && e.Key == "build.file" {
 			hasGoMod = true
 		}
 	}
@@ -357,7 +357,7 @@ func TestDetect_AmbiguousJavaGo(t *testing.T) {
 		t.Error("expected evidence for pom.xml")
 	}
 	if !hasGoMod {
-		t.Error("expected evidence for go.mod")
+		t.Error("expected evidence for Go module file")
 	}
 }
 

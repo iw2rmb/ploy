@@ -18,27 +18,27 @@ func TestJobImage_ResolveImage_Universal(t *testing.T) {
 	}{
 		{
 			name:  "universal image with java-maven stack",
-			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
 			stack: ModStackJavaMaven,
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "universal image with java-gradle stack",
-			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
 			stack: ModStackJavaGradle,
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "universal image with unknown stack",
-			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
 			stack: ModStackUnknown,
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "universal image with empty stack (defaults to unknown)",
-			image: JobImage{Universal: "docker.io/user/mods-orw:latest"},
+			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
 			stack: "",
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 	}
 
@@ -64,9 +64,9 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 	// Stack map with exact keys and default.
 	stackMap := JobImage{
 		ByStack: map[ModStack]string{
-			ModStackDefault:    "docker.io/user/mods-orw:latest",
-			ModStackJavaMaven:  "docker.io/user/mods-orw-maven:latest",
-			ModStackJavaGradle: "docker.io/user/mods-orw-gradle:latest",
+			ModStackDefault:    "docker.io/user/migs-orw:latest",
+			ModStackJavaMaven:  "docker.io/user/migs-orw-maven:latest",
+			ModStackJavaGradle: "docker.io/user/migs-orw-gradle:latest",
 		},
 	}
 
@@ -80,37 +80,37 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 			name:  "exact match java-maven",
 			image: stackMap,
 			stack: ModStackJavaMaven,
-			want:  "docker.io/user/mods-orw-maven:latest",
+			want:  "docker.io/user/migs-orw-maven:latest",
 		},
 		{
 			name:  "exact match java-gradle",
 			image: stackMap,
 			stack: ModStackJavaGradle,
-			want:  "docker.io/user/mods-orw-gradle:latest",
+			want:  "docker.io/user/migs-orw-gradle:latest",
 		},
 		{
 			name:  "fallback to default for java stack",
 			image: stackMap,
 			stack: ModStackJava,
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for unknown stack",
 			image: stackMap,
 			stack: ModStackUnknown,
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for empty stack",
 			image: stackMap,
 			stack: "",
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for custom stack",
 			image: stackMap,
 			stack: ModStack("python-pip"),
-			want:  "docker.io/user/mods-orw:latest",
+			want:  "docker.io/user/migs-orw:latest",
 		},
 	}
 
@@ -136,7 +136,7 @@ func TestJobImage_ResolveImage_NoDefault(t *testing.T) {
 	// Stack map without default key.
 	stackMap := JobImage{
 		ByStack: map[ModStack]string{
-			ModStackJavaMaven: "docker.io/user/mods-orw-maven:latest",
+			ModStackJavaMaven: "docker.io/user/migs-orw-maven:latest",
 		},
 	}
 
@@ -197,13 +197,13 @@ func TestParseJobImage_String(t *testing.T) {
 	}{
 		{
 			name:  "simple string",
-			input: "docker.io/user/mod:latest",
-			want:  "docker.io/user/mod:latest",
+			input: "docker.io/user/mig:latest",
+			want:  "docker.io/user/mig:latest",
 		},
 		{
 			name:  "string with whitespace",
-			input: "  docker.io/user/mod:v1  ",
-			want:  "docker.io/user/mod:v1",
+			input: "  docker.io/user/mig:v1  ",
+			want:  "docker.io/user/mig:v1",
 		},
 		{
 			name:  "empty string",
@@ -236,9 +236,9 @@ func TestParseJobImage_Map(t *testing.T) {
 	t.Run("map[string]any from JSON/YAML", func(t *testing.T) {
 		t.Parallel()
 		input := map[string]any{
-			"default":     "docker.io/user/mods-orw:latest",
-			"java-maven":  "docker.io/user/mods-orw-maven:latest",
-			"java-gradle": "docker.io/user/mods-orw-gradle:latest",
+			"default":     "docker.io/user/migs-orw:latest",
+			"java-maven":  "docker.io/user/migs-orw-maven:latest",
+			"java-gradle": "docker.io/user/migs-orw-gradle:latest",
 		}
 
 		got, err := ParseJobImage(input)
@@ -251,13 +251,13 @@ func TestParseJobImage_Map(t *testing.T) {
 		if len(got.ByStack) != 3 {
 			t.Errorf("expected 3 stack entries, got %d", len(got.ByStack))
 		}
-		if got.ByStack[ModStackDefault] != "docker.io/user/mods-orw:latest" {
+		if got.ByStack[ModStackDefault] != "docker.io/user/migs-orw:latest" {
 			t.Errorf("default image mismatch: %q", got.ByStack[ModStackDefault])
 		}
-		if got.ByStack[ModStackJavaMaven] != "docker.io/user/mods-orw-maven:latest" {
+		if got.ByStack[ModStackJavaMaven] != "docker.io/user/migs-orw-maven:latest" {
 			t.Errorf("java-maven image mismatch: %q", got.ByStack[ModStackJavaMaven])
 		}
-		if got.ByStack[ModStackJavaGradle] != "docker.io/user/mods-orw-gradle:latest" {
+		if got.ByStack[ModStackJavaGradle] != "docker.io/user/migs-orw-gradle:latest" {
 			t.Errorf("java-gradle image mismatch: %q", got.ByStack[ModStackJavaGradle])
 		}
 	})
@@ -437,9 +437,9 @@ func TestJobImage_String(t *testing.T) {
 
 	t.Run("universal", func(t *testing.T) {
 		t.Parallel()
-		img := JobImage{Universal: "docker.io/user/mod:latest"}
+		img := JobImage{Universal: "docker.io/user/mig:latest"}
 		got := img.String()
-		if got != "docker.io/user/mod:latest" {
+		if got != "docker.io/user/mig:latest" {
 			t.Errorf("String() = %q, want universal image", got)
 		}
 	})

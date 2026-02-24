@@ -100,15 +100,15 @@ func TestGlobalEnvScope_MatchesJobType(t *testing.T) {
 		want    bool
 	}{
 		// "all" scope matches every job type.
-		{name: "all matches mod", scope: GlobalEnvScopeAll, jobType: JobTypeMod, want: true},
+		{name: "all matches mig", scope: GlobalEnvScopeAll, jobType: JobTypeMod, want: true},
 		{name: "all matches heal", scope: GlobalEnvScopeAll, jobType: JobTypeHeal, want: true},
 		{name: "all matches pre_gate", scope: GlobalEnvScopeAll, jobType: JobTypePreGate, want: true},
 		{name: "all matches re_gate", scope: GlobalEnvScopeAll, jobType: JobTypeReGate, want: true},
 		{name: "all matches post_gate", scope: GlobalEnvScopeAll, jobType: JobTypePostGate, want: true},
 		{name: "all matches mr", scope: GlobalEnvScopeAll, jobType: JobTypeMR, want: true},
 
-		// "migs" scope matches mod and post_gate jobs.
-		{name: "migs matches mod", scope: GlobalEnvScopeMods, jobType: JobTypeMod, want: true},
+		// "migs" scope matches mig and post_gate jobs.
+		{name: "migs matches mig", scope: GlobalEnvScopeMods, jobType: JobTypeMod, want: true},
 		{name: "migs matches post_gate", scope: GlobalEnvScopeMods, jobType: JobTypePostGate, want: true},
 		{name: "migs does not match heal", scope: GlobalEnvScopeMods, jobType: JobTypeHeal, want: false},
 		{name: "migs does not match pre_gate", scope: GlobalEnvScopeMods, jobType: JobTypePreGate, want: false},
@@ -118,7 +118,7 @@ func TestGlobalEnvScope_MatchesJobType(t *testing.T) {
 		// "heal" scope matches heal and re_gate jobs.
 		{name: "heal matches heal", scope: GlobalEnvScopeHeal, jobType: JobTypeHeal, want: true},
 		{name: "heal matches re_gate", scope: GlobalEnvScopeHeal, jobType: JobTypeReGate, want: true},
-		{name: "heal does not match mod", scope: GlobalEnvScopeHeal, jobType: JobTypeMod, want: false},
+		{name: "heal does not match mig", scope: GlobalEnvScopeHeal, jobType: JobTypeMod, want: false},
 		{name: "heal does not match pre_gate", scope: GlobalEnvScopeHeal, jobType: JobTypePreGate, want: false},
 		{name: "heal does not match post_gate", scope: GlobalEnvScopeHeal, jobType: JobTypePostGate, want: false},
 		{name: "heal does not match mr", scope: GlobalEnvScopeHeal, jobType: JobTypeMR, want: false},
@@ -127,7 +127,7 @@ func TestGlobalEnvScope_MatchesJobType(t *testing.T) {
 		{name: "gate matches pre_gate", scope: GlobalEnvScopeGate, jobType: JobTypePreGate, want: true},
 		{name: "gate matches re_gate", scope: GlobalEnvScopeGate, jobType: JobTypeReGate, want: true},
 		{name: "gate matches post_gate", scope: GlobalEnvScopeGate, jobType: JobTypePostGate, want: true},
-		{name: "gate does not match mod", scope: GlobalEnvScopeGate, jobType: JobTypeMod, want: false},
+		{name: "gate does not match mig", scope: GlobalEnvScopeGate, jobType: JobTypeMod, want: false},
 		{name: "gate does not match heal", scope: GlobalEnvScopeGate, jobType: JobTypeHeal, want: false},
 		{name: "gate does not match mr", scope: GlobalEnvScopeGate, jobType: JobTypeMR, want: false},
 

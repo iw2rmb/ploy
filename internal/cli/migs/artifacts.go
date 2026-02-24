@@ -26,13 +26,13 @@ type ArtifactsCommand struct {
 // Run performs GET /v1/runs/{id}/status and prints per-stage artifacts.
 func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
-		return errors.New("mods artifacts: http client required")
+		return errors.New("migs artifacts: http client required")
 	}
 	if c.BaseURL == nil {
-		return errors.New("mods artifacts: base url required")
+		return errors.New("migs artifacts: base url required")
 	}
 	if c.RunID.IsZero() {
-		return errors.New("mods artifacts: run id required")
+		return errors.New("migs artifacts: run id required")
 	}
 	runID := c.RunID.String()
 	endpoint := c.BaseURL.JoinPath("v1", "runs", runID, "status")
@@ -46,7 +46,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return httpx.WrapError("mods artifacts", resp.Status, resp.Body)
+		return httpx.WrapError("migs artifacts", resp.Status, resp.Body)
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
 	var summary modsapi.RunSummary

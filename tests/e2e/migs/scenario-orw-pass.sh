@@ -11,7 +11,7 @@ ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
 REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
 # Use a known-good remote ref for the passing scenario.
-# "mods-upgrade-java17" may not exist by default; e2e/success does.
+# "migs-upgrade-java17" may not exist by default; e2e/success does.
 TARGET_REF=e2e/success
 
 RECIPE_GROUP=org.openrewrite.recipe

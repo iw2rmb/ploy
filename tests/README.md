@@ -14,15 +14,15 @@ tests/
 │   ├── lab_smoke_test.go
 │   ├── server_insecure_test.go
 │   ├── smoke_workflow_test.go  # Comprehensive workflow validation
-│   └── mods/                   # Mod-specific integration tests
+│   └── migs/                   # Mod-specific integration tests
 ├── e2e/                     # End-to-end scenarios (require cluster)
-│   └── mods/
+│   └── migs/
 │       ├── README.md        # E2E documentation
 │       ├── scenario-selftest.sh
 │       ├── scenario-orw-pass.sh
 │       └── scenario-orw-fail/
 │           ├── run.sh
-│           └── mod.yaml
+│           └── mig.yaml
 └── guards/                  # Build-time guards (lints, docs)
     ├── docs_guard_test.go
     └── lints_guard_test.go
@@ -140,8 +140,8 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
 - **Prerequisites:** Configured cluster, Docker images, optional GitLab PAT
 - **Scenarios:**
   - `scenario-selftest.sh`: Minimal container execution (echo test)
-  - `scenario-orw-pass.sh`: OpenRewrite mod on passing branch
-  - `scenario-orw-fail/run.sh`: OpenRewrite mod with Build Gate healing
+  - `scenario-orw-pass.sh`: OpenRewrite mig on passing branch
+  - `scenario-orw-fail/run.sh`: OpenRewrite mig with Build Gate healing
 
 ### Guards
 - **Location:** `tests/guards/`
@@ -185,7 +185,7 @@ The smoke test suite validates these critical paths:
 
 6. **CLI functionality:**
    - Version and help commands
-   - Subcommand help (mod, server, etc.)
+   - Subcommand help (mig, server, etc.)
    - Flag parsing and validation
    - Run inspection commands: `run status`, `run logs`, `mig run repo status`
 
@@ -194,7 +194,7 @@ The smoke test suite validates these critical paths:
    - Log streaming from container
    - Artifact collection
    - Build Gate validation via HTTP API (repo+diff model)
-   - Healing workflow (Build Gate failure → healing mods → re-gate via remote workers)
+   - Healing workflow (Build Gate failure → healing migs → re-gate via remote workers)
    - Decoupled execution: Mods and Build Gate can run on different nodes
 
 ## Writing New Tests
@@ -246,7 +246,7 @@ dist/ploy mig run \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
   --repo-target-ref feature/test \
-  --job-image your-mod:latest \
+  --job-image your-mig:latest \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}"
 

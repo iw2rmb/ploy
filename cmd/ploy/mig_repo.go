@@ -1,10 +1,10 @@
 // mod_repo.go implements the 'ploy mig repo' command handler.
 //
-// This command manages a mod's repo set:
-// - ploy mig repo add <mod-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>
-// - ploy mig repo list <mod-id|name>
-// - ploy mig repo remove <mod-id|name> --repo-id <repo_id>
-// - ploy mig repo import <mod-id|name> --file <path>
+// This command manages a mig's repo set:
+// - ploy mig repo add <mig-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>
+// - ploy mig repo list <mig-id|name>
+// - ploy mig repo remove <mig-id|name> --repo-id <repo_id>
+// - ploy mig repo import <mig-id|name> --file <path>
 package main
 
 import (
@@ -20,13 +20,13 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleMigRepo routes mod repo subcommands.
+// handleMigRepo routes mig repo subcommands.
 func handleMigRepo(args []string, stderr io.Writer) error {
 	// Handle help flag or empty args.
 	if wantsHelp(args) || len(args) == 0 {
 		printMigRepoUsage(stderr)
 		if len(args) == 0 {
-			return fmt.Errorf("mod repo subcommand required")
+			return fmt.Errorf("mig repo subcommand required")
 		}
 		return nil
 	}
@@ -46,7 +46,7 @@ func handleMigRepo(args []string, stderr io.Writer) error {
 	}
 }
 
-// handleMigRepoAdd implements 'ploy mig repo add <mod-id|name> --repo <url> --base-ref <ref> --target-ref <ref>'.
+// handleMigRepoAdd implements 'ploy mig repo add <mig-id|name> --repo <url> --base-ref <ref> --target-ref <ref>'.
 func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -55,17 +55,17 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	}
 
 	// Parse flags.
-	fs := flag.NewFlagSet("mod repo add", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig repo add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	repoURL := fs.String("repo", "", "Git repository URL (required)")
 	baseRef := fs.String("base-ref", "", "Base git ref (required)")
 	targetRef := fs.String("target-ref", "", "Target git ref (required)")
 
-	// First positional arg is mod ID/name.
+	// First positional arg is mig ID/name.
 	if len(args) == 0 {
 		printMigRepoAddUsage(stderr)
-		return fmt.Errorf("mod id/name required")
+		return fmt.Errorf("mig id/name required")
 	}
 	modRef := args[0]
 
@@ -95,7 +95,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID.
+	// Resolve mig reference to ID.
 	resolveCmd := migs.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -106,7 +106,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod repo add command.
+	// Execute mig repo add command.
 	cmd := migs.AddModRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
@@ -125,7 +125,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleMigRepoList implements 'ploy mig repo list <mod-id|name>'.
+// handleMigRepoList implements 'ploy mig repo list <mig-id|name>'.
 func handleMigRepoList(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -133,10 +133,10 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Require mod ID/name as positional arg.
+	// Require mig ID/name as positional arg.
 	if len(args) == 0 {
 		printMigRepoListUsage(stderr)
-		return fmt.Errorf("mod id/name required")
+		return fmt.Errorf("mig id/name required")
 	}
 	modRef := args[0]
 
@@ -147,7 +147,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID.
+	// Resolve mig reference to ID.
 	resolveCmd := migs.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -158,7 +158,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod repo list command.
+	// Execute mig repo list command.
 	cmd := migs.ListModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -192,7 +192,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleMigRepoRemove implements 'ploy mig repo remove <mod-id|name> --repo-id <repo_id>'.
+// handleMigRepoRemove implements 'ploy mig repo remove <mig-id|name> --repo-id <repo_id>'.
 func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -201,15 +201,15 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	}
 
 	// Parse flags.
-	fs := flag.NewFlagSet("mod repo remove", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig repo remove", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	repoID := fs.String("repo-id", "", "Repo ID to remove (required)")
 
-	// First positional arg is mod ID/name.
+	// First positional arg is mig ID/name.
 	if len(args) == 0 {
 		printMigRepoRemoveUsage(stderr)
-		return fmt.Errorf("mod id/name required")
+		return fmt.Errorf("mig id/name required")
 	}
 	modRef := args[0]
 
@@ -231,7 +231,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID.
+	// Resolve mig reference to ID.
 	resolveCmd := migs.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -242,7 +242,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod repo remove command.
+	// Execute mig repo remove command.
 	cmd := migs.RemoveModRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -258,7 +258,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleMigRepoImport implements 'ploy mig repo import <mod-id|name> --file <path>'.
+// handleMigRepoImport implements 'ploy mig repo import <mig-id|name> --file <path>'.
 func handleMigRepoImport(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -267,15 +267,15 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	}
 
 	// Parse flags.
-	fs := flag.NewFlagSet("mod repo import", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig repo import", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	filePath := fs.String("file", "", "Path to CSV file (required)")
 
-	// First positional arg is mod ID/name.
+	// First positional arg is mig ID/name.
 	if len(args) == 0 {
 		printMigRepoImportUsage(stderr)
-		return fmt.Errorf("mod id/name required")
+		return fmt.Errorf("mig id/name required")
 	}
 	modRef := args[0]
 
@@ -303,7 +303,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID.
+	// Resolve mig reference to ID.
 	resolveCmd := migs.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -314,7 +314,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod repo import command.
+	// Execute mig repo import command.
 	cmd := migs.ImportModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -339,22 +339,22 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printMigRepoUsage prints usage for the mod repo command.
+// printMigRepoUsage prints usage for the mig repo command.
 func printMigRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  add <mod> --repo <url> --base-ref <ref> --target-ref <ref>  Add a repo to the mod")
-	_, _ = fmt.Fprintln(w, "  list <mod>                                                   List repos in the mod")
-	_, _ = fmt.Fprintln(w, "  remove <mod> --repo-id <id>                                  Remove a repo from the mod")
-	_, _ = fmt.Fprintln(w, "  import <mod> --file <path>                                   Import repos from CSV")
+	_, _ = fmt.Fprintln(w, "  add <mig> --repo <url> --base-ref <ref> --target-ref <ref>  Add a repo to the mig")
+	_, _ = fmt.Fprintln(w, "  list <mig>                                                   List repos in the mig")
+	_, _ = fmt.Fprintln(w, "  remove <mig> --repo-id <id>                                  Remove a repo from the mig")
+	_, _ = fmt.Fprintln(w, "  import <mig> --file <path>                                   Import repos from CSV")
 }
 
-// printMigRepoAddUsage prints usage for the mod repo add command.
+// printMigRepoAddUsage prints usage for the mig repo add command.
 func printMigRepoAddUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo add <mod-id|name> --repo <url> --base-ref <ref> --target-ref <ref>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo add <mig-id|name> --repo <url> --base-ref <ref> --target-ref <ref>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Adds a repo to the mod's repo set.")
+	_, _ = fmt.Fprintln(w, "Adds a repo to the mig's repo set.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
 	_, _ = fmt.Fprintln(w, "  --repo <url>        Git repository URL (required)")
@@ -362,27 +362,27 @@ func printMigRepoAddUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --target-ref <ref>  Target git ref (required)")
 }
 
-// printMigRepoListUsage prints usage for the mod repo list command.
+// printMigRepoListUsage prints usage for the mig repo list command.
 func printMigRepoListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo list <mod-id|name>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo list <mig-id|name>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Lists repos in the mod's repo set.")
+	_, _ = fmt.Fprintln(w, "Lists repos in the mig's repo set.")
 }
 
-// printMigRepoRemoveUsage prints usage for the mod repo remove command.
+// printMigRepoRemoveUsage prints usage for the mig repo remove command.
 func printMigRepoRemoveUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo remove <mod-id|name> --repo-id <id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo remove <mig-id|name> --repo-id <id>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Removes a repo from the mod's repo set.")
+	_, _ = fmt.Fprintln(w, "Removes a repo from the mig's repo set.")
 	_, _ = fmt.Fprintln(w, "Refuses if the repo has historical executions.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
 	_, _ = fmt.Fprintln(w, "  --repo-id <id>  Repo ID to remove (required)")
 }
 
-// printMigRepoImportUsage prints usage for the mod repo import command.
+// printMigRepoImportUsage prints usage for the mig repo import command.
 func printMigRepoImportUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo import <mod-id|name> --file <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig repo import <mig-id|name> --file <path>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Imports repos from CSV file. CSV format: repo_url,base_ref,target_ref")
 	_, _ = fmt.Fprintln(w, "Upserts by repo_url; updates refs for existing repos.")

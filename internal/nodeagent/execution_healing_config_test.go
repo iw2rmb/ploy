@@ -65,8 +65,8 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:        "workspace",
@@ -163,7 +163,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	inDir := ""
 
 	// Use a standard runner for the test since we need to intercept Run calls.
-	// The mock gate will pass, so we'll see the main mod execution.
+	// The mock gate will pass, so we'll see the main mig execution.
 	runner := step.Runner{
 		Workspace:  &mockWorkspaceHydrator{},
 		Containers: mockContainer,
@@ -191,8 +191,8 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	// calling Runner.Run, so Runner.Run never sees Gate.Enabled=true.
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:      "workspace",
@@ -222,9 +222,9 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 		t.Errorf("executeWithHealing() exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify gate was executed via runGateWithHealing (pre-mod + post-mod = 2 calls).
+	// Verify gate was executed via runGateWithHealing (pre-mig + post-mig = 2 calls).
 	if gateExecutions != 2 {
-		t.Errorf("gate executions = %d, want 2 (pre-mod + post-mod)", gateExecutions)
+		t.Errorf("gate executions = %d, want 2 (pre-mig + post-mig)", gateExecutions)
 	}
 
 	// Verify PreGate is captured from runGateWithHealing.

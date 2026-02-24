@@ -171,9 +171,9 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 	}
 }
 
-// TestRunner_Run_PreModGateFailureWithoutHealing verifies that when the pre-mod
+// TestRunner_Run_PreModGateFailureWithoutHealing verifies that when the pre-mig
 // gate fails and no healing is configured, the runner returns an error with the
-// build-gate sentinel error without executing the mod step.
+// build-gate sentinel error without executing the mig step.
 func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 	runner := Runner{
 		Workspace: &testWorkspaceHydrator{},
@@ -191,7 +191,7 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 				}, nil
 			},
 		},
-		Containers: nil, // No container runtime; should not execute mod when gate fails
+		Containers: nil, // No container runtime; should not execute mig when gate fails
 	}
 
 	manifest := contracts.StepManifest{
@@ -222,14 +222,14 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 
 	// Should return error when gate fails without healing
 	if err == nil {
-		t.Fatalf("Run() expected error for failed pre-mod gate, got nil")
+		t.Fatalf("Run() expected error for failed pre-mig gate, got nil")
 	}
 
 	// Error should wrap the sentinel ErrBuildGateFailed
 	if !errors.Is(err, ErrBuildGateFailed) {
 		// Check error string contains expected message
 		errStr := err.Error()
-		if errStr != "build gate failed: pre-mod validation failed" {
+		if errStr != "build gate failed: pre-mig validation failed" {
 			t.Errorf("Run() error = %q, want error containing 'build gate failed'", errStr)
 		}
 	}

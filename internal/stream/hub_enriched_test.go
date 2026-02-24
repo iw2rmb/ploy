@@ -31,7 +31,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Line:      "hello world",
 				NodeID:    "aB3xY9",
 				JobID:     jobID,
-				JobType:   "mod",
+				JobType:   "mig",
 			},
 			want: map[string]any{
 				"timestamp": "2025-10-22T12:00:00Z",
@@ -39,7 +39,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"line":      "hello world",
 				"node_id":   "aB3xY9",
 				"job_id":    jobID.String(),
-				"job_type":  "mod",
+				"job_type":  "mig",
 			},
 		},
 		{

@@ -9,11 +9,11 @@ GlobalEnvScope:
   type: string
   description: |
     Scope that controls which job types receive this variable.
-    - `all` — Inject into every job type (mod, heal, pre_gate, re_gate, post_gate)
-    - `mods` — Inject into `mod` and `post_gate` jobs (code modification phases)
+    - `all` — Inject into every job type (mig, heal, pre_gate, re_gate, post_gate)
+    - `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
     - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
     - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate phases)
-  enum: [all, mods, heal, gate]
+  enum: [all, migs, heal, gate]
   example: "all"
 
 # GlobalEnvListItem represents an entry in the GET /v1/config/env list response.

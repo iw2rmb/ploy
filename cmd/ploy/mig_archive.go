@@ -1,8 +1,8 @@
 // mod_archive.go implements the 'ploy mig archive' command handler.
 //
-// This command archives a mod project:
-// - ploy mig archive <mod-id|name>
-// - Refuses when any jobs for that mod are currently running.
+// This command archives a mig project:
+// - ploy mig archive <mig-id|name>
+// - Refuses when any jobs for that mig are currently running.
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// handleMigArchive implements 'ploy mig archive <mod-id|name>'.
+// handleMigArchive implements 'ploy mig archive <mig-id|name>'.
 func handleMigArchive(args []string, stderr io.Writer) error {
 	// Handle help flag.
 	if wantsHelp(args) {
@@ -22,10 +22,10 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	// Require mod ID or name as positional arg.
+	// Require mig ID or name as positional arg.
 	if len(args) == 0 {
 		printMigArchiveUsage(stderr)
-		return fmt.Errorf("mod id or name required")
+		return fmt.Errorf("mig id or name required")
 	}
 	modRef := args[0]
 
@@ -36,7 +36,7 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod archive command.
+	// Execute mig archive command.
 	cmd := migs.ArchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -52,9 +52,9 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printMigArchiveUsage prints usage for the mod archive command.
+// printMigArchiveUsage prints usage for the mig archive command.
 func printMigArchiveUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig archive <mod-id|name>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig archive <mig-id|name>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Archives a mod project. Refuses if any jobs for that mod are running.")
+	_, _ = fmt.Fprintln(w, "Archives a mig project. Refuses if any jobs for that mig are running.")
 }

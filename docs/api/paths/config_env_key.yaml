@@ -52,9 +52,9 @@ put:
     **Common use cases:**
     - `CA_CERTS_PEM_BUNDLE` with scope `all` — PEM-encoded CA certificates
       installed into container trust stores.
-    - `CODEX_AUTH_JSON` with scope `mods` — Codex credentials written to
-      `/root/.codex/auth.json` by mod-codex images.
-    - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated mods.
+    - `CODEX_AUTH_JSON` with scope `migs` — Codex credentials written to
+      `/root/.codex/auth.json` by mig-codex images.
+    - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated migs.
 
     Requires `cli-admin` role.
   parameters:
@@ -88,7 +88,7 @@ put:
             summary: Set a non-secret variable
             value:
               value: "myvalue"
-              scope: "mods"
+              scope: "migs"
               secret: false
   responses:
     '200':

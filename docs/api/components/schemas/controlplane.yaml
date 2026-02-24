@@ -277,7 +277,7 @@ CreateMigRequest:
     spec:
       type: object
       additionalProperties: true
-      description: Optional initial mods spec JSON object.
+      description: Optional initial migs spec JSON object.
     created_by: { type: string, nullable: true }
   required: [name]
 
@@ -530,7 +530,7 @@ MigsRunSummary:
         **Key semantics**: Keys are job IDs (KSUID strings), not job names.
         Use `next_id` within each StageStatus to follow successor links.
 
-        **Typical entries**: `pre-gate`, `mod-0`, `post-gate` jobs, plus any
+        **Typical entries**: `pre-gate`, `mig-0`, `post-gate` jobs, plus any
         dynamically inserted `heal-*` and `re-gate` jobs for healing flows.
       type: object
       additionalProperties:
@@ -612,10 +612,10 @@ NodeClaimResponse:
       description: Claimed job ID (KSUID string)
     job_name:
       type: string
-      description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
+      description: Logical job name (e.g., "pre-gate", "mig-0", "post-gate")
     job_type:
       type: string
-      description: Job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`)
+      description: Job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`)
     job_image:
       type: string
       description: Container image for this job (may be empty for non-container jobs)
@@ -879,11 +879,11 @@ WorkflowGraphNode:
       description: Job ID (KSUID string)
     name:
       type: string
-      description: Logical job name (e.g., "pre-gate", "mod-0", "post-gate")
+      description: Logical job name (e.g., "pre-gate", "mig-0", "post-gate")
     type:
       type: string
       description: Job phase type derived from jobs.job_type
-      enum: [pre_gate, mod, heal, re_gate, post_gate]
+      enum: [pre_gate, mig, heal, re_gate, post_gate]
     next_id:
       type: string
       nullable: true
@@ -1052,10 +1052,10 @@ RepoJobItem:
       description: Job identifier (KSUID string)
     name:
       type: string
-      description: Job name (e.g., "mod-0", "pre-gate", "heal")
+      description: Job name (e.g., "mig-0", "pre-gate", "heal")
     job_type:
       type: string
-      description: Job phase type (pre_gate, mod, post_gate, heal, re_gate, mr)
+      description: Job phase type (pre_gate, mig, post_gate, heal, re_gate, mr)
     job_image:
       type: string
       description: Container image used for this job (may be empty)

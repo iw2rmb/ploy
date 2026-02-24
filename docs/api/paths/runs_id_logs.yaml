@@ -71,13 +71,13 @@ get:
     |--------------|--------|------------------------------------------------------------------|
     | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
     | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
-    | `job_type`   | string | Job phase: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`     |
+    | `job_type`   | string | Job phase: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`     |
     | `next_id` | number | Optional step metadata used for log enrichment                     |
 
     **Example:**
     ```
     event: log
-    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","next_id":2000}
+    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mig","next_id":2000}
     ```
 
     ## `event: retention` — Retention Metadata

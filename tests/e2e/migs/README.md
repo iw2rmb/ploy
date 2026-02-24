@@ -50,30 +50,30 @@ See also:
 
 **Spec‑Driven Flow (recommended)**
 
-Use the YAML spec to define mod parameters, Build Gate, and healing.
+Use the YAML spec to define mig parameters, Build Gate, and healing.
 Example spec:
   - `tests/e2e/migs/scenario-orw-fail/mig.yaml`
 
 **Using `--spec`:**
 
 The `--spec` flag accepts a YAML or JSON file defining:
-- **Main mod configuration** (`image`, `command`, `env`, `env_from_file`)
+- **Main mig configuration** (`image`, `command`, `env`, `env_from_file`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.images`)
-- **Healing configuration** (`build_gate_healing.retries`, `build_gate_healing.mod`)
+- **Healing configuration** (`build_gate_healing.retries`, `build_gate_healing.mig`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
 
 CLI flags override spec values when both are present. For example:
 ```bash
-ploy mig run --spec mod.yaml --job-image custom:tag --gitlab-pat "$TOKEN"
+ploy mig run --spec mig.yaml --job-image custom:tag --gitlab-pat "$TOKEN"
 ```
-This uses `mod.yaml` as the base but overrides the image and PAT.
+This uses `mig.yaml` as the base but overrides the image and PAT.
 
 **Build Gate Healing:**
 
 When `build_gate_healing` is configured in the spec:
-1. The node runs the Build Gate before the main mod.
-2. If the gate fails, the healing `mod` under `build_gate_healing.mod` executes.
-3. After the healing mod completes, the gate is re-run. If it passes, the main mod proceeds.
+1. The node runs the Build Gate before the main mig.
+2. If the gate fails, the healing `mig` under `build_gate_healing.mig` executes.
+3. After the healing mig completes, the gate is re-run. If it passes, the main mig proceeds.
 4. The loop retries up to `build_gate_healing.retries` times (default: 1).
 5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
 
@@ -82,7 +82,7 @@ When `build_gate_healing` is configured in the spec:
 Healing verification uses the same repo+diff semantics as the unified jobs-based Build Gate:
 
 - **Initial workspace**: The Build Gate validates code cloned from `repo_url+ref`.
-- **Healing modifications**: Healing mods modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
+- **Healing modifications**: Healing migs modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
 - **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes` using the local Docker gate executor (no HTTP Build Gate API call).
 - **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
 
@@ -104,14 +104,14 @@ Per RED→GREEN→REFACTOR discipline, the following artifacts should be validat
 **Validation steps:**
 
 1. **Workspace diff driven re-gate**: After each healing attempt, verify that:
-   - Healing mods edit files under `/workspace` as needed to fix the failure.
+   - Healing migs edit files under `/workspace` as needed to fix the failure.
    - The node agent re-runs the Build Gate only when workspace diffs are present (`git status --porcelain` non-empty).
    - When healing performs no net changes (clean `git status`), the gate is not re-run and the run terminates as failed.
 
 2. **Session resume across healing retries**: When `retries > 1` in healing config:
    - After first healing attempt: `codex-session.txt` is written to `/out` with thread ID
    - Before second healing attempt: Session ID is propagated to `/in/codex-session.txt`
-   - Subsequent healing mods receive `CODEX_RESUME=1` environment variable
+   - Subsequent healing migs receive `CODEX_RESUME=1` environment variable
    - `codex.log` shows "resume mode enabled; session=<id>" on retry attempts
    - `codex-run.json` contains `"resumed":true` for resumed runs
 
@@ -122,11 +122,11 @@ Per RED→GREEN→REFACTOR discipline, the following artifacts should be validat
 See `tests/unit/mig_codex_sh_test.sh` for unit tests covering these behaviors.
 Cross-reference: `docs/testing-workflow.md` and `AGENTS.md`.
 
-**Cross-phase inputs available to healing mods:**
+**Cross-phase inputs available to healing migs:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
 
-**Environment variables injected by the node agent for healing mods:**
+**Environment variables injected by the node agent for healing migs:**
 - `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
 - `PLOY_BUILDGATE_REF` — Git ref for Build Gate baseline (base_ref or commit_sha)
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
@@ -134,7 +134,7 @@ Cross-reference: `docs/testing-workflow.md` and `AGENTS.md`.
 
 **Generating diff patches for Build Gate verification (legacy healers only):**
 
-Legacy (non-Codex) healing mods may optionally generate unified diff patches and
+Legacy (non-Codex) healing migs may optionally generate unified diff patches and
 use the repo+diff Build Gate API for mid-healing verification. This avoids
 shipping full workspace archives over HTTP:
 
@@ -145,11 +145,11 @@ shipping full workspace archives over HTTP:
 
 2. Optionally call the Build Gate HTTP API directly (for non-Codex healers) using the injected `PLOY_*` env vars if you need mid-healing verification.
 
-Example healing spec block (Codex workspace diff handshake, single mod):
+Example healing spec block (Codex workspace diff handshake, single mig):
 ```yaml
 build_gate_healing:
   retries: 1
-  mod:
+  mig:
     image: docker.io/you/migs-codex:latest
     env:
       CODEX_PROMPT: |-
@@ -171,7 +171,7 @@ Run the failing→healing scenario with a single script:
   - It submits:
     - `--repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
     - `--repo-base-ref e2e/fail-missing-symbol`
-    - `--repo-target-ref mods-upgrade-java17-heal`
+    - `--repo-target-ref migs-upgrade-java17-heal`
     - `--spec tests/e2e/migs/scenario-orw-fail/mig.yaml`
     - `--follow --artifact-dir ./tmp/migs/scenario-orw-fail/<ts>`
 
@@ -183,7 +183,7 @@ What to verify:
 When `migs-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
 
 Cross-phase inputs are mounted at `/in` (read-only):
-- `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
+- `/in/build-gate.log` — First Build Gate failure log, available for healing migs to reference
 - `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
 
 What to expect with the provided E2E images:
@@ -300,7 +300,7 @@ Stack resolution rules (from `internal/workflow/contracts/job_image.go`):
 
 Example stack-aware spec:
 ```yaml
-mod:
+mig:
   image:
     default: docker.io/user/migs-orw-maven:latest
     java-maven: docker.io/user/migs-orw-maven:latest

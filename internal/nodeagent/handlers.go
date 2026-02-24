@@ -22,15 +22,15 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 // access. The typed options include:
 //
 //   - BuildGate: enabled flag and image overrides for gate validation.
-//   - Healing: heal → re-gate loop policy (retries, healing mod spec).
+//   - Healing: heal → re-gate loop policy (retries, healing mig spec).
 //   - MRWiring: GitLab PAT, domain, and MR creation triggers (mr_on_success, mr_on_fail).
 //   - Execution: container image, command, and retention settings.
 //   - Artifacts: artifact name and workspace-relative paths to upload.
 //   - ServerMetadata: server-injected job ID for upload correlation.
-//   - Steps: multi-step mods array for sequential execution.
+//   - Steps: multi-step migs array for sequential execution.
 //
 // JobType field:
-//   - Identifies the job type: "pre_gate", "mod", "post_gate", "heal", "re_gate".
+//   - Identifies the job type: "pre_gate", "mig", "post_gate", "heal", "re_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
 	RunID   types.RunID     `json:"run_id,omitempty"`
@@ -43,7 +43,7 @@ type StartRunRequest struct {
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
-	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
+	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate, heal, re_gate
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
 	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")

@@ -20,9 +20,9 @@ import (
 //
 // v1 contract:
 // - Submits a single-repo run via POST /v1/runs.
-// - Creates a mod project as a side-effect; mod name == mod id.
+// - Creates a mig project as a side-effect; mig name == mig id.
 // - Creates an initial spec row and sets migs.spec_id.
-// - Creates a mod repo row for the provided repo_url.
+// - Creates a mig repo row for the provided repo_url.
 // - Creates a run and starts execution immediately.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
@@ -82,7 +82,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			return
 		}
 
-		// v1 side-effect: Create mod project with name == id
+		// v1 side-effect: Create mig project with name == id
 		modID := domaintypes.NewMigID()
 		if _, err := st.CreateMig(r.Context(), store.CreateMigParams{
 			ID:        modID,
@@ -90,12 +90,12 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			SpecID:    &createdSpec.ID,
 			CreatedBy: req.CreatedBy,
 		}); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create mod: %v", err)
-			slog.Error("create single-repo run: create mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to create mig: %v", err)
+			slog.Error("create single-repo run: create mig failed", "mig_id", modID, "err", err)
 			return
 		}
 
-		// Create mod repo for the provided repo_url
+		// Create mig repo for the provided repo_url
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(req.RepoURL.String())
 		modRepoID := domaintypes.NewMigRepoID()
 		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
@@ -106,8 +106,8 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
-			slog.Error("create single-repo run: create mod repo failed", "mig_id", modID, "repo_url", req.RepoURL, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
+			slog.Error("create single-repo run: create mig repo failed", "mig_id", modID, "repo_url", req.RepoURL, "err", err)
 			return
 		}
 

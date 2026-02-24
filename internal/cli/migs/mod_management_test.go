@@ -28,24 +28,24 @@ func TestAddModCommand_Run(t *testing.T) {
 	}{
 		{
 			name:       "successful create without spec",
-			modName:    "test-mod",
+			modName:    "test-mig",
 			spec:       nil,
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
 				ID:        types.MigID("mod001"),
-				Name:      "test-mod",
+				Name:      "test-mig",
 				SpecID:    nil,
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
 			name:       "successful create with spec",
-			modName:    "test-mod-with-spec",
+			modName:    "test-mig-with-spec",
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
 				ID:        types.MigID("mod002"),
-				Name:      "test-mod-with-spec",
+				Name:      "test-mig-with-spec",
 				SpecID:    specIDPtr(types.SpecID("spec-001")),
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
@@ -58,7 +58,7 @@ func TestAddModCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "missing client",
-			modName:     "test-mod",
+			modName:     "test-mig",
 			wantErr:     true,
 			wantErrText: "http client required",
 		},
@@ -135,12 +135,12 @@ func TestListMigsCommand_Run(t *testing.T) {
 		wantCount  int
 	}{
 		{
-			name:   "list mods with results",
+			name:   "list migs with results",
 			limit:  50,
 			offset: 0,
 			serverResp: []ModSummary{
-				{ID: types.MigID("mod001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: types.MigID("mod002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+				{ID: types.MigID("mod001"), Name: "mig-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: types.MigID("mod002"), Name: "mig-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 			wantCount: 2,
 		},
@@ -211,15 +211,15 @@ func TestRemoveModCommand_Run(t *testing.T) {
 			statusCode: http.StatusNoContent,
 		},
 		{
-			name:        "mod not found",
+			name:        "mig not found",
 			modID:       "nonexistent",
 			statusCode:  http.StatusNotFound,
 			wantErr:     true,
 			wantErrText: "not found",
 		},
 		{
-			name:        "mod has runs",
-			modID:       "mod-with-runs",
+			name:        "mig has runs",
+			modID:       "mig-with-runs",
 			statusCode:  http.StatusConflict,
 			wantErr:     true,
 			wantErrText: "existing runs",
@@ -287,7 +287,7 @@ func TestArchiveMigCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
 		}
 
-		resp := ArchiveMigResult{ID: types.MigID("mod001"), Name: "test-mod", Archived: true}
+		resp := ArchiveMigResult{ID: types.MigID("mod001"), Name: "test-mig", Archived: true}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -322,7 +322,7 @@ func TestUnarchiveMigCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
 		}
 
-		resp := UnarchiveMigResult{ID: types.MigID("mod001"), Name: "test-mod", Archived: false}
+		resp := UnarchiveMigResult{ID: types.MigID("mod001"), Name: "test-mig", Archived: false}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))

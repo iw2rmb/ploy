@@ -18,7 +18,7 @@
 #     --spec tests/e2e/migs/scenario-stack-aware-images/mig.yaml \
 #     --follow
 
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 steps:

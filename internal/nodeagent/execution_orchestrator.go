@@ -3,7 +3,7 @@
 // This file owns executeRun, the main entry point for executing a single run.
 // It coordinates runtime initialization and dispatches to specialized job
 // handlers based on job type. Job implementations live in:
-//   - execution_orchestrator_jobs.go — mod and healing jobs + standard executor
+//   - execution_orchestrator_jobs.go — mig and healing jobs + standard executor
 //   - execution_orchestrator_gate.go — gate validation jobs
 package nodeagent
 
@@ -22,15 +22,15 @@ import (
 )
 
 // executeRun orchestrates job execution based on job type.
-// Dispatches to specialized handlers: gate jobs, mod jobs, or healing jobs.
+// Dispatches to specialized handlers: gate jobs, mig jobs, or healing jobs.
 //
 // Job types:
 //   - pre_gate, post_gate, re_gate: Run build gate validation
-//   - mod: Run container with mod execution
+//   - mig: Run container with mig execution
 //   - heal: Run healing container after gate failure
 //
 // Each job is atomic - there's no multi-step loop. The server creates
-// individual jobs (pre-gate, mod-0, ..., post-gate) and nodes execute
+// individual jobs (pre-gate, mig-0, ..., post-gate) and nodes execute
 // them independently. Healing jobs are created by the server when
 // gates fail, not run inline by the node.
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
@@ -103,7 +103,7 @@ func inferJobTypeFromJobName(jobName string) types.JobType {
 		return types.JobTypeReGate
 	case strings.HasPrefix(name, "heal-"):
 		return types.JobTypeHeal
-	case strings.HasPrefix(name, "mod-"):
+	case strings.HasPrefix(name, "mig-"):
 		return types.JobTypeMod
 	case strings.EqualFold(name, "mr"):
 		return types.JobTypeMR
@@ -112,24 +112,24 @@ func inferJobTypeFromJobName(jobName string) types.JobType {
 	}
 }
 
-// modStepIndexFromJobName derives the mod step index from server-created job names.
-// Expected shape is "mod-N". For single-step runs without an indexed name, returns 0.
+// modStepIndexFromJobName derives the mig step index from server-created job names.
+// Expected shape is "mig-N". For single-step runs without an indexed name, returns 0.
 func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
 	name := strings.TrimSpace(jobName)
 	if stepsLen <= 1 {
 		return 0, nil
 	}
 
-	if !strings.HasPrefix(name, "mod-") {
-		return 0, fmt.Errorf("mod job_name must start with mod- for multi-step runs, got %q", name)
+	if !strings.HasPrefix(name, "mig-") {
+		return 0, fmt.Errorf("mig job_name must start with mig- for multi-step runs, got %q", name)
 	}
-	raw := strings.TrimPrefix(name, "mod-")
+	raw := strings.TrimPrefix(name, "mig-")
 	idx, err := strconv.Atoi(raw)
 	if err != nil {
-		return 0, fmt.Errorf("parse mod index from job_name %q: %w", name, err)
+		return 0, fmt.Errorf("parse mig index from job_name %q: %w", name, err)
 	}
 	if idx < 0 || idx >= stepsLen {
-		return 0, fmt.Errorf("mod index out of range for job_name %q: idx=%d steps_len=%d", name, idx, stepsLen)
+		return 0, fmt.Errorf("mig index out of range for job_name %q: idx=%d steps_len=%d", name, idx, stepsLen)
 	}
 	return idx, nil
 }
@@ -213,9 +213,9 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	return runner, diffGenerator, logStreamer, nil
 }
 
-// mergeExecutionResults aggregates gate history across phases (pre-mod + per-step)
+// mergeExecutionResults aggregates gate history across phases (pre-mig + per-step)
 // while keeping the latest step.Result for terminal status reporting.
-// - PreGate is preserved from the accumulator when present (pre-mod gate).
+// - PreGate is preserved from the accumulator when present (pre-mig gate).
 // - ReGates are appended in call order to accumulate healing re-gates.
 func mergeExecutionResults(acc executionResult, next executionResult) executionResult {
 	merged := executionResult{
@@ -224,7 +224,7 @@ func mergeExecutionResults(acc executionResult, next executionResult) executionR
 		ReGates: acc.ReGates,
 	}
 
-	// If there is no pre-mod gate recorded yet, fall back to the next result's PreGate.
+	// If there is no pre-mig gate recorded yet, fall back to the next result's PreGate.
 	if merged.PreGate == nil && next.PreGate != nil {
 		merged.PreGate = next.PreGate
 	}
@@ -237,7 +237,7 @@ func mergeExecutionResults(acc executionResult, next executionResult) executionR
 	return merged
 }
 
-// jobExecutionContext holds runtime components initialized for a mod/heal job.
+// jobExecutionContext holds runtime components initialized for a mig/heal job.
 type jobExecutionContext struct {
 	runner        step.Runner
 	diffGenerator step.DiffGenerator

@@ -34,9 +34,9 @@ type ClaimResponse struct {
 	Name      *string          `json:"name,omitempty"`
 	RepoID    types.MigRepoID  `json:"repo_id"`   // Repo ID (NanoID identifying the repo execution)
 	JobID     types.JobID      `json:"job_id"`    // Claimed job ID
-	JobName   string           `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
-	JobType   types.JobType    `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
-	JobImage  string           `json:"job_image"` // Container image for mod/heal jobs
+	JobName   string           `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
+	JobType   types.JobType    `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+	JobImage  string           `json:"job_image"` // Container image for mig/heal jobs
 	NextID    *types.JobID     `json:"next_id"`
 	RepoURL   types.RepoURL    `json:"repo_url"`
 	Status    string           `json:"status"`

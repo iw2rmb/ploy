@@ -78,7 +78,7 @@ Role model (bearer token claims):
 - `worker` — node agent role. Used by nodes after bootstrap to authenticate with the control plane.
 - `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
-  reads this to populate the `Submitter` field when creating mod runs via `ploy mig run`.
+  reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (example: `ghcr.io/iw2rmb`).
 - `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
@@ -87,36 +87,36 @@ Role model (bearer token claims):
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix (e.g., `docker.io/org` or `ghcr.io/org`).
   Takes effect only when `DOCKERHUB_USERNAME` is unset.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
-  plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
+  plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
-- Cross-phase input directory: `/in` is mounted read-only for healing mods (e.g., `mods-codex`).
+- Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
-- `--spec` — Path to a YAML/JSON spec file for `ploy mig run` defining mod parameters,
+- `--spec` — Path to a YAML/JSON spec file for `ploy mig run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `mods[]` — Multi-step spec steps (each with its own image/command/env/retain_container)
+  - `migs[]` — Multi-step spec steps (each with its own image/command/env/retain_container)
   - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
 - `--name` — Creates a **batch run** with the given name (no repository attached yet).
-  Used with `mod run repo add` to attach multiple repositories under a shared spec.
-  Example: `ploy mig run --spec mod.yaml --name my-batch` followed by
+  Used with `mig run repo add` to attach multiple repositories under a shared spec.
+  Example: `ploy mig run --spec mig.yaml --name my-batch` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
-  - `mod` — Single healing mod (container with image/command/env/retain)
-  - After each healing attempt, the Build Gate is re-run; on pass, the main mod proceeds
+  - `mig` — Single healing mig (container with image/command/env/retain)
+  - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
-  - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods
+  - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 
 ## Healing Container Environment
 
 The node agent injects the following environment variables into healing containers to support
-Build Gate verification. These vars enable healing mods to derive the same Git baseline used
+Build Gate verification. These vars enable healing migs to derive the same Git baseline used
 by the Mods run.
 
 Repo metadata (injected from StartRunRequest):
@@ -361,8 +361,8 @@ Precedence at server startup:
 the config file are treated as unset unless the environment variable is actually present.
 
 - `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
-  and healing mods) to. When set on the node, the node agent's Docker runtime uses this network
-  so containers (e.g., `mods-codex`) can reach the control-plane service by its Docker network
+  and healing migs) to. When set on the node, the node agent's Docker runtime uses this network
+  so containers (e.g., `migs-codex`) can reach the control-plane service by its Docker network
   hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
   network is used.
 
@@ -404,8 +404,8 @@ Use the `ploy config env` subcommands to manage global environment variables:
 # Set a CA certificate bundle (injected into all job types)
 ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
 
-# Set Codex auth credentials (injected only into mod and post_gate jobs)
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
+# Set Codex auth credentials (injected only into mig and post_gate jobs)
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs
 
 # Set OpenAI API key (injected into all jobs)
 ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
@@ -426,8 +426,8 @@ The `scope` parameter controls which job types receive each variable:
 
 | Scope | Job Types | Use Case |
 |-------|-----------|----------|
-| `all` | Every job type (mod, heal, pre_gate, re_gate, post_gate) | Credentials needed everywhere (CA certs, API keys) |
-| `mods` | `mod`, `post_gate` | Credentials for code modification phases |
+| `all` | Every job type (mig, heal, pre_gate, re_gate, post_gate) | Credentials needed everywhere (CA certs, API keys) |
+| `migs` | `mig`, `post_gate` | Credentials for code modification phases |
 | `heal` | `heal`, `re_gate` | Credentials specific to healing/retry phases |
 | `gate` | `pre_gate`, `re_gate`, `post_gate` | Credentials for gate execution phases |
 
@@ -450,15 +450,15 @@ The `scope` parameter controls which job types receive each variable:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `CA_CERTS_PEM_BUNDLE` | ORW mods, build-gate, custom mods | PEM-encoded CA certificates installed into the container's trust store |
-| `CODEX_AUTH_JSON` | `mod-codex` | JSON credentials written to `/root/.codex/auth.json` at container startup |
-| `OPENAI_API_KEY` | Future OpenAI-integrated mods | API key for LLM operations |
+| `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
+| `CODEX_AUTH_JSON` | `mig-codex` | JSON credentials written to `/root/.codex/auth.json` at container startup |
+| `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle), `orw-gradle` | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle), `orw-gradle` | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
 
 ### How Official Images Consume These Variables
 
-**Codex images (`mod-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
+**Codex images (`mig-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
 present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
 
 **Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:

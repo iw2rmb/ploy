@@ -23,7 +23,7 @@ import (
 func TestCompleteJob_Success(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult:        f.Job,
@@ -49,7 +49,7 @@ func TestCompleteJob_Success(t *testing.T) {
 func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult:        f.Job,
@@ -275,7 +275,7 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult:        f.Job,
@@ -307,7 +307,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult:        f.Job,
@@ -340,7 +340,7 @@ func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult:        f.Job,
@@ -418,7 +418,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 func TestCompleteJob_NotRunning(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	f.Job.Status = store.JobStatusCreated
 
 	st := &mockStore{
@@ -442,7 +442,7 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 func TestCompleteJob_InvalidStatus(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	handler := completeJobHandler(&mockStore{}, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "running"}))
@@ -456,7 +456,7 @@ func TestCompleteJob_InvalidStatus(t *testing.T) {
 func TestCompleteJob_MissingStatus(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	handler := completeJobHandler(&mockStore{}, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{}))
@@ -470,7 +470,7 @@ func TestCompleteJob_MissingStatus(t *testing.T) {
 func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -495,7 +495,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 func TestCompleteJob_JobNotFound(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{getJobErr: pgx.ErrNoRows}
 
 	handler := completeJobHandler(st, nil)
@@ -512,7 +512,7 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 2000)
+	f := newJobFixture("mig", 2000)
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 
 	st := &mockStore{
@@ -544,7 +544,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 		t.Fatal("expected LastError to be set")
 	}
 	msg := *st.updateRunRepoErrorParams.LastError
-	for _, want := range []string{"mod-0", "exit code 137", "out of memory"} {
+	for _, want := range []string{"mig-0", "exit code 137", "out of memory"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %s", want, msg)
 		}

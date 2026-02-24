@@ -89,8 +89,8 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	started := time.Now().Add(-1500 * time.Millisecond).UTC()
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
 		JobID:       jobID,
-		Name:        "mod-0",
-		JobType:     "mod",
+		Name:        "mig-0",
+		JobType:     "mig",
 		JobImage:    "ubuntu:latest",
 		NodeID:      &nodeID,
 		Status:      store.JobStatusRunning,
@@ -104,7 +104,7 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	if strings.Contains(s, "human-label-should-not-render") {
 		t.Fatalf("render output included DisplayName, output=%q", s)
 	}
-	if strings.Contains(s, "mod-0") {
+	if strings.Contains(s, "mig-0") {
 		t.Fatalf("render output included job name, output=%q", s)
 	}
 	if !strings.Contains(s, "Repos: 1") {
@@ -119,7 +119,7 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	if strings.Contains(s, "Index") || strings.Contains(s, "NodeID") || strings.Contains(s, "Status") {
 		t.Fatalf("render output included legacy header columns, output=%q", s)
 	}
-	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("⣾") + `\s+mod\s+` + regexp.QuoteMeta(jobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
+	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("⣾") + `\s+mig\s+` + regexp.QuoteMeta(jobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
 	if !want.MatchString(s) {
 		t.Fatalf("render output missing expected job row, output=%q", s)
 	}

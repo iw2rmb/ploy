@@ -79,7 +79,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("expected compilation error in build-gate.log, got:\n%s", string(b))
 	}
 
-	// Build mods-codex image (tag: migs-codex:latest).
+	// Build migs-codex image (tag: migs-codex:latest).
 	_, _ = mustRun(t, "docker", "build", "-t", "migs-codex:latest", "-f", filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "Dockerfile"), repoRoot)
 
 	// Prepare prompt using sentinel protocol. Codex does NOT have access to
@@ -106,7 +106,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if strings.TrimSpace(auth) == "" {
 		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
 	}
-	// Run mod-codex; map workspace to the same absolute path inside container.
+	// Run mig-codex; map workspace to the same absolute path inside container.
 	// Inject repo metadata env vars for context; Build Gate is run externally (not by Codex).
 	run := exec.Command("docker", "run", "--rm",
 		"-e", "CODEX_AUTH_JSON="+auth,
@@ -122,7 +122,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		"--input", ws, "--out", "/out", "--prompt-file", filepath.Join(ws, "prompt.txt"),
 	)
 	if out, err := run.CombinedOutput(); err != nil {
-		t.Fatalf("mod-codex container failed: %v\n%s", err, string(out))
+		t.Fatalf("mig-codex container failed: %v\n%s", err, string(out))
 	}
 
 	// Assertions

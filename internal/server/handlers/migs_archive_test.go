@@ -18,16 +18,16 @@ import (
 // PATCH /v1/migs/{mig_ref}/archive — Archive Mig
 // =============================================================================
 
-// TestMods_Archive_Success verifies PATCH /v1/migs/{mig_ref}/archive archives a mod.
-// Tests mod archiving to prevent execution.
+// TestMods_Archive_Success verifies PATCH /v1/migs/{mig_ref}/archive archives a mig.
+// Tests mig archiving to prevent execution.
 func TestMods_Archive_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false}, // Not archived.
 		},
-		// No runs/jobs for this mod.
+		// No runs/jobs for this mig.
 		listRunsResult: []store.Run{},
 	}
 	handler := archiveMigHandler(st)
@@ -72,7 +72,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Already archived.
 		},
 	}
@@ -89,7 +89,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
 	if st.archiveMigCalled {
-		t.Error("store.ArchiveMig should not be called for already-archived mod")
+		t.Error("store.ArchiveMig should not be called for already-archived mig")
 	}
 }
 
@@ -118,10 +118,10 @@ func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
-		// A run exists for this mod.
+		// A run exists for this mig.
 		listRunsResult: []store.Run{
 			{ID: "run1", MigID: "mod123"},
 		},
@@ -154,7 +154,7 @@ func TestMods_Archive_RefusesWithQueuedJobs(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		listRunsResult: []store.Run{
@@ -183,7 +183,7 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		listRunsResult: []store.Run{
@@ -213,13 +213,13 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 func TestMods_Archive_ByName(t *testing.T) {
 	st := &mockStore{
 		getModErr:          pgx.ErrNoRows,
-		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mod", ArchivedAt: pgtype.Timestamptz{Valid: false}},
+		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig", ArchivedAt: pgtype.Timestamptz{Valid: false}},
 		listRunsResult:     []store.Run{},
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/my-mod/archive", nil)
-	req.SetPathValue("mig_ref", "my-mod")
+	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/my-mig/archive", nil)
+	req.SetPathValue("mig_ref", "my-mig")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -240,7 +240,7 @@ func TestMods_Archive_StoreError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		listRunsResult: []store.Run{},
@@ -263,13 +263,13 @@ func TestMods_Archive_StoreError(t *testing.T) {
 // PATCH /v1/migs/{mig_ref}/unarchive — Unarchive Mig
 // =============================================================================
 
-// TestMods_Unarchive_Success verifies PATCH /v1/migs/{mig_ref}/unarchive unarchives a mod.
-// Tests mod unarchiving to allow execution again.
+// TestMods_Unarchive_Success verifies PATCH /v1/migs/{mig_ref}/unarchive unarchives a mig.
+// Tests mig unarchiving to allow execution again.
 func TestMods_Unarchive_Success(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Archived.
 		},
 	}
@@ -312,7 +312,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false}, // Not archived.
 		},
 	}
@@ -329,7 +329,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
 	if st.unarchiveMigCalled {
-		t.Error("store.UnarchiveMig should not be called for already-unarchived mod")
+		t.Error("store.UnarchiveMig should not be called for already-unarchived mig")
 	}
 }
 
@@ -356,7 +356,7 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 	st := &mockStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
-			Name:       "test-mod",
+			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
 		unarchiveMigErr: errors.New("database connection failed"),

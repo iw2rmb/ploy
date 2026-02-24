@@ -3,11 +3,11 @@
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
 #     --repo-base-ref e2e/fail-missing-symbol \
-#     --repo-target-ref mods-upgrade-java17-heal \
+#     --repo-target-ref migs-upgrade-java17-heal \
 #     --spec tests/e2e/migs/scenario-orw-fail/mig.yaml \
 #     --follow
 
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 steps:

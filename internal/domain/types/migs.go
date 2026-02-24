@@ -8,9 +8,9 @@ import (
 // JobType identifies the job phase in the Migs pipeline.
 //
 // Known values:
-//   - JobTypePreGate: pre-mod Build Gate
-//   - JobTypeMod: main mod execution
-//   - JobTypePostGate: post-mod Build Gate
+//   - JobTypePreGate: pre-mig Build Gate
+//   - JobTypeMod: main mig execution
+//   - JobTypePostGate: post-mig Build Gate
 //   - JobTypeHeal: healing after gate failure
 //   - JobTypeReGate: re-run Build Gate after healing
 //   - JobTypeMR: post-run MR creation job
@@ -21,7 +21,7 @@ type JobType string
 
 const (
 	JobTypePreGate  JobType = "pre_gate"
-	JobTypeMod      JobType = "mod"
+	JobTypeMod      JobType = "mig"
 	JobTypePostGate JobType = "post_gate"
 	JobTypeHeal     JobType = "heal"
 	JobTypeReGate   JobType = "re_gate"

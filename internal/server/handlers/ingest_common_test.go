@@ -141,21 +141,21 @@ func TestParseParam(t *testing.T) {
 		t.Parallel()
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req.SetPathValue("mig_ref", "my-mod")
+		req.SetPathValue("mig_ref", "my-mig")
 		ref, err := parseParam[domaintypes.MigRef](req, "mig_ref")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if ref != domaintypes.MigRef("my-mod") {
-			t.Errorf("ref = %q, want %q", ref, "my-mod")
+		if ref != domaintypes.MigRef("my-mig") {
+			t.Errorf("ref = %q, want %q", ref, "my-mig")
 		}
 
 		// Invalid chars
 		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req2.SetPathValue("mig_ref", "my/mod")
+		req2.SetPathValue("mig_ref", "my/mig")
 		_, err = parseParam[domaintypes.MigRef](req2, "mig_ref")
 		if err == nil {
-			t.Error("expected error for invalid mod ref")
+			t.Error("expected error for invalid mig ref")
 		}
 	})
 

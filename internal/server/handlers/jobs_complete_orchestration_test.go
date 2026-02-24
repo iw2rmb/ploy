@@ -26,7 +26,7 @@ import (
 func TestCompleteJob_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	now := time.Now()
 
 	repoID := domaintypes.NewMigRepoID()
@@ -51,9 +51,9 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 				RepoID:      repoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusSuccess,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 1000),
 			},
 		},
@@ -183,7 +183,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 }
 
 // TestCompleteJob_ModFailureCancelsRemainingJobs verifies that when a non-gate
-// mod job fails, remaining non-terminal jobs are canceled so the run can
+// mig job fails, remaining non-terminal jobs are canceled so the run can
 // transition to a terminal state instead of leaving jobs stranded.
 func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
@@ -197,7 +197,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	f.Job.Attempt = 1
 	f.Job.Meta = []byte(`{}`)
 
-	// Jobs: pre-gate succeeded, mod failed, post-gate created.
+	// Jobs: pre-gate succeeded, mig failed, post-gate created.
 	jobs := []store.Job{
 		{
 			ID:          domaintypes.NewJobID(),
@@ -231,7 +231,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			ID:     f.RunID,
 			Status: store.RunStatusStarted,
 		},
-		getJobResult:                   jobs[1], // mod job
+		getJobResult:                   jobs[1], // mig job
 		listJobsByRunResult:            jobs,
 		listJobsByRunRepoAttemptResult: jobs,
 	}
@@ -248,12 +248,12 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify UpdateJobCompletion was called for the mod job.
+	// Verify UpdateJobCompletion was called for the mig job.
 	if !st.updateJobCompletionCalled {
 		t.Fatal("expected UpdateJobCompletion to be called")
 	}
 	if st.updateJobCompletionParams.ID != jobs[1].ID {
-		t.Fatalf("expected UpdateJobCompletion for mod job, got %v", st.updateJobCompletionParams.ID)
+		t.Fatalf("expected UpdateJobCompletion for mig job, got %v", st.updateJobCompletionParams.ID)
 	}
 
 	// Verify UpdateJobStatus was called to cancel the post-gate job.
@@ -388,7 +388,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		RepoID:      repoID,
 		RepoBaseRef: "main",
 		Attempt:     1,
-		Name:        "mod-0",
+		Name:        "mig-0",
 		Status:      store.JobStatusCreated,
 		JobType:     domaintypes.JobTypeMod.String(),
 		Meta:        []byte(`{}`),

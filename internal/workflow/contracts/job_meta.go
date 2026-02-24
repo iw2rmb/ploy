@@ -12,13 +12,13 @@ import (
 )
 
 // JobKind identifies the execution type for a job in the unified queue.
-// All execution units (mods, gates, builds, healers) are now stored in
+// All execution units (migs, gates, builds, healers) are now stored in
 // the jobs table with their kind indicated by this field.
 type JobKind string
 
 const (
-	// JobKindMod indicates a mod execution job (pre_gate, mod, post_gate, heal, re_gate).
-	JobKindMod JobKind = "mod"
+	// JobKindMod indicates a mig execution job (pre_gate, mig, post_gate, heal, re_gate).
+	JobKindMod JobKind = "mig"
 	// JobKindGate indicates a build gate validation job.
 	JobKindGate JobKind = "gate"
 	// JobKindBuild indicates a build tool invocation job (maven, gradle, npm, etc.).
@@ -36,7 +36,7 @@ func (k JobKind) Valid() bool {
 }
 
 // JobMeta is the structured metadata stored in jobs.meta JSONB.
-// It provides a unified schema for gate, build, and mod metadata,
+// It provides a unified schema for gate, build, and mig metadata,
 // enabling the jobs table to serve as the single execution primitive
 // for all workflow stages.
 //
@@ -50,9 +50,9 @@ func (k JobKind) Valid() bool {
 //
 // The kind field is always present and determines which optional
 // metadata section (gate/build) is populated. Mod jobs typically
-// have kind="mod" with no gate or build metadata.
+// have kind="mig" with no gate or build metadata.
 type JobMeta struct {
-	// Kind identifies the job type: "mod", "gate", or "build".
+	// Kind identifies the job type: "mig", "gate", or "build".
 	Kind JobKind `json:"kind"`
 
 	// Gate contains build gate validation metadata when Kind is JobKindGate.
@@ -64,12 +64,12 @@ type JobMeta struct {
 	Build *BuildMeta `json:"build,omitempty"`
 
 	// ModsStepName stores the user-defined step name from ModsSpec.Steps[i].Name
-	// for mod jobs. Used by the CLI to display a friendly name in --follow mode.
-	// Only populated for mod jobs (kind="mod") when a step name is provided.
+	// for mig jobs. Used by the CLI to display a friendly name in --follow mode.
+	// Only populated for mig jobs (kind="mig") when a step name is provided.
 	ModsStepName string `json:"mods_step_name,omitempty"`
 
-	// ActionSummary is a short one-line description of what the healing mod did,
-	// produced by the healing container. Only allowed for mod jobs (kind="mod").
+	// ActionSummary is a short one-line description of what the healing mig did,
+	// produced by the healing container. Only allowed for mig jobs (kind="mig").
 	// Max 200 chars, no newlines.
 	ActionSummary string `json:"action_summary,omitempty"`
 }
@@ -106,7 +106,7 @@ func (m JobMeta) Validate() error {
 			return fmt.Errorf("gate metadata invalid: %w", err)
 		}
 	}
-	// ActionSummary is only valid for mod jobs.
+	// ActionSummary is only valid for mig jobs.
 	if m.ActionSummary != "" {
 		if m.Kind != JobKindMod {
 			return fmt.Errorf("action_summary present but kind is %q (only allowed for %q)", m.Kind, JobKindMod)
@@ -161,7 +161,7 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 		return nil, fmt.Errorf("unmarshal job meta: %w", err)
 	}
 
-	// Require explicit kind field - no defaulting to mod for legacy payloads.
+	// Require explicit kind field - no defaulting to mig for legacy payloads.
 	if m.Kind == "" {
 		return nil, fmt.Errorf("job meta missing required 'kind' field; must be one of: %q, %q, %q",
 			JobKindMod, JobKindGate, JobKindBuild)
@@ -175,14 +175,14 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	return &m, nil
 }
 
-// NewModJobMeta creates a JobMeta for mod execution jobs.
-// This is a convenience constructor for the common case of mod jobs
+// NewModJobMeta creates a JobMeta for mig execution jobs.
+// This is a convenience constructor for the common case of mig jobs
 // that don't carry gate or build metadata.
 func NewModJobMeta() *JobMeta {
 	return &JobMeta{Kind: JobKindMod}
 }
 
-// NewModJobMetaWithStepName creates a JobMeta for mod execution jobs
+// NewModJobMetaWithStepName creates a JobMeta for mig execution jobs
 // with a user-defined step name. The step name is used by the CLI
 // to display a friendly name in --follow mode.
 func NewModJobMetaWithStepName(stepName string) *JobMeta {

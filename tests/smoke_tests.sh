@@ -170,8 +170,8 @@ run_cli_tests() {
         "dist/ploy help" \
         5
 
-    # Test 3: CLI mod help (shows usage even with error code; check output exists)
-    run_test "CLI: mod help" \
+    # Test 3: CLI mig help (shows usage even with error code; check output exists)
+    run_test "CLI: mig help" \
         "dist/ploy mig --help 2>&1 | grep -q 'Usage: ploy mig'" \
         5
 

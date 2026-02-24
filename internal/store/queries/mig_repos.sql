@@ -35,7 +35,7 @@ WHERE id = $1;
 
 -- name: UpsertMigRepo :one
 -- Bulk upsert a mod_repo by normalized repo_url.
--- Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mod.
+-- Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 -- If a row exists, update refs; otherwise insert.
 INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
 VALUES ($1, $2, $3, $4, $5)

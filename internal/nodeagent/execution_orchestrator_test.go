@@ -49,12 +49,12 @@ func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
 
 // TestGateContract_OnlyPreRunGateExecuted verifies the ROADMAP Phase G gate contract:
 // - Exactly one pre-run gate is executed per run (in executeRun Phase 4a).
-// - Per-step execution only observes post-mod gates via Runner.Run.
+// - Per-step execution only observes post-mig gates via Runner.Run.
 //
 // This test tracks gate executor calls to verify:
 // 1. The pre-run gate (before step loop) executes once with phase="pre".
 // 2. Per-step gates from executeWithHealing do NOT trigger additional pre-gates.
-// 3. Only post-mod gates (phase="post") are executed per step.
+// 3. Only post-mig gates (phase="post") are executed per step.
 //
 // NOTE: This test verifies the gate contract by counting gate calls and phases.
 // The implementation relies on executeWithHealing disabling Gate.Enabled on
@@ -155,11 +155,11 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 
 	// Verify gate contract: executeWithHealing should trigger gates.
 	// Per the current implementation:
-	// - 1 pre-mod gate via runGateWithHealing(..., "pre")
-	// - 1 post-mod gate via runGateWithHealing(..., "post") (after successful container exit)
+	// - 1 pre-mig gate via runGateWithHealing(..., "pre")
+	// - 1 post-mig gate via runGateWithHealing(..., "post") (after successful container exit)
 	// Total: 2 gate calls per step.
 	//
-	// The ROADMAP Phase G goal is to have only post-mod gates per step (1 call),
+	// The ROADMAP Phase G goal is to have only post-mig gates per step (1 call),
 	// with the pre-run gate happening once in executeRun before the step loop.
 	// This test documents the current behavior; the expected count will change
 	// once the per-step pre-gate is fully disabled.
@@ -291,9 +291,9 @@ func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
 		want    int
 		wantErr bool
 	}{
-		{name: "step0", jobName: "mod-0", steps: 3, want: 0},
-		{name: "step2", jobName: "mod-2", steps: 3, want: 2},
-		{name: "single step non-indexed", jobName: "mod", steps: 1, want: 0},
+		{name: "step0", jobName: "mig-0", steps: 3, want: 0},
+		{name: "step2", jobName: "mig-2", steps: 3, want: 2},
+		{name: "single step non-indexed", jobName: "mig", steps: 1, want: 0},
 		{name: "invalid prefix", jobName: "pre-gate", steps: 2, wantErr: true},
 	}
 

@@ -8,17 +8,17 @@ import (
 	"testing"
 )
 
-// TestModShell_ExecutesScriptAndWritesReport verifies that mod-shell executes
+// TestModShell_ExecutesScriptAndWritesReport verifies that mig-shell executes
 // the requested script in the workspace and writes a run report.
 func TestModShell_ExecutesScriptAndWritesReport(t *testing.T) {
 	workspace := t.TempDir()
 	outdir := t.TempDir()
 
 	// Script that writes a marker file into the workspace.
-	scriptPath := filepath.Join(workspace, "mod-shell-script.sh")
+	scriptPath := filepath.Join(workspace, "mig-shell-script.sh")
 	script := `#!/usr/bin/env bash
 set -euo pipefail
-echo "from-mod-shell" > rewrite.yml
+echo "from-mig-shell" > rewrite.yml
 `
 	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write script: %v", err)
@@ -32,7 +32,7 @@ echo "from-mod-shell" > rewrite.yml
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("mod-shell failed: %v\nstdout/stderr:\n%s", err, string(out))
+		t.Fatalf("mig-shell failed: %v\nstdout/stderr:\n%s", err, string(out))
 	}
 
 	// Verify the script ran and produced rewrite.yml.
@@ -41,7 +41,7 @@ echo "from-mod-shell" > rewrite.yml
 	if err != nil {
 		t.Fatalf("read rewrite.yml: %v", err)
 	}
-	if !strings.Contains(string(content), "from-mod-shell") {
+	if !strings.Contains(string(content), "from-mig-shell") {
 		t.Fatalf("rewrite.yml does not contain expected content: %s", string(content))
 	}
 

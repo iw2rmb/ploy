@@ -10,7 +10,7 @@ import (
 //
 // Known values:
 //   - GlobalEnvScopeAll: Inject into every job type
-//   - GlobalEnvScopeMods: Inject into mod and post_gate jobs (code modification phases)
+//   - GlobalEnvScopeMods: Inject into mig and post_gate jobs (code modification phases)
 //   - GlobalEnvScopeHeal: Inject into heal and re_gate jobs (healing/retry phases)
 //   - GlobalEnvScopeGate: Inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
 //
@@ -21,7 +21,7 @@ type GlobalEnvScope string
 const (
 	// GlobalEnvScopeAll injects into every job type.
 	GlobalEnvScopeAll GlobalEnvScope = "all"
-	// GlobalEnvScopeMods injects into mod and post_gate jobs (modification phases).
+	// GlobalEnvScopeMods injects into mig and post_gate jobs (modification phases).
 	GlobalEnvScopeMods GlobalEnvScope = "migs"
 	// GlobalEnvScopeHeal injects into heal and re_gate jobs (healing phases).
 	GlobalEnvScopeHeal GlobalEnvScope = "heal"
@@ -69,7 +69,7 @@ func ParseGlobalEnvScope(s string) (GlobalEnvScope, error) {
 //
 // Scope semantics:
 //   - "all"  → inject into every job type
-//   - "migs" → inject into mod and post_gate jobs (code modification phases)
+//   - "migs" → inject into mig and post_gate jobs (code modification phases)
 //   - "heal" → inject into heal and re_gate jobs (healing/retry phases)
 //   - "gate" → inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
 func (s GlobalEnvScope) MatchesJobType(jobType JobType) bool {
@@ -77,7 +77,7 @@ func (s GlobalEnvScope) MatchesJobType(jobType JobType) bool {
 	case GlobalEnvScopeAll:
 		return true
 	case GlobalEnvScopeMods:
-		// Migs scope applies to mod and post_gate jobs (modification phases).
+		// Migs scope applies to mig and post_gate jobs (modification phases).
 		return jobType == JobTypeMod || jobType == JobTypePostGate
 	case GlobalEnvScopeHeal:
 		// Heal scope applies to heal and re_gate jobs (healing phases).

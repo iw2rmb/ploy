@@ -28,7 +28,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create v1 mod+spec+repo, then create a run.
+	// Step 1: Create v1 mig+spec+repo, then create a run.
 	createdBy := "integration-test"
 	modSpec := []byte(`{"type":"integration-test","description":"Happy path test"}`)
 
@@ -46,7 +46,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	modID := domaintypes.NewMigID()
 	_, err = db.CreateMig(ctx, store.CreateMigParams{
 		ID:        modID,
-		Name:      "integration-mod-" + modID.String(),
+		Name:      "integration-mig-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})

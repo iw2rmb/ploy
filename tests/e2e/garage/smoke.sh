@@ -143,7 +143,7 @@ sh -lc 'echo "[garage-smoke] start"; cd /workspace; target="\$(git ls-files | he
 EOC
 )
 
-log "Running deterministic smoke mod"
+log "Running deterministic smoke mig"
 RUN_JSON="$($REPO_ROOT/dist/ploy mig run --json \
   --repo-url "$REPO_URL" \
   --repo-base-ref main \
@@ -155,7 +155,7 @@ RUN_JSON="$($REPO_ROOT/dist/ploy mig run --json \
 
 RUN_ID="$(printf '%s' "$RUN_JSON" | jq -r '.run_id // empty')"
 if [[ -z "$RUN_ID" ]]; then
-  echo "error: could not parse run_id from mod run response" >&2
+  echo "error: could not parse run_id from mig run response" >&2
   printf '%s\n' "$RUN_JSON" >&2
   exit 1
 fi

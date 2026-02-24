@@ -5,9 +5,9 @@ post:
     Submit a single-repo run and start execution immediately.
 
     Side-effects:
-    - Creates a mod project (mod name == mod id).
-    - Creates a spec row and sets mods.spec_id.
-    - Creates a mod repo row for the provided repo_url.
+    - Creates a mig project (mig name == mig id).
+    - Creates a spec row and sets migs.spec_id.
+    - Creates a mig repo row for the provided repo_url.
     - Creates a run and run repo row and enqueues jobs.
   requestBody:
     required: true

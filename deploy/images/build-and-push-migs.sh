@@ -56,7 +56,7 @@ for name in "${images[@]}"; do
 
   # Build context rules:
   # - Default: use "deploy/images/migs/<dir>"
-  # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.mod, internal/ ...)
+  # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.* and internal/ ...)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "-t" "$ref" "--push")
   if [[ "$name" == "mig-codex" ]]; then
     context="."

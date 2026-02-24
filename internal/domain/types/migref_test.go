@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// TestModRef tests the MigRef type for mod reference validation and serialization.
+// TestModRef tests the MigRef type for mig reference validation and serialization.
 func TestModRef(t *testing.T) {
 	t.Parallel()
 
 	t.Run("String", func(t *testing.T) {
 		t.Parallel()
-		ref := MigRef("my-mod")
-		if ref.String() != "my-mod" {
-			t.Errorf("MigRef.String() = %q, want %q", ref.String(), "my-mod")
+		ref := MigRef("my-mig")
+		if ref.String() != "my-mig" {
+			t.Errorf("MigRef.String() = %q, want %q", ref.String(), "my-mig")
 		}
 	})
 
@@ -38,9 +38,9 @@ func TestModRef(t *testing.T) {
 			value   string
 			wantErr error
 		}{
-			// Valid cases: mod IDs and mod names.
+			// Valid cases: mig IDs and mig names.
 			{"valid_nanoid", "abc123", nil},
-			{"valid_name", "my-mod", nil},
+			{"valid_name", "my-mig", nil},
 			{"valid_name_underscore", "my_mod_name", nil},
 			{"valid_alphanumeric", "ModName123", nil},
 			{"valid_uuid_like", "12345678-1234-1234-1234-123456789012", nil}, // No special treatment
@@ -50,9 +50,9 @@ func TestModRef(t *testing.T) {
 			{"whitespace_only", "   ", ErrEmpty},
 
 			// Invalid: contains URL-unsafe characters.
-			{"contains_slash", "my/mod", ErrInvalidMigRef},
-			{"contains_question", "mod?name", ErrInvalidMigRef},
-			{"contains_space", "my mod", ErrInvalidMigRef},
+			{"contains_slash", "my/mig", ErrInvalidMigRef},
+			{"contains_question", "mig?name", ErrInvalidMigRef},
+			{"contains_space", "my mig", ErrInvalidMigRef},
 			{"contains_tab", "my\tmod", ErrInvalidMigRef},
 			{"contains_newline", "my\nmod", ErrInvalidMigRef},
 		}
@@ -72,7 +72,7 @@ func TestModRef(t *testing.T) {
 	t.Run("TextRoundTrip", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []string{"mod123", "my-mod", "ModName_v2"}
+		tests := []string{"mod123", "my-mig", "ModName_v2"}
 		for _, v := range tests {
 			ref := MigRef(v)
 			b, err := ref.MarshalText()
@@ -93,11 +93,11 @@ func TestModRef(t *testing.T) {
 		t.Parallel()
 
 		var ref MigRef
-		if err := ref.UnmarshalText([]byte("  my-mod  ")); err != nil {
+		if err := ref.UnmarshalText([]byte("  my-mig  ")); err != nil {
 			t.Fatalf("UnmarshalText: %v", err)
 		}
-		if ref != "my-mod" {
-			t.Errorf("got %q, want %q", ref, "my-mod")
+		if ref != "my-mig" {
+			t.Errorf("got %q, want %q", ref, "my-mig")
 		}
 	})
 
@@ -119,13 +119,13 @@ func TestModRef(t *testing.T) {
 		t.Parallel()
 
 		var ref MigRef
-		err := ref.UnmarshalText([]byte("my/mod"))
+		err := ref.UnmarshalText([]byte("my/mig"))
 		if !errors.Is(err, ErrInvalidMigRef) {
-			t.Errorf("UnmarshalText(\"my/mod\") = %v, want ErrInvalidMigRef", err)
+			t.Errorf("UnmarshalText(\"my/mig\") = %v, want ErrInvalidMigRef", err)
 		}
-		err = ref.UnmarshalText([]byte("mod?name"))
+		err = ref.UnmarshalText([]byte("mig?name"))
 		if !errors.Is(err, ErrInvalidMigRef) {
-			t.Errorf("UnmarshalText(\"mod?name\") = %v, want ErrInvalidMigRef", err)
+			t.Errorf("UnmarshalText(\"mig?name\") = %v, want ErrInvalidMigRef", err)
 		}
 	})
 
@@ -142,17 +142,17 @@ func TestModRef(t *testing.T) {
 	t.Run("TextMarshalRejectsInvalidChars", func(t *testing.T) {
 		t.Parallel()
 
-		ref := MigRef("my/mod")
+		ref := MigRef("my/mig")
 		_, err := ref.MarshalText()
 		if !errors.Is(err, ErrInvalidMigRef) {
-			t.Errorf("MarshalText(\"my/mod\") = %v, want ErrInvalidMigRef", err)
+			t.Errorf("MarshalText(\"my/mig\") = %v, want ErrInvalidMigRef", err)
 		}
 	})
 
 	t.Run("JSONRoundTrip", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []string{"mod123", "my-mod", "ModName_v2"}
+		tests := []string{"mod123", "my-mig", "ModName_v2"}
 		for _, v := range tests {
 			ref := MigRef(v)
 			b, err := json.Marshal(ref)
@@ -173,9 +173,9 @@ func TestModRef(t *testing.T) {
 		t.Parallel()
 
 		var ref MigRef
-		err := json.Unmarshal([]byte(`"my/mod"`), &ref)
+		err := json.Unmarshal([]byte(`"my/mig"`), &ref)
 		if !errors.Is(err, ErrInvalidMigRef) {
-			t.Errorf("json.Unmarshal(\"my/mod\") = %v, want ErrInvalidMigRef", err)
+			t.Errorf("json.Unmarshal(\"my/mig\") = %v, want ErrInvalidMigRef", err)
 		}
 	})
 }

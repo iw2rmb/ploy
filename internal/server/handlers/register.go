@@ -34,17 +34,17 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *b
 	s.HandleFunc("POST /v1/pki/bootstrap", bootstrapCertificateHandler(st, tokenSecret), auth.RoleWorker)
 
 	// Runs — single-repo run submission (v1 API).
-	// POST /v1/runs creates a single-repo run with automatic mod project creation.
+	// POST /v1/runs creates a single-repo run with automatic mig project creation.
 	s.HandleFunc("POST /v1/runs", createSingleRepoRunHandler(st, eventsService), auth.RoleControlPlane)
 
-	// Migs — mod project CRUD (v1 API).
-	// /v1/migs endpoints handle mod project CRUD operations.
+	// Migs — mig project CRUD (v1 API).
+	// /v1/migs endpoints handle mig project CRUD operations.
 	s.HandleFunc("POST /v1/migs", createMigHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/migs", listMigsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/migs/{mig_ref}", deleteMigHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/migs/{mig_ref}/archive", archiveMigHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("PATCH /v1/migs/{mig_ref}/unarchive", unarchiveMigHandler(st), auth.RoleControlPlane)
-	// Set mod spec (append-only specs + migs.spec_id pointer).
+	// Set mig spec (append-only specs + migs.spec_id pointer).
 	s.HandleFunc("POST /v1/migs/{mig_ref}/specs", setMigSpecHandler(st), auth.RoleControlPlane)
 	// Mig repo set management (add/list/delete + bulk CSV upsert).
 	s.HandleFunc("POST /v1/migs/{mig_id}/repos", addMigRepoHandler(st), auth.RoleControlPlane)
@@ -53,7 +53,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *b
 	s.HandleFunc("POST /v1/migs/{mig_id}/repos/bulk", bulkUpsertMigReposHandler(st), auth.RoleControlPlane)
 	// Multi-repo run submission with repo selection (all/failed/explicit).
 	s.HandleFunc("POST /v1/migs/{mig_id}/runs", createMigRunHandler(st), auth.RoleControlPlane)
-	// Pull resolution for mod repos (last-succeeded/last-failed).
+	// Pull resolution for mig repos (last-succeeded/last-failed).
 	s.HandleFunc("POST /v1/migs/{mig_id}/pull", pullMigRepoHandler(st), auth.RoleControlPlane)
 
 	// Artifact download endpoints
@@ -119,7 +119,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *b
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService), auth.RoleWorker)
 	// Job-level runtime image persistence — nodes persist the resolved container image name
-	// that will be used to execute a mod/heal job (stack-aware resolution).
+	// that will be used to execute a mig/heal job (stack-aware resolution).
 	s.HandleFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)
 
 	// NOTE: HTTP Build Gate endpoints (POST /v1/buildgate/validate, GET /v1/buildgate/jobs/{id},

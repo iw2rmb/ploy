@@ -216,16 +216,16 @@ func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes
 	drafts := []draft{{name: "pre-gate", jobType: "pre_gate"}}
 
 	if modsSpec.IsMultiStep() {
-		for i, mod := range modsSpec.Steps {
+		for i, mig := range modsSpec.Steps {
 			jobImage := ""
-			if mod.Image.Universal != "" {
-				jobImage = strings.TrimSpace(mod.Image.Universal)
+			if mig.Image.Universal != "" {
+				jobImage = strings.TrimSpace(mig.Image.Universal)
 			}
 			drafts = append(drafts, draft{
-				name:     fmt.Sprintf("mod-%d", i),
-				jobType:  "mod",
+				name:     fmt.Sprintf("mig-%d", i),
+				jobType:  "mig",
 				jobImage: jobImage,
-				stepName: mod.Name,
+				stepName: mig.Name,
 			})
 		}
 	} else {
@@ -238,8 +238,8 @@ func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes
 			stepName = modsSpec.Steps[0].Name
 		}
 		drafts = append(drafts, draft{
-			name:     "mod-0",
-			jobType:  "mod",
+			name:     "mig-0",
+			jobType:  "mig",
 			jobImage: modImage,
 			stepName: stepName,
 		})
@@ -277,7 +277,7 @@ func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes
 }
 
 func createPlannedJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
-	// Build job metadata with step name for mod jobs.
+	// Build job metadata with step name for mig jobs.
 	var meta *contracts.JobMeta
 	if planned.StepName != "" {
 		meta = contracts.NewModJobMetaWithStepName(planned.StepName)

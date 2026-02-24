@@ -97,7 +97,7 @@ func (d DiffSummary) FilesChanged() (int, bool) {
 }
 
 // JobType returns the job_type field when present.
-// Common values: "mod", "healing".
+// Common values: "mig", "healing".
 func (d DiffSummary) JobType() string {
 	acc := d.decode()
 	if acc.JobType == nil {

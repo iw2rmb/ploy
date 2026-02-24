@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -44,8 +45,11 @@ func maybeUpdateRunRepoStatus(
 	}
 
 	var (
-		tailJobs []store.Job
-		fallback *store.Job
+		tailJobs         []store.Job
+		fallback         *store.Job
+		lastByNextIDMeta *store.Job
+		maxNextIDMeta    float64
+		hasNextIDMeta    bool
 	)
 	for i := range jobs {
 		job := &jobs[i]
@@ -66,6 +70,13 @@ func maybeUpdateRunRepoStatus(
 		if fallback == nil || job.ID.String() > fallback.ID.String() {
 			fallback = job
 		}
+		if nextID, ok := nextIDFromMeta(job.Meta); ok {
+			if !hasNextIDMeta || nextID > maxNextIDMeta || (nextID == maxNextIDMeta && (lastByNextIDMeta == nil || job.ID.String() > lastByNextIDMeta.ID.String())) {
+				maxNextIDMeta = nextID
+				lastByNextIDMeta = job
+				hasNextIDMeta = true
+			}
+		}
 		if job.NextID == nil || job.NextID.IsZero() {
 			tailJobs = append(tailJobs, *job)
 		}
@@ -75,12 +86,18 @@ func maybeUpdateRunRepoStatus(
 		return false, nil
 	}
 	lastJob := fallback
+	if hasNextIDMeta && lastByNextIDMeta != nil {
+		lastJob = lastByNextIDMeta
+	}
 	if len(tailJobs) > 0 {
 		lastJob = &tailJobs[0]
 		for i := 1; i < len(tailJobs); i++ {
 			if tailJobs[i].ID.String() > lastJob.ID.String() {
 				lastJob = &tailJobs[i]
 			}
+		}
+		if hasNextIDMeta && lastByNextIDMeta != nil {
+			lastJob = lastByNextIDMeta
 		}
 	}
 
@@ -114,6 +131,30 @@ func maybeUpdateRunRepoStatus(
 	)
 
 	return true, nil
+}
+
+func nextIDFromMeta(meta []byte) (float64, bool) {
+	if len(meta) == 0 {
+		return 0, false
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(meta, &raw); err != nil {
+		return 0, false
+	}
+	v, ok := raw["next_id"]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	default:
+		return 0, false
+	}
 }
 
 // maybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when

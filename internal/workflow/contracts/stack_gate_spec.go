@@ -13,7 +13,7 @@
 //
 //	steps:
 //	  - name: java11-to-17
-//	    image: docker.io/user/mods-orw:latest
+//	    image: docker.io/user/migs-orw:latest
 //	    stack:
 //	      inbound:
 //	        enabled: true
@@ -81,15 +81,15 @@ func (p StackGatePhaseSpec) Equal(other StackGatePhaseSpec) bool {
 	return p.Expect.Equal(*other.Expect)
 }
 
-// StackGateSpec configures Stack Gate for a mod step.
-// Inbound validates pre-mod expectations; Outbound validates post-mod expectations.
+// StackGateSpec configures Stack Gate for a mig step.
+// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 type StackGateSpec struct {
-	// Inbound configures pre-mod stack validation.
-	// Validates that the repository matches expectations before the mod runs.
+	// Inbound configures pre-mig stack validation.
+	// Validates that the repository matches expectations before the mig runs.
 	Inbound *StackGatePhaseSpec `json:"inbound,omitempty" yaml:"inbound,omitempty"`
 
-	// Outbound configures post-mod stack validation.
-	// Validates that the mod produced the expected stack transformation.
+	// Outbound configures post-mig stack validation.
+	// Validates that the mig produced the expected stack transformation.
 	Outbound *StackGatePhaseSpec `json:"outbound,omitempty" yaml:"outbound,omitempty"`
 }
 

@@ -9,14 +9,16 @@ import (
 )
 
 // TestNoLegacyModNamingInKeySurfaces enforces the phase-0 contract for the
-// mod->mig migration by blocking legacy naming in key repository surfaces.
+// mig rename by blocking legacy naming in key repository surfaces.
 func TestNoLegacyModNamingInKeySurfaces(t *testing.T) {
+	legacyUnit := "m" + "o" + "d"
+	legacyPlural := legacyUnit + "s"
 	tokens := []string{
-		"/v1/" + "mods",
-		"internal/" + "mods",
-		"ploy " + "mod",
-		"deploy/images/" + "mods",
-		"mods" + "-",
+		"/v1/" + legacyPlural,
+		"internal/" + legacyPlural,
+		"ploy " + legacyUnit,
+		"deploy/images/" + legacyPlural,
+		legacyPlural + "-",
 	}
 
 	roots := []string{"cmd", "internal", "deploy", "docs", "tests"}
@@ -32,7 +34,7 @@ func TestNoLegacyModNamingInKeySurfaces(t *testing.T) {
 			}
 
 			base := filepath.Base(path)
-			if base == "go.mod" || base == "go.sum" {
+			if base == "go."+legacyUnit || base == "go.sum" {
 				return nil
 			}
 

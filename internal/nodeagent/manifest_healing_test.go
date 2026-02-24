@@ -21,7 +21,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 	tests := []struct {
 		name      string
 		req       StartRunRequest
-		mod       ModContainerSpec
+		mig       ModContainerSpec
 		wantEnv   map[string]string
 		wantAbsnt []string // keys that should NOT be present
 	}{
@@ -35,7 +35,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				TargetRef: types.GitRef("e2e/fail-missing-symbol"),
 				CommitSHA: types.CommitSHA("abc123def456"),
 			},
-			mod: ModContainerSpec{
+			mig: ModContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -53,7 +53,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("develop"),
 			},
-			mod: ModContainerSpec{
+			mig: ModContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -72,7 +72,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				TargetRef: types.GitRef("   "), // whitespace only
 				CommitSHA: types.CommitSHA(""),
 			},
-			mod: ModContainerSpec{
+			mig: ModContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -81,14 +81,14 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			wantAbsnt: []string{"PLOY_BASE_REF", "PLOY_TARGET_REF", "PLOY_COMMIT_SHA"},
 		},
 		{
-			name: "mod env is preserved alongside repo metadata",
+			name: "mig env is preserved alongside repo metadata",
 			req: StartRunRequest{
 				RunID:   types.RunID("test-run-4"),
 				JobID:   types.JobID("test-job-4"),
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
-			mod: ModContainerSpec{
+			mig: ModContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"CUSTOM_VAR":   "custom_value",
@@ -105,14 +105,14 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			},
 		},
 		{
-			name: "mod env can override repo metadata if specified",
+			name: "mig env can override repo metadata if specified",
 			req: StartRunRequest{
 				RunID:   types.RunID("test-run-5"),
 				JobID:   types.JobID("test-job-5"),
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
-			mod: ModContainerSpec{
+			mig: ModContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"PLOY_REPO_URL": "https://custom.override/repo.git",
@@ -120,7 +120,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			},
 			// User-specified env takes precedence; repo metadata is injected after
 			// so it overwrites user values. This is the expected behavior so that
-			// healing mods always get the correct Git baseline.
+			// healing migs always get the correct Git baseline.
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git", // request value wins
 				"PLOY_BASE_REF": "main",
@@ -133,7 +133,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 			t.Parallel()
 
 			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			manifest, err := buildHealingManifest(tc.req, tc.mod, 0, "", contracts.ModStackUnknown)
+			manifest, err := buildHealingManifest(tc.req, tc.mig, 0, "", contracts.ModStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -160,7 +160,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 	}
 }
 
-// TestBuildHealingManifest_DoesNotMutateInputEnv verifies that the mod.Env
+// TestBuildHealingManifest_DoesNotMutateInputEnv verifies that the mig.Env
 // map passed to buildHealingManifest is not mutated by the function.
 func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 	t.Parallel()
@@ -178,13 +178,13 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		CommitSHA: types.CommitSHA("sha123"),
 	}
 
-	mod := ModContainerSpec{
+	mig := ModContainerSpec{
 		Image: testJobImage("test/healer:latest"),
 		Env:   originalEnv,
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	_, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+	_, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -202,7 +202,7 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 }
 
 // TestBuildHealingManifest_NilEnvHandledGracefully verifies that a nil
-// mod.Env map does not cause panics and repo metadata is still injected.
+// mig.Env map does not cause panics and repo metadata is still injected.
 func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 	t.Parallel()
 
@@ -213,13 +213,13 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 		BaseRef: types.GitRef("main"),
 	}
 
-	mod := ModContainerSpec{
+	mig := ModContainerSpec{
 		Image: testJobImage("test/healer:latest"),
 		Env:   nil, // explicitly nil
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mod, 0, "", contracts.ModStackUnknown)
+	manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -234,23 +234,23 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 }
 
 // TestBuildHealingManifest_ValidationErrors verifies error handling for
-// invalid healing mod specifications.
+// invalid healing mig specifications.
 func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		mod     ModContainerSpec
+		mig     ModContainerSpec
 		wantErr string
 	}{
 		{
 			name:    "empty image",
-			mod:     ModContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
+			mig:     ModContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
 			wantErr: "image required",
 		},
 		{
 			name:    "whitespace only image",
-			mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "   "}},
+			mig:     ModContainerSpec{Image: contracts.JobImage{Universal: "   "}},
 			wantErr: "image required",
 		},
 	}
@@ -267,7 +267,7 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 			t.Parallel()
 
 			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			_, err := buildHealingManifest(req, tc.mod, 0, "", contracts.ModStackUnknown)
+			_, err := buildHealingManifest(req, tc.mig, 0, "", contracts.ModStackUnknown)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -300,7 +300,7 @@ func TestIsCodexHealingImage(t *testing.T) {
 		{"standard-healer", false},
 		{"ubuntu:latest", false},
 		{"maven:3.8", false},
-		{"mod-fix:latest", false},
+		{"mig-fix:latest", false},
 		{"codecov-tool", false}, // "codec" but not "codex"
 	}
 
@@ -318,51 +318,51 @@ func TestIsCodexHealingImage(t *testing.T) {
 // TestBuildHealingManifest_CodexResumeInjection verifies that CODEX_RESUME=1 is
 // injected into the healing manifest environment when:
 //  1. A non-empty codexSession is provided, AND
-//  2. The healing mod image matches the Codex pattern.
+//  2. The healing mig image matches the Codex pattern.
 //
-// Non-Codex healing mods should never receive CODEX_RESUME.
+// Non-Codex healing migs should never receive CODEX_RESUME.
 func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name         string
-		mod          ModContainerSpec
+		mig          ModContainerSpec
 		codexSession string
 		wantResume   bool // true if CODEX_RESUME=1 should be set
 	}{
 		{
 			name:         "codex image with session sets CODEX_RESUME=1",
-			mod:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
+			mig:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "session-abc-123",
 			wantResume:   true,
 		},
 		{
 			name:         "codex image without session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
+			mig:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image with session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testJobImage("standard-healer:v1")},
+			mig:          ModContainerSpec{Image: testJobImage("standard-healer:v1")},
 			codexSession: "session-xyz-456",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image without session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testJobImage("maven:3.8")},
+			mig:          ModContainerSpec{Image: testJobImage("maven:3.8")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "registry prefixed codex image with session",
-			mod:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/migs-codex:v2")},
+			mig:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/migs-codex:v2")},
 			codexSession: "session-def-789",
 			wantResume:   true,
 		},
 		{
 			name:         "case insensitive codex detection",
-			mod:          ModContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
+			mig:          ModContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
 			codexSession: "session-ghi-012",
 			wantResume:   true,
 		},
@@ -380,7 +380,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 			t.Parallel()
 
 			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			manifest, err := buildHealingManifest(req, tc.mod, 0, tc.codexSession, contracts.ModStackUnknown)
+			manifest, err := buildHealingManifest(req, tc.mig, 0, tc.codexSession, contracts.ModStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -411,7 +411,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 		BaseRef: types.GitRef("main"),
 	}
 
-	mod := ModContainerSpec{
+	mig := ModContainerSpec{
 		Image: testJobImage("migs-codex:latest"),
 		Env: map[string]string{
 			"CUSTOM_VAR": "custom_value",
@@ -420,7 +420,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 	}
 
 	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mod, 0, "session-id-123", contracts.ModStackUnknown)
+	manifest, err := buildHealingManifest(req, mig, 0, "session-id-123", contracts.ModStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}

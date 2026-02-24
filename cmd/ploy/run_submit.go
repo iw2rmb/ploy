@@ -2,8 +2,8 @@
 // for single-repo run submission via POST /v1/runs.
 //
 // This is the CLI entry point for submitting runs directly (without creating
-// a mod project first). The command creates a mod project as a side-effect;
-// the created mod has name == id.
+// a mig project first). The command creates a mig project as a side-effect;
+// the created mig has name == id.
 package main
 
 import (
@@ -295,7 +295,7 @@ func printRunSubmitUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|-> [--follow]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Submits a single-repo run and immediately starts execution.")
-	_, _ = fmt.Fprintln(w, "Creates a mod project as a side-effect; the created mod has name == id.")
+	_, _ = fmt.Fprintln(w, "Creates a mig project as a side-effect; the created mig has name == id.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Required flags:")
 	_, _ = fmt.Fprintln(w, "  --repo <url>       Git repository URL (https/ssh/file)")

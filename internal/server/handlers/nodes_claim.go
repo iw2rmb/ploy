@@ -34,7 +34,7 @@ import (
 // - target_ref: from run_repos.repo_target_ref (snapshot at run_repos creation)
 //
 // Jobs are claimed from a single unified queue. There is no
-// separate Build Gate queue or claim path — all job types (pre-gate, mod, heal,
+// separate Build Gate queue or claim path — all job types (pre-gate, mig, heal,
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
@@ -104,7 +104,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		modRepo, err := st.GetMigRepo(r.Context(), job.RepoID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to get repo for claimed job: %v", err)
-			slog.Error("claim: get mod repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
+			slog.Error("claim: get mig repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
 			return
 		}
 
@@ -178,9 +178,9 @@ func buildAndSendJobClaimResponse(
 		RepoID    domaintypes.MigRepoID `json:"repo_id"`
 		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
-		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
-		JobType   domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
-		JobImage  string                `json:"job_image"` // Container image for mod/heal jobs
+		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
+		JobType   domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+		JobImage  string                `json:"job_image"` // Container image for mig/heal jobs
 		NextID    *domaintypes.JobID    `json:"next_id"`
 		RepoURL   string                `json:"repo_url"`
 		Status    store.RunStatus       `json:"status"`
@@ -264,7 +264,7 @@ func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
 // Parameters:
 //   - spec: The job spec JSON, may contain an "env" map
 //   - env: Map of global env vars from ConfigHolder (uses typed GlobalEnvScope)
-//   - jobType: The job's job_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
+//   - jobType: The job's job_type as typed enum (pre_gate, mig, post_gate, heal, re_gate, mr)
 //
 // Returns the modified spec with global env vars merged into the "env" field.
 func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType domaintypes.JobType) (json.RawMessage, error) {

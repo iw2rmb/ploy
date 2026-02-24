@@ -324,7 +324,7 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 	}
 
 	if gotBody["scope"] != "migs" {
-		t.Fatalf("expected scope 'mods', got: %v", gotBody["scope"])
+		t.Fatalf("expected scope 'migs', got: %v", gotBody["scope"])
 	}
 }
 

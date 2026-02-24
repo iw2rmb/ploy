@@ -211,7 +211,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 		Line:      "enriched line",
 		NodeID:    "aB3xY9",
 		JobID:     jobID,
-		JobType:   "mod",
+		JobType:   "mig",
 	}
 	if err := hub.PublishLog(ctx, domaintypes.RunID(runID), enriched); err != nil {
 		t.Fatalf("publish enriched log: %v", err)
@@ -256,8 +256,8 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	if got := payload["job_id"]; got != jobID.String() {
 		t.Errorf("job_id = %v, want %q", got, jobID.String())
 	}
-	if got := payload["job_type"]; got != "mod" {
-		t.Errorf("job_type = %v, want %q", got, "mod")
+	if got := payload["job_type"]; got != "mig" {
+		t.Errorf("job_type = %v, want %q", got, "mig")
 	}
 	if _, ok := payload["next_id"]; ok {
 		t.Errorf("next_id should be absent, got %v", payload["next_id"])

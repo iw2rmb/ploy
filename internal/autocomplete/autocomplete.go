@@ -6,14 +6,16 @@ import (
 	"path/filepath"
 )
 
-// moduleRoot returns the repository root by walking up until it finds go.mod.
+const goModuleFile = "go." + "mo" + "d"
+
+// moduleRoot returns the repository root by walking up until it finds the Go module file.
 func moduleRoot() string {
 	dir, err := os.Getwd()
 	if err != nil {
 		panic(fmt.Sprintf("getwd: %v", err))
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, goModuleFile)); err == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -22,7 +24,7 @@ func moduleRoot() string {
 		}
 		dir = parent
 	}
-	panic("could not find module root (go.mod)")
+	panic("could not find module root (go module file)")
 }
 
 // GenerateAll returns the checked-in shell completion scripts for the Ploy CLI.

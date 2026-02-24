@@ -101,7 +101,7 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 }
 
 // TestCompleteJob_InvalidJobMeta_GateMetaOnModKind returns 400 when job_meta has
-// gate metadata but kind is "mod" (structural mismatch).
+// gate metadata but kind is "mig" (structural mismatch).
 func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 	t.Parallel()
 
@@ -118,14 +118,14 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	// job_meta with kind="mod" but gate metadata should be rejected (structural mismatch).
+	// job_meta with kind="mig" but gate metadata should be rejected (structural mismatch).
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
-				"kind": "mod",
+				"kind": "mig",
 				"gate": map[string]any{"log_digest": testLogDigest},
 			},
 		},
@@ -197,7 +197,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_ValidJobMeta_ModKind verifies that valid mod job_meta is accepted.
+// TestCompleteJob_ValidJobMeta_ModKind verifies that valid mig job_meta is accepted.
 func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 	t.Parallel()
 
@@ -214,19 +214,19 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	// Valid mod job_meta (kind only, no gate/build metadata).
+	// Valid mig job_meta (kind only, no gate/build metadata).
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
-				"kind": "mod",
+				"kind": "mig",
 			},
 		},
 	}))
 
-	// Expect 204 No Content for valid mod job_meta.
+	// Expect 204 No Content for valid mig job_meta.
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
@@ -239,8 +239,8 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
 		t.Fatalf("failed to unmarshal persisted meta: %v", err)
 	}
-	if kind, ok := meta["kind"].(string); !ok || kind != "mod" {
-		t.Fatalf("expected meta.kind == \"mod\", got %#v", meta["kind"])
+	if kind, ok := meta["kind"].(string); !ok || kind != "mig" {
+		t.Fatalf("expected meta.kind == \"mig\", got %#v", meta["kind"])
 	}
 }
 
@@ -433,7 +433,7 @@ func TestCompleteJob_ValidJobMeta_GateWithBugSummary(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_ValidJobMeta_ModWithActionSummary verifies that mod job_meta
+// TestCompleteJob_ValidJobMeta_ModWithActionSummary verifies that mig job_meta
 // with action_summary is accepted and persisted.
 func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 	t.Parallel()
@@ -458,7 +458,7 @@ func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 		"exit_code": 0,
 		"stats": map[string]any{
 			"job_meta": map[string]any{
-				"kind":           "mod",
+				"kind":           "mig",
 				"action_summary": "Fixed missing import in Main.java",
 			},
 		},
@@ -553,7 +553,7 @@ func TestJobStatsPayload_HasJobMeta(t *testing.T) {
 		},
 		{
 			name:     "valid job_meta",
-			payload:  JobStatsPayload{JobMeta: []byte(`{"kind":"mod"}`)},
+			payload:  JobStatsPayload{JobMeta: []byte(`{"kind":"mig"}`)},
 			expected: true,
 		},
 	}
@@ -594,8 +594,8 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 			wantErr: false, // Null is treated as "no job_meta".
 		},
 		{
-			name:    "valid mod kind",
-			payload: JobStatsPayload{JobMeta: []byte(`{"kind":"mod"}`)},
+			name:    "valid mig kind",
+			payload: JobStatsPayload{JobMeta: []byte(`{"kind":"mig"}`)},
 			wantErr: false,
 		},
 		{
@@ -619,8 +619,8 @@ func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "gate metadata on mod kind",
-			payload: JobStatsPayload{JobMeta: []byte("{\"kind\":\"mod\",\"gate\":{\"log_digest\":\"" + testLogDigest + "\"}}")},
+			name:    "gate metadata on mig kind",
+			payload: JobStatsPayload{JobMeta: []byte("{\"kind\":\"mig\",\"gate\":{\"log_digest\":\"" + testLogDigest + "\"}}")},
 			wantErr: true,
 		},
 		{

@@ -19,7 +19,7 @@ func TestModPullRouting(t *testing.T) {
 		t.Skip("git command not found, skipping test")
 	}
 
-	// Test that we can call mod pull without error (until git check).
+	// Test that we can call mig pull without error (until git check).
 	// The test will fail at the git worktree check.
 	tests := []struct {
 		name    string
@@ -27,13 +27,13 @@ func TestModPullRouting(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "mod pull routes correctly",
+			name:    "mig pull routes correctly",
 			args:    []string{"mig", "pull"},
 			wantErr: "must be run inside a git repository",
 		},
 		{
-			name:    "mod pull with mod-id routes correctly",
-			args:    []string{"mig", "pull", "my-mod"},
+			name:    "mig pull with mig-id routes correctly",
+			args:    []string{"mig", "pull", "my-mig"},
 			wantErr: "must be run inside a git repository",
 		},
 	}
@@ -91,7 +91,7 @@ func TestModPullUsageErrors(t *testing.T) {
 		},
 		{
 			name:    "extra positional argument",
-			args:    []string{"mig", "pull", "my-mod", "extra-arg"},
+			args:    []string{"mig", "pull", "my-mig", "extra-arg"},
 			wantErr: "unexpected argument: extra-arg",
 		},
 		{
@@ -154,9 +154,9 @@ func TestModPullUsageHelp(t *testing.T) {
 		t.Errorf("usage should document --last-succeeded flag, got %q", output)
 	}
 
-	// Verify optional mod argument is documented.
-	if !strings.Contains(output, "[<mod-id|name>]") {
-		t.Errorf("usage should document optional mod argument, got %q", output)
+	// Verify optional mig argument is documented.
+	if !strings.Contains(output, "[<mig-id|name>]") {
+		t.Errorf("usage should document optional mig argument, got %q", output)
 	}
 
 	// Verify examples are present.
@@ -165,8 +165,8 @@ func TestModPullUsageHelp(t *testing.T) {
 	}
 
 	// Verify description of functionality is mentioned.
-	if !strings.Contains(output, "Pulls Mods diffs from a mod") {
-		t.Errorf("usage should describe pulling diffs from a mod, got %q", output)
+	if !strings.Contains(output, "Pulls Mods diffs from a mig") {
+		t.Errorf("usage should describe pulling diffs from a mig, got %q", output)
 	}
 }
 
@@ -199,7 +199,7 @@ func TestHandleModPull_OutsideGitRepo(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = handleMigPull([]string{"my-mod"}, &buf)
+	err = handleMigPull([]string{"my-mig"}, &buf)
 	if err == nil {
 		t.Error("handleMigPull() outside git repo should return error")
 	}
@@ -239,7 +239,7 @@ func TestHandleModPull_DirtyWorkingTree(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = handleMigPull([]string{"my-mod"}, &buf)
+	err = handleMigPull([]string{"my-mig"}, &buf)
 	if err == nil {
 		t.Error("handleMigPull() with dirty working tree should return error")
 	}
@@ -274,7 +274,7 @@ func TestHandleModPull_MissingRemote(t *testing.T) {
 
 	var buf bytes.Buffer
 	// Request a remote that doesn't exist.
-	err = handleMigPull([]string{"--origin", "nonexistent", "my-mod"}, &buf)
+	err = handleMigPull([]string{"--origin", "nonexistent", "my-mig"}, &buf)
 	if err == nil {
 		t.Error("handleMigPull() with missing remote should return error")
 	}
@@ -287,14 +287,14 @@ func TestHandleModPull_MissingRemote(t *testing.T) {
 // inferModFromRepo Unit Tests
 // =============================================================================
 
-// TestInferModFromRepo_NoMods verifies error handling when no mods include the repo.
+// TestInferModFromRepo_NoMods verifies error handling when no migs include the repo.
 func TestInferModFromRepo_NoMods(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.
 	t.Skip("requires mock HTTP server; covered by integration tests")
 }
 
-// TestInferModFromRepo_MultipleMods verifies error handling when multiple mods include the repo.
+// TestInferModFromRepo_MultipleMods verifies error handling when multiple migs include the repo.
 func TestInferModFromRepo_MultipleMods(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.

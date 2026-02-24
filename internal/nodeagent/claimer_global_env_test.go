@@ -43,7 +43,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			name: "global_env_vars_extracted",
 			spec: json.RawMessage(`{
 				"job_id": "` + testKSUID + `",
-				"steps": [{"image": "docker.io/test/mod:latest"}],
+				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"env": {
 					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
 					"CODEX_AUTH_JSON": "{\"api_key\":\"sk-xxx\",\"org_id\":\"org-yyy\"}",
@@ -61,13 +61,13 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			// be merged into the container env map.
 			name: "nested_env_not_merged",
 			spec: json.RawMessage(`{
-					"steps": [{"image": "docker.io/test/mod:latest"}],
+					"steps": [{"image": "docker.io/test/mig:latest"}],
 					"env": {
 						"GLOBAL_VAR": "global_value",
 						"SHARED_VAR": "top_level_value"
 					},
 					"ignored": {
-						"image": "test/mod:latest",
+						"image": "test/mig:latest",
 						"env": {
 							"MOD_VAR": "mod_value",
 							"SHARED_VAR": "mod_ignored"
@@ -75,16 +75,16 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 					}
 				}`),
 			wantEnv: map[string]string{
-				// Only top-level env is extracted; mod.env is ignored.
+				// Only top-level env is extracted; mig.env is ignored.
 				"GLOBAL_VAR": "global_value",
 				"SHARED_VAR": "top_level_value",
-				// MOD_VAR is NOT present because mod.env is not processed.
+				// MOD_VAR is NOT present because mig.env is not processed.
 			},
 		},
 		{
 			name: "empty_env_values_preserved",
 			spec: json.RawMessage(`{
-				"steps": [{"image": "docker.io/test/mod:latest"}],
+				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"env": {
 					"EMPTY_VAR": "",
 					"WHITESPACE_VAR": "   "
@@ -98,7 +98,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 		{
 			name: "multiline_cert_bundle_preserved",
 			spec: json.RawMessage(`{
-				"steps": [{"image": "docker.io/test/mod:latest"}],
+				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"env": {
 					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----"
 				}
@@ -146,7 +146,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	// Simulate a spec with global env vars injected by the server.
 	specJSON := json.RawMessage(`{
 		"job_id": "` + testKSUID + `",
-		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"gitlab_pat": "glpat-test-token",
 		"env": {
 			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
@@ -211,8 +211,8 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		"steps": [
 			{
 				"image": {
-					"java-maven": "docker.io/test/maven-mod:latest",
-					"java-gradle": "docker.io/test/gradle-mod:latest"
+					"java-maven": "docker.io/test/maven-mig:latest",
+					"java-gradle": "docker.io/test/gradle-mig:latest"
 				}
 			}
 		],
@@ -301,14 +301,14 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		},
 		"steps": [
 			{
-				"image": "step0-mod:latest",
+				"image": "step0-mig:latest",
 				"env": {
 					"STEP_VAR": "step0_value",
 					"SHARED_VAR": "step0_override"
 				}
 			},
 			{
-				"image": "step1-mod:latest",
+				"image": "step1-mig:latest",
 				"env": {
 					"STEP_VAR": "step1_value"
 				}
@@ -367,7 +367,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 }
 
 // TestGlobalEnvPropagation_HealingManifest verifies that global env vars are
-// available in healing manifests. While healing mods have their own env config,
+// available in healing manifests. While healing migs have their own env config,
 // global env vars from the spec should still be accessible via the request.
 //
 // Note: Healing manifests are built from HealingMod.Env, not from req.Env directly.
@@ -384,7 +384,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		TargetRef: types.GitRef("feature/healing"),
 	}
 
-	// Healing mod with global env vars pre-merged.
+	// Healing mig with global env vars pre-merged.
 	healingMod := ModContainerSpec{
 		Image: testJobImage("migs-codex:latest"),
 		Env: map[string]string{
@@ -430,7 +430,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 
 	// Test various env key patterns that might be incorrectly filtered.
 	specJSON := json.RawMessage(`{
-		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"env": {
 			"NORMAL_KEY": "value1",
 			"lowercase_key": "value2",

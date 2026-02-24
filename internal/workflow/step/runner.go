@@ -13,15 +13,15 @@ import (
 
 // Runner executes workflow steps.
 //
-// # Execution Stages (Pre-mod Gate per Call)
+// # Execution Stages (Pre-mig Gate per Call)
 //
 // Runner.Run processes each step call through the following stages in order:
 //
 //  1. Hydration — Prepare the workspace by fetching repository sources via
 //     WorkspaceHydrator. Errors here abort the run immediately.
 //
-//  2. Pre-mod Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
-//     workspace before executing the mod container. If the gate fails,
+//  2. Pre-mig Build Gate — When Gate is enabled (Manifest.Gate.Enabled), run static validation on the
+//     workspace before executing the mig container. If the gate fails,
 //     Runner.Run returns ErrBuildGateFailed without executing container
 //     stages. The node agent orchestration layer handles healing when
 //     configured; Runner itself does not perform healing.
@@ -36,7 +36,7 @@ import (
 //
 // # Gate Ownership Contract
 //
-// Runner supports an optional pre-mod gate when Manifest.Gate.Enabled=true.
+// Runner supports an optional pre-mig gate when Manifest.Gate.Enabled=true.
 // This capability exists for direct invocations (e.g., standalone testing)
 // where Runner manages its own gate lifecycle.
 //
@@ -44,10 +44,10 @@ import (
 // The nodeagent orchestration layer owns all gate lifecycle management via
 // runGateWithHealing, which handles:
 //   - A single pre-run gate before the step loop begins.
-//   - Per-step post-mod gates after each container execution.
+//   - Per-step post-mig gates after each container execution.
 //   - Healing retries when gates fail and healing is configured.
 //
-// Passing Gate.Enabled=true from nodeagent would cause duplicate pre-mod gates
+// Passing Gate.Enabled=true from nodeagent would cause duplicate pre-mig gates
 // (one from runGateWithHealing, one from Runner.Run) and break the single-gate-
 // per-run invariant. The nodeagent is the authoritative gate orchestrator.
 type Runner struct {
@@ -88,7 +88,7 @@ type StageTiming struct {
 	TotalDuration     types.Duration
 }
 
-// ErrBuildGateFailed is returned when the pre-mod Build Gate fails
+// ErrBuildGateFailed is returned when the pre-mig Build Gate fails
 // and no healing is configured to continue.
 var ErrBuildGateFailed = errors.New("build gate failed")
 
@@ -106,7 +106,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.HydrationDuration = types.Duration(time.Since(hydrationStart))
 
-	// Stage 2: Pre-mod Build Gate validation.
+	// Stage 2: Pre-mig Build Gate validation.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
@@ -123,7 +123,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		if !gatePassed {
 			result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
 			result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
-			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mod validation failed")
+			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mig validation failed")
 		}
 	}
 	result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
