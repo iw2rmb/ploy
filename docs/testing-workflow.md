@@ -173,6 +173,10 @@ For migration slices that add guardrails under `tests/guards/`, run:
 go test ./tests/guards/...
 ```
 
+For RED slices, guard tests are allowed to fail intentionally when they are
+introduced before implementation renames land (for example the Phase 0
+`mod` -> `mig` legacy naming guard in `roadmap/mig.md`).
+
 ## E2E Tests — Later Phase
 
 After core functionality is stable and unit-tested:

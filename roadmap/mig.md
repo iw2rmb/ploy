@@ -8,15 +8,34 @@ Documentation: `AGENTS.md`; `README.md`; `docs/mods-lifecycle.md`; `docs/api/Ope
 
 Legend: [ ] todo, [x] done.
 
+## Rename Matrix and Exclusions
+
+Canonical mapping for this migration:
+
+| Legacy | Canonical |
+| --- | --- |
+| `mod` | `mig` |
+| `mods` | `migs` |
+| `mod-` | `mig-` |
+| `mods-` | `migs-` |
+| `/v1/mods` | `/v1/migs` |
+| `ploy mod` | `ploy mig` |
+
+Exclusions (do not rename these in bulk scans):
+
+- Go module/tooling terms and files: `go.mod`, `go.sum`, `go mod ...`
+- Generic English words that contain `mod` without workflow meaning (for example `modify`, `mode`)
+- Job field names already migrated by `roadmap/next.md`: `ModType`/`mod_type` -> `Type`/`job_type`, `ModImage`/`mod_image` -> `Image`/`job_image`
+
 ## Phase 0: Naming Contract and Guardrails (RED)
-- [ ] Define exact rename matrix and exclusions before touching implementation — prevents accidental renames of unrelated terms (for example `go.mod` and generic "modify").
+- [x] Define exact rename matrix and exclusions before touching implementation — prevents accidental renames of unrelated terms (for example `go.mod` and generic "modify").
   - Repository: `ploy`
   - Component: Architecture glossary, contributor rules
   - Scope: Add a short mapping section in this roadmap and reference it from `design/` docs used by contributors; mapping must include `mod`->`mig`, `mods`->`migs`, `mod-`->`mig-`, `mods-`->`migs-`, `/v1/mods`->`/v1/migs`, `ploy mod`->`ploy mig`; also document exclusions, including already-migrated `Type`/`Image` job fields from `roadmap/next.md`.
   - Snippets: `rg -n '\\bmods?\\b|/v1/mods|ploy mod|mod-' cmd internal deploy docs tests`
   - Tests: Add guard tests/scripts that fail if new `mod` naming is introduced outside approved exclusions.
 
-- [ ] Add RED checks for forbidden legacy naming in key surfaces — enforces "no compatibility" policy automatically.
+- [x] Add RED checks for forbidden legacy naming in key surfaces — enforces "no compatibility" policy automatically.
   - Repository: `ploy`
   - Component: Test guardrails, CI hygiene
   - Scope: Add or extend guard tests under `tests/guards/` to block `/v1/mods`, `internal/mods`, `ploy mod`, `deploy/images/mods`, and `mods-` image names once the rename lands.
