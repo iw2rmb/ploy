@@ -187,8 +187,8 @@ After core functionality is stable and unit-tested:
    - Require external services (Postgres, etc.)
 
 2. **E2E Tests** — Test full system with real deployment
-  - Location: `tests/e2e/mods/`
-  - Documented in: `tests/e2e/mods/README.md`
+  - Location: `tests/e2e/migs/`
+  - Documented in: `tests/e2e/migs/README.md`
    - Run against the local Docker cluster
    - Examples: `scenario-orw-pass.sh`
 

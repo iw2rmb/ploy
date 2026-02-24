@@ -45,7 +45,7 @@ func TestRunLogsStructuredOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run logs: %v", err)
 	}
-	expect := loadGolden(t, "mods_logs_structured.txt")
+	expect := loadGolden(t, "migs_logs_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("mods logs structured mismatch:\n%s", diff)
 	}
@@ -71,7 +71,7 @@ func TestRunLogsRawOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run logs raw: %v", err)
 	}
-	expect := loadGolden(t, "mods_logs_raw.txt")
+	expect := loadGolden(t, "migs_logs_raw.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("mods logs raw mismatch:\n%s", diff)
 	}

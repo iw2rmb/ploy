@@ -16,17 +16,17 @@
 #
 # Usage:
 #   # From repository root:
-#   bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+#   bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh
 #
 #   # With custom configuration:
 #   REPO_URL="https://gitlab.com/example/repo.git" \
 #   REPO_BASE_REF="main" \
 #   REPO_TARGET_REF="test-branch" \
 #   ARTIFACT_DIR="./tmp/custom" \
-#   bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+#   bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh
 #
 #   # Skip artifact collection (faster, for CI):
-#   SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh
 
 set -euo pipefail
 
@@ -61,13 +61,13 @@ REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mod}"
 
 # Spec file location (relative to script directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SPEC_FILE="${SCRIPT_DIR}/mod.yaml"
+SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 
 # Artifact collection (optional)
 SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   TS=$(date +%y%m%d%H%M%S)
-  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/mods/scenario-multi-node-rehydration/${TS}}"
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-multi-node-rehydration/${TS}}"
   mkdir -p "${ARTIFACT_DIR}"
 fi
 
@@ -108,13 +108,13 @@ fi
 # SUBMIT RUN AND FOLLOW LOGS
 ################################################################################
 
-echo "Submitting multi-step mod run..."
+echo "Submitting multi-step mig run..."
 echo ""
 
 # Build command with required flags
 CMD_ARGS=(
   "$PLOY_BIN"
-  mod run
+  mig run
   --repo-url "$REPO_URL"
   --repo-base-ref "$REPO_BASE_REF"
   --repo-target-ref "$REPO_TARGET_REF"

@@ -9,13 +9,13 @@ source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
 TS=$(date +%y%m%d%H%M%S)
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/selftest}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/selftest}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
 CMD='echo "[selftest] hello"; uname -a; sleep 3; echo "[selftest] done"'
 
-"$REPO_ROOT/dist/ploy" mod run \
+"$REPO_ROOT/dist/ploy" mig run \
   --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
   --repo-base-ref main \
   --repo-target-ref e2e/selftest-${TS} \

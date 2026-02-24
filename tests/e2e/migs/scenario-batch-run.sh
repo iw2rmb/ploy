@@ -6,8 +6,8 @@ set -euo pipefail
 #
 # This test validates the batch run workflow end-to-end:
 # 1. Create a batch run with a spec
-# 2. Add repos to the batch with `mod run repo add`
-# 3. List repos with `mod run repo status`
+# 2. Add repos to the batch with `mig run repo add`
+# 3. List repos with `mig run repo status`
 # 4. (Optional) Restart a repo with a different branch
 # 5. Stop the batch and verify final status
 #
@@ -16,7 +16,7 @@ set -euo pipefail
 #   - Control plane running with PLOY_SERVER_URL set or server.json present
 #
 # Usage:
-#   ./tests/e2e/mods/scenario-batch-run.sh
+#   ./tests/e2e/migs/scenario-batch-run.sh
 #
 # Environment:
 #   PLOY_E2E_SKIP_BATCH_RUN=1  - Skip this test
@@ -40,7 +40,7 @@ TS=$(date +%y%m%d%H%M%S)
 BATCH_NAME="e2e-batch-${TS}"
 
 # Artifact directory for test outputs.
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/batch-run}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/batch-run}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -86,7 +86,7 @@ command: |
   echo "[batch-e2e] Done"
 EOF
 
-# Create the batch run using mod run with a spec file.
+# Create the batch run using mig run with a spec file.
 # Note: This creates the run but doesn't add repos yet.
 run dist/ploy mig run \
   --name "${BATCH_NAME}" \

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Unit tests for mod-codex.sh
+# Unit tests for mig-codex.sh
 # Tests CLI flag detection, JSONL event capture, session ID extraction,
 # and run manifest/session metadata.
 #
-# Usage: bash tests/unit/mod_codex_sh_test.sh
+# Usage: bash tests/unit/mig_codex_sh_test.sh
 #
 # Exit codes:
 #   0: All tests passed
@@ -12,9 +12,9 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/deploy/images/mods/mod-codex/mod-codex.sh"
+SCRIPT="$ROOT_DIR/deploy/images/migs/mig-codex/mig-codex.sh"
 
-# Create a wrapper script that patches mod-codex.sh to use $HOME/.codex instead
+# Create a wrapper script that patches mig-codex.sh to use $HOME/.codex instead
 # of hardcoded /root/.codex. This allows tests to run outside Docker containers.
 create_test_script() {
   local tmp_script
@@ -633,7 +633,7 @@ MOCKCODEX
 # ─────────────────────────────────────────────────────────────────────────────
 # Run all tests
 # ─────────────────────────────────────────────────────────────────────────────
-echo "Running mod-codex.sh unit tests..."
+echo "Running mig-codex.sh unit tests..."
 echo ""
 
 echo "Test: --help flag"

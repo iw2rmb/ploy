@@ -41,12 +41,12 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs", "post"},
 		{"/v1/runs/{id}/logs", "get"},
 		// Mods (mod project CRUD)
-		{"/v1/mods", "get"},
-		{"/v1/mods", "post"},
-		{"/v1/mods/{mod_id}", "delete"},
-		{"/v1/mods/{mod_id}/archive", "patch"},
-		{"/v1/mods/{mod_id}/unarchive", "patch"},
-		{"/v1/mods/{mod_id}/runs", "post"},
+		{"/v1/migs", "get"},
+		{"/v1/migs", "post"},
+		{"/v1/migs/{mod_id}", "delete"},
+		{"/v1/migs/{mod_id}/archive", "patch"},
+		{"/v1/migs/{mod_id}/unarchive", "patch"},
+		{"/v1/migs/{mod_id}/runs", "post"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},
@@ -151,7 +151,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"CreateRunRequest",
 		"CreateRunResponse",
 		"RunSubmitRequest",
-		"ModsRunSummary", // Canonical Mods run status schema (POST/GET /v1/mods responses, SSE events).
+		"ModsRunSummary", // Canonical Mods run status schema (POST/GET /v1/migs responses, SSE events).
 		"StageStatus",    // Job execution state within RunSummary.stages map.
 		"NodeClaimResponse",
 		"Event",

@@ -56,7 +56,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	// Prefer a pre-captured Build Gate log placed alongside this test.
 	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
 	repoRoot = strings.TrimSpace(repoRoot)
-	testLog := filepath.Join(repoRoot, "tests", "integration", "mods", "mod-codex", "build-gate.log")
+	testLog := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
 	logPath := filepath.Join(inDir, "build-gate.log")
 	if data, err := os.ReadFile(testLog); err == nil && len(data) > 0 {
 		if err := os.WriteFile(logPath, data, 0o644); err != nil {
@@ -79,8 +79,8 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("expected compilation error in build-gate.log, got:\n%s", string(b))
 	}
 
-	// Build mods-codex image (tag: mods-codex:latest).
-	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "docker", "mods", "mod-codex", "Dockerfile"), repoRoot)
+	// Build mods-codex image (tag: migs-codex:latest).
+	_, _ = mustRun(t, "docker", "build", "-t", "migs-codex:latest", "-f", filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "Dockerfile"), repoRoot)
 
 	// Prepare prompt using sentinel protocol. Codex does NOT have access to
 	// any Build Gate helper inside the container; Build Gate is run externally
@@ -118,7 +118,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		"-v", outDir+":/out",
 		"-v", inDir+":/in:ro",
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
-		"mods-codex:latest",
+		"migs-codex:latest",
 		"--input", ws, "--out", "/out", "--prompt-file", filepath.Join(ws, "prompt.txt"),
 	)
 	if out, err := run.CombinedOutput(); err != nil {

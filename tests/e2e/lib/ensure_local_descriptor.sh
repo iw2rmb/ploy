@@ -149,7 +149,7 @@ token_works() {
   body="$(mktemp)"
   code="$(curl -sS -m 3 -o "$body" -w '%{http_code}' \
     -H "Authorization: Bearer ${token}" \
-    "${server_url}/v1/mods" || true)"
+    "${server_url}/v1/migs" || true)"
 
   if [[ "$code" == "200" ]]; then
     rm -f "$body"

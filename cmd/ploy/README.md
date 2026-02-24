@@ -371,7 +371,7 @@ ploy completion <shell> --help
   and `mods[]` for multi-step runs. The spec supports inline environment variables (`env`),
   file-based secrets (`env_from_file`), Build Gate healing (`build_gate_healing`),
   and GitLab MR settings. See `docs/schemas/mod.example.yaml` for the full schema and
-  `tests/e2e/mods/README.md` for usage examples.
+  `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
   — Repository materialisation inputs consumed by `mod run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
@@ -588,7 +588,7 @@ build_gate_healing:
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing mods).
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
 
-See `docs/schemas/mod.example.yaml` for a complete example and `tests/e2e/mods/README.md`
+See `docs/schemas/mod.example.yaml` for a complete example and `tests/e2e/migs/README.md`
 for end-to-end usage with `mods-codex`.
 
 ## Job Graph and DAG State

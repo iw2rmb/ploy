@@ -8,7 +8,7 @@
 #     --repo-url https://gitlab.com/example/my-java-project.git \
 #     --repo-base-ref main \
 #     --repo-target-ref mods-multi-step-java-upgrade \
-#     --spec tests/e2e/mods/scenario-multi-step/mod.yaml \
+#     --spec tests/e2e/migs/scenario-multi-step/mig.yaml \
 #     --follow
 
 apiVersion: ploy.mod/v1alpha1
