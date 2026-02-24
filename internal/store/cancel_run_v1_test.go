@@ -16,15 +16,15 @@ func TestCancelRunV1_CancelsRunAndActiveWork(t *testing.T) {
 	runningRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mod.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-running", "main", "feature-running", RunRepoStatusRunning)
 	successRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mod.ID, fx.Run.ID, "https://github.com/test/cancel-run-v1-success", "main", "feature-success", RunRepoStatusSuccess)
 
-	createdJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated, types.StepIndex(10))
-	queuedJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "queued", JobStatusQueued, types.StepIndex(20))
-	runningJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "running", JobStatusQueued, types.StepIndex(30))
+	createdJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated)
+	queuedJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "queued", JobStatusQueued)
+	runningJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "running", JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, runningJob.ID)
 	if _, err := db.Pool().Exec(ctx, `UPDATE jobs SET started_at = now() - interval '3 seconds' WHERE id = $1`, runningJob.ID); err != nil {
 		t.Fatalf("set running started_at failed: %v", err)
 	}
 
-	successJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "success", JobStatusQueued, types.StepIndex(40))
+	successJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "success", JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, successJob.ID)
 	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:       successJob.ID,
@@ -113,7 +113,7 @@ func TestCancelRunV1_RollsBackOnFailure(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-rollback", "main", "feature-rollback", []byte(`{"type":"cancel-run-v1-rollback"}`))
-	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated, types.StepIndex(10))
+	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated)
 
 	// Inject DB error during CancelActiveJobsByRun so earlier updates must roll back.
 	suffix := strings.ToLower(types.NewNodeKey())
@@ -183,8 +183,8 @@ func TestCancelRunV1_IsScopedToRunID(t *testing.T) {
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-scope-a", "main", "feature-a", []byte(`{"type":"cancel-run-v1-scope-a"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-scope-b", "main", "feature-b", []byte(`{"type":"cancel-run-v1-scope-b"}`))
 
-	jobA := createJobForCancelBulkTest(t, ctx, db, fxA.Run.ID, fxA.ModRepo.ID, fxA.RunRepo.RepoBaseRef, "a-created", JobStatusCreated, types.StepIndex(10))
-	jobB := createJobForCancelBulkTest(t, ctx, db, fxB.Run.ID, fxB.ModRepo.ID, fxB.RunRepo.RepoBaseRef, "b-created", JobStatusCreated, types.StepIndex(10))
+	jobA := createJobForCancelBulkTest(t, ctx, db, fxA.Run.ID, fxA.ModRepo.ID, fxA.RunRepo.RepoBaseRef, "a-created", JobStatusCreated)
+	jobB := createJobForCancelBulkTest(t, ctx, db, fxB.Run.ID, fxB.ModRepo.ID, fxB.RunRepo.RepoBaseRef, "b-created", JobStatusCreated)
 
 	if err := db.CancelRunV1(ctx, fxA.Run.ID); err != nil {
 		t.Fatalf("CancelRunV1(run A) failed: %v", err)
@@ -264,7 +264,7 @@ func TestCancelRunV1_RollbackErrorHasContext(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-errctx", "main", "feature-errctx", []byte(`{"type":"cancel-run-v1-errctx"}`))
-	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated, types.StepIndex(10))
+	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.ModRepo.ID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated)
 
 	suffix := strings.ToLower(types.NewNodeKey())
 	fnName := fmt.Sprintf("test_cancel_run_v1_fail_jobs_ctx_fn_%s", suffix)

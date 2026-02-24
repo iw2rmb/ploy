@@ -179,7 +179,7 @@ func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Conte
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	var exitCodeOne int32 = 1
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCodeOne, stats, req.StepIndex, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCodeOne, stats, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload healing failure status (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)
@@ -234,7 +234,7 @@ type standardJobConfig struct {
 	CheckWorkspaceNoChange    bool
 	UploadConfiguredArtifacts bool
 
-	UploadDiff   func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result, stepIndex types.StepIndex)
+	UploadDiff   func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result)
 	BuildJobMeta func(outDir string) json.RawMessage
 
 	StartTime time.Time
@@ -311,11 +311,11 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		duration := time.Since(startTime)
 
 		if cfg.UploadDiff != nil {
-			cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result, req.StepIndex)
+			cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
 		}
 
 		if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
-			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "error", err)
+			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
 		}
 
 		if cfg.UploadConfiguredArtifacts {
@@ -357,27 +357,27 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				var runtimeExitCode int32 = -1
 				exitCode = &runtimeExitCode
 			}
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "error", uploadErr)
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
-			slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "status", status, "duration", duration, "error", runErr)
+			slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "status", status, "duration", duration, "error", runErr)
 			return nil
 		}
 
 		if result.ExitCode != 0 {
 			exitCode := int32(result.ExitCode)
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
-				slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "error", uploadErr)
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID); uploadErr != nil {
+				slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
-			slog.Info("job failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "exit_code", result.ExitCode, "duration", duration)
+			slog.Info("job failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
 			return nil
 		}
 
 		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
-			slog.Error("failed to upload success status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload success status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 		}
-		slog.Info("job succeeded", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "duration", duration)
+		slog.Info("job succeeded", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "duration", duration)
 		return nil
 	}
 
@@ -386,7 +386,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			return withTempDir(cfg.InDirPattern, func(inDir string) error {
 				if cfg.PopulateInDir != nil {
 					if err := cfg.PopulateInDir(inDir); err != nil {
-						slog.Warn("failed to populate in dir", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex, "error", err)
+						slog.Warn("failed to populate in dir", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
 					}
 				}
 				return executeBody(outDir, inDir)
@@ -560,7 +560,7 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // Uses a detached context to ensure reporting even if the run context is cancelled.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex, jobID types.JobID) error {
+func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID) error {
 	if err := r.ensureUploaders(); err != nil {
 		return fmt.Errorf("initialize uploaders: %w", err)
 	}
@@ -577,7 +577,7 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode, "next_id", stepIndex)
+	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode)
 	return nil
 }
 
@@ -629,7 +629,6 @@ func (r *runController) uploadHealingJobDiff(
 	baseDir string,
 	workspace string,
 	result step.Result,
-	stepIndex types.StepIndex,
 ) {
 	if diffGenerator == nil {
 		return
@@ -640,17 +639,16 @@ func (r *runController) uploadHealingJobDiff(
 
 	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
 	if err != nil {
-		slog.Error("failed to generate healing job diff", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
+		slog.Error("failed to generate healing job diff", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
 	if len(diffBytes) == 0 {
-		slog.Info("no diff to upload for healing job (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "next_id", stepIndex)
+		slog.Info("no diff to upload for healing job (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID)
 		return
 	}
 
 	summary := types.NewDiffSummaryBuilder().
-		StepIndex(stepIndex).
 		JobType(DiffJobTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
@@ -662,16 +660,16 @@ func (r *runController) uploadHealingJobDiff(
 		MustBuild()
 
 	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
+		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
+		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
-	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "size", len(diffBytes))
+	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
 }
 
 // isValidArtifactPath validates that an artifact path is safe for upload.

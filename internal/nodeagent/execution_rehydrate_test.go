@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestDecompressPatch verifies gzip decompression of patches.
@@ -354,7 +352,6 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupWorkspace func(t *testing.T, dir string)
-		stepIndex      types.StepIndex
 		wantErr        bool
 		validateAfter  func(t *testing.T, dir string)
 	}{
@@ -369,8 +366,7 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 				writeFile(t, filepath.Join(dir, "step0.txt"), "step 0 changes\n")
 				writeFile(t, filepath.Join(dir, "step1.txt"), "step 1 changes\n")
 			},
-			stepIndex: 2,
-			wantErr:   false,
+			wantErr: false,
 			validateAfter: func(t *testing.T, dir string) {
 				// Verify baseline commit was created.
 				cmd := exec.Command("git", "log", "--oneline", "-1")
@@ -380,7 +376,7 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 					t.Fatalf("git log failed: %v", err)
 				}
 				logOutput := string(output)
-				if !bytes.Contains([]byte(logOutput), []byte("Ploy: rehydration baseline for step 2")) {
+				if !bytes.Contains([]byte(logOutput), []byte("Ploy: rehydration baseline")) {
 					t.Errorf("expected baseline commit message, got: %s", logOutput)
 				}
 
@@ -407,7 +403,6 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 				writeFile(t, filepath.Join(dir, "base.txt"), "base content\n")
 				gitCommit(t, dir, "base commit")
 			},
-			stepIndex:     1,
 			wantErr:       false, // EnsureCommit returns (false, nil) when nothing to commit.
 			validateAfter: nil,
 		},
@@ -423,7 +418,7 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 
 			// Execute baseline commit creation.
 			ctx := context.Background()
-			err := ensureBaselineCommitForRehydration(ctx, workspace, tt.stepIndex)
+			err := ensureBaselineCommitForRehydration(ctx, workspace)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ensureBaselineCommitForRehydration() error = %v, wantErr %v", err, tt.wantErr)
@@ -501,7 +496,7 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		}
 
 		// Create baseline commit (NEW BEHAVIOR).
-		if err := ensureBaselineCommitForRehydration(ctx, step1Workspace, 1); err != nil {
+		if err := ensureBaselineCommitForRehydration(ctx, step1Workspace); err != nil {
 			t.Fatalf("baseline commit for step 1: %v", err)
 		}
 
@@ -538,7 +533,7 @@ func TestIncrementalDiffsAreRehydrationSafe(t *testing.T) {
 		}
 
 		// Create baseline commit (NEW BEHAVIOR).
-		if err := ensureBaselineCommitForRehydration(ctx, step2Workspace, 2); err != nil {
+		if err := ensureBaselineCommitForRehydration(ctx, step2Workspace); err != nil {
 			t.Fatalf("baseline commit for step 2: %v", err)
 		}
 

@@ -29,9 +29,6 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 //   - ServerMetadata: server-injected job ID for upload correlation.
 //   - Steps: multi-step mods array for sequential execution.
 //
-// StepIndex field:
-//   - Optional metadata for diagnostics and stats payloads.
-//
 // JobType field:
 //   - Identifies the job type: "pre_gate", "mod", "post_gate", "heal", "re_gate".
 //   - Used by orchestrator to dispatch to appropriate execution handler.
@@ -46,7 +43,6 @@ type StartRunRequest struct {
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
-	StepIndex types.StepIndex `json:"job_index,omitempty"` // Optional step metadata for diagnostics
 	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain

@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
@@ -140,10 +139,10 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ensureBaselineCommitForRehydration creates a git commit after applying per-step diffs
-// so that "git diff HEAD" in step k captures only step k's changes (not cumulative).
-func ensureBaselineCommitForRehydration(ctx context.Context, workspace string, stepIndex types.StepIndex) error {
-	message := fmt.Sprintf("Ploy: rehydration baseline for step %.0f", stepIndex)
+// ensureBaselineCommitForRehydration creates a git commit after applying prior diffs
+// so that the current job only emits its own changes.
+func ensureBaselineCommitForRehydration(ctx context.Context, workspace string) error {
+	message := "Ploy: rehydration baseline"
 	_, err := gitpkg.EnsureCommit(ctx, workspace, "ploy-rehydrate", "ploy-rehydrate@ploy.local", message)
 	return err
 }

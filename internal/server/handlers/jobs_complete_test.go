@@ -384,7 +384,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 		RunID:  runID,
 		NodeID: &ownerNodeID,
 		Status: store.JobStatusRunning,
-		Meta:   withStepIndexMeta([]byte(`{}`), 1000),
+		Meta:   withNextIDMeta([]byte(`{}`), 1000),
 	}
 
 	st := &mockStore{

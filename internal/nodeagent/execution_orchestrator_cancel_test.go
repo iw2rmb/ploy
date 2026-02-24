@@ -35,9 +35,8 @@ func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *tes
 	}
 
 	req := StartRunRequest{
-		RunID:     types.RunID("test-run"),
-		JobID:     types.JobID("test-job-id"),
-		StepIndex: 1000,
+		RunID: types.RunID("test-run"),
+		JobID: types.JobID("test-job-id"),
 	}
 
 	rc.uploadFailureStatus(context.Background(), req, context.Canceled, 250*time.Millisecond)

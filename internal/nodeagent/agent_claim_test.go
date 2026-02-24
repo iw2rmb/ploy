@@ -456,16 +456,15 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	}
 }
 
-// TestClaimLoop_StepIndexMapping verifies that when a step-level claim includes
-// next_id, it is correctly mapped into StartRunRequest.StepIndex, enabling
-// single-step execution in multi-node scenarios.
-func TestClaimLoop_StepIndexMapping(t *testing.T) {
+// TestClaimLoop_NextIDMapping verifies that claim next_id is mapped into
+// StartRunRequest.NextID.
+func TestClaimLoop_NextIDMapping(t *testing.T) {
 	t.Parallel()
 
-	stepIndex := types.StepIndex(2000) // Job next_id uses StepIndex type
 	commit := types.CommitSHA("abc123")
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
+	nextID := types.NewJobID()
 	nodeIDStr := "aB3xY9"
 	repoID := types.NewModRepoID()
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
@@ -480,8 +479,8 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 		NodeID:    types.NodeID(nodeIDStr),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/multi-step"),
+		NextID:    &nextID,
 		CommitSha: &commit,
-		StepIndex: stepIndex, // Job next_id: StepIndex type.
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -520,15 +519,15 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	defer cancel()
 	_ = claimer.Start(ctx)
 
-	// Verify controller.StartRun was called with StepIndex populated.
+	// Verify controller.StartRun was called with NextID populated.
 	if !mock.startCalled {
 		t.Fatalf("controller.StartRun not called")
 	}
 	got := mock.lastStart
 
-	// Verify StepIndex matches the claim.
-	if got.StepIndex != stepIndex {
-		t.Errorf("StepIndex=%.0f want %.0f", got.StepIndex, stepIndex)
+	// Verify NextID matches the claim.
+	if got.NextID == nil || *got.NextID != nextID {
+		t.Errorf("NextID=%v want %v", got.NextID, nextID)
 	}
 
 	// Verify other fields remain correct.
@@ -564,7 +563,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// Node1 claims job 0 (pre-gate).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
-	stepIndex0 := types.StepIndex(1000)
+	nextID0 := types.NewJobID()
 	claim0 := ClaimResponse{
 		RunID:     runID,
 		RepoID:    repoID,
@@ -575,8 +574,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		NodeID:    nodeID1,
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/parallel-steps"),
+		NextID:    &nextID0,
 		CommitSha: &commit,
-		StepIndex: stepIndex0,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -584,7 +583,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	// Node2 claims job 1 (mod-0).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
-	stepIndex1 := types.StepIndex(2000)
+	nextID1 := types.NewJobID()
 	claim1 := ClaimResponse{
 		RunID:     runID,
 		RepoID:    repoID,
@@ -595,8 +594,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		NodeID:    nodeID2,
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/parallel-steps"),
+		NextID:    &nextID1,
 		CommitSha: &commit,
-		StepIndex: stepIndex1,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -633,8 +632,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if !mock1.startCalled {
 		t.Fatalf("node-1: controller.StartRun not called")
 	}
-	if mock1.lastStart.StepIndex != stepIndex0 {
-		t.Errorf("node-1: StepIndex=%.0f want %.0f", mock1.lastStart.StepIndex, stepIndex0)
+	if mock1.lastStart.NextID == nil || *mock1.lastStart.NextID != nextID0 {
+		t.Errorf("node-1: NextID=%v want %v", mock1.lastStart.NextID, nextID0)
 	}
 	if mock1.lastStart.RunID != runID {
 		t.Errorf("node-1: RunID=%q want %q", mock1.lastStart.RunID, runID)
@@ -672,8 +671,8 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if !mock2.startCalled {
 		t.Fatalf("node-2: controller.StartRun not called")
 	}
-	if mock2.lastStart.StepIndex != stepIndex1 {
-		t.Errorf("node-2: StepIndex=%.0f want %.0f", mock2.lastStart.StepIndex, stepIndex1)
+	if mock2.lastStart.NextID == nil || *mock2.lastStart.NextID != nextID1 {
+		t.Errorf("node-2: NextID=%v want %v", mock2.lastStart.NextID, nextID1)
 	}
 	if mock2.lastStart.RunID != runID {
 		t.Errorf("node-2: RunID=%q want %q", mock2.lastStart.RunID, runID)
@@ -683,7 +682,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if mock1.lastStart.RunID != mock2.lastStart.RunID {
 		t.Errorf("nodes executed different runs: node-1=%q node-2=%q", mock1.lastStart.RunID, mock2.lastStart.RunID)
 	}
-	if mock1.lastStart.StepIndex == mock2.lastStart.StepIndex {
-		t.Error("nodes executed the same step, expected different step indices")
+	if mock1.lastStart.NextID != nil && mock2.lastStart.NextID != nil && *mock1.lastStart.NextID == *mock2.lastStart.NextID {
+		t.Error("nodes executed jobs with identical next_id pointers; expected different claims")
 	}
 }

@@ -12,7 +12,6 @@ package logs
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -91,7 +90,7 @@ func (p *Printer) PrintLog(rec logstream.LogRecord) {
 		}
 
 		// Build context string from enriched fields (only include non-empty).
-		// Order: node, job_type, step, job — most general to most specific.
+		// Order: node, job_type, job — most general to most specific.
 		// Use domain type's IsZero method to check for empty values.
 		var ctx strings.Builder
 		if !rec.NodeID.IsZero() {
@@ -105,15 +104,6 @@ func (p *Printer) PrintLog(rec logstream.LogRecord) {
 			}
 			ctx.WriteString("job_type=")
 			ctx.WriteString(rec.JobType.String())
-		}
-		// StepIndex is now types.StepIndex (float64-backed); include if > 0.
-		// Use !IsZero() to check for non-zero values consistently.
-		if !rec.StepIndex.IsZero() {
-			if ctx.Len() > 0 {
-				ctx.WriteByte(' ')
-			}
-			ctx.WriteString("step=")
-			ctx.WriteString(strconv.FormatFloat(rec.StepIndex.Float64(), 'f', -1, 64))
 		}
 		if !rec.JobID.IsZero() {
 			if ctx.Len() > 0 {

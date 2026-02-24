@@ -11,8 +11,6 @@ checkpoint notes in the repository.
 - **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
   `post-gate`). Jobs are stored as `jobs` rows. Persisted job fields are
   `job_type`, `job_image`, and `next_id` (successor link in the job chain).
-- **StepIndex** — Float index metadata used by parts of the runtime payloads and
-  diagnostics. It is no longer a dedicated `jobs` table column.
 - **Spec** — YAML/JSON file or inline JSON describing container image,
   command, env, Build Gate and optional `mods[]` steps. Parsed by the CLI in
   `cmd/ploy/mod_run_spec.go`.

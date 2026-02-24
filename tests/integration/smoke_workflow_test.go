@@ -481,7 +481,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	runRepo := fixture.RunRepo
 	t.Logf("✓ Created run: id=%v", run.ID)
 
-	// Create jobs for step 0 and step 1 so ListDiffsBeforeStep can filter by jobs.next_id.
+	// Create jobs for step 0 and step 1 so ListDiffsByRunRepo can filter by jobs.next_id.
 	jobStep0, err := db.CreateJob(ctx, store.CreateJobParams{
 		ID:          domaintypes.NewJobID(),
 		RunID:       run.ID,
@@ -604,36 +604,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ ListDiffsByRunRepo returned %d diffs", len(allDiffs))
 
-	// C2: Verify ListDiffsBeforeStep returns correct subset.
-	// Query for next_id <= 0 should return 2 diffs (step 0 mod + heal).
-	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:  run.ID,
-		NextID: 0,
-	})
-	if err != nil {
-		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
-	}
-	if len(diffsBeforeStep0) != 2 {
-		t.Errorf("Expected 2 diffs for step <= 0, got %d", len(diffsBeforeStep0))
-	}
-	t.Logf("✓ ListDiffsBeforeStep(0) returned %d diffs", len(diffsBeforeStep0))
-
-	// Query for next_id <= 1 should return 5 diffs (all).
-	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:  run.ID,
-		NextID: 1,
-	})
-	if err != nil {
-		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)
-	}
-	if len(diffsBeforeStep1) != 5 {
-		t.Errorf("Expected 5 diffs for step <= 1, got %d", len(diffsBeforeStep1))
-	}
-	t.Logf("✓ ListDiffsBeforeStep(1) returned %d diffs", len(diffsBeforeStep1))
-
-	// Verify ordering: diffs are ordered by created_at ASC (next_id is now on jobs, not diffs).
+	// Verify ordering: diffs are ordered by created_at ASC.
 	t.Logf("✓ Verified diff ordering (by created_at)")
-	_ = diffsBeforeStep1 // Silence unused variable warning.
 
 	// Silence unused variable warnings for diff IDs (used implicitly via DB state).
 	_ = step0ModDiff

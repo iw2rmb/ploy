@@ -38,7 +38,6 @@ type ClaimResponse struct {
 	JobType   types.JobType    `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
 	JobImage  string           `json:"job_image"` // Container image for mod/heal jobs
 	NextID    *types.JobID     `json:"next_id"`
-	StepIndex types.StepIndex  `json:"job_index,omitempty"` // Optional metadata for diagnostics only
 	RepoURL   types.RepoURL    `json:"repo_url"`
 	Status    string           `json:"status"`
 	NodeID    types.NodeID     `json:"node_id"`

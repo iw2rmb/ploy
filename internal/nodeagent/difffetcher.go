@@ -116,55 +116,6 @@ func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunI
 	return patches, nil
 }
 
-// FetchDiffsForStepRepo fetches all gzipped patches for non-healing diffs up to (and including)
-// the specified step index for a specific repo within a run.
-//
-// Deprecated: kept for tests and legacy call-sites; new execution paths should use
-// FetchDiffsForJobRepo to avoid step-index orchestration dependence.
-func (f *DiffFetcher) FetchDiffsForStepRepo(ctx context.Context, runID types.RunID, repoID types.ModRepoID, stepIndex types.StepIndex) ([][]byte, error) {
-	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)
-	if err != nil {
-		return nil, fmt.Errorf("list run repo diffs: %w", err)
-	}
-
-	var relevantDiffs []diffListItem
-	for _, d := range diffs {
-		si, ok := d.Summary.StepIndex()
-		if !ok {
-			continue
-		}
-		if si > stepIndex {
-			continue
-		}
-		if d.Summary.JobType() == DiffJobTypeHealing.String() {
-			continue
-		}
-		relevantDiffs = append(relevantDiffs, d)
-	}
-
-	sort.SliceStable(relevantDiffs, func(i, j int) bool {
-		siI, _ := relevantDiffs[i].Summary.StepIndex()
-		siJ, _ := relevantDiffs[j].Summary.StepIndex()
-		if siI != siJ {
-			return siI < siJ
-		}
-		if !relevantDiffs[i].CreatedAt.Equal(relevantDiffs[j].CreatedAt) {
-			return relevantDiffs[i].CreatedAt.Before(relevantDiffs[j].CreatedAt)
-		}
-		return relevantDiffs[i].ID < relevantDiffs[j].ID
-	})
-
-	patches := make([][]byte, 0, len(relevantDiffs))
-	for _, d := range relevantDiffs {
-		patch, err := f.FetchRunRepoDiffPatch(ctx, runID, repoID, d.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetch patch for diff %s: %w", d.ID, err)
-		}
-		patches = append(patches, patch)
-	}
-	return patches, nil
-}
-
 // FetchRunRepoDiffPatch downloads the gzipped patch for a specific diff.
 func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.RunID, repoID types.ModRepoID, diffID string) ([]byte, error) {
 	base, err := url.Parse(f.cfg.ServerURL)

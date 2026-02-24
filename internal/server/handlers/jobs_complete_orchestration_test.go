@@ -54,7 +54,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 				Name:        "mod-0",
 				Status:      store.JobStatusSuccess,
 				JobType:     "mod",
-				Meta:        withStepIndexMeta([]byte(`{}`), 1000),
+				Meta:        withNextIDMeta([]byte(`{}`), 1000),
 			},
 		},
 		// All repos terminal triggers run completion.
@@ -208,7 +208,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			NodeID:      &f.NodeID,
 			Status:      store.JobStatusSuccess,
 			JobType:     domaintypes.JobTypePreGate.String(),
-			Meta:        withStepIndexMeta([]byte(`{}`), 1000),
+			Meta:        withNextIDMeta([]byte(`{}`), 1000),
 		},
 		f.Job,
 		{
@@ -219,7 +219,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			Attempt:     1,
 			Status:      store.JobStatusCreated,
 			JobType:     domaintypes.JobTypePostGate.String(),
-			Meta:        withStepIndexMeta([]byte(`{}`), 3000),
+			Meta:        withNextIDMeta([]byte(`{}`), 3000),
 		},
 	}
 	f.Job.NextID = &postJobID

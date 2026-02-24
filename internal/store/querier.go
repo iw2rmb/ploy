@@ -140,9 +140,6 @@ type Querier interface {
 	// Returns artifact bundle metadata for a run and job.
 	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
-	// Returns all diffs for a run up to (and including) the specified next_id.
-	// next_id is read from summary metadata when present.
-	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.

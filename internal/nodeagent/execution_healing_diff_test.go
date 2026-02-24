@@ -234,7 +234,7 @@ func TestUploadHealingJobDiff_UsesGenerateBetween(t *testing.T) {
 		Timings:  step.StageTiming{},
 	}
 
-	rc.uploadHealingJobDiff(context.Background(), "run-1", "job-1", "heal-1-0", diffGen, baseDir, workspace, result, 1500)
+	rc.uploadHealingJobDiff(context.Background(), "run-1", "job-1", "heal-1-0", diffGen, baseDir, workspace, result)
 
 	if !diffGen.generateBetween {
 		t.Fatalf("GenerateBetween was not called for healing job diff")

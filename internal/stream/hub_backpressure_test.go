@@ -67,7 +67,6 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			NodeID:    nodeID,
 			JobID:     jobID,
 			JobType:   "mod",
-			StepIndex: domaintypes.StepIndex(i),
 		}
 		// Should not block; slow subscriber should be dropped.
 		if err := hub.PublishLog(ctx, runID, record); err != nil {

@@ -225,7 +225,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		}
 	}()
 
-	slog.Info("starting MR job execution", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.StepIndex)
+	slog.Info("starting MR job execution", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID)
 
 	mrURL, mrErr := r.createMR(ctx, req, manifest, workspace)
 	duration := time.Since(startTime)
@@ -240,7 +240,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		stats := builder.MustBuild()
 
 		if errors.Is(mrErr, context.Canceled) || errors.Is(mrErr, context.DeadlineExceeded) {
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.JobID); uploadErr != nil {
 				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 			}
 			slog.Info("MR job cancelled", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
@@ -248,7 +248,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		}
 
 		var exitCode int32 = -1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID); uploadErr != nil {
 			slog.Error("failed to upload MR job failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Warn("MR job failed", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
@@ -257,7 +257,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 
 	stats := builder.MustBuild()
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload MR job success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("MR job succeeded", "run_id", req.RunID, "job_id", req.JobID, "mr_url", mrURL, "duration", duration)

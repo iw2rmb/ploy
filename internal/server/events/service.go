@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -175,8 +174,8 @@ func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID
 }
 
 // publishLogToHubWithBytes converts log data to logstream events and publishes them.
-// It enriches each LogRecord with execution context (node_id, job_id, job_type,
-// next_id) by looking up the associated job metadata when available.
+// It enriches each LogRecord with execution context (node_id, job_id, job_type)
+// by looking up the associated job metadata when available.
 func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
@@ -208,7 +207,6 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 				NodeID:    jobCtx.NodeID,
 				JobID:     jobCtx.JobID,
 				JobType:   jobCtx.JobType,
-				StepIndex: jobCtx.StepIndex,
 			}
 			if err := s.hub.PublishLog(ctx, runID, rec); err != nil {
 				return err
@@ -223,7 +221,6 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 				NodeID:    jobCtx.NodeID,
 				JobID:     jobCtx.JobID,
 				JobType:   jobCtx.JobType,
-				StepIndex: jobCtx.StepIndex,
 			}
 			_ = s.hub.PublishLog(ctx, runID, rec)
 		}
@@ -237,7 +234,6 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 		NodeID:    jobCtx.NodeID,
 		JobID:     jobCtx.JobID,
 		JobType:   jobCtx.JobType,
-		StepIndex: jobCtx.StepIndex,
 	}
 	return s.hub.PublishLog(ctx, runID, rec)
 }
@@ -246,10 +242,9 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 // Used to enrich log records with node and mod information.
 // Uses domain types to preserve type safety end-to-end without lossy casts.
 type jobContext struct {
-	NodeID    domaintypes.NodeID
-	JobID     domaintypes.JobID
-	JobType   domaintypes.JobType
-	StepIndex domaintypes.StepIndex
+	NodeID  domaintypes.NodeID
+	JobID   domaintypes.JobID
+	JobType domaintypes.JobType
 }
 
 // loadJobContext fetches job metadata for a given job ID and extracts
@@ -301,28 +296,10 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		}
 	}
 
-	// next_id is no longer persisted on jobs; preserve log enrichment support
-	// by reading optional metadata when present.
-	var si domaintypes.StepIndex
-	var stepMeta struct {
-		StepIndex *float64 `json:"next_id,omitempty"`
-	}
-	if len(job.Meta) > 0 && json.Unmarshal(job.Meta, &stepMeta) == nil && stepMeta.StepIndex != nil {
-		si = domaintypes.StepIndex(*stepMeta.StepIndex)
-		if !si.Valid() {
-			s.logger.Debug("invalid next_id metadata for log enrichment",
-				"job_id", job.ID.String(),
-				"next_id", *stepMeta.StepIndex,
-			)
-			si = 0
-		}
-	}
-
 	return jobContext{
-		NodeID:    nid,
-		JobID:     jid,
-		JobType:   mt,
-		StepIndex: si,
+		NodeID:  nid,
+		JobID:   jid,
+		JobType: mt,
 	}
 }
 

@@ -53,10 +53,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		jobStepByID := make(map[string]domaintypes.StepIndex, len(jobs))
-		for _, job := range jobs {
-			jobStepByID[job.ID.String()] = jobStepIndex(job)
-		}
+		jobOrderByID := deriveJobOrderByChain(jobs)
 
 		// Fetch artifact bundle metadata only (exclude bundle bytes).
 		bundles, err := st.ListArtifactBundlesMetaByRun(r.Context(), runID)
@@ -75,7 +72,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		}
 		type artifactRow struct {
 			summary   artifactSummary
-			stepIndex domaintypes.StepIndex
+			order     int
 			createdAt int64
 		}
 
@@ -84,7 +81,7 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			if bundle.JobID == nil || bundle.JobID.IsZero() {
 				continue
 			}
-			stepIndex, ok := jobStepByID[bundle.JobID.String()]
+			order, ok := jobOrderByID[bundle.JobID.String()]
 			if !ok {
 				continue
 			}
@@ -115,14 +112,14 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 
 			artifacts = append(artifacts, artifactRow{
 				summary:   summary,
-				stepIndex: stepIndex,
+				order:     order,
 				createdAt: createdAt,
 			})
 		}
 
 		sort.SliceStable(artifacts, func(i, j int) bool {
-			if artifacts[i].stepIndex != artifacts[j].stepIndex {
-				return artifacts[i].stepIndex < artifacts[j].stepIndex
+			if artifacts[i].order != artifacts[j].order {
+				return artifacts[i].order < artifacts[j].order
 			}
 			return artifacts[i].createdAt < artifacts[j].createdAt
 		})
@@ -140,4 +137,77 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			Artifacts: out,
 		})
 	}
+}
+
+func deriveJobOrderByChain(jobs []store.Job) map[string]int {
+	orderByID := make(map[string]int, len(jobs))
+	if len(jobs) == 0 {
+		return orderByID
+	}
+
+	jobByID := make(map[string]store.Job, len(jobs))
+	inDegree := make(map[string]int, len(jobs))
+	for _, job := range jobs {
+		id := job.ID.String()
+		jobByID[id] = job
+		inDegree[id] = 0
+	}
+	for _, job := range jobs {
+		if job.NextID == nil || job.NextID.IsZero() {
+			continue
+		}
+		nextID := job.NextID.String()
+		if _, ok := inDegree[nextID]; ok {
+			inDegree[nextID]++
+		}
+	}
+
+	heads := make([]store.Job, 0, len(jobs))
+	for _, job := range jobs {
+		if inDegree[job.ID.String()] == 0 {
+			heads = append(heads, job)
+		}
+	}
+	sort.SliceStable(heads, func(i, j int) bool {
+		return heads[i].ID.String() < heads[j].ID.String()
+	})
+
+	visited := make(map[string]bool, len(jobs))
+	order := 0
+	for _, head := range heads {
+		current := head
+		for {
+			id := current.ID.String()
+			if visited[id] {
+				break
+			}
+			visited[id] = true
+			orderByID[id] = order
+			order++
+
+			if current.NextID == nil || current.NextID.IsZero() {
+				break
+			}
+			next, ok := jobByID[current.NextID.String()]
+			if !ok {
+				break
+			}
+			current = next
+		}
+	}
+
+	remaining := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		id := job.ID.String()
+		if !visited[id] {
+			remaining = append(remaining, id)
+		}
+	}
+	sort.Strings(remaining)
+	for _, id := range remaining {
+		orderByID[id] = order
+		order++
+	}
+
+	return orderByID
 }

@@ -32,7 +32,6 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 		NodeID:    "aB3xY9",
 		JobID:     domaintypes.NewJobID(),
 		JobType:   "mod",
-		StepIndex: 2000,
 	}
 
 	b.ResetTimer()
@@ -81,7 +80,6 @@ func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 		NodeID:    nodeID,
 		JobID:     jobID,
 		JobType:   "hook",
-		StepIndex: 100,
 	}
 
 	b.ResetTimer()
@@ -165,7 +163,6 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			NodeID:    nodeID,
 			JobID:     jobID,
 			JobType:   "mod",
-			StepIndex: domaintypes.StepIndex(i),
 		}
 		if err := hub.PublishLog(ctx, runID, record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)

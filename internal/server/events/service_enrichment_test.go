@@ -116,9 +116,6 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	if rec.JobType != "mod" {
 		t.Errorf("job_type: got %q, want %q", rec.JobType, "mod")
 	}
-	if rec.StepIndex != 2000 {
-		t.Errorf("next_id: got %v, want %v", rec.StepIndex, 2000)
-	}
 }
 
 // TestLogRecord_LogEnrichmentPreservesTypedFields is a contract test that runs under
@@ -186,9 +183,6 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	}
 	if rec.JobType != domaintypes.JobTypePreGate {
 		t.Errorf("job_type: got %q, want %q", rec.JobType, domaintypes.JobTypePreGate)
-	}
-	if rec.StepIndex != 2000 {
-		t.Errorf("next_id: got %v, want %v", rec.StepIndex, 2000)
 	}
 }
 
@@ -261,9 +255,6 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 	if !rec.JobType.IsZero() {
 		t.Errorf("job_type should be empty, got %q", rec.JobType)
-	}
-	if !rec.StepIndex.IsZero() {
-		t.Errorf("next_id should be 0, got %v", rec.StepIndex)
 	}
 }
 

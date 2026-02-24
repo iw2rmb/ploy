@@ -11,7 +11,7 @@ import (
 )
 
 // TestLogRecordEnrichedFields verifies that enriched fields (NodeID, JobID,
-// JobType, StepIndex) marshal correctly through the publish/subscribe round-trip.
+// JobType) marshal correctly through the publish/subscribe round-trip.
 // Fields with zero values are omitted due to `omitempty` tags.
 func TestLogRecordEnrichedFields(t *testing.T) {
 	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
@@ -32,7 +32,6 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				NodeID:    "aB3xY9",
 				JobID:     jobID,
 				JobType:   "mod",
-				StepIndex: 2,
 			},
 			want: map[string]any{
 				"timestamp": "2025-10-22T12:00:00Z",
@@ -41,7 +40,6 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				"node_id":   "aB3xY9",
 				"job_id":    jobID.String(),
 				"job_type":  "mod",
-				"next_id":   float64(2), // JSON numbers decode as float64
 			},
 		},
 		{
@@ -65,7 +63,6 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 				Stream:    "stdout",
 				Line:      "partial context",
 				NodeID:    "Z9yX3b",
-				StepIndex: 0, // zero value, should be omitted
 			},
 			want: map[string]any{
 				"timestamp": "2025-10-22T12:00:02Z",
@@ -109,7 +106,7 @@ func TestLogRecordEnrichedFields(t *testing.T) {
 			}
 
 			// Verify omitted keys are truly absent.
-			omittedKeys := []string{"node_id", "job_id", "job_type", "next_id"}
+			omittedKeys := []string{"node_id", "job_id", "job_type"}
 			for _, k := range omittedKeys {
 				if _, inWant := tt.want[k]; !inWant {
 					if _, inGot := got[k]; inGot {
@@ -144,7 +141,6 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 		NodeID:    nodeID,
 		JobID:     jobID,
 		JobType:   domaintypes.JobTypePreGate,
-		StepIndex: 999,
 	}
 
 	// Subscribe before publishing.
@@ -177,10 +173,6 @@ func TestHubEnrichedLogPayloadSize(t *testing.T) {
 		if received.NodeID != record.NodeID {
 			t.Errorf("node_id: got %q, want %q", received.NodeID, record.NodeID)
 		}
-		if received.StepIndex != record.StepIndex {
-			t.Errorf("next_id: got %v, want %v", received.StepIndex, record.StepIndex)
-		}
-
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout waiting for large payload event")
 	}

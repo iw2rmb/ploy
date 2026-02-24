@@ -87,59 +87,6 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 	return i, err
 }
 
-const listDiffsBeforeStep = `-- name: ListDiffsBeforeStep :many
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-WHERE d.run_id = $1
-  AND (
-    CASE
-      WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-      ELSE 0
-    END
-  ) <= $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC
-`
-
-type ListDiffsBeforeStepParams struct {
-	RunID  types.RunID `json:"run_id"`
-	NextID float64     `json:"next_id"`
-}
-
-// Returns all diffs for a run up to (and including) the specified next_id.
-// next_id is read from summary metadata when present.
-func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.NextID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Diff{}
-	for rows.Next() {
-		var i Diff
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.PatchSize,
-			&i.ObjectKey,
-			&i.Summary,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id

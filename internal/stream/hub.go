@@ -25,11 +25,11 @@ type Options struct {
 }
 
 // LogRecord represents a structured log frame.
-// The enriched fields (NodeID, JobID, JobType, StepIndex) provide execution
+// The enriched fields (NodeID, JobID, JobType) provide execution
 // context so clients can correlate log lines with specific nodes, jobs, and
 // Mods pipeline stages. These fields are optional — older or internal-only
 // log sources may omit them.
-// Uses domain types (NodeID, JobID, JobType, StepIndex) for type-safe identification.
+// Uses domain types (NodeID, JobID, JobType) for type-safe identification.
 type LogRecord struct {
 	Timestamp string `json:"timestamp"`
 	Stream    string `json:"stream"`
@@ -46,11 +46,6 @@ type LogRecord struct {
 	// JobType indicates the job phase type (e.g., "pre_gate", "mod", "post_gate", "heal", "re_gate").
 	// Empty when not applicable or unknown. Uses domain type for type-safe identification.
 	JobType domaintypes.JobType `json:"job_type,omitempty"`
-
-	// StepIndex is the ordering value of the step within the Mods pipeline.
-	// Uses domain type StepIndex (float64-backed) to preserve ordering without lossy casts.
-	// Zero when omitted; use StepIndex.IsZero() to check for unset values.
-	StepIndex domaintypes.StepIndex `json:"next_id,omitempty"`
 }
 
 // RetentionHint carries retention metadata emitted on the stream.
@@ -134,7 +129,7 @@ func (h *Hub) PublishRetention(ctx context.Context, runID domaintypes.RunID, hin
 
 // PublishStatus appends a terminal status event to a stream.
 // Event types emitted by the hub are:
-//   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, JobType, StepIndex}
+//   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, JobType}
 //   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
 //   - "run": api.RunSummary snapshot
 //   - "stage": stage status update
