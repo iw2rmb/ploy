@@ -283,7 +283,7 @@ func TestRunController_uploadStatus(t *testing.T) {
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
-			err := controller.uploadStatus(ctx, "test-run", JobStatusSuccess.String(), &exitCode, stats, 1000, "test-job-id")
+			err := controller.uploadStatus(ctx, "test-run", JobStatusSuccess.String(), &exitCode, stats, "test-job-id")
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {

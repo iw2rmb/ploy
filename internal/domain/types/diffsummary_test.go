@@ -97,44 +97,6 @@ func TestDiffSummary_FilesChanged(t *testing.T) {
 	}
 }
 
-func TestDiffSummary_StepIndex(t *testing.T) {
-	tests := []struct {
-		name      string
-		json      string
-		wantIdx   StepIndex
-		wantFound bool
-	}{
-		{
-			name:      "step index present",
-			json:      `{"next_id": 2}`,
-			wantIdx:   2,
-			wantFound: true,
-		},
-		{
-			name:      "zero step index",
-			json:      `{"next_id": 0}`,
-			wantIdx:   0,
-			wantFound: true,
-		},
-		{
-			name:      "missing step index",
-			json:      `{}`,
-			wantIdx:   0,
-			wantFound: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			summary := mustParseDiffSummary(t, tt.json)
-			idx, found := summary.StepIndex()
-			if idx != tt.wantIdx || found != tt.wantFound {
-				t.Errorf("StepIndex() = (%v, %v), want (%v, %v)", idx, found, tt.wantIdx, tt.wantFound)
-			}
-		})
-	}
-}
-
 func TestDiffSummary_JobType(t *testing.T) {
 	tests := []struct {
 		name string
@@ -221,7 +183,6 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	jsonData := `{
 		"exit_code": 0,
 		"files_changed": 3,
-		"next_id": 1,
 		"job_type": "mod",
 		"timings": {
 			"hydration_duration_ms": 100,
@@ -248,12 +209,6 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 		t.Errorf("FilesChanged() = (%d, %v), want (3, true)", files, found)
 	}
 
-	// Verify step index.
-	idx, found := summary.StepIndex()
-	if !found || idx != 1 {
-		t.Errorf("StepIndex() = (%v, %v), want (1, true)", idx, found)
-	}
-
 	// Verify mod type.
 	modType := summary.JobType()
 	if modType != "mod" {
@@ -265,18 +220,12 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("basic fields", func(t *testing.T) {
 		summary := NewDiffSummaryBuilder().
 			ExitCode(0).
-			StepIndex(StepIndex(1)).
 			JobType("mod").
 			MustBuild()
 
 		code, found := summary.ExitCode()
 		if !found || code != 0 {
 			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
-		}
-
-		idx, found := summary.StepIndex()
-		if !found || idx != 1 {
-			t.Errorf("StepIndex() = (%v, %v), want (1, true)", idx, found)
 		}
 
 		modType := summary.JobType()
@@ -312,7 +261,6 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("JSON roundtrip", func(t *testing.T) {
 		original := NewDiffSummaryBuilder().
 			ExitCode(0).
-			StepIndex(StepIndex(2)).
 			JobType("healing").
 			FilesChanged(5).
 			MustBuild()
@@ -333,11 +281,6 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		code, found := parsed.ExitCode()
 		if !found || code != 0 {
 			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
-		}
-
-		idx, found := parsed.StepIndex()
-		if !found || idx != 2 {
-			t.Errorf("StepIndex() = (%v, %v), want (2, true)", idx, found)
 		}
 
 		modType := parsed.JobType()

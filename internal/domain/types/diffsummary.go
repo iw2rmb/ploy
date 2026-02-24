@@ -23,7 +23,6 @@ type DiffSummary json.RawMessage
 type diffSummaryAccessor struct {
 	ExitCode     *int                `json:"exit_code,omitempty"`
 	FilesChanged *int                `json:"files_changed,omitempty"`
-	StepIndex    *StepIndex          `json:"next_id,omitempty"`
 	JobType      *string             `json:"job_type,omitempty"`
 	Timings      *diffSummaryTimings `json:"timings,omitempty"`
 }
@@ -97,16 +96,6 @@ func (d DiffSummary) FilesChanged() (int, bool) {
 	return *acc.FilesChanged, true
 }
 
-// StepIndex returns the next_id field as a StepIndex when present.
-// Returns zero StepIndex and false if not present.
-func (d DiffSummary) StepIndex() (StepIndex, bool) {
-	acc := d.decode()
-	if acc.StepIndex == nil {
-		return 0, false
-	}
-	return *acc.StepIndex, true
-}
-
 // JobType returns the job_type field when present.
 // Common values: "mod", "healing".
 func (d DiffSummary) JobType() string {
@@ -137,13 +126,6 @@ func (b *DiffSummaryBuilder) ExitCode(code int) *DiffSummaryBuilder {
 // FilesChanged sets the files_changed field.
 func (b *DiffSummaryBuilder) FilesChanged(count int) *DiffSummaryBuilder {
 	b.acc.FilesChanged = &count
-	return b
-}
-
-// StepIndex sets the next_id field.
-// Uses types.StepIndex for type-safe step ordering without lossy int casts.
-func (b *DiffSummaryBuilder) StepIndex(idx StepIndex) *DiffSummaryBuilder {
-	b.acc.StepIndex = &idx
 	return b
 }
 

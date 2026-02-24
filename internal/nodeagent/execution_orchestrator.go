@@ -60,7 +60,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		"run_id", req.RunID,
 		"job_id", req.JobID,
 		"job_type", req.JobType,
-		"next_id", req.StepIndex,
+		"next_id", req.NextID,
 	)
 
 	jobType := req.JobType
@@ -152,7 +152,7 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 		DurationMs(duration.Milliseconds()).
 		Error(err.Error()).
 		MustBuild()
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 }

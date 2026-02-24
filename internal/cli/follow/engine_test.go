@@ -92,7 +92,6 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 		Name:        "mod-0",
 		JobType:     "mod",
 		JobImage:    "ubuntu:latest",
-		StepIndex:   2000,
 		NodeID:      &nodeID,
 		Status:      store.JobStatusRunning,
 		StartedAt:   &started,
@@ -147,11 +146,10 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	e.repoOrder = []domaintypes.ModRepoID{repoID}
 	e.repoURLs[repoID] = "example.com/org/repo"
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
-		JobID:     jobID,
-		Name:      "pre-gate",
-		JobType:   "pre_gate",
-		StepIndex: 1000,
-		Status:    store.JobStatusFail,
+		JobID:   jobID,
+		Name:    "pre-gate",
+		JobType: "pre_gate",
+		Status:  store.JobStatusFail,
 	}}
 
 	// Set Stack Gate failure message

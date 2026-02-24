@@ -64,11 +64,11 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 		t.Fatalf("got %d diffs, want 3", len(result))
 	}
 
-	if got, ok := result[0].Summary.StepIndex(); !ok || got != 1000 {
-		t.Fatalf("result[0].Summary.StepIndex()=%v ok=%v, want 1000 true", got, ok)
+	if got := result[0].Summary.JobType(); got != "mod" {
+		t.Fatalf("result[0].Summary.JobType()=%q, want %q", got, "mod")
 	}
-	if got, ok := result[2].Summary.StepIndex(); !ok || got != 3000 {
-		t.Fatalf("result[2].Summary.StepIndex()=%v ok=%v, want 3000 true", got, ok)
+	if got := result[2].Summary.JobType(); got != "mod" {
+		t.Fatalf("result[2].Summary.JobType()=%q, want %q", got, "mod")
 	}
 }
 

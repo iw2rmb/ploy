@@ -3,25 +3,6 @@
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE id = $1;
 
--- name: ListDiffsBeforeStep :many
--- Returns all diffs for a run up to (and including) the specified next_id.
--- next_id is read from summary metadata when present.
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-WHERE d.run_id = $1
-  AND (
-    CASE
-      WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-      ELSE 0
-    END
-  ) <= $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC;
-
 -- name: CreateDiff :one
 -- Creates a new diff entry associated with a job. Blob data is stored in object storage.
 INSERT INTO diffs (run_id, job_id, patch_size, summary)

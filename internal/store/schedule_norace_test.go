@@ -176,7 +176,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	// Create jobs with distinct step indices.
 	const numJobs = 5
 	jobIDs := make([]types.JobID, numJobs)
-	stepIndices := []types.StepIndex{5000, 1000, 3000, 2000, 4000} // Not in order
+	stepIndices := []float64{5000, 1000, 3000, 2000, 4000} // Not in order
 
 	for i := 0; i < numJobs; i++ {
 		jobIDs[i] = types.NewJobID()
@@ -201,7 +201,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	// Build expected order: jobs sorted by next_id ASC.
 	type jobWithIndex struct {
 		id    types.JobID
-		index types.StepIndex
+		index float64
 	}
 	jobsWithIndex := make([]jobWithIndex, numJobs)
 	for i := 0; i < numJobs; i++ {

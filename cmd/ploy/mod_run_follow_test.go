@@ -65,7 +65,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				"repo_id": repoID,
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
-					{"job_id": stageID.String(), "name": "mod-0", "job_type": "mod", "next_id": 2000, "status": "Success", "duration_ms": 100},
+					{"job_id": stageID.String(), "name": "mod-0", "job_type": "mod", "next_id": nil, "status": "Success", "duration_ms": 100},
 				},
 			})
 
@@ -233,7 +233,7 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 				"repo_id": repoID,
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
-					{"job_id": jobID, "name": "mod-0", "job_type": "mod", "next_id": 2000, "status": "Running", "duration_ms": 0, "display_name": "java17-upgrade"},
+					{"job_id": jobID, "name": "mod-0", "job_type": "mod", "next_id": nil, "status": "Running", "duration_ms": 0, "display_name": "java17-upgrade"},
 				},
 			})
 
@@ -371,9 +371,9 @@ func TestModRunFollowWithMultipleJobs(t *testing.T) {
 				"repo_id": repoID,
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
-					{"job_id": preGateJobID, "name": "pre-gate", "job_type": "pre_gate", "next_id": 1000, "status": "Success", "duration_ms": 50},
-					{"job_id": modJobID, "name": "mod-0", "job_type": "mod", "next_id": 2000, "status": "Running", "duration_ms": 0},
-					{"job_id": postGateJobID, "name": "post-gate", "job_type": "post_gate", "next_id": 3000, "status": "Created", "duration_ms": 0},
+					{"job_id": preGateJobID, "name": "pre-gate", "job_type": "pre_gate", "next_id": modJobID, "status": "Success", "duration_ms": 50},
+					{"job_id": modJobID, "name": "mod-0", "job_type": "mod", "next_id": postGateJobID, "status": "Running", "duration_ms": 0},
+					{"job_id": postGateJobID, "name": "post-gate", "job_type": "post_gate", "next_id": nil, "status": "Created", "duration_ms": 0},
 				},
 			})
 

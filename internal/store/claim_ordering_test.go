@@ -33,7 +33,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	run := fx.Run
 
 	// Create jobs with the SAME next_id to test tie-breaking by id.
-	const sameStepIndex = types.StepIndex(5000)
+	const sameStepIndex = float64(5000)
 	const numJobs = 5
 
 	jobIDs := make([]types.JobID, numJobs)
@@ -233,7 +233,7 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		{run: run2.ID, repo: repo2.ID}:        run2Repo2,
 	}
 
-	createJob := func(runID types.RunID, repoID types.ModRepoID, stepIndex types.StepIndex) types.JobID {
+	createJob := func(runID types.RunID, repoID types.ModRepoID, stepIndex float64) types.JobID {
 		t.Helper()
 		rr, ok := runRepoByKey[runRepoKey{run: runID, repo: repoID}]
 		if !ok {
@@ -263,9 +263,9 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	// - run_low + repo_low gets the largest next_id
 	// - run_low + repo_high gets a smaller next_id
 	// - run_high + repo_low gets the smallest next_id
-	jobRunLowRepoLow := createJob(runLow, repoLow, types.StepIndex(2000))
-	jobRunLowRepoHigh := createJob(runLow, repoHigh, types.StepIndex(1000))
-	jobRunHighRepoLow := createJob(runHigh, repoLow, types.StepIndex(500))
+	jobRunLowRepoLow := createJob(runLow, repoLow, float64(2000))
+	jobRunLowRepoHigh := createJob(runLow, repoHigh, float64(1000))
+	jobRunHighRepoLow := createJob(runHigh, repoLow, float64(500))
 
 	node, err := db.CreateNode(ctx, CreateNodeParams{
 		ID:          types.NodeID(types.NewNodeKey()),

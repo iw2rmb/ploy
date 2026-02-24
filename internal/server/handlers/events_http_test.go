@@ -212,7 +212,6 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 		NodeID:    "aB3xY9",
 		JobID:     jobID,
 		JobType:   "mod",
-		StepIndex: 2000,
 	}
 	if err := hub.PublishLog(ctx, domaintypes.RunID(runID), enriched); err != nil {
 		t.Fatalf("publish enriched log: %v", err)
@@ -260,7 +259,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	if got := payload["job_type"]; got != "mod" {
 		t.Errorf("job_type = %v, want %q", got, "mod")
 	}
-	if got := payload["next_id"]; got != float64(2000) {
-		t.Errorf("next_id = %v, want %v", got, 2000)
+	if _, ok := payload["next_id"]; ok {
+		t.Errorf("next_id should be absent, got %v", payload["next_id"])
 	}
 }

@@ -160,7 +160,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		BaseRef:      claim.BaseRef,
 		TargetRef:    claim.TargetRef,
 		CommitSHA:    derefCommitSHA(claim.CommitSha),
-		StepIndex:    claim.StepIndex, // Optional step metadata from server.
 		JobType:      claim.JobType,
 		JobImage:     claim.JobImage,
 		NextID:       claim.NextID,

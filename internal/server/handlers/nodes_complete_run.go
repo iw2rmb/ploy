@@ -32,8 +32,8 @@ func maybeUpdateRunRepoStatus(
 	repoID domaintypes.ModRepoID,
 	attempt int32,
 ) (bool, error) {
-	// List jobs for this repo attempt and compute terminal status from the last job
-	// (highest next_id), excluding MR jobs.
+	// List jobs for this repo attempt and compute terminal status from the chain tail
+	// (job with next_id=nil), excluding MR jobs.
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
 		RunID:   runID,
 		RepoID:  repoID,
@@ -43,7 +43,10 @@ func maybeUpdateRunRepoStatus(
 		return false, fmt.Errorf("list jobs by repo attempt: %w", err)
 	}
 
-	var lastJob *store.Job
+	var (
+		tailJobs []store.Job
+		fallback *store.Job
+	)
 	for i := range jobs {
 		job := &jobs[i]
 
@@ -60,18 +63,25 @@ func maybeUpdateRunRepoStatus(
 			return false, nil
 		}
 
-		currentStep := jobStepIndex(*job)
-		if !currentStep.Valid() {
-			return false, fmt.Errorf("invalid next_id for job_id=%s next_id=%v", job.ID, float64(currentStep))
+		if fallback == nil || job.ID.String() > fallback.ID.String() {
+			fallback = job
 		}
-
-		if lastJob == nil || currentStep.Float64() > jobStepIndex(*lastJob).Float64() {
-			lastJob = job
+		if job.NextID == nil || job.NextID.IsZero() {
+			tailJobs = append(tailJobs, *job)
 		}
 	}
 
-	if lastJob == nil {
+	if fallback == nil {
 		return false, nil
+	}
+	lastJob := fallback
+	if len(tailJobs) > 0 {
+		lastJob = &tailJobs[0]
+		for i := 1; i < len(tailJobs); i++ {
+			if tailJobs[i].ID.String() > lastJob.ID.String() {
+				lastJob = &tailJobs[i]
+			}
+		}
 	}
 
 	var repoStatus store.RunRepoStatus

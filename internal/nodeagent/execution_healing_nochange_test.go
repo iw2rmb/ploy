@@ -51,9 +51,8 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 	}
 
 	req := StartRunRequest{
-		RunID:     types.RunID("run-heal-nochange"),
-		JobID:     types.JobID("job-heal-nochange"),
-		StepIndex: types.StepIndex(0),
+		RunID: types.RunID("run-heal-nochange"),
+		JobID: types.JobID("job-heal-nochange"),
 	}
 
 	stats := types.NewRunStatsBuilder().

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -147,46 +146,6 @@ func (v *ModRef) UnmarshalText(b []byte) error {
 
 func (v ModRef) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *ModRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-
-// StepIndex identifies a job's ordering value within a run execution sequence.
-type StepIndex float64
-
-var _ interface {
-	json.Marshaler
-	json.Unmarshaler
-} = (*StepIndex)(nil)
-
-func (v StepIndex) Float64() float64 { return float64(v) }
-func (v StepIndex) IsZero() bool     { return v == 0 }
-
-// Valid reports whether the StepIndex represents a valid step ordering value.
-func (v StepIndex) Valid() bool {
-	f := float64(v)
-	return !math.IsNaN(f) && !math.IsInf(f, 0)
-}
-
-func (v StepIndex) MarshalJSON() ([]byte, error) {
-	if !v.Valid() {
-		return nil, fmt.Errorf("invalid next_id")
-	}
-	return json.Marshal(float64(v))
-}
-
-func (v *StepIndex) UnmarshalJSON(b []byte) error {
-	if v == nil {
-		return errors.New("StepIndex: UnmarshalJSON on nil pointer")
-	}
-	var f float64
-	if err := json.Unmarshal(b, &f); err != nil {
-		return err
-	}
-	si := StepIndex(f)
-	if !si.Valid() {
-		return fmt.Errorf("invalid next_id")
-	}
-	*v = si
-	return nil
-}
 
 // Validation errors for ID types.
 var (

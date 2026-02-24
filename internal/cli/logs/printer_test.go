@@ -93,10 +93,9 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Line:      "Step started",
 				NodeID:    "node-abc",
 				JobType:   "mod",
-				StepIndex: 2000,
 				JobID:     "job-123",
 			},
-			want: "2025-10-22T10:00:00Z stdout node=node-abc job_type=mod step=2000 job=job-123 Step started\n",
+			want: "2025-10-22T10:00:00Z stdout node=node-abc job_type=mod job=job-123 Step started\n",
 		},
 		{
 			name: "node_id only",
@@ -126,7 +125,6 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Stream:    "stdout",
 				Line:      "step index zero",
 				NodeID:    "node-def",
-				StepIndex: 0,
 			},
 			want: "2025-10-22T10:00:03Z stdout node=node-def step index zero\n",
 		},
@@ -136,9 +134,8 @@ func TestPrintLog_StructuredEnriched(t *testing.T) {
 				Timestamp: "2025-10-22T10:00:04Z",
 				Stream:    "stdout",
 				Line:      "step index one",
-				StepIndex: 1,
 			},
-			want: "2025-10-22T10:00:04Z stdout step=1 step index one\n",
+			want: "2025-10-22T10:00:04Z stdout step index one\n",
 		},
 	}
 
@@ -181,7 +178,6 @@ func TestPrintLog_Raw(t *testing.T) {
 				Line:      "warn",
 				NodeID:    "node-ignored",
 				JobType:   "hook",
-				StepIndex: 5,
 				JobID:     "job-ignored",
 			},
 			want: "warn\n",
@@ -347,11 +343,10 @@ func TestLogRecord_PrinterStructuredRendersEnrichedFields(t *testing.T) {
 		Line:      "hello",
 		NodeID:    "node-abc",
 		JobType:   "pre_gate",
-		StepIndex: 2000,
 		JobID:     "job-123",
 	})
 
-	want := "2025-10-22T10:00:00Z stdout node=node-abc job_type=pre_gate step=2000 job=job-123 hello\n"
+	want := "2025-10-22T10:00:00Z stdout node=node-abc job_type=pre_gate job=job-123 hello\n"
 	if got := buf.String(); got != want {
 		t.Errorf("PrintLog() =\n%q\nwant:\n%q", got, want)
 	}
