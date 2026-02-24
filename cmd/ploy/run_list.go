@@ -2,7 +2,7 @@
 //
 // This file provides CLI handlers for managing batch runs as a whole, complementing
 // the repo-level operations in mod_run_repo.go. Batch commands delegate to the
-// internal/cli/mods batch client for HTTP communication with the control plane.
+// internal/cli/migs batch client for HTTP communication with the control plane.
 //
 // Command structure:
 //   - ploy run list [--limit N] [--offset N]
@@ -16,7 +16,7 @@ import (
 	"io"
 	"text/tabwriter"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/migs"
 )
 
 // handleRunList implements `ploy run list [--limit N] [--offset N]`.
@@ -49,7 +49,7 @@ func handleRunList(args []string, stderr io.Writer) error {
 	}
 
 	// Execute the list command using the batch client.
-	cmd := mods.ListBatchesCommand{
+	cmd := migs.ListBatchesCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Limit:   int32(*limit),
@@ -95,6 +95,6 @@ func printRunListUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --offset N  Number of runs to skip (default 0)")
 }
 
-// NOTE: The `ploy mod run status` command has been removed.
+// NOTE: The `ploy mig run status` command has been removed.
 // Run-level status is now exposed via `ploy run status <run-id>`, which
 // reuses the richer status output previously implemented here.

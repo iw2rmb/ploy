@@ -41,12 +41,12 @@ RUN=("$REPO_ROOT/dist/ploy" mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
-  --mod-image "${PLOY_CONTAINER_REGISTRY}/mods-orw-maven:latest" \
-  --mod-env RECIPE_GROUP="$RECIPE_GROUP" \
-  --mod-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
-  --mod-env RECIPE_VERSION="$RECIPE_VERSION" \
-  --mod-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
-  --mod-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
+  --job-image "${PLOY_CONTAINER_REGISTRY}/mods-orw-maven:latest" \
+  --job-env RECIPE_GROUP="$RECIPE_GROUP" \
+  --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
+  --job-env RECIPE_VERSION="$RECIPE_VERSION" \
+  --job-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
+  --job-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
   --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \

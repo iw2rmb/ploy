@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/migs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -153,8 +153,8 @@ func createAndCheckoutBranch(ctx context.Context, targetRef, commitSHA string, s
 	return nil
 }
 
-func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]mods.DiffEntry, error) {
-	cmd := mods.ListRunRepoDiffsCommand{
+func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]migs.DiffEntry, error) {
+	cmd := migs.ListRunRepoDiffsCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
 		RunID:   runID,
@@ -165,7 +165,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffs []migs.DiffEntry, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}
@@ -180,7 +180,7 @@ func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID 
 		_, _ = fmt.Fprintf(stderr, "  applying diff %d/%d: %s...\n",
 			i+1, len(diffs), diff.ID)
 
-		downloadCmd := mods.DownloadDiffCommand{
+		downloadCmd := migs.DownloadDiffCommand{
 			Client:  httpClient,
 			BaseURL: base,
 			RunID:   runID,

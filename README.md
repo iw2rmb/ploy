@@ -85,14 +85,14 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Submit a Mods run and follow events:
 
   ```bash
-  ./dist/ploy mod run --repo-url https://github.com/example/repo.git \
+  ./dist/ploy mig run --repo-url https://github.com/example/repo.git \
     --repo-base-ref main \
     --follow
   ```
 
   # Optional: include an explicit target ref to control the MR source branch
   # (otherwise the node derives ploy/{run_name|run_id} when an MR is created).
-  ./dist/ploy mod run --repo-url https://github.com/example/repo.git \
+  ./dist/ploy mig run --repo-url https://github.com/example/repo.git \
     --repo-base-ref main \
     --repo-target-ref feature/upgrade \
     --mr-success \

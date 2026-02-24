@@ -57,7 +57,7 @@ Source branch naming
 
 Create an MR on success (capture server-assigned run ID via JSON):
 ```bash
-RUN_ID=$(ploy mod run --json \
+RUN_ID=$(ploy mig run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade-java-17 \
@@ -67,7 +67,7 @@ RUN_ID=$(ploy mod run --json \
 
 Create an MR on failure (useful for debugging):
 ```bash
-RUN_ID=$(ploy mod run --json \
+RUN_ID=$(ploy mig run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/debug-build-failure \
@@ -77,7 +77,7 @@ RUN_ID=$(ploy mod run --json \
 
 Create an MR in both success and failure cases and capture MR URL too:
 ```bash
-read RUN_ID MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mig run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/experiment \
@@ -100,7 +100,7 @@ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/$RUN_ID/status" | jq '.metadata.mr_url
 Override the global GitLab configuration for a single run using flags, capture run+MR via JSON:
 
 ```bash
-read RUN_ID MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mig run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade \
@@ -171,7 +171,7 @@ EOF
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Run OpenRewrite to upgrade Java 17
-read RUN_ID MR_URL < <(ploy mod run --json \
+read RUN_ID MR_URL < <(ploy mig run --json \
   --repo-url https://gitlab.com/yourorg/spring-petclinic.git \
   --repo-base-ref main \
   --repo-target-ref workflow/java-17-upgrade \
@@ -198,16 +198,16 @@ per repo. Each `run_repo` can produce its own merge request.
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Create a named batch.
-ploy mod run --spec mod.yaml --name java17-fleet --mr-success
+ploy mig run --spec mod.yaml --name java17-fleet --mr-success
 
 # 3. Add repositories — each will create an MR on success.
-ploy mod run repo add \
+ploy mig run repo add \
   --repo-url https://gitlab.com/org/service-a.git \
   --base-ref main \
   --target-ref workflow/java-17-upgrade \
   java17-fleet
 
-ploy mod run repo add \
+ploy mig run repo add \
   --repo-url https://gitlab.com/org/service-b.git \
   --base-ref main \
   --target-ref workflow/java-17-upgrade \
@@ -223,7 +223,7 @@ If one repository fails due to a missing fix, restart it with a different branch
 
 ```bash
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
-ploy mod run repo restart \
+ploy mig run repo restart \
   --repo-id <repo-id> \
   --target-ref hotfix \
   java17-fleet
@@ -233,14 +233,14 @@ When the restarted job succeeds, an MR is created for the `hotfix` branch merge.
 
 ### Inspect Batch Status
 
-Use `ploy run status` and `ploy mod run repo status` to inspect batch state:
+Use `ploy run status` and `ploy mig run repo status` to inspect batch state:
 
 ```bash
 # Batch-level status and repo counts:
 ploy run status java17-fleet
 
 # Per-repo status within the batch:
-ploy mod run repo status java17-fleet
+ploy mig run repo status java17-fleet
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
@@ -254,10 +254,10 @@ when MR creation is not needed.
 ```bash
 # After a batch run completes, pull changes locally:
 cd service-a
-ploy mod pull java17-fleet
+ploy mig pull java17-fleet
 
 # Preview what would be pulled:
-ploy mod pull --dry-run java17-fleet
+ploy mig pull --dry-run java17-fleet
 ```
 
 The `mod pull` command:

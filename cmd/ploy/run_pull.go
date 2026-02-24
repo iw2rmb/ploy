@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/migs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -120,7 +120,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("run pull: %w", err)
 	}
 
-	pullCmd := mods.RunPullCommand{
+	pullCmd := migs.RunPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   domaintypes.RunID(runID),

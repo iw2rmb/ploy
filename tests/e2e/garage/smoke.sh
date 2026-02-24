@@ -144,12 +144,12 @@ EOC
 )
 
 log "Running deterministic smoke mod"
-RUN_JSON="$($REPO_ROOT/dist/ploy mod run --json \
+RUN_JSON="$($REPO_ROOT/dist/ploy mig run --json \
   --repo-url "$REPO_URL" \
   --repo-base-ref main \
   --repo-target-ref "e2e/garage-smoke-${TS}" \
-  --mod-image alpine:3.20 \
-  --mod-command "$MOD_CMD" \
+  --job-image alpine:3.20 \
+  --job-command "$MOD_CMD" \
   --follow \
   --artifact-dir "$RUN_ARTIFACT_DIR")"
 
@@ -170,7 +170,7 @@ if ! rg -q "garage-smoke" "$RUN_LOG_PATH"; then
 fi
 
 log "Downloading artifacts via CLI"
-$REPO_ROOT/dist/ploy mod fetch --run "$RUN_ID" --artifact-dir "$FETCH_DIR"
+$REPO_ROOT/dist/ploy mig fetch --run "$RUN_ID" --artifact-dir "$FETCH_DIR"
 if [[ ! -f "$FETCH_DIR/manifest.json" ]]; then
   echo "error: expected artifact manifest at $FETCH_DIR/manifest.json" >&2
   exit 1

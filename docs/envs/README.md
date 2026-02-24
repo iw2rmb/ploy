@@ -78,7 +78,7 @@ Role model (bearer token claims):
 - `worker` — node agent role. Used by nodes after bootstrap to authenticate with the control plane.
 - `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
-  reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
+  reads this to populate the `Submitter` field when creating mod runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (example: `ghcr.io/iw2rmb`).
 - `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
@@ -92,7 +92,7 @@ Role model (bearer token claims):
 - Cross-phase input directory: `/in` is mounted read-only for healing mods (e.g., `mods-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
-- `--spec` — Path to a YAML/JSON spec file for `ploy mod run` defining mod parameters,
+- `--spec` — Path to a YAML/JSON spec file for `ploy mig run` defining mod parameters,
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
@@ -102,8 +102,8 @@ Role model (bearer token claims):
   - See `docs/schemas/mod.example.yaml` for the full schema
 - `--name` — Creates a **batch run** with the given name (no repository attached yet).
   Used with `mod run repo add` to attach multiple repositories under a shared spec.
-  Example: `ploy mod run --spec mod.yaml --name my-batch` followed by
-  `ploy mod run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
+  Example: `ploy mig run --spec mod.yaml --name my-batch` followed by
+  `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
@@ -219,7 +219,7 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 
 ## E2E Harness
 
-- `ploy mod run` executes Mods against the Ploy control plane; no tenant variable is required.
+- `ploy mig run` executes Mods against the Ploy control plane; no tenant variable is required.
 - `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
@@ -242,7 +242,7 @@ Control plane configuration (set via CLI or YAML):
   memory at runtime, not persisted back to disk.
 - `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. See details below.
 
-Per-run overrides (CLI flags on `ploy mod run`):
+Per-run overrides (CLI flags on `ploy mig run`):
 - `--gitlab-pat` — Override the control plane PAT for this run only
 - `--gitlab-domain` — Override the control plane domain for this run only
 - `--mr-success` — Create an MR when the run succeeds
@@ -269,13 +269,13 @@ Example usage:
 ploy config gitlab set --file gitlab-config.json
 
 # Run with MR on success (server assigns run ID)
-ploy mod run --mr-success \
+ploy mig run --mr-success \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade
 
 # Per-run override
-ploy mod run --mr-success \
+ploy mig run --mr-success \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.example.com \
   --repo-url https://gitlab.example.com/org/repo.git

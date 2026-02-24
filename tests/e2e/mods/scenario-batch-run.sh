@@ -88,7 +88,7 @@ EOF
 
 # Create the batch run using mod run with a spec file.
 # Note: This creates the run but doesn't add repos yet.
-run dist/ploy mod run \
+run dist/ploy mig run \
   --name "${BATCH_NAME}" \
   --spec "${SPEC_FILE}" \
   --repo-url "https://github.com/placeholder/batch.git" \
@@ -120,14 +120,14 @@ echo "Batch ID: ${RUN_ID}"
 # Step 2: Add repos to the batch.
 echo ""
 echo "[2/5] Adding repos to batch"
-run dist/ploy mod run repo add \
+run dist/ploy mig run repo add \
   --repo-url "https://github.com/example/repo1.git" \
   --base-ref main \
   --target-ref "feature-${TS}-1" \
   "${RUN_ID}" \
   > "${ARTIFACT_DIR}/add-repo1.out" 2>&1 || true
 
-run dist/ploy mod run repo add \
+run dist/ploy mig run repo add \
   --repo-url "https://github.com/example/repo2.git" \
   --base-ref main \
   --target-ref "feature-${TS}-2" \
@@ -137,7 +137,7 @@ run dist/ploy mod run repo add \
 # Step 3: List repos in the batch.
 echo ""
 echo "[3/5] Listing repos in batch"
-run dist/ploy mod run repo status "${RUN_ID}" \
+run dist/ploy mig run repo status "${RUN_ID}" \
   > "${ARTIFACT_DIR}/status.out" 2>&1 || true
 cat "${ARTIFACT_DIR}/status.out" || true
 
@@ -147,7 +147,7 @@ echo ""
 echo "[4/5] Restarting repo with updated branch (if terminal)"
 REPO1_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "${ARTIFACT_DIR}/add-repo1.out" | head -1 || true)
 if [[ -n "${REPO1_ID}" ]]; then
-  run dist/ploy mod run repo restart \
+  run dist/ploy mig run repo restart \
     --repo-id "${REPO1_ID}" \
     --target-ref "feature-${TS}-1-retry" \
     "${RUN_ID}" \
@@ -163,7 +163,7 @@ run dist/ploy run stop "${RUN_ID}" \
   > "${ARTIFACT_DIR}/stop.out" 2>&1 || true
 
 # Final status check.
-run dist/ploy mod run repo status "${RUN_ID}" \
+run dist/ploy mig run repo status "${RUN_ID}" \
   > "${ARTIFACT_DIR}/final-status.out" 2>&1 || true
 echo "Final status:"
 cat "${ARTIFACT_DIR}/final-status.out" || true

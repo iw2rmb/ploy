@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/mods/api"
+	"github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // TestHubRejectsUnknownEventType verifies that the SSEEventType validation

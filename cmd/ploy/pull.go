@@ -32,10 +32,10 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/follow"
-	climods "github.com/iw2rmb/ploy/internal/cli/mods"
+	climods "github.com/iw2rmb/ploy/internal/cli/migs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // pullState represents the persisted state for a pull operation.

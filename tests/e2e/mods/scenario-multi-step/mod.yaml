@@ -4,7 +4,7 @@
 # a diff that enables per-step rehydration and multi-node execution.
 #
 # Submit with:
-#   dist/ploy mod run \
+#   dist/ploy mig run \
 #     --repo-url https://gitlab.com/example/my-java-project.git \
 #     --repo-base-ref main \
 #     --repo-target-ref mods-multi-step-java-upgrade \

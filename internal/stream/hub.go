@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/mods/api"
+	"github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // ErrStreamClosed indicates the target stream is closed.

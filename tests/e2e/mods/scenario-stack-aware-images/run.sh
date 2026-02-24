@@ -56,7 +56,7 @@ echo "  Target ref: $TARGET_REF"
 echo "  Spec:       $SPEC"
 echo ""
 
-RUN=$(dist/ploy mod run --json \
+RUN=$(dist/ploy mig run --json \
   --repo-url "$REPO" \
   --repo-base-ref "$BASE_REF" \
   --repo-target-ref "$TARGET_REF" \

@@ -1,0 +1,62 @@
+Usage: ploy mig <command>
+
+Mig Project Management:
+  add         Create a new mig project
+  list        List mig projects
+  remove      Delete a mig project
+  archive     Archive a mig project
+  unarchive   Unarchive a mig project
+
+Spec Management:
+  spec set    Set a mig's spec from a file
+
+Repo Set Management:
+  repo add    Add a repo to the mig
+  repo list   List repos in the mig
+  repo remove Remove a repo from the mig
+  repo import Import repos from CSV
+
+Pulling Diffs:
+  pull        Pull diffs into the current git worktree
+
+Run Execution:
+  run <mig>   Run a mig project (with --repo or --failed for repo selection)
+  run         Submit a single-repo run (legacy)
+  run repo    Manage repos within a batch run
+
+Artifacts:
+  artifacts   List run artifacts by stage
+  fetch       Download run artifacts
+
+Use 'ploy mig <command> --help' for command details.
+
+Flags for 'ploy mig run <mig>':
+  --repo <url>    Explicit repo URL(s) to run (repeatable)
+  --failed        Run repos with last terminal state Fail
+
+Flags for 'ploy mig pull':
+  --origin <remote>    Git remote to match (default: origin)
+  --dry-run            Validate and print actions without mutating the repo
+  --last-failed        Select the latest failed run (default: last succeeded)
+  --last-succeeded     Select the latest succeeded run (default)
+
+Flags for 'ploy mig run':
+  --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)
+  --repo-url <url>           Git repository URL
+  --repo-base-ref <branch>   Git base ref
+  --repo-target-ref <branch> Git target ref
+  --repo-workspace-hint <dir> Optional subdirectory hint
+  --job-env KEY=VALUE        Job environment (repeatable)
+  --job-image <image>        Container image for mig step
+  --job-command <cmd>        Container command override
+  --retain-container         Retain container after execution
+  --gitlab-pat <token>       GitLab Personal Access Token
+  --gitlab-domain <domain>   GitLab domain
+  --mr-success               Create merge request on success
+  --mr-fail                  Create merge request on failure
+  --follow                   Follow run logs until completion
+  --cap <duration>           Time cap for --follow
+  --cancel-on-cap            Cancel run if cap exceeded
+  --artifact-dir <dir>       Download final artifacts
+  --json                     Print JSON summary
+  --max-retries N            Max reconnect attempts for event stream

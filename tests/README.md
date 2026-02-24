@@ -242,11 +242,11 @@ TS=$(date +%y%m%d%H%M%S)
 ARTIFACT_DIR="./tmp/your-scenario/${TS}"
 mkdir -p "${ARTIFACT_DIR}"
 
-dist/ploy mod run \
+dist/ploy mig run \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
   --repo-target-ref feature/test \
-  --mod-image your-mod:latest \
+  --job-image your-mod:latest \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}"
 

@@ -23,7 +23,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy --help",
 			args:           []string{"--help"},
-			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mod", "cluster"},
+			expectContains: []string{"Ploy CLI v2", "Core Commands:", "mig", "cluster"},
 			expectNoError:  true,
 		},
 		{
@@ -33,17 +33,17 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectNoError:  true,
 		},
 
-		// mod command --help
+		// mig command --help
 		{
-			name:           "ploy mod --help",
-			args:           []string{"mod", "--help"},
-			expectContains: []string{"Usage: ploy mod", "run"},
+			name:           "ploy mig --help",
+			args:           []string{"mig", "--help"},
+			expectContains: []string{"Usage: ploy mig", "run"},
 			expectNoError:  true,
 		},
 		{
-			name:           "ploy mod -h",
-			args:           []string{"mod", "-h"},
-			expectContains: []string{"Usage: ploy mod"},
+			name:           "ploy mig -h",
+			args:           []string{"mig", "-h"},
+			expectContains: []string{"Usage: ploy mig"},
 			expectNoError:  true,
 		},
 
@@ -247,7 +247,7 @@ func TestWantsHelpFunction(t *testing.T) {
 // Token operations are now only accessible via `ploy cluster token`.
 func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
-		{"mod", "--help"},
+		{"mig", "--help"},
 		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
 		// NOTE: {"rollout", "--help"} removed — rollout re-rooted under cluster rollout.
 		// NOTE: {"token", "--help"} removed — token re-rooted under cluster token.
