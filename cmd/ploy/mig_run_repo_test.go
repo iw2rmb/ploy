@@ -387,14 +387,13 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	}
 }
 
-// TestModRunRepoStatusServerError verifies error handling when status query fails.
+// TestModRunRepoStatusServerError verifies the removed status command fails immediately.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoStatusServerError(t *testing.T) {
+	var called bool
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/unknown-batch/repos" {
-			http.Error(w, "run not found", http.StatusNotFound)
-			return
-		}
+		called = true
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
@@ -404,10 +403,13 @@ func TestModRunRepoStatusServerError(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "run", "repo", "status", "unknown-batch"}, buf)
 	if err == nil {
-		t.Fatal("expected error for 404 response")
+		t.Fatal("expected removed-command error")
 	}
-	if !strings.Contains(err.Error(), "404") && !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected error mentioning 404 or not found, got: %v", err)
+	if !strings.Contains(err.Error(), "mig run repo status has been removed; use 'ploy run status <run-id>'") {
+		t.Errorf("expected removed-command error, got: %v", err)
+	}
+	if called {
+		t.Fatal("expected no control plane request for removed status command")
 	}
 }
 

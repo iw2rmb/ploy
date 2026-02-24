@@ -233,14 +233,14 @@ When the restarted job succeeds, an MR is created for the `hotfix` branch merge.
 
 ### Inspect Batch Status
 
-Use `ploy run status` and `ploy mig run repo status` to inspect batch state:
+Use `ploy run status` to inspect batch state:
 
 ```bash
-# Batch-level status and repo counts:
+# Batch snapshot in human format:
 ploy run status java17-fleet
 
-# Per-repo status within the batch:
-ploy mig run repo status java17-fleet
+# Machine-readable payload (includes per-repo fields like repo_id):
+ploy run status --json java17-fleet
 ```
 
 See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
