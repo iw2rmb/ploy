@@ -15,12 +15,12 @@ func int64FromFloat64(f float64) (int64, bool) {
 	return int64(f), true
 }
 
-// IntFromAny coerces a value from a map-backed JSON payload to an int.
+// intFromAny coerces a value from a map-backed JSON payload to an int.
 //
 // JSON decoding produces float64 for numbers; this helper accepts integer-typed
 // values (int, int8, int16, int32, int64) and float32/float64 if and only if
 // the float represents a whole number (fractional part == 0).
-func IntFromAny(v any) (int, bool) {
+func intFromAny(v any) (int, bool) {
 	if v == nil {
 		return 0, false
 	}
@@ -55,12 +55,12 @@ func IntFromAny(v any) (int, bool) {
 	}
 }
 
-// Int64FromAny coerces a value from a map-backed JSON payload to an int64.
+// int64FromAny coerces a value from a map-backed JSON payload to an int64.
 //
 // JSON decoding produces float64 for numbers; this helper accepts integer-typed
 // values (int, int8, int16, int32, int64) and float32/float64 if and only if
 // the float represents a whole number (fractional part == 0).
-func Int64FromAny(v any) (int64, bool) {
+func int64FromAny(v any) (int64, bool) {
 	if v == nil {
 		return 0, false
 	}

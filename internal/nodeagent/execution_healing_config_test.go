@@ -29,7 +29,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			t.Errorf("no containers should be created when gate fails without healing")
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 	}
 
@@ -120,7 +120,7 @@ func TestExecuteWithHealing_RunnerRunDoesNotTriggerHealing(t *testing.T) {
 	// Mock container runtime that captures manifests.
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil

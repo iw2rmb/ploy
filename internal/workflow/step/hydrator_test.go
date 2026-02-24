@@ -13,20 +13,18 @@ import (
 func TestNewFilesystemWorkspaceHydrator(t *testing.T) {
 	tests := []struct {
 		name    string
-		opts    FilesystemWorkspaceHydratorOptions
+		fetcher *testGitFetcher
 		wantErr bool
 		errMsg  string
 	}{
 		{
-			name: "valid options",
-			opts: FilesystemWorkspaceHydratorOptions{
-				RepoFetcher: &testGitFetcher{},
-			},
+			name:    "valid fetcher",
+			fetcher: &testGitFetcher{},
 			wantErr: false,
 		},
 		{
 			name:    "nil repo fetcher",
-			opts:    FilesystemWorkspaceHydratorOptions{},
+			fetcher: nil,
 			wantErr: true,
 			errMsg:  "repo fetcher is required",
 		},
@@ -34,7 +32,13 @@ func TestNewFilesystemWorkspaceHydrator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewFilesystemWorkspaceHydrator(tt.opts)
+			var got WorkspaceHydrator
+			var err error
+			if tt.fetcher == nil {
+				got, err = NewFilesystemWorkspaceHydrator(nil)
+			} else {
+				got, err = NewFilesystemWorkspaceHydrator(tt.fetcher)
+			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewFilesystemWorkspaceHydrator() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -181,9 +185,7 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewFilesystemWorkspaceHydrator(FilesystemWorkspaceHydratorOptions{
-				RepoFetcher: tt.fetcher,
-			})
+			h, err := NewFilesystemWorkspaceHydrator(tt.fetcher)
 			if err != nil {
 				t.Fatalf("NewFilesystemWorkspaceHydrator() error = %v", err)
 			}

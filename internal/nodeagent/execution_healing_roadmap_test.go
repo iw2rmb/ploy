@@ -35,7 +35,7 @@ func TestRouter_FailingGateTriggersRouterAndSetsBugSummary(t *testing.T) {
 				}
 			}
 		}
-		return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
+		return step.ContainerHandle("mock-" + spec.Image), nil
 	}
 
 	workspace, outDir := healingDirs(t)
@@ -91,7 +91,7 @@ func TestRouter_NotRunWhenGatePasses(t *testing.T) {
 		if strings.Contains(spec.Image, "router") {
 			routerRan = true
 		}
-		return step.ContainerHandle{ID: "mock"}, nil
+		return step.ContainerHandle("mock"), nil
 	}
 
 	workspace, outDir := healingDirs(t)
@@ -347,7 +347,7 @@ func TestHealingLog_BugSummaryIncludedWhenRouterRuns(t *testing.T) {
 				}
 			}
 		}
-		return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
+		return step.ContainerHandle("mock-" + spec.Image), nil
 	}
 
 	workspace, outDir := healingDirs(t)

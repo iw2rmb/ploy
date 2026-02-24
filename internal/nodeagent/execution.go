@@ -26,9 +26,7 @@ func (r *runController) createGitFetcher() (hydration.GitFetcher, error) {
 }
 
 func (r *runController) createWorkspaceHydrator(fetcher hydration.GitFetcher) (step.WorkspaceHydrator, error) {
-	return step.NewFilesystemWorkspaceHydrator(step.FilesystemWorkspaceHydratorOptions{
-		RepoFetcher: fetcher,
-	})
+	return step.NewFilesystemWorkspaceHydrator(fetcher)
 }
 
 func (r *runController) createContainerRuntime() (step.ContainerRuntime, error) {

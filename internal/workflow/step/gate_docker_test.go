@@ -47,7 +47,7 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 			if !observerCalled {
 				t.Fatalf("expected runtime image observer to be called before container Create")
 			}
-			return ContainerHandle{ID: "mock"}, nil
+			return ContainerHandle("mock"), nil
 		},
 	}
 	executor := NewDockerGateExecutor(rt)

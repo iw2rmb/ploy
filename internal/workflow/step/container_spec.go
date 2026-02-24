@@ -37,10 +37,8 @@ type ContainerMount struct {
 	ReadOnly bool
 }
 
-// ContainerHandle identifies a prepared container.
-type ContainerHandle struct {
-	ID string
-}
+// ContainerHandle identifies a prepared container by its ID.
+type ContainerHandle string
 
 // ContainerResult captures container exit metadata.
 type ContainerResult struct {

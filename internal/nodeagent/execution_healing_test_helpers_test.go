@@ -43,7 +43,7 @@ func passingGate() *mockGateExecutor {
 func noopContainer() *mockContainerRuntime {
 	return &mockContainerRuntime{
 		createFn: func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
-			return step.ContainerHandle{ID: "mock"}, nil
+			return step.ContainerHandle("mock"), nil
 		},
 		startFn: func(_ context.Context, _ step.ContainerHandle) error { return nil },
 		waitFn: func(_ context.Context, _ step.ContainerHandle) (step.ContainerResult, error) {
@@ -66,7 +66,7 @@ func envCapturingContainer() (*mockContainerRuntime, *map[string]string) {
 					captured[k] = v
 				}
 			}
-			return step.ContainerHandle{ID: "heal"}, nil
+			return step.ContainerHandle("heal"), nil
 		},
 		startFn: func(_ context.Context, _ step.ContainerHandle) error { return nil },
 		waitFn: func(_ context.Context, _ step.ContainerHandle) (step.ContainerResult, error) {

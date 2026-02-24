@@ -15,7 +15,7 @@ func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 	dir := t.TempDir()
 	copyManifestFromTestdata(t, dir, smokeManifestFile)
 
-	compiled := compileManifest(t, dir, manifests.CompileOptions{Name: "smoke", Version: "2025-09-26"})
+	compiled := compileManifest(t, dir, manifests.ExportCompileOptions{Name: "smoke", Version: "2025-09-26"})
 
 	if compiled.Manifest.Name != "smoke" {
 		t.Fatalf("unexpected manifest name: %s", compiled.Manifest.Name)

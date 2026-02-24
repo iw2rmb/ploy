@@ -12,7 +12,7 @@ func TestRegistryCompileRejectsInvalidManifest(t *testing.T) {
 	dir := t.TempDir()
 	writeManifest(t, dir, "broken.toml", `version = "2025-09-26"`)
 
-	_, err := manifests.LoadDirectory(dir)
+	_, err := manifests.ExportLoadDirectory(dir)
 	if err == nil {
 		t.Fatal("expected error for missing name and manifest_version")
 	}
@@ -69,9 +69,7 @@ func TestRegistryCompileValidatesVersionMatch(t *testing.T) {
 	dir := t.TempDir()
 	writeManifest(t, dir, "smoke.toml", minimalManifest)
 
-	registry := loadRegistry(t, dir)
-
-	_, err := registry.Compile(manifests.CompileOptions{Name: "smoke", Version: "other"})
+	_, err := manifests.ExportCompileFromDir(dir, manifests.ExportCompileOptions{Name: "smoke", Version: "other"})
 	if err == nil {
 		t.Fatal("expected version mismatch error")
 	}
@@ -102,7 +100,7 @@ name = "go-native"
 reason = "build-gate"
 `)
 
-	_, err := manifests.LoadDirectory(dir)
+	_, err := manifests.ExportLoadDirectory(dir)
 	if err == nil {
 		t.Fatal("expected error when services block missing")
 	}

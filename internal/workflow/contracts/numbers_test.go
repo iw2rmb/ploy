@@ -35,9 +35,9 @@ func TestIntFromAny(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotValue, gotOK := IntFromAny(tt.input)
+			gotValue, gotOK := intFromAny(tt.input)
 			if gotValue != tt.wantValue || gotOK != tt.wantOK {
-				t.Errorf("IntFromAny(%v) = (%d, %v), want (%d, %v)",
+				t.Errorf("intFromAny(%v) = (%d, %v), want (%d, %v)",
 					tt.input, gotValue, gotOK, tt.wantValue, tt.wantOK)
 			}
 		})
@@ -64,9 +64,9 @@ func TestInt64FromAny(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotValue, gotOK := Int64FromAny(tt.input)
+			gotValue, gotOK := int64FromAny(tt.input)
 			if gotValue != tt.wantValue || gotOK != tt.wantOK {
-				t.Errorf("Int64FromAny(%v) = (%d, %v), want (%d, %v)",
+				t.Errorf("int64FromAny(%v) = (%d, %v), want (%d, %v)",
 					tt.input, gotValue, gotOK, tt.wantValue, tt.wantOK)
 			}
 		})
@@ -77,11 +77,11 @@ func TestSpecialFloatsRejected(t *testing.T) {
 	t.Parallel()
 	specials := []float64{math.NaN(), math.Inf(1), math.Inf(-1)}
 	for _, f := range specials {
-		if _, ok := IntFromAny(f); ok {
-			t.Errorf("IntFromAny(%v) should be rejected", f)
+		if _, ok := intFromAny(f); ok {
+			t.Errorf("intFromAny(%v) should be rejected", f)
 		}
-		if _, ok := Int64FromAny(f); ok {
-			t.Errorf("Int64FromAny(%v) should be rejected", f)
+		if _, ok := int64FromAny(f); ok {
+			t.Errorf("int64FromAny(%v) should be rejected", f)
 		}
 	}
 }

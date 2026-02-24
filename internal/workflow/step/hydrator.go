@@ -13,12 +13,12 @@ type filesystemWorkspaceHydrator struct {
 	fetcher hydration.GitFetcher
 }
 
-// NewFilesystemWorkspaceHydrator creates a new workspace hydrator.
-func NewFilesystemWorkspaceHydrator(opts FilesystemWorkspaceHydratorOptions) (WorkspaceHydrator, error) {
-	if opts.RepoFetcher == nil {
+// NewFilesystemWorkspaceHydrator creates a new workspace hydrator backed by the given fetcher.
+func NewFilesystemWorkspaceHydrator(fetcher hydration.GitFetcher) (WorkspaceHydrator, error) {
+	if fetcher == nil {
 		return nil, errors.New("repo fetcher is required")
 	}
-	return &filesystemWorkspaceHydrator{fetcher: opts.RepoFetcher}, nil
+	return &filesystemWorkspaceHydrator{fetcher: fetcher}, nil
 }
 
 // Hydrate prepares the workspace by fetching repository sources as needed.

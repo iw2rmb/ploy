@@ -49,7 +49,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			containerCallCount++
 			callSequence = append(callSequence, "container:"+spec.Image)
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil
@@ -204,7 +204,7 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil
@@ -332,7 +332,7 @@ func (m *mockContainerRuntime) Create(ctx context.Context, spec step.ContainerSp
 	if m.createFn != nil {
 		return m.createFn(ctx, spec)
 	}
-	return step.ContainerHandle{ID: "mock"}, nil
+	return step.ContainerHandle("mock"), nil
 }
 
 func (m *mockContainerRuntime) Start(ctx context.Context, handle step.ContainerHandle) error {

@@ -20,24 +20,11 @@ func writeManifest(t *testing.T, dir, name, body string) string {
 	return path
 }
 
-// loadRegistry loads all manifests from dir using the production loader.
-func loadRegistry(t *testing.T, dir string) *manifests.Registry {
+// compileManifest loads and compiles the manifest from dir with the given options.
+func compileManifest(t *testing.T, dir string, opts manifests.ExportCompileOptions) manifests.Compilation {
 	t.Helper()
 
-	registry, err := manifests.LoadDirectory(dir)
-	if err != nil {
-		t.Fatalf("load manifests: %v", err)
-	}
-
-	return registry
-}
-
-// compileManifest compiles the registry manifest specified by opts and fails the test if compilation fails.
-func compileManifest(t *testing.T, dir string, opts manifests.CompileOptions) manifests.Compilation {
-	t.Helper()
-
-	registry := loadRegistry(t, dir)
-	compiled, err := registry.Compile(opts)
+	compiled, err := manifests.ExportCompileFromDir(dir, opts)
 	if err != nil {
 		t.Fatalf("compile manifest: %v", err)
 	}

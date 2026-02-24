@@ -52,7 +52,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			containerSpecs = append(containerSpecs, spec)
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil

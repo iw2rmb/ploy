@@ -9,12 +9,12 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type CompileOptions struct {
+type compileOptions struct {
 	Name    string
 	Version string
 }
 
-type Registry struct {
+type registry struct {
 	entries map[string]rawEntry
 }
 
@@ -23,14 +23,14 @@ type rawEntry struct {
 	path     string
 }
 
-// LoadDirectory ingests manifest definitions from the provided directory.
-func LoadDirectory(dir string) (*Registry, error) {
+// loadDirectory ingests manifest definitions from the provided directory.
+func loadDirectory(dir string) (*registry, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read manifest directory: %w", err)
 	}
 
-	registry := &Registry{entries: make(map[string]rawEntry)}
+	registry := &registry{entries: make(map[string]rawEntry)}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -68,8 +68,8 @@ func LoadDirectory(dir string) (*Registry, error) {
 	return registry, nil
 }
 
-// Compile materialises a normalized compilation for the requested manifest.
-func (r *Registry) Compile(opts CompileOptions) (Compilation, error) {
+// compileManifest materialises a normalized compilation for the requested manifest.
+func (r *registry) compileManifest(opts compileOptions) (Compilation, error) {
 	if r == nil {
 		return Compilation{}, fmt.Errorf("%w: registry missing", errRegistryUnavailable)
 	}

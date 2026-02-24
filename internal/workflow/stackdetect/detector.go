@@ -9,6 +9,130 @@ import (
 
 const goModuleFile = "go." + "mo" + "d"
 
+// scanResult holds the filesystem scan state shared between Detect and DetectTool.
+type scanResult struct {
+	workspace string
+
+	hasPom           bool
+	hasGradleGroovy  bool
+	hasGradleKts     bool
+	hasGradle        bool
+	hasJava          bool
+	hasGoMod         bool
+	hasGo            bool
+	hasCargo         bool
+	hasRustToolchain bool
+	hasRust          bool
+	hasPyproject     bool
+	hasPythonVersion bool
+	hasRuntimeTxt    bool
+	hasPython        bool
+
+	pyprojectPath string
+
+	languages []string
+	evidence  []EvidenceItem
+}
+
+// scanWorkspace performs filesystem-only detection of build files in the workspace
+// and returns a scanResult with all detected languages, booleans, and evidence.
+func scanWorkspace(workspace string) scanResult {
+	pomPath := filepath.Join(workspace, "pom.xml")
+	gradleGroovyPath := filepath.Join(workspace, "build.gradle")
+	gradleKtsPath := filepath.Join(workspace, "build.gradle.kts")
+	goModPath := filepath.Join(workspace, goModuleFile)
+	cargoPath := filepath.Join(workspace, "Cargo.toml")
+	rustToolchainTomlPath := filepath.Join(workspace, "rust-toolchain.toml")
+	rustToolchainPath := filepath.Join(workspace, "rust-toolchain")
+	pyprojectPath := filepath.Join(workspace, "pyproject.toml")
+	pythonVersionPath := filepath.Join(workspace, ".python-version")
+	runtimeTxtPath := filepath.Join(workspace, "runtime.txt")
+
+	s := scanResult{
+		workspace:     workspace,
+		pyprojectPath: pyprojectPath,
+	}
+
+	s.hasPom = fileExists(pomPath)
+	s.hasGradleGroovy = fileExists(gradleGroovyPath)
+	s.hasGradleKts = fileExists(gradleKtsPath)
+	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts
+	s.hasJava = s.hasPom || s.hasGradle
+
+	s.hasGoMod = fileExists(goModPath)
+	s.hasGo = s.hasGoMod
+
+	s.hasCargo = fileExists(cargoPath)
+	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
+	s.hasRustToolchain = fileExists(rustToolchainPath)
+	s.hasRust = s.hasCargo || hasRustToolchainToml || s.hasRustToolchain
+
+	s.hasPyproject = fileExists(pyprojectPath)
+	s.hasPythonVersion = fileExists(pythonVersionPath)
+	s.hasRuntimeTxt = fileExists(runtimeTxtPath)
+	s.hasPython = s.hasPythonVersion || s.hasRuntimeTxt || (s.hasPyproject && isPythonPyproject(pyprojectPath))
+
+	// Build detected languages and evidence.
+	if s.hasJava {
+		s.languages = append(s.languages, "java")
+		if s.hasPom {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "pom.xml", Key: "build.file", Value: "exists"})
+		}
+		if s.hasGradleGroovy {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "build.gradle", Key: "build.file", Value: "exists"})
+		} else if s.hasGradleKts {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "build.gradle.kts", Key: "build.file", Value: "exists"})
+		}
+	}
+	if s.hasGo {
+		s.languages = append(s.languages, "go")
+		s.evidence = append(s.evidence, EvidenceItem{Path: goModuleFile, Key: "build.file", Value: "exists"})
+	}
+	if s.hasRust {
+		s.languages = append(s.languages, "rust")
+		if s.hasCargo {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "Cargo.toml", Key: "build.file", Value: "exists"})
+		}
+		if hasRustToolchainToml {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "rust-toolchain.toml", Key: "build.file", Value: "exists"})
+		} else if s.hasRustToolchain {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "rust-toolchain", Key: "build.file", Value: "exists"})
+		}
+	}
+	if s.hasPython {
+		s.languages = append(s.languages, "python")
+		if s.hasPythonVersion {
+			s.evidence = append(s.evidence, EvidenceItem{Path: ".python-version", Key: "build.file", Value: "exists"})
+		}
+		if s.hasRuntimeTxt {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "runtime.txt", Key: "build.file", Value: "exists"})
+		}
+		if s.hasPyproject {
+			s.evidence = append(s.evidence, EvidenceItem{Path: "pyproject.toml", Key: "build.file", Value: "exists"})
+		}
+	}
+
+	return s
+}
+
+// checkAmbiguousOrUnknown returns an error if the scan found multiple or zero languages.
+func (s *scanResult) checkAmbiguousOrUnknown() error {
+	if len(s.languages) > 1 {
+		return &DetectionError{
+			Reason:   "ambiguous",
+			Message:  "multiple languages detected: " + strings.Join(s.languages, ", "),
+			Evidence: s.evidence,
+		}
+	}
+	if len(s.languages) == 0 {
+		return &DetectionError{
+			Reason:  "unknown",
+			Message: "no supported build files found",
+		}
+	}
+	return nil
+}
+
 // Detect performs filesystem-only, deterministic detection of the project stack
 // from build files in the workspace.
 //
@@ -23,108 +147,16 @@ const goModuleFile = "go." + "mo" + "d"
 //   - No build files found (reason: "unknown")
 //   - Version cannot be determined (reason: "unknown")
 func Detect(ctx context.Context, workspace string) (*Observation, error) {
-	// Check for marker files for each language.
-	pomPath := filepath.Join(workspace, "pom.xml")
-	gradleGroovyPath := filepath.Join(workspace, "build.gradle")
-	gradleKtsPath := filepath.Join(workspace, "build.gradle.kts")
-	goModPath := filepath.Join(workspace, goModuleFile)
-	cargoPath := filepath.Join(workspace, "Cargo.toml")
-	rustToolchainTomlPath := filepath.Join(workspace, "rust-toolchain.toml")
-	rustToolchainPath := filepath.Join(workspace, "rust-toolchain")
-	pyprojectPath := filepath.Join(workspace, "pyproject.toml")
-	pythonVersionPath := filepath.Join(workspace, ".python-version")
-	runtimeTxtPath := filepath.Join(workspace, "runtime.txt")
-
-	hasPom := fileExists(pomPath)
-	hasGradleGroovy := fileExists(gradleGroovyPath)
-	hasGradleKts := fileExists(gradleKtsPath)
-	hasGradle := hasGradleGroovy || hasGradleKts
-	hasJava := hasPom || hasGradle
-
-	hasGoMod := fileExists(goModPath)
-	hasGo := hasGoMod
-
-	hasCargo := fileExists(cargoPath)
-	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
-	hasRustToolchain := fileExists(rustToolchainPath)
-	hasRust := hasCargo || hasRustToolchainToml || hasRustToolchain
-
-	hasPyproject := fileExists(pyprojectPath)
-	hasPythonVersion := fileExists(pythonVersionPath)
-	hasRuntimeTxt := fileExists(runtimeTxtPath)
-	// pyproject.toml alone is not Python-specific (could be Rust via maturin).
-	// Only consider Python when pyproject.toml has Python markers OR explicit Python files exist.
-	hasPython := hasPythonVersion || hasRuntimeTxt || (hasPyproject && isPythonPyproject(pyprojectPath))
-
-	// Count detected languages.
-	var detectedLanguages []string
-	var detectedEvidence []EvidenceItem
-
-	if hasJava {
-		detectedLanguages = append(detectedLanguages, "java")
-		if hasPom {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "pom.xml", Key: "build.file", Value: "exists"})
-		}
-		if hasGradleGroovy {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "build.gradle", Key: "build.file", Value: "exists"})
-		} else if hasGradleKts {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "build.gradle.kts", Key: "build.file", Value: "exists"})
-		}
+	s := scanWorkspace(workspace)
+	if err := s.checkAmbiguousOrUnknown(); err != nil {
+		return nil, err
 	}
 
-	if hasGo {
-		detectedLanguages = append(detectedLanguages, "go")
-		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: goModuleFile, Key: "build.file", Value: "exists"})
-	}
-
-	if hasRust {
-		detectedLanguages = append(detectedLanguages, "rust")
-		if hasCargo {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "Cargo.toml", Key: "build.file", Value: "exists"})
-		}
-		if hasRustToolchainToml {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "rust-toolchain.toml", Key: "build.file", Value: "exists"})
-		} else if hasRustToolchain {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "rust-toolchain", Key: "build.file", Value: "exists"})
-		}
-	}
-
-	if hasPython {
-		detectedLanguages = append(detectedLanguages, "python")
-		if hasPythonVersion {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: ".python-version", Key: "build.file", Value: "exists"})
-		}
-		if hasRuntimeTxt {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "runtime.txt", Key: "build.file", Value: "exists"})
-		}
-		if hasPyproject {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "pyproject.toml", Key: "build.file", Value: "exists"})
-		}
-	}
-
-	// Check for ambiguous case: multiple languages detected.
-	if len(detectedLanguages) > 1 {
-		return nil, &DetectionError{
-			Reason:   "ambiguous",
-			Message:  "multiple languages detected: " + strings.Join(detectedLanguages, ", "),
-			Evidence: detectedEvidence,
-		}
-	}
-
-	// Check for unknown case: no build files found.
-	if len(detectedLanguages) == 0 {
-		return nil, &DetectionError{
-			Reason:  "unknown",
-			Message: "no supported build files found",
-		}
-	}
-
-	// Dispatch to language-specific detector.
-	switch detectedLanguages[0] {
+	switch s.languages[0] {
 	case "java":
-		return detectJava(ctx, workspace, hasPom, hasGradle, hasGradleKts, pomPath, gradleGroovyPath, gradleKtsPath)
+		return detectJava(ctx, s)
 	case "go":
-		return detectGo(ctx, workspace, goModPath)
+		return detectGo(ctx, workspace, filepath.Join(workspace, goModuleFile))
 	case "rust":
 		return detectRust(ctx, workspace)
 	case "python":
@@ -132,7 +164,7 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 	default:
 		return nil, &DetectionError{
 			Reason:  "unknown",
-			Message: "unsupported language: " + detectedLanguages[0],
+			Message: "unsupported language: " + s.languages[0],
 		}
 	}
 }
@@ -144,98 +176,17 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 // detection cannot determine a release, Build Gate can still determine the tool
 // (e.g., Maven vs Gradle) to select the correct build command.
 func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
-	pomPath := filepath.Join(workspace, "pom.xml")
-	gradleGroovyPath := filepath.Join(workspace, "build.gradle")
-	gradleKtsPath := filepath.Join(workspace, "build.gradle.kts")
-	goModPath := filepath.Join(workspace, goModuleFile)
-	cargoPath := filepath.Join(workspace, "Cargo.toml")
-	rustToolchainTomlPath := filepath.Join(workspace, "rust-toolchain.toml")
-	rustToolchainPath := filepath.Join(workspace, "rust-toolchain")
-	pyprojectPath := filepath.Join(workspace, "pyproject.toml")
-	pythonVersionPath := filepath.Join(workspace, ".python-version")
-	runtimeTxtPath := filepath.Join(workspace, "runtime.txt")
-
-	hasPom := fileExists(pomPath)
-	hasGradleGroovy := fileExists(gradleGroovyPath)
-	hasGradleKts := fileExists(gradleKtsPath)
-	hasGradle := hasGradleGroovy || hasGradleKts
-	hasJava := hasPom || hasGradle
-
-	hasGoMod := fileExists(goModPath)
-	hasGo := hasGoMod
-
-	hasCargo := fileExists(cargoPath)
-	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
-	hasRustToolchain := fileExists(rustToolchainPath)
-	hasRust := hasCargo || hasRustToolchainToml || hasRustToolchain
-
-	hasPyproject := fileExists(pyprojectPath)
-	hasPythonVersion := fileExists(pythonVersionPath)
-	hasRuntimeTxt := fileExists(runtimeTxtPath)
-	hasPython := hasPythonVersion || hasRuntimeTxt || (hasPyproject && isPythonPyproject(pyprojectPath))
-
-	var detectedLanguages []string
-	var detectedEvidence []EvidenceItem
-
-	if hasJava {
-		detectedLanguages = append(detectedLanguages, "java")
-		if hasPom {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "pom.xml", Key: "build.file", Value: "exists"})
-		}
-		if hasGradleGroovy {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "build.gradle", Key: "build.file", Value: "exists"})
-		} else if hasGradleKts {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "build.gradle.kts", Key: "build.file", Value: "exists"})
-		}
-	}
-	if hasGo {
-		detectedLanguages = append(detectedLanguages, "go")
-		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: goModuleFile, Key: "build.file", Value: "exists"})
-	}
-	if hasRust {
-		detectedLanguages = append(detectedLanguages, "rust")
-		if hasCargo {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "Cargo.toml", Key: "build.file", Value: "exists"})
-		}
-		if hasRustToolchainToml {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "rust-toolchain.toml", Key: "build.file", Value: "exists"})
-		} else if hasRustToolchain {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "rust-toolchain", Key: "build.file", Value: "exists"})
-		}
-	}
-	if hasPython {
-		detectedLanguages = append(detectedLanguages, "python")
-		if hasPythonVersion {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: ".python-version", Key: "build.file", Value: "exists"})
-		}
-		if hasRuntimeTxt {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "runtime.txt", Key: "build.file", Value: "exists"})
-		}
-		if hasPyproject {
-			detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "pyproject.toml", Key: "build.file", Value: "exists"})
-		}
+	s := scanWorkspace(workspace)
+	if err := s.checkAmbiguousOrUnknown(); err != nil {
+		return nil, err
 	}
 
-	if len(detectedLanguages) > 1 {
-		return nil, &DetectionError{
-			Reason:   "ambiguous",
-			Message:  "multiple languages detected: " + strings.Join(detectedLanguages, ", "),
-			Evidence: detectedEvidence,
-		}
-	}
-	if len(detectedLanguages) == 0 {
-		return nil, &DetectionError{
-			Reason:  "unknown",
-			Message: "no supported build files found",
-		}
-	}
-
-	lang := detectedLanguages[0]
+	lang := s.languages[0]
 	switch lang {
 	case "java":
-		if hasPom && hasGradle {
+		if s.hasPom && s.hasGradle {
 			gradleFile := "build.gradle"
-			if hasGradleKts {
+			if s.hasGradleKts {
 				gradleFile = "build.gradle.kts"
 			}
 			return nil, &DetectionError{
@@ -247,38 +198,38 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 				},
 			}
 		}
-		if hasPom {
+		if s.hasPom {
 			return &Observation{
 				Language: "java",
 				Tool:     "maven",
 				Release:  nil,
-				Evidence: detectedEvidence,
+				Evidence: s.evidence,
 			}, nil
 		}
 		return &Observation{
 			Language: "java",
 			Tool:     "gradle",
 			Release:  nil,
-			Evidence: detectedEvidence,
+			Evidence: s.evidence,
 		}, nil
 	case "go":
 		return &Observation{
 			Language: "go",
 			Tool:     "go",
 			Release:  nil,
-			Evidence: detectedEvidence,
+			Evidence: s.evidence,
 		}, nil
 	case "rust":
 		return &Observation{
 			Language: "rust",
 			Tool:     "cargo",
 			Release:  nil,
-			Evidence: detectedEvidence,
+			Evidence: s.evidence,
 		}, nil
 	case "python":
 		tool := "pip"
-		if hasPyproject {
-			content, _ := os.ReadFile(pyprojectPath)
+		if s.hasPyproject {
+			content, _ := os.ReadFile(s.pyprojectPath)
 			if poetryToolRegex.MatchString(string(content)) {
 				tool = "poetry"
 			}
@@ -287,7 +238,7 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 			Language: "python",
 			Tool:     tool,
 			Release:  nil,
-			Evidence: detectedEvidence,
+			Evidence: s.evidence,
 		}, nil
 	default:
 		return nil, &DetectionError{
@@ -298,11 +249,10 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 }
 
 // detectJava handles Java detection with Maven/Gradle disambiguation.
-func detectJava(ctx context.Context, workspace string, hasPom, hasGradle, hasGradleKts bool, pomPath, gradleGroovyPath, gradleKtsPath string) (*Observation, error) {
-	// Check for ambiguous case: both Maven and Gradle present.
-	if hasPom && hasGradle {
+func detectJava(ctx context.Context, s scanResult) (*Observation, error) {
+	if s.hasPom && s.hasGradle {
 		gradleFile := "build.gradle"
-		if hasGradleKts {
+		if s.hasGradleKts {
 			gradleFile = "build.gradle.kts"
 		}
 		return nil, &DetectionError{
@@ -315,17 +265,16 @@ func detectJava(ctx context.Context, workspace string, hasPom, hasGradle, hasGra
 		}
 	}
 
-	// Dispatch to appropriate detector.
-	if hasPom {
-		return detectMaven(ctx, workspace, pomPath)
+	if s.hasPom {
+		return detectMaven(ctx, s.workspace, filepath.Join(s.workspace, "pom.xml"))
 	}
 
 	// Prefer Kotlin DSL if present.
-	gradlePath := gradleGroovyPath
-	if hasGradleKts {
-		gradlePath = gradleKtsPath
+	gradlePath := filepath.Join(s.workspace, "build.gradle")
+	if s.hasGradleKts {
+		gradlePath = filepath.Join(s.workspace, "build.gradle.kts")
 	}
-	return detectGradle(ctx, workspace, gradlePath)
+	return detectGradle(ctx, s.workspace, gradlePath)
 }
 
 // isPythonPyproject checks if a pyproject.toml file contains Python-specific markers.

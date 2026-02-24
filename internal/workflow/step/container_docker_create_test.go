@@ -158,8 +158,8 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if handle.ID != tc.createRes.ID {
-				t.Errorf("got ID %q, want %q", handle.ID, tc.createRes.ID)
+			if string(handle) != tc.createRes.ID {
+				t.Errorf("got ID %q, want %q", string(handle), tc.createRes.ID)
 			}
 			// Verify image pull was called only when configured and the image is missing.
 			expectPull := tc.pullImage && cerrdefs.IsNotFound(tc.inspectErr)

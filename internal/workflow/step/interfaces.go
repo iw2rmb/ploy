@@ -3,14 +3,8 @@ package step
 import (
 	"context"
 
-	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
-
-// FilesystemWorkspaceHydratorOptions holds configuration for workspace hydrator.
-type FilesystemWorkspaceHydratorOptions struct {
-	RepoFetcher hydration.GitFetcher
-}
 
 // WorkspaceHydrator prepares a workspace for execution.
 type WorkspaceHydrator interface {
@@ -33,6 +27,13 @@ type ContainerRuntime interface {
 	Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
 	Logs(ctx context.Context, handle ContainerHandle) ([]byte, error)
 	Remove(ctx context.Context, handle ContainerHandle) error
+}
+
+// GateExecutor validates build artifacts.
+// The primary implementation is dockerGateExecutor (gate_docker.go) which runs
+// validation containers locally via the container runtime.
+type GateExecutor interface {
+	Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
 }
 
 // DiffGenerator generates diffs between states.
