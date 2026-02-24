@@ -18,7 +18,7 @@ import (
 //
 // Repo-scoped status computation:
 // - On job terminal for the last step in a repo: compute and persist run_repos.status.
-// - MR jobs (mod_type='mr') are excluded from terminal computation.
+// - MR jobs (job_type='mr') are excluded from terminal computation.
 //
 // Terminal status derivation rules:
 // - Cancelled: if the last job is Cancelled
@@ -33,7 +33,7 @@ func maybeUpdateRunRepoStatus(
 	attempt int32,
 ) (bool, error) {
 	// List jobs for this repo attempt and compute terminal status from the last job
-	// (highest step_index), excluding MR jobs.
+	// (highest next_id), excluding MR jobs.
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
 		RunID:   runID,
 		RepoID:  repoID,
@@ -47,8 +47,8 @@ func maybeUpdateRunRepoStatus(
 	for i := range jobs {
 		job := &jobs[i]
 
-		mt := domaintypes.ModType(job.JobType)
-		if mt.Validate() == nil && mt == domaintypes.ModTypeMR {
+		mt := domaintypes.JobType(job.JobType)
+		if mt.Validate() == nil && mt == domaintypes.JobTypeMR {
 			continue
 		}
 
@@ -62,7 +62,7 @@ func maybeUpdateRunRepoStatus(
 
 		currentStep := jobStepIndex(*job)
 		if !currentStep.Valid() {
-			return false, fmt.Errorf("invalid step_index for job_id=%s step_index=%v", job.ID, float64(currentStep))
+			return false, fmt.Errorf("invalid next_id for job_id=%s next_id=%v", job.ID, float64(currentStep))
 		}
 
 		if lastJob == nil || currentStep.Float64() > jobStepIndex(*lastJob).Float64() {

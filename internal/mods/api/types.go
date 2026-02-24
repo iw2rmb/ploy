@@ -95,7 +95,7 @@ type StageStatus struct {
 // with job_type identifying the phase type.
 type StageMetadata struct {
 	// JobType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
-	JobType domaintypes.ModType `json:"job_type,omitempty"`
+	JobType domaintypes.JobType `json:"job_type,omitempty"`
 	// JobImage is the container image for this job (optional, for diagnostics).
 	JobImage string `json:"job_image,omitempty"`
 }

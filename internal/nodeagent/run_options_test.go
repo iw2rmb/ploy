@@ -217,7 +217,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			JobID: "job-direct-test-123",
 			Steps: []contracts.ModStep{
 				{
-					Image:           contracts.ModImage{Universal: "docker.io/test/mod:v1"},
+					Image:           contracts.JobImage{Universal: "docker.io/test/mod:v1"},
 					Command:         contracts.CommandSpec{Exec: []string{"echo", "hello"}},
 					Env:             map[string]string{"KEY": "value"},
 					RetainContainer: true,
@@ -227,7 +227,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 				Enabled: true,
 				Healing: &contracts.HealingSpec{
 					Retries:         3,
-					Image:           contracts.ModImage{Universal: "docker.io/test/heal:v1"},
+					Image:           contracts.JobImage{Universal: "docker.io/test/heal:v1"},
 					Command:         contracts.CommandSpec{Shell: "fix.sh"},
 					Env:             map[string]string{"MODE": "auto"},
 					RetainContainer: true,
@@ -313,12 +313,12 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		spec := &contracts.ModsSpec{
 			Steps: []contracts.ModStep{
 				{
-					Image:   contracts.ModImage{Universal: "docker.io/test/step1:v1"},
+					Image:   contracts.JobImage{Universal: "docker.io/test/step1:v1"},
 					Command: contracts.CommandSpec{Shell: "step1.sh"},
 					Env:     map[string]string{"STEP": "1"},
 				},
 				{
-					Image:           contracts.ModImage{Universal: "docker.io/test/step2:v1"},
+					Image:           contracts.JobImage{Universal: "docker.io/test/step2:v1"},
 					Command:         contracts.CommandSpec{Exec: []string{"step2", "--flag"}},
 					Env:             map[string]string{"STEP": "2"},
 					RetainContainer: true,
@@ -387,11 +387,11 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		t.Parallel()
 
 		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.ModImage{Universal: "img"}}},
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
 			BuildGate: &contracts.BuildGateConfig{
 				Healing: &contracts.HealingSpec{
 					Retries: 0,
-					Image:   contracts.ModImage{Universal: "heal"},
+					Image:   contracts.JobImage{Universal: "heal"},
 				},
 			},
 		}
@@ -412,7 +412,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		spec := &contracts.ModsSpec{
 			Steps: []contracts.ModStep{
 				{
-					Image: contracts.ModImage{
+					Image: contracts.JobImage{
 						ByStack: map[contracts.ModStack]string{
 							contracts.ModStackDefault:    "docker.io/test/default:v1",
 							contracts.ModStackJavaMaven:  "docker.io/test/maven:v1",

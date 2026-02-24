@@ -157,7 +157,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 }
 
 // TestScheduleNextJobSequential verifies that sequential calls to ScheduleNextJob
-// correctly schedule jobs in step_index order.
+// correctly schedule jobs in next_id order.
 func TestScheduleNextJobSequential(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
@@ -198,7 +198,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		}
 	}
 
-	// Build expected order: jobs sorted by step_index ASC.
+	// Build expected order: jobs sorted by next_id ASC.
 	type jobWithIndex struct {
 		id    types.JobID
 		index types.StepIndex
@@ -207,7 +207,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	for i := 0; i < numJobs; i++ {
 		jobsWithIndex[i] = jobWithIndex{id: jobIDs[i], index: stepIndices[i]}
 	}
-	// Sort by step_index.
+	// Sort by next_id.
 	for i := 0; i < len(jobsWithIndex); i++ {
 		for j := i + 1; j < len(jobsWithIndex); j++ {
 			if jobsWithIndex[j].index < jobsWithIndex[i].index {
@@ -234,7 +234,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		scheduledOrder = append(scheduledOrder, job.ID)
 	}
 
-	// Verify order matches expected (sorted by step_index ASC).
+	// Verify order matches expected (sorted by next_id ASC).
 	for i := 0; i < numJobs; i++ {
 		if scheduledOrder[i] != expectedOrder[i] {
 			t.Errorf("ScheduleNextJob order mismatch at position %d: got %s, want %s",
@@ -252,5 +252,5 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		t.Fatalf("expected no rows when no Created jobs remain, got: %v", err)
 	}
 
-	t.Logf("Jobs scheduled in expected step_index order")
+	t.Logf("Jobs scheduled in expected next_id order")
 }

@@ -40,7 +40,7 @@ func maybeCreateHealingJobs(
 		failedJob = refreshed
 	}
 
-	jobType := domaintypes.ModType(failedJob.JobType)
+	jobType := domaintypes.JobType(failedJob.JobType)
 	if err := jobType.Validate(); err != nil {
 		return fmt.Errorf("invalid job_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
 	}
@@ -108,7 +108,7 @@ func maybeCreateHealingJobs(
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     failedJob.Attempt,
 		Name:        fmt.Sprintf("heal-%d-0", healingAttemptNumber),
-		JobType:     domaintypes.ModTypeHeal.String(),
+		JobType:     domaintypes.JobTypeHeal.String(),
 		JobImage:    healImage,
 		Status:      store.JobStatusQueued,
 		NextID:      &reGateID,
@@ -125,7 +125,7 @@ func maybeCreateHealingJobs(
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     failedJob.Attempt,
 		Name:        fmt.Sprintf("re-gate-%d", healingAttemptNumber),
-		JobType:     domaintypes.ModTypeReGate.String(),
+		JobType:     domaintypes.JobTypeReGate.String(),
 		JobImage:    "",
 		Status:      store.JobStatusCreated,
 		NextID:      oldNext,
@@ -155,8 +155,8 @@ func maybeCreateHealingJobs(
 	return nil
 }
 
-func isGateJobType(jobType domaintypes.ModType) bool {
-	return jobType == domaintypes.ModTypePreGate || jobType == domaintypes.ModTypePostGate || jobType == domaintypes.ModTypeReGate
+func isGateJobType(jobType domaintypes.JobType) bool {
+	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
 }
 
 func predecessorOf(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
@@ -170,8 +170,8 @@ func predecessorOf(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store
 }
 
 func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {
-	failedType := domaintypes.ModType(failedJob.JobType)
-	if failedType != domaintypes.ModTypeReGate {
+	failedType := domaintypes.JobType(failedJob.JobType)
+	if failedType != domaintypes.JobTypeReGate {
 		return failedJob.ID
 	}
 
@@ -181,8 +181,8 @@ func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store
 		if prev == nil {
 			break
 		}
-		prevType := domaintypes.ModType(prev.JobType)
-		if prevType == domaintypes.ModTypePreGate || prevType == domaintypes.ModTypePostGate {
+		prevType := domaintypes.JobType(prev.JobType)
+		if prevType == domaintypes.JobTypePreGate || prevType == domaintypes.JobTypePostGate {
 			return prev.ID
 		}
 		currentID = prev.ID
@@ -209,11 +209,11 @@ func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[dom
 		if !ok {
 			break
 		}
-		jobType := domaintypes.ModType(job.JobType)
-		if jobType == domaintypes.ModTypeHeal {
+		jobType := domaintypes.JobType(job.JobType)
+		if jobType == domaintypes.JobTypeHeal {
 			attempts++
 		}
-		if jobType != domaintypes.ModTypeHeal && jobType != domaintypes.ModTypeReGate {
+		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
 			break
 		}
 		nextID = job.NextID

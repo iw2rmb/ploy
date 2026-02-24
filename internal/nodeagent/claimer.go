@@ -11,7 +11,7 @@ import (
 )
 
 // ClaimManager periodically polls the server for work and executes claimed jobs.
-// Nodes claim from a single unified jobs queue (FIFO by step_index); there is no
+// Nodes claim from a single unified jobs queue (FIFO by next_id); there is no
 // separate Build Gate queue or claim path.
 // Contains configuration, HTTP client, run controller, and backoff state for
 // polling intervals when no work is available.
@@ -35,10 +35,10 @@ type ClaimResponse struct {
 	RepoID    types.ModRepoID  `json:"repo_id"`   // Repo ID (NanoID identifying the repo execution)
 	JobID     types.JobID      `json:"job_id"`    // Claimed job ID
 	JobName   string           `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")
-	JobType   types.ModType    `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
+	JobType   types.JobType    `json:"job_type"`  // Job phase: pre_gate, mod, post_gate, heal, re_gate
 	JobImage  string           `json:"job_image"` // Container image for mod/heal jobs
 	NextID    *types.JobID     `json:"next_id"`
-	StepIndex types.StepIndex  `json:"step_index"` // Optional metadata for diagnostics only
+	StepIndex types.StepIndex  `json:"job_index,omitempty"` // Optional metadata for diagnostics only
 	RepoURL   types.RepoURL    `json:"repo_url"`
 	Status    string           `json:"status"`
 	NodeID    types.NodeID     `json:"node_id"`
@@ -51,7 +51,7 @@ type ClaimResponse struct {
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.
-// Nodes claim jobs from a single queue (FIFO by step_index); there is no
+// Nodes claim jobs from a single queue (FIFO by next_id); there is no
 // separate Build Gate queue. Initializes backoff parameters for the claim
 // loop polling interval.
 func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error) {

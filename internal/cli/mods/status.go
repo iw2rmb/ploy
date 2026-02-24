@@ -40,7 +40,7 @@ type ListRunRepoDiffsCommand struct {
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
-// Diffs are returned in server-provided order (ordered by step_index, then created_at).
+// Diffs are returned in server-provided order (ordered by next_id, then created_at).
 func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if c.Client == nil {
 		return nil, fmt.Errorf("list run repo diffs: http client required")

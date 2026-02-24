@@ -106,13 +106,13 @@ func TestDiffSummary_StepIndex(t *testing.T) {
 	}{
 		{
 			name:      "step index present",
-			json:      `{"step_index": 2}`,
+			json:      `{"next_id": 2}`,
 			wantIdx:   2,
 			wantFound: true,
 		},
 		{
 			name:      "zero step index",
-			json:      `{"step_index": 0}`,
+			json:      `{"next_id": 0}`,
 			wantIdx:   0,
 			wantFound: true,
 		},
@@ -135,7 +135,7 @@ func TestDiffSummary_StepIndex(t *testing.T) {
 	}
 }
 
-func TestDiffSummary_ModType(t *testing.T) {
+func TestDiffSummary_JobType(t *testing.T) {
 	tests := []struct {
 		name string
 		json string
@@ -143,12 +143,12 @@ func TestDiffSummary_ModType(t *testing.T) {
 	}{
 		{
 			name: "mod type present",
-			json: `{"mod_type": "mod"}`,
+			json: `{"job_type": "mod"}`,
 			want: "mod",
 		},
 		{
 			name: "healing mod type",
-			json: `{"mod_type": "healing"}`,
+			json: `{"job_type": "healing"}`,
 			want: "healing",
 		},
 		{
@@ -158,7 +158,7 @@ func TestDiffSummary_ModType(t *testing.T) {
 		},
 		{
 			name: "null mod type",
-			json: `{"mod_type": null}`,
+			json: `{"job_type": null}`,
 			want: "",
 		},
 	}
@@ -166,9 +166,9 @@ func TestDiffSummary_ModType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			summary := mustParseDiffSummary(t, tt.json)
-			got := summary.ModType()
+			got := summary.JobType()
 			if got != tt.want {
-				t.Errorf("ModType() = %q, want %q", got, tt.want)
+				t.Errorf("JobType() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -221,8 +221,8 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	jsonData := `{
 		"exit_code": 0,
 		"files_changed": 3,
-		"step_index": 1,
-		"mod_type": "mod",
+		"next_id": 1,
+		"job_type": "mod",
 		"timings": {
 			"hydration_duration_ms": 100,
 			"execution_duration_ms": 200,
@@ -255,9 +255,9 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	}
 
 	// Verify mod type.
-	modType := summary.ModType()
+	modType := summary.JobType()
 	if modType != "mod" {
-		t.Errorf("ModType() = %q, want %q", modType, "mod")
+		t.Errorf("JobType() = %q, want %q", modType, "mod")
 	}
 }
 
@@ -266,7 +266,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		summary := NewDiffSummaryBuilder().
 			ExitCode(0).
 			StepIndex(StepIndex(1)).
-			ModType("mod").
+			JobType("mod").
 			MustBuild()
 
 		code, found := summary.ExitCode()
@@ -279,9 +279,9 @@ func TestDiffSummaryBuilder(t *testing.T) {
 			t.Errorf("StepIndex() = (%v, %v), want (1, true)", idx, found)
 		}
 
-		modType := summary.ModType()
+		modType := summary.JobType()
 		if modType != "mod" {
-			t.Errorf("ModType() = %q, want %q", modType, "mod")
+			t.Errorf("JobType() = %q, want %q", modType, "mod")
 		}
 	})
 
@@ -313,7 +313,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		original := NewDiffSummaryBuilder().
 			ExitCode(0).
 			StepIndex(StepIndex(2)).
-			ModType("healing").
+			JobType("healing").
 			FilesChanged(5).
 			MustBuild()
 
@@ -340,9 +340,9 @@ func TestDiffSummaryBuilder(t *testing.T) {
 			t.Errorf("StepIndex() = (%v, %v), want (2, true)", idx, found)
 		}
 
-		modType := parsed.ModType()
+		modType := parsed.JobType()
 		if modType != "healing" {
-			t.Errorf("ModType() = %q, want %q", modType, "healing")
+			t.Errorf("JobType() = %q, want %q", modType, "healing")
 		}
 
 		files, found := parsed.FilesChanged()

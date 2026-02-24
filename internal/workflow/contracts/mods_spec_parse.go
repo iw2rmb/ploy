@@ -66,7 +66,7 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 		}
 	}
 	if _, ok := raw["mod_index"]; ok {
-		return nil, fmt.Errorf("mod_index: forbidden (derived internally from step_index; must not be provided)")
+		return nil, fmt.Errorf("mod_index: forbidden (derived internally from next_id; must not be provided)")
 	}
 
 	// Parse optional metadata fields.

@@ -10,7 +10,7 @@ import (
 
 // modLikeFields holds the common fields shared between ModStep, HealingSpec, and RouterSpec.
 type modLikeFields struct {
-	Image           ModImage
+	Image           JobImage
 	Command         CommandSpec
 	Env             map[string]string
 	RetainContainer bool
@@ -22,7 +22,7 @@ func parseModLikeFields(raw map[string]any, prefix string) (modLikeFields, error
 
 	// Parse image.
 	if v, ok := raw["image"]; ok && v != nil {
-		img, err := ParseModImage(v)
+		img, err := ParseJobImage(v)
 		if err != nil {
 			return f, fmt.Errorf("%s.image: %w", prefix, err)
 		}

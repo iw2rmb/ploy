@@ -229,7 +229,7 @@ CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 -- Diffs (per-run, small count)
 -- Each execution job (mod, healing, pre_gate, post_gate) may produce a diff.
 -- Diffs store `job_id` and `run_id` for association; summary JSONB may include
--- step metadata for ordering and classification (for example: mod_type, step_index).
+-- step metadata for ordering and classification (for example: job_type, next_id).
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match their parent tables.
 -- Blob data is stored in S3-compatible object storage; object_key is a generated column for deterministic paths.
 CREATE TABLE IF NOT EXISTS diffs (

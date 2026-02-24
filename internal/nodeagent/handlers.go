@@ -46,11 +46,11 @@ type StartRunRequest struct {
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
-	StepIndex types.StepIndex `json:"step_index,omitempty"` // Optional step metadata for diagnostics
-	JobType   types.ModType   `json:"job_type,omitempty"`   // Job type: pre_gate, mod, post_gate, heal, re_gate
-	JobImage  string          `json:"job_image,omitempty"`  // Container image for this job (for heal job dispatch)
-	NextID    *types.JobID    `json:"next_id,omitempty"`    // Linked successor in run chain
-	JobName   string          `json:"job_name,omitempty"`   // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	StepIndex types.StepIndex `json:"job_index,omitempty"` // Optional step metadata for diagnostics
+	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mod, post_gate, heal, re_gate
+	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
+	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
+	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

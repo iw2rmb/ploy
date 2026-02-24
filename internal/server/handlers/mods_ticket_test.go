@@ -142,7 +142,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
 		if got.JobType != exp.modType {
-			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.JobType)
+			t.Errorf("job %d: expected job_type %q, got %q", i, exp.modType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
@@ -215,13 +215,13 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
 		if got.JobType != exp.modType {
-			t.Errorf("job %d: expected mod_type %q, got %q", i, exp.modType, got.JobType)
+			t.Errorf("job %d: expected job_type %q, got %q", i, exp.modType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
 		}
 		if got.JobImage != exp.modImage {
-			t.Errorf("job %d: expected mod_image %q, got %q", i, exp.modImage, got.JobImage)
+			t.Errorf("job %d: expected job_image %q, got %q", i, exp.modImage, got.JobImage)
 		}
 
 		// Verify repo_id and repo_base_ref are persisted correctly.

@@ -21,10 +21,10 @@ import (
 
 // diffItem represents a single diff in a list response.
 //
-// C2: Each diff is tagged with job_id and mod_type (in summary) to enable unified rehydration.
-// - job_id: References the job that produced this diff; job's step_index provides ordering.
-// - mod_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
-// Rehydration queries fetch all diffs ordered by job step_index.
+// C2: Each diff is tagged with job_id and job_type (in summary) to enable unified rehydration.
+// - job_id: References the job that produced this diff; job's next_id provides ordering.
+// - job_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
+// Rehydration queries fetch all diffs ordered by job next_id.
 //
 // NOTE: job_id is now a KSUID-backed JobID type (no UUID parsing).
 type diffItem struct {
@@ -32,7 +32,7 @@ type diffItem struct {
 	JobID     domaintypes.JobID       `json:"job_id"` // Job ID (KSUID-backed)
 	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains mod_type, timings.
+	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains job_type, timings.
 }
 
 // diffListResponse is the typed response for listing diffs.

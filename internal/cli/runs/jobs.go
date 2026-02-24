@@ -18,7 +18,7 @@ type RepoJobEntry struct {
 	Name        string                `json:"name"`
 	JobType     string                `json:"job_type"`
 	JobImage    string                `json:"job_image"`
-	StepIndex   domaintypes.StepIndex `json:"step_index"`
+	StepIndex   domaintypes.StepIndex `json:"next_id"`
 	NodeID      *domaintypes.NodeID   `json:"node_id"`
 	Status      store.JobStatus       `json:"status"`
 	StartedAt   *time.Time            `json:"started_at,omitempty"`

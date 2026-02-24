@@ -92,13 +92,13 @@ SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.create
 WHERE d.run_id = $1
   AND (
     CASE
-      WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+      WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
       ELSE 0
     END
   ) <= $2
 ORDER BY
   CASE
-    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
     ELSE 0
   END ASC,
   d.created_at ASC,
@@ -106,14 +106,14 @@ ORDER BY
 `
 
 type ListDiffsBeforeStepParams struct {
-	RunID   types.RunID `json:"run_id"`
-	Summary []byte      `json:"summary"`
+	RunID  types.RunID `json:"run_id"`
+	NextID float64     `json:"next_id"`
 }
 
-// Returns all diffs for a run up to (and including) the specified step_index.
-// step_index is read from summary metadata when present.
+// Returns all diffs for a run up to (and including) the specified next_id.
+// next_id is read from summary metadata when present.
 func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.Summary)
+	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.NextID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY
   CASE
-    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
     ELSE 0
   END ASC,
   d.created_at ASC,
@@ -230,7 +230,7 @@ JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
 ORDER BY
   CASE
-    WHEN jsonb_typeof(d.summary->'step_index') = 'number' THEN (d.summary->>'step_index')::DOUBLE PRECISION
+    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
     ELSE 0
   END ASC,
   d.created_at ASC,

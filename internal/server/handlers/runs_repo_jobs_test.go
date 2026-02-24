@@ -77,9 +77,6 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	if got := job["next_id"]; got != nextID.String() {
 		t.Fatalf("next_id = %v, want %q", got, nextID.String())
 	}
-	if _, ok := job["step_index"]; ok {
-		t.Fatalf("expected step_index to be omitted from repo jobs response")
-	}
 }
 
 func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {

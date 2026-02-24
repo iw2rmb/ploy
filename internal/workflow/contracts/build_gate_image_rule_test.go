@@ -257,7 +257,7 @@ func TestBuildGateImageMapping_Validate(t *testing.T) {
 func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image: ModImage{Universal: "docker.io/user/mod:latest"},
+			Image: JobImage{Universal: "docker.io/user/mod:latest"},
 		}},
 		BuildGate: &BuildGateConfig{
 			Enabled: true,

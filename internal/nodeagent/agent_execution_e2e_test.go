@@ -102,7 +102,7 @@ func TestEndToEndFlow(t *testing.T) {
 			BaseRef: types.GitRef("main"),
 			TypedOptions: RunOptions{
 				Execution: ModContainerSpec{
-					Image:   contracts.ModImage{Universal: "alpine:latest"},
+					Image:   contracts.JobImage{Universal: "alpine:latest"},
 					Command: contracts.CommandSpec{Shell: "echo 'test execution'"},
 				},
 			},

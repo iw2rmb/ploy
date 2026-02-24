@@ -408,8 +408,8 @@ enriched fields for execution context:
 | `line`       | string | Log message content                                               |
 | `node_id`    | string | Execution node identifier (NanoID string, optional)               |
 | `job_id`     | string | Job identifier (KSUID string, optional)                           |
-| `mod_type`   | string | Step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate` (opt)|
-| `step_index` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
+| `job_type`   | string | Step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate` (opt)|
+| `next_id` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
 
 ### Output formats
 
@@ -595,10 +595,10 @@ for end-to-end usage with `mods-codex`.
 
 Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
 surfaces via `GET /v1/runs/{id}/status` in `RunSummary.stages` and through the
-Run status includes a `stages` map. Each job has a `step_index` for execution ordering
+Run status includes a `stages` map. Each job has a `next_id` for execution ordering
 and optional metadata identifying the job phase.
 
-**Job phases (mod_type):**
+**Job phases (job_type):**
 - `pre_gate` — Build Gate validation before mods run
 - `mod` — Main mod execution (code transformation)
 - `post_gate` — Build Gate validation after mods succeed
@@ -632,13 +632,13 @@ Jobs:
   [2500] i9j0k1l2: pending
 ```
 
-The `[step_index]` ordering reflects execution sequence. Healing jobs inserted
+The `[next_id]` ordering reflects execution sequence. Healing jobs inserted
 dynamically appear with midpoint indices (e.g., 1500 between 1000 and 2000).
 
 **API response:**
 
 The `GET /v1/runs/{id}/status` endpoint returns `RunSummary` with:
-- `stages` — Map of job ID (KSUID string) to `StageStatus` (state, step_index, attempts)
+- `stages` — Map of job ID (KSUID string) to `StageStatus` (state, next_id, attempts)
 - `metadata["gate_summary"]` — Human-readable gate result
 - `metadata["mr_url"]` — Merge request URL if created
 

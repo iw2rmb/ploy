@@ -32,7 +32,7 @@ func gzipData(t *testing.T, data string) []byte {
 }
 
 // TestStorage_LogEnrichmentWithJobMetadata verifies that log records are
-// enriched with execution context (node_id, job_id, job_type, step_index)
+// enriched with execution context (node_id, job_id, job_type, next_id)
 // when job metadata is available. This ensures SSE clients receive correlated
 // log data for diagnostics.
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
@@ -57,7 +57,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				RunID:   runID,
 				Name:    "build-step",
 				JobType: "mod",
-				Meta:    []byte(`{"step_index":2000}`),
+				Meta:    []byte(`{"next_id":2000}`),
 				NodeID:  &nodeID,
 			}, nil
 		},
@@ -117,7 +117,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 		t.Errorf("job_type: got %q, want %q", rec.JobType, "mod")
 	}
 	if rec.StepIndex != 2000 {
-		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
+		t.Errorf("next_id: got %v, want %v", rec.StepIndex, 2000)
 	}
 }
 
@@ -141,7 +141,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 				RunID:   runID,
 				Name:    "pre-gate",
 				JobType: "pre_gate",
-				Meta:    []byte(`{"step_index":2000}`),
+				Meta:    []byte(`{"next_id":2000}`),
 				NodeID:  &nodeID,
 			}, nil
 		},
@@ -184,11 +184,11 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
-	if rec.JobType != domaintypes.ModTypePreGate {
-		t.Errorf("job_type: got %q, want %q", rec.JobType, domaintypes.ModTypePreGate)
+	if rec.JobType != domaintypes.JobTypePreGate {
+		t.Errorf("job_type: got %q, want %q", rec.JobType, domaintypes.JobTypePreGate)
 	}
 	if rec.StepIndex != 2000 {
-		t.Errorf("step_index: got %v, want %v", rec.StepIndex, 2000)
+		t.Errorf("next_id: got %v, want %v", rec.StepIndex, 2000)
 	}
 }
 
@@ -263,7 +263,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		t.Errorf("job_type should be empty, got %q", rec.JobType)
 	}
 	if !rec.StepIndex.IsZero() {
-		t.Errorf("step_index should be 0, got %v", rec.StepIndex)
+		t.Errorf("next_id should be 0, got %v", rec.StepIndex)
 	}
 }
 

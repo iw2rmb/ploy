@@ -245,7 +245,7 @@ func TestValidateStackGatePhaseSpec_RejectDisabledWithExpect(t *testing.T) {
 func TestStackGateSpec_RoundTrip(t *testing.T) {
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image: ModImage{Universal: "docker.io/user/mod:latest"},
+			Image: JobImage{Universal: "docker.io/user/mod:latest"},
 			Stack: &StackGateSpec{
 				Inbound: &StackGatePhaseSpec{
 					Enabled: true,
@@ -583,7 +583,7 @@ func TestValidateStackGatePhaseSpec_RejectEnabledWithoutExpect(t *testing.T) {
 func TestStackGateWire_EmptyOmitted(t *testing.T) {
 	spec := &ModsSpec{
 		Steps: []ModStep{{
-			Image: ModImage{Universal: "test:latest"},
+			Image: JobImage{Universal: "test:latest"},
 			Stack: nil, // No stack config.
 		}},
 	}
@@ -607,7 +607,7 @@ func TestStackGateWire_EmptyOmitted(t *testing.T) {
 func TestStackGateWire_DisabledOmitted(t *testing.T) {
 	spec := &ModsSpec{
 		Steps: []ModStep{{
-			Image: ModImage{Universal: "test:latest"},
+			Image: JobImage{Universal: "test:latest"},
 			Stack: &StackGateSpec{
 				Inbound: &StackGatePhaseSpec{Enabled: false}, // Disabled, should be omitted.
 			},

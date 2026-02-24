@@ -17,7 +17,7 @@ func TestApplyGateStackDetect_PrePostAndNotReGate(t *testing.T) {
 		typedOpts.BuildGate.PreStack = pre
 		typedOpts.BuildGate.PostStack = post
 
-		applyGateStackDetect(&manifest, types.ModTypePreGate, typedOpts)
+		applyGateStackDetect(&manifest, types.JobTypePreGate, typedOpts)
 
 		if manifest.Gate.StackDetect != pre {
 			t.Fatalf("Gate.StackDetect=%v; want pre", manifest.Gate.StackDetect)
@@ -30,7 +30,7 @@ func TestApplyGateStackDetect_PrePostAndNotReGate(t *testing.T) {
 		typedOpts.BuildGate.PreStack = pre
 		typedOpts.BuildGate.PostStack = post
 
-		applyGateStackDetect(&manifest, types.ModTypePostGate, typedOpts)
+		applyGateStackDetect(&manifest, types.JobTypePostGate, typedOpts)
 
 		if manifest.Gate.StackDetect != post {
 			t.Fatalf("Gate.StackDetect=%v; want post", manifest.Gate.StackDetect)
@@ -43,7 +43,7 @@ func TestApplyGateStackDetect_PrePostAndNotReGate(t *testing.T) {
 		typedOpts.BuildGate.PreStack = pre
 		typedOpts.BuildGate.PostStack = post
 
-		applyGateStackDetect(&manifest, types.ModTypeReGate, typedOpts)
+		applyGateStackDetect(&manifest, types.JobTypeReGate, typedOpts)
 
 		if manifest.Gate.StackDetect != nil {
 			t.Fatalf("Gate.StackDetect=%v; want nil", manifest.Gate.StackDetect)

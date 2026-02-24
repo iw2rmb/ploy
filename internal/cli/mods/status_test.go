@@ -28,9 +28,9 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	}
 
 	diffs := []testDiff{
-		{ID: "550e8400-e29b-41d4-a716-446655440000", JobID: jobID1.String(), CreatedAt: "2026-01-10T00:00:00Z", Size: 200, Summary: map[string]interface{}{"step_index": 1000, "mod_type": "mod"}},
-		{ID: "550e8400-e29b-41d4-a716-446655440001", JobID: jobID2.String(), CreatedAt: "2026-01-10T00:00:01Z", Size: 150, Summary: map[string]interface{}{"step_index": 2000, "mod_type": "mod"}},
-		{ID: "550e8400-e29b-41d4-a716-446655440002", JobID: jobID3.String(), CreatedAt: "2026-01-10T00:00:02Z", Size: 100, Summary: map[string]interface{}{"step_index": 3000, "mod_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440000", JobID: jobID1.String(), CreatedAt: "2026-01-10T00:00:00Z", Size: 200, Summary: map[string]interface{}{"next_id": 1000, "job_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440001", JobID: jobID2.String(), CreatedAt: "2026-01-10T00:00:01Z", Size: 150, Summary: map[string]interface{}{"next_id": 2000, "job_type": "mod"}},
+		{ID: "550e8400-e29b-41d4-a716-446655440002", JobID: jobID3.String(), CreatedAt: "2026-01-10T00:00:02Z", Size: 100, Summary: map[string]interface{}{"next_id": 3000, "job_type": "mod"}},
 	}
 
 	mux := http.NewServeMux()

@@ -64,7 +64,7 @@ func ParseGlobalEnvScope(s string) (GlobalEnvScope, error) {
 	return scope, nil
 }
 
-// MatchesModType determines whether this scope applies to the given job type (ModType).
+// MatchesJobType determines whether this scope applies to the given job type (JobType).
 // This is the core scope-matching logic for global env var injection.
 //
 // Scope semantics:
@@ -72,19 +72,19 @@ func ParseGlobalEnvScope(s string) (GlobalEnvScope, error) {
 //   - "mods" → inject into mod and post_gate jobs (code modification phases)
 //   - "heal" → inject into heal and re_gate jobs (healing/retry phases)
 //   - "gate" → inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
-func (s GlobalEnvScope) MatchesModType(modType ModType) bool {
+func (s GlobalEnvScope) MatchesJobType(modType JobType) bool {
 	switch s {
 	case GlobalEnvScopeAll:
 		return true
 	case GlobalEnvScopeMods:
 		// Mods scope applies to mod and post_gate jobs (modification phases).
-		return modType == ModTypeMod || modType == ModTypePostGate
+		return modType == JobTypeMod || modType == JobTypePostGate
 	case GlobalEnvScopeHeal:
 		// Heal scope applies to heal and re_gate jobs (healing phases).
-		return modType == ModTypeHeal || modType == ModTypeReGate
+		return modType == JobTypeHeal || modType == JobTypeReGate
 	case GlobalEnvScopeGate:
 		// Gate scope applies to all gate-related jobs.
-		return modType == ModTypePreGate || modType == ModTypeReGate || modType == ModTypePostGate
+		return modType == JobTypePreGate || modType == JobTypeReGate || modType == JobTypePostGate
 	default:
 		return false
 	}

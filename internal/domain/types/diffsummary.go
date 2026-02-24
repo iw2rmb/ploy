@@ -23,8 +23,8 @@ type DiffSummary json.RawMessage
 type diffSummaryAccessor struct {
 	ExitCode     *int                `json:"exit_code,omitempty"`
 	FilesChanged *int                `json:"files_changed,omitempty"`
-	StepIndex    *StepIndex          `json:"step_index,omitempty"`
-	ModType      *string             `json:"mod_type,omitempty"`
+	StepIndex    *StepIndex          `json:"next_id,omitempty"`
+	JobType      *string             `json:"job_type,omitempty"`
 	Timings      *diffSummaryTimings `json:"timings,omitempty"`
 }
 
@@ -97,7 +97,7 @@ func (d DiffSummary) FilesChanged() (int, bool) {
 	return *acc.FilesChanged, true
 }
 
-// StepIndex returns the step_index field as a StepIndex when present.
+// StepIndex returns the next_id field as a StepIndex when present.
 // Returns zero StepIndex and false if not present.
 func (d DiffSummary) StepIndex() (StepIndex, bool) {
 	acc := d.decode()
@@ -107,14 +107,14 @@ func (d DiffSummary) StepIndex() (StepIndex, bool) {
 	return *acc.StepIndex, true
 }
 
-// ModType returns the mod_type field when present.
+// JobType returns the job_type field when present.
 // Common values: "mod", "healing".
-func (d DiffSummary) ModType() string {
+func (d DiffSummary) JobType() string {
 	acc := d.decode()
-	if acc.ModType == nil {
+	if acc.JobType == nil {
 		return ""
 	}
-	return *acc.ModType
+	return *acc.JobType
 }
 
 // DiffSummaryBuilder provides a fluent API for constructing DiffSummary.
@@ -140,16 +140,16 @@ func (b *DiffSummaryBuilder) FilesChanged(count int) *DiffSummaryBuilder {
 	return b
 }
 
-// StepIndex sets the step_index field.
+// StepIndex sets the next_id field.
 // Uses types.StepIndex for type-safe step ordering without lossy int casts.
 func (b *DiffSummaryBuilder) StepIndex(idx StepIndex) *DiffSummaryBuilder {
 	b.acc.StepIndex = &idx
 	return b
 }
 
-// ModType sets the mod_type field.
-func (b *DiffSummaryBuilder) ModType(modType string) *DiffSummaryBuilder {
-	b.acc.ModType = &modType
+// JobType sets the job_type field.
+func (b *DiffSummaryBuilder) JobType(modType string) *DiffSummaryBuilder {
+	b.acc.JobType = &modType
 	return b
 }
 

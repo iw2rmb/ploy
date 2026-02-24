@@ -256,7 +256,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 
 // TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
 // terminal, run_repos.status is derived from the terminal status of the last job
-// (highest step_index), ignoring earlier failures.
+// (highest next_id), ignoring earlier failures.
 func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()
 
@@ -361,7 +361,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_MRJobDoesNotAffectRepoStatus verifies that MR jobs (mod_type='mr')
+// TestCompleteJob_MRJobDoesNotAffectRepoStatus verifies that MR jobs (job_type='mr')
 // do NOT trigger repo status updates. MR jobs are auxiliary post-run jobs.
 func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	t.Parallel()

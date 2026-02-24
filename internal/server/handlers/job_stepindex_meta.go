@@ -7,11 +7,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// jobStepIndex reads optional step_index metadata from jobs.meta.
-// step_index is no longer a dedicated DB column.
+// jobStepIndex reads optional next_id metadata from jobs.meta.
+// next_id is no longer a dedicated DB column.
 func jobStepIndex(job store.Job) domaintypes.StepIndex {
 	var payload struct {
-		StepIndex *float64 `json:"step_index,omitempty"`
+		StepIndex *float64 `json:"next_id,omitempty"`
 	}
 	if len(job.Meta) == 0 {
 		return 0
@@ -22,8 +22,8 @@ func jobStepIndex(job store.Job) domaintypes.StepIndex {
 	return domaintypes.StepIndex(*payload.StepIndex)
 }
 
-// withStepIndexMeta returns metadata that includes step_index.
-// When meta is empty/invalid, it creates a new object with just step_index.
+// withStepIndexMeta returns metadata that includes next_id.
+// When meta is empty/invalid, it creates a new object with just next_id.
 func withStepIndexMeta(meta []byte, stepIndex domaintypes.StepIndex) []byte {
 	if !stepIndex.Valid() {
 		return meta
@@ -34,7 +34,7 @@ func withStepIndexMeta(meta []byte, stepIndex domaintypes.StepIndex) []byte {
 			obj = map[string]any{}
 		}
 	}
-	obj["step_index"] = stepIndex.Float64()
+	obj["next_id"] = stepIndex.Float64()
 	encoded, err := json.Marshal(obj)
 	if err != nil {
 		return meta

@@ -122,7 +122,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 		t.Fatalf("expected 2 artifacts, got %d", len(resp.Artifacts))
 	}
 	// Expected ordering:
-	// - job1 step_index=1000, created_at ascending (t1 then t2).
+	// - job1 next_id=1000, created_at ascending (t1 then t2).
 	if resp.Artifacts[0].ID != id1.String() || resp.Artifacts[1].ID != id2.String() {
 		t.Fatalf("unexpected artifact order: %+v", resp.Artifacts)
 	}

@@ -339,7 +339,7 @@ The Build Gate detects the workspace stack during validation based on file marke
 
 The detected stack is propagated from the Build Gate to Mods steps via
 `BuildGateStageMetadata.Tool`, which is converted to a `ModStack` using
-`ToolToModStack()` in `internal/workflow/contracts/mod_image.go`.
+`ToolToModStack()` in `internal/workflow/contracts/job_image.go`.
 
 ### Image resolution rules
 
@@ -472,12 +472,12 @@ The ORW Mods honor an existing `rewrite.yml` in the workspace:
 
 ### Implementation references
 
-- Image type and resolution: `internal/workflow/contracts/mod_image.go`
-  (`ModImage`, `ResolveImage`, `ParseModImage`, `ToolToModStack`).
+- Image type and resolution: `internal/workflow/contracts/job_image.go`
+  (`JobImage`, `ResolveImage`, `ParseJobImage`, `ToolToModStack`).
 - Stack propagation: `internal/workflow/contracts/build_gate_metadata.go`
   (`BuildGateStageMetadata.Tool`).
 - Image resolution in executor: `internal/nodeagent/run_options.go`.
-- Unit tests: `internal/workflow/contracts/mod_image_test.go`.
+- Unit tests: `internal/workflow/contracts/job_image_test.go`.
 
 ## 1.3 Job Order (DAG)
 
@@ -727,7 +727,7 @@ workflows.
 | `repo_id`                  | API / `POST /v1/*/pull`         | Identify the repo within the run          |
 | `repo_target_ref`          | API / `POST /v1/*/pull`         | Target branch name snapshot               |
 | `run_repos.base_ref`       | API / `GET /v1/runs/{run_id}/repos` | Base ref snapshot for branch base     |
-| `diffs.summary.step_index` | diffs summary JSON              | Optional legacy step metadata for display |
+| `diffs.summary.next_id` | diffs summary JSON              | Optional legacy step metadata for display |
 | `diffs.id`                 | API / `GET /v1/runs/.../diffs`   | UUID used as `diff_id` for download       |
 
 **API endpoints consumed:**
@@ -960,7 +960,7 @@ value is a `StageStatus` object describing that job's execution state.
 - `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
   - Handler: `getRunLogsHandler`.
   - Uses the internal hub (`internal/stream`) and events service to stream:
-    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,job_type,step_index}` (see § 7.2).
+    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,job_type,next_id}` (see § 7.2).
     - `event:  run`, data: `RunSummary`.
     - `event: retention`, data: `RetentionHint`.
     - `event: done`, data: `Status {status:"done"}` sentinel.
@@ -1201,20 +1201,20 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
 | `job_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
-| `step_index` | number | Optional step metadata used for log enrichment                          |
+| `next_id` | number | Optional step metadata used for log enrichment                          |
 
 **Example SSE frame:**
 
 ```
 event: log
-data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","step_index":2000}
+data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","next_id":2000}
 ```
 
 **Notes:**
 
 - Enriched fields may be empty for events not tied to a specific job (e.g.,
   hub-generated system events) or when context is unavailable.
-- `step_index` in logs is optional metadata and does not drive scheduler ordering.
+- `next_id` in logs is optional metadata and does not drive scheduler ordering.
 - CLI consumers (`ploy run logs`) use the enriched fields
   to display contextual information in structured output format.
 

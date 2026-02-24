@@ -7,9 +7,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// testModImage is a helper to create a ModImage from a string for tests.
-func testModImage(image string) contracts.ModImage {
-	return contracts.ModImage{Universal: image}
+// testJobImage is a helper to create a JobImage from a string for tests.
+func testJobImage(image string) contracts.JobImage {
+	return contracts.JobImage{Universal: image}
 }
 
 // TestBuildHealingManifest_RepoMetadataInjection verifies that repo metadata
@@ -36,7 +36,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				CommitSHA: types.CommitSHA("abc123def456"),
 			},
 			mod: ModContainerSpec{
-				Image: testModImage("test/healer:latest"),
+				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL":   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -54,7 +54,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				BaseRef: types.GitRef("develop"),
 			},
 			mod: ModContainerSpec{
-				Image: testModImage("test/healer:latest"),
+				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
@@ -73,7 +73,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				CommitSHA: types.CommitSHA(""),
 			},
 			mod: ModContainerSpec{
-				Image: testModImage("test/healer:latest"),
+				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
@@ -89,7 +89,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				BaseRef: types.GitRef("main"),
 			},
 			mod: ModContainerSpec{
-				Image: testModImage("test/healer:latest"),
+				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"CUSTOM_VAR":   "custom_value",
 					"ANOTHER_VAR":  "another_value",
@@ -113,7 +113,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				BaseRef: types.GitRef("main"),
 			},
 			mod: ModContainerSpec{
-				Image: testModImage("test/healer:latest"),
+				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"PLOY_REPO_URL": "https://custom.override/repo.git",
 				},
@@ -179,7 +179,7 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 	}
 
 	mod := ModContainerSpec{
-		Image: testModImage("test/healer:latest"),
+		Image: testJobImage("test/healer:latest"),
 		Env:   originalEnv,
 	}
 
@@ -214,7 +214,7 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 	}
 
 	mod := ModContainerSpec{
-		Image: testModImage("test/healer:latest"),
+		Image: testJobImage("test/healer:latest"),
 		Env:   nil, // explicitly nil
 	}
 
@@ -245,12 +245,12 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "empty image",
-			mod:     ModContainerSpec{Image: contracts.ModImage{}}, // empty ModImage
+			mod:     ModContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
 			wantErr: "image required",
 		},
 		{
 			name:    "whitespace only image",
-			mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "   "}},
+			mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "   "}},
 			wantErr: "image required",
 		},
 	}
@@ -332,37 +332,37 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	}{
 		{
 			name:         "codex image with session sets CODEX_RESUME=1",
-			mod:          ModContainerSpec{Image: testModImage("mods-codex:latest")},
+			mod:          ModContainerSpec{Image: testJobImage("mods-codex:latest")},
 			codexSession: "session-abc-123",
 			wantResume:   true,
 		},
 		{
 			name:         "codex image without session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testModImage("mods-codex:latest")},
+			mod:          ModContainerSpec{Image: testJobImage("mods-codex:latest")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image with session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testModImage("standard-healer:v1")},
+			mod:          ModContainerSpec{Image: testJobImage("standard-healer:v1")},
 			codexSession: "session-xyz-456",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image without session does not set CODEX_RESUME",
-			mod:          ModContainerSpec{Image: testModImage("maven:3.8")},
+			mod:          ModContainerSpec{Image: testJobImage("maven:3.8")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "registry prefixed codex image with session",
-			mod:          ModContainerSpec{Image: testModImage("registry.gitlab.io/ploy/mods-codex:v2")},
+			mod:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/mods-codex:v2")},
 			codexSession: "session-def-789",
 			wantResume:   true,
 		},
 		{
 			name:         "case insensitive codex detection",
-			mod:          ModContainerSpec{Image: testModImage("my-CODEX-fixer:latest")},
+			mod:          ModContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
 			codexSession: "session-ghi-012",
 			wantResume:   true,
 		},
@@ -412,7 +412,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 	}
 
 	mod := ModContainerSpec{
-		Image: testModImage("mods-codex:latest"),
+		Image: testJobImage("mods-codex:latest"),
 		Env: map[string]string{
 			"CUSTOM_VAR": "custom_value",
 			"ANOTHER":    "another_value",

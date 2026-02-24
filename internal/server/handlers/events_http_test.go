@@ -174,7 +174,7 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 
 // TestGetRunLogsHandler_EnrichedLogPayload verifies that the SSE HTTP
 // handler preserves enriched log fields (node_id, job_id, job_type,
-// step_index) in the JSON payload streamed to clients. This ensures the
+// next_id) in the JSON payload streamed to clients. This ensures the
 // HTTP layer does not strip or alter the enriched LogRecord shape used
 // by CLI consumers (run logs).
 func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
@@ -260,7 +260,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	if got := payload["job_type"]; got != "mod" {
 		t.Errorf("job_type = %v, want %q", got, "mod")
 	}
-	if got := payload["step_index"]; got != float64(2000) {
-		t.Errorf("step_index = %v, want %v", got, 2000)
+	if got := payload["next_id"]; got != float64(2000) {
+		t.Errorf("next_id = %v, want %v", got, 2000)
 	}
 }

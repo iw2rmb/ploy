@@ -188,7 +188,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.ModTypeMod.String(), 2000)
+	f := newJobFixture(domaintypes.JobTypeMod.String(), 2000)
 	repoID := domaintypes.NewModRepoID()
 	postJobID := domaintypes.NewJobID()
 
@@ -207,7 +207,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			Attempt:     1,
 			NodeID:      &f.NodeID,
 			Status:      store.JobStatusSuccess,
-			JobType:     domaintypes.ModTypePreGate.String(),
+			JobType:     domaintypes.JobTypePreGate.String(),
 			Meta:        withStepIndexMeta([]byte(`{}`), 1000),
 		},
 		f.Job,
@@ -218,7 +218,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			Status:      store.JobStatusCreated,
-			JobType:     domaintypes.ModTypePostGate.String(),
+			JobType:     domaintypes.JobTypePostGate.String(),
 			Meta:        withStepIndexMeta([]byte(`{}`), 3000),
 		},
 	}
@@ -319,7 +319,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.ModTypeMod.String(),
+		JobType:     domaintypes.JobTypeMod.String(),
 	}
 	f.Job.RepoID = nextJob.RepoID
 	f.Job.RepoBaseRef = "main"
@@ -346,7 +346,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 	if st.scheduleNextJobCalled {
-		t.Fatal("expected success completion to avoid step_index scheduler path")
+		t.Fatal("expected success completion to avoid next_id scheduler path")
 	}
 	if !st.promoteJobByIDIfUnblockedCalled {
 		t.Fatal("expected linked successor promotion to be called")
@@ -356,7 +356,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.ModTypePreGate.String(), 1000)
+	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
 	repoID := domaintypes.NewModRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
@@ -390,7 +390,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		Attempt:     1,
 		Name:        "mod-0",
 		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.ModTypeMod.String(),
+		JobType:     domaintypes.JobTypeMod.String(),
 		Meta:        []byte(`{}`),
 	}
 	f.Job.NextID = &successor.ID

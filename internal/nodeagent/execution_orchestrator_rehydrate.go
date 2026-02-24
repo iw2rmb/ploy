@@ -175,7 +175,7 @@ func (r *runController) uploadModDiffWithBaseline(
 	// falling back to legacy baseline-less generation. Mod diffs must use
 	// baseline-aware GenerateBetween semantics.
 	if strings.TrimSpace(baseDir) == "" {
-		slog.Warn("mod diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName, "step_index", stepIndex)
+		slog.Warn("mod diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName, "next_id", stepIndex)
 		return
 	}
 
@@ -183,22 +183,22 @@ func (r *runController) uploadModDiffWithBaseline(
 	// files are included in the patch (git diff --no-index semantics).
 	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
 	if err != nil {
-		slog.Error("failed to generate mod diff from baseline", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		slog.Error("failed to generate mod diff from baseline", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
 		return
 	}
 
 	if len(diffBytes) == 0 {
 		// No changes between baseline and workspace; skip upload.
-		slog.Info("no diff to upload for mod (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "step_index", stepIndex)
+		slog.Info("no diff to upload for mod (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "next_id", stepIndex)
 		return
 	}
 
 	// Build diff summary with step metadata for database storage.
 	// Uses typed builder to eliminate map[string]any construction.
-	// Mod job diffs use DiffModTypeMod so they participate in the rehydration chain.
+	// Mod job diffs use DiffJobTypeMod so they participate in the rehydration chain.
 	summary := types.NewDiffSummaryBuilder().
 		StepIndex(stepIndex).
-		ModType(DiffModTypeMod.String()).
+		JobType(DiffJobTypeMod.String()).
 		ExitCode(result.ExitCode).
 		Timings(
 			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
@@ -211,14 +211,14 @@ func (r *runController) uploadModDiffWithBaseline(
 	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
 	// In production, uploaders are pre-initialized at agent startup.
 	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
 		return
 	}
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload mod diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
+		slog.Error("failed to upload mod diff", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "error", err)
 		return
 	}
 
-	slog.Info("mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
+	slog.Info("mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "next_id", stepIndex, "size", len(diffBytes))
 }

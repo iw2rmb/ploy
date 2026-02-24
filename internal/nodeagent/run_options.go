@@ -40,7 +40,7 @@ type HealingConfig struct {
 // ModContainerSpec describes a container's image, command, env, and retention policy.
 // Used for healing mods, router, execution options, and step mods.
 type ModContainerSpec struct {
-	Image           contracts.ModImage
+	Image           contracts.JobImage
 	Command         contracts.CommandSpec
 	Env             map[string]string
 	RetainContainer bool

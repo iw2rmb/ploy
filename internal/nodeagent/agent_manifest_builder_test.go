@@ -193,7 +193,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:        types.RunID("run-123"),
 			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-			TypedOptions: RunOptions{Execution: ModContainerSpec{Image: contracts.ModImage{Universal: "docker.io/example/mods-openrewrite:latest"}}},
+			TypedOptions: RunOptions{Execution: ModContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/mods-openrewrite:latest"}}},
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
@@ -317,12 +317,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
 					{ModContainerSpec: ModContainerSpec{
-						Image:   contracts.ModImage{Universal: "mods-orw:latest"},
+						Image:   contracts.JobImage{Universal: "mods-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
 					}},
 					{ModContainerSpec: ModContainerSpec{
-						Image:   contracts.ModImage{Universal: "mods-fmt:latest"},
+						Image:   contracts.JobImage{Universal: "mods-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
 					}},
@@ -395,7 +395,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
 					{ModContainerSpec: ModContainerSpec{
-						Image: contracts.ModImage{Universal: "mods-step:latest"},
+						Image: contracts.JobImage{Universal: "mods-step:latest"},
 						Env:   map[string]string{"SHARED_VAR": "step_override"},
 					}},
 				},
@@ -424,7 +424,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
-					{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "mods-step:latest"}}},
+					{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mods-step:latest"}}},
 				},
 			},
 		}
@@ -447,7 +447,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
 				Execution: ModContainerSpec{
-					Image:   contracts.ModImage{Universal: "single-mod:latest"},
+					Image:   contracts.JobImage{Universal: "single-mod:latest"},
 					Command: contracts.CommandSpec{Shell: "run-single"},
 				},
 			},
@@ -661,11 +661,11 @@ func TestManifestBuildWithGateRepoMeta(t *testing.T) {
 	})
 }
 
-// TestBuildGateManifestFromRequest_IgnoresStackAwareModImages verifies that the
+// TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages verifies that the
 // gate manifest builder does not attempt stack-aware image resolution using
 // steps[].image. Gate jobs should always use the default execution image and
 // rely on Build Gate stack detection for subsequent Mods steps.
-func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
+func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 	t.Parallel()
 
 	req := StartRunRequest{
@@ -677,7 +677,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareModImages(t *testing.T) {
 			BuildGate: BuildGateOptions{Enabled: true},
 			Steps: []StepMod{
 				{ModContainerSpec: ModContainerSpec{
-					Image: contracts.ModImage{
+					Image: contracts.JobImage{
 						ByStack: map[contracts.ModStack]string{
 							contracts.ModStackJavaMaven:  "docker.io/example/mods-orw-maven:latest",
 							contracts.ModStackJavaGradle: "docker.io/example/mods-orw-gradle:latest",

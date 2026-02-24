@@ -53,7 +53,7 @@ type modRunFlags struct {
 
 	// Mod container configuration
 	ModEnvs    *stringSlice
-	ModImage   *string
+	JobImage   *string
 	ModCommand *string
 	Retain     *bool
 
@@ -94,7 +94,7 @@ func parseModRunFlags(args []string) (*modRunFlags, error) {
 	// Mod container configuration
 	flags.ModEnvs = new(stringSlice)
 	fs.Var(flags.ModEnvs, "mod-env", "Mod environment KEY=VALUE (repeatable)")
-	flags.ModImage = fs.String("mod-image", "", "Container image for the mod step (optional)")
+	flags.JobImage = fs.String("mod-image", "", "Container image for the mod step (optional)")
 	flags.ModCommand = fs.String("mod-command", "", "Container command override (string or JSON array)")
 	flags.Retain = fs.Bool("retain-container", false, "Retain the mod container after execution (for debugging)")
 

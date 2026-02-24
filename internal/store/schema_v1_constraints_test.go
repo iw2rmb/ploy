@@ -225,8 +225,8 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	}
 }
 
-// TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name, step_index).
-// The jobs table has UNIQUE (run_id, repo_id, attempt, name, step_index) to prevent duplicate jobs.
+// TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name, next_id).
+// The jobs table has UNIQUE (run_id, repo_id, attempt, name, next_id) to prevent duplicate jobs.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_JobsUniqueness(t *testing.T) {
@@ -308,22 +308,22 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 
 	// Insert first job.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`, jobID1.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
 	if err != nil {
 		t.Fatalf("first job insert failed: %v", err)
 	}
 
-	// Attempt to insert second job with the same (run_id, repo_id, attempt, name, step_index).
+	// Attempt to insert second job with the same (run_id, repo_id, attempt, name, next_id).
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`, jobID2.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mod", "test-image")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
-		t.Fatal("expected duplicate (run_id, repo_id, attempt, name, step_index) insert to fail, but it succeeded")
+		t.Fatal("expected duplicate (run_id, repo_id, attempt, name, next_id) insert to fail, but it succeeded")
 	}
 	var pgErr *pgconn.PgError
 	if !assertPgError(err, &pgErr) {
@@ -333,18 +333,18 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
 	}
 
-	// Verify that a job with different step_index can be inserted (same run_id, repo_id, attempt, name).
+	// Verify that a job with different next_id can be inserted (same run_id, repo_id, attempt, name).
 	jobID3 := domaintypes.NewJobID()
 	defer func() {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", jobID3.String())
 	}()
 
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, step_index, mod_type, mod_image)
+			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`, jobID3.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 2000.0, "mod", "test-image")
 	if err != nil {
-		t.Fatalf("job insert with different step_index should succeed, but failed: %v", err)
+		t.Fatalf("job insert with different next_id should succeed, but failed: %v", err)
 	}
 }
 

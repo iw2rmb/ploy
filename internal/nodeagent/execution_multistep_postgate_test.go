@@ -125,8 +125,8 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}}},
-				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step1:latest"}}},
 			},
 		},
 	}
@@ -324,12 +324,12 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
 			Steps: []StepMod{
-				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step0:latest"}}},
-				{ModContainerSpec: ModContainerSpec{Image: contracts.ModImage{Universal: "test/mod-step1:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step0:latest"}}},
+				{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test/mod-step1:latest"}}},
 			},
 			Healing: &HealingConfig{
 				Retries: 1,
-				Mod:     ModContainerSpec{Image: contracts.ModImage{Universal: "test/healer:latest"}},
+				Mod:     ModContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
 			},
 		},
 	}

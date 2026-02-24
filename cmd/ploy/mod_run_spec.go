@@ -169,7 +169,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // - Each entry in steps[] represents a sequential transformation step.
 // - All steps share the same repository and global build_gate policy (including healing).
 // - The CLI preserves steps[] without modification; image/command/retain overrides do not apply when len(steps) > 1.
-// - The server copies steps[] indexes into jobs.step_index and diffs.step_index.
+// - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
 func buildSpecPayload(
 	specFile string,
 	modEnvs []string,
