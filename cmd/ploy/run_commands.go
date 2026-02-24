@@ -62,6 +62,7 @@ func handleRun(args []string, stderr io.Writer) error {
 func handleRunStatus(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("run status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
+	jsonOut := fs.Bool("json", false, "print machine-readable JSON report")
 
 	if err := fs.Parse(args); err != nil {
 		printRunUsage(stderr)
@@ -87,6 +88,10 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	}.Run(ctx)
 	if err != nil {
 		return err
+	}
+
+	if *jsonOut {
+		return runcmd.RenderRunReportJSON(stderr, report)
 	}
 
 	if err := runcmd.RenderRunReportText(stderr, report, runcmd.TextRenderOptions{

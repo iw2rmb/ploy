@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Tests: Renderer tests for OSC8-on and OSC8-off modes.
 
 ## Phase 3: Renderer 2 (JSON)
-- [ ] Implement `--json` on `ploy run status` with the same semantic payload as the human report — supports automation without parallel models.
+- [x] Implement `--json` on `ploy run status` with the same semantic payload as the human report — supports automation without parallel models.
   - Repository: `ploy`
   - Component: `cmd/ploy/run_commands.go`, `internal/cli/runs/report_json.go`
   - Scope: Add `--json` flag to `run status`; serialize canonical `RunReport` with top-level keys including `mig_id`, `mig_name`, `spec_id`, `repos`, `runs` and nested link fields.
