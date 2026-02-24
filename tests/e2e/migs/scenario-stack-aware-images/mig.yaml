@@ -19,7 +19,7 @@
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 
 steps:
   - # Stack-aware image map: Build Gate detects workspace stack and selects

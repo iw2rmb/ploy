@@ -466,7 +466,7 @@ func TestBuildSpecPayloadMultiStepMods(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "multi.yaml")
 	specContent := `
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 steps:
   - image: docker.io/test/mig-step1:latest
     env:
