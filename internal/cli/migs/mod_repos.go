@@ -49,11 +49,8 @@ type AddModRepoCommand struct {
 
 // Run executes POST /v1/migs/{mod_id}/repos to add a repo.
 func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
-	if c.Client == nil {
-		return ModRepoSummary{}, fmt.Errorf("mig repo add: http client required")
-	}
-	if c.BaseURL == nil {
-		return ModRepoSummary{}, fmt.Errorf("mig repo add: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return ModRepoSummary{}, fmt.Errorf("mig repo add: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mig repo add: mig id is required")
@@ -99,7 +96,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	if err != nil {
 		return ModRepoSummary{}, fmt.Errorf("mig repo add: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
@@ -110,7 +107,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 		return result, nil
 	}
 
-	return ModRepoSummary{}, decodeHTTPError(resp, "mig repo add")
+	return ModRepoSummary{}, httpx.WrapError("mig repo add", resp.Status, resp.Body)
 }
 
 // ListModReposCommand lists repos in a mig's repo set.
@@ -124,11 +121,8 @@ type ListModReposCommand struct {
 
 // Run executes GET /v1/migs/{mod_id}/repos to list repos.
 func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("mig repo list: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("mig repo list: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("mig repo list: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return nil, fmt.Errorf("mig repo list: mig id is required")
@@ -145,10 +139,10 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("mig repo list: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "mig repo list")
+		return nil, httpx.WrapError("mig repo list", resp.Status, resp.Body)
 	}
 
 	// Response structure: {"repos": [...]}
@@ -174,11 +168,8 @@ type RemoveModRepoCommand struct {
 
 // Run executes DELETE /v1/migs/{mod_id}/repos/{repo_id} to delete a repo.
 func (c RemoveModRepoCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return fmt.Errorf("mig repo remove: http client required")
-	}
-	if c.BaseURL == nil {
-		return fmt.Errorf("mig repo remove: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("mig repo remove: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return fmt.Errorf("mig repo remove: mig id is required")
@@ -204,14 +195,14 @@ func (c RemoveModRepoCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("mig repo remove: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// 204 No Content indicates success.
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 
-	return decodeHTTPError(resp, "mig repo remove")
+	return httpx.WrapError("mig repo remove", resp.Status, resp.Body)
 }
 
 // ImportModReposCommand bulk imports repos for a mig from CSV.
@@ -240,11 +231,8 @@ type ImportError struct {
 
 // Run executes POST /v1/migs/{mod_id}/repos/bulk to import repos from CSV.
 func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, error) {
-	if c.Client == nil {
-		return ImportModReposResult{}, fmt.Errorf("mig repo import: http client required")
-	}
-	if c.BaseURL == nil {
-		return ImportModReposResult{}, fmt.Errorf("mig repo import: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return ImportModReposResult{}, fmt.Errorf("mig repo import: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return ImportModReposResult{}, fmt.Errorf("mig repo import: mig id is required")
@@ -265,7 +253,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	if err != nil {
 		return ImportModReposResult{}, fmt.Errorf("mig repo import: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 200 OK response (bulk import always returns 200 with counts).
 	if resp.StatusCode == http.StatusOK {
@@ -276,5 +264,5 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 		return result, nil
 	}
 
-	return ImportModReposResult{}, decodeHTTPError(resp, "mig repo import")
+	return ImportModReposResult{}, httpx.WrapError("mig repo import", resp.Status, resp.Body)
 }

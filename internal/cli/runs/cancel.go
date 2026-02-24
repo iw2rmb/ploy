@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -25,11 +26,8 @@ type CancelCommand struct {
 
 // Run executes the cancel request (POST /v1/runs/{id}/cancel).
 func (c CancelCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return errors.New("runs cancel: http client required")
-	}
-	if c.BaseURL == nil {
-		return errors.New("runs cancel: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("runs cancel: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return errors.New("runs cancel: run id required")
@@ -59,7 +57,7 @@ func (c CancelCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
 		return httpx.WrapError("runs cancel", resp.Status, resp.Body)
 	}

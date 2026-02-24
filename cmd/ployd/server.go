@@ -8,13 +8,11 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
-	httpserver "github.com/iw2rmb/ploy/internal/server/http"
-	"github.com/iw2rmb/ploy/internal/server/metrics"
 	"github.com/iw2rmb/ploy/internal/server/pki"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -62,7 +60,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 
 	// Initialize events service for SSE fanout.
-	eventsService, err := events.New(events.Options{
+	eventsService, err := server.NewEventsService(server.EventsOptions{
 		BufferSize:  32,
 		HistorySize: 256,
 		Logger:      slog.Default(),
@@ -124,7 +122,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 
 	// Initialize HTTP server for API endpoints.
-	httpSrv, err := httpserver.New(httpserver.Options{
+	httpSrv, err := server.NewHTTPServer(server.HTTPOptions{
 		Config:     cfg.HTTP,
 		Authorizer: authorizer,
 	})
@@ -156,7 +154,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)
 
 	// Initialize metrics server.
-	metricsSrv := metrics.New(metrics.Options{
+	metricsSrv := server.NewMetricsServer(server.MetricsOptions{
 		Listen: cfg.Metrics.Listen,
 	})
 

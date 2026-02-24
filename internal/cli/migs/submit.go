@@ -27,11 +27,8 @@ type SubmitCommand struct {
 // POST /v1/runs returns 201 Created with {run_id, mod_id, spec_id}.
 // GET /v1/runs/{id}/status returns the canonical RunSummary.
 func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
-	if c.Client == nil {
-		return modsapi.RunSummary{}, fmt.Errorf("migs submit: http client required")
-	}
-	if c.BaseURL == nil {
-		return modsapi.RunSummary{}, fmt.Errorf("migs submit: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return modsapi.RunSummary{}, fmt.Errorf("migs submit: %w", err)
 	}
 
 	reqBody := c.Request
@@ -69,7 +66,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("migs submit: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Server returns 201 Created with {run_id, mod_id, spec_id}.
 	if resp.StatusCode == http.StatusCreated {
@@ -88,7 +85,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 		return fetchRunSummary(ctx, c.BaseURL, c.Client, runID)
 	}
 
-	return modsapi.RunSummary{}, decodeHTTPError(resp, "migs submit")
+	return modsapi.RunSummary{}, httpx.WrapError("migs submit", resp.Status, resp.Body)
 }
 
 func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Client, runID domaintypes.RunID) (modsapi.RunSummary, error) {
@@ -101,9 +98,9 @@ func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Cli
 	if err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("migs submit: http status request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
-		return modsapi.RunSummary{}, decodeHTTPError(resp, "migs submit")
+		return modsapi.RunSummary{}, httpx.WrapError("migs submit", resp.Status, resp.Body)
 	}
 	var summary modsapi.RunSummary
 	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {

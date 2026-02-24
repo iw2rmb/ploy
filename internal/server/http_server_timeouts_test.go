@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 
 // Timeout tests cover default and custom HTTP timeout configuration.
 
-// TestServer_Timeouts validates HTTP timeout configuration.
+// TestHTTPServer_Timeouts validates HTTP timeout configuration.
 // It verifies default timeout application and custom timeout override behavior.
-func TestServer_Timeouts(t *testing.T) {
+func TestHTTPServer_Timeouts(t *testing.T) {
 	t.Run("default_timeouts", func(t *testing.T) {
 		// Verify server applies safe default timeouts when not configured.
 		// Timeouts are mandatory for production servers.
@@ -21,16 +21,16 @@ func TestServer_Timeouts(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 				// No timeouts set - defaults should be applied.
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()
@@ -65,7 +65,7 @@ func TestServer_Timeouts(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen:       "127.0.0.1:0",
 				ReadTimeout:  5 * time.Second,
@@ -74,9 +74,9 @@ func TestServer_Timeouts(t *testing.T) {
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()

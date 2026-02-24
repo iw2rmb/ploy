@@ -1,4 +1,4 @@
-package events
+package server
 
 import (
 	"bufio"
@@ -18,8 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Options configures the events service.
-type Options struct {
+// EventsOptions configures the events service.
+type EventsOptions struct {
 	// BufferSize controls the per-subscriber channel size.
 	BufferSize int
 	// HistorySize bounds the number of events retained for resumption.
@@ -30,16 +30,16 @@ type Options struct {
 	Store store.Store
 }
 
-// Service wraps the logstream hub for server-side event streaming
+// EventsService wraps the logstream hub for server-side event streaming
 // and coordinates database persistence with SSE fanout.
-type Service struct {
+type EventsService struct {
 	hub    *logstream.Hub
 	store  store.Store
 	logger *slog.Logger
 }
 
-// New constructs a new events service.
-func New(opts Options) (*Service, error) {
+// NewEventsService constructs a new events service.
+func NewEventsService(opts EventsOptions) (*EventsService, error) {
 	if opts.BufferSize < 0 {
 		return nil, errors.New("events: buffer size must be non-negative")
 	}
@@ -57,7 +57,7 @@ func New(opts Options) (*Service, error) {
 		HistorySize: opts.HistorySize,
 	})
 
-	return &Service{
+	return &EventsService{
 		hub:    hub,
 		store:  opts.Store,
 		logger: logger,
@@ -65,18 +65,18 @@ func New(opts Options) (*Service, error) {
 }
 
 // Hub returns the underlying logstream hub.
-func (s *Service) Hub() *logstream.Hub {
+func (s *EventsService) Hub() *logstream.Hub {
 	return s.hub
 }
 
 // Start is a no-op for now; the hub is ready immediately.
-func (s *Service) Start(ctx context.Context) error {
+func (s *EventsService) Start(ctx context.Context) error {
 	s.logger.Info("events service started")
 	return nil
 }
 
 // Stop gracefully stops the events service.
-func (s *Service) Stop(ctx context.Context) error {
+func (s *EventsService) Stop(ctx context.Context) error {
 	s.logger.Info("events service stopped")
 	return nil
 }
@@ -87,7 +87,7 @@ func (s *Service) Stop(ctx context.Context) error {
 // is returned; SSE fanout errors are logged but do not fail the operation.
 //
 // params.RunID is a KSUID-backed RunID; normalized for hub operations.
-func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
+func (s *EventsService) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
 	}
@@ -124,7 +124,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 // so clients see structured "log" events.
 //
 // params.RunID is a KSUID-backed RunID; normalized for hub operations.
-func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
+func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
 	// Normalize for hub operations.
 	runID := domaintypes.RunID(domaintypes.Normalize(log.RunID.String()))
 	if runID.IsZero() {
@@ -149,7 +149,7 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, log store.Log, data [
 // non‑JSON payloads from being published. Callers should also emit a terminal
 // "done" status via Hub().PublishStatus when the run reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
-func (s *Service) PublishRun(ctx context.Context, runID domaintypes.RunID, payload modsapi.RunSummary) error {
+func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID, payload modsapi.RunSummary) error {
 	if runID.IsZero() {
 		return logstream.ErrInvalidRunID
 	}
@@ -161,7 +161,7 @@ func (s *Service) PublishRun(ctx context.Context, runID domaintypes.RunID, paylo
 }
 
 // publishEventToHub converts a database event to a logstream event and publishes it.
-func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
+func (s *EventsService) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
 	// Convert event to log record format for SSE.
 	// Use the event level as stream and message as line.
 	record := logstream.LogRecord{
@@ -176,7 +176,7 @@ func (s *Service) publishEventToHub(ctx context.Context, runID domaintypes.RunID
 // publishLogToHubWithBytes converts log data to logstream events and publishes them.
 // It enriches each LogRecord with execution context (node_id, job_id, job_type)
 // by looking up the associated job metadata when available.
-func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
+func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
 	// Fetch job metadata to enrich log records with execution context.
@@ -238,10 +238,10 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 	return s.hub.PublishLog(ctx, runID, rec)
 }
 
-// jobContext holds execution context extracted from job metadata.
+// eventsJobContext holds execution context extracted from job metadata.
 // Used to enrich log records with node and mig information.
 // Uses domain types to preserve type safety end-to-end without lossy casts.
-type jobContext struct {
+type eventsJobContext struct {
 	NodeID  domaintypes.NodeID
 	JobID   domaintypes.JobID
 	JobType domaintypes.JobType
@@ -251,14 +251,14 @@ type jobContext struct {
 // fields needed to enrich log records. Returns an empty context if the
 // job ID is nil/empty or the lookup fails (logs are still published without
 // enrichment in these cases).
-func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) jobContext {
+func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) eventsJobContext {
 	// If job ID is nil or empty, return empty context.
 	if jobID == nil || jobID.IsZero() {
-		return jobContext{}
+		return eventsJobContext{}
 	}
 	// If store is not configured, return empty context (log-only mode).
 	if s.store == nil {
-		return jobContext{}
+		return eventsJobContext{}
 	}
 
 	job, err := s.store.GetJob(ctx, *jobID)
@@ -267,7 +267,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		s.logger.Debug("job lookup failed for log enrichment",
 			"job_id", jobID.String(),
 			"error", err)
-		return jobContext{}
+		return eventsJobContext{}
 	}
 
 	// Normalize and validate job metadata before enrichment.
@@ -296,7 +296,7 @@ func (s *Service) loadJobContext(ctx context.Context, jobID *domaintypes.JobID) 
 		}
 	}
 
-	return jobContext{
+	return eventsJobContext{
 		NodeID:  nid,
 		JobID:   jid,
 		JobType: mt,

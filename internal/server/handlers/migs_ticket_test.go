@@ -15,12 +15,12 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func newTestEventsService() *events.Service {
-	svc, _ := events.New(events.Options{
+func newTestEventsService() *server.EventsService {
+	svc, _ := server.NewEventsService(server.EventsOptions{
 		BufferSize:  10,
 		HistorySize: 100,
 	})

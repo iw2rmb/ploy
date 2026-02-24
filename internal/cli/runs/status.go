@@ -20,11 +20,8 @@ type GetStatusCommand struct {
 
 // Run executes GET /v1/runs/{id} and returns the run domaintypes.RunSummary.
 func (c GetStatusCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
-	if c.Client == nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("run status: http client required")
-	}
-	if c.BaseURL == nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("run status: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return domaintypes.RunSummary{}, fmt.Errorf("run status: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return domaintypes.RunSummary{}, fmt.Errorf("run status: run id required")
@@ -40,7 +37,7 @@ func (c GetStatusCommand) Run(ctx context.Context) (domaintypes.RunSummary, erro
 	if err != nil {
 		return domaintypes.RunSummary{}, fmt.Errorf("run status: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return domaintypes.RunSummary{}, httpx.WrapError("run status", resp.Status, resp.Body)

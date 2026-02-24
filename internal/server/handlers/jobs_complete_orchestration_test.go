@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -63,7 +63,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 		},
 	}
 
-	eventsService, _ := events.New(events.Options{
+	eventsService, _ := server.NewEventsService(server.EventsOptions{
 		BufferSize:  10,
 		HistorySize: 100,
 	})

@@ -1,4 +1,4 @@
-package events
+package server
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // FuzzPublishRunRoundTrip ensures arbitrary run payloads marshal/unmarshal without panicking
 // and that the hub stores "run"-typed events. Runs only with `-fuzz`.
 func FuzzPublishRunRoundTrip(f *testing.F) {
-	svc, err := New(Options{BufferSize: 2, HistorySize: 8})
+	svc, err := NewEventsService(EventsOptions{BufferSize: 2, HistorySize: 8})
 	if err != nil {
 		f.Fatalf("new service: %v", err)
 	}

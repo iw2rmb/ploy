@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -89,4 +91,35 @@ func GunzipToBytes(r io.Reader, maxBytes int64) ([]byte, error) {
 		return nil, fmt.Errorf("gunzip: output exceeds %d bytes", maxBytes)
 	}
 	return out, nil
+}
+
+// DrainAndClose drains the response body to io.Discard and then closes it.
+// Safe to call with a nil response or nil body.
+func DrainAndClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// CheckStatus returns nil if resp.StatusCode matches expected.
+// Otherwise it reads the error body and returns a formatted error.
+func CheckStatus(resp *http.Response, expected int, action string) error {
+	if resp.StatusCode == expected {
+		return nil
+	}
+	msg := ReadErrorMessage(resp.Body, resp.Status, MaxErrorBodyBytes)
+	return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, msg)
+}
+
+// RequireClientAndURL validates that both an HTTP client and base URL are set.
+func RequireClientAndURL(client *http.Client, base *url.URL) error {
+	if client == nil {
+		return fmt.Errorf("http client required")
+	}
+	if base == nil {
+		return fmt.Errorf("base url required")
+	}
+	return nil
 }

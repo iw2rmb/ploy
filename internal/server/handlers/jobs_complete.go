@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -41,7 +41,7 @@ type completeJobRequest struct {
 //	}
 //
 // Response: 204 No Content on success.
-func completeJobHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+func completeJobHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 

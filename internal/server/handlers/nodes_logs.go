@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -25,7 +25,7 @@ type nodeLogCreateResponse struct {
 //
 // The blobpersist service handles database metadata and object storage writes.
 // The events service handles SSE fanout.
-func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *events.Service) http.HandlerFunc {
+func createNodeLogsHandler(st store.Store, bp *blobpersist.Service, eventsService *server.EventsService) http.HandlerFunc {
 	// Validate dependencies are provided.
 	if bp == nil {
 		panic("createNodeLogsHandler: blobpersist is required")

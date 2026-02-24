@@ -20,10 +20,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type runJobCreator interface {
-	CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error)
-}
-
 // NOTE: This file uses KSUID-backed string IDs for runs and jobs.
 // Run and job IDs are generated using domaintypes.NewRunID() and domaintypes.NewJobID().
 // UUID parsing is no longer performed for run/job IDs; they are treated as opaque strings.
@@ -201,7 +197,7 @@ type plannedJob struct {
 
 // createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
 // Queue semantics are head-only: the first job is Queued, all successors are Created.
-func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, spec []byte) error {
+func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, spec []byte) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse migs spec: %w", err)
@@ -276,7 +272,7 @@ func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes
 	return nil
 }
 
-func createPlannedJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
+func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
 	// Build job metadata with step name for mig jobs.
 	var meta *contracts.JobMeta
 	if planned.StepName != "" {

@@ -13,8 +13,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -37,7 +37,7 @@ import (
 // separate Build Gate queue or claim path — all job types (pre-gate, mig, heal,
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
-func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *events.Service) http.HandlerFunc {
+func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter using domain type helper.
 		nodeID, err := parseParam[domaintypes.NodeID](r, "id")

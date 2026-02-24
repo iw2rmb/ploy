@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -59,9 +60,9 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, r
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
-	if err := httpError(resp, http.StatusOK, "list run repo diffs"); err != nil {
+	if err := httpx.CheckStatus(resp, http.StatusOK, "list run repo diffs"); err != nil {
 		return nil, err
 	}
 
@@ -137,9 +138,9 @@ func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.Run
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
-	if err := httpError(resp, http.StatusOK, "fetch run repo diff patch"); err != nil {
+	if err := httpx.CheckStatus(resp, http.StatusOK, "fetch run repo diff patch"); err != nil {
 		return nil, err
 	}
 

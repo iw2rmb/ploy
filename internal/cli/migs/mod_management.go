@@ -57,11 +57,8 @@ type AddModResult struct {
 
 // Run executes POST /v1/migs to create a mig project.
 func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
-	if c.Client == nil {
-		return AddModResult{}, fmt.Errorf("mig add: http client required")
-	}
-	if c.BaseURL == nil {
-		return AddModResult{}, fmt.Errorf("mig add: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return AddModResult{}, fmt.Errorf("mig add: %w", err)
 	}
 	if strings.TrimSpace(c.Name) == "" {
 		return AddModResult{}, fmt.Errorf("mig add: name is required")
@@ -95,7 +92,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 	if err != nil {
 		return AddModResult{}, fmt.Errorf("mig add: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
@@ -107,7 +104,7 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 	}
 
 	// Non-success: read error body and return error.
-	return AddModResult{}, decodeHTTPError(resp, "mig add")
+	return AddModResult{}, httpx.WrapError("mig add", resp.Status, resp.Body)
 }
 
 // ListMigsCommand lists mig projects with optional filters.
@@ -125,11 +122,8 @@ type ListMigsCommand struct {
 
 // Run executes GET /v1/migs to list migs with pagination and filters.
 func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("mig list: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("mig list: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("mig list: %w", err)
 	}
 
 	// Build endpoint with query params.
@@ -161,10 +155,10 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mig list: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "mig list")
+		return nil, httpx.WrapError("mig list", resp.Status, resp.Body)
 	}
 
 	// Response structure: {"migs": [...]}
@@ -189,11 +183,8 @@ type RemoveModCommand struct {
 
 // Run executes DELETE /v1/migs/{mod_ref} to delete a mig.
 func (c RemoveModCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return fmt.Errorf("mig remove: http client required")
-	}
-	if c.BaseURL == nil {
-		return fmt.Errorf("mig remove: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("mig remove: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return fmt.Errorf("mig remove: mig ref is required")
@@ -210,14 +201,14 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("mig remove: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// 204 No Content indicates success.
 	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 
-	return decodeHTTPError(resp, "mig remove")
+	return httpx.WrapError("mig remove", resp.Status, resp.Body)
 }
 
 // ArchiveMigCommand archives a mig project.
@@ -238,11 +229,8 @@ type ArchiveMigResult struct {
 
 // Run executes PATCH /v1/migs/{mod_ref}/archive to archive a mig.
 func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
-	if c.Client == nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: http client required")
-	}
-	if c.BaseURL == nil {
-		return ArchiveMigResult{}, fmt.Errorf("mig archive: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return ArchiveMigResult{}, fmt.Errorf("mig archive: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return ArchiveMigResult{}, fmt.Errorf("mig archive: mig ref is required")
@@ -259,7 +247,7 @@ func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 	if err != nil {
 		return ArchiveMigResult{}, fmt.Errorf("mig archive: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode == http.StatusOK {
 		var result ArchiveMigResult
@@ -269,7 +257,7 @@ func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 		return result, nil
 	}
 
-	return ArchiveMigResult{}, decodeHTTPError(resp, "mig archive")
+	return ArchiveMigResult{}, httpx.WrapError("mig archive", resp.Status, resp.Body)
 }
 
 // UnarchiveMigCommand unarchives a mig project.
@@ -290,11 +278,8 @@ type UnarchiveMigResult struct {
 
 // Run executes PATCH /v1/migs/{mod_ref}/unarchive to unarchive a mig.
 func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error) {
-	if c.Client == nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: http client required")
-	}
-	if c.BaseURL == nil {
-		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: mig ref is required")
@@ -311,7 +296,7 @@ func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error
 	if err != nil {
 		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode == http.StatusOK {
 		var result UnarchiveMigResult
@@ -321,7 +306,7 @@ func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error
 		return result, nil
 	}
 
-	return UnarchiveMigResult{}, decodeHTTPError(resp, "mig unarchive")
+	return UnarchiveMigResult{}, httpx.WrapError("mig unarchive", resp.Status, resp.Body)
 }
 
 // SetModSpecCommand creates a new spec row and updates migs.spec_id.
@@ -344,11 +329,8 @@ type SetModSpecResult struct {
 
 // Run executes POST /v1/migs/{mod_ref}/specs to set the mig's spec.
 func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
-	if c.Client == nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: http client required")
-	}
-	if c.BaseURL == nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return SetModSpecResult{}, fmt.Errorf("mig spec set: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mig spec set: mig ref is required")
@@ -387,7 +369,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	if err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mig spec set: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
@@ -398,7 +380,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 		return result, nil
 	}
 
-	return SetModSpecResult{}, decodeHTTPError(resp, "mig spec set")
+	return SetModSpecResult{}, httpx.WrapError("mig spec set", resp.Status, resp.Body)
 }
 
 // ResolveModByNameCommand attempts to resolve a mig reference (ID or name) to a mig ID.
@@ -415,11 +397,8 @@ type ResolveModByNameCommand struct {
 // Returns the mig ID if found by exact name match, or the reference as-is if no match.
 // No client-side heuristics are used to distinguish IDs from names.
 func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
-	if c.Client == nil {
-		return "", fmt.Errorf("resolve mig: http client required")
-	}
-	if c.BaseURL == nil {
-		return "", fmt.Errorf("resolve mig: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return "", fmt.Errorf("resolve mig: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return "", fmt.Errorf("resolve mig: mig reference is required")

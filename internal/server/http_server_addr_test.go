@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"context"
@@ -10,25 +10,25 @@ import (
 
 // Address tests cover configured and resolved listen addresses.
 
-// TestServer_Addr validates address resolution behavior.
+// TestHTTPServer_Addr validates address resolution behavior.
 // It verifies the server returns the configured address before start
 // and the resolved address (with actual port) after start.
-func TestServer_Addr(t *testing.T) {
+func TestHTTPServer_Addr(t *testing.T) {
 	t.Run("before_start", func(t *testing.T) {
 		// Before Start(), Addr() returns the configured listen address.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: ":8443",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		addr := srv.Addr()
@@ -43,15 +43,15 @@ func TestServer_Addr(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0", // Port 0 requests OS-assigned port.
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()

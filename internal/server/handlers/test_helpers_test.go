@@ -11,18 +11,17 @@ import (
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
-	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createTestEventsService creates an events service for testing without a store.
 // Use createTestEventsServiceWithStore for tests that need log/event persistence.
-func createTestEventsService() (*events.Service, error) {
-	return events.New(events.Options{
+func createTestEventsService() (*server.EventsService, error) {
+	return server.NewEventsService(server.EventsOptions{
 		BufferSize:  32,
 		HistorySize: 256,
 		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
@@ -31,8 +30,8 @@ func createTestEventsService() (*events.Service, error) {
 
 // createTestEventsServiceWithStore creates an events service with a store for testing.
 // This is required for log handlers that persist via eventsService.CreateAndPublishLog.
-func createTestEventsServiceWithStore(st store.Store) (*events.Service, error) {
-	return events.New(events.Options{
+func createTestEventsServiceWithStore(st store.Store) (*server.EventsService, error) {
+	return server.NewEventsService(server.EventsOptions{
 		BufferSize:  32,
 		HistorySize: 256,
 		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
@@ -107,14 +106,14 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 
 // newTestServerWithRole creates an HTTP server with routes registered and
 // the given auth role as the default for all requests.
-func newTestServerWithRole(t *testing.T, role auth.Role) *httpapi.Server {
+func newTestServerWithRole(t *testing.T, role auth.Role) *server.HTTPServer {
 	t.Helper()
 	authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: role})
-	srv, err := httpapi.New(httpapi.Options{Authorizer: authz})
+	srv, err := server.NewHTTPServer(server.HTTPOptions{Authorizer: authz})
 	if err != nil {
 		t.Fatalf("http server: %v", err)
 	}
-	ev, err := events.New(events.Options{})
+	ev, err := server.NewEventsService(server.EventsOptions{})
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}

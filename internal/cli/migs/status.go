@@ -42,11 +42,8 @@ type ListRunRepoDiffsCommand struct {
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
 // Diffs are returned in server-provided order (ordered by next_id, then created_at).
 func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("list run repo diffs: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("list run repo diffs: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("list run repo diffs: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("list run repo diffs: run id required")
@@ -67,10 +64,10 @@ func (c ListRunRepoDiffsCommand) Run(ctx context.Context) ([]DiffEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list run repo diffs: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "list run repo diffs")
+		return nil, httpx.WrapError("list run repo diffs", resp.Status, resp.Body)
 	}
 
 	// Response structure: {"diffs": [...]}
@@ -98,11 +95,8 @@ type DownloadDiffCommand struct {
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
 // and returns the decompressed patch.
 func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("download diff: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("download diff: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("download diff: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("download diff: run id required")
@@ -130,10 +124,10 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("download diff: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "download diff")
+		return nil, httpx.WrapError("download diff", resp.Status, resp.Body)
 	}
 
 	patch, err := httpx.GunzipToBytes(io.LimitReader(resp.Body, httpx.MaxDownloadBodyBytes), httpx.MaxGunzipOutputBytes)

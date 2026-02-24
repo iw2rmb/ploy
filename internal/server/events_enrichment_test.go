@@ -1,4 +1,4 @@
-package events
+package server
 
 // This file contains tests for log enrichment with job metadata.
 
@@ -63,7 +63,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 		},
 	}
 
-	svc, err := New(Options{
+	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
 		Store:       mock,
@@ -144,7 +144,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 		},
 	}
 
-	svc, err := New(Options{BufferSize: 4, HistorySize: 8, Store: mock})
+	svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8, Store: mock})
 	if err != nil {
 		t.Fatalf("failed to create service: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		},
 	}
 
-	svc, err := New(Options{
+	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
 		Store:       mock,
@@ -276,7 +276,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		},
 	}
 
-	svc, err := New(Options{
+	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
 		Store:       mock,

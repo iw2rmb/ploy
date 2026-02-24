@@ -1,4 +1,4 @@
-package events
+package server
 
 // This file contains tests for service initialization and lifecycle.
 
@@ -14,12 +14,12 @@ import (
 func TestStorage_New(t *testing.T) {
 	tests := []struct {
 		name    string
-		opts    Options
+		opts    EventsOptions
 		wantErr bool
 	}{
 		{
 			name: "valid options with defaults",
-			opts: Options{
+			opts: EventsOptions{
 				BufferSize:  0,
 				HistorySize: 0,
 			},
@@ -27,7 +27,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "valid options with explicit values",
-			opts: Options{
+			opts: EventsOptions{
 				BufferSize:  32,
 				HistorySize: 256,
 			},
@@ -35,7 +35,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "negative buffer size",
-			opts: Options{
+			opts: EventsOptions{
 				BufferSize:  -1,
 				HistorySize: 256,
 			},
@@ -43,7 +43,7 @@ func TestStorage_New(t *testing.T) {
 		},
 		{
 			name: "negative history size",
-			opts: Options{
+			opts: EventsOptions{
 				BufferSize:  32,
 				HistorySize: -1,
 			},
@@ -53,7 +53,7 @@ func TestStorage_New(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, err := New(tt.opts)
+			svc, err := NewEventsService(tt.opts)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -76,7 +76,7 @@ func TestStorage_New(t *testing.T) {
 // TestStorage_ServiceStartStop verifies the service lifecycle, ensuring the service
 // can be started and stopped cleanly without errors.
 func TestStorage_ServiceStartStop(t *testing.T) {
-	svc, err := New(Options{
+	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
 	})
@@ -102,7 +102,7 @@ func TestStorage_ServiceStartStop(t *testing.T) {
 // CreateAndPublishLog only handles SSE fanout (no store required), so it doesn't fail.
 // This ensures proper error handling for services created without database backing.
 func TestStorage_WithoutStore(t *testing.T) {
-	svc, err := New(Options{
+	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
 		Store:       nil,

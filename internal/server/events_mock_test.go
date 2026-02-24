@@ -1,4 +1,4 @@
-package events
+package server
 
 import (
 	"context"

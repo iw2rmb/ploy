@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"context"
@@ -11,24 +11,24 @@ import (
 
 // Multiplexer tests cover handler registration via HandleFunc and Handle.
 
-// TestServer_HandleFunc verifies the multiplexer API for handler registration.
+// TestHTTPServer_HandleFunc verifies the multiplexer API for handler registration.
 // It validates both direct registration and role-based middleware enforcement.
-func TestServer_HandleFunc(t *testing.T) {
+func TestHTTPServer_HandleFunc(t *testing.T) {
 	t.Run("without_middleware", func(t *testing.T) {
 		// Verify basic handler registration without middleware.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		// Register a test handler without role restrictions.
@@ -61,15 +61,15 @@ func TestServer_HandleFunc(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane, // Insecure requests get ControlPlane role.
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		// Register handler requiring CLIAdmin role (higher than default).
@@ -97,22 +97,22 @@ func TestServer_HandleFunc(t *testing.T) {
 	})
 }
 
-// TestServer_Handle verifies the Handle method for registering http.Handler.
+// TestHTTPServer_Handle verifies the Handle method for registering http.Handler.
 // This complements HandleFunc by supporting the full http.Handler interface.
-func TestServer_Handle(t *testing.T) {
+func TestHTTPServer_Handle(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
 		DefaultRole:   auth.RoleControlPlane,
 	})
-	opts := Options{
+	opts := HTTPOptions{
 		Config: config.HTTPConfig{
 			Listen: "127.0.0.1:0",
 		},
 		Authorizer: authorizer,
 	}
-	srv, err := New(opts)
+	srv, err := NewHTTPServer(opts)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		t.Fatalf("NewHTTPServer() error = %v", err)
 	}
 
 	// Register a handler using Handle (http.Handler interface).
