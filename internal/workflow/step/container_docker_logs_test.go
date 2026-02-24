@@ -33,14 +33,14 @@ func TestDockerContainerRuntimeLogs(t *testing.T) {
 	}{
 		{
 			name:        "success_demux",
-			handle:      ContainerHandle{ID: "container123"},
+			handle:      ContainerHandle("container123"),
 			logsData:    muxLogs.Bytes(),
 			wantContent: []string{"stdout line", "stderr line"},
 			wantErr:     false,
 		},
 		{
 			name:    "error_logs_fails",
-			handle:  ContainerHandle{ID: "container456"},
+			handle:  ContainerHandle("container456"),
 			logsErr: errors.New("container not found"),
 			wantErr: true,
 		},
@@ -142,7 +142,7 @@ func TestDockerLogStreamingV29_ThroughRuntime(t *testing.T) {
 			fake := &fakeDockerClient{logsData: tc.logsData}
 			rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
 
-			logs, err := rt.Logs(context.Background(), ContainerHandle{ID: "test-container"})
+			logs, err := rt.Logs(context.Background(), ContainerHandle("test-container"))
 			if err != nil {
 				t.Fatalf("Logs failed: %v", err)
 			}
@@ -180,7 +180,7 @@ func TestDockerLogStreamingV29_FallbackOnDemuxError(t *testing.T) {
 	fake := &fakeDockerClient{logsData: invalidStream}
 	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
 
-	logs, err := rt.Logs(context.Background(), ContainerHandle{ID: "fallback-test"})
+	logs, err := rt.Logs(context.Background(), ContainerHandle("fallback-test"))
 	if err != nil {
 		t.Fatalf("Logs should not error on demux failure (should fallback): %v", err)
 	}

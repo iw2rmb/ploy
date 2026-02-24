@@ -18,39 +18,40 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// dockerClientAPI abstracts the moby client methods used by DockerContainerRuntime.
+// dockerClientAPI abstracts the core moby client methods used by DockerContainerRuntime.
 // This interface enables dependency injection for testing without requiring a live
 // Docker daemon. It mirrors the moby Engine v29 SDK method signatures exactly.
 type dockerClientAPI interface {
-	// ContainerCreate creates a container and returns its ID.
 	ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error)
-	// ContainerStart starts a previously created container.
 	ContainerStart(ctx context.Context, containerID string, options client.ContainerStartOptions) (client.ContainerStartResult, error)
-	// ContainerWait blocks until the container stops and returns the wait result.
 	ContainerWait(ctx context.Context, containerID string, options client.ContainerWaitOptions) client.ContainerWaitResult
-	// ContainerInspect returns detailed container information.
 	ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error)
-	// ContainerLogs returns a reader for container stdout/stderr (moby returns ContainerLogsResult).
 	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
-	// ContainerRemove deletes a container.
 	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
-	// ContainerStats returns live resource usage statistics for a container.
-	// Used by gate executor for resource telemetry.
-	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
-	// ImagePull fetches an image from a registry (moby returns ImagePullResponse).
+}
+
+// dockerImageAPI abstracts image operations (pull & inspect) for conditional image fetching.
+type dockerImageAPI interface {
 	ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error)
-	// ImageInspect returns image information (used to detect local availability).
 	ImageInspect(ctx context.Context, imageID string, inspectOpts ...client.ImageInspectOption) (client.ImageInspectResult, error)
+}
+
+// dockerStatsAPI abstracts container stats retrieval, used by gate resource telemetry.
+type dockerStatsAPI interface {
+	ContainerStats(ctx context.Context, containerID string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error)
 }
 
 // DockerContainerRuntime executes containers using the local Docker daemon.
 // It uses the moby Engine v29 SDK (github.com/moby/moby/client) for all
 // Docker operations (create, start, wait, logs, remove, image pull).
 type DockerContainerRuntime struct {
-	// client abstracts Docker API calls via dockerClientAPI interface.
-	// In production, this is *client.Client from moby; in tests, a fake.
+	// client abstracts core Docker container lifecycle calls.
 	client dockerClientAPI
-	opts   DockerContainerRuntimeOptions
+	// images handles image pull/inspect (nil when PullImage is false).
+	images dockerImageAPI
+	// stats handles container resource stats (nil-safe; used only by gate telemetry).
+	stats dockerStatsAPI
+	opts  DockerContainerRuntimeOptions
 }
 
 // NewDockerContainerRuntime constructs a Docker-backed container runtime.
@@ -65,13 +66,20 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 	if err != nil {
 		return nil, fmt.Errorf("step: configure docker runtime: %w", err)
 	}
-	return &DockerContainerRuntime{client: cli, opts: opts}, nil
+	return &DockerContainerRuntime{client: cli, images: cli, stats: cli, opts: opts}, nil
 }
 
 // newDockerContainerRuntimeWithClient constructs a DockerContainerRuntime with
 // an injected dockerClientAPI. Used for testing with fake Docker clients.
 func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContainerRuntimeOptions) *DockerContainerRuntime {
-	return &DockerContainerRuntime{client: cli, opts: opts}
+	rt := &DockerContainerRuntime{client: cli, opts: opts}
+	if img, ok := cli.(dockerImageAPI); ok {
+		rt.images = img
+	}
+	if s, ok := cli.(dockerStatsAPI); ok {
+		rt.stats = s
+	}
+	return rt
 }
 
 // Create prepares a container using the moby client ContainerCreate API.
@@ -88,15 +96,15 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 //   - StorageOpt["size"] sets disk quota when supported by the storage driver.
 func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
 	if r == nil || r.client == nil {
-		return ContainerHandle{}, errors.New("step: docker runtime not configured")
+		return "", errors.New("step: docker runtime not configured")
 	}
 	if strings.TrimSpace(spec.Image) == "" {
-		return ContainerHandle{}, errors.New("step: container image required")
+		return "", errors.New("step: container image required")
 	}
 	// Pull image before creation if configured.
 	if r.opts.PullImage {
 		if err := r.ensureImageAvailable(ctx, spec.Image); err != nil {
-			return ContainerHandle{}, err
+			return "", err
 		}
 	}
 	// Build container configuration with image, command, workdir, env, and labels.
@@ -140,9 +148,9 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 		// Name left empty for auto-generated container name.
 	})
 	if err != nil {
-		return ContainerHandle{}, fmt.Errorf("step: create container: %w", err)
+		return "", fmt.Errorf("step: create container: %w", err)
 	}
-	return ContainerHandle{ID: created.ID}, nil
+	return ContainerHandle(created.ID), nil
 }
 
 // Start launches the container using the moby client ContainerStart API.
@@ -160,7 +168,7 @@ func (r *DockerContainerRuntime) Start(ctx context.Context, handle ContainerHand
 	}
 	// Moby Engine v29 SDK uses client.ContainerStartOptions instead of
 	// container.StartOptions; empty struct for default behavior.
-	_, err := r.client.ContainerStart(ctx, handle.ID, client.ContainerStartOptions{})
+	_, err := r.client.ContainerStart(ctx, string(handle), client.ContainerStartOptions{})
 	return err
 }
 
@@ -184,7 +192,7 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 	// Moby Engine v29 SDK uses client.ContainerWaitOptions with Condition field
 	// instead of container.WaitCondition as a positional parameter. The result
 	// is a struct with Result and Error channels.
-	waitResult := r.client.ContainerWait(ctx, handle.ID, client.ContainerWaitOptions{
+	waitResult := r.client.ContainerWait(ctx, string(handle), client.ContainerWaitOptions{
 		Condition: container.WaitConditionNotRunning,
 	})
 	select {
@@ -196,7 +204,7 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 		res := ContainerResult{ExitCode: int(status.StatusCode)}
 		// Inspect container to extract start/finish timestamps.
 		// Moby v29 SDK returns ContainerInspectResult with Container field.
-		inspect, err := r.client.ContainerInspect(ctx, handle.ID, client.ContainerInspectOptions{})
+		inspect, err := r.client.ContainerInspect(ctx, string(handle), client.ContainerInspectOptions{})
 		if err == nil && inspect.Container.State != nil {
 			res.StartedAt = parseDockerTime(inspect.Container.State.StartedAt)
 			res.CompletedAt = parseDockerTime(inspect.Container.State.FinishedAt)
@@ -239,7 +247,7 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 	}
 	// Moby Engine v29 SDK uses client.ContainerLogsOptions (ShowStdout, ShowStderr).
 	// Returns client.ContainerLogsResult which embeds io.ReadCloser.
-	reader, err := r.client.ContainerLogs(ctx, handle.ID, client.ContainerLogsOptions{
+	reader, err := r.client.ContainerLogs(ctx, string(handle), client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 	})
@@ -283,7 +291,7 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 	// Moby Engine v29 SDK uses client.ContainerRemoveOptions instead of
 	// container.RemoveOptions; same field names (Force, RemoveVolumes, RemoveLinks).
 	// Returns (ContainerRemoveResult, error); result is empty, discard it.
-	_, err := r.client.ContainerRemove(ctx, handle.ID, client.ContainerRemoveOptions{Force: true})
+	_, err := r.client.ContainerRemove(ctx, string(handle), client.ContainerRemoveOptions{Force: true})
 	return err
 }
 
@@ -293,7 +301,7 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 // This avoids failing local development runs when tags (e.g. ploy-gate-gradle:jdk11)
 // are built locally and not published to a registry.
 func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
-	_, err := r.client.ImageInspect(ctx, imageRef)
+	_, err := r.images.ImageInspect(ctx, imageRef)
 	if err == nil {
 		return nil
 	}
@@ -308,7 +316,7 @@ func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, image
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {
 	// Moby Engine v29 SDK uses client.ImagePullOptions instead of
 	// imageapi.PullOptions; same field names (RegistryAuth, PrivilegeFunc, etc.).
-	reader, err := r.client.ImagePull(ctx, imageRef, client.ImagePullOptions{})
+	reader, err := r.images.ImagePull(ctx, imageRef, client.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("step: pull image %s: %w", imageRef, err)
 	}

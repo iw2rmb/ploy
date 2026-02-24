@@ -25,12 +25,12 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 	}{
 		{
 			name:    "success",
-			handle:  ContainerHandle{ID: "container123"},
+			handle:  ContainerHandle("container123"),
 			wantErr: false,
 		},
 		{
 			name:     "error_start_fails",
-			handle:   ContainerHandle{ID: "container456"},
+			handle:   ContainerHandle("container456"),
 			startErr: errors.New("container not found"),
 			wantErr:  true,
 		},
@@ -54,8 +54,8 @@ func TestDockerContainerRuntimeStart(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if fake.startID != tc.handle.ID {
-				t.Errorf("started container %q, want %q", fake.startID, tc.handle.ID)
+			if fake.startID != string(tc.handle) {
+				t.Errorf("started container %q, want %q", fake.startID, string(tc.handle))
 			}
 		})
 	}
@@ -77,7 +77,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 	}{
 		{
 			name:       "success_exit_0",
-			handle:     ContainerHandle{ID: "container123"},
+			handle:     ContainerHandle("container123"),
 			statusCode: 0,
 			startedAt:  "2024-01-15T10:00:00.000000000Z",
 			finishedAt: "2024-01-15T10:01:00.000000000Z",
@@ -86,7 +86,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 		},
 		{
 			name:       "success_exit_1",
-			handle:     ContainerHandle{ID: "container456"},
+			handle:     ContainerHandle("container456"),
 			statusCode: 1,
 			startedAt:  "2024-01-15T10:00:00.000000000Z",
 			finishedAt: "2024-01-15T10:00:30.000000000Z",
@@ -95,7 +95,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 		},
 		{
 			name:       "success_inspect_fails_gracefully",
-			handle:     ContainerHandle{ID: "container789"},
+			handle:     ContainerHandle("container789"),
 			statusCode: 0,
 			inspectErr: errors.New("inspect failed"),
 			wantCode:   0,
@@ -103,7 +103,7 @@ func TestDockerContainerRuntimeWait(t *testing.T) {
 		},
 		{
 			name:    "error_wait_fails",
-			handle:  ContainerHandle{ID: "container-err"},
+			handle:  ContainerHandle("container-err"),
 			waitErr: errors.New("container died unexpectedly"),
 			wantErr: true,
 		},
@@ -169,12 +169,12 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 	}{
 		{
 			name:    "success",
-			handle:  ContainerHandle{ID: "container123"},
+			handle:  ContainerHandle("container123"),
 			wantErr: false,
 		},
 		{
 			name:      "error_remove_fails",
-			handle:    ContainerHandle{ID: "container456"},
+			handle:    ContainerHandle("container456"),
 			removeErr: errors.New("container busy"),
 			wantErr:   true,
 		},
@@ -201,8 +201,8 @@ func TestDockerContainerRuntimeRemove(t *testing.T) {
 			if !fake.removeCalled {
 				t.Error("remove should have been called")
 			}
-			if fake.removeID != tc.handle.ID {
-				t.Errorf("removed container %q, want %q", fake.removeID, tc.handle.ID)
+			if fake.removeID != string(tc.handle) {
+				t.Errorf("removed container %q, want %q", fake.removeID, string(tc.handle))
 			}
 		})
 	}
@@ -217,16 +217,16 @@ func TestDockerContainerRuntimeNilClient(t *testing.T) {
 	if _, err := rt.Create(ctx, ContainerSpec{Image: "alpine"}); err == nil {
 		t.Error("Create should fail with nil client")
 	}
-	if err := rt.Start(ctx, ContainerHandle{ID: "x"}); err == nil {
+	if err := rt.Start(ctx, ContainerHandle("x")); err == nil {
 		t.Error("Start should fail with nil client")
 	}
-	if _, err := rt.Wait(ctx, ContainerHandle{ID: "x"}); err == nil {
+	if _, err := rt.Wait(ctx, ContainerHandle("x")); err == nil {
 		t.Error("Wait should fail with nil client")
 	}
-	if _, err := rt.Logs(ctx, ContainerHandle{ID: "x"}); err == nil {
+	if _, err := rt.Logs(ctx, ContainerHandle("x")); err == nil {
 		t.Error("Logs should fail with nil client")
 	}
-	if err := rt.Remove(ctx, ContainerHandle{ID: "x"}); err == nil {
+	if err := rt.Remove(ctx, ContainerHandle("x")); err == nil {
 		t.Error("Remove should fail with nil client")
 	}
 }

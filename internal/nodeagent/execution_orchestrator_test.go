@@ -81,7 +81,7 @@ func TestGateContract_OnlyPreRunGateExecuted(t *testing.T) {
 
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil
@@ -199,7 +199,7 @@ func TestExecuteWithHealing_ManifestGateDisabledForRunnerRun(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			runnerRunCalled = true
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil

@@ -32,11 +32,11 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 			if spec.Image == "heal:latest" {
 				id = "heal"
 			}
-			return step.ContainerHandle{ID: id}, nil
+			return step.ContainerHandle(id), nil
 		},
 		startFn: func(_ context.Context, _ step.ContainerHandle) error { return nil },
 		waitFn: func(_ context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
-			if handle.ID == "heal" {
+			if string(handle) == "heal" {
 				return step.ContainerResult{ExitCode: 17}, nil
 			}
 			return step.ContainerResult{ExitCode: 0}, nil
@@ -78,7 +78,7 @@ func TestExecuteWithHealing_RetriesValueHonored(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
 		creates++
-		return step.ContainerHandle{ID: "heal"}, nil
+		return step.ContainerHandle("heal"), nil
 	}
 
 	ws, outDir := healingDirs(t)
@@ -106,7 +106,7 @@ func TestExecuteWithHealing_RetriesValueHonored(t *testing.T) {
 func TestExecuteWithHealing_HealingConfiguredNoMod_NoHealing(t *testing.T) {
 	mockContainer := &mockContainerRuntime{createFn: func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
 		t.Fatalf("no container should be created when no healing mig is configured")
-		return step.ContainerHandle{ID: "x"}, nil
+		return step.ContainerHandle("x"), nil
 	}}
 
 	ws, outDir := healingDirs(t)
@@ -154,7 +154,7 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
 		containerCreates++
-		return step.ContainerHandle{ID: "mock-container"}, nil
+		return step.ContainerHandle("mock-container"), nil
 	}
 
 	ws, outDir := healingDirs(t)
@@ -193,7 +193,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 		}
 		capturedEnv = copied
 		capturedMounts = append([]step.ContainerMount{}, spec.Mounts...)
-		return step.ContainerHandle{ID: "heal"}, nil
+		return step.ContainerHandle("heal"), nil
 	}
 
 	ws, outDir := healingDirs(t)
@@ -310,7 +310,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		healerSpecs = append(healerSpecs, spec)
-		return step.ContainerHandle{ID: "heal"}, nil
+		return step.ContainerHandle("heal"), nil
 	}
 
 	ws, outDir := healingDirs(t)
@@ -360,7 +360,7 @@ func TestExecuteWithHealing_NonSessionAwareHealerNoResume(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		healerSpecs = append(healerSpecs, spec)
-		return step.ContainerHandle{ID: "heal"}, nil
+		return step.ContainerHandle("heal"), nil
 	}
 
 	ws, outDir := healingDirs(t)

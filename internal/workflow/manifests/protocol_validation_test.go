@@ -55,7 +55,7 @@ reason = "build-gate"
 `
 
 	writeManifest(t, dir, "smoke.toml", body)
-	_, err := manifests.LoadDirectory(dir)
+	_, err := manifests.ExportLoadDirectory(dir)
 	if err == nil {
 		t.Fatal("expected error for invalid protocol")
 	}

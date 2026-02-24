@@ -54,18 +54,18 @@ func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			switch spec.Image {
 			case "test/healer-final-gate:latest":
-				return step.ContainerHandle{ID: "healer"}, nil
+				return step.ContainerHandle("healer"), nil
 			case "test/main-mig-final-gate:latest":
-				return step.ContainerHandle{ID: "main"}, nil
+				return step.ContainerHandle("main"), nil
 			default:
-				return step.ContainerHandle{ID: "unknown"}, nil
+				return step.ContainerHandle("unknown"), nil
 			}
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil
 		},
 		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
-			switch handle.ID {
+			switch string(handle) {
 			case "healer":
 				// Healing container succeeds.
 				return step.ContainerResult{ExitCode: 0}, nil
@@ -241,7 +241,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			healingContainerCount++
-			return step.ContainerHandle{ID: fmt.Sprintf("heal-%d", healingContainerCount)}, nil
+			return step.ContainerHandle(fmt.Sprintf("heal-%d", healingContainerCount)), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil

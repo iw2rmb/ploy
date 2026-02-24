@@ -83,7 +83,7 @@ func TestExecuteRun_PostGateStopsFurtherMods(t *testing.T) {
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			containerCreateCount++
 			executionOrder = append(executionOrder, "container:"+spec.Image)
-			return step.ContainerHandle{ID: "mock-container"}, nil
+			return step.ContainerHandle("mock-container"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil
@@ -285,7 +285,7 @@ func TestExecuteRun_PostGateStopsFurtherMods_HealingExhausted(t *testing.T) {
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			containerImages = append(containerImages, spec.Image)
 			executionOrder = append(executionOrder, "container:"+spec.Image)
-			return step.ContainerHandle{ID: "mock"}, nil
+			return step.ContainerHandle("mock"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
 			return nil

@@ -452,7 +452,7 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 				}
 			}
 		}
-		return step.ContainerHandle{ID: "mock-" + spec.Image}, nil
+		return step.ContainerHandle("mock-" + spec.Image), nil
 	}
 
 	runner := step.Runner{Containers: mc}

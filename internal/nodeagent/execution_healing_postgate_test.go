@@ -49,7 +49,7 @@ func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			containerCallCount++
-			return step.ContainerHandle{ID: "mock"}, nil
+			return step.ContainerHandle("mock"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
 		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
@@ -194,7 +194,7 @@ func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 			callSequence = append(callSequence, "container:"+spec.Image)
-			return step.ContainerHandle{ID: "mock"}, nil
+			return step.ContainerHandle("mock"), nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
 		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {

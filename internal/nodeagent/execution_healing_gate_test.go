@@ -34,7 +34,7 @@ func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T)
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, _ step.ContainerSpec) (step.ContainerHandle, error) {
 		healingContainerCount++
-		return step.ContainerHandle{ID: "healer"}, nil
+		return step.ContainerHandle("healer"), nil
 	}
 
 	// Create workspace with a clean git repo so git status --porcelain is empty.
@@ -166,7 +166,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		callSequence = append(callSequence, "container:"+spec.Image)
-		return step.ContainerHandle{ID: "mock"}, nil
+		return step.ContainerHandle("mock"), nil
 	}
 
 	workspace, outDir := healingDirs(t)
@@ -280,7 +280,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		callSequence = append(callSequence, "container:"+spec.Image)
-		return step.ContainerHandle{ID: "mock"}, nil
+		return step.ContainerHandle("mock"), nil
 	}
 
 	workspace, outDir := healingDirs(t)
@@ -354,7 +354,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		} else {
 			healingContainerCount++
 		}
-		return step.ContainerHandle{ID: "mock"}, nil
+		return step.ContainerHandle("mock"), nil
 	}
 
 	workspace, outDir := healingDirs(t)
@@ -418,7 +418,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 			healingContainerCount++
 			t.Error("healing container should NOT run when gate passes")
 		}
-		return step.ContainerHandle{ID: "mock"}, nil
+		return step.ContainerHandle("mock"), nil
 	}
 
 	workspace, outDir := healingDirs(t)

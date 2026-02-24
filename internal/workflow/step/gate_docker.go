@@ -428,11 +428,11 @@ func collectDockerResourceUsage(
 	spec ContainerSpec,
 ) *contracts.BuildGateResourceUsage {
 	d, ok := rt.(*DockerContainerRuntime)
-	if !ok || d == nil || d.client == nil {
+	if !ok || d == nil || d.stats == nil {
 		return nil
 	}
 
-	stats, err := d.client.ContainerStats(ctx, h.ID, dockerStatsOptions())
+	stats, err := d.stats.ContainerStats(ctx, string(h), dockerStatsOptions())
 	if err != nil || stats.Body == nil {
 		return nil
 	}
@@ -463,7 +463,7 @@ func collectDockerResourceUsage(
 	}
 
 	var sizeRw *int64
-	if inspect, ierr := d.client.ContainerInspect(ctx, h.ID, dockerInspectOptionsWithSize()); ierr == nil {
+	if inspect, ierr := d.client.ContainerInspect(ctx, string(h), dockerInspectOptionsWithSize()); ierr == nil {
 		if inspect.Container.SizeRw != nil {
 			size := *inspect.Container.SizeRw
 			sizeRw = &size

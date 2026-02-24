@@ -31,7 +31,7 @@ func (m *testContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (
 	if m.createFn != nil {
 		return m.createFn(ctx, spec)
 	}
-	return ContainerHandle{ID: "mock"}, nil
+	return ContainerHandle("mock"), nil
 }
 
 func (m *testContainerRuntime) Start(ctx context.Context, handle ContainerHandle) error {

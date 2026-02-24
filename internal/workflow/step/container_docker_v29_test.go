@@ -144,8 +144,8 @@ func TestDockerContainerLifecycleV29(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Create failed: %v", err)
 			}
-			if handle.ID != containerID {
-				t.Errorf("Create: got ID %q, want %q", handle.ID, containerID)
+			if string(handle) != containerID {
+				t.Errorf("Create: got ID %q, want %q", string(handle), containerID)
 			}
 			// Verify Engine v29 ContainerCreateOptions were used correctly.
 			if !fake.createCalled {
@@ -256,7 +256,7 @@ func TestDockerContainerLifecycleV29_ContextCancellation(t *testing.T) {
 
 		// With our fake, Wait should still complete since channels are pre-filled.
 		// In production, context cancellation would cause the daemon call to abort.
-		_, _ = rt.Wait(ctx, ContainerHandle{ID: "cancel-test"})
+		_, _ = rt.Wait(ctx, ContainerHandle("cancel-test"))
 		// No assertion on error since fake doesn't simulate blocking wait.
 	})
 }
@@ -336,7 +336,7 @@ func TestDockerContainerLifecycleV29_WaitCondition(t *testing.T) {
 	rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
 
 	ctx := context.Background()
-	handle := ContainerHandle{ID: "wait-condition-test"}
+	handle := ContainerHandle("wait-condition-test")
 
 	result, err := rt.Wait(ctx, handle)
 	if err != nil {
