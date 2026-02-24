@@ -27,6 +27,14 @@ func newTestEventsService() *server.EventsService {
 	return svc
 }
 
+func createJobsByName(params []store.CreateJobParams) map[string]store.CreateJobParams {
+	byName := make(map[string]store.CreateJobParams, len(params))
+	for _, p := range params {
+		byName[p.Name] = p
+	}
+	return byName
+}
+
 func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
@@ -88,11 +96,12 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	if len(st.createJobParams) != 3 {
 		t.Fatalf("expected 3 CreateJob param sets, got %d", len(st.createJobParams))
 	}
-	if st.createJobParams[0].Status != store.JobStatusQueued {
-		t.Fatalf("expected first job to be Queued, got %s", st.createJobParams[0].Status)
+	byName := createJobsByName(st.createJobParams)
+	if byName["pre-gate"].Status != store.JobStatusQueued {
+		t.Fatalf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 	}
-	if st.createJobParams[1].Status != store.JobStatusCreated || st.createJobParams[2].Status != store.JobStatusCreated {
-		t.Fatalf("expected non-first jobs to be Created, got %s/%s", st.createJobParams[1].Status, st.createJobParams[2].Status)
+	if byName["mig-0"].Status != store.JobStatusCreated || byName["post-gate"].Status != store.JobStatusCreated {
+		t.Fatalf("expected mig-0/post-gate to be Created, got %s/%s", byName["mig-0"].Status, byName["post-gate"].Status)
 	}
 }
 
@@ -125,7 +134,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		t.Fatalf("expected 3 jobs, got %d", st.createJobCallCount)
 	}
 
-	// Verify job ordering and status (first job is Queued, rest are Created).
+	// Verify job status and shape (pre-gate is Queued, rest are Created).
 	expectedJobs := []struct {
 		name    string
 		jobType string
@@ -136,30 +145,31 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		{"post-gate", "post_gate", store.JobStatusCreated},
 	}
 
-	for i, exp := range expectedJobs {
-		got := st.createJobParams[i]
-		if got.Name != exp.name {
-			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
+	byName := createJobsByName(st.createJobParams)
+	for _, exp := range expectedJobs {
+		got, ok := byName[exp.name]
+		if !ok {
+			t.Fatalf("missing job %q", exp.name)
 		}
 		if got.JobType != exp.jobType {
-			t.Errorf("job %d: expected job_type %q, got %q", i, exp.jobType, got.JobType)
+			t.Errorf("job %q: expected job_type %q, got %q", exp.name, exp.jobType, got.JobType)
 		}
 		if got.Status != exp.status {
-			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
+			t.Errorf("job %q: expected status %s, got %s", exp.name, exp.status, got.Status)
 		}
 
 		// Verify repo_id and repo_base_ref are persisted correctly.
 		if got.RepoID != repoID {
-			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
+			t.Errorf("job %q: expected repo_id %q, got %q", exp.name, repoID, got.RepoID)
 		}
 		if got.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, got.RepoBaseRef)
+			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.name, repoBaseRef, got.RepoBaseRef)
 		}
 		if got.Attempt != attempt {
-			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, got.Attempt)
+			t.Errorf("job %q: expected attempt %d, got %d", exp.name, attempt, got.Attempt)
 		}
 		if got.RunID != runID {
-			t.Errorf("job %d: expected run_id %q, got %q", i, runID, got.RunID)
+			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
 		}
 	}
 }
@@ -195,7 +205,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		t.Fatalf("expected 5 jobs (pre-gate + 3 migs + post-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify job ordering and status (first job is Queued, rest are Created).
+	// Verify job status and shape (pre-gate is Queued, rest are Created).
 	expectedJobs := []struct {
 		name     string
 		jobType  string
@@ -209,33 +219,34 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		{"post-gate", "post_gate", store.JobStatusCreated, ""},
 	}
 
-	for i, exp := range expectedJobs {
-		got := st.createJobParams[i]
-		if got.Name != exp.name {
-			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
+	byName := createJobsByName(st.createJobParams)
+	for _, exp := range expectedJobs {
+		got, ok := byName[exp.name]
+		if !ok {
+			t.Fatalf("missing job %q", exp.name)
 		}
 		if got.JobType != exp.jobType {
-			t.Errorf("job %d: expected job_type %q, got %q", i, exp.jobType, got.JobType)
+			t.Errorf("job %q: expected job_type %q, got %q", exp.name, exp.jobType, got.JobType)
 		}
 		if got.Status != exp.status {
-			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
+			t.Errorf("job %q: expected status %s, got %s", exp.name, exp.status, got.Status)
 		}
 		if got.JobImage != exp.modImage {
-			t.Errorf("job %d: expected job_image %q, got %q", i, exp.modImage, got.JobImage)
+			t.Errorf("job %q: expected job_image %q, got %q", exp.name, exp.modImage, got.JobImage)
 		}
 
 		// Verify repo_id and repo_base_ref are persisted correctly.
 		if got.RepoID != repoID {
-			t.Errorf("job %d: expected repo_id %q, got %q", i, repoID, got.RepoID)
+			t.Errorf("job %q: expected repo_id %q, got %q", exp.name, repoID, got.RepoID)
 		}
 		if got.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, got.RepoBaseRef)
+			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.name, repoBaseRef, got.RepoBaseRef)
 		}
 		if got.Attempt != attempt {
-			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, got.Attempt)
+			t.Errorf("job %q: expected attempt %d, got %d", exp.name, attempt, got.Attempt)
 		}
 		if got.RunID != runID {
-			t.Errorf("job %d: expected run_id %q, got %q", i, runID, got.RunID)
+			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
 		}
 	}
 }
@@ -286,23 +297,26 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				}
 			}
 
-			if queuedCount != 1 {
-				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
-			}
-
-			// Verify the first job is the queue head.
-			if st.createJobParams[0].Status != store.JobStatusQueued {
-				t.Errorf("expected first job to be Queued, got %s", st.createJobParams[0].Status)
-			}
-
-			// Verify all remaining jobs are Created.
-			for i := 1; i < len(st.createJobParams); i++ {
-				if st.createJobParams[i].Status != store.JobStatusCreated {
-					t.Errorf("job %d: expected status Created, got %s", i, st.createJobParams[i].Status)
+				if queuedCount != 1 {
+					t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
 				}
-			}
-		})
-	}
+
+				byName := createJobsByName(st.createJobParams)
+				if byName["pre-gate"].Status != store.JobStatusQueued {
+					t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
+				}
+
+				// Verify all non-head jobs are Created.
+				for _, p := range st.createJobParams {
+					if p.Name == "pre-gate" {
+						continue
+					}
+					if p.Status != store.JobStatusCreated {
+						t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
+					}
+				}
+			})
+		}
 }
 
 func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
@@ -351,18 +365,46 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify chain ordering: pre-gate -> mig-0 -> mig-1 -> post-gate.
-	for i := 0; i < len(st.createJobParams)-1; i++ {
-		next := st.createJobParams[i].NextID
-		if next == nil {
-			t.Fatalf("job %d (%s): expected next_id to be set", i, st.createJobParams[i].Name)
-		}
-		if *next != st.createJobParams[i+1].ID {
-			t.Fatalf("job %d (%s): expected next_id=%s, got %s", i, st.createJobParams[i].Name, st.createJobParams[i+1].ID, *next)
-		}
+	// Verify chain ordering by name: pre-gate -> mig-0 -> mig-1 -> post-gate.
+	byName := createJobsByName(st.createJobParams)
+	preGate := byName["pre-gate"]
+	mig0 := byName["mig-0"]
+	mig1 := byName["mig-1"]
+	postGate := byName["post-gate"]
+
+	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
+		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
 	}
-	if st.createJobParams[len(st.createJobParams)-1].NextID != nil {
-		t.Fatalf("expected tail job next_id=nil, got %s", *st.createJobParams[len(st.createJobParams)-1].NextID)
+	if mig0.NextID == nil || *mig0.NextID != mig1.ID {
+		t.Fatalf("mig-0 next_id = %v, want %s", mig0.NextID, mig1.ID)
+	}
+	if mig1.NextID == nil || *mig1.NextID != postGate.ID {
+		t.Fatalf("mig-1 next_id = %v, want %s", mig1.NextID, postGate.ID)
+	}
+	if postGate.NextID != nil {
+		t.Fatalf("post-gate next_id = %s, want nil", *postGate.NextID)
+	}
+}
+
+func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{}
+	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
+
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.MigRepoID("repo_456"), "main", 1, spec)
+	if err != nil {
+		t.Fatalf("createJobsFromSpec failed: %v", err)
+	}
+
+	inserted := make(map[domaintypes.JobID]struct{}, len(st.createJobParams))
+	for i, p := range st.createJobParams {
+		if p.NextID != nil {
+			if _, ok := inserted[*p.NextID]; !ok {
+				t.Fatalf("insert %d (%s) references next_id %s before it was inserted", i, p.Name, *p.NextID)
+			}
+		}
+		inserted[p.ID] = struct{}{}
 	}
 }
 
@@ -561,11 +603,21 @@ func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 	if st.createJobCallCount != 4 {
 		t.Fatalf("expected 4 jobs (pre-gate, mig-0, mig-1, post-gate), got %d", st.createJobCallCount)
 	}
-	if st.createJobParams[0].Name != "pre-gate" || st.createJobParams[1].Name != "mig-0" || st.createJobParams[2].Name != "mig-1" || st.createJobParams[3].Name != "post-gate" {
-		t.Fatalf("unexpected job ordering: %q, %q, %q, %q", st.createJobParams[0].Name, st.createJobParams[1].Name, st.createJobParams[2].Name, st.createJobParams[3].Name)
+	byName := createJobsByName(st.createJobParams)
+	if _, ok := byName["pre-gate"]; !ok {
+		t.Fatalf("missing pre-gate job")
 	}
-	if st.createJobParams[0].Status != store.JobStatusQueued {
-		t.Fatalf("expected first job to be Queued, got %s", st.createJobParams[0].Status)
+	if _, ok := byName["mig-0"]; !ok {
+		t.Fatalf("missing mig-0 job")
+	}
+	if _, ok := byName["mig-1"]; !ok {
+		t.Fatalf("missing mig-1 job")
+	}
+	if _, ok := byName["post-gate"]; !ok {
+		t.Fatalf("missing post-gate job")
+	}
+	if byName["pre-gate"].Status != store.JobStatusQueued {
+		t.Fatalf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 	}
 }
 

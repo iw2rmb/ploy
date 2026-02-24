@@ -1020,6 +1020,7 @@ For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
    `cmd/ploy/mod_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
    - Creates jobs (pre-gate, mig, post-gate) as a `next_id`-linked chain.
+   - Persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Publishes an initial `RunSummary` over SSE.
 3. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
@@ -1039,6 +1040,7 @@ For a spec with `migs[]`:
    or reorder entries).
 2. `POST /v1/runs`:
    - Creates jobs for pre-gate, each mig, and post-gates as a linked chain.
+   - Persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).
 3. Scheduler and nodeagents:

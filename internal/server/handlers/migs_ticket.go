@@ -264,7 +264,8 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 		}
 	}
 
-	for i := range planned {
+	// Insert chain tail-first to satisfy jobs.next_id -> jobs.id FK at insert time.
+	for i := len(planned) - 1; i >= 0; i-- {
 		if err := createPlannedJob(ctx, st, runID, repoID, repoBaseRef, attempt, planned[i]); err != nil {
 			return fmt.Errorf("create job %q: %w", planned[i].Name, err)
 		}
