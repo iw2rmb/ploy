@@ -22,14 +22,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ploy/...` — RED expected before implementation lands.
 
 ## Phase 1: Data Assembly (Canonical Report Builder)
-- [ ] Implement a report builder that aggregates all data once — centralizes collection logic for both renderers.
+- [x] Implement a report builder that aggregates all data once — centralizes collection logic for both renderers.
   - Repository: `ploy`
   - Component: `internal/cli/runs` (new report builder module), existing run/mig API clients
   - Scope: Build a `GetRunReportCommand` (or equivalent) that composes run summary, mig identity/name, spec id, repo base/target refs, per-repo job graph data, and artifact/log endpoints needed for OSC8 link rendering.
   - Snippets: `internal/cli/runs/report.go`; `internal/cli/runs/report_builder.go`
   - Tests: Unit tests with mocked HTTP responses to validate assembled contract, including missing optional fields.
 
-- [ ] Normalize link fields for build logs and patches in the report model — makes OSC8/text and JSON deterministic.
+- [x] Normalize link fields for build logs and patches in the report model — makes OSC8/text and JSON deterministic.
   - Repository: `ploy`
   - Component: report builder + URL helpers
   - Scope: Populate explicit URL fields per repo/job for build logs and patch downloads; keep relative/API path behavior consistent with existing `run logs` and `run diff` endpoints.
