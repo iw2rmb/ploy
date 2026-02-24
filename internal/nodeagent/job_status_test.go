@@ -29,7 +29,7 @@ func TestJobStatusConstants(t *testing.T) {
 func TestDiffJobTypeConstants(t *testing.T) {
 	tests := []struct {
 		name     string
-		modType  DiffJobType
+		jobType  DiffJobType
 		expected string
 	}{
 		{"Mod", DiffJobTypeMod, "mod"},
@@ -38,7 +38,7 @@ func TestDiffJobTypeConstants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.modType.String(); got != tt.expected {
+			if got := tt.jobType.String(); got != tt.expected {
 				t.Errorf("DiffJobType%s.String() = %q, want %q", tt.name, got, tt.expected)
 			}
 		})

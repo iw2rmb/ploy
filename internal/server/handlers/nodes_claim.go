@@ -142,8 +142,8 @@ func buildAndSendJobClaimResponse(
 	modRepo store.ModRepo,
 	job store.Job,
 ) error {
-	modType := domaintypes.JobType(job.JobType)
-	if err := modType.Validate(); err != nil {
+	jobType := domaintypes.JobType(job.JobType)
+	if err := jobType.Validate(); err != nil {
 		return fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 
@@ -165,7 +165,7 @@ func buildAndSendJobClaimResponse(
 	// Merge global env vars (CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, OPENAI_API_KEY, etc.)
 	// into spec.env based on job type and scope matching.
 	// Per-run env vars in spec take precedence over global env.
-	mergedSpec, err = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), modType)
+	mergedSpec, err = mergeGlobalEnvIntoSpec(mergedSpec, configHolder.GetGlobalEnv(), jobType)
 	if err != nil {
 		return fmt.Errorf("merge global env into spec: %w", err)
 	}
@@ -197,7 +197,7 @@ func buildAndSendJobClaimResponse(
 		Attempt:   job.Attempt,
 		JobID:     job.ID,
 		JobName:   job.Name,
-		JobType:   modType,
+		JobType:   jobType,
 		JobImage:  job.JobImage,
 		NextID:    job.NextID,
 		RepoURL:   modRepo.RepoUrl,
@@ -264,10 +264,10 @@ func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
 // Parameters:
 //   - spec: The job spec JSON, may contain an "env" map
 //   - env: Map of global env vars from ConfigHolder (uses typed GlobalEnvScope)
-//   - modType: The job's job_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
+//   - jobType: The job's job_type as typed enum (pre_gate, mod, post_gate, heal, re_gate, mr)
 //
 // Returns the modified spec with global env vars merged into the "env" field.
-func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, modType domaintypes.JobType) (json.RawMessage, error) {
+func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType domaintypes.JobType) (json.RawMessage, error) {
 	// If no global env vars exist, return spec unchanged.
 	if len(env) == 0 {
 		return spec, nil
@@ -296,7 +296,7 @@ func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, m
 	for k, v := range env {
 		// Check if this global env var's typed scope matches the job type.
 		// The scope matching uses typed enums to prevent typo-class bugs.
-		if !v.Scope.MatchesJobType(modType) {
+		if !v.Scope.MatchesJobType(jobType) {
 			continue
 		}
 		// Per-run env wins over global; do not overwrite existing keys.

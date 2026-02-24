@@ -82,8 +82,8 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		modType := domaintypes.JobType(job.JobType)
-		switch modType {
+		jobType := domaintypes.JobType(job.JobType)
+		switch jobType {
 		case domaintypes.JobTypeMod, domaintypes.JobTypeHeal,
 			domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 			// allowed

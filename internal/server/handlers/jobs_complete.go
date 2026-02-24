@@ -239,16 +239,16 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 				}
 			}
 
-			modType := domaintypes.JobType(job.JobType)
-			if err := modType.Validate(); err != nil {
+			jobType := domaintypes.JobType(job.JobType)
+			if err := jobType.Validate(); err != nil {
 				slog.Error("complete job: invalid job_type in job record; treating as non-gate for failure handling",
 					"job_id", jobID,
 					"job_type", job.JobType,
 					"err", err,
 				)
-				modType = ""
+				jobType = ""
 			}
-			switch modType {
+			switch jobType {
 			case domaintypes.JobTypeMR:
 				// MR jobs are best-effort and must not trigger healing or
 				// cancellation of other jobs when they fail.
@@ -259,7 +259,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 			case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 				// Set last_error for Stack Gate failures
 				if statsPayload.HasJobMeta() {
-					if errMsg := formatStackGateError(modType, statsPayload.JobMeta); errMsg != nil {
+					if errMsg := formatStackGateError(jobType, statsPayload.JobMeta); errMsg != nil {
 						if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
 							RunID:     job.RunID,
 							RepoID:    job.RepoID,
@@ -295,8 +295,8 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// reaches a terminal state by cancelling remaining jobs after this step.
 		// This is critical for policy-driven cancellations (e.g., stack detection required).
 		if jobStatus == store.JobStatusCancelled && err == nil {
-			modType := domaintypes.JobType(job.JobType)
-			if modType.Validate() == nil && modType == domaintypes.JobTypeMR {
+			jobType := domaintypes.JobType(job.JobType)
+			if jobType.Validate() == nil && jobType == domaintypes.JobTypeMR {
 				// MR jobs are best-effort and must not affect run-level progression.
 			} else {
 				if cerr := cancelRemainingJobsAfterFailure(ctx, st, job); cerr != nil {

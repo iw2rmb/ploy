@@ -130,8 +130,8 @@ func (b *DiffSummaryBuilder) FilesChanged(count int) *DiffSummaryBuilder {
 }
 
 // JobType sets the job_type field.
-func (b *DiffSummaryBuilder) JobType(modType string) *DiffSummaryBuilder {
-	b.acc.JobType = &modType
+func (b *DiffSummaryBuilder) JobType(jobType string) *DiffSummaryBuilder {
+	b.acc.JobType = &jobType
 	return b
 }
 

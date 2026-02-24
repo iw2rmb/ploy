@@ -277,12 +277,12 @@ func (r *runController) runRouterForGateFailure(
 //   - post_gate may use build_gate.post.stack as a fallback/override.
 //   - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
 //     stackdetect output to select the runtime image/tool.
-func applyGateStackDetect(manifest *contracts.StepManifest, modType types.JobType, typedOpts RunOptions) {
+func applyGateStackDetect(manifest *contracts.StepManifest, jobType types.JobType, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
 
-	switch modType {
+	switch jobType {
 	case types.JobTypePreGate:
 		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack

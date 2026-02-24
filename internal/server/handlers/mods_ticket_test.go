@@ -128,7 +128,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 	// Verify job ordering and status (first job is Queued, rest are Created).
 	expectedJobs := []struct {
 		name    string
-		modType string
+		jobType string
 		status  store.JobStatus
 	}{
 		{"pre-gate", "pre_gate", store.JobStatusQueued}, // First job is Queued.
@@ -141,8 +141,8 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		if got.Name != exp.name {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
-		if got.JobType != exp.modType {
-			t.Errorf("job %d: expected job_type %q, got %q", i, exp.modType, got.JobType)
+		if got.JobType != exp.jobType {
+			t.Errorf("job %d: expected job_type %q, got %q", i, exp.jobType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
@@ -198,7 +198,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 	// Verify job ordering and status (first job is Queued, rest are Created).
 	expectedJobs := []struct {
 		name     string
-		modType  string
+		jobType  string
 		status   store.JobStatus
 		modImage string
 	}{
@@ -214,8 +214,8 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		if got.Name != exp.name {
 			t.Errorf("job %d: expected name %q, got %q", i, exp.name, got.Name)
 		}
-		if got.JobType != exp.modType {
-			t.Errorf("job %d: expected job_type %q, got %q", i, exp.modType, got.JobType)
+		if got.JobType != exp.jobType {
+			t.Errorf("job %d: expected job_type %q, got %q", i, exp.jobType, got.JobType)
 		}
 		if got.Status != exp.status {
 			t.Errorf("job %d: expected status %s, got %s", i, exp.status, got.Status)
