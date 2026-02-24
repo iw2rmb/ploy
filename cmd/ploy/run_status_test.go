@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -155,38 +154,10 @@ func TestRunStatusJSONGate(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String() {
-			now := time.Now()
-			resp := struct {
-				ID        string    `json:"id"`
-				Status    string    `json:"status"`
-				MigID     string    `json:"mig_id"`
-				SpecID    string    `json:"spec_id"`
-				CreatedAt time.Time `json:"created_at"`
-				Counts    *struct {
-					Total         int32  `json:"total"`
-					Queued        int32  `json:"queued"`
-					Running       int32  `json:"running"`
-					Success       int32  `json:"success"`
-					Fail          int32  `json:"fail"`
-					Cancelled     int32  `json:"cancelled"`
-					DerivedStatus string `json:"derived_status"`
-				} `json:"repo_counts,omitempty"`
-			}{
-				ID:        runID.String(),
-				Status:    "running",
-				MigID:     modID.String(),
-				SpecID:    specID.String(),
-				CreatedAt: now,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-		http.NotFound(w, r)
-	}))
+	server := newRunStatusReportServer(t, runID, modID, specID, repoID, jobID)
 	defer server.Close()
 
 	useServerDescriptor(t, server.URL)
@@ -212,5 +183,8 @@ func TestRunStatusJSONGate(t *testing.T) {
 	}
 	if _, ok := parsed["runs"]; !ok {
 		t.Fatalf("expected runs in JSON output, got %v", parsed)
+	}
+	if strings.Contains(buf.String(), "Run: ") {
+		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
 	}
 }
