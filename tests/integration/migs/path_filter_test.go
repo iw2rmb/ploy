@@ -43,7 +43,7 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(out)
 }
 
-// parseScenarioORWPass extracts values from tests/e2e/mods/scenario-orw-pass.sh.
+// parseScenarioORWPass extracts values from tests/e2e/migs/scenario-orw-pass.sh.
 // Defaults align with the scenario script; parsing overrides them if found.
 func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, artifact, version, classname, plugin string) {
 	repoURL = "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"

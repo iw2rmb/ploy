@@ -88,14 +88,14 @@ Exclusions (do not rename these in bulk scans):
   - Tests: Nodeagent unit tests for artifact names + e2e artifact extraction scripts.
 
 ## Phase 4: Test Tree and Fixtures Rename
-- [ ] Rename test directories, scenarios, and fixture names under `tests/*/mods` — keeps test paths aligned with production vocabulary.
+- [x] Rename test directories, scenarios, and fixture names under `tests/*/mods` — keeps test paths aligned with production vocabulary.
   - Repository: `ploy`
   - Component: `tests/e2e`, `tests/integration`, `tests/unit`, smoke scripts
   - Scope: Move `tests/e2e/mods` and `tests/integration/mods` to `migs`, rename scripts/spec files with `mod` prefixes where they represent the feature, and update all invocations.
   - Snippets: `tests/e2e/mods/scenario-*.sh`, `tests/integration/mods/*`, `tests/smoke_tests.sh`
   - Tests: Run renamed e2e selftest and core integration suites from new paths.
 
-- [ ] Update golden outputs and static fixtures for CLI/API naming changes — prevents flaky diffs after rename.
+- [x] Update golden outputs and static fixtures for CLI/API naming changes — prevents flaky diffs after rename.
   - Repository: `ploy`
   - Component: `cmd/ploy/testdata`, API verification fixtures, docs examples in tests
   - Scope: Regenerate or rewrite help text fixtures and API path assertions from `mod`/`mods` to `mig`/`migs`.

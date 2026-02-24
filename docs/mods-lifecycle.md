@@ -1255,11 +1255,11 @@ Code paths most relevant for Mods:
 
 For concrete end-to-end scenarios and sample specs see:
 
-- `tests/e2e/mods/README.md`
-- `tests/e2e/mods/scenario-orw-pass.sh`
-- `tests/e2e/mods/scenario-orw-fail/run.sh`
-- `tests/e2e/mods/scenario-multi-step/mod.yaml`
-- `tests/e2e/mods/scenario-multi-node-rehydration/run.sh`
+- `tests/e2e/migs/README.md`
+- `tests/e2e/migs/scenario-orw-pass.sh`
+- `tests/e2e/migs/scenario-orw-fail/run.sh`
+- `tests/e2e/migs/scenario-multi-step/mig.yaml`
+- `tests/e2e/migs/scenario-multi-node-rehydration/run.sh`
 
 ## 9. Quick checklist for coding agents
 
@@ -1268,7 +1268,7 @@ When changing Mods behaviour, prefer these anchors:
 - Run/status model:
   - Update `internal/migs/api/types.go` ( run/job types).
   - Wire server handlers in `internal/server/handlers/handlers_mods_*.go`.
-  - Keep `docs/mods-lifecycle.md` and `tests/e2e/mods/README.md` in sync.
+  - Keep `docs/mods-lifecycle.md` and `tests/e2e/migs/README.md` in sync.
 - SSE/event flow:
   - Use `internal/server/events/service.go` and `internal/stream/*` for hub/SSE.
   - Adjust CLI consumers under `internal/cli/migs` and `internal/cli/runs`.

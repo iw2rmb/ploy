@@ -52,7 +52,7 @@ See also:
 
 Use the YAML spec to define mod parameters, Build Gate, and healing.
 Example spec:
-  - `tests/e2e/mods/scenario-orw-fail/mod.yaml`
+  - `tests/e2e/migs/scenario-orw-fail/mig.yaml`
 
 **Using `--spec`:**
 
@@ -119,7 +119,7 @@ Per RED→GREEN→REFACTOR discipline, the following artifacts should be validat
    - `session_id`: Thread ID for conversation continuity (may be empty)
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
-See `tests/unit/mod_codex_sh_test.sh` for unit tests covering these behaviors.
+See `tests/unit/mig_codex_sh_test.sh` for unit tests covering these behaviors.
 Cross-reference: `docs/testing-workflow.md` and `AGENTS.md`.
 
 **Cross-phase inputs available to healing mods:**
@@ -167,13 +167,13 @@ build_gate_healing:
 See `docs/schemas/mod.example.yaml` for the full spec schema.
 
 Run the failing→healing scenario with a single script:
-  - `bash tests/e2e/mods/scenario-orw-fail/run.sh`
+  - `bash tests/e2e/migs/scenario-orw-fail/run.sh`
   - It submits:
     - `--repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
     - `--repo-base-ref e2e/fail-missing-symbol`
     - `--repo-target-ref mods-upgrade-java17-heal`
-    - `--spec tests/e2e/mods/scenario-orw-fail/mod.yaml`
-    - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
+    - `--spec tests/e2e/migs/scenario-orw-fail/mig.yaml`
+    - `--follow --artifact-dir ./tmp/migs/scenario-orw-fail/<ts>`
 
 What to verify:
 - First Build Gate fails (Maven compile error), healing runs using `migs-codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
@@ -247,7 +247,7 @@ This makes gate health visible without requiring raw artifact inspection.
 **Multi-Step, Multi-Node Rehydration Scenario**
 
 E2E validation for multi-step Mods runs with multi-node execution and workspace rehydration:
-  - `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh`
+  - `bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh`
 
 This scenario validates:
 - Multi-step execution (3 sequential Java migration steps: Java 8 → 11 → 17)
@@ -267,18 +267,18 @@ Configuration:
 - Uses the public test repository: `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
 - Three OpenRewrite transformation steps with build gate validation
 - Optional: Set `PLOY_GITLAB_PAT` to validate MR creation with cumulative changes
-- Artifacts saved to `./tmp/mods/scenario-multi-node-rehydration/<timestamp>/`
+- Artifacts saved to `./tmp/migs/scenario-multi-node-rehydration/<timestamp>/`
 
 Skip artifact collection for faster runs (e.g., in CI):
 ```bash
-SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh
 ```
 
 **Stack-Aware Image Selection Scenario**
 
 E2E validation for stack-aware image resolution where different container images
 are selected based on Build Gate stack detection:
-  - `bash tests/e2e/mods/scenario-stack-aware-images/run.sh`
+  - `bash tests/e2e/migs/scenario-stack-aware-images/run.sh`
 
 This scenario validates:
 - Stack-aware image map parsing from the spec
@@ -315,19 +315,19 @@ dist/ploy mig run \
   --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
   --repo-base-ref main \
   --repo-target-ref e2e/stack-aware-error \
-  --spec tests/e2e/mods/scenario-stack-aware-images/mod-no-default.yaml \
+  --spec tests/e2e/migs/scenario-stack-aware-images/mig-no-default.yaml \
   --follow
 ```
 Expected error: `no image specified for stack "java-maven" and no default provided`
 
 Skip artifact collection for faster runs (e.g., in CI):
 ```bash
-SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-stack-aware-images/run.sh
+SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-stack-aware-images/run.sh
 ```
 
 **References**
 
-- Historic E2E assets from prior implementations are found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
+- Historic E2E assets from prior implementations are found in repo history under `tests/e2e/migs/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
   - `internal/workflow/contracts/` — Step manifest shapes and validation.
   - `internal/workflow/runner/job_templates.go` — Mods image bindings for lanes.
   - `internal/workflow/runner/healing.go` — Healing flow appended after Build Gate failures.

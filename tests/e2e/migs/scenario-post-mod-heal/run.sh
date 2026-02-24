@@ -6,7 +6,7 @@
 # it before the run can continue.
 #
 # Scenario flow:
-#   1. Submit multi-step mod run to fail-missing-symbol branch
+#   1. Submit multi-step mig run to fail-missing-symbol branch
 #   2. Some steps may trigger post-gate failures (missing class reference)
 #   3. Healing mod creates the missing class
 #   4. Re-gate passes after healing
@@ -26,15 +26,15 @@
 #
 # Usage:
 #   # From repository root:
-#   bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 #
 #   # With custom configuration:
 #   REPO_URL="https://gitlab.com/example/repo.git" \
 #   REPO_BASE_REF="fail-branch" \
-#   bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 #
 #   # Skip artifact collection:
-#   SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 
 set -euo pipefail
 
@@ -70,13 +70,13 @@ REPO_TARGET_REF="${REPO_TARGET_REF:-mods-e2e-post-mod-heal-$(date +%y%m%d%H%M%S)
 
 # Spec file location (relative to script directory).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SPEC_FILE="${SCRIPT_DIR}/mod.yaml"
+SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 
 # Artifact collection (optional).
 SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   TS=$(date +%y%m%d%H%M%S)
-  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/mods/scenario-post-mod-heal/${TS}}"
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mod-heal/${TS}}"
   mkdir -p "${ARTIFACT_DIR}"
 fi
 
@@ -126,13 +126,13 @@ fi
 # SUBMIT RUN AND FOLLOW LOGS
 ################################################################################
 
-echo "Submitting multi-step mod run with post-mod healing..."
+echo "Submitting multi-step mig run with post-mod healing..."
 echo ""
 
 # Build command with required flags.
 CMD_ARGS=(
   "$PLOY_BIN"
-  mod run
+  mig run
   --repo-url "$REPO_URL"
   --repo-base-ref "$REPO_BASE_REF"
   --repo-target-ref "$REPO_TARGET_REF"

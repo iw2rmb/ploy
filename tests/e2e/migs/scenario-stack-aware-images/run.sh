@@ -27,13 +27,13 @@ REPO=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.g
 BASE_REF=${PLOY_E2E_BASE_REF:-main}
 TARGET_REF=${PLOY_E2E_TARGET_REF:-e2e/stack-aware-test}
 
-# Artifacts directory: default to ./tmp/mods/scenario-stack-aware-images/<YYMMDDHHmmss>/
+# Artifacts directory: default to ./tmp/migs/scenario-stack-aware-images/<YYMMDDHHmmss>/
 TS=$(date +%y%m%d%H%M%S)
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/scenario-stack-aware-images}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/scenario-stack-aware-images}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
-SPEC=${PLOY_E2E_SPEC:-tests/e2e/mods/scenario-stack-aware-images/mod.yaml}
+SPEC=${PLOY_E2E_SPEC:-tests/e2e/migs/scenario-stack-aware-images/mig.yaml}
 
 # Optional per-run GitLab overrides
 EXTRA_FLAGS=()

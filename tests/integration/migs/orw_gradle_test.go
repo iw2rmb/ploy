@@ -35,14 +35,14 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 	outdir := t.TempDir()
 
 	// Use scenario script defaults for recipe coordinates.
-	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "migs", "scenario-orw-pass.sh")
 	scenarioBytes, err := os.ReadFile(scenarioPath)
 	if err != nil {
 		t.Fatalf("read scenario script: %v", err)
 	}
 	_, _, _, group, artifact, version, classname, _ := parseScenarioORWPass(string(scenarioBytes))
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	// Remove system gradle from PATH so the script uses ./gradlew.
 	filteredPath := filterPath("gradle")
@@ -116,14 +116,14 @@ recipeList:
 	outdir := t.TempDir()
 
 	// Use scenario script defaults for recipe coordinates.
-	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "migs", "scenario-orw-pass.sh")
 	scenarioBytes, err := os.ReadFile(scenarioPath)
 	if err != nil {
 		t.Fatalf("read scenario script: %v", err)
 	}
 	_, _, _, group, artifact, version, classname, _ := parseScenarioORWPass(string(scenarioBytes))
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	// Remove system gradle from PATH so the script uses ./gradlew.
 	filteredPath := filterPath("gradle")
@@ -163,7 +163,7 @@ func TestOrwGradle_NonGradleWorkspace_Fails(t *testing.T) {
 		t.Fatalf("write pom.xml: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
@@ -210,7 +210,7 @@ echo "[gradle-stub] invoked"
 		t.Fatalf("write gradlew stub: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	// Remove system gradle from PATH so the script uses ./gradlew.
 	filteredPath := filterPath("gradle")
@@ -244,7 +244,7 @@ func TestOrwGradle_SelfTest(t *testing.T) {
 	workspace := t.TempDir()
 	outdir := t.TempDir()
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-gradle", "orw-gradle.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(), "MODS_SELF_TEST=1")
 

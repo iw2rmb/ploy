@@ -19,7 +19,7 @@ func TestOrwMaven_MavenWorkspace_AppliesRecipe(t *testing.T) {
 	}
 
 	// Use the scenario script defaults for recipe coordinates.
-	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "migs", "scenario-orw-pass.sh")
 	scenarioBytes, err := os.ReadFile(scenarioPath)
 	if err != nil {
 		t.Fatalf("read scenario script: %v", err)
@@ -37,7 +37,7 @@ func TestOrwMaven_MavenWorkspace_AppliesRecipe(t *testing.T) {
 	outdir := t.TempDir()
 
 	// Run the orw-maven script with recipe coordinates.
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-maven", "orw-maven.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-maven", "orw-maven.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,
@@ -103,7 +103,7 @@ echo "[maven-stub] rewrite-maven-plugin invoked with args: $@"
 	}
 
 	// Use scenario script defaults for recipe coordinates.
-	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "mods", "scenario-orw-pass.sh")
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "migs", "scenario-orw-pass.sh")
 	scenarioBytes, err := os.ReadFile(scenarioPath)
 	if err != nil {
 		t.Fatalf("read scenario script: %v", err)
@@ -111,7 +111,7 @@ echo "[maven-stub] rewrite-maven-plugin invoked with args: $@"
 	repoURL, _, _, group, artifact, version, classname, plugin := parseScenarioORWPass(string(scenarioBytes))
 	_ = repoURL // unused for this stubbed test
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-maven", "orw-maven.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-maven", "orw-maven.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,
@@ -160,7 +160,7 @@ func TestOrwMaven_NonMavenWorkspace_Fails(t *testing.T) {
 		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-maven", "orw-maven.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-maven", "orw-maven.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
@@ -191,7 +191,7 @@ func TestOrwMaven_SelfTest(t *testing.T) {
 	workspace := t.TempDir()
 	outdir := t.TempDir()
 
-	modScript := filepath.Join(repoRoot(t), "docker", "mods", "orw-maven", "orw-maven.sh")
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-maven", "orw-maven.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(), "MODS_SELF_TEST=1")
 

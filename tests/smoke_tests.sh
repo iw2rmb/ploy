@@ -225,7 +225,7 @@ run_e2e_selftest() {
 
     # Run selftest scenario (fast container echo test)
     run_test "E2E: Selftest scenario" \
-        "bash tests/e2e/mods/scenario-selftest.sh" \
+        "bash tests/e2e/migs/scenario-selftest.sh" \
         180
 }
 

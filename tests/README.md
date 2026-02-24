@@ -105,16 +105,16 @@ go test -v ./tests/integration -run=TestSmokeWorkflow_EndToEnd
 **E2E tests (require cluster):**
 ```bash
 # Selftest: minimal container execution
-bash tests/e2e/mods/scenario-selftest.sh
+bash tests/e2e/migs/scenario-selftest.sh
 
 # OpenRewrite Java 11→17 (passing branch)
-bash tests/e2e/mods/scenario-orw-pass.sh
+bash tests/e2e/migs/scenario-orw-pass.sh
 
 # OpenRewrite Java 11→17 with healing (failing branch)
-bash tests/e2e/mods/scenario-orw-fail/run.sh
+bash tests/e2e/migs/scenario-orw-fail/run.sh
 ```
 
-See `tests/e2e/mods/README.md` for detailed e2e documentation.
+See `tests/e2e/migs/README.md` for detailed e2e documentation.
 
 ## Test Categories
 
@@ -135,7 +135,7 @@ See `tests/e2e/mods/README.md` for detailed e2e documentation.
   - `smoke_workflow_test.go`: Comprehensive end-to-end workflow through store layer
 
 ### E2E Tests
-- **Location:** `tests/e2e/mods/`
+- **Location:** `tests/e2e/migs/`
 - **Purpose:** Validate complete workflows with real containers and cluster
 - **Prerequisites:** Configured cluster, Docker images, optional GitLab PAT
 - **Scenarios:**
@@ -187,7 +187,7 @@ The smoke test suite validates these critical paths:
    - Version and help commands
    - Subcommand help (mod, server, etc.)
    - Flag parsing and validation
-   - Run inspection commands: `run status`, `run logs`, `mod run repo status`
+   - Run inspection commands: `run status`, `run logs`, `mig run repo status`
 
 7. **Container execution (e2e):**
    - Mod container lifecycle
@@ -304,7 +304,7 @@ The smoke test suite is designed for CI environments:
 ## References
 
 - **Engineering guide:** `AGENTS.md` and `docs/testing-workflow.md` (TDD, coverage targets)
-- **E2E documentation:** `tests/e2e/mods/README.md` (container workflows)
+- **E2E documentation:** `tests/e2e/migs/README.md` (container workflows)
 - **System docs:** `docs/` (current contracts and operations)
 - **Agent guide:** `AGENTS.md` (TDD discipline, RED→GREEN→REFACTOR)
 
