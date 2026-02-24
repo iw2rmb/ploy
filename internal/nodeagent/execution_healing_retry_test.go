@@ -326,7 +326,7 @@ func TestExecuteWithHealing_SessionPropagation(t *testing.T) {
 	inDir := ""
 	runner := healingRunner(failingGate(), mc)
 	rc := healingRC()
-	req := healingRequest("t-session", "t-job-session", 2, "mods-codex:latest")
+	req := healingRequest("t-session", "t-job-session", 2, "migs-codex:latest")
 	manifest := healingManifest(req)
 
 	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)

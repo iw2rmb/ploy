@@ -193,14 +193,14 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:        types.RunID("run-123"),
 			JobID:        types.JobID("job-123"),
 			RepoURL:      types.RepoURL("https://github.com/example/repo.git"),
-			TypedOptions: RunOptions{Execution: ModContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/mods-openrewrite:latest"}}},
+			TypedOptions: RunOptions{Execution: ModContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}}},
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
 		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
-		if got, want := manifest.Image, "docker.io/example/mods-openrewrite:latest"; got != want {
+		if got, want := manifest.Image, "docker.io/example/migs-openrewrite:latest"; got != want {
 			t.Fatalf("image=%q, want %q", got, want)
 		}
 		if len(manifest.Command) != 0 {
@@ -317,12 +317,12 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
 					{ModContainerSpec: ModContainerSpec{
-						Image:   contracts.JobImage{Universal: "mods-orw:latest"},
+						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
 					}},
 					{ModContainerSpec: ModContainerSpec{
-						Image:   contracts.JobImage{Universal: "mods-fmt:latest"},
+						Image:   contracts.JobImage{Universal: "migs-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
 					}},
@@ -341,8 +341,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step=0) error: %v", err)
 		}
-		if manifest0.Image != "mods-orw:latest" {
-			t.Errorf("step 0: expected image mods-orw:latest, got %q", manifest0.Image)
+		if manifest0.Image != "migs-orw:latest" {
+			t.Errorf("step 0: expected image migs-orw:latest, got %q", manifest0.Image)
 		}
 		wantCmd0 := []string{"--apply", "--dir", "/workspace"}
 		if len(manifest0.Command) != len(wantCmd0) {
@@ -366,8 +366,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
 		}
-		if manifest1.Image != "mods-fmt:latest" {
-			t.Errorf("step 1: expected image mods-fmt:latest, got %q", manifest1.Image)
+		if manifest1.Image != "migs-fmt:latest" {
+			t.Errorf("step 1: expected image migs-fmt:latest, got %q", manifest1.Image)
 		}
 		wantCmd1 := []string{"/bin/sh", "-c", "fmt --check"}
 		if len(manifest1.Command) != len(wantCmd1) {
@@ -395,7 +395,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
 					{ModContainerSpec: ModContainerSpec{
-						Image: contracts.JobImage{Universal: "mods-step:latest"},
+						Image: contracts.JobImage{Universal: "migs-step:latest"},
 						Env:   map[string]string{"SHARED_VAR": "step_override"},
 					}},
 				},
@@ -424,7 +424,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			TypedOptions: RunOptions{
 				Steps: []StepMod{
-					{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mods-step:latest"}}},
+					{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}},
 				},
 			},
 		}
@@ -679,8 +679,8 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 				{ModContainerSpec: ModContainerSpec{
 					Image: contracts.JobImage{
 						ByStack: map[contracts.ModStack]string{
-							contracts.ModStackJavaMaven:  "docker.io/example/mods-orw-maven:latest",
-							contracts.ModStackJavaGradle: "docker.io/example/mods-orw-gradle:latest",
+							contracts.ModStackJavaMaven:  "docker.io/example/migs-orw-maven:latest",
+							contracts.ModStackJavaGradle: "docker.io/example/migs-orw-gradle:latest",
 						},
 					},
 				}},

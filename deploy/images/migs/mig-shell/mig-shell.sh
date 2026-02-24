@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mod-shell --script <path> [--dir <workspace>] [--out <dir>]
+mig-shell --script <path> [--dir <workspace>] [--out <dir>]
 
 Environment:
   MOD_SHELL_SCRIPT   Relative or absolute script path to execute.
@@ -62,7 +62,7 @@ if [[ ! -f "$script_path" ]]; then
   exit 3
 fi
 
-echo "[mod-shell] executing script: $script_path"
+echo "[mig-shell] executing script: $script_path"
 
 status=0
 bash "$script_path" || status=$?
@@ -71,7 +71,7 @@ ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 report="$outdir/shell-run.json"
 
 if [[ $status -ne 0 ]]; then
-  echo "[mod-shell] script failed with exit $status" >&2
+  echo "[mig-shell] script failed with exit $status" >&2
   cat > "$report" <<JSON
 {"success":false,"script":"$script_path","workspace":"$workspace","exit_code":$status,"ts":"$ts"}
 JSON
@@ -81,4 +81,4 @@ fi
 cat > "$report" <<JSON
 {"success":true,"script":"$script_path","workspace":"$workspace","exit_code":0,"ts":"$ts"}
 JSON
-echo "[mod-shell] completed successfully"
+echo "[mig-shell] completed successfully"

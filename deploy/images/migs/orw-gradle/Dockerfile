@@ -4,14 +4,14 @@
 # OpenRewrite Gradle plugin. It expects build.gradle or build.gradle.kts
 # in /workspace and recipe coordinates via environment variables.
 #
-# See deploy/images/mods/README.md for the Mods runtime contract.
+# See deploy/images/migs/README.md for the Migs runtime contract.
 
 FROM --platform=$TARGETOS/$TARGETARCH eclipse-temurin:17-jdk
 
 ARG BUILD_TS
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.title="orw-gradle" \
-    org.opencontainers.image.description="Ploy Mods: OpenRewrite apply runner (Gradle-only)" \
+    org.opencontainers.image.description="Ploy Migs: OpenRewrite apply runner (Gradle-only)" \
     org.opencontainers.image.created="$BUILD_TS"
 
 # Install minimal dependencies for git operations.
@@ -36,9 +36,9 @@ WORKDIR /workspace
 
 # Install the entry script and create the canonical symlink.
 COPY --chmod=755 orw-gradle.sh /usr/local/bin/orw-gradle
-RUN ln -s /usr/local/bin/orw-gradle /usr/local/bin/mods-orw-gradle
+RUN ln -s /usr/local/bin/orw-gradle /usr/local/bin/migs-orw-gradle
 
-ENTRYPOINT ["mods-orw-gradle"]
+ENTRYPOINT ["migs-orw-gradle"]
 CMD ["--apply", "--dir", "/workspace", "--out", "/out"]
 
-# The runner invokes: mods-orw-gradle --apply --dir /workspace --out /out
+# The runner invokes: migs-orw-gradle --apply --dir /workspace --out /out

@@ -134,9 +134,9 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	specJSON := `{
 		"steps": [{
 			"image": {
-				"default": "docker.io/user/mods-orw:latest",
-				"java-maven": "docker.io/user/mods-orw-maven:latest",
-				"java-gradle": "docker.io/user/mods-orw-gradle:latest"
+				"default": "docker.io/user/migs-orw:latest",
+				"java-maven": "docker.io/user/migs-orw-maven:latest",
+				"java-gradle": "docker.io/user/migs-orw-gradle:latest"
 			}
 		}]
 	}`
@@ -148,7 +148,7 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving maven image: %v", err)
 	}
-	if mavenImg != "docker.io/user/mods-orw-maven:latest" {
+	if mavenImg != "docker.io/user/migs-orw-maven:latest" {
 		t.Errorf("expected maven image, got %q", mavenImg)
 	}
 }

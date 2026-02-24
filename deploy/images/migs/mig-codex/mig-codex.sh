@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mod-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--model <name>] [--prompt-file <file>]
+mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--model <name>] [--prompt-file <file>]
 
 Environment:
   CODEX_PROMPT     Inline prompt text (used when --prompt-file not provided).
@@ -106,7 +106,7 @@ fi
 if [[ "$supports_add_dir" == true ]]; then
   cmd+=(--add-dir "$input_dir")
 else
-  echo "[mod-codex] codex exec does not support --add-dir; proceeding without explicit repo mount" >> "$out_dir/codex.log" 2>/dev/null || true
+  echo "[mig-codex] codex exec does not support --add-dir; proceeding without explicit repo mount" >> "$out_dir/codex.log" 2>/dev/null || true
 fi
 if [[ -n "$model" ]]; then
   cmd+=(--model "$model")
@@ -149,9 +149,9 @@ manifest="$out_dir/codex-run.json"
 jsonl="$out_dir/codex-events.jsonl"
 
 # Initialize log file with start message; log resume mode if active.
-echo "[mod-codex] starting codex exec with repo context" > "$logfile"
+echo "[mig-codex] starting codex exec with repo context" > "$logfile"
 if [[ -n "$resume_session" ]]; then
-  echo "[mod-codex] resume mode enabled; session=$resume_session" >> "$logfile"
+  echo "[mig-codex] resume mode enabled; session=$resume_session" >> "$logfile"
 fi
 set +e
 # Pipe Codex output to:
@@ -162,7 +162,7 @@ printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile" | tee "$jsonl" >/de
 status=${PIPESTATUS[1]}
 set -e
 if [[ ! -s "$logfile" ]]; then
-  echo "[mod-codex] no output captured from codex" >> "$logfile"
+  echo "[mig-codex] no output captured from codex" >> "$logfile"
 fi
 
 # Extract session/thread ID from JSON events (if jq is available and events were captured).

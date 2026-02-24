@@ -37,8 +37,8 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 		}
 		// run_id is now in URL path, not payload
 		// Expect name to be set
-		if payload["name"] != "mod-out" {
-			t.Fatalf("name = %v, want mod-out", payload["name"])
+		if payload["name"] != "mig-out" {
+			t.Fatalf("name = %v, want mig-out", payload["name"])
 		}
 		// Expect bundle present (base64-encoded string after JSON)
 		if b64, ok := payload["bundle"].(string); !ok || len(b64) == 0 {

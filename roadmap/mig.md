@@ -4,7 +4,7 @@ Scope: Rename the workflow concept from `mod`/`mods` to `mig`/`migs` across code
 
 Precondition: Execute `roadmap/next.md` first. This roadmap does not include migration of `ModType`/`ModImage` fields, because those are replaced earlier by `Type` (`JobType`) and `Image` (`JobImage`).
 
-Documentation: `AGENTS.md`; `README.md`; `docs/mods-lifecycle.md`; `docs/api/OpenAPI.yaml`; `docs/how-to/publish-mods.md`; `deploy/images/mods/README.md`; `tests/e2e/mods/README.md`; `docs/testing-workflow.md`.
+Documentation: `AGENTS.md`; `README.md`; `docs/mods-lifecycle.md`; `docs/api/OpenAPI.yaml`; `docs/how-to/publish-mods.md`; `deploy/images/migs/README.md`; `tests/e2e/mods/README.md`; `docs/testing-workflow.md`.
 
 Legend: [ ] todo, [x] done.
 
@@ -73,14 +73,14 @@ Exclusions (do not rename these in bulk scans):
   - Tests: `make test`; `make build`; verify no stale import path remains.
 
 ## Phase 3: Runtime Image and Artifact Rename
-- [ ] Rename image directories, scripts, and tags from mods to migs — keeps build/publish/runtime naming consistent.
+- [x] Rename image directories, scripts, and tags from mods to migs — keeps build/publish/runtime naming consistent.
   - Repository: `ploy`
   - Component: `deploy/images`, image build scripts, e2e image references
   - Scope: Rename `deploy/images/mods` to `deploy/images/migs`; update `build-and-push-mods.sh` to mig naming and tags (`mods-*` -> `migs-*`); rename image folder names where prefixed by `mod-`.
-  - Snippets: `deploy/images/build-and-push-mods.sh`, `deploy/images/mods/*`, references in `tests/e2e/*` and docs
+  - Snippets: `deploy/images/build-and-push-migs.sh`, `deploy/images/migs/*`, references in `tests/e2e/*` and docs
   - Tests: Build each renamed image locally; run representative e2e scenarios that pull/use renamed images.
 
-- [ ] Rename runtime artifact and temp naming where user-facing — avoids mixed terminology in output bundles/logs.
+- [x] Rename runtime artifact and temp naming where user-facing — avoids mixed terminology in output bundles/logs.
   - Repository: `ploy`
   - Component: Nodeagent execution artifacts, CLI artifact fetch/output labels
   - Scope: Replace user-facing names like `mod-out`, `ploy-mod-in-*`, and related log labels with `mig-*`; keep binary behavior otherwise unchanged.
