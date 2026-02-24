@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestAddModRepoHandler tests the POST /v1/mods/{mod_id}/repos endpoint.
+// TestAddModRepoHandler tests the POST /v1/migs/{mig_id}/repos endpoint.
 func TestAddModRepoHandler(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -34,7 +34,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature-branch",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus: http.StatusCreated,
 		},
@@ -47,7 +47,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantRepoURL: "https://github.com/org/repo",
 			wantStatus:  http.StatusCreated,
@@ -75,7 +75,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{
+				m.getModResult = store.Mig{
 					ID:         "modarc",
 					Name:       "archived-mod",
 					ArchivedAt: pgtype.Timestamptz{Valid: true},
@@ -92,7 +92,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "repo_url is required",
@@ -105,7 +105,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "base_ref is required",
@@ -119,7 +119,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				"target_ref": "feature",
 			},
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "repo_url",
@@ -134,12 +134,12 @@ func TestAddModRepoHandler(t *testing.T) {
 			}
 
 			bodyJSON, _ := json.Marshal(tt.body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+tt.modID+"/repos", bytes.NewReader(bodyJSON))
+			req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+tt.modID+"/repos", bytes.NewReader(bodyJSON))
 			req.Header.Set("Content-Type", "application/json")
-			req.SetPathValue("mod_id", tt.modID)
+			req.SetPathValue("mig_id", tt.modID)
 
 			rec := httptest.NewRecorder()
-			handler := addModRepoHandler(ms)
+			handler := addMigRepoHandler(ms)
 			handler(rec, req)
 
 			if rec.Code != tt.wantStatus {
@@ -149,18 +149,18 @@ func TestAddModRepoHandler(t *testing.T) {
 				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
 			}
 			if tt.wantRepoURL != "" {
-				if !ms.createModRepoCalled {
-					t.Fatalf("expected CreateModRepo to be called")
+				if !ms.createMigRepoCalled {
+					t.Fatalf("expected CreateMigRepo to be called")
 				}
-				if ms.createModRepoParams.RepoUrl != tt.wantRepoURL {
-					t.Fatalf("CreateModRepo repo_url mismatch: got=%q want=%q", ms.createModRepoParams.RepoUrl, tt.wantRepoURL)
+				if ms.createMigRepoParams.RepoUrl != tt.wantRepoURL {
+					t.Fatalf("CreateMigRepo repo_url mismatch: got=%q want=%q", ms.createMigRepoParams.RepoUrl, tt.wantRepoURL)
 				}
 			}
 		})
 	}
 }
 
-// TestListModReposHandler tests the GET /v1/mods/{mod_id}/repos endpoint.
+// TestListModReposHandler tests the GET /v1/migs/{mig_id}/repos endpoint.
 func TestListModReposHandler(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -174,10 +174,10 @@ func TestListModReposHandler(t *testing.T) {
 			name:  "success - lists repos",
 			modID: "mod123",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				m.listModReposByModResult = []store.ModRepo{
-					{ID: "repo0001", ModID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo0002", ModID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				m.listMigReposByModResult = []store.MigRepo{
+					{ID: "repo0001", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo0002", MigID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -187,8 +187,8 @@ func TestListModReposHandler(t *testing.T) {
 			name:  "success - empty list",
 			modID: "mod123",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				m.listModReposByModResult = []store.ModRepo{}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				m.listMigReposByModResult = []store.MigRepo{}
 			},
 			wantStatus: http.StatusOK,
 			wantCount:  0,
@@ -211,11 +211,11 @@ func TestListModReposHandler(t *testing.T) {
 				tt.setupMock(ms)
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+tt.modID+"/repos", nil)
-			req.SetPathValue("mod_id", tt.modID)
+			req := httptest.NewRequest(http.MethodGet, "/v1/migs/"+tt.modID+"/repos", nil)
+			req.SetPathValue("mig_id", tt.modID)
 
 			rec := httptest.NewRecorder()
-			handler := listModReposHandler(ms)
+			handler := listMigReposHandler(ms)
 			handler(rec, req)
 
 			if rec.Code != tt.wantStatus {
@@ -241,8 +241,8 @@ func TestListModReposHandler(t *testing.T) {
 	}
 }
 
-// TestDeleteModRepoHandler tests the DELETE /v1/mods/{mod_id}/repos/{repo_id} endpoint.
-func TestDeleteModRepoHandler(t *testing.T) {
+// TestDeleteMigRepoHandler tests the DELETE /v1/migs/{mig_id}/repos/{repo_id} endpoint.
+func TestDeleteMigRepoHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		modID          string
@@ -256,8 +256,8 @@ func TestDeleteModRepoHandler(t *testing.T) {
 			modID:  "mod123",
 			repoID: "repoX789",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repoX789", ModID: "mod123"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.MigRepo{ID: "repoX789", MigID: "mod123"}
 				m.hasModRepoHistoryResult = false
 			},
 			wantStatus: http.StatusNoContent,
@@ -277,7 +277,7 @@ func TestDeleteModRepoHandler(t *testing.T) {
 			modID:  "mod123",
 			repoID: "repo4040",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 				m.getModRepoErr = pgx.ErrNoRows
 			},
 			wantStatus:     http.StatusNotFound,
@@ -288,8 +288,8 @@ func TestDeleteModRepoHandler(t *testing.T) {
 			modID:  "mod123",
 			repoID: "repo0003",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repo0003", ModID: "moddif"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.MigRepo{ID: "repo0003", MigID: "moddif"}
 			},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo does not belong to this mod",
@@ -299,8 +299,8 @@ func TestDeleteModRepoHandler(t *testing.T) {
 			modID:  "mod123",
 			repoID: "repohist",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				m.getModRepoResult = store.ModRepo{ID: "repohist", ModID: "mod123"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				m.getModRepoResult = store.MigRepo{ID: "repohist", MigID: "mod123"}
 				m.hasModRepoHistoryResult = true
 			},
 			wantStatus:     http.StatusConflict,
@@ -315,12 +315,12 @@ func TestDeleteModRepoHandler(t *testing.T) {
 				tt.setupMock(ms)
 			}
 
-			req := httptest.NewRequest(http.MethodDelete, "/v1/mods/"+tt.modID+"/repos/"+tt.repoID, nil)
-			req.SetPathValue("mod_id", tt.modID)
+			req := httptest.NewRequest(http.MethodDelete, "/v1/migs/"+tt.modID+"/repos/"+tt.repoID, nil)
+			req.SetPathValue("mig_id", tt.modID)
 			req.SetPathValue("repo_id", tt.repoID)
 
 			rec := httptest.NewRecorder()
-			handler := deleteModRepoHandler(ms)
+			handler := deleteMigRepoHandler(ms)
 			handler(rec, req)
 
 			if rec.Code != tt.wantStatus {
@@ -333,8 +333,8 @@ func TestDeleteModRepoHandler(t *testing.T) {
 	}
 }
 
-// TestBulkUpsertModReposHandler tests the POST /v1/mods/{mod_id}/repos/bulk endpoint.
-func TestBulkUpsertModReposHandler(t *testing.T) {
+// TestBulkUpsertMigReposHandler tests the POST /v1/migs/{mig_id}/repos/bulk endpoint.
+func TestBulkUpsertMigReposHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		modID          string
@@ -356,8 +356,8 @@ func TestBulkUpsertModReposHandler(t *testing.T) {
 https://github.com/org/repo1,main,feature1
 https://github.com/org/repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				// GetModRepoByURL returns not found (new repos).
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				// GetMigRepoByURL returns not found (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -372,11 +372,11 @@ https://github.com/org/repo2,develop,feature2`,
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/existing,main,new-feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				// GetModRepoByURL returns existing repo (update case).
-				m.getModRepoByURLResult = store.ModRepo{
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				// GetMigRepoByURL returns existing repo (update case).
+				m.getModRepoByURLResult = store.MigRepo{
 					ID:    "repoexst",
-					ModID: "mod123",
+					MigID: "mod123",
 				}
 			},
 			wantStatus:  http.StatusOK,
@@ -392,8 +392,8 @@ https://github.com/org/existing,main,new-feature`,
 https://github.com/org/new-repo1,main,feature1
 https://github.com/org/new-repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
-				// GetModRepoByURL returns not found for all (new repos).
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
+				// GetMigRepoByURL returns not found for all (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -408,7 +408,7 @@ https://github.com/org/new-repo2,develop,feature2`,
 			body: "repo_url,base_ref,target_ref\n" +
 				"\"https://github.com/org/привет\",\"main\",\"feature\"\"one\"",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -423,22 +423,22 @@ https://github.com/org/new-repo2,develop,feature2`,
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo.git/,main,feature",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()
 				if !m.getModRepoByURLCalled {
-					t.Fatalf("expected GetModRepoByURL to be called")
+					t.Fatalf("expected GetMigRepoByURL to be called")
 				}
 				if m.getModRepoByURLParams.RepoUrl != "https://github.com/org/repo" {
-					t.Fatalf("GetModRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.RepoUrl, "https://github.com/org/repo")
+					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.RepoUrl, "https://github.com/org/repo")
 				}
 				if !m.upsertModRepoCalled {
-					t.Fatalf("expected UpsertModRepo to be called")
+					t.Fatalf("expected UpsertMigRepo to be called")
 				}
 				if m.upsertModRepoParams.RepoUrl != "https://github.com/org/repo" {
-					t.Fatalf("UpsertModRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.RepoUrl, "https://github.com/org/repo")
+					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.RepoUrl, "https://github.com/org/repo")
 				}
 			},
 			wantStatus:  http.StatusOK,
@@ -452,7 +452,7 @@ https://github.com/org/new-repo2,develop,feature2`,
 			contentType: "application/json",
 			body:        `{}`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "Content-Type must be text/csv",
@@ -476,7 +476,7 @@ https://github.com/org/repo,main,feature`,
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo,main,feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{
+				m.getModResult = store.Mig{
 					ID:         "modarc",
 					Name:       "archived-mod",
 					ArchivedAt: pgtype.Timestamptz{Valid: true},
@@ -492,7 +492,7 @@ https://github.com/org/repo,main,feature`,
 			body: `wrong,headers,here
 https://github.com/org/repo,main,feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "CSV header must be",
@@ -505,7 +505,7 @@ https://github.com/org/repo,main,feature`,
 https://github.com/org/good-repo,main,feature1
 ftp://invalid.com/bad-repo,main,feature2`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -520,7 +520,7 @@ ftp://invalid.com/bad-repo,main,feature2`,
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo,,feature`,
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:     http.StatusOK,
 			wantCreated:    0,
@@ -535,7 +535,7 @@ https://github.com/org/repo,,feature`,
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo,main,\"unterminated",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 0,
@@ -549,13 +549,13 @@ https://github.com/org/repo,,feature`,
 			body: "repo_url,base_ref,target_ref\n" +
 				"https://github.com/org/repo,main,feature",
 			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mod{ID: "mod123", Name: "test-mod"}
+				m.getModResult = store.Mig{ID: "mod123", Name: "test-mod"}
 				m.getModRepoByURLErr = errors.New("db down")
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()
 				if m.upsertModRepoCalled {
-					t.Fatalf("did not expect UpsertModRepo to be called when lookup fails")
+					t.Fatalf("did not expect UpsertMigRepo to be called when lookup fails")
 				}
 			},
 			wantStatus:  http.StatusOK,
@@ -572,12 +572,12 @@ https://github.com/org/repo,,feature`,
 				tt.setupMock(ms)
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+tt.modID+"/repos/bulk", bytes.NewReader([]byte(tt.body)))
+			req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+tt.modID+"/repos/bulk", bytes.NewReader([]byte(tt.body)))
 			req.Header.Set("Content-Type", tt.contentType)
-			req.SetPathValue("mod_id", tt.modID)
+			req.SetPathValue("mig_id", tt.modID)
 
 			rec := httptest.NewRecorder()
-			handler := bulkUpsertModReposHandler(ms)
+			handler := bulkUpsertMigReposHandler(ms)
 			handler(rec, req)
 
 			if rec.Code != tt.wantStatus {

@@ -21,7 +21,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	t.Helper()
 
 	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewMigRepoID().String()
 	artifactCID := "bafy-artifact-test"
 	stageID := domaintypes.NewJobID()
 	artifactID := "11111111-1111-1111-1111-111111111111"
@@ -37,9 +37,9 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+			}{RunID: runID, MigID: domaintypes.NewMigID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/repos", runID):
 			// Return repos list for follow engine.
@@ -186,7 +186,7 @@ func list(dir string) []string {
 // This replaces the old log streaming test since --follow now shows job graphs.
 func TestModRunFollowShowsJobGraph(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewMigRepoID().String()
 	jobID := domaintypes.NewJobID().String()
 
 	// Control-plane emulator.
@@ -197,9 +197,9 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+			}{RunID: runID, MigID: domaintypes.NewMigID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
 			// Minimal RunSummary status response used by the submit command.
@@ -323,7 +323,7 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 // all jobs in the job graph when a run has multiple jobs.
 func TestModRunFollowWithMultipleJobs(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewMigRepoID().String()
 	preGateJobID := domaintypes.NewJobID().String()
 	modJobID := domaintypes.NewJobID().String()
 	postGateJobID := domaintypes.NewJobID().String()
@@ -335,9 +335,9 @@ func TestModRunFollowWithMultipleJobs(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+			}{RunID: runID, MigID: domaintypes.NewMigID().String(), SpecID: domaintypes.NewSpecID().String()})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/runs/%s/status", runID):
 			// Minimal RunSummary status response used by the submit command.

@@ -125,7 +125,7 @@ func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.H
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

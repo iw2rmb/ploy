@@ -203,7 +203,7 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 	return nil
 }
 
-func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.ModID, error) {
+func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.MigID, error) {
 	if base == nil {
 		return "", "", fmt.Errorf("run submit: base url required")
 	}
@@ -247,7 +247,7 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 
 	var created struct {
 		RunID  domaintypes.RunID  `json:"run_id"`
-		ModID  domaintypes.ModID  `json:"mod_id"`
+		MigID  domaintypes.MigID  `json:"mig_id"`
 		SpecID domaintypes.SpecID `json:"spec_id"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
@@ -256,10 +256,10 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 	if created.RunID.IsZero() {
 		return "", "", fmt.Errorf("run submit: empty run_id in response")
 	}
-	if created.ModID.IsZero() {
+	if created.MigID.IsZero() {
 		return "", "", fmt.Errorf("run submit: empty mod_id in response")
 	}
-	return created.RunID, created.ModID, nil
+	return created.RunID, created.MigID, nil
 }
 
 // loadSpec loads a spec from a file path or stdin (when path is "-").

@@ -45,7 +45,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ListModsResponse'
+            $ref: '../components/schemas/controlplane.yaml#/ListMigsResponse'
     '400':
       description: Bad request (invalid query parameters)
       content:
@@ -70,14 +70,14 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/CreateModRequest'
+          $ref: '../components/schemas/controlplane.yaml#/CreateMigRequest'
   responses:
     '201':
       description: Created
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/CreateModResponse'
+            $ref: '../components/schemas/controlplane.yaml#/CreateMigResponse'
     '400':
       description: Bad request — missing or invalid fields in the request body.
       content:

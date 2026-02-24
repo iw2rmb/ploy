@@ -62,15 +62,15 @@ func (q *Queries) CountRunReposByStatus(ctx context.Context, runID types.RunID) 
 }
 
 const createRunRepo = `-- name: CreateRunRepo :one
-INSERT INTO run_repos (mod_id, run_id, repo_id, repo_base_ref, repo_target_ref)
+INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 `
 
 type CreateRunRepoParams struct {
-	ModID         types.ModID     `json:"mod_id"`
+	MigID         types.MigID     `json:"mig_id"`
 	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoID        types.MigRepoID `json:"repo_id"`
 	RepoBaseRef   string          `json:"repo_base_ref"`
 	RepoTargetRef string          `json:"repo_target_ref"`
 }
@@ -79,7 +79,7 @@ type CreateRunRepoParams struct {
 // Note: attempt defaults to 1; status defaults to 'Queued'.
 func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, createRunRepo,
-		arg.ModID,
+		arg.MigID,
 		arg.RunID,
 		arg.RepoID,
 		arg.RepoBaseRef,
@@ -87,7 +87,7 @@ func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (R
 	)
 	var i RunRepo
 	err := row.Scan(
-		&i.ModID,
+		&i.MigID,
 		&i.RunID,
 		&i.RepoID,
 		&i.RepoBaseRef,
@@ -109,7 +109,7 @@ WHERE run_id = $1 AND repo_id = $2
 
 type DeleteRunRepoParams struct {
 	RunID  types.RunID     `json:"run_id"`
-	RepoID types.ModRepoID `json:"repo_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 }
 
 func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error {
@@ -117,56 +117,56 @@ func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) er
 	return err
 }
 
-const getLatestRunRepoByModAndRepoStatus = `-- name: GetLatestRunRepoByModAndRepoStatus :one
+const getLatestRunRepoByMigAndRepoStatus = `-- name: GetLatestRunRepoByMigAndRepoStatus :one
 SELECT rr.run_id, rr.repo_id, rr.repo_target_ref
 FROM run_repos rr
 JOIN runs r ON rr.run_id = r.id
-WHERE r.mod_id = $1
+WHERE r.mig_id = $1
   AND rr.repo_id = $2
   AND rr.status = $3
 ORDER BY rr.created_at DESC
 LIMIT 1
 `
 
-type GetLatestRunRepoByModAndRepoStatusParams struct {
-	ModID  types.ModID     `json:"mod_id"`
-	RepoID types.ModRepoID `json:"repo_id"`
+type GetLatestRunRepoByMigAndRepoStatusParams struct {
+	MigID  types.MigID     `json:"mig_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 	Status RunRepoStatus   `json:"status"`
 }
 
-type GetLatestRunRepoByModAndRepoStatusRow struct {
+type GetLatestRunRepoByMigAndRepoStatusRow struct {
 	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoID        types.MigRepoID `json:"repo_id"`
 	RepoTargetRef string          `json:"repo_target_ref"`
 }
 
 // v1: Gets the newest run_repos row for a specific repo_id in a mod,
 // filtered by terminal status (Success or Fail).
-// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
+// Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
 // Order by created_at DESC to get the newest matching run_repos row.
-func (q *Queries) GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error) {
-	row := q.db.QueryRow(ctx, getLatestRunRepoByModAndRepoStatus, arg.ModID, arg.RepoID, arg.Status)
-	var i GetLatestRunRepoByModAndRepoStatusRow
+func (q *Queries) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByMigAndRepoStatusParams) (GetLatestRunRepoByMigAndRepoStatusRow, error) {
+	row := q.db.QueryRow(ctx, getLatestRunRepoByMigAndRepoStatus, arg.MigID, arg.RepoID, arg.Status)
+	var i GetLatestRunRepoByMigAndRepoStatusRow
 	err := row.Scan(&i.RunID, &i.RepoID, &i.RepoTargetRef)
 	return i, err
 }
 
 const getRunRepo = `-- name: GetRunRepo :one
-SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND repo_id = $2
 `
 
 type GetRunRepoParams struct {
 	RunID  types.RunID     `json:"run_id"`
-	RepoID types.ModRepoID `json:"repo_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 }
 
 func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error) {
 	row := q.db.QueryRow(ctx, getRunRepo, arg.RunID, arg.RepoID)
 	var i RunRepo
 	err := row.Scan(
-		&i.ModID,
+		&i.MigID,
 		&i.RunID,
 		&i.RepoID,
 		&i.RepoBaseRef,
@@ -193,7 +193,7 @@ WHERE run_id = $1 AND repo_id = $2
 
 type IncrementRunRepoAttemptParams struct {
 	RunID  types.RunID     `json:"run_id"`
-	RepoID types.ModRepoID `json:"repo_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 }
 
 // Increments attempt and resets status/timing for a fresh repo execution attempt.
@@ -202,11 +202,11 @@ func (q *Queries) IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunR
 	return err
 }
 
-const listFailedRepoIDsByMod = `-- name: ListFailedRepoIDsByMod :many
+const listFailedRepoIDsByMig = `-- name: ListFailedRepoIDsByMig :many
 SELECT repo_id FROM (
   SELECT DISTINCT ON (rr.repo_id) rr.repo_id, rr.status
   FROM run_repos rr
-  WHERE rr.mod_id = $1
+  WHERE rr.mig_id = $1
     AND rr.status IN ('Fail', 'Success', 'Cancelled')
   ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC
 ) AS last_status
@@ -217,15 +217,15 @@ WHERE status = 'Fail'
 // "Last terminal state" per repo_id is determined by looking at the newest run_repos
 // row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 // Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-func (q *Queries) ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error) {
-	rows, err := q.db.Query(ctx, listFailedRepoIDsByMod, modID)
+func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.MigRepoID, error) {
+	rows, err := q.db.Query(ctx, listFailedRepoIDsByMig, migID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []types.ModRepoID{}
+	items := []types.MigRepoID{}
 	for rows.Next() {
-		var repo_id types.ModRepoID
+		var repo_id types.MigRepoID
 		if err := rows.Scan(&repo_id); err != nil {
 			return nil, err
 		}
@@ -238,7 +238,7 @@ func (q *Queries) ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID)
 }
 
 const listQueuedRunReposByRun = `-- name: ListQueuedRunReposByRun :many
-SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND status = 'Queued'
 ORDER BY created_at ASC, repo_id ASC
@@ -254,7 +254,7 @@ func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID
 	for rows.Next() {
 		var i RunRepo
 		if err := rows.Scan(
-			&i.ModID,
+			&i.MigID,
 			&i.RunID,
 			&i.RepoID,
 			&i.RepoBaseRef,
@@ -277,7 +277,7 @@ func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID
 }
 
 const listRunReposByRun = `-- name: ListRunReposByRun :many
-SELECT mod_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
 ORDER BY created_at ASC, repo_id ASC
@@ -294,7 +294,7 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 	for rows.Next() {
 		var i RunRepo
 		if err := rows.Scan(
-			&i.ModID,
+			&i.MigID,
 			&i.RunID,
 			&i.RepoID,
 			&i.RepoBaseRef,
@@ -317,19 +317,19 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 }
 
 const listRunReposWithURLByRun = `-- name: ListRunReposWithURLByRun :many
-SELECT rr.mod_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
+SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
        mr.repo_url
 FROM run_repos rr
-JOIN mod_repos mr ON rr.repo_id = mr.id
+JOIN mig_repos mr ON rr.repo_id = mr.id
 WHERE rr.run_id = $1
 ORDER BY rr.created_at ASC, rr.repo_id ASC
 `
 
 type ListRunReposWithURLByRunRow struct {
-	ModID         types.ModID        `json:"mod_id"`
+	MigID         types.MigID        `json:"mig_id"`
 	RunID         types.RunID        `json:"run_id"`
-	RepoID        types.ModRepoID    `json:"repo_id"`
+	RepoID        types.MigRepoID    `json:"repo_id"`
 	RepoBaseRef   string             `json:"repo_base_ref"`
 	RepoTargetRef string             `json:"repo_target_ref"`
 	Status        RunRepoStatus      `json:"status"`
@@ -341,7 +341,7 @@ type ListRunReposWithURLByRunRow struct {
 	RepoUrl       string             `json:"repo_url"`
 }
 
-// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
+// v1: Lists all run_repos for a run with their repo_url (from mig_repos).
 // Used by:
 // - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 // - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
@@ -355,7 +355,7 @@ func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunI
 	for rows.Next() {
 		var i ListRunReposWithURLByRunRow
 		if err := rows.Scan(
-			&i.ModID,
+			&i.MigID,
 			&i.RunID,
 			&i.RepoID,
 			&i.RepoBaseRef,
@@ -381,7 +381,7 @@ func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunI
 const listRunsForRepo = `-- name: ListRunsForRepo :many
 SELECT
   r.id AS run_id,
-  r.mod_id,
+  r.mig_id,
   r.status AS run_status,
   rr.status AS repo_status,
   rr.repo_base_ref,
@@ -397,14 +397,14 @@ LIMIT $2 OFFSET $3
 `
 
 type ListRunsForRepoParams struct {
-	RepoID types.ModRepoID `json:"repo_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 	Limit  int32           `json:"limit"`
 	Offset int32           `json:"offset"`
 }
 
 type ListRunsForRepoRow struct {
 	RunID         types.RunID        `json:"run_id"`
-	ModID         types.ModID        `json:"mod_id"`
+	MigID         types.MigID        `json:"mig_id"`
 	RunStatus     RunStatus          `json:"run_status"`
 	RepoStatus    RunRepoStatus      `json:"repo_status"`
 	RepoBaseRef   string             `json:"repo_base_ref"`
@@ -414,7 +414,7 @@ type ListRunsForRepoRow struct {
 	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
 }
 
-// Lists runs for a given repo_id (mod_repos.id).
+// Lists runs for a given repo_id (mig_repos.id).
 func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
 	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -426,7 +426,7 @@ func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams
 		var i ListRunsForRepoRow
 		if err := rows.Scan(
 			&i.RunID,
-			&i.ModID,
+			&i.MigID,
 			&i.RunStatus,
 			&i.RepoStatus,
 			&i.RepoBaseRef,
@@ -483,7 +483,7 @@ WHERE run_id = $1 AND repo_id = $2
 
 type UpdateRunRepoErrorParams struct {
 	RunID     types.RunID     `json:"run_id"`
-	RepoID    types.ModRepoID `json:"repo_id"`
+	RepoID    types.MigRepoID `json:"repo_id"`
 	LastError *string         `json:"last_error"`
 }
 
@@ -501,7 +501,7 @@ WHERE run_id = $1 AND repo_id = $2
 
 type UpdateRunRepoRefsParams struct {
 	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.ModRepoID `json:"repo_id"`
+	RepoID        types.MigRepoID `json:"repo_id"`
 	RepoBaseRef   string          `json:"repo_base_ref"`
 	RepoTargetRef string          `json:"repo_target_ref"`
 }
@@ -527,7 +527,7 @@ WHERE run_id = $1 AND repo_id = $2
 
 type UpdateRunRepoStatusParams struct {
 	RunID  types.RunID     `json:"run_id"`
-	RepoID types.ModRepoID `json:"repo_id"`
+	RepoID types.MigRepoID `json:"repo_id"`
 	Status RunRepoStatus   `json:"status"`
 }
 

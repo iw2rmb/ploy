@@ -72,9 +72,9 @@ type (
 func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
 func (jobIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidJobID) }
 func (nodeIDTag) ValidateID(s string) error    { return validateNanoID(s, 6, ErrInvalidNodeID) }
-func (modIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidModID) }
+func (modIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidMigID) }
 func (specIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidSpecID) }
-func (modRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidModRepoID) }
+func (modRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidMigRepoID) }
 
 // RunID identifies a run instance (workflow execution).
 type RunID = StringID[runIDTag]
@@ -92,51 +92,51 @@ type ClusterID = StringID[clusterIDTag]
 // NodeID identifies a worker node in the cluster.
 type NodeID = StringID[nodeIDTag]
 
-// ModID identifies a mod project.
+// MigID identifies a mod project.
 // Uses NanoID(6) for compact, URL-safe identifiers suitable for CLI usage and display.
-type ModID = StringID[modIDTag]
+type MigID = StringID[modIDTag]
 
 // SpecID identifies a spec instance in the specs table.
 // Uses NanoID(8) for spec identifiers in the append-only specs table.
 type SpecID = StringID[specIDTag]
 
-// ModRepoID identifies a repo entry within a mod project.
+// MigRepoID identifies a repo entry within a mod project.
 // Uses NanoID(8) for per-mod repository identifiers.
-type ModRepoID = StringID[modRepoIDTag]
+type MigRepoID = StringID[modRepoIDTag]
 
-// ModRef is a reference that can be either a mod ID or a mod name.
+// MigRef is a reference that can be either a mod ID or a mod name.
 // Used for endpoints that accept "mod id OR name" in the path.
 // This type prevents conflating IDs with names at the type level.
 // Values must be non-empty and URL-safe (no whitespace, no / or ? characters).
-type ModRef string
+type MigRef string
 
-func (v ModRef) String() string { return string(v) }
-func (v ModRef) IsZero() bool   { return IsEmpty(string(v)) }
+func (v MigRef) String() string { return string(v) }
+func (v MigRef) IsZero() bool   { return IsEmpty(string(v)) }
 
-// Validate checks that the ModRef is non-empty and URL-safe.
-func (v ModRef) Validate() error {
+// Validate checks that the MigRef is non-empty and URL-safe.
+func (v MigRef) Validate() error {
 	s := Normalize(string(v))
 	if s == "" {
 		return ErrEmpty
 	}
 	for _, c := range s {
 		if c == '/' || c == '?' || c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			return ErrInvalidModRef
+			return ErrInvalidMigRef
 		}
 	}
 	return nil
 }
 
-func (v ModRef) MarshalText() ([]byte, error) {
+func (v MigRef) MarshalText() ([]byte, error) {
 	if err := v.Validate(); err != nil {
 		return nil, err
 	}
 	return []byte(Normalize(string(v))), nil
 }
 
-func (v *ModRef) UnmarshalText(b []byte) error {
+func (v *MigRef) UnmarshalText(b []byte) error {
 	s := Normalize(string(b))
-	ref := ModRef(s)
+	ref := MigRef(s)
 	if err := ref.Validate(); err != nil {
 		return err
 	}
@@ -144,17 +144,17 @@ func (v *ModRef) UnmarshalText(b []byte) error {
 	return nil
 }
 
-func (v ModRef) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *ModRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
+func (v MigRef) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
+func (v *MigRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
 
 // Validation errors for ID types.
 var (
 	ErrInvalidRunID     = errors.New("invalid run id")
 	ErrInvalidJobID     = errors.New("invalid job id")
 	ErrInvalidNodeID    = errors.New("invalid node id")
-	ErrInvalidModID     = errors.New("invalid mod id")
+	ErrInvalidMigID     = errors.New("invalid mod id")
 	ErrInvalidSpecID    = errors.New("invalid spec id")
-	ErrInvalidModRepoID = errors.New("invalid mod repo id")
+	ErrInvalidMigRepoID = errors.New("invalid mod repo id")
 	ErrInvalidDiffID    = errors.New("invalid diff id")
 )
 

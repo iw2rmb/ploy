@@ -23,7 +23,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/BulkUpsertModReposResponse'
+            $ref: '../components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse'
     '400':
       description: Bad request — Content-Type must be text/csv, or CSV header is invalid.
       content:

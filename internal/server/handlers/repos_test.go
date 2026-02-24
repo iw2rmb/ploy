@@ -151,12 +151,12 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 	st := &mockStore{
 		listRunsForRepoResult: []store.ListRunsForRepoRow{
 			{
 				RunID:         runID,
-				ModID:         modID,
+				MigID:         modID,
 				RunStatus:     store.RunStatusFinished,
 				RepoStatus:    store.RunRepoStatusSuccess,
 				RepoBaseRef:   "main",
@@ -193,8 +193,8 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if run.RunID.String() != runID.String() {
 		t.Fatalf("unexpected run_id: %s", run.RunID.String())
 	}
-	if run.ModID != modID {
-		t.Fatalf("unexpected mod_id: %s", run.ModID.String())
+	if run.MigID != modID {
+		t.Fatalf("unexpected mig_id: %s", run.MigID.String())
 	}
 	if run.RunStatus != "Finished" {
 		t.Fatalf("unexpected run_status: %s", run.RunStatus)

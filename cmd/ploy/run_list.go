@@ -78,7 +78,7 @@ func handleRunList(args []string, stderr io.Writer) error {
 			derived = b.Counts.DerivedStatus
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			b.ID, b.Status, b.ModID, b.SpecID, repos, derived)
+			b.ID, b.Status, b.MigID, b.SpecID, repos, derived)
 	}
 	_ = tw.Flush()
 	return nil

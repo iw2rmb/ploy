@@ -45,7 +45,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fx.Run.ID,
-			RepoID:      fx.ModRepo.ID,
+			RepoID:      fx.MigRepo.ID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-norace-" + jobID.String(),
@@ -74,7 +74,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 			<-start
 			job, err := db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 				RunID:   fx.Run.ID,
-				RepoID:  fx.ModRepo.ID,
+				RepoID:  fx.MigRepo.ID,
 				Attempt: fx.RunRepo.Attempt,
 			})
 			if err != nil {
@@ -135,7 +135,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 	// Verify no Created jobs remain and exactly numJobs are Queued for the repo attempt.
 	rows, err := db.CountJobsByRunRepoAttemptGroupByStatus(ctx, CountJobsByRunRepoAttemptGroupByStatusParams{
 		RunID:   fx.Run.ID,
-		RepoID:  fx.ModRepo.ID,
+		RepoID:  fx.MigRepo.ID,
 		Attempt: fx.RunRepo.Attempt,
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobIDs[i],
 			RunID:       fx.Run.ID,
-			RepoID:      fx.ModRepo.ID,
+			RepoID:      fx.MigRepo.ID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-seq-" + jobIDs[i].String(),
@@ -225,7 +225,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	for i := 0; i < numJobs; i++ {
 		job, err := db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 			RunID:   fx.Run.ID,
-			RepoID:  fx.ModRepo.ID,
+			RepoID:  fx.MigRepo.ID,
 			Attempt: fx.RunRepo.Attempt,
 		})
 		if err != nil {
@@ -245,7 +245,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 	// Verify no more jobs to schedule.
 	_, err = db.ScheduleNextJob(ctx, ScheduleNextJobParams{
 		RunID:   fx.Run.ID,
-		RepoID:  fx.ModRepo.ID,
+		RepoID:  fx.MigRepo.ID,
 		Attempt: fx.RunRepo.Attempt,
 	})
 	if !errors.Is(err, pgx.ErrNoRows) {

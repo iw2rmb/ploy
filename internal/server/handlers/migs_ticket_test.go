@@ -62,7 +62,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 
 	var resp struct {
 		RunID  string `json:"run_id"`
-		ModID  string `json:"mod_id"`
+		MigID  string `json:"mig_id"`
 		SpecID string `json:"spec_id"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
@@ -72,14 +72,14 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	if resp.RunID == "" {
 		t.Fatalf("expected run_id to be set")
 	}
-	if resp.ModID == "" {
-		t.Fatalf("expected mod_id to be set")
+	if resp.MigID == "" {
+		t.Fatalf("expected mig_id to be set")
 	}
 	if resp.SpecID == "" {
 		t.Fatalf("expected spec_id to be set")
 	}
 
-	if !st.createSpecCalled || !st.createModCalled || !st.createModRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
+	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
 		t.Fatalf("expected spec/mod/repo/run creation calls to be made")
 	}
 	if st.createJobCallCount != 3 {
@@ -105,7 +105,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.RunID("run_test_12345678901234567")
-	repoID := domaintypes.ModRepoID("repo_abc")
+	repoID := domaintypes.MigRepoID("repo_abc")
 	const (
 		repoBaseRef = "main"
 		attempt     = int32(1)
@@ -168,7 +168,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.RunID("run_multistep_0123456789")
-	repoID := domaintypes.ModRepoID("repo_multi")
+	repoID := domaintypes.MigRepoID("repo_multi")
 	const (
 		repoBaseRef = "develop"
 		attempt     = int32(2)
@@ -192,7 +192,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 
 	// Verify 5 jobs were created: pre-gate, mod-0, mod-1, mod-2, post-gate.
 	if st.createJobCallCount != 5 {
-		t.Fatalf("expected 5 jobs (pre-gate + 3 mods + post-gate), got %d", st.createJobCallCount)
+		t.Fatalf("expected 5 jobs (pre-gate + 3 migs + post-gate), got %d", st.createJobCallCount)
 	}
 
 	// Verify job ordering and status (first job is Queued, rest are Created).
@@ -269,7 +269,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := &mockStore{}
 
-			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.ModRepoID("repo_456"), "main", 1, tc.spec)
+			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.MigRepoID("repo_456"), "main", 1, tc.spec)
 			if err != nil {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
@@ -309,7 +309,7 @@ func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.RunID("run_v1_direct_addressing_12")
-	repoID := domaintypes.ModRepoID("repo_direct_addr")
+	repoID := domaintypes.MigRepoID("repo_direct_addr")
 	const (
 		repoBaseRef = "feature/test"
 		attempt     = int32(3)
@@ -346,7 +346,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	st := &mockStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.ModRepoID("repo_456"), "main", 1, spec)
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.MigRepoID("repo_456"), "main", 1, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		listRunReposByRunResult: []store.RunRepo{
 			{RunID: runID, RepoID: "repo_123", RepoBaseRef: "main", RepoTargetRef: "feature"},
 		},
-		getModRepoResult: store.ModRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
+		getModRepoResult: store.MigRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
 			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},

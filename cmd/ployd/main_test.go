@@ -182,7 +182,7 @@ func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 		{Key: "A", Value: "1", Scope: "all", Secret: true},
 		{Key: "B", Value: "2", Scope: "", Secret: false},     // defaults to all
 		{Key: "C", Value: "3", Scope: "mod", Secret: false},  // invalid (typo)
-		{Key: "D", Value: "4", Scope: "mods", Secret: false}, // valid
+		{Key: "D", Value: "4", Scope: "migs", Secret: false}, // valid
 	}
 
 	got := globalEnvMapFromStoreEntries(entries)

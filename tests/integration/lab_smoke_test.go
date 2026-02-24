@@ -45,47 +45,47 @@ func TestLabSmoke(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewModID()
-	_, err = db.CreateMod(ctx, store.CreateModParams{
+	modID := domaintypes.NewMigID()
+	_, err = db.CreateMig(ctx, store.CreateMigParams{
 		ID:        modID,
 		Name:      "smoke-test-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
+		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
 	repoURL := "https://github.com/octocat/Hello-World"
 	baseRef := "main"
 	targetRef := "feature/smoke-test"
 
-	modRepoID := domaintypes.NewModRepoID()
-	modRepo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
+	modRepoID := domaintypes.NewMigRepoID()
+	modRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
 		ID:        modRepoID,
-		ModID:     modID,
+		MigID:     modID,
 		RepoUrl:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
 	if err != nil {
-		t.Fatalf("CreateModRepo() failed: %v", err)
+		t.Fatalf("CreateMigRepo() failed: %v", err)
 	}
 
 	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
-		ModID:     modID,
+		MigID:     modID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%s, spec_id=%s, status=%s", run.ID, run.ModID, run.SpecID, run.Status)
+	t.Logf("Created run: id=%v, mod_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		ModID:         modID,
+		MigID:         modID,
 		RunID:         run.ID,
 		RepoID:        modRepo.ID,
 		RepoBaseRef:   modRepo.BaseRef,

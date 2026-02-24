@@ -12,11 +12,11 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestCreateModRunCommand_Run validates CreateModRunCommand responses.
-func TestCreateModRunCommand_Run(t *testing.T) {
+// TestCreateMigRunCommand_Run validates CreateMigRunCommand responses.
+func TestCreateMigRunCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 
 	tests := []struct {
 		name        string
@@ -100,7 +100,7 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 					t.Errorf("expected mode all, got %s", req.RepoSelector.Mode)
 				}
 
-				resp := CreateModRunResult{RunID: runID}
+				resp := CreateMigRunResult{RunID: runID}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.statusCode)
@@ -110,10 +110,10 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 
 			baseURL, _ := url.Parse(srv.URL)
 
-			cmd := CreateModRunCommand{
+			cmd := CreateMigRunCommand{
 				Client:   srv.Client(),
 				BaseURL:  baseURL,
-				ModRef:   domaintypes.ModRef(tc.modID),
+				MigRef:   domaintypes.MigRef(tc.modID),
 				RepoURLs: tc.repoURLs,
 				Failed:   tc.failed,
 			}
@@ -138,11 +138,11 @@ func TestCreateModRunCommand_Run(t *testing.T) {
 	}
 }
 
-// TestCreateModRunCommand_SelectorMutualExclusion validates --repo and --failed are mutually exclusive.
-func TestCreateModRunCommand_SelectorMutualExclusion(t *testing.T) {
+// TestCreateMigRunCommand_SelectorMutualExclusion validates --repo and --failed are mutually exclusive.
+func TestCreateMigRunCommand_SelectorMutualExclusion(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
@@ -151,10 +151,10 @@ func TestCreateModRunCommand_SelectorMutualExclusion(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := CreateModRunCommand{
+	cmd := CreateMigRunCommand{
 		Client:   srv.Client(),
 		BaseURL:  baseURL,
-		ModRef:   domaintypes.ModRef(modID.String()),
+		MigRef:   domaintypes.MigRef(modID.String()),
 		RepoURLs: []string{"https://github.com/org/repo.git"},
 		Failed:   true,
 	}

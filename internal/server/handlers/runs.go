@@ -43,7 +43,7 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 		// run.ID is now a string (KSUID); cast directly to domain type.
 		ID:        run.ID,
 		Status:    string(run.Status),
-		ModID:     run.ModID,
+		MigID:     run.MigID,
 		SpecID:    run.SpecID,
 		CreatedBy: run.CreatedBy,
 		CreatedAt: run.CreatedAt.Time,
@@ -154,10 +154,10 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 // RunRepoResponse represents a single repo within a batch for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
 // v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
-// to mod_repos.id (NanoID(8)).
+// to mig_repos.id (NanoID(8)).
 type RunRepoResponse struct {
 	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoID     domaintypes.MigRepoID `json:"repo_id"`
 	RepoURL    string                `json:"repo_url"`
 	BaseRef    string                `json:"base_ref"`
 	TargetRef  string                `json:"target_ref"`

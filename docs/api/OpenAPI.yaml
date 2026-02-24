@@ -8,11 +8,11 @@ info:
     tokens (`Authorization: Bearer ...`) depending on client and deployment.
 
     v1 API surfaces:
-    - `/v1/mods` — mod project CRUD (create/list/delete/archive).
-    - `/v1/mods/{mod_id}/specs` — spec management for mod projects.
-    - `/v1/mods/{mod_id}/repos` — repo set management (add/list/delete repos).
-    - `/v1/mods/{mod_id}/runs` — create multi-repo batch runs for a mod.
-    - `/v1/mods/{mod_id}/pull` — resolve repo execution for `ploy mod pull`.
+    - `/v1/migs` — mod project CRUD (create/list/delete/archive).
+    - `/v1/migs/{mod_id}/specs` — spec management for mod projects.
+    - `/v1/migs/{mod_id}/repos` — repo set management (add/list/delete repos).
+    - `/v1/migs/{mod_id}/runs` — create multi-repo batch runs for a mod.
+    - `/v1/migs/{mod_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start/timing).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
@@ -75,25 +75,25 @@ paths:
   # Control-plane surfaces
   # Run lifecycle and streaming are exposed under /v1/runs/*.
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
-  /v1/mods:
+  /v1/migs:
     $ref: './paths/mods.yaml'
-  /v1/mods/{mod_id}:
+  /v1/migs/{mod_id}:
     $ref: './paths/mods_mod_id.yaml'
-  /v1/mods/{mod_id}/archive:
+  /v1/migs/{mod_id}/archive:
     $ref: './paths/mods_mod_id_archive.yaml'
-  /v1/mods/{mod_id}/unarchive:
+  /v1/migs/{mod_id}/unarchive:
     $ref: './paths/mods_mod_id_unarchive.yaml'
-  /v1/mods/{mod_id}/specs:
+  /v1/migs/{mod_id}/specs:
     $ref: './paths/mods_mod_id_specs.yaml'
-  /v1/mods/{mod_id}/repos:
+  /v1/migs/{mod_id}/repos:
     $ref: './paths/mods_mod_id_repos.yaml'
-  /v1/mods/{mod_id}/repos/{repo_id}:
+  /v1/migs/{mod_id}/repos/{repo_id}:
     $ref: './paths/mods_mod_id_repos_repo_id.yaml'
-  /v1/mods/{mod_id}/repos/bulk:
+  /v1/migs/{mod_id}/repos/bulk:
     $ref: './paths/mods_mod_id_repos_bulk.yaml'
-  /v1/mods/{mod_id}/runs:
+  /v1/migs/{mod_id}/runs:
     $ref: './paths/mods_mod_id_runs.yaml'
-  /v1/mods/{mod_id}/pull:
+  /v1/migs/{mod_id}/pull:
     $ref: './paths/mods_mod_id_pull.yaml'
   /v1/runs/{id}/logs:
     $ref: './paths/runs_id_logs.yaml'
@@ -263,43 +263,43 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
     RepoRunSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
-    # Mod project CRUD types — POST /v1/mods, GET /v1/mods, DELETE /v1/mods/{mod_id}
-    CreateModRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateModRequest'
-    CreateModResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateModResponse'
+    # Mod project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mod_id}
+    CreateMigRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateMigRequest'
+    CreateMigResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateMigResponse'
     ModListItem:
       $ref: './components/schemas/controlplane.yaml#/ModListItem'
-    ListModsResponse:
-      $ref: './components/schemas/controlplane.yaml#/ListModsResponse'
+    ListMigsResponse:
+      $ref: './components/schemas/controlplane.yaml#/ListMigsResponse'
     ModArchiveResponse:
       $ref: './components/schemas/controlplane.yaml#/ModArchiveResponse'
-    # Spec management types — POST /v1/mods/{mod_id}/specs
+    # Spec management types — POST /v1/migs/{mod_id}/specs
     SetModSpecRequest:
       $ref: './components/schemas/controlplane.yaml#/SetModSpecRequest'
     SetModSpecResponse:
       $ref: './components/schemas/controlplane.yaml#/SetModSpecResponse'
-    # Mod repo types — POST/GET /v1/mods/{mod_id}/repos, DELETE /v1/mods/{mod_id}/repos/{repo_id}
+    # Mod repo types — POST/GET /v1/migs/{mod_id}/repos, DELETE /v1/migs/{mod_id}/repos/{repo_id}
     ModRepo:
       $ref: './components/schemas/controlplane.yaml#/ModRepo'
     AddModRepoRequest:
       $ref: './components/schemas/controlplane.yaml#/AddModRepoRequest'
     ListModReposResponse:
       $ref: './components/schemas/controlplane.yaml#/ListModReposResponse'
-    BulkUpsertModReposResponse:
-      $ref: './components/schemas/controlplane.yaml#/BulkUpsertModReposResponse'
+    BulkUpsertMigReposResponse:
+      $ref: './components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse'
     BulkUpsertError:
       $ref: './components/schemas/controlplane.yaml#/BulkUpsertError'
-    # Mod run types — POST /v1/mods/{mod_id}/runs
+    # Mod run types — POST /v1/migs/{mod_id}/runs
     RepoSelectorMode:
       $ref: './components/schemas/controlplane.yaml#/RepoSelectorMode'
     ModRepoSelector:
       $ref: './components/schemas/controlplane.yaml#/ModRepoSelector'
-    CreateModRunRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateModRunRequest'
-    CreateModRunResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateModRunResponse'
-    # Pull resolution types — POST /v1/mods/{mod_id}/pull, POST /v1/runs/{run_id}/pull
+    CreateMigRunRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateMigRunRequest'
+    CreateMigRunResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateMigRunResponse'
+    # Pull resolution types — POST /v1/migs/{mod_id}/pull, POST /v1/runs/{run_id}/pull
     PullResolutionMode:
       $ref: './components/schemas/controlplane.yaml#/PullResolutionMode'
     ModPullRequest:

@@ -217,7 +217,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 // runRepoDetails holds the repo details needed for pull operations.
 // This is a simplified structure containing only the fields we need.
 type runRepoDetails struct {
-	RepoID    domaintypes.ModRepoID `json:"repo_id"`
+	RepoID    domaintypes.MigRepoID `json:"repo_id"`
 	BaseRef   string                `json:"base_ref"`
 	TargetRef string                `json:"target_ref"`
 	Status    string                `json:"status"`
@@ -225,7 +225,7 @@ type runRepoDetails struct {
 
 // fetchRunRepoDetails fetches the repo details for a run/repo pair.
 // Queries GET /v1/runs/{run_id}/repos and filters by repo_id.
-func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.ModRepoID) (*runRepoDetails, error) {
+func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) (*runRepoDetails, error) {
 	if baseURL == nil {
 		return nil, errors.New("base url required")
 	}

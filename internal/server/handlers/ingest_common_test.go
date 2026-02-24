@@ -123,53 +123,53 @@ func TestParseParam(t *testing.T) {
 		}
 	})
 
-	t.Run("ModID", func(t *testing.T) {
+	t.Run("MigID", func(t *testing.T) {
 		t.Parallel()
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req.SetPathValue("mod_id", "mod123")
-		id, err := parseParam[domaintypes.ModID](req, "mod_id")
+		req.SetPathValue("mig_id", "mod123")
+		id, err := parseParam[domaintypes.MigID](req, "mig_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if id != domaintypes.ModID("mod123") {
+		if id != domaintypes.MigID("mod123") {
 			t.Errorf("id = %q, want %q", id, "mod123")
 		}
 	})
 
-	t.Run("ModRef", func(t *testing.T) {
+	t.Run("MigRef", func(t *testing.T) {
 		t.Parallel()
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req.SetPathValue("mod_ref", "my-mod")
-		ref, err := parseParam[domaintypes.ModRef](req, "mod_ref")
+		req.SetPathValue("mig_ref", "my-mod")
+		ref, err := parseParam[domaintypes.MigRef](req, "mig_ref")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if ref != domaintypes.ModRef("my-mod") {
+		if ref != domaintypes.MigRef("my-mod") {
 			t.Errorf("ref = %q, want %q", ref, "my-mod")
 		}
 
 		// Invalid chars
 		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req2.SetPathValue("mod_ref", "my/mod")
-		_, err = parseParam[domaintypes.ModRef](req2, "mod_ref")
+		req2.SetPathValue("mig_ref", "my/mod")
+		_, err = parseParam[domaintypes.MigRef](req2, "mig_ref")
 		if err == nil {
 			t.Error("expected error for invalid mod ref")
 		}
 	})
 
-	t.Run("ModRepoID", func(t *testing.T) {
+	t.Run("MigRepoID", func(t *testing.T) {
 		t.Parallel()
-		validRepoID := domaintypes.NewModRepoID().String()
+		validRepoID := domaintypes.NewMigRepoID().String()
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("repo_id", validRepoID)
-		id, err := parseParam[domaintypes.ModRepoID](req, "repo_id")
+		id, err := parseParam[domaintypes.MigRepoID](req, "repo_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if id != domaintypes.ModRepoID(validRepoID) {
+		if id != domaintypes.MigRepoID(validRepoID) {
 			t.Errorf("id = %q, want %q", id, validRepoID)
 		}
 	})

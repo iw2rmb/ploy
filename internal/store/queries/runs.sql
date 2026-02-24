@@ -1,10 +1,10 @@
 -- name: GetRun :one
-SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
 WHERE id = $1;
 
 -- name: ListRuns :many
-SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
@@ -12,9 +12,9 @@ LIMIT $1 OFFSET $2;
 -- name: CreateRun :one
 -- v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
 -- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
-INSERT INTO runs (id, mod_id, spec_id, created_by, status, started_at)
+INSERT INTO runs (id, mig_id, spec_id, created_by, status, started_at)
 VALUES ($1, $2, $3, $4, 'Started', now())
-RETURNING id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats;
+RETURNING id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats;
 
 -- name: UpdateRunStatus :exec
 UPDATE runs

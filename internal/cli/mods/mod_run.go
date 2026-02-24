@@ -18,20 +18,20 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// CreateModRunCommand creates a batch run from a mod project with repo selection.
+// CreateMigRunCommand creates a batch run from a mod project with repo selection.
 // Endpoint: POST /v1/mods/{mod_id}/runs
 // Creates a run with repo selection based on mode: all, explicit, or failed.
-type CreateModRunCommand struct {
+type CreateMigRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	ModRef    domaintypes.ModRef // Required: mod ID or name.
+	MigRef    domaintypes.MigRef // Required: mod ID or name.
 	RepoURLs  []string           // Optional: explicit repo URLs for "explicit" mode.
 	Failed    bool               // If true, use "failed" mode; otherwise "all" or "explicit".
 	CreatedBy *string            // Optional: creator identifier.
 }
 
-// CreateModRunResult contains the response from creating a mod run.
-type CreateModRunResult struct {
+// CreateMigRunResult contains the response from creating a mod run.
+type CreateMigRunResult struct {
 	RunID domaintypes.RunID `json:"run_id"`
 }
 
@@ -40,20 +40,20 @@ type CreateModRunResult struct {
 //   - --repo ... selects explicit repos (by repo_url identity within the mod)
 //   - --failed selects repos with last terminal state Fail
 //   - omitted selects all repos in the mod repo set
-func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error) {
+func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error) {
 	if c.Client == nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: http client required")
+		return CreateMigRunResult{}, fmt.Errorf("mod run: http client required")
 	}
 	if c.BaseURL == nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: base url required")
+		return CreateMigRunResult{}, fmt.Errorf("mod run: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: mod id is required")
+	if err := c.MigRef.Validate(); err != nil {
+		return CreateMigRunResult{}, fmt.Errorf("mod run: mod id is required")
 	}
 
 	// Validate flag mutual exclusion: --failed and --repo cannot both be specified.
 	if c.Failed && len(c.RepoURLs) > 0 {
-		return CreateModRunResult{}, fmt.Errorf("mod run: --failed and --repo are mutually exclusive")
+		return CreateMigRunResult{}, fmt.Errorf("mod run: --failed and --repo are mutually exclusive")
 	}
 
 	// Determine repo_selector mode based on flags.
@@ -69,7 +69,7 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 		for _, raw := range c.RepoURLs {
 			u := domaintypes.RepoURL(strings.TrimSpace(raw))
 			if err := u.Validate(); err != nil {
-				return CreateModRunResult{}, fmt.Errorf("mod run: --repo must be a valid repo url")
+				return CreateMigRunResult{}, fmt.Errorf("mod run: --repo must be a valid repo url")
 			}
 			repoURLs = append(repoURLs, u)
 		}
@@ -95,31 +95,31 @@ func (c CreateModRunCommand) Run(ctx context.Context) (CreateModRunResult, error
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: marshal request: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mod run: marshal request: %w", err)
 	}
 
 	// POST /v1/mods/{mod_id}/runs
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "runs")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String(), "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: build request: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mod run: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return CreateModRunResult{}, fmt.Errorf("mod run: http request failed: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mod run: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
-		var result CreateModRunResult
+		var result CreateMigRunResult
 		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return CreateModRunResult{}, fmt.Errorf("mod run: decode response: %w", err)
+			return CreateMigRunResult{}, fmt.Errorf("mod run: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return CreateModRunResult{}, decodeHTTPError(resp, "mod run")
+	return CreateMigRunResult{}, decodeHTTPError(resp, "mod run")
 }

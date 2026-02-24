@@ -40,7 +40,7 @@ func handleModRemove(args []string, stderr io.Writer) error {
 	cmd := mods.RemoveModCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 
 	if err := cmd.Run(ctx); err != nil {

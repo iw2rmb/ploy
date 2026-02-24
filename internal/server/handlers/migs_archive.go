@@ -13,30 +13,30 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// archiveModHandler archives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_ref}/archive
+// archiveMigHandler archives a mod project.
+// Endpoint: PATCH /v1/migs/{mig_ref}/archive
 // Response: 200 OK with mod details
 //
 // v1 contract:
 // - Archives a mod (prevents execution).
 // - Cannot archive a mod with running jobs.
-func archiveModHandler(st store.Store) http.HandlerFunc {
+func archiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
+		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Resolve mod by ID-or-name.
-		mod, err := resolveModByRef(r.Context(), st, modRef)
+		mod, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("archive mod: get mod failed", "mod_ref", modRef, "err", err)
+			slog.Error("archive mod: get mod failed", "mig_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
@@ -63,7 +63,7 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
-			slog.Error("archive mod: check jobs failed", "mod_id", modID, "err", err)
+			slog.Error("archive mod: check jobs failed", "mig_id", modID, "err", err)
 			return
 		}
 		if hasRunningJobs {
@@ -72,9 +72,9 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Archive the mod
-		if err := st.ArchiveMod(r.Context(), modID); err != nil {
+		if err := st.ArchiveMig(r.Context(), modID); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to archive mod: %v", err)
-			slog.Error("archive mod: database error", "mod_id", modID, "err", err)
+			slog.Error("archive mod: database error", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -91,11 +91,11 @@ func archiveModHandler(st store.Store) http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod archived", "mod_id", modID)
+		slog.Info("mod archived", "mig_id", modID)
 	}
 }
 
-func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes.ModID) (bool, error) {
+func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
 	const pageLimit = int32(200)
 	pageOffset := int32(0)
 	for {
@@ -107,7 +107,7 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 			return false, nil
 		}
 		for _, run := range page {
-			if run.ModID != modID {
+			if run.MigID != modID {
 				continue
 			}
 			jobs, err := st.ListJobsByRun(ctx, run.ID)
@@ -124,29 +124,29 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 	}
 }
 
-// unarchiveModHandler unarchives a mod project.
-// Endpoint: PATCH /v1/mods/{mod_ref}/unarchive
+// unarchiveMigHandler unarchives a mod project.
+// Endpoint: PATCH /v1/migs/{mig_ref}/unarchive
 // Response: 200 OK with mod details
 //
 // v1 contract:
 // - Unarchives a mod (allows execution again).
-func unarchiveModHandler(st store.Store) http.HandlerFunc {
+func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
+		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Resolve mod by ID-or-name.
-		mod, err := resolveModByRef(r.Context(), st, modRef)
+		mod, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("unarchive mod: get mod failed", "mod_ref", modRef, "err", err)
+			slog.Error("unarchive mod: get mod failed", "mig_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
@@ -170,9 +170,9 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Unarchive the mod
-		if err := st.UnarchiveMod(r.Context(), modID); err != nil {
+		if err := st.UnarchiveMig(r.Context(), modID); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to unarchive mod: %v", err)
-			slog.Error("unarchive mod: database error", "mod_id", modID, "err", err)
+			slog.Error("unarchive mod: database error", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -189,6 +189,6 @@ func unarchiveModHandler(st store.Store) http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod unarchived", "mod_id", modID)
+		slog.Info("mod unarchived", "mig_id", modID)
 	}
 }

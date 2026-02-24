@@ -12,14 +12,14 @@ import (
 )
 
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (id, mod_id, spec_id, created_by, status, started_at)
+INSERT INTO runs (id, mig_id, spec_id, created_by, status, started_at)
 VALUES ($1, $2, $3, $4, 'Started', now())
-RETURNING id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+RETURNING id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 `
 
 type CreateRunParams struct {
 	ID        types.RunID  `json:"id"`
-	ModID     types.ModID  `json:"mod_id"`
+	MigID     types.MigID  `json:"mig_id"`
 	SpecID    types.SpecID `json:"spec_id"`
 	CreatedBy *string      `json:"created_by"`
 }
@@ -29,14 +29,14 @@ type CreateRunParams struct {
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
 		arg.ID,
-		arg.ModID,
+		arg.MigID,
 		arg.SpecID,
 		arg.CreatedBy,
 	)
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.ModID,
+		&i.MigID,
 		&i.SpecID,
 		&i.CreatedBy,
 		&i.Status,
@@ -59,7 +59,7 @@ func (q *Queries) DeleteRun(ctx context.Context, id types.RunID) error {
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
 WHERE id = $1
 `
@@ -69,7 +69,7 @@ func (q *Queries) GetRun(ctx context.Context, id types.RunID) (Run, error) {
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.ModID,
+		&i.MigID,
 		&i.SpecID,
 		&i.CreatedBy,
 		&i.Status,
@@ -97,7 +97,7 @@ func (q *Queries) GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming,
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT id, mod_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
+SELECT id, mig_id, spec_id, created_by, status, created_at, started_at, finished_at, stats
 FROM runs
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
@@ -119,7 +119,7 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
-			&i.ModID,
+			&i.MigID,
 			&i.SpecID,
 			&i.CreatedBy,
 			&i.Status,

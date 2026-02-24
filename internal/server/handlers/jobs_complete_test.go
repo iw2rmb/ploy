@@ -513,7 +513,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mod", 2000)
-	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoID = domaintypes.NewMigRepoID()
 
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -557,7 +557,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("pre_gate", 1000)
-	f.Job.RepoID = domaintypes.NewModRepoID()
+	f.Job.RepoID = domaintypes.NewMigRepoID()
 
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},

@@ -86,8 +86,8 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 	if resp.Value != `{"token":"secret"}` {
 		t.Errorf("Value = %q, want %q", resp.Value, `{"token":"secret"}`)
 	}
-	if resp.Scope != "mods" {
-		t.Errorf("Scope = %q, want %q", resp.Scope, "mods")
+	if resp.Scope != "migs" {
+		t.Errorf("Scope = %q, want %q", resp.Scope, "migs")
 	}
 	if !resp.Secret {
 		t.Errorf("Secret = %v, want true", resp.Secret)
@@ -166,7 +166,7 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	// Omit "secret" field — should default to true.
 	reqBody := map[string]any{
 		"value": "test-value",
-		"scope": "mods",
+		"scope": "migs",
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -283,7 +283,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			name:   "codex auth JSON",
 			key:    "CODEX_AUTH_JSON",
 			value:  `{"api_key":"sk-...","org_id":"org-123"}`,
-			scope:  "mods",
+			scope:  "migs",
 			secret: true,
 		},
 	}

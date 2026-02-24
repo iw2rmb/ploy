@@ -37,10 +37,10 @@ func handleModArchive(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mod archive command.
-	cmd := mods.ArchiveModCommand{
+	cmd := mods.ArchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 
 	result, err := cmd.Run(ctx)

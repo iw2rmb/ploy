@@ -43,7 +43,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
@@ -120,7 +120,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
@@ -137,7 +137,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
@@ -154,7 +154,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
@@ -247,7 +247,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          types.NewJobID(),
 			RunID:       run.ID,
-			RepoID:      fx.ModRepo.ID,
+			RepoID:      fx.MigRepo.ID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-" + strconv.Itoa(i),
@@ -389,7 +389,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
@@ -459,7 +459,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	job, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
@@ -538,7 +538,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job3, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
@@ -555,7 +555,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job1, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
@@ -572,7 +572,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	job2, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
@@ -644,7 +644,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	_, err = db.CreateJob(ctx, CreateJobParams{
 		ID:          types.NewJobID(),
 		RunID:       run.ID,
-		RepoID:      fx.ModRepo.ID,
+		RepoID:      fx.MigRepo.ID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "running-job",

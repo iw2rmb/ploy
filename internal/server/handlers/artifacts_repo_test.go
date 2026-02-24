@@ -18,13 +18,13 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewModRepoID().String()
+	repoID := domaintypes.NewMigRepoID().String()
 
 	job1 := domaintypes.NewJobID().String()
 	job2 := domaintypes.NewJobID().String()
 	otherJob := domaintypes.NewJobID().String()
 	runIDTyped := domaintypes.RunID(runID)
-	repoIDTyped := domaintypes.ModRepoID(repoID)
+	repoIDTyped := domaintypes.MigRepoID(repoID)
 	job1Typed := domaintypes.JobID(job1)
 	job2Typed := domaintypes.JobID(job2)
 	otherJobTyped := domaintypes.JobID(otherJob)

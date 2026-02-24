@@ -31,7 +31,7 @@ func handleModList(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mod list command.
-	cmd := mods.ListModsCommand{
+	cmd := mods.ListMigsCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Limit:   100,

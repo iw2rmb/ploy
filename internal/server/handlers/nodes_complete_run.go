@@ -29,7 +29,7 @@ func maybeUpdateRunRepoStatus(
 	ctx context.Context,
 	st store.Store,
 	runID domaintypes.RunID,
-	repoID domaintypes.ModRepoID,
+	repoID domaintypes.MigRepoID,
 	attempt int32,
 ) (bool, error) {
 	// List jobs for this repo attempt and compute terminal status from the chain tail
@@ -160,7 +160,7 @@ func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 	if eventsService != nil {
 		repoURL := ""
 		if repos, err := st.ListRunReposByRun(ctx, runID); err == nil && len(repos) > 0 {
-			if mr, err := st.GetModRepo(ctx, repos[0].RepoID); err == nil {
+			if mr, err := st.GetMigRepo(ctx, repos[0].RepoID); err == nil {
 				repoURL = mr.RepoUrl
 			}
 		}

@@ -93,7 +93,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	// Rich summary output (previously used by `ploy mod run status`).
 	_, _ = fmt.Fprintf(stderr, "Run: %s\n", summary.ID)
 	_, _ = fmt.Fprintf(stderr, "Status: %s\n", summary.Status)
-	_, _ = fmt.Fprintf(stderr, "Mod ID: %s\n", summary.ModID)
+	_, _ = fmt.Fprintf(stderr, "Mod ID: %s\n", summary.MigID)
 	_, _ = fmt.Fprintf(stderr, "Spec ID: %s\n", summary.SpecID)
 	if summary.CreatedBy != nil && *summary.CreatedBy != "" {
 		_, _ = fmt.Fprintf(stderr, "Created By: %s\n", *summary.CreatedBy)

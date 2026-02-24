@@ -16,16 +16,16 @@ import (
 // createSingleRepoRunHandler submits a single-repo run and immediately starts execution.
 // Endpoint: POST /v1/runs
 // Request: {repo_url, base_ref, target_ref, spec}
-// Response: 201 Created with {run_id, mod_id, spec_id}
+// Response: 201 Created with {run_id, mig_id, spec_id}
 //
 // v1 contract:
 // - Submits a single-repo run via POST /v1/runs.
 // - Creates a mod project as a side-effect; mod name == mod id.
-// - Creates an initial spec row and sets mods.spec_id.
+// - Creates an initial spec row and sets migs.spec_id.
 // - Creates a mod repo row for the provided repo_url.
 // - Creates a run and starts execution immediately.
 //
-// This handler replaces the previous POST /v1/mods endpoint for run submission.
+// This handler replaces the previous POST /v1/migs endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Spec can be large (JSON blobs), so we allow up to 4 MiB.
 	const maxBodySize = 4 << 20
@@ -83,31 +83,31 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		}
 
 		// v1 side-effect: Create mod project with name == id
-		modID := domaintypes.NewModID()
-		if _, err := st.CreateMod(r.Context(), store.CreateModParams{
+		modID := domaintypes.NewMigID()
+		if _, err := st.CreateMig(r.Context(), store.CreateMigParams{
 			ID:        modID,
 			Name:      modID.String(),
 			SpecID:    &createdSpec.ID,
 			CreatedBy: req.CreatedBy,
 		}); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create mod: %v", err)
-			slog.Error("create single-repo run: create mod failed", "mod_id", modID, "err", err)
+			slog.Error("create single-repo run: create mod failed", "mig_id", modID, "err", err)
 			return
 		}
 
 		// Create mod repo for the provided repo_url
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(req.RepoURL.String())
-		modRepoID := domaintypes.NewModRepoID()
-		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
+		modRepoID := domaintypes.NewMigRepoID()
+		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        modRepoID,
-			ModID:     modID,
+			MigID:     modID,
 			RepoUrl:   normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
-			slog.Error("create single-repo run: create mod repo failed", "mod_id", modID, "repo_url", req.RepoURL, "err", err)
+			slog.Error("create single-repo run: create mod repo failed", "mig_id", modID, "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
@@ -115,7 +115,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 		runID := domaintypes.NewRunID()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
-			ModID:     modID,
+			MigID:     modID,
 			SpecID:    createdSpec.ID,
 			CreatedBy: req.CreatedBy,
 		})
@@ -127,7 +127,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		// Create run_repo entry
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			ModID:         modID,
+			MigID:         modID,
 			RunID:         run.ID,
 			RepoID:        modRepo.ID,
 			RepoBaseRef:   modRepo.BaseRef,
@@ -147,14 +147,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 			return
 		}
 
-		// Build response with run_id, mod_id, and spec_id.
+		// Build response with run_id, mig_id, and spec_id.
 		resp := struct {
 			RunID  domaintypes.RunID  `json:"run_id"`
-			ModID  domaintypes.ModID  `json:"mod_id"`
+			MigID  domaintypes.MigID  `json:"mig_id"`
 			SpecID domaintypes.SpecID `json:"spec_id"`
 		}{
 			RunID:  run.ID,
-			ModID:  modID,
+			MigID:  modID,
 			SpecID: createdSpec.ID,
 		}
 
@@ -188,7 +188,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *events.Service) h
 
 		slog.Info("single-repo run created",
 			"run_id", run.ID,
-			"mod_id", modID.String(),
+			"mig_id", modID.String(),
 			"spec_id", createdSpec.ID,
 			"repo_id", runRepo.RepoID,
 			"repo_url", req.RepoURL,

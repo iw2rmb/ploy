@@ -27,7 +27,7 @@ import (
 // RepoSummary represents a repository with its last run metadata.
 // Used in the GET /v1/repos response to show known repositories.
 type RepoSummary struct {
-	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoID     domaintypes.MigRepoID `json:"repo_id"`
 	RepoURL    string                `json:"repo_url"`
 	LastRunAt  *time.Time            `json:"last_run_at,omitempty"`
 	LastStatus *string               `json:"last_status,omitempty"`
@@ -37,7 +37,7 @@ type RepoSummary struct {
 // Used in the GET /v1/repos/{repo_id}/runs response.
 type RepoRunSummary struct {
 	RunID      domaintypes.RunID `json:"run_id"`
-	ModID      domaintypes.ModID `json:"mod_id"`
+	MigID      domaintypes.MigID `json:"mig_id"`
 	RunStatus  string            `json:"run_status"`
 	RepoStatus string            `json:"repo_status"`
 	BaseRef    string            `json:"base_ref"`
@@ -115,14 +115,14 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 // listRunsForRepoHandler returns an HTTP handler that lists runs for a given repository.
 // GET /v1/repos/{repo_id}/runs — Returns runs associated with the repo_url.
 // Path parameters:
-//   - repo_id: repository identifier (mod_repos.id, NanoID string)
+//   - repo_id: repository identifier (mig_repos.id, NanoID string)
 //
 // Query parameters:
 //   - limit: max number of runs to return (default 50, max 100)
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -171,7 +171,7 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 		for _, run := range runs {
 			summary := RepoRunSummary{
 				RunID:      run.RunID,
-				ModID:      run.ModID,
+				MigID:      run.MigID,
 				RunStatus:  string(run.RunStatus),
 				RepoStatus: string(run.RepoStatus),
 				BaseRef:    run.RepoBaseRef,

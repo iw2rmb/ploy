@@ -88,7 +88,7 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	resolveCmd := climods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -96,10 +96,10 @@ func handleModRunProject(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mod run command with repo selection.
-	cmd := climods.CreateModRunCommand{
+	cmd := climods.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  base,
-		ModRef:   domaintypes.ModRef(modID),
+		MigRef:   domaintypes.MigRef(modID),
 		RepoURLs: repoURLs,
 		Failed:   *failed,
 	}

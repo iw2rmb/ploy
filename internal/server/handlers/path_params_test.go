@@ -76,14 +76,14 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		}
 	})
 
-	t.Run("POST /v1/mods/{mod_id}/runs rejects empty mod_id before store calls", func(t *testing.T) {
+	t.Run("POST /v1/migs/{mig_id}/runs rejects empty mig_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
 		st := &mockStore{}
-		h := createModRunHandler(st)
+		h := createMigRunHandler(st)
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/mods//runs", nil)
-		req.SetPathValue("mod_id", "")
+		req := httptest.NewRequest(http.MethodPost, "/v1/migs//runs", nil)
+		req.SetPathValue("mig_id", "")
 		rr := httptest.NewRecorder()
 
 		h.ServeHTTP(rr, req)
@@ -92,7 +92,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 		}
 		if st.getModCalled || st.createRunCalled {
-			t.Fatalf("expected no store calls, but got GetMod=%v CreateRun=%v", st.getModCalled, st.createRunCalled)
+			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getModCalled, st.createRunCalled)
 		}
 	})
 

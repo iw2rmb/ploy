@@ -6,7 +6,7 @@
 //
 // Endpoints:
 //   - POST /v1/runs/{run_id}/pull — resolve repo for a specific run
-//   - POST /v1/mods/{mod_id}/pull — resolve repo for a mod (last succeeded/failed)
+//   - POST /v1/migs/{mig_id}/pull — resolve repo for a mod (last succeeded/failed)
 //
 // Implements pull resolution endpoints for mod and run repos.
 package handlers
@@ -33,7 +33,7 @@ type runPullRequest struct {
 	RepoURL string `json:"repo_url"`
 }
 
-// modPullRequest is the request body for POST /v1/mods/{mod_id}/pull.
+// modPullRequest is the request body for POST /v1/migs/{mig_id}/pull.
 // The client provides a repo_url and optional mode to select which run to resolve.
 type modPullRequest struct {
 	RepoURL string `json:"repo_url"`
@@ -46,11 +46,11 @@ type modPullRequest struct {
 // pullResponse is the response for both pull resolution endpoints.
 // It provides the identifiers needed to fetch diffs:
 //   - run_id: the run containing the execution
-//   - repo_id: the mod_repos.id for the matched repo
+//   - repo_id: the mig_repos.id for the matched repo
 //   - repo_target_ref: the target ref snapshot from run_repos
 type pullResponse struct {
 	RunID         domaintypes.RunID     `json:"run_id"`
-	RepoID        domaintypes.ModRepoID `json:"repo_id"`
+	RepoID        domaintypes.MigRepoID `json:"repo_id"`
 	RepoTargetRef string                `json:"repo_target_ref"`
 }
 
@@ -64,7 +64,7 @@ type pullResponse struct {
 // Response: 200 OK with {run_id, repo_id, repo_target_ref}
 //
 // v1 contract:
-//   - Server matches the repo by joining run_repos to mod_repos by repo_id,
+//   - Server matches the repo by joining run_repos to mig_repos by repo_id,
 //     filtering by run_id, and comparing normalized repo_url.
 //   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
@@ -160,13 +160,13 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// pullModRepoHandler resolves a repo_url to execution identifiers for a mod.
-// Endpoint: POST /v1/mods/{mod_id}/pull
+// pullMigRepoHandler resolves a repo_url to execution identifiers for a mod.
+// Endpoint: POST /v1/migs/{mig_id}/pull
 // Request: {repo_url, mode?}
 // Response: 200 OK with {run_id, repo_id, repo_target_ref}
 //
 // v1 contract:
-//   - Server performs the lookup using mod_id + repo_url → mod_repos.id.
+//   - Server performs the lookup using mig_id + repo_url → mig_repos.id.
 //   - Then selects the appropriate run_repos by created_at DESC, filtering by
 //     the requested terminal status (Success or Fail).
 //   - Mode values:
@@ -175,10 +175,10 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 //   - Uses domaintypes.NormalizeRepoURL for URL comparison.
 //   - If no repo matches: 404 error.
 //   - If no run with matching status found: 404 error.
-func pullModRepoHandler(st store.Store) http.HandlerFunc {
+func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract mod_id from path.
-		modID, err := parseParam[domaintypes.ModID](r, "mod_id")
+		// Extract mig_id from path.
+		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -218,27 +218,27 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Verify the mod exists.
-		_, err = st.GetMod(r.Context(), modID)
+		_, err = st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("pull mod repo: get mod failed", "mod_id", modID, "err", err)
+			slog.Error("pull mod repo: get mod failed", "mig_id", modID, "err", err)
 			return
 		}
 
 		// List all repos for this mod to find matching repo by normalized URL.
-		modRepos, err := st.ListModReposByMod(r.Context(), modID)
+		modRepos, err := st.ListMigReposByMig(r.Context(), modID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
-			slog.Error("pull mod repo: list mod repos failed", "mod_id", modID, "err", err)
+			slog.Error("pull mod repo: list mod repos failed", "mig_id", modID, "err", err)
 			return
 		}
 
 		// Find the repo_id matching the normalized URL.
-		var matchedRepoID domaintypes.ModRepoID
+		var matchedRepoID domaintypes.MigRepoID
 		for _, mr := range modRepos {
 			if domaintypes.NormalizeRepoURL(mr.RepoUrl) == normalizedURL {
 				matchedRepoID = mr.ID
@@ -253,8 +253,8 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Get the latest run_repos row with the specified terminal status.
 		// Select by run_repos.created_at DESC.
-		latestRunRepo, err := st.GetLatestRunRepoByModAndRepoStatus(r.Context(), store.GetLatestRunRepoByModAndRepoStatusParams{
-			ModID:  modID,
+		latestRunRepo, err := st.GetLatestRunRepoByMigAndRepoStatus(r.Context(), store.GetLatestRunRepoByMigAndRepoStatusParams{
+			MigID:  modID,
 			RepoID: matchedRepoID,
 			Status: targetStatus,
 		})
@@ -265,7 +265,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
 			slog.Error("pull mod repo: get latest run repo failed",
-				"mod_id", modID,
+				"mig_id", modID,
 				"repo_id", matchedRepoID,
 				"status", targetStatus,
 				"err", err,
@@ -287,7 +287,7 @@ func pullModRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("pull mod repo resolved",
-			"mod_id", modID.String(),
+			"mig_id", modID.String(),
 			"run_id", latestRunRepo.RunID,
 			"repo_id", latestRunRepo.RepoID.String(),
 			"mode", mode,

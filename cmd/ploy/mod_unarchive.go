@@ -36,10 +36,10 @@ func handleModUnarchive(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mod unarchive command.
-	cmd := mods.UnarchiveModCommand{
+	cmd := mods.UnarchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 
 	result, err := cmd.Run(ctx)

@@ -183,7 +183,7 @@ func (s RunStats) LastResumedAt() string {
 // Format: "passed duration=123ms" or "failed pre-gate duration=45ms" or empty if no gate data.
 //
 // Priority order:
-//  1. final_gate — The latest post-mod gate result. For runs with no mods executed,
+//  1. final_gate — The latest post-mod gate result. For runs with no migs executed,
 //     final_gate is populated from the pre-mod gate to ensure consistent summary output.
 //  2. last re-gate — The most recent healing re-gate attempt (from either pre- or post-mod phases).
 //  3. pre_gate — The initial pre-mod gate before any mod execution (fallback when no final_gate).
@@ -196,7 +196,7 @@ func (s RunStats) GateSummary() string {
 		return ""
 	}
 
-	// Check final_gate first (post-mod gate or pre-mod gate fallback for runs with no mods).
+	// Check final_gate first (post-mod gate or pre-mod gate fallback for runs with no migs).
 	if acc.Gate.FinalGate != nil {
 		return formatGatePhaseTyped(acc.Gate.FinalGate, "final-gate")
 	}

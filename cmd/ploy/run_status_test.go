@@ -16,7 +16,7 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 	t.Helper()
 
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +25,7 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 			resp := struct {
 				ID        string    `json:"id"`
 				Status    string    `json:"status"`
-				ModID     string    `json:"mod_id"`
+				MigID     string    `json:"mig_id"`
 				SpecID    string    `json:"spec_id"`
 				CreatedAt time.Time `json:"created_at"`
 				Counts    *struct {
@@ -40,7 +40,7 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 			}{
 				ID:        runID.String(),
 				Status:    "running",
-				ModID:     modID.String(),
+				MigID:     modID.String(),
 				SpecID:    specID.String(),
 				CreatedAt: now,
 				Counts: &struct {

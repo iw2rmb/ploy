@@ -13,18 +13,18 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// setModSpecHandler creates a new spec row and updates mods.spec_id to point at it.
-// Endpoint: POST /v1/mods/{mod_ref}/specs
+// setMigSpecHandler creates a new spec row and updates migs.spec_id to point at it.
+// Endpoint: POST /v1/migs/{mig_ref}/specs
 // Request: {name?, spec}
 // Response: 201 Created with spec details (id, created_at)
 //
 // v1 contract:
 // - Specs are append-only: each call inserts a new specs row.
-// - mods.spec_id is updated to point at the newly created spec.
+// - migs.spec_id is updated to point at the newly created spec.
 // - This is the canonical way to "set" or "update" a mod's spec.
-func setModSpecHandler(st store.Store) http.HandlerFunc {
+func setMigSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
+		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -46,26 +46,26 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate spec structure (same validation as in createModHandler).
+		// Validate spec structure (same validation as in createMigHandler).
 		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
 			httpErr(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}
 
 		// Resolve mod by ID-or-name.
-		mod, err := resolveModByRef(r.Context(), st, modRef)
+		mod, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("set mod spec: get mod failed", "mod_ref", modRef, "err", err)
+			slog.Error("set mod spec: get mod failed", "mig_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
 
-		// Check if mod is archived — cannot update spec on archived mods.
+		// Check if mod is archived — cannot update spec on archived migs.
 		if mod.ArchivedAt.Valid {
 			httpErr(w, http.StatusConflict, "cannot set spec on archived mod")
 			return
@@ -81,14 +81,14 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-			slog.Error("set mod spec: create spec failed", "mod_id", modID, "err", err)
+			slog.Error("set mod spec: create spec failed", "mig_id", modID, "err", err)
 			return
 		}
 
-		// Update mods.spec_id to point at the new spec.
-		if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
+		// Update migs.spec_id to point at the new spec.
+		if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to update mod spec: %v", err)
-			slog.Error("set mod spec: update mod failed", "mod_id", modID, "spec_id", createdSpec.ID, "err", err)
+			slog.Error("set mod spec: update mod failed", "mig_id", modID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
 
@@ -107,6 +107,6 @@ func setModSpecHandler(st store.Store) http.HandlerFunc {
 			slog.Error("set mod spec: encode response failed", "err", err)
 		}
 
-		slog.Info("mod spec set", "mod_id", modID, "spec_id", createdSpec.ID.String())
+		slog.Info("mod spec set", "mig_id", modID, "spec_id", createdSpec.ID.String())
 	}
 }

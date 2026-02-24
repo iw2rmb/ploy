@@ -25,7 +25,7 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]map[string]any{
 			{"key": "CA_CERTS_PEM_BUNDLE", "scope": "all", "secret": true},
-			{"key": "OPENAI_API_KEY", "scope": "mods", "secret": true},
+			{"key": "OPENAI_API_KEY", "scope": "migs", "secret": true},
 			{"key": "DEBUG_MODE", "value": "true", "scope": "gate", "secret": false},
 		})
 	}))
@@ -147,7 +147,7 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "SECRET_KEY",
 			"value":  "super-secret-value-12345",
-			"scope":  "mods",
+			"scope":  "migs",
 			"secret": true,
 		})
 	}))
@@ -301,7 +301,7 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "CODEX_AUTH_JSON",
 			"value":  "{}",
-			"scope":  "mods",
+			"scope":  "migs",
 			"secret": true,
 		})
 	}))
@@ -315,7 +315,7 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 		err = handleConfigEnvSet([]string{
 			"--key", "CODEX_AUTH_JSON",
 			"--value", "{}",
-			"--scope", "mods",
+			"--scope", "migs",
 		}, buf)
 	})
 
@@ -323,7 +323,7 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
 	}
 
-	if gotBody["scope"] != "mods" {
+	if gotBody["scope"] != "migs" {
 		t.Fatalf("expected scope 'mods', got: %v", gotBody["scope"])
 	}
 }

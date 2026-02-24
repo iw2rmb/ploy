@@ -19,10 +19,10 @@ import (
 // Tests single-repo run creation with automatic mod project creation.
 // Contract:
 //   - Creates a mod project (mod name == mod id).
-//   - Creates a spec row and sets mods.spec_id.
+//   - Creates a spec row and sets migs.spec_id.
 //   - Creates a mod repo row for the provided repo_url.
 //   - Creates a run and run repo row and enqueues jobs.
-//   - Response includes run_id, mod_id, spec_id.
+//   - Response includes run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()
@@ -55,11 +55,11 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if !st.createSpecCalled {
 		t.Error("store.CreateSpec was not called")
 	}
-	if !st.createModCalled {
-		t.Error("store.CreateMod was not called")
+	if !st.createMigCalled {
+		t.Error("store.CreateMig was not called")
 	}
-	if !st.createModRepoCalled {
-		t.Error("store.CreateModRepo was not called")
+	if !st.createMigRepoCalled {
+		t.Error("store.CreateMigRepo was not called")
 	}
 	if !st.createRunCalled {
 		t.Error("store.CreateRun was not called")
@@ -72,20 +72,20 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	}
 
 	// Verify mod name == mod id (v1 contract).
-	if st.createModParams.Name != st.createModParams.ID.String() {
+	if st.createMigParams.Name != st.createMigParams.ID.String() {
 		t.Errorf("mod name (%q) != mod id (%q); v1 requires name == id for single-repo runs",
-			st.createModParams.Name, st.createModParams.ID.String())
+			st.createMigParams.Name, st.createMigParams.ID.String())
 	}
 
 	// Verify spec_id was linked to mod.
-	if st.createModParams.SpecID == nil {
+	if st.createMigParams.SpecID == nil {
 		t.Error("mod was not linked to spec (spec_id is nil)")
 	}
 
 	// Verify response shape matches v1 contract.
 	var resp struct {
 		RunID  string `json:"run_id"`
-		ModID  string `json:"mod_id"`
+		MigID  string `json:"mig_id"`
 		SpecID string `json:"spec_id"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
@@ -94,8 +94,8 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if resp.RunID == "" {
 		t.Error("response run_id is empty")
 	}
-	if resp.ModID == "" {
-		t.Error("response mod_id is empty")
+	if resp.MigID == "" {
+		t.Error("response mig_id is empty")
 	}
 	if resp.SpecID == "" {
 		t.Error("response spec_id is empty")
@@ -183,13 +183,13 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	}
 
 	// Verify mod_repo was created with normalized URL.
-	if !st.createModRepoCalled {
-		t.Fatal("store.CreateModRepo was not called")
+	if !st.createMigRepoCalled {
+		t.Fatal("store.CreateMigRepo was not called")
 	}
 	// types.NormalizeRepoURL trims trailing "/" and ".git".
 	expectedURL := "https://github.com/org/repo"
-	if st.createModRepoParams.RepoUrl != expectedURL {
-		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createModRepoParams.RepoUrl, expectedURL)
+	if st.createMigRepoParams.RepoUrl != expectedURL {
+		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createMigRepoParams.RepoUrl, expectedURL)
 	}
 }
 
@@ -416,8 +416,8 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	if st.createSpecParams.CreatedBy == nil || *st.createSpecParams.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateSpec")
 	}
-	if st.createModParams.CreatedBy == nil || *st.createModParams.CreatedBy != "test-user@example.com" {
-		t.Error("created_by not propagated to CreateMod")
+	if st.createMigParams.CreatedBy == nil || *st.createMigParams.CreatedBy != "test-user@example.com" {
+		t.Error("created_by not propagated to CreateMig")
 	}
 	if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
 		t.Error("created_by not propagated to CreateRun")
@@ -499,10 +499,10 @@ func TestRunsCreateSingleRepo_CreateSpecError(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_CreateModError verifies POST /v1/runs returns 500 on CreateMod failure.
-func TestRunsCreateSingleRepo_CreateModError(t *testing.T) {
+// TestRunsCreateSingleRepo_CreateMigError verifies POST /v1/runs returns 500 on CreateMig failure.
+func TestRunsCreateSingleRepo_CreateMigError(t *testing.T) {
 	st := &mockStore{
-		createModErr: errors.New("database connection failed"),
+		createMigErr: errors.New("database connection failed"),
 	}
 	handler := createSingleRepoRunHandler(st, nil)
 
@@ -530,10 +530,10 @@ func TestRunsCreateSingleRepo_CreateModError(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_CreateModRepoError verifies POST /v1/runs returns 500 on CreateModRepo failure.
-func TestRunsCreateSingleRepo_CreateModRepoError(t *testing.T) {
+// TestRunsCreateSingleRepo_CreateMigRepoError verifies POST /v1/runs returns 500 on CreateMigRepo failure.
+func TestRunsCreateSingleRepo_CreateMigRepoError(t *testing.T) {
 	st := &mockStore{
-		createModRepoErr: errors.New("database connection failed"),
+		createMigRepoErr: errors.New("database connection failed"),
 	}
 	handler := createSingleRepoRunHandler(st, nil)
 

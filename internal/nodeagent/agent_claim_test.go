@@ -33,7 +33,7 @@ func TestClaimLoop(t *testing.T) {
 			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
 				RunID:     types.NewRunID(),
-				RepoID:    types.NewModRepoID(),
+				RepoID:    types.NewMigRepoID(),
 				JobID:     types.NewJobID(),
 				RepoURL:   types.RepoURL("https://github.com/test/repo"),
 				Status:    "Started",
@@ -283,7 +283,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 			// v1 run status values are: Started, Cancelled, Finished.
 			resp := ClaimResponse{
 				RunID:     types.NewRunID(),
-				RepoID:    types.NewModRepoID(),
+				RepoID:    types.NewMigRepoID(),
 				JobID:     types.NewJobID(),
 				RepoURL:   types.RepoURL("https://github.com/test/repo"),
 				Status:    "Started",
@@ -382,7 +382,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	runID := types.NewRunID()
 	jobID := types.NewJobID()
 	nodeIDStr := "aB3xY9"
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
@@ -466,7 +466,7 @@ func TestClaimLoop_NextIDMapping(t *testing.T) {
 	jobID := types.NewJobID()
 	nextID := types.NewJobID()
 	nodeIDStr := "aB3xY9"
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	claim := ClaimResponse{
@@ -555,7 +555,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	t.Parallel()
 
 	runID := types.NewRunID()
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	commit := types.CommitSHA("deadbeef")
 	nodeID1 := types.NodeID("aB3xY9")
 	nodeID2 := types.NodeID("Z9yX3b")
