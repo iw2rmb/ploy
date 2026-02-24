@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -53,7 +54,7 @@ func (b *baseUploader) postJSON(ctx context.Context, apiPath string, payload any
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	if err := httpError(resp, expectedStatus, action); err != nil {
+	if err := httpx.CheckStatus(resp, expectedStatus, action); err != nil {
 		_ = resp.Body.Close()
 		return nil, err
 	}
@@ -109,29 +110,6 @@ func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, s
 		payload["stats"] = stats
 	}
 	return b.postJSONWithRetry(ctx, fmt.Sprintf("/v1/jobs/%s/complete", jobID), payload, "upload job status")
-}
-
-func drainAndClose(resp *http.Response) {
-	if resp == nil || resp.Body == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, resp.Body)
-	_ = resp.Body.Close()
-}
-
-func readErrorBody(resp *http.Response) string {
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "(failed to read body)"
-	}
-	return string(body)
-}
-
-func httpError(resp *http.Response, expected int, action string) error {
-	if resp.StatusCode == expected {
-		return nil
-	}
-	return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, readErrorBody(resp))
 }
 
 // BuildURL resolves a base URL and a path-only reference, preserving scheme/host.

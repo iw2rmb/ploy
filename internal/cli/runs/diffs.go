@@ -29,11 +29,8 @@ type DiffsCommand struct {
 
 // Run executes the command.
 func (c DiffsCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return errors.New("run diffs: http client required")
-	}
-	if c.BaseURL == nil {
-		return errors.New("run diffs: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("run diffs: %w", err)
 	}
 	// Use domain type's IsZero method for validation.
 	if c.RunID.IsZero() {
@@ -55,7 +52,7 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
 		return httpx.WrapError("run diffs", resp.Status, resp.Body)
 	}
@@ -110,11 +107,8 @@ type RepoDiffsCommand struct {
 
 // Run executes the command.
 func (c RepoDiffsCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return errors.New("run repo diffs: http client required")
-	}
-	if c.BaseURL == nil {
-		return errors.New("run repo diffs: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("run repo diffs: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return errors.New("run repo diffs: run id required")
@@ -139,7 +133,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
 		return httpx.WrapError("run repo diffs", resp.Status, resp.Body)
 	}
@@ -186,7 +180,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp2.Body.Close() }()
+	defer httpx.DrainAndClose(resp2)
 	if resp2.StatusCode != http.StatusOK {
 		return httpx.WrapError("run repo diffs", resp2.Status, resp2.Body)
 	}

@@ -41,11 +41,8 @@ type CreateMigRunResult struct {
 //   - --failed selects repos with last terminal state Fail
 //   - omitted selects all repos in the mig repo set
 func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error) {
-	if c.Client == nil {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: http client required")
-	}
-	if c.BaseURL == nil {
-		return CreateMigRunResult{}, fmt.Errorf("mig run: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return CreateMigRunResult{}, fmt.Errorf("mig run: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return CreateMigRunResult{}, fmt.Errorf("mig run: mig id is required")
@@ -110,7 +107,7 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 	if err != nil {
 		return CreateMigRunResult{}, fmt.Errorf("mig run: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
@@ -121,5 +118,5 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		return result, nil
 	}
 
-	return CreateMigRunResult{}, decodeHTTPError(resp, "mig run")
+	return CreateMigRunResult{}, httpx.WrapError("mig run", resp.Status, resp.Body)
 }

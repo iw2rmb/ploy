@@ -21,11 +21,8 @@ type StopCommand struct {
 func (c StopCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
 	var zero domaintypes.RunSummary
 
-	if c.Client == nil {
-		return zero, fmt.Errorf("run stop: http client required")
-	}
-	if c.BaseURL == nil {
-		return zero, fmt.Errorf("run stop: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return zero, fmt.Errorf("run stop: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return zero, fmt.Errorf("run stop: run id required")
@@ -41,7 +38,7 @@ func (c StopCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
 	if err != nil {
 		return zero, fmt.Errorf("run stop: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return zero, httpx.WrapError("run stop", resp.Status, resp.Body)

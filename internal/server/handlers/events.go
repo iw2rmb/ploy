@@ -12,7 +12,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
@@ -41,7 +41,7 @@ func parseLastEventID(header string) domaintypes.EventID {
 // Run IDs are now KSUID-backed strings (27 characters). We perform a cheap
 // length check to reject obviously invalid IDs before hitting the store; the
 // database layer enforces existence.
-func getRunLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+func getRunLogsHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseParam[domaintypes.RunID](r, "id")
 		if err != nil {
@@ -118,7 +118,7 @@ func (v *optionalJobID) UnmarshalJSON(b []byte) error {
 // getRunRepoLogsHandler returns an HTTP handler that streams run logs/events over SSE,
 // filtered to jobs belonging to a specific repo execution within the run.
 // GET /v1/runs/{run_id}/repos/{repo_id}/logs
-func getRunRepoLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+func getRunRepoLogsHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		runID, err := parseParam[domaintypes.RunID](r, "run_id")
 		if err != nil {

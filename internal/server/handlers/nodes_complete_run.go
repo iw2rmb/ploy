@@ -9,7 +9,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
@@ -160,7 +160,7 @@ func nextIDFromMeta(meta []byte) (float64, bool) {
 // maybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
 // all run_repos are terminal (Success/Fail/Cancelled), and publishes the run and
 // done SSE events.
-func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID domaintypes.RunID) error {
+func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run, runID domaintypes.RunID) error {
 	if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 		return nil
 	}

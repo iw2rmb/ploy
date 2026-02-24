@@ -1,4 +1,4 @@
-package metrics
+package server
 
 import (
 	"context"
@@ -14,13 +14,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// Options configure the metrics server.
-type Options struct {
+// MetricsOptions configure the metrics server.
+type MetricsOptions struct {
 	Listen string
 }
 
-// Server exposes Prometheus metrics.
-type Server struct {
+// MetricsServer exposes Prometheus metrics.
+type MetricsServer struct {
 	mu       sync.Mutex
 	cfg      config.MetricsConfig
 	listen   string
@@ -31,20 +31,20 @@ type Server struct {
 	parent   context.Context
 }
 
-// New constructs the metrics server.
-func New(opts Options) *Server {
+// NewMetricsServer constructs the metrics server.
+func NewMetricsServer(opts MetricsOptions) *MetricsServer {
 	listen := opts.Listen
 	if listen == "" {
 		listen = ":9100"
 	}
-	return &Server{
+	return &MetricsServer{
 		cfg:    config.MetricsConfig{Listen: listen},
 		listen: listen,
 	}
 }
 
 // Start begins serving metrics.
-func (s *Server) Start(ctx context.Context) error {
+func (s *MetricsServer) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.running {
@@ -82,7 +82,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Stop stops the metrics server.
-func (s *Server) Stop(ctx context.Context) error {
+func (s *MetricsServer) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.running {
 		s.mu.Unlock()
@@ -114,7 +114,7 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 // Reload applies new configuration.
-func (s *Server) Reload(ctx context.Context, cfg config.MetricsConfig) error {
+func (s *MetricsServer) Reload(ctx context.Context, cfg config.MetricsConfig) error {
 	s.mu.Lock()
 	s.cfg = cfg
 	s.mu.Unlock()
@@ -128,7 +128,7 @@ func (s *Server) Reload(ctx context.Context, cfg config.MetricsConfig) error {
 }
 
 // Addr returns the listener address if running.
-func (s *Server) Addr() string {
+func (s *MetricsServer) Addr() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.addr != "" {
@@ -137,8 +137,8 @@ func (s *Server) Addr() string {
 	return s.cfg.Listen
 }
 
-// Config returns the current metrics configuration.
-func (s *Server) Config() config.MetricsConfig {
+// MetricsConfig returns the current metrics configuration.
+func (s *MetricsServer) MetricsConfig() config.MetricsConfig {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.cfg

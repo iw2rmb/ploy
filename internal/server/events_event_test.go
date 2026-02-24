@@ -1,4 +1,4 @@
-package events
+package server
 
 // This file contains tests for event storage and persistence behavior.
 
@@ -89,7 +89,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStore{createEventFunc: tt.storeFunc}
-			svc, err := New(Options{
+			svc, err := NewEventsService(EventsOptions{
 				BufferSize:  4,
 				HistorySize: 8,
 				Store:       mock,
@@ -171,7 +171,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 				}, nil
 			}}
 
-			svc, err := New(Options{BufferSize: 4, HistorySize: 8, Store: mock})
+			svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8, Store: mock})
 			if err != nil {
 				t.Fatalf("failed to create service: %v", err)
 			}

@@ -56,11 +56,8 @@ type RunPullCommand struct {
 // Run executes POST /v1/runs/{run_id}/pull with the provided repo_url.
 // Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
 func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("run pull: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("run pull: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("run pull: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return nil, fmt.Errorf("run pull: run id required")
@@ -97,10 +94,10 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err != nil {
 		return nil, fmt.Errorf("run pull: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "run pull")
+		return nil, httpx.WrapError("run pull", resp.Status, resp.Body)
 	}
 
 	var result PullResolution
@@ -147,11 +144,8 @@ type ModPullCommand struct {
 // Run executes POST /v1/migs/{mod_id}/pull with the provided repo_url and mode.
 // Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
 func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("mig pull: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("mig pull: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("mig pull: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
 		return nil, fmt.Errorf("mig pull: mig id required")
@@ -196,10 +190,10 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mig pull: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "mig pull")
+		return nil, httpx.WrapError("mig pull", resp.Status, resp.Body)
 	}
 
 	var result PullResolution

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -117,7 +118,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("send claim request: %w", err)
 	}
-	defer drainAndClose(resp)
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 204 No Content (no work available).
 	if resp.StatusCode == http.StatusNoContent {

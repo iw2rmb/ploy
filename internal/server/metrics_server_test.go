@@ -1,4 +1,4 @@
-package metrics_test
+package server_test
 
 import (
 	"context"
@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/metrics"
 )
 
 func TestServerStartStop(t *testing.T) {
-	srv := metrics.New(metrics.Options{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
@@ -28,7 +28,7 @@ func TestServerStartStop(t *testing.T) {
 }
 
 func TestServerReload(t *testing.T) {
-	srv := metrics.New(metrics.Options{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
@@ -41,13 +41,13 @@ func TestServerReload(t *testing.T) {
 	if err := srv.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
-	if srv.Config().Listen == oldAddr {
+	if srv.MetricsConfig().Listen == oldAddr {
 		t.Fatalf("expected listen address updated")
 	}
 }
 
 func TestServerStopTimeout(t *testing.T) {
-	srv := metrics.New(metrics.Options{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {

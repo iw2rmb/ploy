@@ -10,10 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/config"
-	"github.com/iw2rmb/ploy/internal/server/events"
-	httpserver "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -45,14 +44,14 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	})
 
 	// Step 3: Initialize events service for SSE fanout (required by handlers).
-	eventsService, err := events.New(events.Options{
+	eventsService, err := server.NewEventsService(server.EventsOptions{
 		BufferSize:  32,
 		HistorySize: 256,
 		Logger:      nil,
 		Store:       db,
 	})
 	if err != nil {
-		t.Fatalf("events.New() failed: %v", err)
+		t.Fatalf("server.NewEventsService() failed: %v", err)
 	}
 	if err := eventsService.Start(ctx); err != nil {
 		t.Fatalf("eventsService.Start() failed: %v", err)
@@ -67,12 +66,12 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	httpCfg := config.HTTPConfig{
 		Listen: "127.0.0.1:0", // Use port 0 to let OS assign a free port.
 	}
-	httpSrv, err := httpserver.New(httpserver.Options{
+	httpSrv, err := server.NewHTTPServer(server.HTTPOptions{
 		Config:     httpCfg,
 		Authorizer: authorizer,
 	})
 	if err != nil {
-		t.Fatalf("httpserver.New() failed: %v", err)
+		t.Fatalf("server.NewHTTPServer() failed: %v", err)
 	}
 
 	// Register a simple health handler to verify the server is responding.

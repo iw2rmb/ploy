@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// Options configure the HTTP server.
-type Options struct {
+// HTTPOptions configure the HTTP server.
+type HTTPOptions struct {
 	Config     config.HTTPConfig
 	Authorizer *auth.Authorizer
 }
 
-// Server manages the main API HTTP server with bearer token authentication.
-type Server struct {
+// HTTPServer manages the main API HTTP server with bearer token authentication.
+type HTTPServer struct {
 	mu         sync.Mutex
 	cfg        config.HTTPConfig
 	authorizer *auth.Authorizer
@@ -31,13 +31,13 @@ type Server struct {
 	mux        *http.ServeMux
 }
 
-// New constructs a new HTTP server.
-func New(opts Options) (*Server, error) {
+// NewHTTPServer constructs a new HTTP server.
+func NewHTTPServer(opts HTTPOptions) (*HTTPServer, error) {
 	if opts.Authorizer == nil {
 		return nil, errors.New("httpserver: authorizer is required")
 	}
 
-	return &Server{
+	return &HTTPServer{
 		cfg:        opts.Config,
 		authorizer: opts.Authorizer,
 		mux:        http.NewServeMux(),
@@ -45,7 +45,7 @@ func New(opts Options) (*Server, error) {
 }
 
 // Start begins serving HTTP(S) requests.
-func (s *Server) Start(ctx context.Context) error {
+func (s *HTTPServer) Start(ctx context.Context) error {
 	s.mu.Lock()
 	if s.running {
 		s.mu.Unlock()
@@ -100,7 +100,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Stop gracefully stops the HTTP server.
-func (s *Server) Stop(ctx context.Context) error {
+func (s *HTTPServer) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.running {
 		s.mu.Unlock()
@@ -126,7 +126,7 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 // Addr returns the listener address if the server is running.
-func (s *Server) Addr() string {
+func (s *HTTPServer) Addr() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.listener != nil {
@@ -137,7 +137,7 @@ func (s *Server) Addr() string {
 
 // Handle registers a handler for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *Server) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
+func (s *HTTPServer) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -150,14 +150,14 @@ func (s *Server) Handle(pattern string, handler http.Handler, roles ...auth.Role
 
 // HandleFunc registers a handler function for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *Server) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+func (s *HTTPServer) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.Handle(pattern, handlerFunc, roles...)
 }
 
 // Handler returns the underlying HTTP handler (ServeMux) used by the server.
 // This is primarily intended for tests that need to exercise the registered
 // routes without starting a real listener.
-func (s *Server) Handler() http.Handler {
+func (s *HTTPServer) Handler() http.Handler {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mux
@@ -165,7 +165,7 @@ func (s *Server) Handler() http.Handler {
 
 // listen creates a plain TCP listener.
 // TLS termination is handled by the load balancer.
-func (s *Server) listen(ctx context.Context) (net.Listener, error) {
+func (s *HTTPServer) listen(ctx context.Context) (net.Listener, error) {
 	address := s.cfg.Listen
 	if address == "" {
 		address = ":8080"

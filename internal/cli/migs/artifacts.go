@@ -25,11 +25,8 @@ type ArtifactsCommand struct {
 
 // Run performs GET /v1/runs/{id}/status and prints per-stage artifacts.
 func (c ArtifactsCommand) Run(ctx context.Context) error {
-	if c.Client == nil {
-		return errors.New("migs artifacts: http client required")
-	}
-	if c.BaseURL == nil {
-		return errors.New("migs artifacts: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return fmt.Errorf("migs artifacts: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return errors.New("migs artifacts: run id required")
@@ -44,7 +41,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 	if resp.StatusCode != http.StatusOK {
 		return httpx.WrapError("migs artifacts", resp.Status, resp.Body)
 	}

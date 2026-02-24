@@ -46,11 +46,8 @@ type ListRepoJobsCommand struct {
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
 func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error) {
-	if c.Client == nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: http client required")
-	}
-	if c.BaseURL == nil {
-		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: run id required")
@@ -75,7 +72,7 @@ func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error
 	if err != nil {
 		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return ListRepoJobsResult{}, httpx.WrapError("list repo jobs", resp.Status, resp.Body)

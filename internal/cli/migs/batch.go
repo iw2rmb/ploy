@@ -37,11 +37,8 @@ type CreateBatchCommand struct {
 // Run executes POST /v1/runs to submit the initial repo for a run.
 // Returns the created batch summary on success.
 func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, error) {
-	if c.Client == nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("batch create: http client required")
-	}
-	if c.BaseURL == nil {
-		return domaintypes.RunSummary{}, fmt.Errorf("batch create: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return domaintypes.RunSummary{}, fmt.Errorf("batch create: %w", err)
 	}
 
 	repoURL := strings.TrimSpace(c.RepoURL)
@@ -93,7 +90,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 	if err != nil {
 		return domaintypes.RunSummary{}, fmt.Errorf("batch create: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response from server.
 	if resp.StatusCode == http.StatusCreated {
@@ -117,7 +114,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 	}
 
 	// Non-success: read error body and return error.
-	return domaintypes.RunSummary{}, decodeHTTPError(resp, "batch create")
+	return domaintypes.RunSummary{}, httpx.WrapError("batch create", resp.Status, resp.Body)
 }
 
 // ListBatchesCommand lists batch runs from the control plane.
@@ -130,11 +127,8 @@ type ListBatchesCommand struct {
 
 // Run executes GET /v1/runs to list batch runs with pagination.
 func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, error) {
-	if c.Client == nil {
-		return nil, fmt.Errorf("batch list: http client required")
-	}
-	if c.BaseURL == nil {
-		return nil, fmt.Errorf("batch list: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("batch list: %w", err)
 	}
 
 	// Build endpoint with query params.
@@ -157,10 +151,10 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, 
 	if err != nil {
 		return nil, fmt.Errorf("batch list: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, decodeHTTPError(resp, "batch list")
+		return nil, httpx.WrapError("batch list", resp.Status, resp.Body)
 	}
 
 	// Response structure: {"runs": [...]}
@@ -172,11 +166,4 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, 
 	}
 
 	return result.Runs, nil
-}
-
-// decodeHTTPError reads and formats an error from a non-success HTTP response.
-// It attempts to extract an error message from the response body; otherwise,
-// falls back to the HTTP status text.
-func decodeHTTPError(resp *http.Response, prefix string) error {
-	return httpx.WrapError(prefix, resp.Status, resp.Body)
 }

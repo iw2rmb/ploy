@@ -1,4 +1,4 @@
-package httpserver
+package server
 
 import (
 	"context"
@@ -13,27 +13,27 @@ import (
 
 // Server lifecycle tests cover construction, start/stop behavior, and graceful shutdown.
 
-// TestNew verifies server construction with valid and invalid options.
+// TestNewHTTPServer verifies server construction with valid and invalid options.
 // It ensures the authorizer is required and properly assigned.
-func TestNew(t *testing.T) {
+func TestNewHTTPServer(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// Create authorizer for testing (insecure mode allows requests without certs).
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: ":0",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 		if srv == nil {
-			t.Fatal("New() returned nil server")
+			t.Fatal("NewHTTPServer() returned nil server")
 		}
 		if srv.authorizer != authorizer {
 			t.Error("authorizer not set correctly")
@@ -41,40 +41,40 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("error_missing_authorizer", func(t *testing.T) {
-		// New() requires an authorizer; omitting it should fail fast.
-		opts := Options{
+		// NewHTTPServer() requires an authorizer; omitting it should fail fast.
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: ":0",
 			},
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err == nil {
-			t.Fatal("New() expected error for missing authorizer")
+			t.Fatal("NewHTTPServer() expected error for missing authorizer")
 		}
 		if srv != nil {
-			t.Error("New() should return nil server on error")
+			t.Error("NewHTTPServer() should return nil server on error")
 		}
 	})
 }
 
-// TestServer_StartStop validates server lifecycle management.
+// TestHTTPServer_StartStop validates server lifecycle management.
 // It covers normal start/stop, double-start prevention, and idempotent stop.
-func TestServer_StartStop(t *testing.T) {
+func TestHTTPServer_StartStop(t *testing.T) {
 	t.Run("plain_http", func(t *testing.T) {
 		// Verify basic HTTP server startup and shutdown without TLS.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0", // OS-assigned port for parallel tests.
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()
@@ -105,15 +105,15 @@ func TestServer_StartStop(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()
@@ -134,15 +134,15 @@ func TestServer_StartStop(t *testing.T) {
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
-		opts := Options{
+		opts := HTTPOptions{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 			},
 			Authorizer: authorizer,
 		}
-		srv, err := New(opts)
+		srv, err := NewHTTPServer(opts)
 		if err != nil {
-			t.Fatalf("New() error = %v", err)
+			t.Fatalf("NewHTTPServer() error = %v", err)
 		}
 
 		ctx := context.Background()
@@ -153,22 +153,22 @@ func TestServer_StartStop(t *testing.T) {
 	})
 }
 
-// TestServer_GracefulShutdown verifies graceful shutdown behavior.
+// TestHTTPServer_GracefulShutdown verifies graceful shutdown behavior.
 // It ensures in-flight requests complete before the server stops.
-func TestServer_GracefulShutdown(t *testing.T) {
+func TestHTTPServer_GracefulShutdown(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
 		DefaultRole:   auth.RoleControlPlane,
 	})
-	opts := Options{
+	opts := HTTPOptions{
 		Config: config.HTTPConfig{
 			Listen: "127.0.0.1:0",
 		},
 		Authorizer: authorizer,
 	}
-	srv, err := New(opts)
+	srv, err := NewHTTPServer(opts)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		t.Fatalf("NewHTTPServer() error = %v", err)
 	}
 
 	// Register a slow handler to simulate in-flight request.

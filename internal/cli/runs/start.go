@@ -28,11 +28,8 @@ type StartResult struct {
 
 // Run executes POST /v1/runs/{id}/start to start execution for pending repos.
 func (c StartCommand) Run(ctx context.Context) (StartResult, error) {
-	if c.Client == nil {
-		return StartResult{}, fmt.Errorf("run start: http client required")
-	}
-	if c.BaseURL == nil {
-		return StartResult{}, fmt.Errorf("run start: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return StartResult{}, fmt.Errorf("run start: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return StartResult{}, fmt.Errorf("run start: run id required")
@@ -48,7 +45,7 @@ func (c StartCommand) Run(ctx context.Context) (StartResult, error) {
 	if err != nil {
 		return StartResult{}, fmt.Errorf("run start: http request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return StartResult{}, httpx.WrapError("run start", resp.Status, resp.Body)

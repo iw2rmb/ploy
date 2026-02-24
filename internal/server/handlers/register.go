@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
-	"github.com/iw2rmb/ploy/internal/server/events"
-	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
-func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *events.Service, configHolder *ConfigHolder, tokenSecret string) {
+func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *server.EventsService, configHolder *ConfigHolder, tokenSecret string) {
 	// Health
 	s.HandleFunc("/health", healthHandler)
 

@@ -23,11 +23,8 @@ type GetRunReportCommand struct {
 
 // Run assembles run summary, mig identity, repo rows, job rows, and links.
 func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
-	if c.Client == nil {
-		return RunReport{}, fmt.Errorf("run report: http client required")
-	}
-	if c.BaseURL == nil {
-		return RunReport{}, fmt.Errorf("run report: base url required")
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return RunReport{}, fmt.Errorf("run report: %w", err)
 	}
 	if c.RunID.IsZero() {
 		return RunReport{}, fmt.Errorf("run report: run id required")
@@ -162,7 +159,7 @@ func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	if err != nil {
 		return nil, fmt.Errorf("run report: fetch run repos failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpx.WrapError("run report: fetch run repos", resp.Status, resp.Body)
@@ -229,7 +226,7 @@ func listMigsPage(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	if err != nil {
 		return nil, fmt.Errorf("run report: fetch migs failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpx.WrapError("run report: fetch migs", resp.Status, resp.Body)
@@ -267,7 +264,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	if err != nil {
 		return nil, fmt.Errorf("run report: fetch diffs failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpx.WrapError("run report: fetch diffs", resp.Status, resp.Body)
