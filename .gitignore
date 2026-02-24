@@ -72,6 +72,7 @@ tests/e2e/deploy/e2e-logs/
 deploy/local/auth-secret.txt
 deploy/local/cli
 deploy/local/node/bearer-token
+local/
 
 /ploy
 /ployd
