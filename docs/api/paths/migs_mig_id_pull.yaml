@@ -1,8 +1,8 @@
 post:
   tags: [Control]
-  summary: Resolve repo execution identifiers for pulling diffs (mod)
+  summary: Resolve repo execution identifiers for pulling diffs (mig)
   description: |
-    Selects the latest run for a specific repo in a mod and returns the repo-scoped
+    Selects the latest run for a specific repo in a mig and returns the repo-scoped
     execution identifiers needed to pull diffs.
 
     Behavior:
@@ -14,13 +14,13 @@ post:
       required: true
       schema:
         type: string
-      description: Mod ID (NanoID string)
+      description: Mig ID (NanoID string)
   requestBody:
     required: true
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/ModPullRequest'
+          $ref: '../components/schemas/controlplane.yaml#/MigPullRequest'
   responses:
     '200':
       description: OK
@@ -35,7 +35,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '404':
-      description: Not found — mod/repo or matching run not found.
+      description: Not found — mig/repo or matching run not found.
       content:
         application/json:
           schema:

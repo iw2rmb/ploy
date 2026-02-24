@@ -34,7 +34,7 @@ Notes:
 - The Codex healer now uses a **workspace diff handshake**: Codex edits the workspace and exits when done. The node agent then inspects the workspace via `git status --porcelain` and only re-runs the Build Gate externally when changes are present. Codex no longer invokes Build Gate tooling directly from inside the container.
 
 See also:
-- `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
+- `docs/how-to/publish-migs.md` for end-to-end Mods image publishing via CLI.
 
 **Sample Repository**
 
@@ -164,7 +164,7 @@ build_gate_healing:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
-See `docs/schemas/mod.example.yaml` for the full spec schema.
+See `docs/schemas/mig.example.yaml` for the full spec schema.
 
 Run the failing→healing scenario with a single script:
   - `bash tests/e2e/migs/scenario-orw-fail/run.sh`

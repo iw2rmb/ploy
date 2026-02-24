@@ -99,7 +99,7 @@ Role model (bearer token claims):
   - `mods[]` — Multi-step spec steps (each with its own image/command/env/retain_container)
   - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
-  - See `docs/schemas/mod.example.yaml` for the full schema
+  - See `docs/schemas/mig.example.yaml` for the full schema
 - `--name` — Creates a **batch run** with the given name (no repository attached yet).
   Used with `mod run repo add` to attach multiple repositories under a shared spec.
   Example: `ploy mig run --spec mod.yaml --name my-batch` followed by

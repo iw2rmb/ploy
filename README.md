@@ -1,10 +1,10 @@
-# Ploy — Mods Orchestrator and Control Plane
+# Ploy — Migs Orchestrator and Control Plane
 
 [![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml) [![Coverage (native)](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml) [![Test Suite](https://github.com/iw2rmb/ploy/actions/workflows/test.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/test.yml) [![Build](https://github.com/iw2rmb/ploy/actions/workflows/build.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/build.yml)
 
-Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
+Ploy is a workstation‑first orchestration stack for code‑mig (Migs) workflows. It consists of:
 
-- `ploy` — a CLI for submitting Mods runs, following logs, and administering clusters.
+- `ploy` — a CLI for submitting migs runs, following logs, and administering clusters.
 - `ployd` — the control-plane daemon with scheduler, HTTP/SSE API, PKI, and PostgreSQL-backed storage.
 - `ployd-node` — lightweight worker nodes that execute jobs in ephemeral workspaces.
 
@@ -12,10 +12,10 @@ Ploy uses a server/node split with PostgreSQL for state and mTLS for all control
 
 **High-Level Architecture**
 - Control plane:
-  - `ployd` exposes a `/v1/mods` facade for Mods runs and a small set of cluster/control endpoints (PKI, nodes, repos).
+  - `ployd` exposes a `/v1/migs` facade for migs runs and a small set of cluster/control endpoints (PKI, nodes, repos).
   - Runs are stored in PostgreSQL along with jobs, logs, diffs, and artifact bundles.
 - Workers:
-  - `ployd-node` claims jobs from the control plane, hydrates an ephemeral workspace, runs Mods/build/tests, and streams logs/diffs/artifacts to the server.
+  - `ployd-node` claims jobs from the control plane, hydrates an ephemeral workspace, runs migs/build/tests, and streams logs/diffs/artifacts to the server.
   - Workers derive MR branches and repo metadata (e.g., `ploy/{run_name|run_id}` when `--repo-target-ref` is omitted) from the run they execute.
 - Security:
   - PKI-backed mTLS between CLI, server, and nodes; cluster CA and node/server certificates are managed by `ployd`.
@@ -28,7 +28,7 @@ For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This READ
 - Local Docker cluster: `docs/how-to/deploy-locally.md`.
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
 - Environment variables: `docs/envs/README.md`.
-- Mods lifecycle and SSE events: `docs/mods-lifecycle.md`.
+- Migs lifecycle and SSE events: `docs/migs-lifecycle.md`.
 - Contributor rules and TDD discipline: `AGENTS.md`, `docs/testing-workflow.md`.
 
 **Installation**
@@ -82,7 +82,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
   ```
 
-- Submit a Mods run and follow events:
+- Submit a mig run and follow events:
 
   ```bash
   ./dist/ploy mig run --repo-url https://github.com/example/repo.git \

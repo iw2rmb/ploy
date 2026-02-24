@@ -1,17 +1,17 @@
 patch:
   tags: [Control]
-  summary: Unarchive mod
+  summary: Unarchive mig
   description: |
-    Unarchive a mod project.
+    Unarchive a mig project.
   responses:
     '200':
       description: OK
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ModArchiveResponse'
+            $ref: '../components/schemas/controlplane.yaml#/MigArchiveResponse'
     '400':
-      description: Bad request (invalid mod id)
+      description: Bad request (invalid mig id)
       content:
         application/json:
           schema:

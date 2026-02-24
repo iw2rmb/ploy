@@ -6,7 +6,7 @@
 # - `event: retention` → RetentionHint
 # - `event: done` → Terminal sentinel
 #
-# See docs/mods-lifecycle.md § 7 for complete SSE contract.
+# See docs/migs-lifecycle.md § 7 for complete SSE contract.
 parameters:
   - in: path
     name: id
@@ -96,7 +96,7 @@ get:
     data: {"status":"done"}
     ```
 
-    See `docs/mods-lifecycle.md` § 7 for the complete SSE contract specification.
+    See `docs/migs-lifecycle.md` § 7 for the complete SSE contract specification.
   responses:
     '200':
       description: OK — SSE stream established.

@@ -1,23 +1,23 @@
 post:
   tags: [Control]
-  summary: Set mod spec
+  summary: Set mig spec
   description: |
-    Create a new specs row (append-only) and update mods.spec_id to point at it.
+    Create a new specs row (append-only) and update migs.spec_id to point at it.
 
-    Refuses updates for archived mods.
+    Refuses updates for archived migs.
   requestBody:
     required: true
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/SetModSpecRequest'
+          $ref: '../components/schemas/controlplane.yaml#/SetMigSpecRequest'
   responses:
     '201':
       description: Created
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/SetModSpecResponse'
+            $ref: '../components/schemas/controlplane.yaml#/SetMigSpecResponse'
     '400':
       description: Bad request — missing or invalid fields in the request body.
       content:
@@ -31,7 +31,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod is archived.
+      description: Conflict — mig is archived.
       content:
         application/json:
           schema:

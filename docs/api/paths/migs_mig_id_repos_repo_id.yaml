@@ -1,8 +1,8 @@
 delete:
   tags: [Control]
-  summary: Delete mod repo
+  summary: Delete mig repo
   description: |
-    Delete a repo from a mod project's managed repo set.
+    Delete a repo from a mig project's managed repo set.
 
     Refuses deletion when the repo has historical executions.
   responses:

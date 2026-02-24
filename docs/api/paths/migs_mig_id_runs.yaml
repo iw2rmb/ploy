@@ -1,12 +1,12 @@
 post:
   tags: [Control]
-  summary: Create mod run (multi-repo)
+  summary: Create mig run (multi-repo)
   description: |
-    Create a batch run from the mod's current spec over a selected set of repos
+    Create a batch run from the mig's current spec over a selected set of repos
     and start execution immediately.
 
     Repo selection modes:
-    - all: all repos in the mod repo set
+    - all: all repos in the mig repo set
     - failed: repos whose last terminal run state is Fail
     - explicit: only repos matching the provided repo URLs (normalized)
   requestBody:
@@ -35,7 +35,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod is archived.
+      description: Conflict — mig is archived.
       content:
         application/json:
           schema:

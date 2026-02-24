@@ -225,7 +225,7 @@ Implementation references:
 - Summary parsing: `internal/nodeagent/execution_healing.go` (`parseBugSummary`, `parseActionSummary`).
 - Metadata types: `internal/workflow/contracts/build_gate_metadata.go` (`BugSummary`),
   `internal/workflow/contracts/job_meta.go` (`ActionSummary`).
-- Schema example: `docs/schemas/mod.example.yaml`.
+- Schema example: `docs/schemas/mig.example.yaml`.
 
 ### Workspace and rehydration semantics
 
@@ -1268,7 +1268,7 @@ When changing Mods behaviour, prefer these anchors:
 - Run/status model:
   - Update `internal/migs/api/types.go` ( run/job types).
   - Wire server handlers in `internal/server/handlers/handlers_mods_*.go`.
-  - Keep `docs/mods-lifecycle.md` and `tests/e2e/migs/README.md` in sync.
+  - Keep `docs/migs-lifecycle.md` and `tests/e2e/migs/README.md` in sync.
 - SSE/event flow:
   - Use `internal/server/events/service.go` and `internal/stream/*` for hub/SSE.
   - Adjust CLI consumers under `internal/cli/migs` and `internal/cli/runs`.

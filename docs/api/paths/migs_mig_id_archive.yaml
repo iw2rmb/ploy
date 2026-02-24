@@ -1,15 +1,19 @@
-delete:
+patch:
   tags: [Control]
-  summary: Delete mod
+  summary: Archive mig
   description: |
-    Delete a mod project.
+    Archive a mig project. An archived mig cannot be executed.
 
-    Refuses deletion if any runs exist for the mod.
+    Refuses archiving if the mig has any queued or running jobs.
   responses:
-    '204':
-      description: No Content
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/MigArchiveResponse'
     '400':
-      description: Bad request (invalid mod id)
+      description: Bad request (invalid mig id)
       content:
         application/json:
           schema:
@@ -21,7 +25,7 @@ delete:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod has existing runs.
+      description: Conflict — mig has queued or running jobs.
       content:
         application/json:
           schema:
