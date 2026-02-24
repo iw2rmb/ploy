@@ -7,14 +7,14 @@ Documentation: `AGENTS.md`; `cmd/ploy/README.md`; `docs/migs-lifecycle.md`; `doc
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Contract and RED Gates
-- [ ] Define a single report contract used by both renderers — keeps text and JSON outputs structurally aligned.
+- [x] Define a single report contract used by both renderers — keeps text and JSON outputs structurally aligned.
   - Repository: `ploy`
   - Component: CLI reporting contract (`internal/cli/runs`), command flags (`cmd/ploy`)
   - Scope: Introduce a `RunReport` model with explicit fields for `mig_id`, `mig_name`, `spec_id`, repo rows (`repo_id`, `repo_url`, `base_ref`, `target_ref`, status, attempts, error), job/run graph entries (same rows currently shown by `--follow`), and link metadata for build logs + patches.
   - Snippets: `type RunReport struct { MigID string; MigName string; SpecID string; Repos []RepoReport; Runs []RunEntry }`
   - Tests: Add failing contract tests for both output formats derived from one fixture model — expect identical semantic data in text and JSON.
 
-- [ ] Add RED CLI behavior tests for the new status surface — prevents regressions while replacing old variants.
+- [x] Add RED CLI behavior tests for the new status surface — prevents regressions while replacing old variants.
   - Repository: `ploy`
   - Component: `cmd/ploy/*_test.go`, help golden files
   - Scope: Add failing tests for: `ploy run status <id>` default human report, `ploy run status --json <id>` JSON report, and hard failure/removal path for `ploy mig run repo status`.
