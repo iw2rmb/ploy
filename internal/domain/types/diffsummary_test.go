@@ -210,9 +210,9 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	}
 
 	// Verify mod type.
-	modType := summary.JobType()
-	if modType != "mod" {
-		t.Errorf("JobType() = %q, want %q", modType, "mod")
+	jobType := summary.JobType()
+	if jobType != "mod" {
+		t.Errorf("JobType() = %q, want %q", jobType, "mod")
 	}
 }
 
@@ -228,9 +228,9 @@ func TestDiffSummaryBuilder(t *testing.T) {
 			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
 		}
 
-		modType := summary.JobType()
-		if modType != "mod" {
-			t.Errorf("JobType() = %q, want %q", modType, "mod")
+		jobType := summary.JobType()
+		if jobType != "mod" {
+			t.Errorf("JobType() = %q, want %q", jobType, "mod")
 		}
 	})
 
@@ -283,9 +283,9 @@ func TestDiffSummaryBuilder(t *testing.T) {
 			t.Errorf("ExitCode() = (%d, %v), want (0, true)", code, found)
 		}
 
-		modType := parsed.JobType()
-		if modType != "healing" {
-			t.Errorf("JobType() = %q, want %q", modType, "healing")
+		jobType := parsed.JobType()
+		if jobType != "healing" {
+			t.Errorf("JobType() = %q, want %q", jobType, "healing")
 		}
 
 		files, found := parsed.FilesChanged()
