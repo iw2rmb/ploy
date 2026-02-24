@@ -37,7 +37,7 @@ Run:
     mod_id:
       type: string
       minLength: 1
-      description: Mod (project) ID (NanoID string). Must be non-empty.
+      description: Mig (project) ID (NanoID string). Must be non-empty.
     spec_id:
       type: string
       minLength: 1
@@ -187,7 +187,7 @@ RunSummary:
     mod_id:
       type: string
       minLength: 1
-      description: Mod (project) identifier for the run. Must be non-empty.
+      description: Mig (project) identifier for the run. Must be non-empty.
     spec_id:
       type: string
       minLength: 1
@@ -236,7 +236,7 @@ CreateRunRequest:
     spec:
       type: object
       additionalProperties: true
-      description: Mods spec JSON object.
+      description: Migs spec JSON object.
   required: [repo_url, base_ref, target_ref]
 
 CreateRunResponse:
@@ -258,7 +258,7 @@ RunSubmitRequest:
     spec:
       type: object
       additionalProperties: true
-      description: Mods spec JSON object (must be a JSON object).
+      description: Migs spec JSON object (must be a JSON object).
     created_by: { type: string, nullable: true }
   required: [repo_url, base_ref, target_ref, spec]
 
@@ -266,14 +266,14 @@ CreateSingleRepoRunResponse:
   type: object
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    mod_id: { type: string, description: "Mod ID (NanoID string)" }
+    mod_id: { type: string, description: "Mig ID (NanoID string)" }
     spec_id: { type: string, description: "Spec ID (NanoID string)" }
   required: [run_id, mod_id, spec_id]
 
 CreateMigRequest:
   type: object
   properties:
-    name: { type: string, description: "Unique mod name." }
+    name: { type: string, description: "Unique mig name." }
     spec:
       type: object
       additionalProperties: true
@@ -284,14 +284,14 @@ CreateMigRequest:
 CreateMigResponse:
   type: object
   properties:
-    id: { type: string, description: "Mod ID (NanoID string)" }
+    id: { type: string, description: "Mig ID (NanoID string)" }
     name: { type: string }
     spec_id: { type: string, nullable: true }
     created_by: { type: string, nullable: true }
     created_at: { type: string, format: date-time }
   required: [id, name, created_at]
 
-SetModSpecRequest:
+SetMigSpecRequest:
   type: object
   properties:
     name:
@@ -300,18 +300,18 @@ SetModSpecRequest:
     spec:
       type: object
       additionalProperties: true
-      description: Mods spec JSON object.
+      description: Migs spec JSON object.
     created_by: { type: string, nullable: true }
   required: [spec]
 
-SetModSpecResponse:
+SetMigSpecResponse:
   type: object
   properties:
     id: { type: string, description: "Spec ID (NanoID string)" }
     created_at: { type: string, format: date-time }
   required: [id, created_at]
 
-AddModRepoRequest:
+AddMigRepoRequest:
   type: object
   properties:
     repo_url:
@@ -321,11 +321,11 @@ AddModRepoRequest:
     target_ref: { type: string }
   required: [repo_url, base_ref, target_ref]
 
-ModRepo:
+MigRepo:
   type: object
   properties:
     id: { type: string, description: "Repo ID (NanoID string)" }
-    mod_id: { type: string, description: "Mod ID (NanoID string)" }
+    mod_id: { type: string, description: "Mig ID (NanoID string)" }
     repo_url:
       type: string
       description: "Repository URL (normalized for matching)."
@@ -334,13 +334,13 @@ ModRepo:
     created_at: { type: string, format: date-time }
   required: [id, mod_id, repo_url, base_ref, target_ref, created_at]
 
-ListModReposResponse:
+ListMigReposResponse:
   type: object
   properties:
     repos:
       type: array
       items:
-        $ref: '#/ModRepo'
+        $ref: '#/MigRepo'
   required: [repos]
 
 BulkUpsertError:
@@ -364,10 +364,10 @@ BulkUpsertMigReposResponse:
 
 RepoSelectorMode:
   type: string
-  description: Repo selection mode for creating a mod run.
+  description: Repo selection mode for creating a mig run.
   enum: [all, failed, explicit]
 
-ModRepoSelector:
+MigRepoSelector:
   type: object
   properties:
     mode:
@@ -383,7 +383,7 @@ CreateMigRunRequest:
   type: object
   properties:
     repo_selector:
-      $ref: '#/ModRepoSelector'
+      $ref: '#/MigRepoSelector'
     created_by: { type: string, nullable: true }
   required: [repo_selector]
 
@@ -396,7 +396,7 @@ CreateMigRunResponse:
 PullResolutionMode:
   type: string
   description: |
-    Selection mode for resolving a mod repo execution for pull.
+    Selection mode for resolving a mig repo execution for pull.
     - last-succeeded: newest terminal Success (default)
     - last-failed: newest terminal Fail
   enum: [last-succeeded, last-failed]
@@ -409,7 +409,7 @@ RunPullRequest:
       description: Repository URL (normalized for matching).
   required: [repo_url]
 
-ModPullRequest:
+MigPullRequest:
   type: object
   properties:
     repo_url:
@@ -433,10 +433,10 @@ PullResolutionResponse:
       description: Target ref snapshot for this repo execution (run_repos.repo_target_ref)
   required: [run_id, repo_id, repo_target_ref]
 
-ModListItem:
+MigListItem:
   type: object
   properties:
-    id: { type: string, description: "Mod ID (NanoID string)" }
+    id: { type: string, description: "Mig ID (NanoID string)" }
     name: { type: string }
     spec_id: { type: string, nullable: true }
     created_by: { type: string, nullable: true }
@@ -447,13 +447,13 @@ ModListItem:
 ListMigsResponse:
   type: object
   properties:
-    mods:
+    migs:
       type: array
       items:
-        $ref: '#/ModListItem'
-  required: [mods]
+        $ref: '#/MigListItem'
+  required: [migs]
 
-ModArchiveResponse:
+MigArchiveResponse:
   type: object
   properties:
     id: { type: string }
@@ -461,7 +461,7 @@ ModArchiveResponse:
     archived: { type: boolean }
   required: [id, name, archived]
 
-# ModsRunSummary — Canonical Mods run status schema
+# MigsRunSummary — Canonical Migs run status schema
 #
 # This is the single authoritative response type for:
 # - GET /v1/runs/{id}/status (status) → 200 response body
@@ -472,11 +472,11 @@ ModArchiveResponse:
 # - Field names are stable and match internal/migs/api/types.go exactly.
 # - All IDs use KSUID format (27 characters, lexicographically sortable).
 #
-# See docs/mods-lifecycle.md § 2.1 for the complete data model reference.
-ModsRunSummary:
+# See docs/migs-lifecycle.md § 2.1 for the complete data model reference.
+MigsRunSummary:
   type: object
   description: |
-    Canonical Mods run status schema. This is the single response type for run
+    Canonical Migs run status schema. This is the single response type for run
     status queries (GET /v1/runs/{id}/status) and SSE `event: run` payloads. No
     wrapper types are used — the JSON shape is RunSummary directly.
   properties:
@@ -586,7 +586,7 @@ StageStatus:
         current tail in the chain.
   required: [state]
 
-# Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
+# Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
 # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
 # The buildgate_jobs table and related HTTP endpoints have been removed;
 # all gate execution now uses the jobs table with job_type='pre_gate'|'re_gate'|'post_gate'.
@@ -1001,7 +1001,7 @@ RepoRunSummary:
       description: Unique run identifier (KSUID string)
     mod_id:
       type: string
-      description: Mod (project) identifier for the run
+      description: Mig (project) identifier for the run
     run_status:
       type: string
       description: Parent run status (Started, Finished, Cancelled)
@@ -1087,7 +1087,7 @@ RepoJobItem:
     display_name:
       type: string
       nullable: true
-      description: User-friendly step name from spec (for mod jobs)
+      description: User-friendly step name from spec (for mig jobs)
   required:
     - job_id
     - name

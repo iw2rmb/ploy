@@ -1,17 +1,17 @@
 get:
   tags: [Control]
-  summary: List mod repos
+  summary: List mig repos
   description: |
-    List repos in a mod project's managed repo set.
+    List repos in a mig project's managed repo set.
   responses:
     '200':
       description: OK
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ListModReposResponse'
+            $ref: '../components/schemas/controlplane.yaml#/ListMigReposResponse'
     '400':
-      description: Bad request (invalid mod id)
+      description: Bad request (invalid mig id)
       content:
         application/json:
           schema:
@@ -31,24 +31,24 @@ get:
 
 post:
   tags: [Control]
-  summary: Add mod repo
+  summary: Add mig repo
   description: |
-    Add a repo to a mod project's managed repo set.
+    Add a repo to a mig project's managed repo set.
 
-    Refuses updates for archived mods.
+    Refuses updates for archived migs.
   requestBody:
     required: true
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/AddModRepoRequest'
+          $ref: '../components/schemas/controlplane.yaml#/AddMigRepoRequest'
   responses:
     '201':
       description: Created
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ModRepo'
+            $ref: '../components/schemas/controlplane.yaml#/MigRepo'
     '400':
       description: Bad request — missing or invalid fields in the request body.
       content:
@@ -62,7 +62,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod is archived, or repo already exists for the mod.
+      description: Conflict — mig is archived, or repo already exists for the mig.
       content:
         application/json:
           schema:

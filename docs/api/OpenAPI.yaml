@@ -8,10 +8,10 @@ info:
     tokens (`Authorization: Bearer ...`) depending on client and deployment.
 
     v1 API surfaces:
-    - `/v1/migs` — mod project CRUD (create/list/delete/archive).
-    - `/v1/migs/{mod_id}/specs` — spec management for mod projects.
+    - `/v1/migs` — mig project CRUD (create/list/delete/archive).
+    - `/v1/migs/{mod_id}/specs` — spec management for mig projects.
     - `/v1/migs/{mod_id}/repos` — repo set management (add/list/delete repos).
-    - `/v1/migs/{mod_id}/runs` — create multi-repo batch runs for a mod.
+    - `/v1/migs/{mod_id}/runs` — create multi-repo batch runs for a mig.
     - `/v1/migs/{mod_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start/timing).
@@ -41,7 +41,7 @@ tags:
   - name: Config
     description: Configuration management (GitLab, runtime settings).
   - name: Control
-    description: Core control-plane surfaces (repos, mods run lifecycle, runs).
+    description: Core control-plane surfaces (repos, migs run lifecycle, runs).
   - name: Artifacts
     description: Artifact bundles, diffs, and logs stored in PostgreSQL.
 security:
@@ -76,25 +76,25 @@ paths:
   # Run lifecycle and streaming are exposed under /v1/runs/*.
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
   /v1/migs:
-    $ref: './paths/mods.yaml'
+    $ref: './paths/migs.yaml'
   /v1/migs/{mod_id}:
-    $ref: './paths/mods_mod_id.yaml'
+    $ref: './paths/migs_mig_id.yaml'
   /v1/migs/{mod_id}/archive:
-    $ref: './paths/mods_mod_id_archive.yaml'
+    $ref: './paths/migs_mig_id_archive.yaml'
   /v1/migs/{mod_id}/unarchive:
-    $ref: './paths/mods_mod_id_unarchive.yaml'
+    $ref: './paths/migs_mig_id_unarchive.yaml'
   /v1/migs/{mod_id}/specs:
-    $ref: './paths/mods_mod_id_specs.yaml'
+    $ref: './paths/migs_mig_id_specs.yaml'
   /v1/migs/{mod_id}/repos:
-    $ref: './paths/mods_mod_id_repos.yaml'
+    $ref: './paths/migs_mig_id_repos.yaml'
   /v1/migs/{mod_id}/repos/{repo_id}:
-    $ref: './paths/mods_mod_id_repos_repo_id.yaml'
+    $ref: './paths/migs_mig_id_repos_repo_id.yaml'
   /v1/migs/{mod_id}/repos/bulk:
-    $ref: './paths/mods_mod_id_repos_bulk.yaml'
+    $ref: './paths/migs_mig_id_repos_bulk.yaml'
   /v1/migs/{mod_id}/runs:
-    $ref: './paths/mods_mod_id_runs.yaml'
+    $ref: './paths/migs_mig_id_runs.yaml'
   /v1/migs/{mod_id}/pull:
-    $ref: './paths/mods_mod_id_pull.yaml'
+    $ref: './paths/migs_mig_id_pull.yaml'
   /v1/runs/{id}/logs:
     $ref: './paths/runs_id_logs.yaml'
   /v1/artifacts:
@@ -137,7 +137,7 @@ paths:
   /v1/runs/{id}:
     $ref: './paths/runs_id.yaml'
   /v1/runs/{id}/status:
-    $ref: './paths/mods_id.yaml'
+    $ref: './paths/migs_id.yaml'
   /v1/runs/{id}/start:
     $ref: './paths/runs_id_start.yaml'
   /v1/runs/{id}/cancel:
@@ -148,7 +148,7 @@ paths:
     $ref: './paths/runs_id_repos.yaml'
   /v1/runs/{id}/repos/{repo_id}/restart:
     $ref: './paths/runs_id_repos_repo_id_restart.yaml'
-  # Repo-scoped diffs listing — see docs/mods-lifecycle.md § "Pulling Diffs Locally"
+  # Repo-scoped diffs listing — see docs/migs-lifecycle.md § "Pulling Diffs Locally"
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
     $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
   # Repo-scoped logs SSE stream — filters run logs to jobs in this repo
@@ -179,7 +179,7 @@ paths:
   # Control-plane diff ingestion endpoint
   /v1/runs/{id}/diffs:
     $ref: './paths/runs_id_diffs.yaml'
-  # Build Gate HTTP service removed: gate runs as jobs in the Mods pipeline.
+  # Build Gate HTTP service removed: gate runs as jobs in the Migs pipeline.
   # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
   # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
@@ -238,8 +238,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
     RunSubmitRequest:
       $ref: './components/schemas/controlplane.yaml#/RunSubmitRequest'
-    ModsRunSummary:
-      $ref: './components/schemas/controlplane.yaml#/ModsRunSummary'
+    MigsRunSummary:
+      $ref: './components/schemas/controlplane.yaml#/MigsRunSummary'
     StageStatus:
       $ref: './components/schemas/controlplane.yaml#/StageStatus'
     NodeClaimResponse:
@@ -256,45 +256,45 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Node'
     NodeCreateLogResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeCreateLogResponse'
-    # Build Gate HTTP schemas removed: gate runs as jobs in the Mods pipeline.
+    # Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
     # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint using NodeClaimResponse.
     # Repo-centric API types
     RepoSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
     RepoRunSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
-    # Mod project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mod_id}
+    # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mod_id}
     CreateMigRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateMigRequest'
     CreateMigResponse:
       $ref: './components/schemas/controlplane.yaml#/CreateMigResponse'
-    ModListItem:
-      $ref: './components/schemas/controlplane.yaml#/ModListItem'
+    MigListItem:
+      $ref: './components/schemas/controlplane.yaml#/MigListItem'
     ListMigsResponse:
       $ref: './components/schemas/controlplane.yaml#/ListMigsResponse'
-    ModArchiveResponse:
-      $ref: './components/schemas/controlplane.yaml#/ModArchiveResponse'
+    MigArchiveResponse:
+      $ref: './components/schemas/controlplane.yaml#/MigArchiveResponse'
     # Spec management types — POST /v1/migs/{mod_id}/specs
-    SetModSpecRequest:
-      $ref: './components/schemas/controlplane.yaml#/SetModSpecRequest'
-    SetModSpecResponse:
-      $ref: './components/schemas/controlplane.yaml#/SetModSpecResponse'
-    # Mod repo types — POST/GET /v1/migs/{mod_id}/repos, DELETE /v1/migs/{mod_id}/repos/{repo_id}
-    ModRepo:
-      $ref: './components/schemas/controlplane.yaml#/ModRepo'
-    AddModRepoRequest:
-      $ref: './components/schemas/controlplane.yaml#/AddModRepoRequest'
-    ListModReposResponse:
-      $ref: './components/schemas/controlplane.yaml#/ListModReposResponse'
+    SetMigSpecRequest:
+      $ref: './components/schemas/controlplane.yaml#/SetMigSpecRequest'
+    SetMigSpecResponse:
+      $ref: './components/schemas/controlplane.yaml#/SetMigSpecResponse'
+    # Mig repo types — POST/GET /v1/migs/{mod_id}/repos, DELETE /v1/migs/{mod_id}/repos/{repo_id}
+    MigRepo:
+      $ref: './components/schemas/controlplane.yaml#/MigRepo'
+    AddMigRepoRequest:
+      $ref: './components/schemas/controlplane.yaml#/AddMigRepoRequest'
+    ListMigReposResponse:
+      $ref: './components/schemas/controlplane.yaml#/ListMigReposResponse'
     BulkUpsertMigReposResponse:
       $ref: './components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse'
     BulkUpsertError:
       $ref: './components/schemas/controlplane.yaml#/BulkUpsertError'
-    # Mod run types — POST /v1/migs/{mod_id}/runs
+    # Mig run types — POST /v1/migs/{mod_id}/runs
     RepoSelectorMode:
       $ref: './components/schemas/controlplane.yaml#/RepoSelectorMode'
-    ModRepoSelector:
-      $ref: './components/schemas/controlplane.yaml#/ModRepoSelector'
+    MigRepoSelector:
+      $ref: './components/schemas/controlplane.yaml#/MigRepoSelector'
     CreateMigRunRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateMigRunRequest'
     CreateMigRunResponse:
@@ -302,8 +302,8 @@ components:
     # Pull resolution types — POST /v1/migs/{mod_id}/pull, POST /v1/runs/{run_id}/pull
     PullResolutionMode:
       $ref: './components/schemas/controlplane.yaml#/PullResolutionMode'
-    ModPullRequest:
-      $ref: './components/schemas/controlplane.yaml#/ModPullRequest'
+    MigPullRequest:
+      $ref: './components/schemas/controlplane.yaml#/MigPullRequest'
     RunPullRequest:
       $ref: './components/schemas/controlplane.yaml#/RunPullRequest'
     PullResolutionResponse:

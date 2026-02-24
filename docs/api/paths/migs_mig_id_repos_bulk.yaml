@@ -1,15 +1,15 @@
 post:
   tags: [Control]
-  summary: Bulk upsert mod repos (CSV)
+  summary: Bulk upsert mig repos (CSV)
   description: |
-    Bulk upsert repos for a mod project from CSV.
+    Bulk upsert repos for a mig project from CSV.
 
     The request body is UTF-8 CSV with a required header row:
     `repo_url,base_ref,target_ref`.
 
     Continues on per-line errors; may partially apply.
 
-    Refuses updates for archived mods.
+    Refuses updates for archived migs.
   requestBody:
     required: true
     content:
@@ -37,7 +37,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod is archived.
+      description: Conflict — mig is archived.
       content:
         application/json:
           schema:

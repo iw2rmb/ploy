@@ -55,5 +55,5 @@ Ordering is defined by link traversal, not by numeric sorting.
 
 - `roadmap/next.md`
 - `roadmap/mig.md` (Phase 0 rename matrix and exclusions for `mod` -> `mig`)
-- `docs/mods-lifecycle.md`
+- `docs/migs-lifecycle.md`
 - `docs/api/OpenAPI.yaml`

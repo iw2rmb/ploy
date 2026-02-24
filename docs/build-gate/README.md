@@ -71,7 +71,7 @@ abstraction for gate validation. The only implementation is the Docker-based exe
 - Build tools have direct access to the workspace.
 - Gate results are captured and returned as `BuildGateStageMetadata`.
 
-See `docs/mods-lifecycle.md` section 1.1 for gate sequence diagrams and healing
+See `docs/migs-lifecycle.md` section 1.1 for gate sequence diagrams and healing
 flow details.
 
 ## Gate Configuration

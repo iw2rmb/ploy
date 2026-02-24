@@ -4,7 +4,7 @@ Scope: Rename the workflow concept from `mod`/`mods` to `mig`/`migs` across code
 
 Precondition: Execute `roadmap/next.md` first. This roadmap does not include migration of `ModType`/`ModImage` fields, because those are replaced earlier by `Type` (`JobType`) and `Image` (`JobImage`).
 
-Documentation: `AGENTS.md`; `README.md`; `docs/mods-lifecycle.md`; `docs/api/OpenAPI.yaml`; `docs/how-to/publish-mods.md`; `deploy/images/migs/README.md`; `tests/e2e/mods/README.md`; `docs/testing-workflow.md`.
+Documentation: `AGENTS.md`; `README.md`; `docs/migs-lifecycle.md`; `docs/api/OpenAPI.yaml`; `docs/how-to/publish-migs.md`; `deploy/images/migs/README.md`; `tests/e2e/migs/README.md`; `docs/testing-workflow.md`.
 
 Legend: [ ] todo, [x] done.
 
@@ -103,14 +103,14 @@ Exclusions (do not rename these in bulk scans):
   - Tests: Targeted fixture tests + full `make test`.
 
 ## Phase 5: Documentation and OpenAPI Rewrite
-- [ ] Rewrite docs to mig vocabulary and new paths only — published behavior must match implementation exactly.
+- [x] Rewrite docs to mig vocabulary and new paths only — published behavior must match implementation exactly.
   - Repository: `ploy`
   - Component: `docs/`, `README.md`, API docs
-  - Scope: Rename and rewrite docs like `docs/mods-lifecycle.md`, `docs/how-to/publish-mods.md`, `docs/schemas/mod.example.yaml`, and cross-links to new names; remove old doc filenames/content.
+  - Scope: Rename and rewrite docs like `docs/migs-lifecycle.md`, `docs/how-to/publish-migs.md`, `docs/schemas/mig.example.yaml`, and cross-links to new names; remove old doc filenames/content.
   - Snippets: `docs/api/OpenAPI.yaml` paths `/v1/migs/...`; schema examples and CLI snippets using `ploy mig ...`
   - Tests: `go test ./docs/api/...`; validate all markdown links and command snippets referenced by tests/scripts.
 
-- [ ] Keep `docs/` synchronized with each implementation slice — enforces project doc policy at commit time.
+- [x] Keep `docs/` synchronized with each implementation slice — enforces project doc policy at commit time.
   - Repository: `ploy`
   - Component: Documentation governance
   - Scope: For each commit in this migration, update corresponding docs and cross-references in the same diff; avoid trailing stale `mod` docs.

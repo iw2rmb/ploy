@@ -273,4 +273,4 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
 ## Related Documentation
 
 - [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options
-- [docs/how-to/publish-mods.md](publish-mods.md) — Publishing custom Mods images
+- [docs/how-to/publish-migs.md](publish-migs.md) — Publishing custom Mods images

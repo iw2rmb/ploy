@@ -2,7 +2,7 @@
 
 Scope: Implement job graph execution using explicit `next_id -> jobs.id` links instead of sortable/fractional `step_index`, and rename `ModType`/`ModImage` to `Type` (`JobType`) / `Image` (`JobImage`) across store, server, nodeagent, API, CLI output, tests, and docs. This lands before `mod -> mig` naming migration.
 
-Documentation: `AGENTS.md`; `docs/mods-lifecycle.md`; `docs/build-gate/README.md`; `docs/api/OpenAPI.yaml`; `docs/api/components/schemas/controlplane.yaml`; `docs/testing-workflow.md`.
+Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/build-gate/README.md`; `docs/api/OpenAPI.yaml`; `docs/api/components/schemas/controlplane.yaml`; `docs/testing-workflow.md`.
 
 Legend: [ ] todo, [x] done.
 
@@ -85,7 +85,7 @@ Legend: [ ] todo, [x] done.
   - Repository: `ploy`
   - Component: Runtime docs
   - Scope: Replace diagrams/text that describe fractional insertion with `next_id` rewiring examples, including the requested case: failed pre-build job gets `next_id` updated to healing step, and healing points to former successor.
-  - Snippets: `docs/mods-lifecycle.md`, `docs/build-gate/README.md`
+  - Snippets: `docs/migs-lifecycle.md`, `docs/build-gate/README.md`
   - Tests: Link checks and doc-tested snippets if present.
 
 ## Phase 5: GREEN and REFACTOR

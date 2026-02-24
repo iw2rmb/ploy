@@ -1,12 +1,12 @@
-# GET /v1/runs/{id}/status — Get Mods run status
+# GET /v1/runs/{id}/status — Get Migs run status
 #
 # Canonical response: RunSummary (no wrapper types).
-# See docs/api/components/schemas/controlplane.yaml#/ModsRunSummary for schema.
+# See docs/api/components/schemas/controlplane.yaml#/MigsRunSummary for schema.
 get:
   tags: [Control]
-  summary: Get Mods run status
+  summary: Get Migs run status
   description: |
-    Return the current status of a Mods run identified by its `run_id` (KSUID string).
+    Return the current status of a Migs run identified by its `run_id` (KSUID string).
 
     **Response contract**:
     - Returns `RunSummary` directly (no wrapper types).
@@ -47,7 +47,7 @@ get:
     }
     ```
 
-    See `docs/mods-lifecycle.md` § 2.1 for the complete data model reference.
+    See `docs/migs-lifecycle.md` § 2.1 for the complete data model reference.
   parameters:
     - in: path
       name: id
@@ -61,7 +61,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/ModsRunSummary'
+            $ref: '../components/schemas/controlplane.yaml#/MigsRunSummary'
     '400':
       description: Bad request — missing or empty run ID.
       content:

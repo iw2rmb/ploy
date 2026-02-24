@@ -1,8 +1,8 @@
 get:
   tags: [Control]
-  summary: List mods
+  summary: List migs
   description: |
-    List mod projects with pagination and optional filters.
+    List mig projects with pagination and optional filters.
   parameters:
     - in: query
       name: limit
@@ -12,7 +12,7 @@ get:
         format: int32
         minimum: 1
         maximum: 100
-      description: Maximum number of mods to return (default 50, max 100).
+      description: Maximum number of migs to return (default 50, max 100).
     - in: query
       name: offset
       required: false
@@ -20,25 +20,25 @@ get:
         type: integer
         format: int32
         minimum: 0
-      description: Number of mods to skip from the start of the result set.
+      description: Number of migs to skip from the start of the result set.
     - in: query
       name: name_substring
       required: false
       schema:
         type: string
-      description: Substring filter on mod name (case-insensitive).
+      description: Substring filter on mig name (case-insensitive).
     - in: query
       name: archived
       required: false
       schema:
         type: boolean
-      description: When set, filters to archived (true) or active (false) mods.
+      description: When set, filters to archived (true) or active (false) migs.
     - in: query
       name: repo_url
       required: false
       schema:
         type: string
-      description: When set, filters to mods that include this repo URL.
+      description: When set, filters to migs that include this repo URL.
   responses:
     '200':
       description: OK
@@ -61,10 +61,10 @@ get:
 
 post:
   tags: [Control]
-  summary: Create mod
+  summary: Create mig
   description: |
-    Create a mod project. Optionally creates an initial spec row and sets
-    mods.spec_id.
+    Create a mig project. Optionally creates an initial spec row and sets
+    migs.spec_id.
   requestBody:
     required: true
     content:
@@ -85,7 +85,7 @@ post:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
     '409':
-      description: Conflict — mod name already exists.
+      description: Conflict — mig name already exists.
       content:
         application/json:
           schema:

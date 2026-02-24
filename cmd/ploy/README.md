@@ -23,7 +23,7 @@ ploy mig run <mod-id|name> [--repo <url> ...] [--failed]                   # exe
 ploy mig run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
-  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
+  [--migs-plan-timeout <duration>] [--migs-max-parallel <n>] [--cap <duration>] [--cancel-on-cap]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>]
 ```
@@ -49,7 +49,7 @@ materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
-exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
+exit. Mods planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
 flow into stage metadata so the control plane can respect concurrency/timebox controls.
 
 When `--follow` is set, the CLI displays a summarized per-repo job graph that
@@ -187,7 +187,7 @@ ploy mig run repo remove \
 | `mod pull [<mod>]`       | Pull diffs for the current repo from a mod    |
 | `run logs <batch>`       | Stream logs/events for all repos in a batch   |
 
-See `docs/mods-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
+See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
 ### Pull Mods Changes Locally
 
@@ -370,13 +370,13 @@ ploy completion <shell> --help
   top-level fields for single-step runs (`image`, `command`, `env`, `retain_container`)
   and `mods[]` for multi-step runs. The spec supports inline environment variables (`env`),
   file-based secrets (`env_from_file`), Build Gate healing (`build_gate_healing`),
-  and GitLab MR settings. See `docs/schemas/mod.example.yaml` for the full schema and
+  and GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
   — Repository materialisation inputs consumed by `mod run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
-- `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
+- `--migs-plan-timeout` — Duration string passed to the Mods planner to timebox
   plan evaluation (`mod run`).
-- `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
+- `--migs-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
 - `--artifact-dir` — Download final artifacts to the given directory after a
   successful run (`mod run --follow`). A `manifest.json` file is created with
@@ -442,7 +442,7 @@ ploy run logs <run-id>
 ploy run logs <run-id> --format raw
 ```
 
-See `docs/mods-lifecycle.md` § 7.2 for the complete SSE payload specification.
+See `docs/migs-lifecycle.md` § 7.2 for the complete SSE payload specification.
 
 ## Global Environment Configuration
 
@@ -497,7 +497,7 @@ ploy config env unset --key OLD_VAR
 | `OPENAI_API_KEY` | OpenAI API key for LLM-integrated mods | `all` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
-`docs/mods-lifecycle.md` for how these variables flow into job containers.
+`docs/migs-lifecycle.md` for how these variables flow into job containers.
 
 ## GitLab MR Integration
 
@@ -575,7 +575,7 @@ reporting.
 build_gate_healing:
   retries: 1
   mod:
-    image: docker.io/you/mods-codex:latest
+    image: docker.io/you/migs-codex:latest
     command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
     env:
       CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
@@ -588,8 +588,8 @@ build_gate_healing:
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing mods).
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
 
-See `docs/schemas/mod.example.yaml` for a complete example and `tests/e2e/migs/README.md`
-for end-to-end usage with `mods-codex`.
+See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
+for end-to-end usage with `migs-codex`.
 
 ## Job Graph and DAG State
 
@@ -622,8 +622,8 @@ fix. If re-gate passes, the DAG continues to the next mod.
 Use `GET /v1/runs/{id}/status` to view run-level state:
 
 ```bash
-$ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/mods-abc123/status" | jq .
-Run mods-abc123: running
+$ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/migs-abc123/status" | jq .
+Run migs-abc123: running
 MR: https://gitlab.com/org/repo/-/merge_requests/1
 Gate: failed pre-gate duration=567ms
 Jobs:
