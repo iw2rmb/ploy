@@ -297,26 +297,26 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				}
 			}
 
-				if queuedCount != 1 {
-					t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
-				}
+			if queuedCount != 1 {
+				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
+			}
 
-				byName := createJobsByName(st.createJobParams)
-				if byName["pre-gate"].Status != store.JobStatusQueued {
-					t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
-				}
+			byName := createJobsByName(st.createJobParams)
+			if byName["pre-gate"].Status != store.JobStatusQueued {
+				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
+			}
 
-				// Verify all non-head jobs are Created.
-				for _, p := range st.createJobParams {
-					if p.Name == "pre-gate" {
-						continue
-					}
-					if p.Status != store.JobStatusCreated {
-						t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
-					}
+			// Verify all non-head jobs are Created.
+			for _, p := range st.createJobParams {
+				if p.Name == "pre-gate" {
+					continue
 				}
-			})
-		}
+				if p.Status != store.JobStatusCreated {
+					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
+				}
+			}
+		})
+	}
 }
 
 func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {

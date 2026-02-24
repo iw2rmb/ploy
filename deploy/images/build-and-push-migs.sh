@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Build and push Migs Docker images to Docker Hub.
-# Requires: docker buildx
+# Build and push Migs Docker images to GitHub Container Registry.
+# Requires: docker buildx plugin.
 
 PLATFORM=${PLATFORM:-linux/amd64}
 PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}        # seconds (default 15m)
 PUSH_RETRIES=${PUSH_RETRIES:-1}          # number of retries on failure
 IMAGE_PREFIX="ghcr.io/iw2rmb"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "error: docker CLI not found" >&2
+  exit 2
+fi
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "error: docker buildx not available (install docker buildx plugin)" >&2
+  exit 2
+fi
 
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
@@ -57,7 +66,7 @@ for name in "${images[@]}"; do
   # Build context rules:
   # - Default: use "deploy/images/migs/<dir>"
   # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.* and internal/ ...)
-  build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "-t" "$ref" "--push")
+  build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "--progress=plain" "-t" "$ref" "--push")
   if [[ "$name" == "mig-codex" ]]; then
     context="."
     build_args+=("-f" "deploy/images/migs/mig-codex/Dockerfile" "$context")
@@ -71,7 +80,7 @@ for name in "${images[@]}"; do
   while :; do
     attempt=$((attempt+1))
     echo "[attempt ${attempt}/${PUSH_RETRIES}] ${build_args[*]}"
-    if with_timeout "$PUSH_TIMEOUT" "${build_args[@]}" --progress=plain; then
+    if with_timeout "$PUSH_TIMEOUT" "${build_args[@]}"; then
       echo "OK: ${ref}"
       break
     fi
